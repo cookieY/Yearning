@@ -1,5 +1,4 @@
-![](http://oy0f4k5qi.bkt.clouddn.com/QQ20171018-161859.png)
-![](https://img.shields.io/badge/build-passing-brightgreen.svg)  ![](https://img.shields.io/badge/vue.js-2.4.2-brightgreen.svg) ![](https://img.shields.io/badge/iview-2.5.0-brightgreen.svg?style=flat-square) ![](https://img.shields.io/badge/python-3.5-brightgreen.svg)
+![logo](http://oy0f4k5qi.bkt.clouddn.com/QQ20171018-161859.png) ![](https://img.shields.io/badge/build-passing-brightgreen.svg)  ![](https://img.shields.io/badge/vue.js-2.4.2-brightgreen.svg) ![](https://img.shields.io/badge/iview-2.5.0-brightgreen.svg?style=flat-square) ![](https://img.shields.io/badge/python-3.5-brightgreen.svg)
 ## 简介
 
 
@@ -24,11 +23,11 @@ Closeli SQL 审计平台 基于Vue.js与Django的整套sql审核平台解决方�
 - 登陆与退出
 
 
-##安装及更新日志
+## 安装及更新日志
 - [更新日志](更新日志.md)
 - [安装](安装.md)
 
-##效果展示
+## 效果展示
 
 - 登陆
 
@@ -50,8 +49,8 @@ Closeli SQL 审计平台 基于Vue.js与Django的整套sql审核平台解决方�
 
 [安装](常见问题.md)
 
-##License
+## License
 
-- [MIT](https://opensource.org/licenses/MIT)
+- [GPL](https://www.gnu.org/licenses/quick-guide-gplv3.html)
 
 2017 © Closeli_Ops, Cookie
