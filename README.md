@@ -51,7 +51,7 @@ Closeli SQL 审计平台 基于Vue.js与Django的整套sql审核平台解决方�
 ![](https://s1.ax1x.com/2017/10/18/Yq4p9.gif)
 
 - SQL语句提交及审核
-![](https://s1.ax1x.com/2017/10/18/Yqvpd.gif)
+![](https://github.com/cookieY/Yearning/blob/master/images/sql.gif)
 
 
 
