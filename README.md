@@ -1,4 +1,12 @@
-![logo](http://oy0f4k5qi.bkt.clouddn.com/QQ20171018-161859.png) ![](https://img.shields.io/badge/build-passing-brightgreen.svg)  ![](https://img.shields.io/badge/vue.js-2.4.2-brightgreen.svg) ![](https://img.shields.io/badge/iview-2.5.0-brightgreen.svg?style=flat-square) ![](https://img.shields.io/badge/python-3.5-brightgreen.svg)
+<p align="center">
+        <img width="200" src="http://oy0f4k5qi.bkt.clouddn.com/QQ20171018-161859.png">
+</p>
+
+# Yearning SQL审核平台
+![](https://img.shields.io/badge/build-passing-brightgreen.svg)  
+![](https://img.shields.io/badge/vue.js-2.4.2-brightgreen.svg) 
+![](https://img.shields.io/badge/iview-2.5.0-brightgreen.svg?style=flat-square) 
+![](https://img.shields.io/badge/python-3.5-brightgreen.svg)
 ## 简介
 
 
