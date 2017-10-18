@@ -10,7 +10,7 @@
 ## 简介
 
 
-Closeli SQL 审计平台 基于Vue.js与Django的整套sql审核平台解决方案。
+Yearning SQL 审计平台 基于Vue.js与Django的整套sql审核平台解决方案。
 
 提供基于Inception的SQL检测及执行
 
