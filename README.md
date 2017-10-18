@@ -1,5 +1,5 @@
 <p align="center">
-        <img width="300" src="https://github.com/cookieY/Yearning/blob/master/images/IMG_1325.PNG">
+        <img  src="https://github.com/cookieY/Yearning/blob/master/images/emblemmatic-yearning-logo-224.svg">
 </p>
 
 # Yearning SQL审核平台
