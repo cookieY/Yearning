@@ -55,7 +55,7 @@ Closeli SQL 审计平台 基于Vue.js与Django的整套sql审核平台解决方�
 
 
 
-[安装](常见问题.md)
+## [常见问题](常见问题.md)
 
 ## License
 
