@@ -16,10 +16,10 @@ Yearning SQL 审计平台 基于Vue.js与Django的整套sql审核平台解决方
 
 ## 功能：
 - SQL可视化自动生成
- - INDEX 索引语句
- - ALTER 更改表结构语句
+   - INDEX 索引语句
+   - ALTER 更改表结构语句
 - 数据库字典
-  - 自动表结构生成
+   - 自动表结构生成
 - SQL审核
     - SQL语句检测
     - SQL语句执行
