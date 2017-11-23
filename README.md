@@ -45,6 +45,11 @@ Yearning SQL 审计平台 基于Vue.js与Django的整套sql审核平台解决方
 ![login -w1200](http://oy0f4k5qi.bkt.clouddn.com/logo.png)
 
 
+- Dashboard
+
+![](http://oy0f4k5qi.bkt.clouddn.com/index.png)
+
+
 - 表结构提交页面
 
 ![](http://oy0f4k5qi.bkt.clouddn.com/table.png)
