@@ -1,7 +1,9 @@
 <p align="center">
         <img width="300" src="http://oy0f4k5qi.bkt.clouddn.com/git_logo2.svg">
 </p>
+
 # Yearning SQL审核平台
+
 ![](https://img.shields.io/badge/build-passing-brightgreen.svg)  
 ![](https://img.shields.io/badge/vue.js-2.5.0-brightgreen.svg) 
 ![](https://img.shields.io/badge/iview-2.5.0-brightgreen.svg?style=flat-square) 
@@ -32,11 +34,11 @@ Yearning SQL 审计平台 基于Vue.js与Django的整套sql审核平台解决方
 - 用户权限及管理
 
 
-##安装及更新日志
+## 安装及更新日志
 - [更新日志](更新日志.md)
 - [安装](安装.md)
 
-##效果展示
+## 效果展示
 
 - Login
 
@@ -55,7 +57,7 @@ Yearning SQL 审计平台 基于Vue.js与Django的整套sql审核平台解决方
 ![](http://oy0f4k5qi.bkt.clouddn.com/order.png)
 
 
-##License
+## License
 
 - [GPL](https://www.gnu.org/licenses/quick-guide-gplv3.html)
 
