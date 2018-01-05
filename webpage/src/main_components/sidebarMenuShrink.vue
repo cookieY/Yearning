@@ -1,0 +1,78 @@
+<template>
+<div>
+  <Icon type="cube" size="40" class="MenuIcon"></Icon>
+  <template v-for="(item, index) in menuList">
+      <Dropdown v-if="item.children.length >= 1 && item.name != 'main'" placement="right-start" :key="index" @on-click="changeMenu">
+            <Button style="width: 70px;margin-left: -5px;padding:10px 0;" type="text">
+                <Icon :size="20" :color="iconColor" :type="item.icon"></Icon>
+            </Button>
+          <DropdownMenu style="width: 200px;" slot="list">
+              <template v-for="child in item.children">
+                  <DropdownItem :name="child.name" :key="child.title">
+                    <Icon :type="child.icon"></Icon>
+                    <span style="padding-left:10px;">{{ child.title }}</span>
+                  </DropdownItem>
+              </template>
+  </DropdownMenu>
+  </Dropdown>
+  <Dropdown v-else placement="right-start" :key="index" @on-click="changeMenu">
+    <Button @click="changeMenu(item.children[0].name)" style="width: 70px;margin-left: -5px;padding:10px 0;" type="text">
+          <Icon :size="20" :color="iconColor" :type="item.icon"></Icon>
+    </Button>
+    <DropdownMenu style="width: 200px;" slot="list">
+      <DropdownItem :name="item.children[0].name" :key="item.children[0].title">
+        <Icon :type="item.icon"></Icon>
+        <span style="padding-left:10px;">{{ item.children[0].title }}</span>
+      </DropdownItem>
+    </DropdownMenu>
+  </Dropdown>
+  </template>
+  <Dropdown placement="right-start" @on-click="changeMenu">
+    <Button @click="changeMenu('login')" style="width: 70px;margin-left: -5px;padding:10px 0;" type="text">
+          <Icon type="log-out" size="20" :color="iconColor"></Icon>
+    </Button>
+    <DropdownMenu slot="list">
+      <DropdownItem name="login" key="login">退出</DropdownItem>
+    </DropdownMenu>
+  </Dropdown>
+</div>
+</template>
+
+<script>
+import Cookies from 'js-cookie'
+import util from '../libs/util'
+export default {
+  name: 'sidebarMenuShrink',
+  props: {
+    menuList: {
+      type: Array
+    },
+    iconColor: {
+      type: String,
+      default: 'white'
+    }
+  },
+  data () {
+    return {
+      currentPageName: this.$route.name,
+      openedSubmenuArr: this.$store.state.openedSubmenuArr
+    };
+  },
+  methods: {
+    changeMenu (active) {
+      if (active === 'login') {
+        Cookies.remove('user');
+        Cookies.remove('password');
+        Cookies.remove('hasGreet');
+        Cookies.remove('access');
+        localStorage.clear()
+        this.$router.push({
+          name: active
+        })
+      } else {
+        util.openPage(this, active)
+      }
+    }
+  }
+};
+</script>

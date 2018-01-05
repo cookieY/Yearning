@@ -6,8 +6,8 @@
 
 ![](https://img.shields.io/badge/build-passing-brightgreen.svg)  
 ![](https://img.shields.io/badge/vue.js-2.5.0-brightgreen.svg) 
-![](https://img.shields.io/badge/iview-2.5.0-brightgreen.svg?style=flat-square) 
-![](https://img.shields.io/badge/python-3.5-brightgreen.svg)
+![](https://img.shields.io/badge/iview-2.8.0-brightgreen.svg?style=flat-square) 
+![](https://img.shields.io/badge/python-3.6-brightgreen.svg)
 ![](https://img.shields.io/badge/Django-1.11.3-brightgreen.svg)
 ## 简介
 
@@ -35,8 +35,7 @@ Yearning SQL 审计平台 基于Vue.js与Django的整套sql审核平台解决方
 
 
 ## 安装及更新日志
-- [更新日志](更新日志.md)
-- [安装](安装.md)
+- [Yearning使用及安装文档](https://cookiey.github.io/Yearning-document/)
 
 ## 效果展示
 
@@ -64,8 +63,8 @@ Yearning SQL 审计平台 基于Vue.js与Django的整套sql审核平台解决方
 
 ## License
 
-- [GPL](https://www.gnu.org/licenses/quick-guide-gplv3.html)
+- [Apache 2.0](http://www.apache.org/licenses/LICENSE-2.0)
 
-2017 © Closeli_Ops, Cookie
+2018 © Cookie
 
 

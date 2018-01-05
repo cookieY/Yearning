@@ -1,0 +1,36 @@
+.own-space-btn-box {
+  margin-bottom: 10px;
+}
+.own-space-btn-box button {
+  padding-left: 0;
+}
+.own-space-btn-box button span {
+  color: #2D8CF0;
+  transition: all 0.2s;
+}
+.own-space-btn-box button span:hover {
+  color: #0C25F1;
+  transition: all 0.2s;
+}
+.own-space-tra {
+  width: 10px;
+  height: 10px;
+  transform: rotate(45deg);
+  position: absolute;
+  top: 50%;
+  margin-top: -6px;
+  left: -3px;
+  box-shadow: 0 0 2px 3px rgba(0, 0, 0, 0.1);
+  background-color: white;
+  z-index: 100;
+}
+.own-space-input-identifycode-con {
+  position: absolute;
+  width: 200px;
+  height: 100px;
+  right: -220px;
+  top: 50%;
+  margin-top: -50px;
+  border-radius: 4px;
+  box-shadow: 0 0 2px 3px rgba(0, 0, 0, 0.1);
+}

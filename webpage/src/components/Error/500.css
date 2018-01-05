@@ -1,0 +1,69 @@
+@keyframes error500animation {
+  0% {
+    transform: rotateZ(0deg);
+  }
+  20% {
+    transform: rotateZ(-10deg);
+  }
+  40% {
+    transform: rotateZ(5deg);
+  }
+  60% {
+    transform: rotateZ(-5deg);
+  }
+  80% {
+    transform: rotateZ(10deg);
+  }
+  100% {
+    transform: rotateZ(0deg);
+  }
+}
+.error500-body-con {
+  width: 100%;
+  height: 500px;
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+}
+.error500-body-con-title {
+  text-align: center;
+  font-size: 240px;
+  font-weight: 700;
+  color: #2d8cf0;
+  height: 260px;
+  line-height: 260px;
+  margin-top: 40px;
+}
+.error500-body-con-title .error500-0-span {
+  display: inline-block;
+  position: relative;
+  width: 170px;
+  height: 170px;
+  border-radius: 50%;
+  border: 20px solid #ed3f14;
+  color: #ed3f14;
+  margin-right: 10px;
+}
+.error500-body-con-title .error500-0-span i {
+  display: inline-block;
+  font-size: 120px;
+  position: absolute;
+  bottom: -10px;
+  left: 10px;
+  transform-origin: center bottom;
+  animation: error500animation 3s ease 0s infinite alternate;
+}
+.error500-body-con-message {
+  display: block;
+  text-align: center;
+  font-size: 30px;
+  font-weight: 500;
+  letter-spacing: 4px;
+  color: #dddde2;
+}
+.error500-btn-con {
+  text-align: center;
+  padding: 20px 0;
+  margin-bottom: 40px;
+}

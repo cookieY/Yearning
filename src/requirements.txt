@@ -1,0 +1,7 @@
+Django==1.11.3
+django-cors-headers==2.1.0
+djangorestframework==3.6.3
+djangorestframework-jwt==1.11.0
+PyMySQL==0.7.11
+sqlparse==0.2.3
+python-docx==0.8.6

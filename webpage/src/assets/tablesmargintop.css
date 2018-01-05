@@ -1,0 +1,68 @@
+.tabletop{
+  margin-top: 1%
+}
+
+.model_input{
+  width: 100%;
+  margin-top: 2%;
+  font-size: 14px
+}
+
+.model_p{
+  font-size: 14px;
+  margin-top: 2%;
+}
+
+.div{
+  margin-top: 2%;
+  margin-left: 10%;
+}
+.div_center{
+  width: 50%;
+  margin-left: 10%;
+  margin-top: 2%;
+}
+
+.div_display{
+  display: none;
+}
+
+.ivu-table .demo-table-info-row td{
+  background-color: #2db7f5;
+  color: #000;
+}
+.ivu-table .demo-table-error-row td{
+  background-color: #ff9900;
+  color: #000;
+}
+
+.ivu-table .demo-table-row td{
+  background-color: #bbbec4;
+  color: #000;
+}
+.ivu-table td.demo-table-info-column{
+  background-color: #2db7f5;
+  color: #fff;
+}
+.ivu-table .demo-table-info-cell-name {
+  background-color: #2db7f5;
+  color: #fff;
+}
+.ivu-table .demo-table-info-cell-age {
+  background-color: #ff6600;
+  color: #fff;
+}
+.ivu-table .demo-table-info-cell-address {
+  background-color: #187;
+  color: #fff;
+}
+
+.model_title {
+  font-size: 13px;
+  color: #1c2438;
+}
+
+.model_context {
+  font-size: 15px;
+  color: #80848f;
+}
