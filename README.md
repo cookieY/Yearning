@@ -63,7 +63,7 @@ Yearning SQL 审计平台 基于Vue.js与Django的整套sql审核平台解决方
 
 ## License
 
-- [Apache 2.0](http://www.apache.org/licenses/LICENSE-2.0)
+- MIT
 
 2018 © Cookie
 
