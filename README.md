@@ -9,12 +9,8 @@
 ![](https://img.shields.io/badge/iview-2.8.0-brightgreen.svg?style=flat-square) 
 ![](https://img.shields.io/badge/python-3.6-brightgreen.svg)
 ![](https://img.shields.io/badge/Django-1.11.3-brightgreen.svg)
-## 简介
 
-
-Yearning SQL 审核平台 
-
-提供基于Inception的整套sql审核平台解决方案。
+基于Inception的整套sql审核平台解决方案。
 
 ## Feature 功能：
 - SQL可视化自动生成
