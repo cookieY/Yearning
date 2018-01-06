@@ -44,6 +44,19 @@ Yearning SQL 审核平台
 ## Install 安装及更新日志
 - [Yearning使用及安装文档](https://cookiey.github.io/Yearning-document/)
 
+- 体验及快速测试安装(docker)
+
+```
+docker run -it -d -p 80:80 -p 8000:8000 -e "HOST=宿主机ip" registry.cn-hangzhou.aliyuncs.com/cookie/yearning:v0.0.2 
+
+初始账号: admin  密码: Yearning_admin
+```
+注意: 
+
+由于目前镜像并没有将数据库数据存放目录挂载到宿主机所以不建议在正式环境中使用docker
+
+建议在使用前评估及测试中使用
+
 ## About 联系方式
    
    QQ群:103674679
