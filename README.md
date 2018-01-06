@@ -12,11 +12,11 @@
 ## 简介
 
 
-Yearning SQL 审计平台 基于Vue.js与Django的整套sql审核平台解决方案。
+Yearning SQL 审核平台 
 
-提供基于Inception的SQL检测及执行
+提供基于Inception的整套sql审核平台解决方案。
 
-## 功能：
+## Feature 功能：
 - SQL可视化自动生成
  - INDEX 索引语句
  - ALTER 更改表结构语句
@@ -33,11 +33,24 @@ Yearning SQL 审计平台 基于Vue.js与Django的整套sql审核平台解决方
 - 历史审核记录
 - 用户权限及管理
 
+## Environment 环境
 
-## 安装及更新日志
+- Python 3.6
+
+- Vue.js 2.5
+
+- Django 1.11.3
+
+## Install 安装及更新日志
 - [Yearning使用及安装文档](https://cookiey.github.io/Yearning-document/)
 
-## 效果展示
+## About 联系方式
+   
+   QQ群:103674679
+   
+   E-mail: im@supermancookie.com
+
+## Snapshot 效果展示
 
 - Login
 
