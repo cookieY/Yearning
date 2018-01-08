@@ -24,7 +24,6 @@
 </template>
 <script>
 import axios from 'axios'
-import expandRow from './IndexTableData.vue'
 import util from '../../../libs/util'
 export default {
   name: 'editindex',
@@ -41,20 +40,18 @@ export default {
         extra: 'NO'
       }, // 添加的index信息参数存储
       add_row: [], // 添加Index信息
-      tabcolumns: [{
-          type: 'expand',
-          width: 50,
-          render: (h, params) => {
-            return h(expandRow, {
-              props: {
-                row: params.row
-              }
-            })
-          }
-        },
+      tabcolumns: [
         {
           title: '索引名称',
           key: 'key_name'
+        },
+        {
+          title: '是否唯一索引',
+          key: 'Non_unique'
+        },
+        {
+          title: '字段名',
+          key: 'column_name'
         },
         {
           title: '操作',

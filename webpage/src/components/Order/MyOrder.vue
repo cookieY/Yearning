@@ -66,7 +66,7 @@ export default {
               value: 1
             },
             {
-              label: '驳回',
+              label: '拒绝',
               value: 0
             },
             {

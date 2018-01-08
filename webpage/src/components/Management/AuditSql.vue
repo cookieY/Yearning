@@ -12,7 +12,14 @@
       </p>
       <Row>
         <Col span="24">
-        <Table border :columns="columns6" :data="tmp" stripe></Table>
+        <Poptip
+          confirm
+          title="您确认删除这些工单信息吗?"
+          @on-ok="delrecordData"
+          >
+        <Button type="text" style="margin-left: -1%">删除记录</Button>
+        </Poptip>
+        <Table border :columns="columns6" :data="tmp" stripe ref="selection" @on-selection-change="delrecordList"></Table>
         <br>
         <Page :total="pagenumber" show-elevator @on-change="splicpage" :page-size="20" ref="page"></Page>
         </Col>
@@ -80,7 +87,13 @@ export default {
   name: 'Sqltable',
   data () {
     return {
-      columns6: [{
+      columns6: [
+        {
+          type: 'selection',
+          width: 60,
+          align: 'center'
+        },
+        {
           title: '工单编号:',
           key: 'work_id',
           sortable: true,
@@ -125,12 +138,12 @@ export default {
               value: 1
             },
             {
-              label: '驳回',
-              value: 2
+              label: '拒绝',
+              value: 0
             },
             {
               label: '审核中',
-              value: 3
+              value: 2
             }
           ],
           //            filterMultiple: false 禁止多选,
@@ -139,8 +152,8 @@ export default {
               return row.status === 1
             } else if (value === 2) {
               return row.status === 2
-            } else if (value === 3) {
-              return row.status === 3
+            } else if (value === 0) {
+              return row.status === 0
             }
           }
         },
@@ -178,7 +191,8 @@ export default {
         id: null
       },
       summit: false,
-      columnsName: [{
+      columnsName: [
+        {
           title: 'ID',
           key: 'ID',
           width: '50'
@@ -216,7 +230,8 @@ export default {
         textarea: ''
       },
       tmp: [],
-      pagenumber: 1
+      pagenumber: 1,
+      delrecord: []
     }
   },
   methods: {
@@ -309,6 +324,24 @@ export default {
         .then(res => {
           this.tmp = res.data.data
           this.pagenumber = res.data.page.alter_number
+        })
+        .catch(error => {
+          util.ajanxerrorcode(this, error)
+        })
+    },
+    delrecordList (vl) {
+      this.delrecord = vl
+    },
+    delrecordData () {
+      axios.post(`${util.url}/audit_sql`, {
+        'id': JSON.stringify(this.delrecord)
+      })
+        .then(res => {
+          this.$Notice.info({
+            title: '信息',
+            desc: res.data
+          })
+          this.mou_data()
         })
         .catch(error => {
           util.ajanxerrorcode(this, error)

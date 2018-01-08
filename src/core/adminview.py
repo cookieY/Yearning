@@ -380,7 +380,7 @@ class AuditSql_Api(baseview.SuperUserpermissions):
                                                 i['errlevel'] == 0 and \
                                                 i['sql'].find('use') == -1 and \
                                                 i['stagestatus'] != 'Audit completed':
-                                    data = testddl.AutomaticallyDDL(sql=i['sql'])
+                                    data = testddl.AutomaticallyDDL(sql=" ".join(i['sql'].split()))
                                     if data['mode'] == 'edit':
                                         SqlDictionary.objects.filter(
                                             BaseName=data['BaseName'],
@@ -412,16 +412,16 @@ class AuditSql_Api(baseview.SuperUserpermissions):
                                             Name=SQL_LIST.connection_name).delete()
 
                         '''
-                        
+
                         修改该工单编号的state状态
-                        
+
                         '''
                         SqlOrder.objects.filter(id=id).update(status=1)
 
                         '''
-                        
+
                         通知消息
-                        
+
                         '''
                         Usermessage.objects.get_or_create(
                             from_user=from_user, time=util.date(),
@@ -430,9 +430,9 @@ class AuditSql_Api(baseview.SuperUserpermissions):
                         )
 
                         '''
-                        
+
                         Dingding
-                        
+
                         '''
 
                         content = DatabaseList.objects.filter(id=c.bundle_id).first()
@@ -467,6 +467,24 @@ class AuditSql_Api(baseview.SuperUserpermissions):
                         CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
                         return Response({'status': '500'})
 
+    def post(self, request, args: str = None):
+        try:
+            dataid = json.loads(request.data['id'])
+        except KeyError as e:
+            CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
+        else:
+            try:
+                for i in dataid:
+                    if i['status'] == 1:
+                        workid = SqlOrder.objects.filter(id=i['id']).first()
+                        SqlRecord.objects.filter(workid=workid.work_id).delete()
+                        SqlOrder.objects.filter(id=i['id']).delete()
+                    else:
+                        SqlOrder.objects.filter(id=i['id']).delete()
+                return Response('工单数据删除成功!')
+            except Exception as e:
+                CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
+                return HttpResponse(status=500)
 
 
 class RecordC(baseview.SuperUserpermissions):

@@ -152,47 +152,66 @@ export default {
           width: 400,
           align: 'center',
           render: (h, params) => {
-            return h('div', [
-              h('Button', {
-                props: {
-                  type: 'primary',
-                  size: 'small'
-                },
-                style: {
-                  marginRight: '5px'
-                },
-                on: {
-                  click: () => {
-                    this.edituser(params.index)
+            if (params.row.username !== this.data5[0].username) {
+              return h('div', [
+                h('Button', {
+                  props: {
+                    type: 'primary',
+                    size: 'small'
+                  },
+                  style: {
+                    marginRight: '5px'
+                  },
+                  on: {
+                    click: () => {
+                      this.edituser(params.index)
+                    }
                   }
-                }
-              }, '更改密码'),
-              h('Button', {
-                props: {
-                  type: 'info',
-                  size: 'small'
-                },
-                style: {
-                  marginRight: '5px'
-                },
-                on: {
-                  click: () => {
-                    this.editgroup(params.index)
+                }, '更改密码'),
+                h('Button', {
+                  props: {
+                    type: 'info',
+                    size: 'small'
+                  },
+                  style: {
+                    marginRight: '5px'
+                  },
+                  on: {
+                    click: () => {
+                      this.editgroup(params.index)
+                    }
                   }
-                }
-              }, '更改所属组'),
-              h('Button', {
-                props: {
-                  type: 'warning',
-                  size: 'small'
-                },
-                on: {
-                  click: () => {
-                    this.deleteUser(params.index)
+                }, '更改所属组'),
+                h('Button', {
+                  props: {
+                    type: 'warning',
+                    size: 'small'
+                  },
+                  on: {
+                    click: () => {
+                      this.deleteUser(params.index)
+                    }
                   }
-                }
-              }, '删除')
-            ])
+                }, '删除')
+              ])
+            } else {
+              return h('div', [
+                h('Button', {
+                  props: {
+                    type: 'primary',
+                    size: 'small'
+                  },
+                  style: {
+                    marginRight: '5px'
+                  },
+                  on: {
+                    click: () => {
+                      this.edituser(params.index)
+                    }
+                  }
+                }, '更改密码')
+              ])
+            }
           }
         }
       ],

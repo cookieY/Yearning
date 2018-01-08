@@ -64,8 +64,11 @@
             <Table stripe :columns="addcolums" :data="add_row" height="385" border></Table>
             <div style="margin-top: 5%">
               <Input v-model="Add_tmp.Field" placeholder="字段名" style="width: 10%"></Input>
-              <Input v-model="Add_tmp.Type" placeholder="类型及长度" style="width: 10%"></Input>
-              <Select v-model="Add_tmp.Null" style="width: 15%" placeholder="字段可以为空" clearable>
+              <Select v-model="Add_tmp.Species" style="width: 10%" transfer placeholder="字段类型">
+                <Option v-for="i in optionData" :key="i" :value="i">{{i}}</Option>
+              </Select>
+              <Input v-model="Add_tmp.Len" placeholder="字段长度" style="width: 10%"></Input>
+              <Select v-model="Add_tmp.Null" style="width: 15%" placeholder="字段可以为空" transfer>
                       <Option value="YES">YES</Option>
                       <Option value="NO">NO</Option>
               </Select>
@@ -74,24 +77,16 @@
               <Button type="warning" @click.native="ClearColumns">清空</Button>
               <Button type="info" @click.native="AddColumns()">添加</Button>
             </div>
-            <br>
-            <br>
-            <br>
-            <br>
           </TabPane>
 
           <TabPane label="修改&删除字段" name="order2" icon="edit">
-            <Table stripe :columns="tabcolumns" :data="TableDataNew" border style="margin-left: 1%"></Table>
+            <edittable refs="table2" v-model="TableDataNew" :columns-list="tabcolumns" @index="remove"></edittable>
             <br>
             <Button type="info" @click="confirmsql()" style="margin-left: 80%">生成</Button>
           </TabPane>
 
           <TabPane label="添加&删除索引" name="order3" icon="ios-unlocked">
             <editindex :tabledata="indexinfo" :table_name="formItem.tablename" @on-indexdata="getindexconfirm"></editindex>
-            <br>
-            <br>
-            <br>
-            <br>
           </TabPane>
         </Tabs>
       </div>
@@ -140,14 +135,14 @@
 
 <script>
 import Cookies from 'js-cookie'
-import expandRow from './components/FieldsTableData.vue'
 import axios from 'axios'
 import util from '../../libs/util'
 import editindex from './components/ModifyIndex.vue'
+import edittable from './components/editTable'
 export default {
   components: {
-    expandRow,
-    editindex
+    editindex,
+    edittable
   },
   data () {
     return {
@@ -164,54 +159,39 @@ export default {
       },
       tabcolumns: [
         {
-          type: 'expand',
-          width: 50,
-          render: (h, params) => {
-            return h(expandRow, {
-              props: {
-                row: params.row
-              }
-            })
-          }
-        },
-        {
           title: '字段名',
           key: 'Field'
         },
         {
+          title: '字段类型',
+          key: 'Type',
+          editable: true
+        },
+        {
+          title: '字段是否为空',
+          key: 'Null',
+          editable: true,
+          option: true
+        },
+        {
+          title: '默认值',
+          key: 'Default',
+          editable: true
+        },
+        {
+          title: '索引类型',
+          key: 'Key'
+        },
+        {
+          title: '备注',
+          key: 'Extra'
+        },
+        {
           title: '操作',
-          key: 'action',
-          width: 150,
           align: 'center',
-          render: (h, params) => {
-            return h('div', [
-              h('Button', {
-                props: {
-                  size: 'small',
-                  type: 'success'
-                },
-                style: {
-                  marginRight: '5px'
-                },
-                on: {
-                  click: () => {
-                    this.edit_tab(params)
-                  }
-                }
-              }, '修改确认'),
-              h('Button', {
-                props: {
-                  size: 'small',
-                  type: 'warning'
-                },
-                on: {
-                  click: () => {
-                    this.remove(params.index)
-                  }
-                }
-              }, '删除')
-            ])
-          }
+          width: 190,
+          key: 'handle',
+          handle: ['edit', 'delete']
         }
       ],
       putdata: [],
@@ -220,7 +200,9 @@ export default {
         Type: '',
         Null: null,
         Default: null,
-        Extra: null
+        Extra: null,
+        Len: null,
+        Species: null
       },
       add_row: [],
       username: Cookies.get('user'),
@@ -312,8 +294,9 @@ export default {
         backup: 0
       },
       id: null,
-      tabs: 'order1'
-    };
+      tabs: 'order1',
+      optionData: ['varchar', 'int', 'char', 'tinytext', 'text', 'mediumtext', 'longtext', 'tinyint', 'smallint', 'mediumint', 'bigint']
+    }
   },
   methods: {
     Connection_Name (index) {
@@ -413,7 +396,7 @@ export default {
       })
     },
     AddColumns () {
-      if (this.Add_tmp.Field === '' || this.Add_tmp.Null === null || this.Add_tmp.Type === '') {
+      if (this.Add_tmp.Field === '' || this.Add_tmp.Null === null || this.Add_tmp.Species === '') {
         this.$Notice.warning({
           title: '字段名,是否为空，类型为必填项'
         })
@@ -421,6 +404,8 @@ export default {
         if (this.Add_tmp.Extra) {
           this.Add_tmp.Extra = this.Add_tmp.Extra.replace(/\s+/g, '')
         }
+        this.Add_tmp.Type = `${this.Add_tmp.Species}(${this.Add_tmp.Len})`
+        console.log(this.add_row.Type)
         this.add_row.push(JSON.parse(JSON.stringify(this.Add_tmp)))
         for (let c of Object.keys(this.Add_tmp)) {
           this.Add_tmp[c] = ''
@@ -433,15 +418,10 @@ export default {
       this.Add_tmp = {}
     },
     remove (index) {
-      this.$Notice.error({
-        title: `${this.TableDataNew[index].Field}-字段删除成功!`
-      })
       this.putdata.push({
-        'del': this.TableDataNew[index],
+        'del': index,
         'table_name': this.formItem.tablename
       })
-      this.TableDataNew.splice(index, 1)
-      this.TableDataOld.splice(index, 1)
     },
     canel () {
       this.$refs['formItem'].resetFields();
