@@ -326,7 +326,6 @@ export default {
                 title: '通知',
                 desc: '数据库信息添加成功!'
               })
-              this.rowdata.push(data)
             })
             .catch(error => {
               this.$Notice.error({
