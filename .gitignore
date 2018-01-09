@@ -97,3 +97,7 @@ ENV/
 
 # mypy
 .mypy_cache/
+.idea/modules.xml
+.idea/vcs.xml
+.idea/workspace.xml
+.idea/Yearning.iml
