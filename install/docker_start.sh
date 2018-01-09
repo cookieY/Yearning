@@ -10,8 +10,7 @@ if [ ! -d "/var/lib/mysql/Yearning" ]; then
   echo "from core.models import Account; Account.objects.create_user(username='admin', password='Yearning_admin', group='admin',is_staff=1)" | python3 manage.py shell
 fi
 
-cd /opt/Yearning/src
 sed -i "s/ipaddress =.*/ipaddress=$HOST/" deploy.conf
 /usr/sbin/nginx
-cd /opt/Yearning/install/inception/bin && ./Inception --defaults-file=inc.cnf &
-cd /opt/Yearning/src && python3 manage.py runserver 0.0.0.0:8000
+/opt/install/inception/bin/Inception --defaults-file=/opt/install/inception/bin/inc.cnf &
+python3 manage.py runserver 0.0.0.0:8000

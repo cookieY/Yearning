@@ -1,0 +1,464 @@
+'\" t
+.\"     Title: \fBmysql_upgrade\fR
+.\"    Author: [FIXME: author] [see http://docbook.sf.net/el/author]
+.\" Generator: DocBook XSL Stylesheets v1.77.1 <http://docbook.sf.net/>
+.\"      Date: 01/22/2013
+.\"    Manual: MySQL Database System
+.\"    Source: MySQL 5.6
+.\"  Language: English
+.\"
+.TH "\FBMYSQL_UPGRADE\FR" "1" "01/22/2013" "MySQL 5\&.6" "MySQL Database System"
+.\" -----------------------------------------------------------------
+.\" * Define some portability stuff
+.\" -----------------------------------------------------------------
+.\" ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+.\" http://bugs.debian.org/507673
+.\" http://lists.gnu.org/archive/html/groff/2009-02/msg00013.html
+.\" ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+.ie \n(.g .ds Aq \(aq
+.el       .ds Aq '
+.\" -----------------------------------------------------------------
+.\" * set default formatting
+.\" -----------------------------------------------------------------
+.\" disable hyphenation
+.nh
+.\" disable justification (adjust text to left margin only)
+.ad l
+.\" -----------------------------------------------------------------
+.\" * MAIN CONTENT STARTS HERE *
+.\" -----------------------------------------------------------------
+.\" mysql_upgrade
+.\" upgrading MySQL
+.\" MySQL: upgrading
+.SH "NAME"
+mysql_upgrade \- check and upgrade MySQL tables
+.SH "SYNOPSIS"
+.HP \w'\fBmysql_upgrade\ [\fR\fB\fIoptions\fR\fR\fB]\fR\ 'u
+\fBmysql_upgrade [\fR\fB\fIoptions\fR\fR\fB]\fR
+.SH "DESCRIPTION"
+.PP
+\fBmysql_upgrade\fR
+examines all tables in all databases for incompatibilities with the current version of MySQL Server\&.
+\fBmysql_upgrade\fR
+also upgrades the system tables so that you can take advantage of new privileges or capabilities that might have been added\&.
+.PP
+\fBmysql_upgrade\fR
+should be executed each time you upgrade MySQL\&.
+.PP
+If
+\fBmysql_upgrade\fR
+finds that a table has a possible incompatibility, it performs a table check and, if problems are found, attempts a table repair\&. If the table cannot be repaired, see
+Section\ \&2.11.4, \(lqRebuilding or Repairing Tables or Indexes\(rq
+for manual table repair strategies\&.
+.if n \{\
+.sp
+.\}
+.RS 4
+.it 1 an-trap
+.nr an-no-space-flag 1
+.nr an-break-flag 1
+.br
+.ps +1
+\fBNote\fR
+.ps -1
+.br
+.PP
+On Windows Server 2008, Vista, and newer, you must run
+\fBmysql_upgrade\fR
+with administrator privileges\&. You can do this by running a Command Prompt as Administrator and running the command\&. Failure to do so may result in the upgrade failing to execute correctly\&.
+.sp .5v
+.RE
+.if n \{\
+.sp
+.\}
+.RS 4
+.it 1 an-trap
+.nr an-no-space-flag 1
+.nr an-break-flag 1
+.br
+.ps +1
+\fBCaution\fR
+.ps -1
+.br
+.PP
+You should always back up your current MySQL installation
+\fIbefore\fR
+performing an upgrade\&. See
+Section\ \&7.2, \(lqDatabase Backup Methods\(rq\&.
+.PP
+Some upgrade incompatibilities may require special handling before you upgrade your MySQL installation and run
+\fBmysql_upgrade\fR\&. See
+Section\ \&2.11.1, \(lqUpgrading MySQL\(rq, for instructions on determining whether any such incompatibilities apply to your installation and how to handle them\&.
+.sp .5v
+.RE
+.PP
+To use
+\fBmysql_upgrade\fR, make sure that the server is running, and then invoke it like this:
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+shell> \fBmysql_upgrade [\fR\fB\fIoptions\fR\fR\fB]\fR
+.fi
+.if n \{\
+.RE
+.\}
+.PP
+After running
+\fBmysql_upgrade\fR, stop the server and restart it so that any changes made to the system tables take effect\&.
+.PP
+\fBmysql_upgrade\fR
+executes the following commands to check and repair tables and to upgrade the system tables:
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+mysqlcheck \-\-all\-databases \-\-check\-upgrade \-\-auto\-repair
+mysql < \fIfix_priv_tables\fR
+mysqlcheck \-\-all\-databases \-\-check\-upgrade \-\-fix\-db\-names \-\-fix\-table\-names
+.fi
+.if n \{\
+.RE
+.\}
+.PP
+Notes about the preceding commands:
+.sp
+.RS 4
+.ie n \{\
+\h'-04'\(bu\h'+03'\c
+.\}
+.el \{\
+.sp -1
+.IP \(bu 2.3
+.\}
+Because
+\fBmysql_upgrade\fR
+invokes
+\fBmysqlcheck\fR
+with the
+\fB\-\-all\-databases\fR
+option, it processes all tables in all databases, which might take a long time to complete\&. Each table is locked and therefore unavailable to other sessions while it is being processed\&. Check and repair operations can be time\-consuming, particularly for large tables\&.
+.RE
+.sp
+.RS 4
+.ie n \{\
+\h'-04'\(bu\h'+03'\c
+.\}
+.el \{\
+.sp -1
+.IP \(bu 2.3
+.\}
+For details about what checks the
+\fB\-\-check\-upgrade\fR
+option entails, see the description of the
+FOR UPGRADE
+option of the
+CHECK TABLE
+statement (see
+Section\ \&13.7.2.2, \(lqCHECK TABLE Syntax\(rq)\&.
+.RE
+.sp
+.RS 4
+.ie n \{\
+\h'-04'\(bu\h'+03'\c
+.\}
+.el \{\
+.sp -1
+.IP \(bu 2.3
+.\}
+\fIfix_priv_tables\fR
+represents a script generated internally by
+\fBmysql_upgrade\fR
+that contains SQL statements to upgrade the tables in the
+mysql
+database\&.
+.RE
+.PP
+All checked and repaired tables are marked with the current MySQL version number\&. This ensures that next time you run
+\fBmysql_upgrade\fR
+with the same version of the server, it can tell whether there is any need to check or repair the table again\&.
+.\" mysql_upgrade_info file: mysql_upgrade
+.\" mysql_upgrade: mysql_upgrade_info file
+.PP
+\fBmysql_upgrade\fR
+also saves the MySQL version number in a file named
+mysql_upgrade_info
+in the data directory\&. This is used to quickly check whether all tables have been checked for this release so that table\-checking can be skipped\&. To ignore this file and perform the check regardless, use the
+\fB\-\-force\fR
+option\&.
+.PP
+If you install MySQL from RPM packages on Linux, you must install the server and client RPMs\&.
+\fBmysql_upgrade\fR
+is included in the server RPM but requires the client RPM because the latter includes
+\fBmysqlcheck\fR\&. (See
+Section\ \&2.5.1, \(lqInstalling MySQL from RPM Packages on Linux\(rq\&.)
+.PP
+\fBmysql_upgrade\fR
+does not upgrade the contents of the help tables\&. For upgrade instructions, see
+Section\ \&5.1.10, \(lqServer-Side Help\(rq\&.
+.PP
+\fBmysql_upgrade\fR
+supports the following options, which can be specified on the command line or in the
+[mysql_upgrade]
+and
+[client]
+groups of an option file\&. Other options are passed to
+\fBmysqlcheck\fR\&. For example, it might be necessary to specify the
+\fB\-\-password[=\fR\fB\fIpassword\fR\fR\fB]\fR
+option\&.
+\fBmysql_upgrade\fR
+also supports the options for processing option files described at
+Section\ \&4.2.3.4, \(lqCommand-Line Options that Affect Option-File Handling\(rq\&.
+.sp
+.RS 4
+.ie n \{\
+\h'-04'\(bu\h'+03'\c
+.\}
+.el \{\
+.sp -1
+.IP \(bu 2.3
+.\}
+.\" mysql_upgrade: help option
+.\" help option: mysql_upgrade
+\fB\-\-help\fR
+.sp
+Display a short help message and exit\&.
+.RE
+.sp
+.RS 4
+.ie n \{\
+\h'-04'\(bu\h'+03'\c
+.\}
+.el \{\
+.sp -1
+.IP \(bu 2.3
+.\}
+.\" mysql_upgrade: basedir option
+.\" basedir option: mysql_upgrade
+\fB\-\-basedir=\fR\fB\fIpath\fR\fR
+.sp
+The path to the MySQL installation directory\&. This option is accepted for backward compatibility but ignored\&.
+.RE
+.sp
+.RS 4
+.ie n \{\
+\h'-04'\(bu\h'+03'\c
+.\}
+.el \{\
+.sp -1
+.IP \(bu 2.3
+.\}
+.\" mysql_upgrade: datadir option
+.\" datadir option: mysql_upgrade
+\fB\-\-datadir=\fR\fB\fIpath\fR\fR
+.sp
+The path to the data directory\&. This option is accepted for backward compatibility but ignored\&.
+.RE
+.sp
+.RS 4
+.ie n \{\
+\h'-04'\(bu\h'+03'\c
+.\}
+.el \{\
+.sp -1
+.IP \(bu 2.3
+.\}
+.\" mysql_upgrade: debug-check option
+.\" debug-check option: mysql_upgrade
+\fB\-\-debug\-check\fR
+.sp
+Print some debugging information when the program exits\&.
+.RE
+.sp
+.RS 4
+.ie n \{\
+\h'-04'\(bu\h'+03'\c
+.\}
+.el \{\
+.sp -1
+.IP \(bu 2.3
+.\}
+.\" mysql_upgrade: debug-info option
+.\" debug-info option: mysql_upgrade
+\fB\-\-debug\-info\fR,
+\fB\-T\fR
+.sp
+Print debugging information and memory and CPU usage statistics when the program exits\&.
+.RE
+.sp
+.RS 4
+.ie n \{\
+\h'-04'\(bu\h'+03'\c
+.\}
+.el \{\
+.sp -1
+.IP \(bu 2.3
+.\}
+.\" mysql_upgrade: default-auth option
+.\" default-auth option: mysql_upgrade
+\fB\-\-default\-auth=\fR\fB\fIplugin\fR\fR
+.sp
+The client\-side authentication plugin to use\&. See
+Section\ \&6.3.6, \(lqPluggable Authentication\(rq\&.
+.sp
+This option was added in MySQL 5\&.6\&.2\&.
+.RE
+.sp
+.RS 4
+.ie n \{\
+\h'-04'\(bu\h'+03'\c
+.\}
+.el \{\
+.sp -1
+.IP \(bu 2.3
+.\}
+.\" mysql_upgrade: force option
+.\" force option: mysql_upgrade
+\fB\-\-force\fR
+.sp
+Ignore the
+mysql_upgrade_info
+file and force execution of
+\fBmysqlcheck\fR
+even if
+\fBmysql_upgrade\fR
+has already been executed for the current version of MySQL\&.
+.RE
+.sp
+.RS 4
+.ie n \{\
+\h'-04'\(bu\h'+03'\c
+.\}
+.el \{\
+.sp -1
+.IP \(bu 2.3
+.\}
+.\" mysql_upgrade: plugin-dir option
+.\" plugin-dir option: mysql_upgrade
+\fB\-\-plugin\-dir=\fR\fB\fIpath\fR\fR
+.sp
+The directory in which to look for plugins\&. It may be necessary to specify this option if the
+\fB\-\-default\-auth\fR
+option is used to specify an authentication plugin but
+\fBmysql_upgrade\fR
+does not find it\&. See
+Section\ \&6.3.6, \(lqPluggable Authentication\(rq\&.
+.sp
+This option was added in MySQL 5\&.6\&.2\&.
+.RE
+.sp
+.RS 4
+.ie n \{\
+\h'-04'\(bu\h'+03'\c
+.\}
+.el \{\
+.sp -1
+.IP \(bu 2.3
+.\}
+.\" mysql_upgrade: tmpdir option
+.\" tmpdir option: mysql_upgrade
+\fB\-\-tmpdir=\fR\fB\fIpath\fR\fR,
+\fB\-t \fR\fB\fIpath\fR\fR
+.sp
+The path name of the directory to use for creating temporary files\&.
+.RE
+.sp
+.RS 4
+.ie n \{\
+\h'-04'\(bu\h'+03'\c
+.\}
+.el \{\
+.sp -1
+.IP \(bu 2.3
+.\}
+.\" mysql_upgrade: upgrade-system-tables option
+.\" upgrade-system-tables option: mysql_upgrade
+\fB\-\-upgrade\-system\-tables\fR,
+\fB\-s\fR
+.sp
+Upgrade only the system tables, do not upgrade data\&.
+.RE
+.sp
+.RS 4
+.ie n \{\
+\h'-04'\(bu\h'+03'\c
+.\}
+.el \{\
+.sp -1
+.IP \(bu 2.3
+.\}
+.\" mysql_upgrade: user option
+.\" user option: mysql_upgrade
+\fB\-\-user=\fR\fB\fIuser_name\fR\fR,
+\fB\-u \fR\fB\fIuser_name\fR\fR
+.sp
+The MySQL user name to use when connecting to the server\&. The default user name is
+root\&.
+.RE
+.sp
+.RS 4
+.ie n \{\
+\h'-04'\(bu\h'+03'\c
+.\}
+.el \{\
+.sp -1
+.IP \(bu 2.3
+.\}
+.\" mysql_upgrade: verbose option
+.\" verbose option: mysql_upgrade
+\fB\-\-verbose\fR
+.sp
+Verbose mode\&. Print more information about what the program does\&.
+.RE
+.sp
+.RS 4
+.ie n \{\
+\h'-04'\(bu\h'+03'\c
+.\}
+.el \{\
+.sp -1
+.IP \(bu 2.3
+.\}
+.\" mysql_upgrade: write-binlog option
+.\" write-binlog option: mysql_upgrade
+\fB\-\-write\-binlog\fR
+.sp
+Cause binary logging to be enabled while
+\fBmysql_upgrade\fR
+runs\&. In MySQL 5\&.6\&.6 and earlier, this was the default behavior\&. (To disable binary logging during the upgrade, it was necessary to use the inverse of this option, by starting the program with
+\fB\-\-skip\-write\-binlog\fR\&.) Beginning with MySQL 5\&.6\&.7, binary logging by
+\fBmysql_upgrade\fR
+is disabled by default (Bug #14221043), and you must invoke the program explicitly with
+\fB\-\-write\-binlog\fR
+if you want its actions to be written to the binary log\&. (Also beginning with MySQL 5\&.6\&.7, the
+\fB\-\-skip\-write\-binlog\fR
+option effectively does nothing\&.)
+.sp
+Running
+\fBmysql_upgrade\fR
+is not recommended with a MySQL Server that is running with global transaction identifiers enabled (Bug #13833710)\&. This is because enabling GTIDs means that any updates which
+\fBmysql_upgrade\fR
+might need to perform on system tables using a nontransactional storage engine such as
+MyISAM
+to fail\&. See
+Section\ \&16.1.3.3, \(lqRestrictions on Replication with GTIDs\(rq, for more information\&.
+.RE
+.SH "COPYRIGHT"
+.br
+.PP
+Copyright \(co 1997, 2013, Oracle and/or its affiliates. All rights reserved.
+.PP
+This documentation is free software; you can redistribute it and/or modify it only under the terms of the GNU General Public License as published by the Free Software Foundation; version 2 of the License.
+.PP
+This documentation is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details.
+.PP
+You should have received a copy of the GNU General Public License along with the program; if not, write to the Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA or see http://www.gnu.org/licenses/.
+.sp
+.SH "SEE ALSO"
+For more information, please refer to the MySQL Reference Manual,
+which may already be installed locally and which is also available
+online at http://dev.mysql.com/doc/.
+.SH AUTHOR
+Oracle Corporation (http://dev.mysql.com/).
