@@ -20,14 +20,14 @@ WORKDIR /opt/
 
 
 RUN git clone https://github.com/cookieY/Yearning.git && \
-    cp -rf Yearning/install/connections.py /usr/local/lib/python3.6/site-packages/pymysql/ && \
-    cp -rf Yearning/install/cursors.py /usr/local/lib/python3.6/site-packages/pymysql/ && \
-    cp -rf Yearning/install/docker_start.sh /usr/local/bin/ && \ 
-    cp -rf Yearning/webpage/dist/* /usr/share/nginx/html/
+    cd /opt/Yearning/src && pip3 install -r requirements.txt && \
+    cp -rf /opt/Yearning/install/connections.py /usr/local/lib/python3.6/site-packages/pymysql/ && \
+    cp -rf /opt/Yearning/install/cursors.py /usr/local/lib/python3.6/site-packages/pymysql/ && \
+    cp -rf /opt/Yearning/install/docker_start.sh /usr/local/bin/ && \ 
+    cp -rf /opt/Yearning/webpage/dist/* /usr/share/nginx/html/ && \
+    cd /opt/Yearning/install/ && tar xvf inception.tar && \
     chmod 755 /usr/local/bin/docker_start.sh
 
 WORKDIR /opt/Yearning/src
-
-RUN pip3 install -r requirements.txt
 
 ENTRYPOINT docker_start.sh
