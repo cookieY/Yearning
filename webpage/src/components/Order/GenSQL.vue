@@ -64,7 +64,7 @@
             <Table stripe :columns="addcolums" :data="add_row" height="385" border></Table>
             <div style="margin-top: 5%">
               <Input v-model="Add_tmp.Field" placeholder="字段名" style="width: 10%"></Input>
-              <Select v-model="Add_tmp.Species" style="width: 10%" transfer placeholder="字段类型">
+              <Select v-model="Add_tmp.Species" style="width: 15%" transfer placeholder="字段类型">
                 <Option v-for="i in optionData" :key="i" :value="i">{{i}}</Option>
               </Select>
               <Input v-model="Add_tmp.Len" placeholder="字段长度" style="width: 10%"></Input>
@@ -201,7 +201,7 @@ export default {
         Null: null,
         Default: null,
         Extra: null,
-        Len: null,
+        Len: '',
         Species: null
       },
       add_row: [],
@@ -404,8 +404,11 @@ export default {
         if (this.Add_tmp.Extra) {
           this.Add_tmp.Extra = this.Add_tmp.Extra.replace(/\s+/g, '')
         }
-        this.Add_tmp.Type = `${this.Add_tmp.Species}(${this.Add_tmp.Len})`
-        console.log(this.add_row.Type)
+        if (this.Add_tmp.Len !== '') {
+          this.Add_tmp.Type = `${this.Add_tmp.Species}(${this.Add_tmp.Len})`
+        } else {
+          this.Add_tmp.Type = `${this.Add_tmp.Species}`
+        }
         this.add_row.push(JSON.parse(JSON.stringify(this.Add_tmp)))
         for (let c of Object.keys(this.Add_tmp)) {
           this.Add_tmp[c] = ''
