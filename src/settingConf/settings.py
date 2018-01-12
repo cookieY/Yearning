@@ -76,7 +76,7 @@ DATABASES = {
         'USER': CONF_DATA.username,
         "POST": CONF_DATA.port,
         "PASSWORD": CONF_DATA.password,
-        "ADDRESS": CONF_DATA.address
+        "HOST": CONF_DATA.address
     }
 }
 
