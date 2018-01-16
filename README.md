@@ -43,7 +43,7 @@
 - 体验及快速测试安装(docker)
 
 ```
-docker run -it -d -p 80:80 -p 8000:8000 -e "HOST=宿主机ip" registry.cn-hangzhou.aliyuncs.com/cookie/yearning:v0.0.3 
+docker run -it -d -p 80:80 -p 8000:8000 -e "HOST=宿主机ip" registry.cn-hangzhou.aliyuncs.com/cookie/yearning:v0.0.4 
 
 初始账号: admin  密码: Yearning_admin
 ```
