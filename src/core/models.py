@@ -60,7 +60,7 @@ class DatabaseList(models.Model):
     password = models.CharField(max_length=50) #数据库密码
     before = models.TextField(max_length=200, null=True) #提交工单 钉钉webhook发送内容
     after = models.TextField(max_length=200, null=True)  #工单执行成功后 钉钉webhook发送内容
-    url = models.CharField(max_length=100, null=True)    #钉钉webhook url地址
+    url = models.CharField(max_length=500, null=True)    #钉钉webhook url地址
 
 
 class SqlRecord(models.Model):
