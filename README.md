@@ -47,13 +47,8 @@
 - 体验及快速测试安装(docker)
 
 ```
-<<<<<<< Updated upstream
-docker run -it -d -p 80:80 -p 8000:8000 -e "HOST=宿主机ip" registry.cn-hangzhou.aliyuncs.com/cookie/yearning:v0.0.4 
-=======
-docker run -it -d -p 80:80 -p 8000:8000 -e "HOST=宿主机ip" registry.cn-hangzhou.aliyuncs.com/cookie/yearning:v0.0.5 
 
-注意:端口不可更改
->>>>>>> Stashed changes
+docker run -it -d -p 80:80 -p 8000:8000 -e "HOST=宿主机ip" registry.cn-hangzhou.aliyuncs.com/cookie/yearning:v0.0.5 
 
 初始账号: admin  密码: Yearning_admin
 ```
