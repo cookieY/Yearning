@@ -74,7 +74,4 @@ class send_email(object):
         server.sendmail(from_addr, [self.to_addr], msg.as_string())
         server.quit()
 
-if __name__ == '__main__':
-    mess_info = {'workid': '201801231446381827', 'to_user': 'ysb6931', 'addr': '3232', 'rejected': '2'}
-    a=send_email(to_addr='834958386@qq.com')
-    a.send_mail(mail_data=mess_info,type=1)
+        
