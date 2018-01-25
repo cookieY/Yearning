@@ -59,8 +59,8 @@ class DatabaseList(models.Model):
     username = models.CharField(max_length=150) #数据库用户名
     port = models.IntegerField() #端口
     password = models.CharField(max_length=50) #数据库密码
-    before = models.TextField(max_length=200, null=True) #提交工单 钉钉webhook发送内容
-    after = models.TextField(max_length=200, null=True)  #工单执行成功后 钉钉webhook发送内容
+    before = models.TextField(null=True) #提交工单 钉钉webhook发送内容
+    after = models.TextField(null=True)  #工单执行成功后 钉钉webhook发送内容
     url = models.TextField(blank=True)    #钉钉webhook url地址
 
 
