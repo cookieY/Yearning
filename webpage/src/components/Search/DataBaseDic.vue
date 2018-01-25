@@ -162,14 +162,6 @@ export default {
           key: 'Type'
         },
         {
-          title: '是否可以为空',
-          key: 'Null'
-        },
-        {
-          title: '默认值',
-          key: 'Default'
-        },
-        {
           title: '备注',
           key: 'Extra'
         },
@@ -334,12 +326,11 @@ export default {
         .then(res => {
           this.TmpData = res.data
         })
-        .catch(error => {
+        .catch(() => {
           this.$Notice.error({
             title: '警告',
             desc: '分页获取失败!'
           })
-          console.log(error)
         })
     },
     // 获得点击表名后获得的单表数据
@@ -535,7 +526,6 @@ export default {
     axios.get(`${util.url}/sqldic/`)
       .then(res => {
         this.TableList = res.data
-        console.log(this.formItem.name)
       })
       .catch(error => {
         this.$Notice.error({

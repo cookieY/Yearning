@@ -50,8 +50,21 @@ export default {
           key: 'status',
           render: (h, params) => {
             const row = params.row
-            const color = row.status === 2 ? 'blue' : row.status === 1 ? 'green' : 'red'
-            const text = row.status === 2 ? '审核中' : row.status === 1 ? '同意' : '拒绝'
+            let color = ''
+            let text = ''
+            if (row.status === 2) {
+              color = 'blue'
+              text = '审核中'
+            } else if (row.status === 0) {
+              color = 'red'
+              text = '拒绝'
+            } else if (row.status === 1) {
+              color = 'green'
+              text = '同意'
+            } else {
+              color = 'yellow'
+              text = '进行中'
+            }
 
             return h('Tag', {
               props: {
@@ -72,6 +85,10 @@ export default {
             {
               label: '审核中',
               value: 2
+            },
+            {
+              label: '进行中',
+              value: 3
             }
           ],
           //            filterMultiple: false 禁止多选,
@@ -82,6 +99,8 @@ export default {
               return row.status === 0
             } else if (value === 2) {
               return row.status === 2
+            } else if (value === 3) {
+              return row.status === 3
             }
           }
         },

@@ -26,12 +26,19 @@ SECRET_KEY = 'u)zall!ag&mci+ja5u&-6*1e^ufyu)l4i8+^=mw$845@k!ie+3.txt'
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
+# CELERY_BROKER_URL = 'redis://127.0.0.1:6379/3'
+
+# CELERY_ACCEPT_CONTENT = ['json']
+# CELERY_RESULT_BACKEND = 'django-db'
+# CELERY_TASK_SERIALIZER = 'json'
+
 ALLOWED_HOSTS = [str(CONF_DATA.ipaddress).split(':')[0]]
 
 # Application definition
 AUTH_USER_MODEL = 'core.Account'
 
 INSTALLED_APPS = [
+    # 'django_celery_results',
     'django.contrib.auth',
     'django.contrib.contenttypes',
     'core.apps.CoreConfig',
@@ -51,7 +58,8 @@ CORS_ORIGIN_WHITELIST = (
 )
 
 CSRF_TRUSTED_ORIGINS = (
-    CONF_DATA.ipaddress
+    CONF_DATA.ipaddress,
+    '127.0.0.1:8080'
 )
 
 CORS_ALLOW_METHODS = (
@@ -74,7 +82,7 @@ DATABASES = {
         'ENGINE': 'django.db.backends.mysql',
         'NAME': CONF_DATA.db,
         'USER': CONF_DATA.username,
-        "POST": CONF_DATA.port,
+        "PORT": CONF_DATA.port,
         "PASSWORD": CONF_DATA.password,
         "HOST": CONF_DATA.address
     }

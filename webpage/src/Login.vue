@@ -22,6 +22,8 @@
     </div>
     <br>
     <Card>
+      <Tabs value="custom">
+        <TabPane label="普通登陆" name="custom">
       <Form ref="formInline" :model="formInline" :rules="ruleInline" inline>
         <Form-item prop="user" style="width: 100%">
           <Input v-model="formInline.user" placeholder="Username">
@@ -33,9 +35,29 @@
         </Form-item>
         <Form-item style="width: 100%">
           <Button type="primary" @click="authdata()" style="width: 100%" size="large">登录</Button>
-          <p style="margin-left: 20%;margin-top: 2%">如需注册账号请联系平台管理员</p>
+          <p style="margin-left: 22%;margin-top: 2%">如需注册账号请联系平台管理员</p>
+          <p style="margin-left: 5%;">2018 © Power By Cookie.Ye 使用chrome获得最佳体验</p>
         </Form-item>
       </Form>
+        </TabPane>
+        <TabPane label="LDAP登陆" name="ldap">
+          <Form ref="formInline" :model="formInline" :rules="ruleInline" inline>
+            <Form-item prop="user" style="width: 100%">
+              <Input v-model="formInline.user" placeholder="ldap_Username">
+              </Input>
+            </Form-item>
+            <Form-item prop="password" style="width: 100%">
+              <Input type="password" v-model="formInline.password" placeholder="ldap_Password" @on-keyup.enter="authdata()">
+              </Input>
+            </Form-item>
+            <Form-item style="width: 100%">
+              <Button type="primary" @click="ldap_login()" style="width: 100%" size="large">登录</Button>
+              <p style="margin-left: 22%;margin-top: 2%">如需注册账号请联系平台管理员</p>
+              <p style="margin-left: 5%;">2018 © Power By Cookie.Ye 使用chrome获得最佳体验</p>
+            </Form-item>
+          </Form>
+        </TabPane>
+      </Tabs>
     </Card>
   </div>
 </div>
@@ -84,24 +106,50 @@ export default {
           'password': this.formInline.password
         })
         .then(res => {
-          axios.defaults.headers.common['Authorization'] = 'JWT ' + res.data['token']
-          Cookies.set('user', this.formInline.user)
-          Cookies.set('password', this.formInline.password)
-          Cookies.set('jwt', 'JWT ' + res.data['token'])
-          axios.post(`${util.url}/auth_twice`, {
-              'user': Cookies.get('user')
+            axios.defaults.headers.common['Authorization'] = 'JWT ' + res.data['token']
+            Cookies.set('user', this.formInline.user)
+            Cookies.set('password', this.formInline.password)
+            Cookies.set('jwt', 'JWT ' + res.data['token'])
+            let auth = res.data['permissions']
+            if (auth === 'admin') {
+              Cookies.set('access', 0)
+            } else {
+              Cookies.set('access', 1)
+            }
+            this.$router.push({
+              name: 'home_index'
             })
-            .then(res => {
-              let auth = res.data
-              if (auth === 'admin') {
-                Cookies.set('access', 0)
-              } else {
-                Cookies.set('access', 1)
-              }
-              this.$router.push({
-                name: 'home_index'
-              })
+        })
+        .catch(error => {
+          util.ajanxerrorcode(this, error)
+        })
+    },
+    ldap_login () {
+      axios.post(`${util.url}/ldapauth`, {
+        'username': this.formInline.user,
+        'password': this.formInline.password
+      })
+        .then(res => {
+          if (res.data['token'] === 'null') {
+            this.$Notice.error({
+              title: '警告',
+              desc: res.data['res']
             })
+          } else {
+            axios.defaults.headers.common['Authorization'] = 'JWT ' + res.data['token']
+            Cookies.set('user', this.formInline.user)
+            Cookies.set('password', this.formInline.password)
+            Cookies.set('jwt', 'JWT ' + res.data['token'])
+            let auth = res.data['permissions']
+            if (auth === 'admin') {
+              Cookies.set('access', 0)
+            } else {
+              Cookies.set('access', 1)
+            }
+            this.$router.push({
+              name: 'home_index'
+            })
+          }
         })
         .catch(error => {
           util.ajanxerrorcode(this, error)

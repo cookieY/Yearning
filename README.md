@@ -8,25 +8,29 @@
 ![](https://img.shields.io/badge/vue.js-2.5.0-brightgreen.svg) 
 ![](https://img.shields.io/badge/iview-2.8.0-brightgreen.svg?style=flat-square) 
 ![](https://img.shields.io/badge/python-3.6-brightgreen.svg)
-![](https://img.shields.io/badge/Django-1.11.3-brightgreen.svg)
+![](https://img.shields.io/badge/Django-2.0-brightgreen.svg)
 
 基于Inception的整套sql审核平台解决方案。
 
 ## Feature 功能：
+- 数据库字典自动生成
+- SQL查询
 - SQL可视化自动生成
- - INDEX 索引语句
- - ALTER 更改表结构语句
-- 数据库字典
-  - 数据表字段一键生成
+    - INDEX 索引语句
+    - ALTER 更改表结构语句
 - SQL审核
     - 流程化工单
     - SQL语句检测
     - SQL语句执行
     - SQL回滚
-    - 站内信通知
+    - 历史审核记录
+- 推送
+    - 站内信工单通知
+    - E-mail工单推送
+    - 钉钉webhook机器人工单推送
+- 其他
     - todoList
-    - 钉钉webhook机器人通知    
-- 历史审核记录
+    - LDAP登陆   
 - 用户权限及管理
 
 ## Environment 环境
@@ -35,15 +39,21 @@
 
 - Vue.js 2.5
 
-- Django 1.11.3
+- Django 2.0
 
-## Install 安装及更新日志
+## Install 安装及使用日志
 - [Yearning使用及安装文档](https://cookiey.github.io/Yearning-document/)
 
 - 体验及快速测试安装(docker)
 
 ```
+<<<<<<< Updated upstream
 docker run -it -d -p 80:80 -p 8000:8000 -e "HOST=宿主机ip" registry.cn-hangzhou.aliyuncs.com/cookie/yearning:v0.0.4 
+=======
+docker run -it -d -p 80:80 -p 8000:8000 -e "HOST=宿主机ip" registry.cn-hangzhou.aliyuncs.com/cookie/yearning:v0.0.5 
+
+注意:端口不可更改
+>>>>>>> Stashed changes
 
 初始账号: admin  密码: Yearning_admin
 ```

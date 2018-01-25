@@ -107,6 +107,14 @@ export const appRouter = [
           require(['./components/Order/GenSQL.vue'], resolve)
         }
       }, {
+        path: 'indexedit',
+        name: 'indexedit',
+        title: '索引修改',
+        'icon': 'share',
+        component: resolve => {
+          require(['./components/Order/GenIndex.vue'], resolve)
+        }
+      }, {
         path: 'dmledit',
         name: 'dmledit',
         title: 'SQL语句提交',
@@ -130,6 +138,15 @@ export const appRouter = [
         'icon': 'ios-book',
         component: resolve => {
           require(['./components/Search/DataBaseDic.vue'], resolve)
+        }
+      },
+      {
+        path: 'serach-sql',
+        name: 'serach-sql',
+        title: 'SQL查询',
+        'icon': 'qr-scanner',
+        component: resolve => {
+          require(['./components/Search/SearchSQL.vue'], resolve)
         }
       }
     ]

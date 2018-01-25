@@ -3,48 +3,61 @@ url table
 '''
 from django.conf.urls import url, include
 from rest_framework.urlpatterns import format_suffix_patterns
-from rest_framework_jwt.views import obtain_jwt_token
-from core.views import (
-    Addressing_Api,
-    GenerationOrder_Api,
-    SqlDic,
-    AuthModel,
-    SQLSyntax,
-    MainData,
-    messages,
-    OtherUser,
-    Orderdetail
+from core.api.gensql import (
+    addressing,
+    gensql
 )
-from core.adminview import (
-    Userinfo_Api,
-    ManagementSql_Api,
-    AuditSql_Api,
-    Admin_dic,
-    RecordC,
-    ExportDoc,
-    DingDing,
+from core.api.sqldic import (
+    adminpremisson,
+    exportdoc,
+    dictionary,
     downloadFile
 )
+from core.api.user import (
+    userinfo,
+    generaluser,
+    authgroup,
+    ldapauth,
+    login_auth
+)
+from core.api.other import (
+    maindata,
+    messages,
+    dingding
+)
+from core.api.managerdb import (
+    managementdb,
+    pushpermissions
+)
+from core.api.auditorder import (
+    orderdetail,
+    audit
+)
+from core.api.record import recordorder
+from core.api.sqlorder import sqlorder
+from core.api.serachsql import serach
 
 urlpatterns = [
-    url(r'^api/v1/userinfo/(.*)', Userinfo_Api.as_view()),
-    url(r'^api/v1/workorder/(.*)', Addressing_Api.as_view()),
-    url(r'^api/v1/sqlorder/(.*)', GenerationOrder_Api.as_view()),
-    url(r'^api/v1/mamagement_sql/(.*)', ManagementSql_Api.as_view()),
-    url(r'^api/v1/audit_sql', AuditSql_Api.as_view()),
-    url(r'^api/v1/sqldic/(.*)', SqlDic.as_view()),
-    url(r'^api/v1/auth_twice', AuthModel.as_view()),
-    url(r'^api/v1/sqlsyntax/(.*)', SQLSyntax.as_view()),
-    url(r'^api/v1/adminsql/(.*)', Admin_dic.as_view()),
-    url(r'^api/v1/record/(.*)', RecordC.as_view()),
-    url(r'^api/v1/homedata/(.*)', MainData.as_view()),
+    url(r'^api/v1/userinfo/(.*)', userinfo.as_view()),
+    url(r'^api/v1/workorder/(.*)', addressing.as_view()),
+    url(r'^api/v1/sqlorder/(.*)', gensql.as_view()),
+    url(r'^api/v1/mamagement_sql/(.*)', managementdb.as_view()),
+    url(r'^api/v1/audit_sql', audit.as_view()),
+    url(r'^api/v1/sqldic/(.*)', dictionary.as_view()),
+    url(r'^api/v1/auth_twice', authgroup.as_view()),
+    url(r'^api/v1/sqlsyntax/(.*)', sqlorder.as_view()),
+    url(r'^api/v1/adminsql/(.*)', adminpremisson.as_view()),
+    url(r'^api/v1/record/(.*)', recordorder.as_view()),
+    url(r'^api/v1/homedata/(.*)', maindata.as_view()),
     url(r'^api/v1/messages/(.*)', messages.as_view()),
-    url(r'^api/v1/otheruser/(.*)', OtherUser.as_view()),
-    url(r'^api/v1/exportdocx/', ExportDoc.as_view()),
-    url(r'^api/v1/dingding', DingDing.as_view()),
-    url(r'^api/v1/detail', Orderdetail.as_view()),
+    url(r'^api/v1/otheruser/(.*)', generaluser.as_view()),
+    url(r'^api/v1/exportdocx/', exportdoc.as_view()),
+    url(r'^api/v1/dingding', dingding.as_view()),
+    url(r'^api/v1/detail', orderdetail.as_view()),
+    url(r'^api/v1/search', serach.as_view()),
+    url(r'^api/v1/ldapauth', ldapauth.as_view()),
+    url(r'^api/v1/globalpermissions', pushpermissions.as_view()),
     url(r'^api/v1/download', downloadFile),
-    url(r'^api-auth/', include('rest_framework.urls', namespace='rest_framework')),
-    url(r'^api-token-auth/', obtain_jwt_token),
+    url(r'^api-token-auth/', login_auth.as_view()),
 ]
 urlpatterns = format_suffix_patterns(urlpatterns)

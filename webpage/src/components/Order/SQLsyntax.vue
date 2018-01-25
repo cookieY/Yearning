@@ -38,6 +38,12 @@
               <Input v-model="formItem.text" placeholder="请输入"></Input>
             </FormItem>
 
+            <FormItem label="指定审核人:" prop="text">
+              <Select v-model="formItem.assigned">
+                <Option v-for="i in this.assigned" :value="i.username" :key="i.username">{{i.username}}</Option>
+              </Select>
+            </FormItem>
+
             <FormItem label="是否备份">
               <RadioGroup v-model="formItem.backup">
                 <Radio label="1">是</Radio>
@@ -62,8 +68,9 @@
             <template slot="desc">
                 <p>1.错误等级 0正常,1警告,2错误。</p>
                 <p>2.阶段状态 审核成功,Audit completed</p>
-                <p>5.错误信息 用来表示出错错误信息</p>
-                <p>6.当前检查的sql</p>
+                <p>3.错误信息 用来表示出错错误信息</p>
+                <p>4.当前检查的sql</p>
+                <p>注:只有错误等级等于0时提交按钮才会激活</p>
               </template>
           </Alert>
         </div>
@@ -76,7 +83,7 @@
         <Icon type="ios-crop-strong"></Icon>
         填写sql语句
       </p>
-      <Input v-model="formItem.textarea" type="textarea" :autosize="{minRows: 15,maxRows: 15}" placeholder="请输入需要提交的SQL语句,多条sql请用;分隔"></Input>
+      <Input v-model="formItem.textarea" type="textarea" :autosize="{minRows: 15,maxRows: 15}" placeholder="请输入需要提交的SQL语句,多条sql请用;分隔" autocomplete="on"></Input>
       <br>
       <br>
       <Table :columns="columnsName" :data="Testresults" highlight-row></Table>
@@ -104,24 +111,29 @@ export default {
         connection_name: '',
         basename: '',
         text: '',
-        backup: 0
+        backup: 0,
+        assigned: ''
       },
       columnsName: [
         {
           title: 'ID',
-          key: 'ID'
+          key: 'ID',
+          width: '50'
         },
         {
           title: '阶段',
-          key: 'stage'
+          key: 'stage',
+          width: '100'
         },
         {
           title: '错误等级',
-          key: 'errlevel'
+          key: 'errlevel',
+          width: '100'
         },
         {
           title: '阶段状态',
-          key: 'stagestatus'
+          key: 'stagestatus',
+          width: '150'
         },
         {
           title: '错误信息',
@@ -133,7 +145,8 @@ export default {
         },
         {
           title: '预计影响的SQL',
-          key: 'affected_rows'
+          key: 'affected_rows',
+          width: '130'
         }
       ],
       Testresults: [],
@@ -173,7 +186,8 @@ export default {
           }
         ]
       },
-      id: null
+      id: null,
+      assigned: []
     }
   },
   methods: {
@@ -272,6 +286,7 @@ export default {
       this.$refs['formItem'].validate((valid) => {
         if (valid) {
           if (this.formItem.textarea) {
+            this.validate_gen = true
             this.datalist.sqllist = this.formItem.textarea.replace(/(;|；)$/gi, '').replace(/\s/g, ' ').replace(/；/g, ';').split(';')
             axios.post(`${util.url}/sqlsyntax/`, {
                 'data': JSON.stringify(this.formItem),
@@ -307,7 +322,8 @@ export default {
   mounted () {
     axios.put(`${util.url}/workorder/connection`)
       .then(res => {
-        this.item = res.data
+        this.item = res.data['connection']
+        this.assigned = res.data['person']
       })
       .catch(error => {
         util.ajanxerrorcode(this, error)

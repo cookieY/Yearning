@@ -22,9 +22,9 @@ def rollbackSQL(db=None, opid=None):
 
 def roll(backdb=None, opid=None):
     with con_database.SQLgo(
-        ip=conf.backupdb, 
-        user=conf.backupuser, 
-        password=conf.backuppassword, 
+        ip=conf.backupdb,
+        user=conf.backupuser,
+        password=conf.backuppassword,
         port=conf.backupport
         ) as f:
         data = f.execute(
@@ -32,4 +32,4 @@ def roll(backdb=None, opid=None):
             '''
             select rollback_statement from %s where opid_time =%s;
             ''' % (backdb, opid))
-        return data[0][0]
+        return data

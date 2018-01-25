@@ -30,6 +30,9 @@
               <Option value="guest">使用者</Option>
             </Select>
         </FormItem>
+        <FormItem label="电子邮箱">
+          <Input v-model="userinfo.email" placeholder="请输入"></Input>
+        </FormItem>
         <Button type="primary" @click.native="Registered" style="margin-left: 35%">注册</Button>
       </Form>
     </div>
@@ -108,6 +111,19 @@
       <Button type="warning" @click="delUser">删除</Button>
     </div>
   </Modal>
+
+  <Modal v-model="editemail" :closable='false' :mask-closable=false :width="500">
+    <h3 slot="header" style="color:#2D8CF0">更改email邮箱</h3>
+    <Form :label-width="100" label-position="right">
+      <FormItem label="E-mail">
+        <Input v-model="email"></Input>
+      </FormItem>
+    </Form>
+    <div slot="footer">
+      <Button type="text" @click="editemail=false">取消</Button>
+      <Button type="warning" @click="putemail">更改</Button>
+    </div>
+  </Modal>
 </div>
 </template>
 <script>
@@ -131,7 +147,8 @@ export default {
       }
     };
     return {
-      columns6: [{
+      columns6: [
+        {
           title: '用户名',
           key: 'username',
           sortable: true
@@ -144,6 +161,11 @@ export default {
         {
           title: '部门',
           key: 'department',
+          sortable: true
+        },
+        {
+          title: 'email',
+          key: 'email',
           sortable: true
         },
         {
@@ -184,6 +206,20 @@ export default {
                 }, '更改所属组'),
                 h('Button', {
                   props: {
+                    type: 'success',
+                    size: 'small'
+                  },
+                  style: {
+                    marginRight: '5px'
+                  },
+                  on: {
+                    click: () => {
+                      this.editEmail(params.index)
+                    }
+                  }
+                }, 'email更改'),
+                h('Button', {
+                  props: {
                     type: 'warning',
                     size: 'small'
                   },
@@ -209,7 +245,21 @@ export default {
                       this.edituser(params.index)
                     }
                   }
-                }, '更改密码')
+                }, '更改密码'),
+                h('Button', {
+                  props: {
+                    type: 'success',
+                    size: 'small'
+                  },
+                  style: {
+                    marginRight: '5px'
+                  },
+                  on: {
+                    click: () => {
+                      this.editEmail(params.index)
+                    }
+                  }
+                }, 'email更改')
               ])
             }
           }
@@ -224,7 +274,8 @@ export default {
         confirmpassword: '',
         group: '',
         checkbox: '',
-        department: ''
+        department: '',
+        email: ''
       },
       userinfoValidate: {
         username: [{
@@ -320,6 +371,8 @@ export default {
       },
       // 更改部门及权限遮罩层状态
       editInfodModal: false,
+      editemail: false,
+      email: '',
       // 用户名
       username: '',
       confirmuser: '',
@@ -341,6 +394,27 @@ export default {
       this.deluserModal = true
       this.username = this.data5[index].username
     },
+    editEmail (index) {
+      this.editemail = true
+      this.username = this.data5[index].username
+      this.email = this.data5[index].email
+    },
+    putemail () {
+      axios.put(`${util.url}/userinfo/changemail`, {
+        'username': this.username,
+        'mail': this.email
+      })
+        .then(res => {
+          this.$Notice.success({
+            title: res.data
+          })
+          this.editemail = false
+          this.refreshuser()
+        })
+        .catch(error => {
+          util.ajanxerrorcode(this, error)
+        })
+    },
     Registered () {
       this.$refs['userinfova'].validate((valid) => {
         if (valid) {
@@ -348,7 +422,8 @@ export default {
               'username': this.userinfo.username,
               'password': this.userinfo.password,
               'group': this.userinfo.group,
-              'department': this.userinfo.department
+              'department': this.userinfo.department,
+              'email': this.userinfo.email
             })
             .then(res => {
               this.$Notice.success({

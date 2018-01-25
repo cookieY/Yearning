@@ -24,6 +24,7 @@
 <script>
 import axios from 'axios'
 import util from '../../libs/util'
+import Cookies from 'js-cookie'
 export default {
   name: 'Record',
   data () {
@@ -88,7 +89,7 @@ export default {
   },
   methods: {
     getrecordinfo (vl = 1) {
-      axios.get(`${util.url}/record?page=${vl}`)
+      axios.get(`${util.url}/record?page=${vl}&username=${Cookies.get('user')}`)
         .then(res => {
           this.TableDataNew = res.data.data
           this.pagenumber = res.data.page

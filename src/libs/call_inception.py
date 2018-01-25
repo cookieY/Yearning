@@ -40,7 +40,7 @@ class Inception(object):
             InceptionSQL = '''
              /*--user=%s;--password=%s;--host=%s;--port=%s;%s;%s;*/ \
              inception_magic_start;\
-             use %s;\
+             use `%s`;\
              %s; \
              inception_magic_commit;
             ''' % (self.__dict__.get('user'),
@@ -54,18 +54,20 @@ class Inception(object):
             return InceptionSQL
         else:
             InceptionSQL = '''
-                        /*--user=%s;--password=%s;--host=%s;--port=3306;%s;*/ \
+                        /*--user=%s;--password=%s;--host=%s;--port=%s;%s;*/ \
                         inception_magic_start;\
-                        use %s;\
+                        use `%s`;\
                         %s; \
                         inception_magic_commit;
                        ''' % (self.__dict__.get('user'),
                               self.__dict__.get('password'),
                               self.__dict__.get('host'),
+                              self.__dict__.get('port'),
                               Type,
                               self.__dict__.get('db'),
                               Sql)
             return InceptionSQL
+
     def Execute(self, sql, backup: int):
         if backup == 1:
             Inceptionsql = self.GenerateStatements(Sql=sql, Type='--enable-execute')

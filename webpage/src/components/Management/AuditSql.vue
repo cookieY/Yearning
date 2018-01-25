@@ -122,9 +122,21 @@ export default {
           width: 150,
           render: (h, params) => {
             const row = params.row
-            const color = row.status === 2 ? 'blue' : row.status === 1 ? 'green' : 'red'
-            const text = row.status === 2 ? '审核中' : row.status === 1 ? '同意' : '拒绝'
-
+            let color = ''
+            let text = ''
+            if (row.status === 2) {
+              color = 'blue'
+              text = '审核中'
+            } else if (row.status === 0) {
+              color = 'red'
+              text = '拒绝'
+            } else if (row.status === 1) {
+              color = 'green'
+              text = '同意'
+            } else {
+              color = 'yellow'
+              text = '进行中'
+            }
             return h('Tag', {
               props: {
                 type: 'dot',
@@ -144,6 +156,10 @@ export default {
             {
               label: '审核中',
               value: 2
+            },
+            {
+              label: '进行中',
+              value: 3
             }
           ],
           //            filterMultiple: false 禁止多选,
@@ -154,6 +170,8 @@ export default {
               return row.status === 2
             } else if (value === 0) {
               return row.status === 0
+            } else if (value === 3) {
+              return row.status === 3
             }
           }
         },
@@ -231,22 +249,22 @@ export default {
       },
       tmp: [],
       pagenumber: 1,
-      delrecord: []
+      delrecord: [],
+      togoing: null
     }
   },
   methods: {
     edit_tab: function (index) {
+      this.togoing = index
       this.dataId = []
       this.modal2 = true
       if (this.tmp[index].status === 2) {
         this.summit = false
         this.formitem = this.tmp[index]
         this.sql = this.tmp[index].sql.split(';')
-//        this.sql.splice(-1, 1)
       } else {
         this.formitem = this.tmp[index]
         this.sql = this.tmp[index].sql.split(';')
-//        this.sql.splice(-1, 1)
         this.summit = true
       }
     },
@@ -255,6 +273,7 @@ export default {
     },
     put_button () {
       this.modal2 = false
+      this.tmp[this.togoing].status = 3
       axios.put(`${util.url}/audit_sql`, {
           'type': 1,
           'from_user': Cookies.get('user'),
@@ -320,7 +339,7 @@ export default {
       this.mou_data(page)
     },
     mou_data (vl = 1) {
-      axios.get(`${util.url}/audit_sql?page=${vl}`)
+      axios.get(`${util.url}/audit_sql?page=${vl}&username=${Cookies.get('user')}`)
         .then(res => {
           this.tmp = res.data.data
           this.pagenumber = res.data.page.alter_number

@@ -12,7 +12,7 @@
 }
 </style>
 <template>
-<Menu width="auto" :theme="theme" @on-select="currentPageTab" :active-name="currentPageName">
+<Menu width="auto" :theme="theme" @on-select="currentPageTab" :active-name="currentPageName" accordion>
   <MenuItem name="main">
   <Icon type="cube" size="50" class="MenuIcon"></Icon>
   <br>

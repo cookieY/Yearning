@@ -9,6 +9,8 @@ __pycache__/
 # Distribution / packaging
 .Python
 src/deploy.conf
+src/exportData/*.docx
+src/core/migrations/*.py
 env/
 develop-eggs/
 downloads/

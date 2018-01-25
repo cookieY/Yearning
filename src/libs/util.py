@@ -14,6 +14,7 @@ import json
 import random
 import ssl
 import time
+import ldap3
 import configparser
 
 
@@ -71,7 +72,8 @@ def conf_path() -> object:
     _conf.read('deploy.conf')
     conf_set = namedtuple("name", ["db", "address", "port", "username", "password", "ipaddress",
                                    "inc_host", "inc_port", "inc_user", "inc_pwd", "backupdb",
-                                   "backupport", "backupuser", "backuppassword"])
+                                   "backupport", "backupuser", "backuppassword","ladp_server",
+                                   "ldap_scbase","ladp_domain", "mail_user","mail_password","smtp"])
 
     return conf_set(_conf.get('mysql', 'db'), _conf.get('mysql', 'address'),
                     _conf.get('mysql', 'port'), _conf.get('mysql', 'username'),
@@ -79,4 +81,21 @@ def conf_path() -> object:
                     _conf.get('Inception', 'ip'), _conf.get('Inception', 'port'),
                     _conf.get('Inception', 'user'), _conf.get('Inception', 'password'),
                     _conf.get('Inception', 'backupdb'), _conf.get('Inception', 'backupport'),
-                    _conf.get('Inception', 'backupuser'), _conf.get('Inception', 'backuppassword'))
+                    _conf.get('Inception', 'backupuser'), _conf.get('Inception', 'backuppassword'),
+                    _conf.get('LDAP','LDAP_SERVER'),_conf.get('LDAP','LDAP_SCBASE'),_conf.get('LDAP','LDAP_DOMAIN'),
+                    _conf.get('email', 'username'), _conf.get('email', 'password'), _conf.get('email', 'smtp_server'))
+
+def auth(username, password):
+    conf = conf_path()
+    LDAP_SERVER = conf.ladp_server
+    LDAP_DOMAIN = conf.ladp_domain
+    c = ldap3.Connection(
+        ldap3.Server(LDAP_SERVER, get_info=ldap3.ALL),
+        user=username + '@' + LDAP_DOMAIN,
+        password=password)
+    ret = c.bind()
+    if ret:
+        c.unbind()
+        return True
+    else:
+        return False

@@ -84,10 +84,6 @@
             <br>
             <Button type="info" @click="confirmsql()" style="margin-left: 80%">生成</Button>
           </TabPane>
-
-          <TabPane label="添加&删除索引" name="order3" icon="ios-unlocked">
-            <editindex :tabledata="indexinfo" :table_name="formItem.tablename" @on-indexdata="getindexconfirm"></editindex>
-          </TabPane>
         </Tabs>
       </div>
     </Card>
@@ -117,6 +113,11 @@
           <FormItem label="工单提交说明:">
             <Input v-model="formItem.text" placeholder="最多不超过20个字"></Input>
           </FormItem>
+          <FormItem label="指定审核人:">
+            <Select v-model="formItem.assigned">
+              <Option v-for="i in this.assigned" :value="i.username" :key="i.username">{{i.username}}</Option>
+            </Select>
+          </FormItem>
           <FormItem label="是否备份">
             <RadioGroup v-model="formItem.backup">
               <Radio label="1">是</Radio>
@@ -137,11 +138,9 @@
 import Cookies from 'js-cookie'
 import axios from 'axios'
 import util from '../../libs/util'
-import editindex from './components/ModifyIndex.vue'
 import edittable from './components/editTable'
 export default {
   components: {
-    editindex,
     edittable
   },
   data () {
@@ -247,7 +246,6 @@ export default {
           }
         }
       ],
-      indexinfo: [],
       sql: [],
       openswitch: false,
       pass: false,
@@ -291,11 +289,13 @@ export default {
         connection_name: '',
         basename: '',
         tablename: '',
-        backup: 0
+        backup: 0,
+        assigned: ''
       },
       id: null,
       tabs: 'order1',
-      optionData: ['varchar', 'int', 'char', 'tinytext', 'text', 'mediumtext', 'longtext', 'tinyint', 'smallint', 'mediumint', 'bigint']
+      optionData: ['varchar', 'int', 'char', 'tinytext', 'text', 'mediumtext', 'longtext', 'tinyint', 'smallint', 'mediumint', 'bigint'],
+      assigned: []
     }
   },
   methods: {
@@ -350,7 +350,8 @@ export default {
       this.delinfo()
       axios.put(`${util.url}/workorder/connection`)
         .then(res => {
-          this.item = res.data
+          this.item = res.data['connection']
+          this.assigned = res.data['person']
         })
         .catch(error => {
           util.ajanxerrorcode(this, error)
@@ -487,26 +488,6 @@ export default {
       this.TableDataNew = []
       this.sql = []
       this.pass = false
-      this.indexinfo = []
-    },
-    getindex () {
-      if (this.formItem.table_name) {
-        axios.put(`${util.url}/workorder/indexdata`, {
-            'login': JSON.stringify(this.formItem),
-            'table': this.formItem.tablename,
-            'id': this.id[0].id
-          })
-          .then(res => {
-            this.indexinfo = res.data
-          }).catch(error => {
-            util.ajanxerrorcode(this, error)
-          })
-      }
-    },
-    getindexconfirm (val) {
-      for (let i of val) {
-        this.sql.push(i)
-      }
     },
     orderswitch () {
       this.openswitch = !this.openswitch

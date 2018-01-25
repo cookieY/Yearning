@@ -1,5 +1,5 @@
 <template>
-<div style="margin-left: 1%;height: 100%">
+<div>
   <Table stripe :columns="tabcolumns" :data="tabledata" border ></Table>
   <br/>
   <Table stripe :columns="addcolums" :data="add_row" border></Table>
@@ -13,7 +13,7 @@
         <Option value="NO" >NO</Option>
       </Select>
     <Input v-model="add_tmp.column_name" placeholder="字段名" style="width: 15%"></Input>
-    <Select v-model="add_tmp.extra" placeholder="是否为全文索引" style="width: 20%">
+    <Select v-model="add_tmp.extra" placeholder="是否为全文索引" style="width: 20%" transfer>
         <Option value="YES" >YES</Option>
         <Option value="NO" >NO</Option>
       </Select>
