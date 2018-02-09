@@ -12,8 +12,10 @@ from django.http import (
 from libs.serializers import SQLGeneratDic
 from core.models import (
     SqlDictionary,
-    DatabaseList
+    DatabaseList,
+    grained
 )
+from core.task import grained_permissions
 
 CUSTOM_ERROR = logging.getLogger('Yearning.core.views')
 
@@ -22,7 +24,7 @@ class exportdoc(baseview.SuperUserpermissions):
     '''
     导出数据字典为docx文档
     '''
-
+    @grained_permissions
     def post(self, request, args=None):
         try:
             conf = configparser.ConfigParser()
@@ -31,11 +33,20 @@ class exportdoc(baseview.SuperUserpermissions):
             user = conf.get('mysql', 'username')
             db = conf.get('mysql', 'db')
             password = conf.get('mysql', 'password')
-        except Exception:
+        except KeyError:
             CUSTOM_ERROR.error('''The configuration file information is missing!''')
             return HttpResponse(status=500)
         else:
             try:
+                _c = request.data['permissions_type'] + 'export'
+                permissions = grained.objects.filter(username=request.user).first()
+                if permissions.permissions[_c] == '0':
+                    return Response(
+                        {
+                            'status': '该账户没有导出数据字典权限',
+                            'url': ''
+                        }
+                    )
                 data = json.loads(request.data['data'])
                 connection_name = request.data['connection_name']
                 basename = request.data['basename']
@@ -397,11 +408,13 @@ class dictionary(baseview.BaseView):
                     CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
                     return HttpResponse(status=500)
 
+    @grained_permissions
     def get(self, request, args=None):
         try:
-            data = SqlDictionary.objects.all().values('Name')
-            data.query.distinct = ['Name']
-            return Response(data)
+            _type = request.GET.get('permissions_type') + 'con'
+            permission = grained.objects.filter(username=request.user).first()
+            _c = [x for x in permission.permissions[_type]]
+            return Response(_c)
         except Exception as e:
             CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
             return HttpResponse(status=500)

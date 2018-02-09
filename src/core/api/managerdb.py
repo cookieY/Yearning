@@ -2,6 +2,7 @@ import logging
 import json
 from libs import baseview
 from libs import con_database
+from core.task import grained_permissions
 from rest_framework.response import Response
 from django.http import HttpResponse
 from django.db.models import Count
@@ -20,9 +21,14 @@ CUSTOM_ERROR = logging.getLogger('Yearning.core.views')
 
 
 class managementdb(baseview.SuperUserpermissions):
+
+
     '''
     数据库管理相关
     '''
+
+
+    @grained_permissions
     def get(self, request, args=None):
         try:
             page = request.GET.get('page')
@@ -100,10 +106,11 @@ class managementdb(baseview.SuperUserpermissions):
 
     def delete(self, request, args=None):
         try:
-            id = DatabaseList.objects.filter(connection_name=args).first()
+            connection_name = request.GET.get('del')
+            id = DatabaseList.objects.filter(connection_name=connection_name).first()
             SqlOrder.objects.filter(bundle_id=id.id).delete()
-            SqlRecord.objects.filter(name=args).delete()
-            DatabaseList.objects.filter(connection_name=args).delete()
+            SqlRecord.objects.filter(name=connection_name).delete()
+            DatabaseList.objects.filter(connection_name=connection_name).delete()
             return Response('数据库信息已删除!')
         except Exception as e:
             CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')

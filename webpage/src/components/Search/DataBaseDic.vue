@@ -32,7 +32,7 @@ a:active {
         <Form :label-width="80">
           <Form-item label="数据库连接:">
             <Select v-model="formItem.namedata" @on-change="InitializationTableInfo" filterable>
-                <Option v-for="i in TableList" :value="i.Name" :key="i.Name">{{ i.Name }}</Option>
+                <Option v-for="i in TableList" :value="i" :key="i">{{ i }}</Option>
               </Select>
           </Form-item>
           <Form-item label="数据库:">
@@ -141,7 +141,6 @@ a:active {
 import ICol from '../../../node_modules/iview/src/components/grid/col.vue'
 import axios from 'axios'
 import util from '../../libs/util'
-import Cookies from 'js-cookie'
 export default {
   components: {
     ICol
@@ -225,15 +224,20 @@ export default {
       axios.post(`${util.url}/exportdocx/`, {
           'data': JSON.stringify(this.ExportData.checkbox),
           'connection_name': this.formItem.namedata,
-          'basename': this.formItem.select
+          'basename': this.formItem.select,
+          'permissions_type': 'dic'
         })
         .then(res => {
           this.ExportData.urloff = true
           this.$Notice.success({
-            title: '警告',
+            title: '通知',
             desc: res.data.status
           })
-          this.ExportData.url = `${util.url}/download/?url=${res.data.url}`
+          if (res.data.url === '') {
+            this.ExportData.urloff = false
+          } else {
+            this.ExportData.url = `${util.url}/download/?url=${res.data.url}`
+          }
           this.$Spin.hide();
         })
         .catch(error => {
@@ -383,11 +387,11 @@ export default {
     EdiTtableInfo (c) {
       let auth = ''
       axios.post(`${util.url}/auth_twice`, {
-          'user': Cookies.get('user')
+          'permissions_type': 'dic'
         })
         .then(res => {
           auth = res.data
-          if (auth === 'admin') {
+          if (auth === '1') {
             this.EditTableinfo.Onoff = true
             this.EditTableinfo.comment = c[0].TableComment
             this.EditTableinfo.basename = c[0].BaseName
@@ -404,11 +408,11 @@ export default {
     Deltabledata (c) {
       let auth = ''
       axios.post(`${util.url}/auth_twice`, {
-          'user': Cookies.get('user')
+          'permissions_type': 'dic'
         })
         .then(res => {
           auth = res.data
-          if (auth === 'admin') {
+          if (auth === '1') {
             axios.put(`${util.url}/adminsql/deltable`, {
                 'basename': c[0].BaseName,
                 'tablename': c[0].TableName,
@@ -460,11 +464,11 @@ export default {
     EditField (row) {
       let auth = ''
       axios.post(`${util.url}/auth_twice`, {
-          'user': Cookies.get('user')
+          'permissions_type': 'dic'
         })
         .then(res => {
           auth = res.data
-          if (auth === 'admin') {
+          if (auth === '1') {
             this.EditTableinfo.offon = true
             this.EditTableinfo.felid = row.Field
             this.EditTableinfo.felidcomment = row.Extra
@@ -523,15 +527,12 @@ export default {
     }
   },
   mounted () {
-    axios.get(`${util.url}/sqldic/`)
+    axios.get(`${util.url}/sqldic/all?permissions_type=dic`)
       .then(res => {
         this.TableList = res.data
       })
       .catch(error => {
-        this.$Notice.error({
-          title: '警告',
-          desc: error
-        })
+       util.ajanxerrorcode(this, error)
       })
   }
 }

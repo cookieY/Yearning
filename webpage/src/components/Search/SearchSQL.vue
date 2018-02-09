@@ -211,7 +211,7 @@
       }
     },
     mounted () {
-      axios.put(`${util.url}/workorder/connection`)
+      axios.put(`${util.url}/workorder/connection`, {'permissions_type': 'query'})
         .then(res => {
           this.item = res.data['connection']
         })

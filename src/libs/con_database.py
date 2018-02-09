@@ -46,12 +46,17 @@ class SQLgo(object):
 
     def search(self, sql=None):
         data_dict=[]
+        id = 0
         with self.con.cursor(cursor=pymysql.cursors.DictCursor) as cursor:
             sqllist = sql
             cursor.execute(sqllist)
             result = cursor.fetchall()
             for field in cursor.description:
-                data_dict.append({'title':field[0],"key":field[0]})
+                if id  == 0:
+                    data_dict.append({'title': field[0], "key": field[0], "fixed": "left", "width": 150})
+                    id +=1
+                else:
+                    data_dict.append({'title': field[0], "key": field[0], "width": 200})
             len = cursor.rowcount
         return {'data':result,'title':data_dict,'len':len}
 

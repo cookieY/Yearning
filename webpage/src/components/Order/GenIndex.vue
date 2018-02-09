@@ -274,7 +274,7 @@
       },
       getdatabases () {
         this.delinfo()
-        axios.put(`${util.url}/workorder/connection`)
+        axios.put(`${util.url}/workorder/connection`, {'permissions_type': 'index'})
           .then(res => {
             this.item = res.data['connection']
             this.assigned = res.data['person']

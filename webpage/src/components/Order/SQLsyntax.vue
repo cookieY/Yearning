@@ -38,7 +38,7 @@
               <Input v-model="formItem.text" placeholder="请输入"></Input>
             </FormItem>
 
-            <FormItem label="指定审核人:" prop="text">
+            <FormItem label="指定审核人:" prop="assigned">
               <Select v-model="formItem.assigned">
                 <Option v-for="i in this.assigned" :value="i.username" :key="i.username">{{i.username}}</Option>
               </Select>
@@ -111,7 +111,7 @@ export default {
         connection_name: '',
         basename: '',
         text: '',
-        backup: 0,
+        backup: '0',
         assigned: ''
       },
       columnsName: [
@@ -184,7 +184,12 @@ export default {
             message: '最多20个字',
             trigger: 'blur'
           }
-        ]
+        ],
+        assigned: [{
+          required: true,
+          message: '说明不得为空',
+          trigger: 'blur'
+        }]
       },
       id: null,
       assigned: []
@@ -243,6 +248,16 @@ export default {
       }
     },
     test_sql () {
+      let ddl = ['select', 'alter', 'drop', 'create']
+      let createtable = this.formItem.textarea.replace(/(;|；)$/gi, '').replace(/\s/g, ' ').replace(/；/g, ';').split(';')
+      for (let i of createtable) {
+        for (let c of ddl) {
+          if (i.toLowerCase().indexOf(c) !== -1) {
+            this.$Message.error('不可提交非DML语句!');
+            return false
+          }
+        }
+      }
       this.$refs['formItem'].validate((valid) => {
         if (valid) {
           if (this.formItem.textarea) {
@@ -320,7 +335,7 @@ export default {
     }
   },
   mounted () {
-    axios.put(`${util.url}/workorder/connection`)
+    axios.put(`${util.url}/workorder/connection`, {'permissions_type': 'dml'})
       .then(res => {
         this.item = res.data['connection']
         this.assigned = res.data['person']

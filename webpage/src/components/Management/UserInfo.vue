@@ -74,8 +74,8 @@
     </div>
   </Modal>
 
-  <Modal v-model="editInfodModal" :closable='false' :mask-closable=false :width="500">
-    <h3 slot="header" style="color:#2D8CF0">修改用户信息</h3>
+  <Modal v-model="editInfodModal"  :width="800">
+    <h3 slot="header" style="color:#2D8CF0">权限设定</h3>
     <Form :model="editInfodForm" :label-width="100" label-position="right">
       <FormItem label="用户名">
         <Input v-model="username" readonly="readonly"></Input>
@@ -83,12 +83,117 @@
       <FormItem label="权限">
         <Select v-model="editInfodForm.group" placeholder="请选择">
             <Option value="admin">管理员</Option>
-            <Option value="guest">使用者</Option>
+            <Option value="guest" v-if="this.userid !== 1">使用者</Option>
           </Select>
       </FormItem>
       <FormItem label="部门">
         <Input v-model="editInfodForm.department" placeholder="请输入新部门"></Input>
       </FormItem>
+      <template>
+        <FormItem label="表结构修改权限:">
+          <RadioGroup v-model="permission.ddl">
+            <Radio label="1">是</Radio>
+            <Radio label="0">否</Radio>
+          </RadioGroup>
+        </FormItem>
+        <template v-if="permission.ddl === '1'">
+        <FormItem label="连接名:">
+          <CheckboxGroup v-model="permission.ddlcon">
+            <Checkbox  v-for="i in this.con" :label="i.connection_name" :key="i.connection_name">{{i.connection_name}}</Checkbox>
+          </CheckboxGroup>
+        </FormItem>
+        </template>
+        <hr style="height:1px;border:none;border-top:1px dashed #dddee1;" />
+        <br>
+        <FormItem label="sql提交权限:">
+          <RadioGroup v-model="permission.dml">
+            <Radio label="1">是</Radio>
+            <Radio label="0">否</Radio>
+          </RadioGroup>
+        </FormItem>
+        <template v-if="permission.dml === '1'">
+          <FormItem label="连接名:">
+            <CheckboxGroup v-model="permission.dmlcon">
+              <Checkbox  v-for="i in this.con" :label="i.connection_name" :key="i.connection_name">{{i.connection_name}}</Checkbox>
+            </CheckboxGroup>
+          </FormItem>
+      </template>
+        <hr style="height:1px;border:none;border-top:1px dashed #dddee1;" />
+        <br>
+      <FormItem label="索引提交权限:">
+        <RadioGroup v-model="permission.index">
+          <Radio label="1">是</Radio>
+          <Radio label="0">否</Radio>
+        </RadioGroup>
+      </FormItem>
+      <template v-if="permission.index === '1'">
+        <FormItem label="连接名:">
+          <CheckboxGroup v-model="permission.indexcon">
+            <Checkbox  v-for="i in this.con" :label="i.connection_name" :key="i.connection_name">{{i.connection_name}}</Checkbox>
+          </CheckboxGroup>
+        </FormItem>
+      </template>
+        <hr style="height:1px;border:none;border-top:1px dashed #dddee1;" />
+        <br>
+      <FormItem label="数据字典权限:">
+        <RadioGroup v-model="permission.dic">
+          <Radio label="1">是</Radio>
+          <Radio label="0">否</Radio>
+        </RadioGroup>
+      </FormItem>
+      <template v-if="permission.dic === '1'">
+        <FormItem label="数据字典修改权限:">
+          <RadioGroup v-model="permission.dicedit">
+            <Radio label="1">是</Radio>
+            <Radio label="0">否</Radio>
+          </RadioGroup>
+        </FormItem>
+        <FormItem label="数据字典导出权限:">
+          <RadioGroup v-model="permission.dicexport">
+            <Radio label="1">是</Radio>
+            <Radio label="0">否</Radio>
+          </RadioGroup>
+        </FormItem>
+        <FormItem label="连接名:">
+          <CheckboxGroup v-model="permission.diccon">
+            <Checkbox  v-for="i in this.dicadd" :label="i.Name" :key="i.Name">{{i.Name}}</Checkbox>
+          </CheckboxGroup>
+        </FormItem>
+      </template>
+        <hr style="height:1px;border:none;border-top:1px dashed #dddee1;" />
+        <br>
+      <FormItem label="数据查询权限:">
+        <RadioGroup v-model="permission.query">
+          <Radio label="1">是</Radio>
+          <Radio label="0">否</Radio>
+        </RadioGroup>
+      </FormItem>
+      <template v-if="permission.query === '1'">
+        <FormItem label="连接名:">
+          <CheckboxGroup v-model="permission.querycon">
+            <Checkbox  v-for="i in this.con" :label="i.connection_name" :key="i.connection_name">{{i.connection_name}}</Checkbox>
+          </CheckboxGroup>
+        </FormItem>
+      </template>
+      </template>
+      <template v-if="this.editInfodForm.group === 'admin'">
+        <hr style="height:1px;border:none;border-top:1px dashed #dddee1;" />
+        <br>
+        <FormItem label="用户管理权限:">
+          <RadioGroup v-model="permission.user">
+            <Radio label="1">是</Radio>
+            <Radio label="0">否</Radio>
+          </RadioGroup>
+        </FormItem>
+        <hr style="height:1px;border:none;border-top:1px dashed #dddee1;" />
+        <br>
+        <FormItem label="数据库管理权限:">
+          <RadioGroup v-model="permission.base">
+            <Radio label="1">是</Radio>
+            <Radio label="0">否</Radio>
+          </RadioGroup>
+        </FormItem>
+      </template>
     </Form>
     <div slot="footer">
       <Button type="text" @click="cancelEditInfo">取消</Button>
@@ -147,6 +252,24 @@ export default {
       }
     };
     return {
+      percent: 0,
+      permission: {
+        ddl: '0',
+        ddlcon: [],
+        dml: '0',
+        dmlcon: [],
+        dic: '0',
+        diccon: [],
+        dicedit: '0',
+        dicexport: '0',
+        index: '0',
+        indexcon: [],
+        query: '0',
+        querycon: [],
+        user: '0',
+        base: '0'
+      },
+      con: [],
       columns6: [
         {
           title: '用户名',
@@ -203,7 +326,7 @@ export default {
                       this.editgroup(params.index)
                     }
                   }
-                }, '更改所属组'),
+                }, '权限'),
                 h('Button', {
                   props: {
                     type: 'success',
@@ -234,7 +357,7 @@ export default {
               return h('div', [
                 h('Button', {
                   props: {
-                    type: 'primary',
+                    type: 'info',
                     size: 'small'
                   },
                   style: {
@@ -242,10 +365,10 @@ export default {
                   },
                   on: {
                     click: () => {
-                      this.edituser(params.index)
+                      this.editgroup(params.index)
                     }
                   }
-                }, '更改密码'),
+                }, '权限'),
                 h('Button', {
                   props: {
                     type: 'success',
@@ -376,7 +499,9 @@ export default {
       // 用户名
       username: '',
       confirmuser: '',
-      deluserModal: false
+      deluserModal: false,
+      userid: null,
+      dicadd: []
     }
   },
   methods: {
@@ -386,9 +511,14 @@ export default {
     },
     editgroup (index) {
       this.editInfodModal = true
+      this.userid = this.data5[index].id
       this.username = this.data5[index].username
       this.editInfodForm.department = this.data5[index].department
       this.editInfodForm.group = this.data5[index].group
+      axios.get(`${util.url}/userinfo/permissions?user=${this.username}`)
+        .then(res => {
+          this.permission = res.data
+        })
     },
     deleteUser (index) {
       this.deluserModal = true
@@ -493,7 +623,8 @@ export default {
       axios.put(util.url + '/userinfo/changegroup', {
           'username': this.username,
           'group': this.editInfodForm.group,
-          'department': this.editInfodForm.department
+          'department': this.editInfodForm.department,
+          'permission': JSON.stringify(this.permission)
         })
         .then(res => {
           this.$Notice.success({
@@ -527,6 +658,14 @@ export default {
     }
   },
   mounted () {
+    axios.put(`${util.url}/workorder/connection`, {'permissions_type': 'user'})
+      .then(res => {
+        this.con = res.data['connection']
+        this.dicadd = res.data['dic']
+      })
+      .catch(error => {
+        util.ajanxerrorcode(this, error)
+      })
     this.refreshuser()
   }
 }

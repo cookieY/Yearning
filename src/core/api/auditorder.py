@@ -1,6 +1,5 @@
 import logging
 import json
-from libs import send_email
 from libs import baseview
 from libs import util
 from libs import call_inception
@@ -12,13 +11,13 @@ from core.models import (
     SqlOrder,
     Usermessage,
     DatabaseList,
-    SqlRecord,
-    Account,
-    globalpermissions
+    SqlRecord
 )
 from libs.serializers import (
     Record
 )
+
+from core.task import order_push_message,rejected_push_messages
 
 conf = util.conf_path()
 addr_ip = conf.ipaddress
@@ -88,35 +87,8 @@ class audit(baseview.SuperUserpermissions):
                             to_user=to_user,
                             state='unread'
                         )
-                        content = DatabaseList.objects.filter(id=_tmpData['bundle_id']).first()
-                        mail = Account.objects.filter(username=to_user).first()
-                        tag = globalpermissions.objects.filter(authorization='global').first()
-                        ret_info = '操作成功，该请求已驳回！'
-                        if tag is None or tag.dingding == 0:
-                            pass
-                        else:
-                            try:
-                                if content.url:
-                                    util.dingding(
-                                        content='工单驳回通知\n工单编号:%s\n发起人:%s\n地址:%s\n驳回说明:%s\n状态:驳回'
-                                        %(_tmpData['work_id'],to_user,addr_ip,text), url=content.url)
-                            except:
-                                ret_info = '工单执行成功!但是钉钉推送失败,请查看错误日志排查错误.'
-                        if tag is None or tag.email == 0:
-                            pass
-                        else:
-                            try:
-                                if mail.email:
-                                    mess_info = {
-                                        'workid':_tmpData['work_id'],
-                                        'to_user':to_user,
-                                        'addr': addr_ip,
-                                        'rejected': text}
-                                    put_mess = send_email.send_email(to_addr=mail.email)
-                                    put_mess.send_mail(mail_data=mess_info,type=1)
-                            except:
-                                ret_info = '工单执行成功!但是邮箱推送失败,请查看错误日志排查错误.'
-                        return Response(ret_info)
+                        rejected_push_messages(_tmpData, to_user, addr_ip, text).start()
+                        return Response('操作成功，该请求已驳回！')
                     except Exception as e:
                         CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
                         return HttpResponse(status=500)
@@ -132,108 +104,8 @@ class audit(baseview.SuperUserpermissions):
                 else:
                     try:
                         SqlOrder.objects.filter(id=id).update(status=3)
-                        c = SqlOrder.objects.filter(id=id).first()
-                        title = f'工单:{c.work_id}审核通过通知'
-
-                        '''
-
-                        根据工单编号拿出对应sql的拆解数据
-
-                        '''
-
-                        SQL_LIST = DatabaseList.objects.filter(id=c.bundle_id).first()
-                        '''
-
-                        发送sql语句到inception中执行
-
-                        '''
-                        with call_inception.Inception(
-                            LoginDic={
-                                'host': SQL_LIST.ip,
-                                'user': SQL_LIST.username,
-                                'password': SQL_LIST.password,
-                                'db': c.basename,
-                                'port': SQL_LIST.port
-                            }
-                        ) as f:
-                            res = f.Execute(sql=c.sql, backup=c.backup)
-                            '''
-
-                            修改该工单编号的state状态
-
-                            '''
-                            SqlOrder.objects.filter(id=id).update(status=1)
-                            
-                            '''
-
-                            遍历返回结果插入到执行记录表中
-
-                            '''
-                            for i in res:
-                                SqlRecord.objects.get_or_create(
-                                    date=util.date(),
-                                    state=i['stagestatus'],
-                                    sql=i['sql'],
-                                    area=SQL_LIST.computer_room,
-                                    name=SQL_LIST.connection_name,
-                                    error=i['errormessage'],
-                                    base=c.basename,
-                                    workid=c.work_id,
-                                    person=c.username,
-                                    reviewer=c.assigned,
-                                    affectrow=i['affected_rows'],
-                                    sequence=i['sequence'],
-                                    backup_dbname=i['backup_dbname']
-                                )
-                        '''
-
-                        通知消息
-
-                        '''
-                        Usermessage.objects.get_or_create(
-                            from_user=from_user, time=util.date(),
-                            title=title, content='该工单已审核通过!', to_user=to_user,
-                            state='unread'
-                        )
-
-                        '''
-
-                        Dingding
-
-                        '''
-
-                        content = DatabaseList.objects.filter(id=c.bundle_id).first()
-                        mail = Account.objects.filter(username=to_user).first()
-                        tag = globalpermissions.objects.filter(authorization='global').first()
-                        ret_info = '操作成功，该请求已同意!并且已在相应库执行！详细执行信息请前往执行记录页面查看！'
-
-                        if tag is None or tag.dingding == 0:
-                            pass
-                        else:
-                            try:
-                                if content.url:
-                                    util.dingding(
-                                        content='工单执行通知\n工单编号:%s\n发起人:%s\n地址:%s\n工单备注:%s\n状态:同意\n备注:%s'
-                                                          %(c.work_id,c.username,addr_ip,c.text,content.after), url=content.url)
-                            except:
-                                ret_info = '工单执行成功!但是钉钉推送失败,请查看错误日志排查错误.'
-
-                        if tag is None or tag.email == 0:
-                            pass
-                        else:
-                            try:
-                                if mail.email:
-                                    mess_info = {
-                                        'workid':c.work_id,
-                                        'to_user':c.username,
-                                        'addr': addr_ip,
-                                        'text':c.text,
-                                        'note': content.after}
-                                    put_mess = send_email.send_email(to_addr=mail.email)
-                                    put_mess.send_mail(mail_data=mess_info,type=0)
-                            except:
-                                ret_info = '工单执行成功!但是邮箱推送失败,请查看错误日志排查错误.'
-                        return Response(ret_info)
+                        order_push_message(addr_ip, id, from_user, to_user).start()
+                        return Response('工单执行成功!请通过记录页面查看具体执行结果')
                     except Exception as e:
                         CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
                         return HttpResponse(status=500)

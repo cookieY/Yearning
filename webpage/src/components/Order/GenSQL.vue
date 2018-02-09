@@ -37,7 +37,7 @@
               <Option v-for="item in tableform.info" :value="item" :key="item">{{ item }}</Option>
             </Select>
           </Form-item>
-          <Button type="warning" @click="canel()" style="margin-left: 20%">重置</Button>
+          <Button type="warning" @click="canel()" style="margin-left: 30%">重置</Button>
           <Button type="primary" @click="getinfo()" style="margin-left: 5%">连接</Button>
         </Form>
         <br>
@@ -60,7 +60,21 @@
       </p>
       <div class="edittable-table-height-con">
         <Tabs :value="tabs">
-          <TabPane label="添加字段" name="order1" icon="plus">
+          <TabPane label="手动模式" name="order1" icon="edit">
+            <Form>
+              <FormItem>
+                <Input v-model="formDynamic" type="textarea" :autosize="{minRows: 15,maxRows: 15}" placeholder="请输入需要提交的DDL语句,多条sql请用;分隔"></Input>
+              </FormItem>
+              <FormItem>
+                <Table :columns="columnsName" :data="Testresults" highlight-row></Table>
+              </FormItem>
+              <FormItem>
+                <Button type="warning" @click="test_sql">检测</Button>
+                <Button type="primary" @click="handleSubmit(formDynamic)" style="margin-left: 3%" :disabled="this.validate_gen">提交</Button>
+              </FormItem>
+            </Form>
+          </TabPane>
+          <TabPane label="生成添加字段" name="order3" icon="plus">
             <Table stripe :columns="addcolums" :data="add_row" height="385" border></Table>
             <div style="margin-top: 5%">
               <Input v-model="Add_tmp.Field" placeholder="字段名" style="width: 10%"></Input>
@@ -78,11 +92,10 @@
               <Button type="info" @click.native="AddColumns()">添加</Button>
             </div>
           </TabPane>
-
-          <TabPane label="修改&删除字段" name="order2" icon="edit">
+          <TabPane label="生成修改&删除字段" name="order4" icon="edit">
             <edittable refs="table2" v-model="TableDataNew" :columns-list="tabcolumns" @index="remove"></edittable>
             <br>
-            <Button type="info" @click="confirmsql()" style="margin-left: 80%">生成</Button>
+            <Button type="success" @click="confirmsql()" style="margin-left: 90%">生成</Button>
           </TabPane>
         </Tabs>
       </div>
@@ -139,8 +152,10 @@ import Cookies from 'js-cookie'
 import axios from 'axios'
 import util from '../../libs/util'
 import edittable from './components/editTable'
+import ICol from 'iview/src/components/grid/col'
 export default {
   components: {
+    ICol,
     edittable
   },
   data () {
@@ -156,6 +171,42 @@ export default {
         basename: [],
         info: []
       },
+      columnsName: [
+        {
+          title: 'ID',
+          key: 'ID',
+          width: '50'
+        },
+        {
+          title: '阶段',
+          key: 'stage',
+          width: '100'
+        },
+        {
+          title: '错误等级',
+          key: 'errlevel',
+          width: '100'
+        },
+        {
+          title: '阶段状态',
+          key: 'stagestatus',
+          width: '150'
+        },
+        {
+          title: '错误信息',
+          key: 'errormessage'
+        },
+        {
+          title: '当前检查的sql',
+          key: 'sql'
+        },
+        {
+          title: '预计影响的SQL',
+          key: 'affected_rows',
+          width: '130'
+        }
+      ],
+      Testresults: [],
       tabcolumns: [
         {
           title: '字段名',
@@ -289,13 +340,30 @@ export default {
         connection_name: '',
         basename: '',
         tablename: '',
-        backup: 0,
+        backup: '0',
         assigned: ''
       },
       id: null,
       tabs: 'order1',
-      optionData: ['varchar', 'int', 'char', 'tinytext', 'text', 'mediumtext', 'longtext', 'tinyint', 'smallint', 'mediumint', 'bigint'],
-      assigned: []
+      optionData: [
+        'varchar',
+        'int',
+        'char',
+        'tinytext',
+        'text',
+        'mediumtext',
+        'longtext',
+        'tinyint',
+        'smallint',
+        'mediumint',
+        'bigint',
+        'date',
+        'datetime',
+        'timestamp'
+      ],
+      assigned: [],
+      formDynamic: '',
+      validate_gen: true
     }
   },
   methods: {
@@ -303,6 +371,62 @@ export default {
       if (index) {
         this.ScreenConnection(index)
       }
+    },
+    test_sql () {
+      let ddl = ['select', 'insert', 'update', 'delete']
+      let createtable = this.formDynamic.split(';')
+      for (let i of createtable) {
+        for (let c of ddl) {
+          if (i.toLowerCase().indexOf(c) !== -1) {
+            this.$Message.error('不可提交非DDL语句!');
+            return false
+          }
+        }
+      }
+      this.$refs['formItem'].validate((valid) => {
+        if (valid) {
+            let tmp = this.formDynamic.replace(/(;|；)$/gi, '').replace(/；/g, ';')
+            axios.put(`${util.url}/sqlsyntax/test`, {
+              'id': this.id[0].id,
+              'base': this.formItem.basename,
+              'sql': tmp
+            })
+              .then(res => {
+                if (res.data.status === 200) {
+                  this.Testresults = res.data.result
+                  let gen = 0
+                  this.Testresults.forEach(vl => {
+                    if (vl.errlevel !== 0) {
+                      gen += 1
+                    }
+                  })
+                  if (gen === 0) {
+                    this.validate_gen = false
+                  } else {
+                    this.validate_gen = true
+                  }
+                } else {
+                  this.$Notice.error({
+                    title: '警告',
+                    desc: '无法连接到Inception!'
+                  })
+                }
+              })
+              .catch(error => {
+                util.ajanxerrorcode(this, error)
+              })
+          } else {
+            this.$Message.error('请填写具体地址或sql语句后再测试!');
+          }
+      })
+    },
+    handleSubmit () {
+      let createtable = this.formDynamic.split(';')
+      this.validate_gen = true
+      for (let i of createtable) {
+        this.sql.push(i)
+      }
+      this.sql.splice(-1, 1)
     },
     DataBaseName (index) {
       if (index) {
@@ -348,7 +472,7 @@ export default {
     },
     getdatabases () {
       this.delinfo()
-      axios.put(`${util.url}/workorder/connection`)
+      axios.put(`${util.url}/workorder/connection`, {'permissions_type': 'ddl'})
         .then(res => {
           this.item = res.data['connection']
           this.assigned = res.data['person']

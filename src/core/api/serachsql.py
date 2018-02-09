@@ -24,10 +24,15 @@ class serach(baseview.BaseView):
             _c = DatabaseList.objects.filter(id=address['id']).first()
 
             try:
-                with con_database.SQLgo(ip=_c.ip,password=_c.password,user=_c.username,port=_c.port,db=address['basename']) as f:
+                with con_database.SQLgo(
+                        ip=_c.ip,
+                        password=_c.password,
+                        user=_c.username,
+                        port=_c.port,
+                        db=address['basename']
+                ) as f:
                     dataset = f.search(sql=sql)
                     return Response(dataset)
-
             except Exception as e:
                 return Response({'error': str(e)})
         else:

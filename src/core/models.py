@@ -4,6 +4,28 @@
 '''
 from django.db import models
 from django.contrib.auth.models import AbstractUser
+import ast
+
+
+class JSONField(models.TextField):
+    description = "Json"
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+    def from_db_value(self, value, expression, connection, context):
+        if not value:
+            value = {}
+        return ast.literal_eval(value)
+
+    def get_prep_value(self, value):
+        if value is None:
+            return value
+        return str(value)
+
+    def value_to_string(self, obj):
+        value = self._get_val_from_obj(obj)
+        return self.get_db_prep_save(value)
 
 
 class Account(AbstractUser):
@@ -83,12 +105,14 @@ class SqlRecord(models.Model):
     backup_dbname = models.CharField(max_length=100, null=True)
     rollbackid = models.IntegerField(null=True)
 
+
 class Todolist(models.Model):
     '''
     todo info 
     '''
     username = models.CharField(max_length=50) #账户
     content = models.CharField(max_length=200) #内容
+
 
 class Usermessage(models.Model):
     '''
@@ -101,13 +125,18 @@ class Usermessage(models.Model):
     state = models.CharField(max_length=10) #发送状态
     title = models.CharField(max_length=100) # 站内信标题
 
+
 class globalpermissions(models.Model):
     '''
 
     globalpermissions
 
     '''
-
+    authorization = models.CharField(max_length=50, null=True, db_index=True)
     dingding = models.SmallIntegerField(default=0)
     email = models.SmallIntegerField(default=0)
-    authorization = models.CharField(max_length=50,null=True)
+
+
+class grained(models.Model):
+    username = models.CharField(max_length=50,db_index=True)
+    permissions = JSONField()

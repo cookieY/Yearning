@@ -7,10 +7,13 @@ from libs import gen_ddl
 from libs import baseview
 from libs import con_database
 from libs import util
+from core.task import grained_permissions
 from core.models import (
     SqlOrder,
     DatabaseList,
-    Account
+    Account,
+    grained,
+    SqlDictionary
 )
 from libs.serializers import (
     Area,
@@ -21,11 +24,14 @@ CUSTOM_ERROR = logging.getLogger('Yearning.core.views')
 
 
 class addressing(baseview.BaseView):
+
     '''
+
 
     get: 分页获取我的工单数据
 
     put: 分别返回 连接名 库名 表名 字段名 索引名
+
 
     '''
 
@@ -53,15 +59,28 @@ class addressing(baseview.BaseView):
                 CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
                 return HttpResponse(status=500)
 
+    @grained_permissions
     def put(self, request, args=None):
 
         if args == 'connection':
             try:
-                info = DatabaseList.objects.all()
-                _serializers = Area(info, many=True)
+                if request.data['permissions_type'] == 'user':
+                    info = DatabaseList.objects.all()
+                    ser = Area(info, many=True)
+                    _c = ser.data
+                    dic = SqlDictionary.objects.all().values('Name')
+                    dic.query.distinct = ['Name']
+                else:
+                    _c = []
+                    _type = request.data['permissions_type'] + 'con'
+                    permissionslist = grained.objects.filter(username=request.user).first()
+                    for i in permissionslist.permissions[_type]:
+                        con=DatabaseList.objects.filter(connection_name=i).first()
+                        _c.append({'id': con.id, 'connection_name': con.connection_name, 'ip': con.ip, 'computer_room': con.computer_room})
+                    dic = ''
                 info = Account.objects.filter(is_staff=1).all()
                 serializers = UserINFO(info, many=True)
-                return Response({'connection': _serializers.data, 'person': serializers.data})
+                return Response({'connection': _c, 'person': serializers.data, 'dic': dic})
             except Exception as e:
                 CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
                 return HttpResponse(status=500)
