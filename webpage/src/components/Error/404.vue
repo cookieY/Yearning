@@ -26,7 +26,7 @@ export default {
     },
     goHome () {
       this.$router.push({
-        name: 'login'
+        name: 'home_index'
       });
     }
   }

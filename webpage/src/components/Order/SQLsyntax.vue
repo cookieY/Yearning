@@ -330,7 +330,7 @@ export default {
       })
     },
     ClearForm () {
-      this.$refs['formItem'].resetFields();
+      // this.$refs['formItem'].resetFields();
       this.formItem.textarea = ''
     }
   },

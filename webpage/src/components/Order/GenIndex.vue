@@ -273,7 +273,6 @@
         }
       },
       getdatabases () {
-        this.delinfo()
         axios.put(`${util.url}/workorder/connection`, {'permissions_type': 'index'})
           .then(res => {
             this.item = res.data['connection']
@@ -322,24 +321,26 @@
         })
       },
       canel () {
-        this.$refs['formItem'].resetFields();
-        this.delinfo()
-      },
-      delinfo () {
-        this.tableform.sqlname = []
-        this.tableform.basename = []
-        this.tableform.info = []
-        this.formItem.connection_name = ''
-        this.formItem.computer_room = ''
-        this.formItem.basename = ''
-        this.formItem.table_name = ''
-        this.formItem.tablename = ''
-        this.TableDataOld = []
-        this.TableDataNew = []
+        // this.$refs['formItem'].resetFields();
+        // this.delinfo()
         this.sql = []
         this.pass = false
-        this.indexinfo = []
       },
+      // delinfo () {
+      //   this.tableform.sqlname = []
+      //   this.tableform.basename = []
+      //   this.tableform.info = []
+      //   this.formItem.connection_name = ''
+      //   this.formItem.computer_room = ''
+      //   this.formItem.basename = ''
+      //   this.formItem.table_name = ''
+      //   this.formItem.tablename = ''
+      //   this.TableDataOld = []
+      //   this.TableDataNew = []
+      //   this.sql = []
+      //   this.pass = false
+      //   this.indexinfo = []
+      // },
       getindex () {
         if (this.formItem.table_name) {
           axios.put(`${util.url}/workorder/indexdata`, {

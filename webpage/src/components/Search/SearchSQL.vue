@@ -60,12 +60,13 @@
         <Button type="error" icon="trash-a" @click.native="ClearForm()">清除</Button>
         <Button type="info" icon="paintbucket" @click.native="beautify()">美化</Button>
         <Button type="success" icon="ios-redo" @click.native="Search_sql()">查询</Button>
+        <Button type="primary" icon="ios-cloud-download" @click.native="exportdata()">导出查询数据</Button>
         <br>
         <br>
         <p>查询结果:</p>
-        <Table :columns="columnsName" :data="Testresults" highlight-row></Table>
+        <Table :columns="columnsName" :data="Testresults" highlight-row ref="table"></Table>
         <br>
-        <Page :total="total" show-total @on-change="splice_arr"></Page>
+        <Page :total="total" show-total @on-change="splice_arr" ref="totol"></Page>
       </Card>
       </Col>
     </Row>
@@ -75,6 +76,37 @@
   import ICol from '../../../node_modules/iview/src/components/grid/col.vue'
   import axios from 'axios'
   import util from '../../libs/util'
+  import Csv from '../../../node_modules/iview/src/utils/csv'
+  import ExportCsv from '../../../node_modules/iview/src/components/table/export-csv';
+
+  const exportcsv = function exportCsv (params) {
+    if (params.filename) {
+      if (params.filename.indexOf('.csv') === -1) {
+        params.filename += '.csv';
+      }
+    } else {
+      params.filename = 'table.csv';
+    }
+
+    let columns = [];
+    let datas = [];
+    if (params.columns && params.data) {
+      columns = params.columns;
+      datas = params.data;
+    } else {
+      columns = this.columns;
+      if (!('original' in params)) params.original = true;
+      datas = params.original ? this.data : this.rebuildData;
+    }
+
+    let noHeader = false;
+    if ('noHeader' in params) noHeader = params.noHeader;
+
+    const data = Csv(columns, datas, params, noHeader);
+    if (params.callback) params.callback(data);
+    else ExportCsv.download(params.filename, data);
+  }
+
   export default {
     components: {
       ICol
@@ -182,6 +214,8 @@
         this.formItem.textarea = ''
         this.Testresults = []
         this.columnsName = []
+        this.$refs.totol.currentPage = 1
+        this.total = 0
       },
       Search_sql () {
         let address = {
@@ -208,6 +242,14 @@
           .catch(error => {
             util.ajanxerrorcode(this, error)
           })
+      },
+      exportdata () {
+        exportcsv({
+          filename: 'Sorting and filtering data',
+          original: false,
+          data: this.allsearchdata,
+          columns: this.columnsName
+        })
       }
     },
     mounted () {

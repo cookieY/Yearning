@@ -89,7 +89,7 @@ export default {
   },
   methods: {
     getrecordinfo (vl = 1) {
-      axios.get(`${util.url}/record?page=${vl}&username=${Cookies.get('user')}`)
+      axios.get(`${util.url}/record/all?page=${vl}&username=${Cookies.get('user')}`)
         .then(res => {
           this.TableDataNew = res.data.data
           this.pagenumber = res.data.page

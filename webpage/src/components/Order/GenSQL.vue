@@ -37,8 +37,9 @@
               <Option v-for="item in tableform.info" :value="item" :key="item">{{ item }}</Option>
             </Select>
           </Form-item>
-          <Button type="warning" @click="canel()" style="margin-left: 30%">重置</Button>
+          <Button type="warning" @click="canel()" style="margin-left: 20%">重置</Button>
           <Button type="primary" @click="getinfo()" style="margin-left: 5%">连接</Button>
+          <Button type="success" @click="confirmsql()" style="margin-left: 5%">生成</Button>
         </Form>
         <br>
         <Tabs value="order1" style="height: 300px;overflow-y: scroll;">
@@ -94,8 +95,6 @@
           </TabPane>
           <TabPane label="生成修改&删除字段" name="order4" icon="edit">
             <edittable refs="table2" v-model="TableDataNew" :columns-list="tabcolumns" @index="remove"></edittable>
-            <br>
-            <Button type="success" @click="confirmsql()" style="margin-left: 90%">生成</Button>
           </TabPane>
         </Tabs>
       </div>
@@ -471,7 +470,6 @@ export default {
       }
     },
     getdatabases () {
-      this.delinfo()
       axios.put(`${util.url}/workorder/connection`, {'permissions_type': 'ddl'})
         .then(res => {
           this.item = res.data['connection']
@@ -552,8 +550,8 @@ export default {
       })
     },
     canel () {
-      this.$refs['formItem'].resetFields();
-      this.delinfo()
+      this.sql = []
+      this.pass = false
     },
     edit_tab (col) {
       this.TableDataNew[col.index] = col.row
@@ -594,53 +592,61 @@ export default {
             }
             this.putdata = []
             this.add_row = []
+            this.TableDataNew = Array.from(this.TableDataOld)
           }).catch(error => {
             util.ajanxerrorcode(this, error)
           })
       }
     },
-    delinfo () {
-      this.tableform.sqlname = []
-      this.tableform.basename = []
-      this.tableform.info = []
-      this.formItem.connection_name = ''
-      this.formItem.computer_room = ''
-      this.formItem.basename = ''
-      this.formItem.table_name = ''
-      this.formItem.tablename = ''
-      this.TableDataOld = []
-      this.TableDataNew = []
-      this.sql = []
-      this.pass = false
-    },
+    // delinfo () {
+    //   this.tableform.sqlname = []
+    //   this.tableform.basename = []
+    //   this.tableform.info = []
+    //   this.formItem.connection_name = ''
+    //   this.formItem.computer_room = ''
+    //   this.formItem.basename = ''
+    //   this.formItem.table_name = ''
+    //   this.formItem.tablename = ''
+    //   this.TableDataOld = []
+    //   this.TableDataNew = []
+    //   this.sql = []
+    //   this.pass = false
+    // },
     orderswitch () {
       this.openswitch = !this.openswitch
     },
     commitorder () {
-      if (this.pass === true) {
-        axios.post(`${util.url}/sqlsyntax/`, {
+      if (this.sql === [] || this.formItem.basename === '' || this.formItem.tablename === '' || this.assigned === '') {
+        this.$Notice.error({
+          title: '警告',
+          desc: '工单数据缺失,请检查数据库信息及生成的sql语句'
+        })
+      } else {
+        if (this.pass === true) {
+          axios.post(`${util.url}/sqlsyntax/`, {
             'data': JSON.stringify(this.formItem),
             'sql': JSON.stringify(this.sql),
             'user': Cookies.get('user'),
             'type': 0,
             'id': this.id[0].id
           })
-          .then(res => {
-            this.$Notice.success({
-              title: '通知',
-              desc: res.data
-            })
-            this.$router.push({
-              name: 'myorder'
-            })
-          }).catch(error => {
+            .then(res => {
+              this.$Notice.success({
+                title: '通知',
+                desc: res.data
+              })
+              this.$router.push({
+                name: 'myorder'
+              })
+            }).catch(error => {
             util.ajanxerrorcode(this, error)
           })
-      } else {
-        this.$Notice.warning({
-          title: '注意',
-          desc: '提交工单需点击确认按钮'
-        })
+        } else {
+          this.$Notice.warning({
+            title: '注意',
+            desc: '提交工单需点击确认按钮'
+          })
+        }
       }
     }
   },
