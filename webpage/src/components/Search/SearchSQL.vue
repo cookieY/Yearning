@@ -34,8 +34,6 @@
                 </Select>
               </FormItem>
             </Form>
-
-
             <Alert style="height: 145px">
               SQL查询步骤:
               <template slot="desc">
@@ -54,7 +52,7 @@
           <Icon type="ios-crop-strong"></Icon>
           填写sql语句
         </p>
-        <Input v-model="formItem.textarea" type="textarea" :autosize="{minRows: 5,maxRows: 10}" placeholder="请输入SQL语句"></Input>
+        <editor v-model="formItem.textarea" @init="editorInit"></editor>
         <br>
         <br>
         <Button type="error" icon="trash-a" @click.native="ClearForm()">清除</Button>
@@ -78,7 +76,6 @@
   import util from '../../libs/util'
   import Csv from '../../../node_modules/iview/src/utils/csv'
   import ExportCsv from '../../../node_modules/iview/src/components/table/export-csv';
-
   const exportcsv = function exportCsv (params) {
     if (params.filename) {
       if (params.filename.indexOf('.csv') === -1) {
@@ -101,15 +98,14 @@
 
     let noHeader = false;
     if ('noHeader' in params) noHeader = params.noHeader;
-
     const data = Csv(columns, datas, params, noHeader);
     if (params.callback) params.callback(data);
     else ExportCsv.download(params.filename, data);
   }
-
   export default {
-    components: {
-      ICol
+  components: {
+      ICol,
+      editor: require('../../libs/editor')
     },
     name: 'SearchSQL',
     data () {
@@ -156,6 +152,10 @@
       }
     },
     methods: {
+      editorInit: function () {
+        require('brace/mode/mysql')
+        require('brace/theme/xcode')
+      },
       beautify () {
         axios.put(`${util.url}/sqlsyntax/beautify`, {
           'data': this.formItem.textarea
@@ -245,7 +245,7 @@
       },
       exportdata () {
         exportcsv({
-          filename: 'Sorting and filtering data',
+          filename: 'Yearning_Data',
           original: false,
           data: this.allsearchdata,
           columns: this.columnsName

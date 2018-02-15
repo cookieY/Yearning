@@ -35,6 +35,10 @@ export default {
           key: 'workid'
         },
         {
+          title: '工单说明',
+          key: 'text'
+        },
+        {
           title: '执行时间',
           key: 'date',
           sortType: 'desc'

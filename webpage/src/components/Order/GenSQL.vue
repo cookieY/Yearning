@@ -64,7 +64,7 @@
           <TabPane label="手动模式" name="order1" icon="edit">
             <Form>
               <FormItem>
-                <Input v-model="formDynamic" type="textarea" :autosize="{minRows: 15,maxRows: 15}" placeholder="请输入需要提交的DDL语句,多条sql请用;分隔"></Input>
+                <editor v-model="formDynamic" @init="editorInit"></editor>
               </FormItem>
               <FormItem>
                 <Table :columns="columnsName" :data="Testresults" highlight-row></Table>
@@ -126,7 +126,7 @@
             <Input v-model="formItem.text" placeholder="最多不超过20个字"></Input>
           </FormItem>
           <FormItem label="指定审核人:">
-            <Select v-model="formItem.assigned">
+            <Select v-model="formItem.assigned" filterable>
               <Option v-for="i in this.assigned" :value="i.username" :key="i.username">{{i.username}}</Option>
             </Select>
           </FormItem>
@@ -155,7 +155,8 @@ import ICol from 'iview/src/components/grid/col'
 export default {
   components: {
     ICol,
-    edittable
+    edittable,
+    editor: require('../../libs/editor')
   },
   data () {
     return {
@@ -366,6 +367,10 @@ export default {
     }
   },
   methods: {
+    editorInit: function () {
+      require('brace/mode/mysql')
+      require('brace/theme/xcode')
+    },
     Connection_Name (index) {
       if (index) {
         this.ScreenConnection(index)

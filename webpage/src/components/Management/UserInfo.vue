@@ -90,7 +90,7 @@
         <Input v-model="editInfodForm.department" placeholder="请输入新部门"></Input>
       </FormItem>
       <template>
-        <FormItem label="表结构修改权限:">
+        <FormItem label="DDL及索引权限:">
           <RadioGroup v-model="permission.ddl">
             <Radio label="1">是</Radio>
             <Radio label="0">否</Radio>
@@ -105,7 +105,7 @@
         </template>
         <hr style="height:1px;border:none;border-top:1px dashed #dddee1;" />
         <br>
-        <FormItem label="sql提交权限:">
+        <FormItem label="DML权限:">
           <RadioGroup v-model="permission.dml">
             <Radio label="1">是</Radio>
             <Radio label="0">否</Radio>
@@ -117,21 +117,6 @@
               <Checkbox  v-for="i in this.con" :label="i.connection_name" :key="i.connection_name">{{i.connection_name}}</Checkbox>
             </CheckboxGroup>
           </FormItem>
-      </template>
-        <hr style="height:1px;border:none;border-top:1px dashed #dddee1;" />
-        <br>
-      <FormItem label="索引提交权限:">
-        <RadioGroup v-model="permission.index">
-          <Radio label="1">是</Radio>
-          <Radio label="0">否</Radio>
-        </RadioGroup>
-      </FormItem>
-      <template v-if="permission.index === '1'">
-        <FormItem label="连接名:">
-          <CheckboxGroup v-model="permission.indexcon">
-            <Checkbox  v-for="i in this.con" :label="i.connection_name" :key="i.connection_name">{{i.connection_name}}</Checkbox>
-          </CheckboxGroup>
-        </FormItem>
       </template>
         <hr style="height:1px;border:none;border-top:1px dashed #dddee1;" />
         <br>

@@ -181,6 +181,7 @@ class userinfo(baseview.SuperUserpermissions):
             Account.objects.filter(username=args).delete()
             Usermessage.objects.filter(to_user=args).delete()
             Todolist.objects.filter(username=args).delete()
+            grained.objects.filter(username=args).delete()
             return Response('%s--用户已删除!' % args)
         except Exception as e:
             CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
@@ -214,6 +215,19 @@ class generaluser(baseview.BaseView):
                 except Exception as e:
                     CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
                     return HttpResponse(status=500)
+
+    def put(self, request, args: str = None):
+        try:
+            mail = request.data['mail']
+        except KeyError as e:
+            CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
+        else:
+            try:
+                Account.objects.filter(username=request.user).update(email=mail)
+                return Response('邮箱地址已更新!')
+            except Exception as e:
+                CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
+                return HttpResponse(status=500)
 
 
 class authgroup(baseview.BaseView):

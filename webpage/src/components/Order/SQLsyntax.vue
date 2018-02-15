@@ -39,7 +39,7 @@
             </FormItem>
 
             <FormItem label="指定审核人:" prop="assigned">
-              <Select v-model="formItem.assigned">
+              <Select v-model="formItem.assigned" filterable>
                 <Option v-for="i in this.assigned" :value="i.username" :key="i.username">{{i.username}}</Option>
               </Select>
             </FormItem>
@@ -83,7 +83,7 @@
         <Icon type="ios-crop-strong"></Icon>
         填写sql语句
       </p>
-      <Input v-model="formItem.textarea" type="textarea" :autosize="{minRows: 15,maxRows: 15}" placeholder="请输入需要提交的SQL语句,多条sql请用;分隔" autocomplete="on"></Input>
+      <editor v-model="formItem.textarea" @init="editorInit"></editor>
       <br>
       <br>
       <Table :columns="columnsName" :data="Testresults" highlight-row></Table>
@@ -99,7 +99,8 @@ import Cookies from 'js-cookie'
 import util from '../../libs/util'
 export default {
   components: {
-    ICol
+    ICol,
+    editor: require('../../libs/editor')
   },
   name: 'SQLsyntax',
   data () {
@@ -196,6 +197,10 @@ export default {
     }
   },
   methods: {
+    editorInit: function () {
+      require('brace/mode/mysql')
+      require('brace/theme/xcode')
+    },
     beautify () {
       axios.put(`${util.url}/sqlsyntax/beautify`, {
           'data': this.formItem.textarea

@@ -16,11 +16,15 @@
   <MenuItem name="main">
   <Icon type="cube" size="50" class="MenuIcon"></Icon>
   <br>
-  <span>Yearning SQL审计平台</span>
+  <span>Yearning SQL审核平台</span>
   </MenuItem>
   <MenuItem name="home_index">
   <Icon type="home" :size="iconSize"></Icon>
   <span class="layout-text">首页</span>
+  </MenuItem>
+  <MenuItem name="myorder">
+    <Icon type="person" :size="iconSize"></Icon>
+    <span class="layout-text">我的工单</span>
   </MenuItem>
   <template v-for="item in menuList">
       <Submenu v-if="item.children.length>=1 && item.name !== 'main'" :name="item.name" :key="item.path">
@@ -31,7 +35,7 @@
   <template v-for="child in item.children">
           <MenuItem :name="child.name" :key="child.name" style="margin-left: -5%">
             <Icon :type="child.icon" :size="iconSize" :key="child.name"></Icon>
-            <span class="layout-text" :key="child.name">{{ child.title }}</span>
+            <span class="layout-text" :key="child.name + 1">{{ child.title }}</span>
           </MenuItem>
         </template>
   </Submenu>
