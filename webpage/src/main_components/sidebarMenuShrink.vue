@@ -28,6 +28,14 @@
   </Dropdown>
   </template>
   <Dropdown placement="right-start" @on-click="changeMenu">
+    <Button @click="changeMenu()" style="width: 70px;margin-left: -5px;padding:10px 0;" type="text">
+      <Icon type="person" size="20" :color="iconColor"></Icon>
+    </Button>
+    <DropdownMenu slot="list">
+      <DropdownItem name="myorder" key="myorder">我的工单</DropdownItem>
+    </DropdownMenu>
+  </Dropdown>
+  <Dropdown placement="right-start" @on-click="changeMenu">
     <Button @click="changeMenu('login')" style="width: 70px;margin-left: -5px;padding:10px 0;" type="text">
           <Icon type="log-out" size="20" :color="iconColor"></Icon>
     </Button>

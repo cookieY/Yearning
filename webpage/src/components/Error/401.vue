@@ -7,9 +7,9 @@
   <div class="error401-body-con">
     <Card>
       <div class="error401-body-con-title">4<span class="error401-0-span"><Icon type="android-lock"></Icon></span><span class="error401-key-span"><Icon type="key"></Icon></span></div>
-      <p class="error401-body-con-message">Sorry You don't have permission</p>
+      <p class="error401-body-con-message">对不起,该用户没有此页面访问权限，请联系管理员!</p>
       <div class="error401-btn-con">
-        <Button @click="goHome" size="large" style="width: 200px;" type="text">返回登陆页</Button>
+        <Button @click="goHome" size="large" style="width: 200px;" type="text">返回首页</Button>
         <Button @click="backPage" size="large" style="width: 200px;margin-left: 40px;" type="primary">返回上一页</Button>
       </div>
     </Card>
@@ -22,11 +22,11 @@ export default {
   name: 'Error401',
   methods: {
     backPage () {
-      this.$router.go(-1);
+      this.$router.go(-2);
     },
     goHome () {
       this.$router.push({
-        name: 'login'
+        name: 'home_index'
       });
     }
   }

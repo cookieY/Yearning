@@ -9,8 +9,8 @@ from core.models import (
     Usermessage,
     Account,
     DatabaseList,
-    Todolist
-
+    Todolist,
+    grained
 )
 from libs.serializers import (
     UserINFO,
@@ -68,7 +68,11 @@ class maindata(baseview.BaseView):
                         state='unread',
                         to_user=user
                         ).aggregate(messagecount=Count('id'))
-                    return Response(count)
+                    statement = Account.objects.filter(username=request.user).first()
+                    if statement.id == 1:
+                        return Response({'count':count,'statement':statement.last_name})
+                    else:
+                        return Response({'count': count, 'statement': '1'})
                 except Exception as e:
                     CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
                     return HttpResponse(status=500)
@@ -109,7 +113,13 @@ class maindata(baseview.BaseView):
             user = request.data['user']
             info = Account.objects.filter(username=user).get()
             _serializers = UserINFO(info)
-            return Response(_serializers.data)
+            permissons = grained.objects.filter(username=request.user).first()
+
+            return Response({'userinfo':_serializers.data,'permissons': permissons.permissions})
+
+        elif args == 'statement':
+            Account.objects.filter(username=request.user).update(last_name='1')
+            return Response('')
 
     def post(self, request, args=None):
         try:

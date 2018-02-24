@@ -52,15 +52,15 @@ class DbInfo(object):
         '''根据数据库链接名 和数据库名 获取此连接下的schemal的表名称信息'''
         if TableName:
             sql = f'''
-            select  `TableName`,`TableComment`  \
+            select  `TableName`  \
             from core_sqldictionary where Name='{ConnName}' and \
-            BaseName ='{SchemalName}' group by TableName,`TableComment`
+            BaseName ='{SchemalName}' and TableName = '{TableName}' group by `TableName`
             '''
             return self.execute(sql)
         else:
-            sql = f"select  `TableName`,`TableComment`  from core_sqldictionary \
+            sql = f"select  `TableName`  from core_sqldictionary \
             where Name='{ConnName}' and BaseName ='{SchemalName}' and TableName = '{TableName}' \
-            group by TableName,`TableComment` limit 1"
+            group by TableName limit 1"
             return self.execute(sql)
 
     def getTableInfo(self, ConnName, SchemalName=None, TableName=None):
@@ -96,12 +96,12 @@ class ToWord:
 
         for tableName in TableList:
             tabSet = self.turnOjb.getTableName(
-                ConnName=Conn, 
-                SchemalName=Schemal, 
+                ConnName=Conn,
+                SchemalName=Schemal,
                 TableName=tableName)
             self.document.add_page_break()
             self.document.add_heading(
-                '%s : %s' % ([TB[0] for TB in tabSet][0], [TB[1] for TB in tabSet][0]), level=2
+                '%s' %[TB[0] for TB in tabSet][0], level=2
                 )
             table = self.document.add_table(rows=1, cols=5)
             table.style = 'LightShading-Accent1'
@@ -145,4 +145,14 @@ class ToWord:
                 cells[2].text = '%s' % column[6]
                 cells[3].text = '%s' % column[7]
                 cells[4].text = '%s' % column[8]
-        self.document.save('%s_%s_数据字典.docx' % (Conn, Schemal))
+        self.document.save('./exportData/%s_%s_数据字典.docx' % (Conn, Schemal))
+
+if __name__ == "__main__":
+
+    a = ToWord(
+                Host='127.0.0.1',
+                User='root',
+                Password='19931003',
+                Database='Yearning',
+                Charset='utf8')
+    c=a.exportTables(Conn='test',Schemal='Yearning',TableList=['auth_group', 'core_account'])

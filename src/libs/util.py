@@ -73,7 +73,8 @@ def conf_path() -> object:
     conf_set = namedtuple("name", ["db", "address", "port", "username", "password", "ipaddress",
                                    "inc_host", "inc_port", "inc_user", "inc_pwd", "backupdb",
                                    "backupport", "backupuser", "backuppassword","ladp_server",
-                                   "ldap_scbase","ladp_domain", "mail_user","mail_password","smtp"])
+                                   "ldap_scbase","ladp_domain", "ladp_type","mail_user","mail_password","smtp",
+                                   "smtp_port"])
 
     return conf_set(_conf.get('mysql', 'db'), _conf.get('mysql', 'address'),
                     _conf.get('mysql', 'port'), _conf.get('mysql', 'username'),
@@ -82,20 +83,35 @@ def conf_path() -> object:
                     _conf.get('Inception', 'user'), _conf.get('Inception', 'password'),
                     _conf.get('Inception', 'backupdb'), _conf.get('Inception', 'backupport'),
                     _conf.get('Inception', 'backupuser'), _conf.get('Inception', 'backuppassword'),
-                    _conf.get('LDAP','LDAP_SERVER'),_conf.get('LDAP','LDAP_SCBASE'),_conf.get('LDAP','LDAP_DOMAIN'),
-                    _conf.get('email', 'username'), _conf.get('email', 'password'), _conf.get('email', 'smtp_server'))
+                    _conf.get('LDAP','LDAP_SERVER'),_conf.get('LDAP','LDAP_SCBASE'),_conf.get('LDAP','LDAP_DOMAIN'),_conf.get('LDAP','LDAP_TYPE'),
+                    _conf.get('email', 'username'), _conf.get('email', 'password'), _conf.get('email', 'smtp_server'),
+                    _conf.get('email', 'smtp_port'))
 
 def auth(username, password):
     conf = conf_path()
     LDAP_SERVER = conf.ladp_server
     LDAP_DOMAIN = conf.ladp_domain
-    c = ldap3.Connection(
-        ldap3.Server(LDAP_SERVER, get_info=ldap3.ALL),
-        user=username + '@' + LDAP_DOMAIN,
-        password=password)
-    ret = c.bind()
-    if ret:
-        c.unbind()
-        return True
+    LDAP_TYPE = conf.ladp_type
+    LDAP_SCBASE = conf.ldap_scbase
+    if LDAP_TYPE == '1':
+        c = ldap3.Connection(
+            ldap3.Server(LDAP_SERVER, get_info=ldap3.ALL),
+            user=username + '@' + LDAP_DOMAIN,
+            password=password)
+        ret = c.bind()
+        if ret:
+            c.unbind()
+            return True
+        else:
+            return False
     else:
-        return False
+        c = ldap3.Connection(
+            ldap3.Server(LDAP_SERVER, get_info=ldap3.ALL),
+            user="uid=%s,%s"%(username,LDAP_SCBASE),
+            password=password)
+        ret = c.bind()
+        if ret:
+            c.unbind()
+            return True
+        else:
+            return False

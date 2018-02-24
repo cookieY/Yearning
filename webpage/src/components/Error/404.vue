@@ -22,11 +22,11 @@ export default {
   name: 'Error404',
   methods: {
     backPage () {
-      this.$router.go(-1);
+      this.$router.go(-2);
     },
     goHome () {
       this.$router.push({
-        name: 'login'
+        name: 'home_index'
       });
     }
   }

@@ -19,6 +19,7 @@
           >
         <Button type="text" style="margin-left: -1%">删除记录</Button>
         </Poptip>
+        <Button type="text" style="margin-left: -1%" @click.native="mou_data()">刷新</Button>
         <Table border :columns="columns6" :data="tmp" stripe ref="selection" @on-selection-change="delrecordList"></Table>
         <br>
         <Page :total="pagenumber" show-elevator @on-change="splicpage" :page-size="20" ref="page"></Page>
@@ -285,7 +286,6 @@ export default {
             title: '执行成功',
             desc: res.data
           })
-          this.mou_data()
           this.$refs.page.currentPage = 1
         })
         .catch(error => {

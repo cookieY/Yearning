@@ -1,6 +1,8 @@
 import logging
+import json
 from libs import baseview
 from libs import util
+from core.task import grained_permissions
 from libs.serializers import UserINFO
 from rest_framework.response import Response
 from django.http import HttpResponse
@@ -10,7 +12,8 @@ from rest_framework_jwt.settings import api_settings
 from core.models import (
     Account,
     Usermessage,
-    Todolist
+    Todolist,
+    grained
 )
 CUSTOM_ERROR = logging.getLogger('Yearning.core.views')
 
@@ -44,7 +47,6 @@ class userinfo(baseview.SuperUserpermissions):
             del user
       
     '''
-
     def get(self, request, args=None):
         if args == 'all':
             try:
@@ -63,6 +65,12 @@ class userinfo(baseview.SuperUserpermissions):
                 except Exception as e:
                     CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
                     return HttpResponse(e)
+
+        elif args == 'permissions':
+            user = request.GET.get('user')
+            user=grained.objects.filter(username=user).first()
+            return Response(user.permissions)
+
 
     def put(self, request, args=None):
         if args == 'changepwd':
@@ -88,25 +96,29 @@ class userinfo(baseview.SuperUserpermissions):
                 username = request.data['username']
                 group = request.data['group']
                 department = request.data['department']
+                permission = json.loads(request.data['permission'])
             except KeyError as e:
                 CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
                 return HttpResponse(status=500)
             else:
                 try:
+                    if grained.objects.filter(username=username).first():
+                        grained.objects.filter(username=username).update(permissions=permission)
+                    else:
+                        grained.objects.get_or_create(username=username, permissions=permission)
                     if group == 'admin':
                         Account.objects.filter(username=username).update(
                             group=group,
                             department=department,
                             is_staff=1
                             )
-                        return Response('%s--用户组修改成功!' % username)
                     elif group == 'guest':
                         Account.objects.filter(username=username).update(
                             group=group,
                             department=department, 
                             is_staff=0
                             )
-                        return Response('%s--用户组修改成功!' % username)
+                    return Response('%s--权限修改成功!' % username)
                 except Exception as e:
                     CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
                     return HttpResponse(status=500)
@@ -168,6 +180,7 @@ class userinfo(baseview.SuperUserpermissions):
             Account.objects.filter(username=args).delete()
             Usermessage.objects.filter(to_user=args).delete()
             Todolist.objects.filter(username=args).delete()
+            grained.objects.filter(username=args).delete()
             return Response('%s--用户已删除!' % args)
         except Exception as e:
             CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
@@ -202,6 +215,19 @@ class generaluser(baseview.BaseView):
                     CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
                     return HttpResponse(status=500)
 
+    def put(self, request, args: str = None):
+        try:
+            mail = request.data['mail']
+        except KeyError as e:
+            CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
+        else:
+            try:
+                Account.objects.filter(username=request.user).update(email=mail)
+                return Response('邮箱地址已更新!')
+            except Exception as e:
+                CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
+                return HttpResponse(status=500)
+
 
 class authgroup(baseview.BaseView):
     '''
@@ -210,18 +236,15 @@ class authgroup(baseview.BaseView):
 
     '''
 
+    @grained_permissions
     def post(self, request, args=None):
         try:
-            user = request.data['user']
-        except KeyError as e:
+            _type = request.data['permissions_type'] + 'edit'
+            permission = grained.objects.filter(username=request.user).first()
+            return Response(permission.permissions[_type])
+        except Exception as e:
             CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
-        else:
-            try:
-                info = Account.objects.filter(username=user).get()
-                return Response(info.group)
-            except Exception as e:
-                CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
-                return HttpResponse(status=500)
+            return HttpResponse(status=500)
 
 
 class ldapauth(baseview.AnyLogin):

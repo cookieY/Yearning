@@ -35,6 +35,10 @@ export default {
           key: 'workid'
         },
         {
+          title: '工单说明',
+          key: 'text'
+        },
+        {
           title: '执行时间',
           key: 'date',
           sortType: 'desc'
@@ -89,7 +93,7 @@ export default {
   },
   methods: {
     getrecordinfo (vl = 1) {
-      axios.get(`${util.url}/record?page=${vl}&username=${Cookies.get('user')}`)
+      axios.get(`${util.url}/record/all?page=${vl}&username=${Cookies.get('user')}`)
         .then(res => {
           this.TableDataNew = res.data.data
           this.pagenumber = res.data.page

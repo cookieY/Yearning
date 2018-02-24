@@ -19,11 +19,46 @@
         <FormItem label="部门：">
           <span>{{ userForm.department }}</span>
         </FormItem>
-        <FormItem label="权限：">
+        <FormItem label="权限分类：">
           <span>{{ userForm.group }}</span>
         </FormItem>
-        <FormItem label="登录密码：">
+        <FormItem label="具体权限：">
+          <br>
+        <FormItem label="DDL提交权限:">
+          <p>{{formItem.ddl}}</p>
+        </FormItem>
+          <FormItem label="可访问的连接名:" v-if="formItem.ddl === '是'">
+            <p>{{formItem.ddlcon}}</p>
+          </FormItem>
+          <FormItem label="DML提交权限:">
+            <p>{{formItem.dml}}</p>
+          </FormItem>
+          <FormItem label="可访问的连接名:" v-if="formItem.dml === '是'">
+            <p>{{formItem.dmlcon}}</p>
+          </FormItem>
+          <FormItem label="字典查看权限:">
+            <p>{{formItem.dic}}</p>
+          </FormItem>
+          <FormItem label="可访问的连接名:" v-if="formItem.dic === '是'">
+            <p>{{formItem.diccon}}</p>
+          </FormItem>
+          <FormItem label="数据查询权限:">
+            <p>{{formItem.query}}</p>
+          </FormItem>
+          <FormItem label="可访问的连接名:" v-if="formItem.query === '是'">
+            <p>{{formItem.querycon}}</p>
+          </FormItem>
+          <FormItem label="用户管理权限:">
+            <p>{{formItem.user}}</p>
+          </FormItem>
+          <FormItem label="数据库管理权限:">
+            <p>{{formItem.base}}</p>
+          </FormItem>
+        </FormItem>
+        <FormItem label="编辑：">
           <Button type="text" size="small" @click="editPasswordModal=true">修改密码</Button>
+          <br>
+          <Button type="text" size="small" @click="editEmailModal=true">修改邮箱</Button>
         </FormItem>
       </Form>
     </div>
@@ -46,6 +81,18 @@
       <Button type="primary" :loading="savePassLoading" @click="saveEditPass">保存</Button>
     </div>
   </Modal>
+  <Modal v-model="editEmailModal" :closable='false' :mask-closable=false :width="500">
+    <h3 slot="header" style="color:#2D8CF0">邮箱修改</h3>
+    <Form :label-width="100" label-position="right">
+      <FormItem label="邮箱地址">
+        <Input v-model="editEmailForm.mail"></Input>
+      </FormItem>
+    </Form>
+    <div slot="footer">
+      <Button type="text" @click="editEmailModal=false">取消</Button>
+      <Button type="primary" :loading="savePassLoading" @click="saveEmail">保存</Button>
+    </div>
+  </Modal>
 </div>
 </template>
 
@@ -53,6 +100,17 @@
 import Cookies from 'js-cookie'
 import util from '../../libs/util'
 import axios from 'axios'
+const exchangetype = function typeok (vl) {
+  if (typeof vl === 'string') {
+    if (vl === '1') {
+      return '是'
+    } else {
+      return '否'
+    }
+  } else {
+    return vl.toString()
+  }
+}
 export default {
   name: 'own-space',
   data () {
@@ -64,10 +122,19 @@ export default {
       }
     };
     return {
+      editEmailModal: false,
+      editEmailForm: {
+        mail: ''
+      },
       userForm: {
         name: '',
         group: '',
-        department: ''
+        department: '',
+        permisson: []
+      },
+      formItem: {
+        ddl: '',
+        ddlcon: ''
       },
       uid: '', // 登录用户的userId
       save_loading: false,
@@ -142,14 +209,39 @@ export default {
         this.editPasswordForm[i] = ''
       }
     },
+    saveEmail () {
+      this.savePassLoading = true;
+      axios.put(`${util.url}/otheruser/mail`, {'mail': this.editEmailForm.mail})
+        .then(res => {
+          this.$Notice.success({
+            title: '通知',
+            desc: res.data
+          })
+          this.editEmailModal = false;
+        })
+        .catch(error => {
+          util.ajanxerrorcode(this, error)
+        })
+      this.savePassLoading = false
+    },
     init () {
       axios.put(`${util.url}/homedata/ownspace`, {
           'user': Cookies.get('user')
         })
         .then(res => {
           this.userForm.name = Cookies.get('user');
-          this.userForm.group = res.data.group;
-          this.userForm.department = res.data.department;
+          this.userForm.group = res.data.userinfo.group;
+          this.userForm.department = res.data.userinfo.department;
+          this.formItem.ddl = exchangetype(res.data.permissons.ddl)
+          this.formItem.ddlcon = exchangetype(res.data.permissons.ddlcon)
+          this.formItem.dml = exchangetype(res.data.permissons.dml)
+          this.formItem.dmlcon = exchangetype(res.data.permissons.dmlcon)
+          this.formItem.dic = exchangetype(res.data.permissons.dic)
+          this.formItem.diccon = exchangetype(res.data.permissons.diccon)
+          this.formItem.query = exchangetype(res.data.permissons.query)
+          this.formItem.querycon = exchangetype(res.data.permissons.querycon)
+          this.formItem.user = exchangetype(res.data.permissons.user)
+          this.formItem.base = exchangetype(res.data.permissons.base)
         })
     }
   },

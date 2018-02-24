@@ -100,7 +100,7 @@
               <Input v-model="formItem.text" placeholder="最多不超过20个字"></Input>
             </FormItem>
             <FormItem label="指定审核人:">
-              <Select v-model="formItem.assigned">
+              <Select v-model="formItem.assigned" filterable>
                 <Option v-for="i in this.assigned" :value="i.username" :key="i.username">{{i.username}}</Option>
               </Select>
             </FormItem>
@@ -273,8 +273,7 @@
         }
       },
       getdatabases () {
-        this.delinfo()
-        axios.put(`${util.url}/workorder/connection`)
+        axios.put(`${util.url}/workorder/connection`, {'permissions_type': 'ddl'})
           .then(res => {
             this.item = res.data['connection']
             this.assigned = res.data['person']
@@ -322,24 +321,26 @@
         })
       },
       canel () {
-        this.$refs['formItem'].resetFields();
-        this.delinfo()
-      },
-      delinfo () {
-        this.tableform.sqlname = []
-        this.tableform.basename = []
-        this.tableform.info = []
-        this.formItem.connection_name = ''
-        this.formItem.computer_room = ''
-        this.formItem.basename = ''
-        this.formItem.table_name = ''
-        this.formItem.tablename = ''
-        this.TableDataOld = []
-        this.TableDataNew = []
+        // this.$refs['formItem'].resetFields();
+        // this.delinfo()
         this.sql = []
         this.pass = false
-        this.indexinfo = []
       },
+      // delinfo () {
+      //   this.tableform.sqlname = []
+      //   this.tableform.basename = []
+      //   this.tableform.info = []
+      //   this.formItem.connection_name = ''
+      //   this.formItem.computer_room = ''
+      //   this.formItem.basename = ''
+      //   this.formItem.table_name = ''
+      //   this.formItem.tablename = ''
+      //   this.TableDataOld = []
+      //   this.TableDataNew = []
+      //   this.sql = []
+      //   this.pass = false
+      //   this.indexinfo = []
+      // },
       getindex () {
         if (this.formItem.table_name) {
           axios.put(`${util.url}/workorder/indexdata`, {

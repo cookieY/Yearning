@@ -1,16 +1,15 @@
-from django.views.generic.base import View
-from django.utils.decorators import method_decorator
-from rest_framework.decorators import api_view
 from rest_framework.permissions import (
     IsAdminUser,
-    AllowAny
+    IsAuthenticated,
+    BasePermission
 )
+from core.models import globalpermissions
 from rest_framework.views import APIView
 
-@method_decorator(api_view(['DELETE', 'GET', 'POST', 'PUT']), 'dispatch')
-class BaseView(View):
-    def dispatch(self, *args, **kwargs):
-        return super(BaseView, self).dispatch(*args, **kwargs)
+
+class BaseView(APIView):
+
+    permission_classes = (IsAuthenticated,)
 
     def get(self, request, args: str = None):
         pass
@@ -58,3 +57,18 @@ class AnyLogin(APIView):
 
     def delete(self, request, args: str = None):
         pass
+
+
+'''
+
+平台页面权限permission
+
+'''
+
+
+class WebPermission(BasePermission):
+
+    def has_permission(self, request, view):
+        permisson = globalpermissions.objects.filter(authorization=request.user).first()
+        if permisson is not None and permisson.dingding == 0:
+            return True

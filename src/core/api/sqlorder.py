@@ -4,6 +4,7 @@ from libs import send_email
 from libs import baseview
 from libs import call_inception
 from libs import util
+from core.task import submit_push_messages
 from rest_framework.response import Response
 from django.http import HttpResponse
 from core.models import (
@@ -96,36 +97,15 @@ class sqlorder(baseview.BaseView):
                     bundle_id=id,
                     assigned=data['assigned']
                     )
-                content = DatabaseList.objects.filter(id=id).first()
-                mail = Account.objects.filter(username=data['assigned']).first()
-                tag = globalpermissions.objects.filter(authorization='global').first()
-                ret_info = '已提交，请等待管理员审核!'
-                if tag is None or tag.dingding == 0:
-                    pass
-                else:
-                    if content.url:
-                        try:
-                            util.dingding(
-                                content='工单提交通知\n工单编号:%s\n发起人:%s\n地址:%s\n工单说明:%s\n状态:已提交\n备注:%s'
-                                        %(workId,user,addr_ip,data['text'],content.before), url=content.url)
-                        except:
-                            ret_info = '工单执行成功!但是钉钉推送失败,请查看错误日志排查错误.'
-                if tag is None or tag.email == 0:
-                    pass
-                else:
-                    if mail.email:
-                        mess_info = {
-                            'workid': workId,
-                            'to_user': user,
-                            'addr': addr_ip,
-                            'text': data['text'],
-                            'note': content.before}
-                        try:
-                            put_mess = send_email.send_email(to_addr=mail.email)
-                            put_mess.send_mail(mail_data=mess_info, type=2)
-                        except:
-                            ret_info = '工单执行成功!但是邮箱推送失败,请查看错误日志排查错误.'
-                return Response(ret_info)
+                submit_push_messages(
+                    workId=workId,
+                    user=user,
+                    addr_ip=addr_ip,
+                    text=data['text'],
+                    assigned=data['assigned'],
+                    id=id
+                ).start()
+                return Response('已提交，请等待管理员审核!')
             except Exception as e:
                 CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
                 return HttpResponse(status=500)

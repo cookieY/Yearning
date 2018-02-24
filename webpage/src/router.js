@@ -87,40 +87,32 @@ export const appRouter = [
     path: '/order',
     icon: 'folder',
     name: 'order',
-    title: '工单',
+    title: '工单提交',
     component: Index,
     children: [
-      {
-        path: 'myorder',
-        name: 'myorder',
-        title: '我的工单',
-        'icon': 'person',
-        component: resolve => {
-          require(['./components/Order/MyOrder.vue'], resolve)
-        }
-      }, {
+    {
         path: 'ddledit',
         name: 'ddledit',
-        title: '表结构修改',
+        title: 'DDL',
         'icon': 'compose',
         component: resolve => {
           require(['./components/Order/GenSQL.vue'], resolve)
         }
       }, {
-        path: 'indexedit',
-        name: 'indexedit',
-        title: '索引修改',
-        'icon': 'share',
-        component: resolve => {
-          require(['./components/Order/GenIndex.vue'], resolve)
-        }
-      }, {
         path: 'dmledit',
         name: 'dmledit',
-        title: 'SQL语句提交',
+        title: 'DML',
         'icon': 'code',
         component: resolve => {
           require(['./components/Order/SQLsyntax.vue'], resolve)
+        }
+      }, {
+        path: 'indexedit',
+        name: 'indexedit',
+        title: '索引',
+        'icon': 'share',
+        component: resolve => {
+          require(['./components/Order/GenIndex.vue'], resolve)
         }
       }
     ]
@@ -128,7 +120,7 @@ export const appRouter = [
     path: '/view',
     icon: 'search',
     name: 'view',
-    title: '查看',
+    title: '查询',
     component: Index,
     children: [
       {
@@ -212,12 +204,33 @@ export const orderList = {
       }
     }
   ]
-};
-export const MainRoute = [
+}
+
+export const myorder = {
+  path: '/',
+  icon: 'home',
+  name: 'main',
+  title: '首页',
+  component: Index,
+  redirect: '/home',
+  children: [
+    {
+      path: 'myorder',
+      name: 'myorder',
+      title: '我的工单',
+      'icon': 'person',
+      component: resolve => {
+        require(['./components/Order/MyOrder.vue'], resolve)
+      }
+    }
+  ]
+}
+  export const MainRoute = [
   loginRouter,
   locking,
   ...appRouter,
   orderList,
+  myorder,
   page404,
   page401,
   page500

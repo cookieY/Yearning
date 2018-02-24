@@ -340,6 +340,7 @@ export default {
                 title: '通知',
                 desc: '数据库信息添加成功!'
               })
+              this.mountdata()
             })
             .catch(error => {
               this.$Notice.error({
@@ -348,7 +349,6 @@ export default {
               })
             })
           this.del()
-          this.mountdata()
         }
       })
     },
@@ -372,23 +372,30 @@ export default {
           duration: 5
         })
       } else {
-        this.$Loading.start()
-        axios.put(`${util.url}/adminsql/deldic`, {
+        if (this.dictionary.getdel.length === 0) {
+          this.$Message.error({
+            content: '请选择相应的数据表再删除!',
+            duration: 5
+          })
+        } else {
+          this.$Loading.start()
+          axios.put(`${util.url}/adminsql/deldic`, {
             'name': this.dictionary.delname,
             'basename': this.dictionary.getdel
           })
-          .then(res => {
-            this.$Notice.success({
-              title: '通知',
-              desc: res.data
+            .then(res => {
+              this.$Notice.success({
+                title: '通知',
+                desc: res.data
+              })
+              this.$Loading.finish()
+              this.cleardata()
             })
-            this.$Loading.finish()
-            this.cleardata()
-          })
-          .catch(error => {
-            util.ajanxerrorcode(this, error)
-            this.$Loading.error()
-          })
+            .catch(error => {
+              util.ajanxerrorcode(this, error)
+              this.$Loading.error()
+            })
+        }
       }
     },
     // 生成数据库字典
@@ -417,10 +424,10 @@ export default {
             'id': this.tmp_id,
             'basename': JSON.stringify(this.dictionary.databases)
           })
-          .then(() => {
+          .then(res => {
             this.$Notice.success({
               title: '通知',
-              desc: '数据库字典生成成功！'
+              desc: res.data
             })
             this.$Spin.hide();
             this.cleardata()
@@ -481,14 +488,16 @@ export default {
     },
     // 重置
     cleardata () {
+      this.dictionary.name = ''
       this.dictionary.databases = []
       this.dictionary.databasesList = []
       this.dictionary.getdellist = []
       this.dictionary.getdel = []
+      this.dictionary.delname = ''
     },
     delbaselink () {
       if (this.delbasename === this.delconfirmbasename) {
-        axios.delete(util.url + '/mamagement_sql/' + this.delbasename)
+        axios.delete(`${util.url}/mamagement_sql?del=${this.delbasename}`)
           .then(res => {
             this.$Notice.success({
               title: '通知',
@@ -511,7 +520,7 @@ export default {
       this.mountdata(page)
     },
     mountdata (vl = 1) {
-      axios.get(`${util.url}/mamagement_sql?page=${vl}`)
+      axios.get(`${util.url}/mamagement_sql?page=${vl}&permissions_type=base`)
         .then(res => {
           this.rowdata = res.data.data
           this.pagenumber = parseInt(res.data.page.alter_number)

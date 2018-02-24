@@ -8,6 +8,7 @@ conf = util.conf_path()
 from_addr = conf.mail_user
 password = conf.mail_password
 smtp_server = conf.smtp
+smtp_port = conf.smtp_port
 
 
 class send_email(object):
@@ -68,7 +69,7 @@ class send_email(object):
         msg['To'] = self._format_addr('Dear_guest <%s>' % self.to_addr)
         msg['Subject'] = Header('Yearning 工单消息推送', 'utf-8').encode()
 
-        server = smtplib.SMTP(smtp_server, 25)
+        server = smtplib.SMTP(smtp_server, int(smtp_port))
         server.set_debuglevel(1)
         server.login(from_addr, password)
         server.sendmail(from_addr, [self.to_addr], msg.as_string())

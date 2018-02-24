@@ -4,7 +4,8 @@
 
 # Yearning SQL审核平台
 
-![](https://img.shields.io/badge/build-passing-brightgreen.svg)  
+![](https://img.shields.io/badge/build-release-brightgreen.svg)  
+![](https://img.shields.io/badge/version-v1.0.0-brightgreen.svg)  
 ![](https://img.shields.io/badge/vue.js-2.5.0-brightgreen.svg) 
 ![](https://img.shields.io/badge/iview-2.8.0-brightgreen.svg?style=flat-square) 
 ![](https://img.shields.io/badge/python-3.6-brightgreen.svg)
@@ -13,8 +14,11 @@
 基于Inception的整套sql审核平台解决方案。
 
 ## Feature 功能：
+
 - 数据库字典自动生成
 - SQL查询
+    - 查询导出
+    - 查询自动补全 
 - SQL可视化自动生成
     - INDEX 索引语句
     - ALTER 更改表结构语句
@@ -32,7 +36,7 @@
     - todoList
     - LDAP登陆   
 - 用户权限及管理
-
+    - 拼图式权限划分(共12项独立权限,可随意组合)
 ## Environment 环境
 
 - Python 3.6
@@ -93,7 +97,7 @@ docker版本不支持e-mail推送及ldap登陆
 
 ## License
 
-- MIT
+- Apache 2.0
 
 2018 © Cookie
 
