@@ -97,7 +97,6 @@ class userinfo(baseview.SuperUserpermissions):
                 group = request.data['group']
                 department = request.data['department']
                 permission = json.loads(request.data['permission'])
-                print(permission)
             except KeyError as e:
                 CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
                 return HttpResponse(status=500)

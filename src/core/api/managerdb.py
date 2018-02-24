@@ -11,7 +11,8 @@ from core.models import (
     SqlDictionary,
     SqlRecord,
     SqlOrder,
-    globalpermissions
+    globalpermissions,
+    grained
 )
 from libs.serializers import (
     Sqllist
@@ -111,6 +112,12 @@ class managementdb(baseview.SuperUserpermissions):
             SqlOrder.objects.filter(bundle_id=id.id).delete()
             SqlRecord.objects.filter(name=connection_name).delete()
             DatabaseList.objects.filter(connection_name=connection_name).delete()
+            per = grained.objects.all().values('username', 'permissions')
+            for i in per:
+                for c in i['permissions']:
+                    if isinstance(i['permissions'][c], list) and c != 'diccon':
+                        i['permissions'][c] = list(filter(lambda x: x != connection_name, i['permissions'][c]))
+                grained.objects.filter(username=i['username']).update(permissions=i['permissions'])
             return Response('数据库信息已删除!')
         except Exception as e:
             CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')

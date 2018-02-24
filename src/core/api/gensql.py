@@ -76,7 +76,8 @@ class addressing(baseview.BaseView):
                     permissionslist = grained.objects.filter(username=request.user).first()
                     for i in permissionslist.permissions[_type]:
                         con=DatabaseList.objects.filter(connection_name=i).first()
-                        _c.append({'id': con.id, 'connection_name': con.connection_name, 'ip': con.ip, 'computer_room': con.computer_room})
+                        if con:
+                            _c.append({'id': con.id, 'connection_name': con.connection_name, 'ip': con.ip, 'computer_room': con.computer_room})
                     dic = ''
                 info = Account.objects.filter(is_staff=1).all()
                 serializers = UserINFO(info, many=True)

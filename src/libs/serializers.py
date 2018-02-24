@@ -34,8 +34,7 @@ class SQLGeneratDic(serializers.HyperlinkedModelSerializer):
     class Meta:
         model = SqlDictionary
         fields = (
-            'BaseName', 'TableName', 'Field', 'Type',
-            'Null', 'Default', 'Extra', 'TableComment'
+            'BaseName', 'TableName', 'Field', 'Type','Extra', 'TableComment'
             )
 
 

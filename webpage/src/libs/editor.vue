@@ -42,7 +42,6 @@
       this.$emit('init', editor);
       editor.setOptions({
         enableBasicAutocompletion: true,
-        enableSnippets: true,
         enableLiveAutocompletion: true})
       editor.$blockScrolling = Infinity;
       editor.setFontSize(14);

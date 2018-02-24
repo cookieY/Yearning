@@ -5,7 +5,6 @@
     animation: ani-demo-spin 1s linear infinite;
 }
 </style>
-
 <template>
 <div>
   <Row>
