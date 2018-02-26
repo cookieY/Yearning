@@ -232,8 +232,8 @@ class orderdetail(baseview.BaseView):
                     spa = rollback.roll(backdb=link, opid=i)
                     sql.append(spa)
                 _h=[]
-                for i in sql[0]:
-                    _h.append(i[0])
+                for i in sql:
+                    _h.append(i[0][0])
                 _h = sorted(_h)
                 return Response({'data': data[0], 'sql': _h, 'type': 1})
             except Exception as e:

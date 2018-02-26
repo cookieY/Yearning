@@ -306,7 +306,6 @@ export default {
       this.$refs['formItem'].validate((valid) => {
         if (valid) {
           if (this.formItem.textarea) {
-            this.validate_gen = true
             this.datalist.sqllist = this.formItem.textarea.replace(/(;|；)$/gi, '').replace(/\s/g, ' ').replace(/；/g, ';').split(';')
             axios.post(`${util.url}/sqlsyntax/`, {
                 'data': JSON.stringify(this.formItem),
@@ -320,7 +319,6 @@ export default {
                   title: '成功',
                   desc: res.data
                 })
-                this.validate_gen = !this.validate_gen
                 this.ClearForm()
               })
               .catch(error => {
@@ -329,6 +327,7 @@ export default {
           } else {
             this.$Message.error('请填写sql语句后再提交!');
           }
+          this.validate_gen = true
         } else {
           this.$Message.error('表单验证失败!');
         }
