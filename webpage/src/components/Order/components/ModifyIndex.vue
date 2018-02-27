@@ -14,8 +14,8 @@
       </Select>
     <Input v-model="add_tmp.column_name" placeholder="字段名" style="width: 15%"></Input>
     <Select v-model="add_tmp.extra" placeholder="是否为全文索引" style="width: 20%" transfer>
-        <Option value="YES" >YES</Option>
-        <Option value="NO" >NO</Option>
+        <Option value="YES" >设置为全文索引</Option>
+        <Option value="NO" >不设置为全文索引</Option>
       </Select>
     <Button type="primary" @click.native="addcolumns">  添加</Button>
     <Button type="success" @click.native="confirm2()">生成索引语句</Button>
