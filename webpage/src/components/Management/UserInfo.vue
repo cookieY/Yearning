@@ -545,7 +545,14 @@ export default {
                 title: res.data
               })
               this.refreshuser()
-              this.userinfo = {}
+              this.userinfo = {
+                username: '',
+                password: '',
+                confirmpassword: '',
+                group: '',
+                checkbox: '',
+                department: '',
+                email: ''}
             })
             .catch(() => {
               this.$Notice.error({

@@ -95,10 +95,10 @@ class adminpremisson(baseview.SuperUserpermissions):
                 try:
                     for i in basename:
                         if SqlDictionary.objects.filter(BaseName=i).first():
-                            return HttpResponse('该数据库字典已存在,不可重复生成！')
+                            pass
                         else:
                             adminpremisson.DicGenerate(id, i)
-                            return HttpResponse('数据库字典生成成功！')
+                    return HttpResponse('数据库字典生成成功！')
                 except Exception as e:
                     CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
                     return HttpResponse(status=500)
@@ -114,6 +114,15 @@ class adminpremisson(baseview.SuperUserpermissions):
                 try:
                     for i in BaseName:
                         SqlDictionary.objects.filter(Name=Name, BaseName=i).delete()
+                    if SqlDictionary.objects.filter(Name=Name).first():
+                        pass
+                    else:
+                        per = grained.objects.all().values('username', 'permissions')
+                        for i in per:
+                            for c in i['permissions']:
+                                if isinstance(i['permissions'][c], list) and c == 'diccon':
+                                    i['permissions'][c] = list(filter(lambda x: x != Name, i['permissions'][c]))
+                            grained.objects.filter(username=i['username']).update(permissions=i['permissions'])
                     return Response('字典已删除！')
                 except Exception as e:
                     CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
