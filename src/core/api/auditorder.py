@@ -231,10 +231,7 @@ class orderdetail(baseview.BaseView):
                     link = _data.backup_dbname + '.' + roll
                     spa = rollback.roll(backdb=link, opid=i)
                     sql.append(spa)
-                _h=[]
-                for i in sql:
-                    _h.append(i[0][0])
-                _h = sorted(_h)
+                _h = sorted([i[0][0] for i in sql])
                 return Response({'data': data[0], 'sql': _h, 'type': 1})
             except Exception as e:
                 CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
