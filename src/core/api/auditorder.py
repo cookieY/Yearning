@@ -135,25 +135,6 @@ class audit(baseview.SuperUserpermissions):
                         CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
                         return Response({'status': '500'})
 
-    def post(self, request, args: str = None):
-        try:
-            dataid = json.loads(request.data['id'])
-        except KeyError as e:
-            CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
-        else:
-            try:
-                for i in dataid:
-                    if i['status'] == 1:
-                        workid = SqlOrder.objects.filter(id=i['id']).first()
-                        SqlRecord.objects.filter(workid=workid.work_id).delete()
-                        SqlOrder.objects.filter(id=i['id']).delete()
-                    else:
-                        SqlOrder.objects.filter(id=i['id']).delete()
-                return Response('工单数据删除成功!')
-            except Exception as e:
-                CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
-                return HttpResponse(status=500)
-
 
 class orderdetail(baseview.BaseView):
 
@@ -233,6 +214,28 @@ class orderdetail(baseview.BaseView):
                     sql.append(spa)
                 _h = sorted([i[0][0] for i in sql])
                 return Response({'data': data[0], 'sql': _h, 'type': 1})
+            except Exception as e:
+                CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
+                return HttpResponse(status=500)
+
+
+class undoOrder(baseview.BaseView):
+
+    def post(self, request, args: str = None):
+        try:
+            dataid = json.loads(request.data['id'])
+        except KeyError as e:
+            CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
+        else:
+            try:
+                for i in dataid:
+                    if i['status'] == 1:
+                        workid = SqlOrder.objects.filter(id=i['id']).first()
+                        SqlRecord.objects.filter(workid=workid.work_id).delete()
+                        SqlOrder.objects.filter(id=i['id']).delete()
+                    else:
+                        SqlOrder.objects.filter(id=i['id']).delete()
+                return Response('工单数据删除成功!')
             except Exception as e:
                 CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
                 return HttpResponse(status=500)

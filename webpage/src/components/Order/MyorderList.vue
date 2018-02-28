@@ -132,6 +132,7 @@ export default {
         axios.post(`${util.url}/detail/`, {'opid': JSON.stringify(opid), 'id': this.$route.query.id})
         .then(res => {
           this.formItem = res.data.data
+          this.formItem.backup = '0'
           this.ddlsql = res.data.sql
           this.sqltype = res.data.type
           this.reloadsql = true
@@ -199,7 +200,7 @@ export default {
     delorder () {
       let _list = []
       _list.push({'status': this.$route.query.status, 'id': this.$route.query.id})
-      axios.post(`${util.url}/audit_sql`, {
+      axios.post(`${util.url}/undoOrder`, {
         'id': JSON.stringify(_list)
       })
         .then(res => {

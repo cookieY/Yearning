@@ -36,9 +36,9 @@
               <Option v-for="item in tableform.info" :value="item" :key="item">{{ item }}</Option>
             </Select>
           </Form-item>
-          <Button type="warning" @click="canel()" style="margin-left: 20%">重置</Button>
-          <Button type="primary" @click="getinfo()" style="margin-left: 5%">连接</Button>
-          <Button type="success" @click="confirmsql()" style="margin-left: 5%">生成</Button>
+          <Button type="warning" @click="canel()" style="margin-left: 15%">重置</Button>
+          <Button type="primary" @click="getinfo()" style="margin-left: 3%">连接</Button>
+          <Button type="success" @click="confirmsql()" style="margin-left: 3%">生成</Button>
         </Form>
         <br>
         <Tabs value="order1" style="height: 300px;overflow-y: scroll;">
