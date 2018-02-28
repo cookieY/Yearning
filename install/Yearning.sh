@@ -123,8 +123,8 @@ fi
 # 05
 Data="05) Git Clone Yearning"
 echo -n $Data
-cd /opt && mv Yearning Yearning_back &> /dev/null
-git clone https://github.com/cookieY/Yearning.git &>/dev/null
+cd /opt && rm -fr Yearning_back &> /dev/null && mv Yearning Yearning_back &> /dev/null
+git clone https://github.com/cookieY/Yearning.git || failure "$Data"
 cd /opt/Yearning/src &> /dev/null
 pip3 install -r requirements.txt &>/dev/null && success "$Data" || failure "$Data" 
 

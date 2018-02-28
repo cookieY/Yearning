@@ -31,7 +31,7 @@
               <Option v-for="item in tableform.basename" :value="item" :key="item">{{ item }}</Option>
             </Select>
           </Form-item>
-          <Form-item label="数据库表名:" prop="tablename">
+          <Form-item label="数据库表名:">
             <Select v-model="formItem.tablename" placeholder="请选择" filterable>
               <Option v-for="item in tableform.info" :value="item" :key="item">{{ item }}</Option>
             </Select>
@@ -424,12 +424,11 @@ export default {
       })
     },
     handleSubmit () {
-      let createtable = this.formDynamic.split(';')
+      let createtable = this.formDynamic.replace(/(;|；)$/gi, '').replace(/\s/g, ' ').replace(/；/g, ';').split(';')
       this.validate_gen = true
       for (let i of createtable) {
         this.sql.push(i)
       }
-      this.sql.splice(-1, 1)
     },
     DataBaseName (index) {
       if (index) {
