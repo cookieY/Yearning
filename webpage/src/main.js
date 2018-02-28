@@ -19,7 +19,6 @@ Vue.use(iView)
 Vue.use(VueRouter)
 Vue.prototype.$http = axios
 /* eslint-disable no-new */
-
 const RouterConfig = {
   routes: MainRoute
 }

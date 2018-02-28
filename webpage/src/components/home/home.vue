@@ -149,7 +149,7 @@ export default {
       username: Cookies.get('user'),
       time: '',
       board: {
-        'title': ['1.SQL可视化自动生成', '2.数据库字典', '3.SQL审核', '4.流程化工单']
+        'title': ['1.DML语句生成', '2.数据库字典生成及查看', '3.SQL语句审核及回滚', '4.工单流程化', '5.数据查询', '6.细粒度的权限划分']
       }
     };
   },

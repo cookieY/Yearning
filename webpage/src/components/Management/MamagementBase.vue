@@ -424,10 +424,10 @@ export default {
             'id': this.tmp_id,
             'basename': JSON.stringify(this.dictionary.databases)
           })
-          .then(() => {
+          .then(res => {
             this.$Notice.success({
               title: '通知',
-              desc: '数据库字典生成成功！'
+              desc: res.data
             })
             this.$Spin.hide();
             this.cleardata()
@@ -488,10 +488,12 @@ export default {
     },
     // 重置
     cleardata () {
+      this.dictionary.name = ''
       this.dictionary.databases = []
       this.dictionary.databasesList = []
       this.dictionary.getdellist = []
       this.dictionary.getdel = []
+      this.dictionary.delname = ''
     },
     delbaselink () {
       if (this.delbasename === this.delconfirmbasename) {

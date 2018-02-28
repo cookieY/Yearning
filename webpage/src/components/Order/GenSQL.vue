@@ -5,7 +5,6 @@
     animation: ani-demo-spin 1s linear infinite;
 }
 </style>
-
 <template>
 <div>
   <Row>
@@ -32,18 +31,18 @@
               <Option v-for="item in tableform.basename" :value="item" :key="item">{{ item }}</Option>
             </Select>
           </Form-item>
-          <Form-item label="数据库表名:" prop="tablename">
+          <Form-item label="数据库表名:">
             <Select v-model="formItem.tablename" placeholder="请选择" filterable>
               <Option v-for="item in tableform.info" :value="item" :key="item">{{ item }}</Option>
             </Select>
           </Form-item>
-          <Button type="warning" @click="canel()" style="margin-left: 20%">重置</Button>
-          <Button type="primary" @click="getinfo()" style="margin-left: 5%">连接</Button>
-          <Button type="success" @click="confirmsql()" style="margin-left: 5%">生成</Button>
+          <Button type="warning" @click="canel()" style="margin-left: 15%">重置</Button>
+          <Button type="primary" @click="getinfo()" style="margin-left: 3%">连接</Button>
+          <Button type="success" @click="confirmsql()" style="margin-left: 3%">生成</Button>
         </Form>
         <br>
         <Tabs value="order1" style="height: 300px;overflow-y: scroll;">
-          <TabPane label="生成语句" name="order1">
+          <TabPane label="DDL语句" name="order1">
             <p v-for="list in sql" style="font-size: 12px;color:#2b85e4"> {{ list }}<br><br></p>
           </TabPane>
           <TabPane label="提交工单" name="order2">
@@ -64,14 +63,14 @@
           <TabPane label="手动模式" name="order1" icon="edit">
             <Form>
               <FormItem>
-                <Input v-model="formDynamic" type="textarea" :autosize="{minRows: 15,maxRows: 15}" placeholder="请输入需要提交的DDL语句,多条sql请用;分隔"></Input>
+                <editor v-model="formDynamic" @init="editorInit"></editor>
               </FormItem>
               <FormItem>
                 <Table :columns="columnsName" :data="Testresults" highlight-row></Table>
               </FormItem>
               <FormItem>
                 <Button type="warning" @click="test_sql">检测</Button>
-                <Button type="primary" @click="handleSubmit(formDynamic)" style="margin-left: 3%" :disabled="this.validate_gen">提交</Button>
+                <Button type="primary" @click="handleSubmit(formDynamic)" style="margin-left: 3%" :disabled="this.validate_gen">提交到DDL语句</Button>
               </FormItem>
             </Form>
           </TabPane>
@@ -126,7 +125,7 @@
             <Input v-model="formItem.text" placeholder="最多不超过20个字"></Input>
           </FormItem>
           <FormItem label="指定审核人:">
-            <Select v-model="formItem.assigned">
+            <Select v-model="formItem.assigned" filterable>
               <Option v-for="i in this.assigned" :value="i.username" :key="i.username">{{i.username}}</Option>
             </Select>
           </FormItem>
@@ -155,7 +154,8 @@ import ICol from 'iview/src/components/grid/col'
 export default {
   components: {
     ICol,
-    edittable
+    edittable,
+    editor: require('../../libs/editor')
   },
   data () {
     return {
@@ -366,6 +366,10 @@ export default {
     }
   },
   methods: {
+    editorInit: function () {
+      require('brace/mode/mysql')
+      require('brace/theme/xcode')
+    },
     Connection_Name (index) {
       if (index) {
         this.ScreenConnection(index)
@@ -420,12 +424,11 @@ export default {
       })
     },
     handleSubmit () {
-      let createtable = this.formDynamic.split(';')
+      let createtable = this.formDynamic.replace(/(;|；)$/gi, '').replace(/\s/g, ' ').replace(/；/g, ';').split(';')
       this.validate_gen = true
       for (let i of createtable) {
         this.sql.push(i)
       }
-      this.sql.splice(-1, 1)
     },
     DataBaseName (index) {
       if (index) {

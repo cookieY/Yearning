@@ -100,7 +100,7 @@
               <Input v-model="formItem.text" placeholder="最多不超过20个字"></Input>
             </FormItem>
             <FormItem label="指定审核人:">
-              <Select v-model="formItem.assigned">
+              <Select v-model="formItem.assigned" filterable>
                 <Option v-for="i in this.assigned" :value="i.username" :key="i.username">{{i.username}}</Option>
               </Select>
             </FormItem>
@@ -273,7 +273,7 @@
         }
       },
       getdatabases () {
-        axios.put(`${util.url}/workorder/connection`, {'permissions_type': 'index'})
+        axios.put(`${util.url}/workorder/connection`, {'permissions_type': 'ddl'})
           .then(res => {
             this.item = res.data['connection']
             this.assigned = res.data['person']

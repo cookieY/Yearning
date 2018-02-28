@@ -70,8 +70,3 @@ def AutomaticallyDDL(sql: str = ''):
 
     else:
         return {'mode': 'pass'}
-
-
-if __name__ == "__main__":
-    a=AutomaticallyDDL(sql='drop table haha')
-    print(a)
