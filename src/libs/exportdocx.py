@@ -65,7 +65,7 @@ class DbInfo(object):
 
     def getTableInfo(self, ConnName, SchemalName=None, TableName=None):
         sql = f"""select `Name`, `BaseName`, `TableName`, `TableComment`, \
-        `Field`, `Type`, `Null`, `Default`, `Extra` from core_sqldictionary \
+        `Field`, `Type`, `Extra` from core_sqldictionary \
         where Name = '{ConnName}' and BaseName='{SchemalName}' and TableName='{TableName}' """
         return self.execute(sql)
 
@@ -107,9 +107,7 @@ class ToWord:
             table.style = 'LightShading-Accent1'
             table.rows[0].cells[0].text = '字段名'
             table.rows[0].cells[1].text = '类型'
-            table.rows[0].cells[2].text = '是否可以为空'
-            table.rows[0].cells[3].text = '默认值'
-            table.rows[0].cells[4].text = '备注'
+            table.rows[0].cells[2].text = '备注'
             columnSet = self.turnOjb.getTableInfo(ConnName=Conn, SchemalName=Schemal,
                                                   TableName='%s' % [TB[0] for TB in tabSet][0])
             for index, column in enumerate(columnSet):
@@ -117,8 +115,6 @@ class ToWord:
                 cells[0].text = '%s' % column[4]
                 cells[1].text = '%s' % column[5]
                 cells[2].text = '%s' % column[6]
-                cells[3].text = '%s' % column[7]
-                cells[4].text = '%s' % column[8]
         time = datetime.now()
         self.document.save('./exportData/%s_%s_Dictionary_%s.docx' % (Conn, Schemal, time))
         return time

@@ -217,6 +217,7 @@ class adminpremisson(baseview.SuperUserpermissions):
                 tablename = request.data['tablename']
                 name = request.data['name']
                 text = json.loads(request.data['text'])
+                tablecomment = request.data['tablecomment']
             except KeyError as e:
                 CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
                 return HttpResponse(status=500)
@@ -228,7 +229,7 @@ class adminpremisson(baseview.SuperUserpermissions):
                         SqlDictionary.objects.get_or_create(
                             BaseName = basename, TableName = tablename,
                             Field = i['value'], Type = i['type'],Name = name,
-                            Extra = i['extra'], TableComment = i['tablecomment']
+                            Extra = i['extra'], TableComment = tablecomment
                         )
                     return Response('表数据已添加成功!')
                 except Exception as e:
