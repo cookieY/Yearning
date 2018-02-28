@@ -42,7 +42,7 @@
         </Form>
         <br>
         <Tabs value="order1" style="height: 300px;overflow-y: scroll;">
-          <TabPane label="生成语句" name="order1">
+          <TabPane label="DDL语句" name="order1">
             <p v-for="list in sql" style="font-size: 12px;color:#2b85e4"> {{ list }}<br><br></p>
           </TabPane>
           <TabPane label="提交工单" name="order2">
@@ -70,7 +70,7 @@
               </FormItem>
               <FormItem>
                 <Button type="warning" @click="test_sql">检测</Button>
-                <Button type="primary" @click="handleSubmit(formDynamic)" style="margin-left: 3%" :disabled="this.validate_gen">提交</Button>
+                <Button type="primary" @click="handleSubmit(formDynamic)" style="margin-left: 3%" :disabled="this.validate_gen">提交到DDL语句</Button>
               </FormItem>
             </Form>
           </TabPane>
