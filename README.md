@@ -48,14 +48,20 @@
 ## Install 安装及使用日志
 - [Yearning使用及安装文档](https://cookiey.github.io/Yearning-document/)
 
-- 体验及快速测试安装(docker)
+- 体验及快速测试(docker)
 
 ```
 
-docker run -it -d -p 80:80 -p 8000:8000 -e "HOST=宿主机ip" registry.cn-hangzhou.aliyuncs.com/cookie/yearning:v0.0.5 
+docker run -it -d -p 80:80 -p 8000:8000 -e "HOST=宿主机ip" registry.cn-hangzhou.aliyuncs.com/cookie/yearning:v1.0.0
+
+docker exec -it  container_id /bin/bash 
+
+echo "from core.models import grained;grained.objects.get_or_create(username='admin', permissions={'ddl': '1', 'ddlcon': [], 'dml': '1', 'dmlcon': [], 'dic': '1', 'diccon': [], 'dicedit': '0', 'query': '1', 'querycon': [], 'user': '1', 'base': '1', 'dicexport': '0'})" | python3 manage.py shell
 
 初始账号: admin  密码: Yearning_admin
 ```
+- [一键安装脚本(由 运维那点事 贡献)](https://github.com/cookieY/Yearning/blob/master/install/Yearning.sh)
+
 注意: 
 
 docker版本不支持e-mail推送及ldap登陆
@@ -80,16 +86,14 @@ docker版本不支持e-mail推送及ldap登陆
 
 - Dashboard
 
-![](http://oy0f4k5qi.bkt.clouddn.com/index.png)
+![](http://oy0f4k5qi.bkt.clouddn.com/23123.png)
 
+- SQL语法高亮及自动补全
 
-- 表结构提交页面
+![](http://oy0f4k5qi.bkt.clouddn.com/dml.png)
 
-![](http://oy0f4k5qi.bkt.clouddn.com/table.png)
-
-- SQL提交页面
-
-![](http://oy0f4k5qi.bkt.clouddn.com/sql.png)
+- 细粒度的权限分配
+![](http://oy0f4k5qi.bkt.clouddn.com/per.png)
 
 - 工单页面
 ![](http://oy0f4k5qi.bkt.clouddn.com/order.png)
