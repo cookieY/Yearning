@@ -222,13 +222,22 @@ export default {
         'text',
         'mediumtext',
         'longtext',
+        'blob',
+        'mediumblob',
+        'longblob',
         'tinyint',
         'smallint',
         'mediumint',
         'bigint',
+        'time',
+        'year',
         'date',
         'datetime',
-        'timestamp'
+        'timestamp',
+        'decimal',
+        'float',
+        'double',
+        'jason'
       ],
       formItem: {
         info: [],

@@ -44,7 +44,7 @@ class SqlDictionary(models.Model):
     TableName = models.CharField(max_length=100) #表名
     Field = models.CharField(max_length=100) #字段名
     Type = models.CharField(max_length=100) #类型
-    Extra = models.CharField(max_length=100) #备注
+    Extra = models.TextField() #备注
     TableComment = models.CharField(max_length=100) #表备注
     Name = models.CharField(max_length=100, null=True) #连接名
 
