@@ -71,6 +71,14 @@ docker版本不支持e-mail推送及ldap登陆
 建议在使用前评估及测试中使用
 ## Update 更新日志
   - [Yearning更新日志](https://cookiey.github.io/Yearning-document/update/)
+
+## Support 支持Yearning
+
+如果Yearning能够帮助到你，请支持下Yearning吧，让Yearning能够持续改善并更新
+
+![](http://oy0f4k5qi.bkt.clouddn.com/alipay.jpg)
+![](http://oy0f4k5qi.bkt.clouddn.com/wechat.jpg)
+  
 ## About 联系方式
    
    QQ群:103674679
