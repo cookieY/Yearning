@@ -5,6 +5,13 @@
 # Author: Pengdongwen
 # Blog: www.ywnds.com
 
+# Network
+ping -c 1 -W 3 www.baidu.com &> /dev/null
+if [ ! $? = 0 ];then
+  echo "Cannot be networked"
+  exit 1
+fi
+
 echo "
 -------------------------------------------
                                           |
@@ -21,7 +28,7 @@ export PATH=/usr/local/sbin:/sbin:/bin:/usr/sbin:/usr/bin:/usr/local/bin:/root/b
 
 # Set output color
 COLUMENS=80
-SPACE_COL=$[ $COLUMENS-31 ]
+SPACE_COL=$[ $COLUMENS-21 ]
 VERSION=`uname -r | awk -F'.' '{print $1}'`
  
 RED='\033[1;5;31m'
@@ -51,18 +58,19 @@ help() {
 
 install() {
 # 01
-Data="01) Install Dependency Packages"
+Data="01) Install Dependency Packages, Please wait..."
 echo -n $Data
+rm -fr /var/run/yum.pid &> /dev/null
 yum install -y epel-release wget gcc openssl-devel git python-pip net-tools &> /dev/null
 yum install -y zlib zlib-devel tar gzip bzip2 xz zip &>/dev/null && success "$Data" || failure "$Data" 
 
 # 02
-Data="02) Install Ningx"
+Data="02) Install Nginx, Please wait..."
 echo -n $Data
 yum install -y nginx &>/dev/null && success "$Data" || failure "$Data"
 
 # 03
-Data="03) Install MySQL"
+Data="03) Install MySQL, Please wait..."
 echo -n $Data
 if [ $VERSION = 2 ];then
 echo '
@@ -86,12 +94,12 @@ if [ $? = 0 ];then
   read -p "MySQL/MariaDB already exists, uninstall and delete data after reinstall[y/n]: " SELECT
   case $SELECT in
     y|Y)
-      Data="Remove MySQL"
+      Data="Remove MySQL, Please wait..."
       echo -n $Data
       yum remove mysql-community-* MariaDB* -y &> /dev/null && success "$Data" || failure "$Data" 
       rm -fr /tmp/mysql_back &> /dev/null
       mv /var/lib/mysql /tmp/mysql_back &> /dev/null
-      Data="Install MySQL"
+      Data="Install MySQL, Please wait..."
       echo -n $Data
       yum install -y mysql-community-server &>/dev/null && success "$Data" || failure "$Data" 
       ;;
@@ -106,7 +114,7 @@ else
 fi
 
 # 04
-Data="04) Install Python 3.6"
+Data="04) Install Python 3.6, Please wait..."
 echo -n $Data
 which python3.6 &> /dev/null
 if [ $? = 0 ]; then
@@ -121,15 +129,15 @@ else
 fi
 
 # 05
-Data="05) Git Clone Yearning"
+Data="05) Git Clone Yearning, Please wait..."
 echo -n $Data
 cd /opt && rm -fr Yearning_back &> /dev/null && mv Yearning Yearning_back &> /dev/null
-git clone https://github.com/cookieY/Yearning.git || failure "$Data"
+git clone https://github.com/cookieY/Yearning.git &>/dev/null || failure "$Data"
 cd /opt/Yearning/src &> /dev/null
 pip3 install -r requirements.txt &>/dev/null && success "$Data" || failure "$Data" 
 
 # 06
-Data="06) Copy Yearning File"
+Data="06) Copy Yearning File, Please wait..."
 echo -n $Data
 ps aux | grep runserver | grep -v grep | awk '{print $2}' | xargs kill -9 &> /dev/null
 rm -fr /usr/share/nginx/html/* &> /dev/null
@@ -138,7 +146,7 @@ yes | cp -fnr /opt/Yearning/install/cursors.py /usr/local/lib/python3.6/site-pac
 yes | cp -fnr /opt/Yearning/webpage/dist/* /usr/share/nginx/html/ &>/dev/null && success "$Data" || failure "$Data"
 
 # 07
-Data="07) Start Ningx"
+Data="07) Start Nginx, Please wait..."
 echo -n $Data
 if [ $VERSION = 2 ];then
   service nginx restart &>/dev/null && success "$Data" || failure "$Data"
@@ -147,7 +155,7 @@ else
 fi  
 
 # 08
-Data="08) Start MySQL"
+Data="08) Start MySQL, Please wait..."
 echo -n $Data
 if [ $VERSION = 2 ];then
   service mysqld restart &>/dev/null && success "$Data" || failure "$Data"
@@ -197,7 +205,7 @@ cd /opt/Yearning/src && sed -i "s/ipaddress = .*/ipaddress = ${ADDRESS}:8000/" d
 cd /opt/Yearning/src && sed -i "s/password =.*/password = $MYSQLPASSWORD/" deploy.conf &> /dev/null 
 
 # 11
-Data="11) Migrate Yearning Tables"
+Data="11) Migrate Yearning Tables, Please wait..."
 echo -n $Data
 cd /opt/Yearning/src
 python3 manage.py makemigrations &> /dev/null && python3 manage.py migrate &> /dev/null && success "$Data" || failure "$Data"
@@ -212,7 +220,7 @@ echo "from core.models import Account; Account.objects.create_user(username='adm
 echo "from core.models import grained;grained.objects.get_or_create(username='admin', permissions={'ddl': '1', 'ddlcon': [], 'dml': '1', 'dmlcon': [], 'dic': '1', 'diccon': [], 'dicedit': '0', 'query': '1', 'querycon': [], 'user': '1', 'base': '1', 'dicexport': '0'})" | python3 manage.py shell &> /dev/null
 
 # 13
-Data="13) Start Inception"
+Data="13) Start Inception, Please wait..."
 echo -n $Data
 cd /opt/Yearning/install/ && tar xvf inception.tar &> /dev/null
 ps aux | grep Inception | grep -v grep | awk '{print $2}' | xargs kill -9 &> /dev/null
@@ -224,7 +232,7 @@ else
 fi
 
 # 14
-Data="14) Start Yearning"
+Data="14) Start Yearning, Please wait..."
 echo -n $Data
 cd /opt/Yearning/src
 ps aux | grep runserver | grep -v grep | awk '{print $2}' | xargs kill -9 &> /dev/null
@@ -237,7 +245,7 @@ fi
 }
 
 restart() {
-  Data="01) Restart Ningx"
+  Data="01) Restart Nginx"
   echo -n $Data
   if [ $VERSION = 2 ];then
     service nginx restart &>/dev/null && success "$Data" || failure "$Data"
@@ -278,7 +286,7 @@ restart() {
 }
 
 stop() {
-  Data="01) Stop Ningx"
+  Data="01) Stop Nginx"
   echo -n $Data
   if [ $VERSION = 2 ];then
     service nginx stop &>/dev/null && success "$Data" || failure "$Data"
@@ -329,6 +337,7 @@ Yearning log   |   /opt/Yearning/src/log/*                     |
 ----------------------------------------------------------------
 END
 }
+
 
 read -p "Please select enter a valid sequence number: " NUMBER
 echo
