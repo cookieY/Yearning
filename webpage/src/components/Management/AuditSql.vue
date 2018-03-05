@@ -346,7 +346,7 @@ export default {
       axios.get(`${util.url}/audit_sql?page=${vl}&username=${Cookies.get('user')}`)
         .then(res => {
           this.tmp = res.data.data
-          this.tmp.forEach((item) => { (item.backup === 1) ? item.backup = '否' : item.backup = '是' })
+          this.tmp.forEach((item) => { (item.backup === 1) ? item.backup = '是' : item.backup = '否' })
           this.pagenumber = res.data.page.alter_number
         })
         .catch(error => {

@@ -161,7 +161,7 @@ export default {
     axios.get(`${util.url}/workorder/?user=${Cookies.get('user')}&page=1`)
       .then(res => {
         this.applytable = res.data.data
-        this.applytable.forEach((item) => { (item.backup === 1) ? item.backup = '否' : item.backup = '是' })
+        this.applytable.forEach((item) => { (item.backup === 1) ? item.backup = '是' : item.backup = '否' })
         this.pagenumber = res.data.page.alter_number
       })
       .catch(error => {
