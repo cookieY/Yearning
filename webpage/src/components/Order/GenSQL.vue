@@ -389,7 +389,7 @@ export default {
       let createtable = this.formDynamic.split(';')
       for (let i of createtable) {
         for (let c of ddl) {
-          if (i.toLowerCase().indexOf(c) !== -1) {
+          if (i.toLowerCase().indexOf(c) === 0) {
             this.$Message.error('不可提交非DDL语句!');
             return false
           }
