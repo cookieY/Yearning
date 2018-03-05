@@ -628,7 +628,7 @@ export default {
       this.openswitch = !this.openswitch
     },
     commitorder () {
-      if (this.sql === [] || this.formItem.basename === '' || this.formItem.tablename === '' || this.assigned === '') {
+      if (this.sql === [] || this.formItem.basename === '' || this.assigned === '') {
         this.$Notice.error({
           title: '警告',
           desc: '工单数据缺失,请检查数据库信息及生成的sql语句'
