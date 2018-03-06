@@ -357,7 +357,7 @@ export default {
       this.delrecord = vl
     },
     delrecordData () {
-      axios.post(`${util.url}/audit_sql`, {
+      axios.post(`${util.url}/undoOrder`, {
         'id': JSON.stringify(this.delrecord)
       })
         .then(res => {

@@ -226,6 +226,7 @@ class undoOrder(baseview.BaseView):
             dataid = json.loads(request.data['id'])
         except KeyError as e:
             CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
+            return HttpResponse(status=500)
         else:
             try:
                 for i in dataid:
