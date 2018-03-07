@@ -282,7 +282,7 @@ export default {
           width: 400,
           align: 'center',
           render: (h, params) => {
-            if (params.row.username !== this.data5[0].username) {
+            if (params.row.id !== 1) {
               return h('div', [
                 h('Button', {
                   props: {
