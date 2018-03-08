@@ -93,25 +93,19 @@ def auth(username, password):
     LDAP_DOMAIN = conf.ladp_domain
     LDAP_TYPE = conf.ladp_type
     LDAP_SCBASE = conf.ldap_scbase
+
+    server = ldap3.Server(LDAP_SERVER, get_info=ldap3.ALL)
     if LDAP_TYPE == '1':
-        c = ldap3.Connection(
-            ldap3.Server(LDAP_SERVER, get_info=ldap3.ALL),
-            user=username + '@' + LDAP_DOMAIN,
-            password=password)
-        ret = c.bind()
-        if ret:
-            c.unbind()
-            return True
-        else:
-            return False
+        user = username + '@' + LDAP_SCBASE
+    elif LDAP_TYPE == '2':
+        user = "cn=%s,%s" % (username, LDAP_SCBASE)
     else:
-        c = ldap3.Connection(
-            ldap3.Server(LDAP_SERVER, get_info=ldap3.ALL),
-            user="uid=%s,%s"%(username,LDAP_SCBASE),
-            password=password)
-        ret = c.bind()
-        if ret:
-            c.unbind()
-            return True
-        else:
-            return False
+        user = "uid=%s,%s" % (username, LDAP_SCBASE)
+
+    c = ldap3.Connection(server, user=user, password=password)
+    ret = c.bind()
+    if ret:
+        c.unbind()
+        return True
+    else:
+        return False

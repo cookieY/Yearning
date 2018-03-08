@@ -47,12 +47,16 @@ class addressing(baseview.BaseView):
                     username=username).aggregate(alter_number=Count('id'))
                 start = (int(page) - 1) * 20
                 end = int(page) * 20
+
+                # admin 用户查询所有工单
+                condition_sql = "WHERE core_sqlorder.username = '{}'"\
+                    .format(username) if username != 'admin' else ''
+
                 info = SqlOrder.objects.raw(
                     "select core_sqlorder.*,core_databaselist.connection_name,\
                     core_databaselist.computer_room from core_sqlorder INNER JOIN \
                     core_databaselist on core_sqlorder.bundle_id = core_databaselist.id \
-                    WHERE core_sqlorder.username = '%s'ORDER BY core_sqlorder.id DESC "
-                    % username)[start:end]
+                    %s ORDER BY core_sqlorder.id DESC " % condition_sql)[start:end]
                 data = util.ser(info)
                 return Response({'page': pagenumber, 'data': data})
             except Exception as e:
