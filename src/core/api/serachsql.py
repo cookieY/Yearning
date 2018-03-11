@@ -16,8 +16,8 @@ class serach(baseview.BaseView):
 
     def post(self, request, args=None):
         sql = request.data['sql']
-        check = str(sql).strip().rstrip(';').split('\n')
-        if check[-1].lower().find('s') != 0:
+        check = str(sql).strip().split(';\n')
+        if check[-1].strip().lower().startswith('select') != 1:
             return Response({'error': '只支持查询功能!'})
         else:
             address = json.loads(request.data['address'])
@@ -30,7 +30,7 @@ class serach(baseview.BaseView):
                         port=_c.port,
                         db=address['basename']
                 ) as f:
-                    dataset = f.search(sql=check[-1] + '  limit 1000')
+                    dataset = f.search(sql=check[-1].strip().rstrip(';') + '  limit 1000')
                     return Response(dataset)
             except Exception as e:
                 return Response({'error': str(e)})
