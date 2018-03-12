@@ -88,20 +88,20 @@ class SqlRecord(models.Model):
     '''
     工单执行记录表
     '''
-    date = models.CharField(max_length=50) #执行时间
+    date = models.CharField(max_length=50) #执行时间 下个版本可废弃
     state = models.CharField(max_length=100) #执行状态
     sql = models.TextField(blank=True) #
-    area = models.CharField(max_length=50)
-    name = models.CharField(max_length=50)
-    base = models.CharField(max_length=50)
-    error = models.TextField(max_length=500, null=True)
+    area = models.CharField(max_length=50)#下个版本可废弃
+    name = models.CharField(max_length=50)#下个版本可废弃
+    base = models.CharField(max_length=50)#下个版本可废弃
+    error = models.TextField(null=True)
     workid = models.CharField(max_length=50, null=True)
-    person = models.CharField(max_length=50, null=True) #执行人
-    reviewer = models.CharField(max_length=50, null=True)
+    person = models.CharField(max_length=50, null=True) #下个版本可废弃
+    reviewer = models.CharField(max_length=50, null=True) #下个版本可废弃
     affectrow = models.CharField(max_length=100, null=True)
     sequence = models.CharField(max_length=50, null=True)
-    backup_dbname = models.CharField(max_length=100, null=True)
-    rollbackid = models.IntegerField(null=True)
+    backup_dbname = models.CharField(max_length=100, null=True) #下个版本可废弃
+    rollbackid = models.IntegerField(null=True) #下个版本可废弃
 
 
 class Todolist(models.Model):

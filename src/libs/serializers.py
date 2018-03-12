@@ -7,6 +7,7 @@ from core.models import DatabaseList
 from core.models import SqlDictionary
 from core.models import SqlRecord
 from core.models import Account
+from core.models import SqlOrder
 
 
 class MessagesUser(serializers.HyperlinkedModelSerializer):
@@ -62,9 +63,7 @@ class Record(serializers.HyperlinkedModelSerializer):
     class Meta:
         model = SqlRecord
         fields = (
-            'sql', 'state', 'error', 'affectrow',
-            'sequence', 'area', 'name', 'base', 'rollbackid'
-            )
+            'sql', 'state', 'error', 'affectrow','sequence')
 
 
 class Getdingding(serializers.HyperlinkedModelSerializer):
@@ -74,3 +73,15 @@ class Getdingding(serializers.HyperlinkedModelSerializer):
     class Meta:
         model = DatabaseList
         fields = ('id', 'before', 'after', 'url')
+
+
+class Recordinfo(serializers.HyperlinkedModelSerializer):
+    '''
+
+    执行记录 返回
+
+    '''
+
+    class Meta:
+        model = SqlOrder
+        fields = ('workid', 'username', 'text', 'data', 'basename', 'assigned')

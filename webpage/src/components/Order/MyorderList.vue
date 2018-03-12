@@ -140,7 +140,7 @@ export default {
         .catch(() => {
           this.$Notice.error({
             title: '警告',
-            desc: 'Inception连接失败,请检查Inception是否已启动'
+            desc: '无法获得相关回滚数据,请确认备份库配置正确及备份规则'
           })
         })
       } else {
