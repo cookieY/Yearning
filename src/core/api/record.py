@@ -1,11 +1,8 @@
 import logging
-from libs import baseview
+from libs import baseview, util
 from rest_framework.response import Response
 from django.http import HttpResponse
-from core.models import (
-    SqlRecord,
-    SqlOrder
-)
+from core.models import SqlOrder
 
 CUSTOM_ERROR = logging.getLogger('Yearning.core.views')
 
@@ -18,7 +15,6 @@ class recordorder(baseview.SuperUserpermissions):
 
     def get(self, request, args=None):
         try:
-            info = []
             page = request.GET.get('page')
             username = request.GET.get('username')
         except KeyError as e:
@@ -26,27 +22,21 @@ class recordorder(baseview.SuperUserpermissions):
             return HttpResponse(status=500)
         else:
             try:
-                pagenumber = SqlRecord.objects.filter(reviewer=username).all().values('workid')
-                pagenumber.query.distinct = ['workid']
+                pagenumber = SqlOrder.objects.filter(status=1).all().values('id')
+                pagenumber.query.distinct = ['id']
                 start = int(page) * 10 - 10
                 end = int(page) * 10
-                workid = SqlRecord.objects.filter(reviewer=username).all().values('workid')[start:end]
-                workid.query.distinct = ['workid']
-                for i in workid:
-                    dataset = SqlRecord.objects.filter(workid=i['workid']).all()
-                    buld_id = SqlOrder.objects.filter(work_id=i['workid']).first()
-                    info.append({'workid': dataset[0].workid,
-                                 'date': dataset[0].date,
-                                 'person': dataset[0].person,
-                                 'area': dataset[0].area,
-                                 'base': dataset[0].base,
-                                 'name': dataset[0].name,
-                                 'reviewer': dataset[0].reviewer,
-                                 'id': buld_id.id,
-                                 'text': buld_id.text
-                                })
-                return Response({'data': info, 'page': len(pagenumber)})
+                sql = SqlOrder.objects.raw(
+                    '''
+                    select core_sqlorder.*,core_databaselist.connection_name, \
+                    core_databaselist.computer_room from core_sqlorder \
+                    INNER JOIN core_databaselist on \
+                    core_sqlorder.bundle_id = core_databaselist.id where core_sqlorder.status = 1 and core_sqlorder.assigned = '%s'\
+                    ORDER BY core_sqlorder.id desc
+                    '''%username
+                )[start:end]
+                data = util.ser(sql)
+                return Response({'data': data, 'page': len(pagenumber)})
             except Exception as e:
                 CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
                 return HttpResponse(status=500)
-            

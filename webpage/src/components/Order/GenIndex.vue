@@ -96,10 +96,10 @@
             <FormItem label="执行SQL:">
               <p v-for="i in sql">{{i}}</p>
             </FormItem>
-            <FormItem label="工单提交说明:">
+            <FormItem label="工单提交说明:" required>
               <Input v-model="formItem.text" placeholder="最多不超过20个字"></Input>
             </FormItem>
-            <FormItem label="指定审核人:">
+            <FormItem label="指定审核人:" required>
               <Select v-model="formItem.assigned" filterable>
                 <Option v-for="i in this.assigned" :value="i.username" :key="i.username">{{i.username}}</Option>
               </Select>
@@ -321,26 +321,9 @@
         })
       },
       canel () {
-        // this.$refs['formItem'].resetFields();
-        // this.delinfo()
         this.sql = []
         this.pass = false
       },
-      // delinfo () {
-      //   this.tableform.sqlname = []
-      //   this.tableform.basename = []
-      //   this.tableform.info = []
-      //   this.formItem.connection_name = ''
-      //   this.formItem.computer_room = ''
-      //   this.formItem.basename = ''
-      //   this.formItem.table_name = ''
-      //   this.formItem.tablename = ''
-      //   this.TableDataOld = []
-      //   this.TableDataNew = []
-      //   this.sql = []
-      //   this.pass = false
-      //   this.indexinfo = []
-      // },
       getindex () {
         if (this.formItem.table_name) {
           axios.put(`${util.url}/workorder/indexdata`, {
@@ -364,30 +347,37 @@
         this.openswitch = !this.openswitch
       },
       commitorder () {
-        if (this.pass === true) {
-          axios.post(`${util.url}/sqlsyntax/`, {
-            'data': JSON.stringify(this.formItem),
-            'sql': JSON.stringify(this.sql),
-            'user': Cookies.get('user'),
-            'type': 1,
-            'id': this.id[0].id
-          })
-            .then(res => {
-              this.$Notice.success({
-                title: '通知',
-                desc: res.data
-              })
-              this.$router.push({
-                name: 'myorder'
-              })
-            }).catch(error => {
-            util.ajanxerrorcode(this, error)
+        if (this.sql === [] || this.formItem.basename === '' || this.assigned === '' || this.formItem.text === '' || this.formItem.assigned === '') {
+          this.$Notice.error({
+            title: '警告',
+            desc: '工单数据缺失,请检查工单信息是否缺失!'
           })
         } else {
-          this.$Notice.warning({
-            title: '注意',
-            desc: '提交工单需点击确认按钮'
-          })
+          if (this.pass === true) {
+            axios.post(`${util.url}/sqlsyntax/`, {
+              'data': JSON.stringify(this.formItem),
+              'sql': JSON.stringify(this.sql),
+              'user': Cookies.get('user'),
+              'type': 1,
+              'id': this.id[0].id
+            })
+              .then(res => {
+                this.$Notice.success({
+                  title: '通知',
+                  desc: res.data
+                })
+                this.$router.push({
+                  name: 'myorder'
+                })
+              }).catch(error => {
+              util.ajanxerrorcode(this, error)
+            })
+          } else {
+            this.$Notice.warning({
+              title: '注意',
+              desc: '提交工单需点击确认按钮'
+            })
+          }
         }
       }
     },

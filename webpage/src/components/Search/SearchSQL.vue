@@ -35,7 +35,7 @@
               </FormItem>
             </Form>
             <Alert style="height: 145px">
-              SQL查询步骤:
+              SQL查询注意事项:
               <template slot="desc">
                 <p>1.选择对应的数据库</p>
                 <p>2.输入相应select语句</p>

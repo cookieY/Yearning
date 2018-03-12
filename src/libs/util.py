@@ -74,7 +74,7 @@ def conf_path() -> object:
                                    "inc_host", "inc_port", "inc_user", "inc_pwd", "backupdb",
                                    "backupport", "backupuser", "backuppassword","ladp_server",
                                    "ldap_scbase","ladp_domain", "ladp_type","mail_user","mail_password","smtp",
-                                   "smtp_port"])
+                                   "smtp_port", "limit"])
 
     return conf_set(_conf.get('mysql', 'db'), _conf.get('mysql', 'address'),
                     _conf.get('mysql', 'port'), _conf.get('mysql', 'username'),
@@ -85,7 +85,7 @@ def conf_path() -> object:
                     _conf.get('Inception', 'backupuser'), _conf.get('Inception', 'backuppassword'),
                     _conf.get('LDAP','LDAP_SERVER'),_conf.get('LDAP','LDAP_SCBASE'),_conf.get('LDAP','LDAP_DOMAIN'),_conf.get('LDAP','LDAP_TYPE'),
                     _conf.get('email', 'username'), _conf.get('email', 'password'), _conf.get('email', 'smtp_server'),
-                    _conf.get('email', 'smtp_port'))
+                    _conf.get('email', 'smtp_port'),_conf.get('sql', 'limit'))
 
 def auth(username, password):
     conf = conf_path()

@@ -257,6 +257,7 @@ export default {
       let createtable = this.formItem.textarea.replace(/(;|；)$/gi, '').replace(/\s/g, ' ').replace(/；/g, ';').split(';')
       for (let i of createtable) {
         for (let c of ddl) {
+          i = i.replace(/(^\s*)|(\s*$)/g, '')
           if (i.toLowerCase().indexOf(c) === 0) {
             this.$Message.error('不可提交非DML语句!');
             return false

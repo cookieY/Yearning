@@ -138,7 +138,7 @@ a:active {
   <Modal v-model="AddTable.open" width="700" @on-ok="handleSubmit('formDynamic')" ok-text="提交">
     <p slot="header" style="color:#5cadff;text-align:center">
       <Icon type="information-circled"></Icon>
-      <span>添加数据表</span>
+      <span>添加数据表/字段</span>
     </p>
     <Form ref="formDynamic" :model="formDynamic" :label-width="80" style="width: 650px">
       <FormItem
@@ -273,7 +273,56 @@ export default {
                     this.EditField(params.row, params.index)
                   }
                 }
-              }, '更改字段备注')
+              }, '更改字段备注'),
+              h('Poptip', {
+                props: {
+                  confirm: true,
+                  transfer: true,
+                  title: '您确认删除这条内容吗?'
+                },
+                style: {
+                  marginLeft: '5%'
+                },
+                on: {
+                  'on-ok': () => {
+                    let data = {
+                      'name': this.formItem.namedata,
+                      'basename': params.row.BaseName,
+                      'tablename': params.row.TableName,
+                      'field': params.row.Field
+                    }
+                    let auth = ''
+                    axios.post(`${util.url}/auth_twice`, {
+                      'permissions_type': 'dic'
+                    })
+                      .then(res => {
+                        auth = res.data
+                        if (auth === '1') {
+                          axios.put(`${util.url}/adminsql/delfield`, {
+                            'data': JSON.stringify(data)
+                          })
+                            .then(res => {
+                              this.$Notice.success({
+                                title: '通知',
+                                desc: res.data
+                              })
+                              this.ResetData()
+                            })
+                            .catch(error => {
+                              util.ajanxerrorcode(this, error)
+                            })
+                        } else {
+                          this.$Notice.error({
+                            title: '警告:',
+                            desc: '账号权限不足，无法提供修改功能！'
+                          })
+                        }
+                      })
+                  }
+                }
+              }, [
+                h('a', '删除字段')
+              ])
             ])
           }
         }

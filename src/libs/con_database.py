@@ -60,6 +60,13 @@ class SQLgo(object):
             len = cursor.rowcount
         return {'data':result,'title':data_dict,'len':len}
 
+    def rolldata(self, sql=None):
+        with self.con.cursor(cursor=pymysql.cursors.DictCursor) as cursor:
+            sqllist = sql
+            cursor.execute(sqllist)
+            result = cursor.fetchall()
+        return result
+
     def showtable(self, table_name):
         with self.con.cursor() as cursor:
             sqllist = '''

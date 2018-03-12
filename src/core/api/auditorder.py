@@ -192,13 +192,14 @@ class orderdetail(baseview.BaseView):
     def post(self, request, args: str = None):
         try:
             id = request.data['id']
-            info = json.loads(request.data['opid'])
+            info = list(set(json.loads(request.data['opid'])))
         except KeyError as e:
             CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
             return HttpResponse(status=500)
         else:
             try:
                 sql = []
+                rollData = []
                 for i in info:
                     info = SqlOrder.objects.raw(
                         "select core_sqlorder.*,core_databaselist.connection_name,\
@@ -210,10 +211,12 @@ class orderdetail(baseview.BaseView):
                     _data = SqlRecord.objects.filter(sequence=i).first()
                     roll = rollback.rollbackSQL(db=_data.backup_dbname, opid=i)
                     link = _data.backup_dbname + '.' + roll
-                    spa = rollback.roll(backdb=link, opid=i)
-                    sql.append(spa)
-                _h = sorted([i[0][0] for i in sql])
-                return Response({'data': data[0], 'sql': _h, 'type': 1})
+                    sql.append(rollback.roll(backdb=link, opid=i))
+                for i in sql:
+                    for c in i:
+                        rollData.append(c['rollback_statement'])
+                rollData = sorted(rollData)
+                return Response({'data': data[0], 'sql': rollData, 'type': 1})
             except Exception as e:
                 CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
                 return HttpResponse(status=500)

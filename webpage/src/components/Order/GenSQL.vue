@@ -121,10 +121,10 @@
           <FormItem label="执行SQL:">
             <p v-for="i in sql">{{i}}</p>
           </FormItem>
-          <FormItem label="工单提交说明:">
+          <FormItem label="工单提交说明:" required>
             <Input v-model="formItem.text" placeholder="最多不超过20个字"></Input>
           </FormItem>
-          <FormItem label="指定审核人:">
+          <FormItem label="指定审核人:" required>
             <Select v-model="formItem.assigned" filterable>
               <Option v-for="i in this.assigned" :value="i.username" :key="i.username">{{i.username}}</Option>
             </Select>
@@ -389,6 +389,7 @@ export default {
       let createtable = this.formDynamic.split(';')
       for (let i of createtable) {
         for (let c of ddl) {
+          i = i.replace(/(^\s*)|(\s*$)/g, '')
           if (i.toLowerCase().indexOf(c) === 0) {
             this.$Message.error('不可提交非DDL语句!');
             return false
@@ -610,28 +611,14 @@ export default {
           })
       }
     },
-    // delinfo () {
-    //   this.tableform.sqlname = []
-    //   this.tableform.basename = []
-    //   this.tableform.info = []
-    //   this.formItem.connection_name = ''
-    //   this.formItem.computer_room = ''
-    //   this.formItem.basename = ''
-    //   this.formItem.table_name = ''
-    //   this.formItem.tablename = ''
-    //   this.TableDataOld = []
-    //   this.TableDataNew = []
-    //   this.sql = []
-    //   this.pass = false
-    // },
     orderswitch () {
       this.openswitch = !this.openswitch
     },
     commitorder () {
-      if (this.sql === [] || this.formItem.basename === '' || this.assigned === '') {
+      if (this.sql === [] || this.formItem.basename === '' || this.assigned === '' || this.formItem.text === '' || this.formItem.assigned === '') {
         this.$Notice.error({
           title: '警告',
-          desc: '工单数据缺失,请检查数据库信息及生成的sql语句'
+          desc: '工单数据缺失,请检查工单信息是否缺失!'
         })
       } else {
         if (this.pass === true) {

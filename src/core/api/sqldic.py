@@ -127,6 +127,19 @@ class adminpremisson(baseview.SuperUserpermissions):
                 except Exception as e:
                     CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
                     return HttpResponse(status=500)
+        elif args == 'delfield':
+            try:
+                data = json.loads(request.data['data'])
+            except KeyError as e:
+                CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
+                return HttpResponse(status=500)
+            else:
+                try:
+                    SqlDictionary.objects.filter(BaseName=data['basename'],TableName=data['tablename'],Name= data['name'],Field=data['field']).delete()
+                    return Response('%s 该字段已删除!'%data['field'])
+                except Exception as e:
+                    CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
+                    return HttpResponse(status=500)
 
         elif args == 'edittableinfo':
             try:
