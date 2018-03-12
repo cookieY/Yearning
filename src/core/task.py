@@ -6,13 +6,12 @@ from .models import (
     globalpermissions,
     SqlOrder,
     SqlRecord,
-    SqlDictionary,
     grained
 )
 from django.http import HttpResponse
 from libs import util
 from libs import send_email
-from libs import testddl,call_inception
+from libs import call_inception
 import logging
 import functools
 CUSTOM_ERROR = logging.getLogger('Yearning.core.views')
@@ -111,37 +110,6 @@ class order_push_message(threading.Thread):
                     sequence=i['sequence'],
                     backup_dbname=i['backup_dbname']
                 )
-
-                if self.order.type == 0 and \
-                        i['errlevel'] == 0 and \
-                        i['sql'].find('use') == -1 and \
-                        i['stagestatus'] != 'Audit completed':
-                    data = testddl.AutomaticallyDDL(sql=" ".join(i['sql'].split()))
-                    if data['mode'] == 'pass':
-                        pass
-                    elif data['mode'] == 'add':
-                        SqlDictionary.objects.get_or_create(
-                            Type=data['Type'],
-                            Null=data['Null'],
-                            Default=data['Default'],
-                            Extra=data['COMMENT'],
-                            BaseName=data['BaseName'],
-                            TableName=data['TableName'],
-                            Field=data['Field'],
-                            TableComment='',
-                            Name=SQL_LIST.connection_name
-                        )
-                    elif data['mode'] == 'del':
-                        SqlDictionary.objects.filter(
-                            BaseName=data['BaseName'],
-                            TableName=data['TableName'],
-                            Field=data['Field'],
-                            Name=SQL_LIST.connection_name).delete()
-                    elif data['mode'] == 'drop':
-                        SqlDictionary.objects.filter(
-                            BaseName=self.order.basename,
-                            TableName=data['TableName']
-                        ).delete()
 
     def Agreed(self):
 

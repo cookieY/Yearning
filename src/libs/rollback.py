@@ -27,7 +27,7 @@ def roll(backdb=None, opid=None):
         password=conf.backuppassword,
         port=conf.backupport
         ) as f:
-        data = f.execute(
+        data = f.rolldata(
             sql=
             '''
             select rollback_statement from %s where opid_time =%s;

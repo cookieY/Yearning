@@ -32,7 +32,7 @@ export default {
       tabcolumns: [
         {
           title: '工单',
-          key: 'workid'
+          key: 'work_id'
         },
         {
           title: '工单说明',
@@ -45,23 +45,23 @@ export default {
         },
         {
           title: '申请人',
-          key: 'person'
+          key: 'username'
         },
         {
           title: '执行人',
-          key: 'reviewer'
+          key: 'assigned'
         },
         {
           title: '执行区域',
-          key: 'area'
+          key: 'computer_room'
         },
         {
           title: '连接名称',
-          key: 'name'
+          key: 'connection_name'
         },
         {
           title: '库名',
-          key: 'base'
+          key: 'basename'
         },
         {
           title: '操作',
@@ -78,7 +78,7 @@ export default {
                   click: () => {
                     this.$router.push({
                       name: 'orderlist',
-                      query: {workid: params.row.workid, id: params.row.id, status: 1, type: params.row.type}
+                      query: {workid: params.row.work_id, id: params.row.id, status: 1, type: params.row.type}
                     })
                   }
                 }
