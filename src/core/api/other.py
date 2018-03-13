@@ -257,4 +257,18 @@ class dingding(baseview.SuperUserpermissions):
             except Exception as e:
                 CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
                 return HttpResponse(status=500)
-            
+
+
+class ConfigInfo(baseview.SuperUserpermissions):
+    """
+    提供配置文件获取接口
+    只获取limit数，做固定值
+    """
+    def get(self, request, args=None):
+        # data = request.data
+        import configparser
+        conf = configparser.ConfigParser()
+        conf.read('deploy.conf')
+        limit = conf.get('sql', 'limit')
+        return Response(dict(limit=limit))
+

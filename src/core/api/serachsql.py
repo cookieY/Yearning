@@ -1,4 +1,5 @@
 import json
+import re
 import logging
 from libs import util
 from rest_framework.response import Response
@@ -32,7 +33,77 @@ class serach(baseview.BaseView):
                         port=_c.port,
                         db=address['basename']
                 ) as f:
-                    dataset = f.search(sql=check[-1].strip().rstrip(';') + '  limit %s'%conf.limit)
+
+                    '''
+                    check可能是多条查询语句，取最后一条查询语句执行
+                    
+                    '''
+                    query_sql = replace_limit(check[-1].strip(), int(conf.limit))
+                    dataset = f.search(sql=query_sql)
                     return Response(dataset)
             except Exception as e:
                 return Response({'error': str(e)})
+
+
+def replace_limit(sql, limit):
+    """
+    替换sql中所有limit的字符
+
+    依次查找limit关键字，处理一个limit用指定字符替换
+    全部处理完在把特殊字符替换会limit
+    :param sql:
+    :param limit:
+    :return:
+    """
+    special_flag = 'l-*jin-*fu-*imit'
+
+    def fun(new_sql):
+        """
+        limit  将limit替换程 l-*jin-*fu-*imit
+        :return:
+        """
+        upper_sql = new_sql.upper()
+        if 'LIMIT' not in upper_sql:
+            return new_sql
+
+        start_index = upper_sql.find('LIMIT') + len('LIMIT')
+        end_index = start_index
+
+        for i in range(start_index, len(upper_sql)):
+            if bool(re.match(r'^[0-9]|,| ', upper_sql[i])):
+                end_index += 1
+            else:
+                break
+
+        limit_str = upper_sql[start_index:end_index]
+        limit_str = limit_str.strip()
+
+        if len(limit_str) < 1:
+            new_sql = new_sql.replace(
+                new_sql[start_index - len('LIMIT'):start_index], special_flag, 1
+            )
+            return new_sql
+
+        if ',' in limit_str:
+            offsets = limit_str.split(',')
+            if int(offsets[-1]) > limit:
+                limit_str = '{}, {}'.format(offsets[0], limit)
+        else:
+            if int(limit_str) > limit:
+                limit_str = '{}'.format(limit)
+
+        limit_str = ' ' + limit_str + ' '
+        new_sql = new_sql.replace(
+            new_sql[start_index:end_index], limit_str, 1
+        )
+        new_sql = new_sql.replace(
+            new_sql[start_index - len('LIMIT'):start_index], special_flag, 1
+        )
+        return new_sql
+
+    #  用for循环更恰当
+    while bool(re.search('limit', sql, re.IGNORECASE)):
+        sql = fun(sql)
+
+    sql = sql.replace(special_flag, 'limit')
+    return sql

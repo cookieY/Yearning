@@ -23,7 +23,8 @@ from core.api.user import (
 from core.api.other import (
     maindata,
     messages,
-    dingding
+    dingding,
+    ConfigInfo
 )
 from core.api.managerdb import (
     managementdb,
@@ -54,6 +55,7 @@ urlpatterns = [
     url(r'^api/v1/otheruser/(.*)', generaluser.as_view()),
     url(r'^api/v1/exportdocx/', exportdoc.as_view()),
     url(r'^api/v1/dingding', dingding.as_view()),
+    url(r'^api/v1/config', ConfigInfo.as_view()),
     url(r'^api/v1/detail', orderdetail.as_view()),
     url(r'^api/v1/search', serach.as_view()),
     url(r'^api/v1/ldapauth', ldapauth.as_view()),
