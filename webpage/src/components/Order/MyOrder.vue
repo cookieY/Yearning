@@ -10,6 +10,9 @@
         <Icon type="person"></Icon>
         我的工单
       </p>
+      <Select v-model="username" slot="extra" style="width:200px" @on-change="selectChange">
+        <Option v-for="name in users" :value="name" :key="name" >{{ name }}</Option>
+      </Select>
       <Row>
         <Col span="24">
         <Table border :columns="columns6" :data="applytable" stripe size="small"></Table>
@@ -142,12 +145,22 @@ export default {
       applytable: [],
       openswitch: false,
       modaltext: {},
-      editsql: ''
+      editsql: '',
+      username: '',
+      users: []
     }
   },
   methods: {
     currentpage (vl) {
-      axios.get(`${util.url}/workorder/?user=${Cookies.get('user')}&page=${vl}`)
+        this.server_data(vl, this.username)
+    },
+
+    selectChange (val) {
+      this.server_data(1, val)
+    },
+
+    server_data (page, user) {
+      axios.get(`${util.url}/workorder/?user=${Cookies.get('user')}&page=${page}&filter_name=${user}`)
         .then(res => {
           this.applytable = res.data.data
           this.pagenumber = parseInt(res.data.page.alter_number)
@@ -163,6 +176,7 @@ export default {
         this.applytable = res.data.data
         this.applytable.forEach((item) => { (item.backup === 1) ? item.backup = '是' : item.backup = '否' })
         this.pagenumber = res.data.page.alter_number
+        this.users = res.data.users
       })
       .catch(error => {
         util.ajanxerrorcode(this, error)

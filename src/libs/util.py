@@ -93,25 +93,67 @@ def auth(username, password):
     LDAP_DOMAIN = conf.ladp_domain
     LDAP_TYPE = conf.ladp_type
     LDAP_SCBASE = conf.ldap_scbase
+
+    server = ldap3.Server(LDAP_SERVER, get_info=ldap3.ALL)
     if LDAP_TYPE == '1':
-        c = ldap3.Connection(
-            ldap3.Server(LDAP_SERVER, get_info=ldap3.ALL),
-            user=username + '@' + LDAP_DOMAIN,
-            password=password)
-        ret = c.bind()
-        if ret:
-            c.unbind()
-            return True
-        else:
-            return False
+        user = username + '@' + LDAP_SCBASE
+    elif LDAP_TYPE == '2':
+        user = "cn=%s,%s" % (username, LDAP_SCBASE)
     else:
-        c = ldap3.Connection(
-            ldap3.Server(LDAP_SERVER, get_info=ldap3.ALL),
-            user="uid=%s,%s"%(username,LDAP_SCBASE),
-            password=password)
-        ret = c.bind()
-        if ret:
-            c.unbind()
-            return True
-        else:
+        user = "uid=%s,%s" % (username, LDAP_SCBASE)
+
+    c = ldap3.Connection(server, user=user, password=password)
+    ret = c.bind()
+    if ret:
+        c.unbind()
+        return True
+    else:
+        return False
+
+
+def user_auth(username, password):
+    """
+    用户验证，存在返回ldap获取的用户数据字典
+    :param username:
+    :param password:
+    :return: 存在：用户数据字典  不存在：False
+    """
+    conf = conf_path()
+    LDAP_SERVER = conf.ladp_server
+    LDAP_DOMAIN = conf.ladp_domain
+    LDAP_TYPE = conf.ladp_type
+    LDAP_SCBASE = conf.ldap_scbase
+
+    server = ldap3.Server(LDAP_SERVER, get_info=ldap3.ALL)
+    if LDAP_TYPE == '1':
+        user = username + '@' + LDAP_SCBASE
+    elif LDAP_TYPE == '2':
+        user = "cn=%s,%s" % (username, LDAP_SCBASE)
+    else:
+        user = "uid=%s,%s" % (username, LDAP_SCBASE)
+
+    c = ldap3.Connection(server, user=user, password=password, check_names=True, lazy=False)
+    ret = c.bind()
+
+    if ret:
+        c.search(search_base=LDAP_SCBASE,
+                 search_filter='(cn=%s)' % username,
+                 search_scope=ldap3.SUBTREE,
+                 attributes=ldap3.ALL_ATTRIBUTES,
+                 paged_size=1)
+        response = c.response
+        if not len(response):
             return False
+
+        store = response[0].get('attributes')._store
+        ret = dict(
+            cn=store.get('cn')[0],
+            sn=store.get('sn')[0],
+            mail=store.get('mail')[0],
+            uid=store.get('uid')[0],
+
+        )
+        c.unbind()
+        return ret
+    else:
+        return False

@@ -61,7 +61,7 @@
         <Button type="primary" icon="ios-cloud-download" @click.native="exportdata()">导出查询数据</Button>
         <br>
         <br>
-        <p>查询结果:</p>
+        <p>查询结果<span v-model="limitPrompt" v-bind:style="limitStyle">{{ limitPrompt }}</span>:</p>
         <Table :columns="columnsName" :data="Testresults" highlight-row ref="table"></Table>
         <br>
         <Page :total="total" show-total @on-change="splice_arr" ref="totol"></Page>
@@ -148,7 +148,12 @@
         },
         id: null,
         total: 0,
-        allsearchdata: []
+        allsearchdata: [],
+        limitPrompt: '',
+        limitStyle: {
+          color: 'red',
+          fontSize: '13px'
+        }
       }
     },
     methods: {
@@ -256,6 +261,13 @@
       axios.put(`${util.url}/workorder/connection`, {'permissions_type': 'query'})
         .then(res => {
           this.item = res.data['connection']
+        })
+        .catch(error => {
+          util.ajanxerrorcode(this, error)
+        });
+      axios.get(`${util.url}/config`, {'cfg': 'sql'})
+        .then(res => {
+          this.limitPrompt = '（查询限制条数为' + res.data.limit + '条）'
         })
         .catch(error => {
           util.ajanxerrorcode(this, error)

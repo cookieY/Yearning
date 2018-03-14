@@ -262,8 +262,10 @@ class ldapauth(baseview.AnyLogin):
         else:
             jwt_payload_handler = api_settings.JWT_PAYLOAD_HANDLER
             jwt_encode_handler = api_settings.JWT_ENCODE_HANDLER
-            valite = util.auth(username=user,password=password)
-            if valite:
+            # valite = util.auth(username=user,password=password)
+
+            data = util.user_auth(username=user,password=password)
+            if data:
                 try:
                     user = Account.objects.filter(username=user).get()
                     permissions = authenticate(username=user, password=password)
@@ -280,6 +282,7 @@ class ldapauth(baseview.AnyLogin):
                         username=user,
                         password=password,
                         is_staff=0,
+                        email=data.get('mail'),
                         group='guest')
                     permissions.save()
                     _user = authenticate(username=user, password=password)
