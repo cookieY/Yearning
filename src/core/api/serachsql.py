@@ -11,6 +11,7 @@ CUSTOM_ERROR = logging.getLogger('Yearning.core.views')
 
 conf = util.conf_path()
 
+
 class serach(baseview.BaseView):
 
     '''
@@ -33,10 +34,8 @@ class serach(baseview.BaseView):
                         port=_c.port,
                         db=address['basename']
                 ) as f:
-
                     '''
                     check可能是多条查询语句，取最后一条查询语句执行
-                    
                     '''
                     query_sql = replace_limit(check[-1].strip(), int(conf.limit))
                     dataset = f.search(sql=query_sql)
@@ -55,7 +54,15 @@ def replace_limit(sql, limit):
     :param limit:
     :return:
     """
-    special_flag = 'l-*jin-*fu-*imit'
+    special_flag_field = 'f-*jin-*du-*yearning'
+    special_flag_keyword = 'k-*jin-*du-*yearning'
+
+    # 处理字段带有limit 且查询条件没有带limit
+    field_limit = '\`limit\`'
+    sql = re.sub(field_limit, special_flag_keyword, sql, re.IGNORECASE)
+
+    if re.search('limit', sql, re.IGNORECASE) is None:
+        sql = sql.rstrip(';') + ' limit %s' % int(limit) + ';'
 
     def fun(new_sql):
         """
@@ -63,9 +70,6 @@ def replace_limit(sql, limit):
         :return:
         """
         upper_sql = new_sql.upper()
-        if 'LIMIT' not in upper_sql:
-            return new_sql
-
         start_index = upper_sql.find('LIMIT') + len('LIMIT')
         end_index = start_index
 
@@ -78,12 +82,7 @@ def replace_limit(sql, limit):
         limit_str = upper_sql[start_index:end_index]
         limit_str = limit_str.strip()
 
-        if len(limit_str) < 1:
-            new_sql = new_sql.replace(
-                new_sql[start_index - len('LIMIT'):start_index], special_flag, 1
-            )
-            return new_sql
-
+        # 输入limit值大于默认limit值就进行替换成默认limit值
         if ',' in limit_str:
             offsets = limit_str.split(',')
             if int(offsets[-1]) > limit:
@@ -97,7 +96,7 @@ def replace_limit(sql, limit):
             new_sql[start_index:end_index], limit_str, 1
         )
         new_sql = new_sql.replace(
-            new_sql[start_index - len('LIMIT'):start_index], special_flag, 1
+            new_sql[start_index - len('LIMIT'):start_index], special_flag_field, 1
         )
         return new_sql
 
@@ -105,5 +104,6 @@ def replace_limit(sql, limit):
     while bool(re.search('limit', sql, re.IGNORECASE)):
         sql = fun(sql)
 
-    sql = sql.replace(special_flag, 'limit')
+    sql = sql.replace(special_flag_field, 'limit')
+    sql = sql.replace(special_flag_keyword, '`limit`')
     return sql
