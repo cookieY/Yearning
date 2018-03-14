@@ -54,15 +54,8 @@ def replace_limit(sql, limit):
     :param limit:
     :return:
     """
-    special_flag_field = 'f-*jin-*du-*yearning'
-    special_flag_keyword = 'k-*jin-*du-*yearning'
-
-    # 处理字段带有limit 且查询条件没有带limit
-    field_limit = '\`limit\`'
-    sql = re.sub(field_limit, special_flag_keyword, sql, re.IGNORECASE)
-
-    if re.search('limit', sql, re.IGNORECASE) is None:
-        sql = sql.rstrip(';') + ' limit %s' % int(limit) + ';'
+    special_flag = 'f-*jin-*du-*yearning'
+    special_flag_keyword = 'k-*jin-*du-*yearning'  #  mysql 关键字
 
     def fun(new_sql):
         """
@@ -82,6 +75,13 @@ def replace_limit(sql, limit):
         limit_str = upper_sql[start_index:end_index]
         limit_str = limit_str.strip()
 
+        # 处理字段带有limit字符的字段
+        if len(limit_str) < 1:
+            new_sql = new_sql.replace(
+                new_sql[start_index - len('LIMIT'):start_index], special_flag, 1
+            )
+            return new_sql
+
         # 输入limit值大于默认limit值就进行替换成默认limit值
         if ',' in limit_str:
             offsets = limit_str.split(',')
@@ -96,14 +96,23 @@ def replace_limit(sql, limit):
             new_sql[start_index:end_index], limit_str, 1
         )
         new_sql = new_sql.replace(
-            new_sql[start_index - len('LIMIT'):start_index], special_flag_field, 1
+            new_sql[start_index - len('LIMIT'):start_index], special_flag, 1
         )
         return new_sql
 
-    #  用for循环更恰当
+    # 处理字段带有limit关键字
+    field_limit = '\`limit\`'
+    sql = re.sub(field_limit, special_flag_keyword, sql, re.IGNORECASE)
+
+    # 原sql没有limit 在最后加上 limit
+    if re.search(r'limit\s.*\d.*', sql, re.IGNORECASE) is None:
+        sql = sql.rstrip(';') + ' limit %s' % int(limit) + ';'
+
+    # 分析limit语句
     while bool(re.search('limit', sql, re.IGNORECASE)):
         sql = fun(sql)
 
-    sql = sql.replace(special_flag_field, 'limit')
+    # 替换回limit语句
+    sql = sql.replace(special_flag, 'limit')
     sql = sql.replace(special_flag_keyword, '`limit`')
     return sql
