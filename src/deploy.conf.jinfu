@@ -1,0 +1,41 @@
+[mysql]
+db = Yearning
+address = 10.10.0.142
+port = 3306
+username = root
+password = 123456
+
+[host]
+ipaddress = 127.0.0.1:8080
+
+[Inception]
+
+ip = 10.10.0.142
+port = 6669
+user = root
+password  =
+backupdb = 10.10.0.142
+backupport = 3306
+backupuser = root
+backuppassword =
+
+[LDAP]
+LDAP_SERVER = 10.10.0.116
+LDAP_SCBASE = dc=jr,dc=ly,dc=com
+LDAP_DOMAIN = cn=Monitor,dc=jr,dc=ly,dc=com
+LDAP_TYPE = 2  
+
+[email]
+
+username =
+
+password =
+
+smtp_server =
+
+
+smtp_port = 25
+
+[sql]
+
+limit = 1000
