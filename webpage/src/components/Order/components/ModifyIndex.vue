@@ -130,7 +130,7 @@ export default {
         'addindex': this.add_row,
         'table_name': this.table_name
       })
-      axios.put(`${util.url}/sqlorder/index`, {
+      axios.put(`${util.url}/gensql/index`, {
           'data': JSON.stringify(this.putdata)
         })
         .then(mm => {

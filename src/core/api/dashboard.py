@@ -1,4 +1,5 @@
 import logging
+import json
 from libs import baseview
 from rest_framework.response import Response
 from django.http import HttpResponse
@@ -14,16 +15,18 @@ from core.models import (
 )
 from libs.serializers import (
     UserINFO,
-    MessagesUser,
-    Getdingding
+    MessagesUser
 )
 
 
 CUSTOM_ERROR = logging.getLogger('Yearning.core.views')
 
 
-class maindata(baseview.BaseView):
+class dashboard(baseview.BaseView):
+
     '''
+
+    :argument 主页面展示数据接口api
 
     get  主页图表信息
 
@@ -38,8 +41,7 @@ class maindata(baseview.BaseView):
             try:
                 alter = SqlOrder.objects.filter(type=0).aggregate(alter_number=Count('id'))
                 sql = SqlOrder.objects.filter(type=1).aggregate(sql_number=Count('id'))
-                data = [alter, sql]
-                return Response(data)
+                return Response([alter, sql])
             except Exception as e:
                 CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
                 return HttpResponse(status=500)
@@ -50,8 +52,7 @@ class maindata(baseview.BaseView):
                 user = Account.objects.aggregate(user=Count('id'))
                 order = SqlOrder.objects.aggregate(order=Count('id'))
                 link = DatabaseList.objects.aggregate(link=Count('id'))
-                data = [dic, user, order, link]
-                return Response(data)
+                return Response([dic, user, order, link])
             except Exception as e:
                 CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
                 return HttpResponse(status=500)
@@ -77,6 +78,10 @@ class maindata(baseview.BaseView):
                     CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
                     return HttpResponse(status=500)
 
+        elif args == 'menu':
+            permissions = grained.objects.filter(username=request.user).first()
+            return Response(json.dumps(permissions.permissions))
+
     def put(self, request, args=None):
 
         if args == 'todolist':
@@ -88,8 +93,7 @@ class maindata(baseview.BaseView):
             else:
                 try:
                     todo = Todolist.objects.filter(username=user).all()
-                    data = [{'title': i.content} for i in todo]
-                    return Response(data)
+                    return Response([{'title': i.content} for i in todo])
                 except Exception as e:
                     CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
                     return HttpResponse(status=500)
@@ -113,9 +117,8 @@ class maindata(baseview.BaseView):
             user = request.data['user']
             info = Account.objects.filter(username=user).get()
             _serializers = UserINFO(info)
-            permissons = grained.objects.filter(username=request.user).first()
-
-            return Response({'userinfo':_serializers.data,'permissons': permissons.permissions})
+            permissions = grained.objects.filter(username=request.user).first()
+            return Response({'userinfo':_serializers.data, 'permissons': permissions.permissions})
 
         elif args == 'statement':
             Account.objects.filter(username=request.user).update(last_name='1')
@@ -139,13 +142,15 @@ class maindata(baseview.BaseView):
 class messages(baseview.BaseView):
     '''
 
-    get  站内信列表
+    :argument 站内信功能相关接口api
 
-    put  站内信详细内容
+    :get  站内信列表
 
-    post 更新站内信状态
+    :put  站内信详细内容
 
-    del 删除站内信
+    :post 更新站内信状态
+
+    :del 删除站内信
 
     '''
 
@@ -222,39 +227,3 @@ class messages(baseview.BaseView):
             return HttpResponse(status=500)
 
 
-class dingding(baseview.SuperUserpermissions):
-    '''
-    dingding 相关
-    '''
-    def get(self, request, args=None):
-        try:
-            connection_name = request.GET.get('connection_name')
-        except KeyError as e:
-            CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
-            return HttpResponse(status=500)
-        else:
-            try:
-                data = DatabaseList.objects.filter(connection_name=connection_name).first()
-                serializers = Getdingding(data)
-                return Response(serializers.data)
-            except Exception as e:
-                CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
-                return HttpResponse(status=500)
-
-    def post(self, request, args=None):
-        try:
-            id = request.data['id']
-            before = request.data['before']
-            after = request.data['after']
-            url = request.data['url']
-        except KeyError as e:
-            CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
-            return HttpResponse(status=500)
-        else:
-            try:
-                DatabaseList.objects.filter(id=id).update(before=before, after=after, url=url)
-                return Response('ok')
-            except Exception as e:
-                CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
-                return HttpResponse(status=500)
-            

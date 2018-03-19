@@ -1,6 +1,38 @@
 <style lang="less">
 @import '../../styles/common.less';
 @import '../Order/components/table.less';
+.demo-Circle-custom{
+  & h1{
+    color: #3f414d;
+    font-size: 28px;
+    font-weight: normal;
+  }
+  & p{
+    color: #657180;
+    font-size: 14px;
+    margin: 10px 0 15px;
+  }
+  & span{
+    display: block;
+    padding-top: 15px;
+    color: #657180;
+    font-size: 14px;
+    &:before{
+      content: '';
+      display: block;
+      width: 50px;
+      height: 1px;
+      margin: 0 auto;
+      background: #e0e3e6;
+      position: relative;
+      top: -15px;
+    };
+  }
+  & span i{
+    font-style: normal;
+    color: #3f414d;
+  }
+}
 </style>
 <template>
 <div>
@@ -78,13 +110,54 @@
     </p>
     <Input v-model="reject.textarea" type="textarea" :autosize="{minRows: 15,maxRows: 15}" placeholder="请填写驳回说明"></Input>
   </Modal>
+
+  <Modal
+    v-model="osc"
+    title="osc进度查看窗口"
+    :closable="false"
+    :mask-closable="false"
+    @on-cancel="callback_method"
+    @on-ok="stop_osc"
+    ok-text="终止osc"
+    cancel-text="关闭窗口">
+    <Form>
+      <FormItem label="SQL语句SHA1值">
+        <Select v-model="oscsha1" style="width:70%" @on-change="oscsetp" transfer>
+          <Option v-for="item in osclist" :value="item.SQLSHA1" :key="item.SQLSHA1">{{ item.SQLSHA1 }}</Option>
+        </Select>
+      </FormItem>
+      <FormItem label="osc进度详情图表">
+        <i-circle
+          :size="250"
+          :trail-width="4"
+          :stroke-width="5"
+          :percent="percent"
+          stroke-linecap="square"
+          stroke-color="#43a3fb">
+          <div class="demo-Circle-custom">
+            <p>已完成</p>
+            <h1>{{percent}}%</h1>
+            <br>
+            <span>
+                距离完成还差
+                <i>{{consuming}}</i>
+            </span>
+          </div>
+        </i-circle>
+      </FormItem>
+    </Form>
+  </Modal>
+
+
 </div>
 </template>
 <script>
 import axios from 'axios'
 import Cookies from 'js-cookie'
 import util from '../../libs/util'
+import ICircle from 'iview/src/components/circle/circle'
 export default {
+  components: {ICircle},
   name: 'Sqltable',
   data () {
     return {
@@ -183,22 +256,80 @@ export default {
         {
           title: '操作',
           key: 'action',
-          width: 100,
+          width: 200,
           align: 'center',
           render: (h, params) => {
-            return h('div', [
-              h('Button', {
-                props: {
-                  size: 'small',
-                  type: 'text'
-                },
-                on: {
-                  click: () => {
-                    this.edit_tab(params.index)
+            if (params.row.status !== 1) {
+              if (params.row.status === 3 && params.row.type === 0) {
+                return h('div', [
+                  h('Button', {
+                    props: {
+                      size: 'small',
+                      type: 'text'
+                    },
+                    on: {
+                      click: () => {
+                        this.edit_tab(params.index)
+                      }
+                    }
+                  }, '查看'),
+                  h('Button', {
+                    props: {
+                      size: 'small',
+                      type: 'text'
+                    },
+                    on: {
+                      click: () => {
+                        this.oscsha1 = ''
+                        this.osc = true
+                      }
+                    }
+                  }, 'osc进度')
+                ])
+              } else {
+                return h('div', [
+                  h('Button', {
+                    props: {
+                      size: 'small',
+                      type: 'text'
+                    },
+                    on: {
+                      click: () => {
+                        this.edit_tab(params.index)
+                      }
+                    }
+                  }, '查看')
+                ])
+              }
+            } else {
+              return h('div', [
+                h('Button', {
+                  props: {
+                    size: 'small',
+                    type: 'text'
+                  },
+                  on: {
+                    click: () => {
+                      this.edit_tab(params.index)
+                    }
                   }
-                }
-              }, '查看')
-            ])
+                }, '查看'),
+                h('Button', {
+                  props: {
+                    size: 'small',
+                    type: 'text'
+                  },
+                  on: {
+                    click: () => {
+                      this.$router.push({
+                        name: 'orderlist',
+                        query: {workid: params.row.work_id, id: params.row.id, status: 1, type: params.row.type}
+                      })
+                    }
+                  }
+                }, '执行结果')
+              ])
+            }
           }
         }
       ],
@@ -245,6 +376,10 @@ export default {
         {
           title: '预计影响的SQL',
           key: 'affected_rows'
+        },
+        {
+          title: 'SQLSHA1',
+          key: 'SQLSHA1'
         }
       ],
       dataId: [],
@@ -255,7 +390,13 @@ export default {
       tmp: [],
       pagenumber: 1,
       delrecord: [],
-      togoing: null
+      togoing: null,
+      osc: false,
+      oscsha1: '',
+      osclist: JSON.parse(sessionStorage.getItem('osc')),
+      percent: 0,
+      consuming: '00:00',
+      callback_time: null
     }
   },
   methods: {
@@ -320,6 +461,7 @@ export default {
         })
     },
     test_button () {
+      this.osclist = []
       axios.put(`${util.url}/audit_sql`, {
           'type': 'test',
           'base': this.formitem.basename,
@@ -327,7 +469,15 @@ export default {
         })
         .then(res => {
           if (res.data.status === 200) {
+            let osclist
             this.dataId = res.data.result
+            osclist = this.dataId.filter(vl => {
+              if (vl.SQLSHA1 !== '') {
+                return vl
+              }
+            })
+            this.osclist = osclist
+            sessionStorage.setItem('osc', JSON.stringify(osclist))
           } else {
             this.$Notice.error({
               title: '警告',
@@ -370,6 +520,31 @@ export default {
         .catch(error => {
           util.ajanxerrorcode(this, error)
         })
+    },
+    oscsetp (vl) {
+      let vm = this
+      this.callback_time = setInterval(function () {
+        axios.get(`${util.url}/osc/${vl}`)
+          .then(res => {
+            console.log(res.data)
+            vm.percent = res.data[0].PERCENT
+            vm.consuming = res.data[0].REMAINTIME
+          })
+          .catch(error => console.log(error))
+      }, 2000)
+    },
+    callback_method () {
+      clearInterval(this.callback_time)
+    },
+    stop_osc () {
+      axios.delete(`${util.url}/osc/${this.oscsha1}`)
+        .then(res => {
+            this.$Notice.info({
+              title: '通知',
+              desc: res.data
+            })
+        })
+        .catch(error => console.log(error))
     }
   },
   mounted () {

@@ -1,4 +1,11 @@
 from __future__ import absolute_import, unicode_literals
+import logging
+import functools
+import threading
+from django.http import HttpResponse
+from libs import util
+from libs import send_email
+from libs import call_inception
 from .models import (
     Usermessage,
     DatabaseList,
@@ -8,16 +15,15 @@ from .models import (
     SqlRecord,
     grained
 )
-from django.http import HttpResponse
-from libs import util
-from libs import send_email
-from libs import call_inception
-import logging
-import functools
 CUSTOM_ERROR = logging.getLogger('Yearning.core.views')
 
 
 def grained_permissions(func):
+    '''
+
+    :argument 装饰器函数,校验细化权限。非法请求直接返回401交由前端判断状态码
+
+    '''
     @functools.wraps(func)
     def wrapper(self, request, args=None):
         if request.method == "PUT" and args != 'connection':
@@ -35,15 +41,13 @@ def grained_permissions(func):
     return wrapper
 
 
-
-
-
-
-
-import threading
-
-
 class order_push_message(threading.Thread):
+
+    '''
+
+    :argument 同意执行工单调用该方法异步处理数据
+
+    '''
 
     def __init__(self, addr_ip, id, from_user, to_user):
         super().__init__()
@@ -52,55 +56,46 @@ class order_push_message(threading.Thread):
         self.order = SqlOrder.objects.filter(id=id).first()
         self.from_user = from_user
         self.to_user = to_user
+        self.title = f'工单:{self.order.work_id}审核通过通知'
 
     def run(self):
         self.execute()
-        self.Agreed()
+        self.agreed()
 
     def execute(self):
 
-        self.title = f'工单:{self.order.work_id}审核通过通知'
+        '''
+
+        :argument 将获得的sql语句提交给inception执行并将返回结果写入SqlRecord表,最后更改该工单SqlOrder表中的status
+
+        :param
+                self.order
+                self.id
+
+        :return: none
 
         '''
 
-        根据工单编号拿出对应sql的拆解数据
+        detail = DatabaseList.objects.filter(id=self.order.bundle_id).first()
 
-        '''
-
-        SQL_LIST = DatabaseList.objects.filter(id=self.order.bundle_id).first()
-        '''
-
-        发送sql语句到inception中执行
-
-        '''
         with call_inception.Inception(
                 LoginDic={
-                    'host': SQL_LIST.ip,
-                    'user': SQL_LIST.username,
-                    'password': SQL_LIST.password,
+                    'host': detail.ip,
+                    'user': detail.username,
+                    'password': detail.password,
                     'db': self.order.basename,
-                    'port': SQL_LIST.port
+                    'port': detail.port
                 }
         ) as f:
             res = f.Execute(sql=self.order.sql, backup=self.order.backup)
-            '''
-
-            修改该工单编号的state状态
-
-            '''
             SqlOrder.objects.filter(id=self.id).update(status=1)
-            '''
-
-            遍历返回结果插入到执行记录表中
-
-            '''
             for i in res:
                 SqlRecord.objects.get_or_create(
                     date=util.date(),
                     state=i['stagestatus'],
                     sql=i['sql'],
-                    area=SQL_LIST.computer_room,
-                    name=SQL_LIST.connection_name,
+                    area=detail.computer_room,
+                    name=detail.connection_name,
                     error=i['errormessage'],
                     base=self.order.basename,
                     workid=self.order.work_id,
@@ -108,27 +103,32 @@ class order_push_message(threading.Thread):
                     reviewer=self.order.assigned,
                     affectrow=i['affected_rows'],
                     sequence=i['sequence'],
-                    backup_dbname=i['backup_dbname']
+                    backup_dbname=i['backup_dbname'],
+                    execute_time=i['execute_time'],
+                    SQLSHA1=i['SQLSHA1']
                 )
 
-    def Agreed(self):
+    def agreed(self):
 
         '''
 
-         站内信通知
+        :argument 将执行的结果通过站内信,email,dingding 发送
+
+        :param   self.from_user
+                 self.to_user
+                 self.title
+                 self.order
+                 self.addr_ip
+
+        :return: none
 
         '''
+
         Usermessage.objects.get_or_create(
             from_user=self.from_user, time=util.date(),
             title=self.title, content='该工单已审核通过!', to_user=self.to_user,
             state='unread'
         )
-
-        '''
-
-        Dingding & Email
-
-        '''
 
         content = DatabaseList.objects.filter(id=self.order.bundle_id).first()
         mail = Account.objects.filter(username=self.to_user).first()
@@ -164,6 +164,12 @@ class order_push_message(threading.Thread):
 
 class rejected_push_messages(threading.Thread):
 
+    '''
+
+    :argument 驳回工单调用该方法异步处理数据
+
+    '''
+
     def __init__(self, _tmpData, to_user, addr_ip, text):
         super().__init__()
         self.to_user = to_user
@@ -172,9 +178,23 @@ class rejected_push_messages(threading.Thread):
         self.text = text
 
     def run(self):
-        self.push()
+        self.execute()
 
-    def push(self):
+    def execute(self):
+
+        '''
+
+        :argument 更改该工单SqlOrder表中的status
+
+        :param
+                self._tmpData
+                self.addr_ip
+                self.text
+                self.to_user
+
+        :return: none
+
+        '''
         content = DatabaseList.objects.filter(id=self._tmpData['bundle_id']).first()
         mail = Account.objects.filter(username=self.to_user).first()
         tag = globalpermissions.objects.filter(authorization='global').first()
@@ -206,6 +226,12 @@ class rejected_push_messages(threading.Thread):
 
 class submit_push_messages(threading.Thread):
 
+    '''
+
+    :argument 提交工单调用该方法异步处理数据
+
+    '''
+
     def __init__(self, workId, user, addr_ip, text, assigned, id):
         super().__init__()
         self.workId = workId
@@ -219,6 +245,20 @@ class submit_push_messages(threading.Thread):
         self.submit()
 
     def submit(self):
+        '''
+
+        :argument 更改该工单SqlOrder表中的status
+
+        :param
+                self.workId
+                self.user
+                self.addr_ip
+                self.text
+                self.assigned
+                self.id
+        :return: none
+
+        '''
         content = DatabaseList.objects.filter(id=self.id).first()
         mail = Account.objects.filter(username=self.assigned).first()
         tag = globalpermissions.objects.filter(authorization='global').first()

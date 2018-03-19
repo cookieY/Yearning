@@ -19,6 +19,21 @@ CUSTOM_ERROR = logging.getLogger('Yearning.core.views')
 
 jwt_payload_handler = api_settings.JWT_PAYLOAD_HANDLER
 jwt_encode_handler = api_settings.JWT_ENCODE_HANDLER
+PERMISSION = {
+    'ddl': '0',
+    'ddlcon': [],
+    'dml': '0',
+    'dmlcon': [],
+    'dic': '0',
+    'diccon': [],
+    'dicedit': '0',
+    'query': '0',
+    'querycon': [],
+    'user': '0',
+    'base': '0',
+    'dicexport': '0',
+    'person': []
+}
 
 
 class userinfo(baseview.SuperUserpermissions):
@@ -56,12 +71,12 @@ class userinfo(baseview.SuperUserpermissions):
                 return HttpResponse(status=500)
             else:
                 try:
-                    pagenumber = Account.objects.aggregate(alter_number=Count('id'))
+                    page_number = Account.objects.aggregate(alter_number=Count('id'))
                     start = int(page) * 10 - 10
                     end = int(page) * 10
                     info = Account.objects.all()[start:end]
                     serializers = UserINFO(info, many=True)
-                    return Response({'page': pagenumber, 'data': serializers.data})
+                    return Response({'page': page_number, 'data': serializers.data})
                 except Exception as e:
                     CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
                     return HttpResponse(e)
@@ -70,7 +85,6 @@ class userinfo(baseview.SuperUserpermissions):
             user = request.GET.get('user')
             user=grained.objects.filter(username=user).first()
             return Response(user.permissions)
-
 
     def put(self, request, args=None):
         if args == 'changepwd':
@@ -91,21 +105,27 @@ class userinfo(baseview.SuperUserpermissions):
                 except Exception as e:
                     CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
                     return HttpResponse(status=500)
+
         elif args == 'changegroup':
             try:
                 username = request.data['username']
                 group = request.data['group']
                 department = request.data['department']
                 permission = json.loads(request.data['permission'])
+                brfore = Account.objects.filter(username=username).first()
             except KeyError as e:
                 CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
                 return HttpResponse(status=500)
             else:
                 try:
-                    if grained.objects.filter(username=username).first():
-                        grained.objects.filter(username=username).update(permissions=permission)
-                    else:
-                        grained.objects.get_or_create(username=username, permissions=permission)
+                    if brfore.group == 'admin' and group == 'guest':
+                        per = grained.objects.all().values('username', 'permissions')
+                        for i in per:
+                            for c in i['permissions']:
+                                if isinstance(i['permissions'][c], list) and c == 'person':
+                                    i['permissions'][c] = list(filter(lambda x: x != username, i['permissions'][c]))
+                            grained.objects.filter(username=i['username']).update(permissions=i['permissions'])
+                    grained.objects.filter(username=username).update(permissions=permission)
                     if group == 'admin':
                         Account.objects.filter(username=username).update(
                             group=group,
@@ -138,7 +158,6 @@ class userinfo(baseview.SuperUserpermissions):
                     CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
                     return HttpResponse(status=500)
 
-
     def post(self, request, args=None):
         try:
             username = request.data['username']
@@ -160,6 +179,7 @@ class userinfo(baseview.SuperUserpermissions):
                         is_staff=1,
                         email=email)
                     user.save()
+                    grained.objects.get_or_create(username=username, permissions=PERMISSION)
                     return Response('%s 用户注册成功!' % username)
                 elif group == 'guest':
                     user = Account.objects.create_user(
@@ -170,6 +190,7 @@ class userinfo(baseview.SuperUserpermissions):
                         email=email
                         )
                     user.save()
+                    grained.objects.get_or_create(username=username, permissions=PERMISSION)
                     return Response('%s 用户注册成功!' % username)
             except Exception as e:
                 CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
@@ -177,6 +198,14 @@ class userinfo(baseview.SuperUserpermissions):
 
     def delete(self, request, args=None):
         try:
+            pr = Account.objects.filter(username=args).first()
+            if pr.is_staff ==1:
+                per = grained.objects.all().values('username', 'permissions')
+                for i in per:
+                    for c in i['permissions']:
+                        if isinstance(i['permissions'][c], list) and c == 'person':
+                            i['permissions'][c] = list(filter(lambda x: x != args, i['permissions'][c]))
+                    grained.objects.filter(username=i['username']).update(permissions=i['permissions'])
             Account.objects.filter(username=args).delete()
             Usermessage.objects.filter(to_user=args).delete()
             Todolist.objects.filter(username=args).delete()
@@ -190,7 +219,7 @@ class userinfo(baseview.SuperUserpermissions):
 class generaluser(baseview.BaseView):
     '''
 
-    普通用户修改密码
+    :argument 普通用户修改密码
 
     '''
 
@@ -282,6 +311,7 @@ class ldapauth(baseview.AnyLogin):
                         is_staff=0,
                         group='guest')
                     permissions.save()
+                    grained.objects.get_or_create(username=user, permissions=PERMISSION)
                     _user = authenticate(username=user, password=password)
                     token = jwt_encode_handler(jwt_payload_handler(_user))
                     return Response({'token':token,'res': '', 'permissions': 'guest'})

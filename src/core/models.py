@@ -101,7 +101,8 @@ class SqlRecord(models.Model):
     affectrow = models.CharField(max_length=100, null=True)
     sequence = models.CharField(max_length=50, null=True)
     backup_dbname = models.CharField(max_length=100, null=True) #下个版本可废弃
-    rollbackid = models.IntegerField(null=True) #下个版本可废弃
+    execute_time = models.CharField(max_length=150, null=True)
+    SQLSHA1 = models.TextField(null=True)
 
 
 class Todolist(models.Model):

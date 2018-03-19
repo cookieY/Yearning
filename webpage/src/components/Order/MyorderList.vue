@@ -104,6 +104,11 @@ export default {
           title: '影响行数',
           key: 'affectrow',
           width: 100
+        },
+        {
+          title: '执行时间/秒',
+          key: 'execute_time',
+          width: 200
         }
       ],
       TableDataNew: [],
@@ -220,6 +225,7 @@ export default {
      .then(res => {
        this.TableDataNew = res.data.data
        this.dmlorddl = res.data.type
+       console.log(res.data.data)
      })
      .catch(error => {
        this.$Notice.error({

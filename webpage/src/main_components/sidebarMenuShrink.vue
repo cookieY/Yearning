@@ -8,10 +8,12 @@
             </Button>
           <DropdownMenu style="width: 200px;" slot="list">
               <template v-for="child in item.children">
+                <template v-if="filtermenulist[child.name] === '1'">
                   <DropdownItem :name="child.name" :key="child.title">
                     <Icon :type="child.icon"></Icon>
                     <span style="padding-left:10px;">{{ child.title }}</span>
                   </DropdownItem>
+                </template>
               </template>
   </DropdownMenu>
   </Dropdown>
@@ -49,6 +51,7 @@
 <script>
 import Cookies from 'js-cookie'
 import util from '../libs/util'
+import axios from 'axios'
 export default {
   name: 'sidebarMenuShrink',
   props: {
@@ -63,7 +66,18 @@ export default {
   data () {
     return {
       currentPageName: this.$route.name,
-      openedSubmenuArr: this.$store.state.openedSubmenuArr
+      openedSubmenuArr: this.$store.state.openedSubmenuArr,
+      filtermenulist: {
+        'ddledit': '',
+        'dmledit': '',
+        'indexedit': '',
+        'view-dml': '',
+        'serach-sql': '',
+        'management-user': '',
+        'management-database': '',
+        'managerment-audit': '1',
+        'management-record': '1'
+      }
     };
   },
   methods: {
@@ -81,6 +95,19 @@ export default {
         util.openPage(this, active)
       }
     }
+  },
+  created () {
+    axios.get(`${util.url}/homedata/menu`)
+      .then(res => {
+        let c = JSON.parse(res.data)
+        this.filtermenulist.ddledit = c.ddl
+        this.filtermenulist.indexedit = c.ddl
+        this.filtermenulist.dmledit = c.dml
+        this.filtermenulist['view-dml'] = c.dic
+        this.filtermenulist['serach-sql'] = c.query
+        this.filtermenulist['management-user'] = c.user
+        this.filtermenulist['management-database'] = c.base
+      })
   }
 };
 </script>

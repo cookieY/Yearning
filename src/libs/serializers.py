@@ -62,8 +62,7 @@ class Record(serializers.HyperlinkedModelSerializer):
     '''
     class Meta:
         model = SqlRecord
-        fields = (
-            'sql', 'state', 'error', 'affectrow','sequence')
+        fields = ('sql', 'state', 'error', 'affectrow','sequence','execute_time')
 
 
 class Getdingding(serializers.HyperlinkedModelSerializer):

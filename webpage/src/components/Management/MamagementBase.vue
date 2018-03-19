@@ -36,13 +36,13 @@
           <Input v-model="formItem.password" placeholder="请输入" type="password"></Input>
         </Form-item>
         <Form-item label="email推送开关:">
-          <i-switch v-model="mail_switch" size="large" @on-change="mailchange">
+          <i-switch v-model="mail_switch" size="large" @on-change="mail_switching">
             <span slot="open">开</span>
             <span slot="close">关</span>
           </i-switch>
         </Form-item>
         <Form-item label="钉钉推送开关:">
-          <i-switch v-model="dingding_switch" size="large" @on-change="dingdingchange">
+          <i-switch v-model="dingding_switch" size="large" @on-change="dingding_switching">
             <span slot="open">开</span>
             <span slot="close">关</span>
           </i-switch>
@@ -296,7 +296,7 @@ export default {
       this.formItem = {}
     },
     testlink () {
-      axios.put(util.url + '/mamagement_sql/', {
+      axios.put(util.url + '/management_db/', {
           'ip': this.formItem.ip,
           'user': this.formItem.username,
           'password': this.formItem.password,
@@ -332,7 +332,7 @@ export default {
             'password': this.formItem.password,
             'port': this.formItem.port
           }
-          axios.post(util.url + '/mamagement_sql/', {
+          axios.post(util.url + '/management_db/', {
               'data': JSON.stringify(data)
             })
             .then(() => {
@@ -497,7 +497,7 @@ export default {
     },
     delbaselink () {
       if (this.delbasename === this.delconfirmbasename) {
-        axios.delete(`${util.url}/mamagement_sql?del=${this.delbasename}`)
+        axios.delete(`${util.url}/management_db?del=${this.delbasename}`)
           .then(res => {
             this.$Notice.success({
               title: '通知',
@@ -520,7 +520,7 @@ export default {
       this.mountdata(page)
     },
     mountdata (vl = 1) {
-      axios.get(`${util.url}/mamagement_sql?page=${vl}&permissions_type=base`)
+      axios.get(`${util.url}/management_db?page=${vl}&permissions_type=base`)
         .then(res => {
           this.rowdata = res.data.data
           this.pagenumber = parseInt(res.data.page.alter_number)
@@ -564,10 +564,10 @@ export default {
           util.ajanxerrorcode(this, error)
         })
     },
-    mailchange (status) {
+    mail_switching (status) {
       let id = null
       status ? id = 1 : id = 0
-      axios.post(`${util.url}/globalpermissions`, {
+      axios.post(`${util.url}/global_switch`, {
         'type': '1',
         'id': id
       })
@@ -581,10 +581,10 @@ export default {
           util.ajanxerrorcode(this, error)
         })
     },
-    dingdingchange (status) {
+    dingding_switching (status) {
       let id = null
       status ? id = 1 : id = 0
-      axios.post(`${util.url}/globalpermissions`, {
+      axios.post(`${util.url}/global_switch`, {
         'type': '0',
         'id': id
       })

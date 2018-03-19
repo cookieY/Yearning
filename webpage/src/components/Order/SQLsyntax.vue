@@ -40,7 +40,7 @@
 
             <FormItem label="指定审核人:" prop="assigned">
               <Select v-model="formItem.assigned" filterable>
-                <Option v-for="i in this.assigned" :value="i.username" :key="i.username">{{i.username}}</Option>
+                <Option v-for="i in this.assigned" :value="i" :key="i">{{i}}</Option>
               </Select>
             </FormItem>
 
@@ -342,7 +342,7 @@ export default {
     axios.put(`${util.url}/workorder/connection`, {'permissions_type': 'dml'})
       .then(res => {
         this.item = res.data['connection']
-        this.assigned = res.data['person']
+        this.assigned = res.data['assigend']
       })
       .catch(error => {
         util.ajanxerrorcode(this, error)
