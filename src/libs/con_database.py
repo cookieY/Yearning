@@ -176,9 +176,3 @@ class SQLgo(object):
             result = cursor.fetchall()
             data = [c for i in result for c in i]
             return data
-
-
-if __name__ == '__main__':
-    with SQLgo(ip='192.168.146.128',port=6669,user='root',password='x') as f:
-        b=f.rolldata(sql='inception get osc_percent "*32ABFA2C791E1F46676E45D7C6A68DBD87C20955";')
-        print(b)
