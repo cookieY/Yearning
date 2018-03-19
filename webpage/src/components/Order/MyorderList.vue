@@ -225,7 +225,6 @@ export default {
      .then(res => {
        this.TableDataNew = res.data.data
        this.dmlorddl = res.data.type
-       console.log(res.data.data)
      })
      .catch(error => {
        this.$Notice.error({

@@ -526,7 +526,6 @@ export default {
       this.callback_time = setInterval(function () {
         axios.get(`${util.url}/osc/${vl}`)
           .then(res => {
-            console.log(res.data)
             vm.percent = res.data[0].PERCENT
             vm.consuming = res.data[0].REMAINTIME
           })
