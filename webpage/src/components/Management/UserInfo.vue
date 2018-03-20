@@ -711,7 +711,6 @@ export default {
         this.checkAll[indeterminate] = !this.checkAll[indeterminate];
       }
       this.indeterminate[indeterminate] = false;
-
       if (this.checkAll[indeterminate]) {
         if (ty === 'dic') {
           this.permission[name] = this.connectionList[ty].map(vl => vl.Name)
