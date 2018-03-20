@@ -23,6 +23,8 @@ addr_ip = conf.ipaddress
 class sqlorder(baseview.BaseView):
     '''
 
+    :argument 手动模式工单提交相关接口api
+
     put   美化sql  测试sql
 
     post 提交工单
@@ -109,4 +111,3 @@ class sqlorder(baseview.BaseView):
             except Exception as e:
                 CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
                 return HttpResponse(status=500)
-            

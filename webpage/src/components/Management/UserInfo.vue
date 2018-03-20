@@ -74,7 +74,7 @@
     </div>
   </Modal>
 
-  <Modal v-model="editInfodModal"  :width="800">
+  <Modal v-model="editInfodModal"  :width="900">
     <h3 slot="header" style="color:#2D8CF0">权限设定</h3>
     <Form :model="editInfodForm" :label-width="100" label-position="right">
       <FormItem label="用户名">
@@ -98,8 +98,14 @@
         </FormItem>
         <template v-if="permission.ddl === '1'">
         <FormItem label="连接名:">
+          <div style="border-bottom: 1px solid #e9e9e9;padding-bottom:6px;margin-bottom:6px;">
+            <Checkbox
+              :indeterminate="indeterminate.ddl"
+              :value="checkAll.ddl"
+              @click.prevent.native="ddlCheckAll('ddlcon', 'ddl', 'connection')">全选</Checkbox>
+          </div>
           <CheckboxGroup v-model="permission.ddlcon">
-            <Checkbox  v-for="i in this.con" :label="i.connection_name" :key="i.connection_name">{{i.connection_name}}</Checkbox>
+            <Checkbox  v-for="i in connectionList.connection" :label="i.connection_name" :key="i.connection_name">{{i.connection_name}}</Checkbox>
           </CheckboxGroup>
         </FormItem>
         </template>
@@ -113,11 +119,30 @@
         </FormItem>
         <template v-if="permission.dml === '1'">
           <FormItem label="连接名:">
+            <div style="border-bottom: 1px solid #e9e9e9;padding-bottom:6px;margin-bottom:6px;">
+              <Checkbox
+                :indeterminate="indeterminate.dml"
+                :value="checkAll.dml"
+                @click.prevent.native="ddlCheckAll('dmlcon', 'dml', 'connection')">全选</Checkbox>
+            </div>
             <CheckboxGroup v-model="permission.dmlcon">
-              <Checkbox  v-for="i in this.con" :label="i.connection_name" :key="i.connection_name">{{i.connection_name}}</Checkbox>
+              <Checkbox  v-for="i in connectionList.connection" :label="i.connection_name" :key="i.connection_name">{{i.connection_name}}</Checkbox>
             </CheckboxGroup>
           </FormItem>
       </template>
+        <hr style="height:1px;border:none;border-top:1px dashed #dddee1;" />
+        <br>
+        <FormItem label="选择上级审核人:">
+          <div style="border-bottom: 1px solid #e9e9e9;padding-bottom:6px;margin-bottom:6px;">
+            <Checkbox
+              :indeterminate="indeterminate.person"
+              :value="checkAll.person"
+              @click.prevent.native="ddlCheckAll('person', 'person', 'person')">全选</Checkbox>
+          </div>
+          <CheckboxGroup v-model="permission.person">
+            <Checkbox  v-for="i in connectionList.person" :label="i.username" :key="i.username">{{i.username}}</Checkbox>
+          </CheckboxGroup>
+        </FormItem>
         <hr style="height:1px;border:none;border-top:1px dashed #dddee1;" />
         <br>
       <FormItem label="数据字典权限:">
@@ -140,8 +165,14 @@
           </RadioGroup>
         </FormItem>
         <FormItem label="连接名:">
+          <div style="border-bottom: 1px solid #e9e9e9;padding-bottom:6px;margin-bottom:6px;">
+            <Checkbox
+              :indeterminate="indeterminate.dic"
+              :value="checkAll.dic"
+              @click.prevent.native="ddlCheckAll('diccon', 'dic', 'dic')">全选</Checkbox>
+          </div>
           <CheckboxGroup v-model="permission.diccon">
-            <Checkbox  v-for="i in this.dicadd" :label="i.Name" :key="i.Name">{{i.Name}}</Checkbox>
+            <Checkbox  v-for="i in connectionList.dic" :label="i.Name" :key="i.Name">{{i.Name}}</Checkbox>
           </CheckboxGroup>
         </FormItem>
       </template>
@@ -155,8 +186,14 @@
       </FormItem>
       <template v-if="permission.query === '1'">
         <FormItem label="连接名:">
+          <div style="border-bottom: 1px solid #e9e9e9;padding-bottom:6px;margin-bottom:6px;">
+            <Checkbox
+              :indeterminate="indeterminate.query"
+              :value="checkAll.query"
+              @click.prevent.native="ddlCheckAll('querycon', 'query', 'connection')">全选</Checkbox>
+          </div>
           <CheckboxGroup v-model="permission.querycon">
-            <Checkbox  v-for="i in this.con" :label="i.connection_name" :key="i.connection_name">{{i.connection_name}}</Checkbox>
+            <Checkbox  v-for="i in connectionList.connection" :label="i.connection_name" :key="i.connection_name">{{i.connection_name}}</Checkbox>
           </CheckboxGroup>
         </FormItem>
       </template>
@@ -486,7 +523,26 @@ export default {
       confirmuser: '',
       deluserModal: false,
       userid: null,
-      dicadd: []
+      dicadd: [],
+      checkAll: {
+        ddl: false,
+        dml: false,
+        query: false,
+        dic: false,
+        person: false
+      },
+      indeterminate: {
+        ddl: true,
+        dml: true,
+        query: true,
+        dic: true,
+        person: true
+      },
+      connectionList: {
+        connection: [],
+        dic: [],
+        person: []
+      }
     }
   },
   methods: {
@@ -647,13 +703,34 @@ export default {
       } else {
         this.$Message.error('用户名不一致!请重新操作!')
       }
+    },
+    ddlCheckAll (name, indeterminate, ty) {
+      if (this.indeterminate[indeterminate]) {
+        this.checkAll[indeterminate] = false;
+      } else {
+        this.checkAll[indeterminate] = !this.checkAll[indeterminate];
+      }
+      this.indeterminate[indeterminate] = false;
+
+      if (this.checkAll[indeterminate]) {
+        if (ty === 'dic') {
+          this.permission[name] = this.connectionList[ty].map(vl => vl.Name)
+        } else if (ty === 'person') {
+          this.permission[name] = this.connectionList[ty].map(vl => vl.username)
+        } else {
+          this.permission[name] = this.connectionList[ty].map(vl => vl.connection_name)
+        }
+      } else {
+        this.permission[name] = [];
+      }
     }
   },
   mounted () {
     axios.put(`${util.url}/workorder/connection`, {'permissions_type': 'user'})
       .then(res => {
-        this.con = res.data['connection']
-        this.dicadd = res.data['dic']
+        this.connectionList.connection = res.data['connection']
+        this.connectionList.dic = res.data['dic']
+        this.connectionList.person = res.data['person']
       })
       .catch(error => {
         util.ajanxerrorcode(this, error)

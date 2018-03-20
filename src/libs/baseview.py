@@ -69,6 +69,6 @@ class AnyLogin(APIView):
 class WebPermission(BasePermission):
 
     def has_permission(self, request, view):
-        permisson = globalpermissions.objects.filter(authorization=request.user).first()
-        if permisson is not None and permisson.dingding == 0:
+        permission = globalpermissions.objects.filter(authorization=request.user).first()
+        if permission is not None and permission.dingding == 0:
             return True

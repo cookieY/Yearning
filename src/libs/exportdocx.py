@@ -142,13 +142,3 @@ class ToWord:
                 cells[3].text = '%s' % column[7]
                 cells[4].text = '%s' % column[8]
         self.document.save('./exportData/%s_%s_数据字典.docx' % (Conn, Schemal))
-
-if __name__ == "__main__":
-
-    a = ToWord(
-                Host='127.0.0.1',
-                User='root',
-                Password='19931003',
-                Database='Yearning',
-                Charset='utf8')
-    c=a.exportTables(Conn='test',Schemal='Yearning',TableList=['auth_group', 'core_account'])

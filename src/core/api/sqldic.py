@@ -21,16 +21,22 @@ CUSTOM_ERROR = logging.getLogger('Yearning.core.views')
 
 
 class adminpremisson(baseview.SuperUserpermissions):
+
     '''
-    数据库字典相关 admin权限
+
+    :argument 数据库字典
+
     '''
 
     @staticmethod
-    def DicGenerate(id, basename):
+    def DicGenerate(_connection, basename):
+
         '''
-        字典生成
+
+        :argument 字典生成
+
         '''
-        _connection = DatabaseList.objects.filter(id=id).first()
+
         with con_database.SQLgo(
             ip=_connection.ip,
             user=_connection.username,
@@ -54,18 +60,22 @@ class adminpremisson(baseview.SuperUserpermissions):
 
     @staticmethod
     def GenerateTableData(basename=None, name=None, signal=None):
+
         '''
-        生成表结构数据
+
+        :argument 生成表结构数据
+
         '''
+
         signal = int(signal)
-        DictionaryInfo = SqlDictionary.objects.filter(
+        dic_data = SqlDictionary.objects.filter(
             BaseName=basename,
             Name=name
         ).values('TableName')
-        DictionaryInfo.query.group_by = ['TableName']  # 不重复表名
+        dic_data.query.group_by = ['TableName']  # 不重复表名
         dic = []
         if signal == 1 or signal is None:
-            for i in DictionaryInfo[:signal * 3]:
+            for i in dic_data[:signal * 3]:
                 tmp = SqlDictionary.objects.filter(
                     TableName=i['TableName'],
                     BaseName=basename
@@ -73,7 +83,7 @@ class adminpremisson(baseview.SuperUserpermissions):
                 serializers = SQLGeneratDic(tmp, many=True)
                 dic.append(serializers.data)
         else:
-            for i in DictionaryInfo[signal * 3 - 3:signal * 3]:
+            for i in dic_data[signal * 3 - 3:signal * 3]:
                 tmp = SqlDictionary.objects.filter(
                     TableName=i['TableName'],
                     BaseName=basename
@@ -84,20 +94,25 @@ class adminpremisson(baseview.SuperUserpermissions):
 
     def put(self, request, args: str = None):
 
+        '''
+        :argument 生成, 删除字典 删除字段 添加字段 修改备注 修改表备注 添加表 删除表
+        '''
+
         if args == 'Generation':  # 一次性自动扫描数据库表结构并且把信息插入sqldic表
             try:
-                id = request.data['id']
+                con_id = request.data['id']
                 basename = json.loads(request.data['basename'])
             except KeyError as e:
                 CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
                 return HttpResponse(status=500)
             else:
                 try:
+                    _connection = DatabaseList.objects.filter(id=con_id).first()
                     for i in basename:
-                        if SqlDictionary.objects.filter(BaseName=i).first():
+                        if SqlDictionary.objects.filter(BaseName=i, Name=_connection.connection_name).first():
                             pass
                         else:
-                            adminpremisson.DicGenerate(id, i)
+                            adminpremisson.DicGenerate(_connection, i)
                     return HttpResponse('数据库字典生成成功！')
                 except Exception as e:
                     CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
@@ -127,6 +142,7 @@ class adminpremisson(baseview.SuperUserpermissions):
                 except Exception as e:
                     CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
                     return HttpResponse(status=500)
+
         elif args == 'delfield':
             try:
                 data = json.loads(request.data['data'])
@@ -267,6 +283,12 @@ class adminpremisson(baseview.SuperUserpermissions):
 
 
 class dictionary(baseview.BaseView):
+
+    '''
+
+    :argument 数据字典展示相关数据
+
+    '''
     def put(self, request, args=None):
 
         if args == 'info':
@@ -433,9 +455,11 @@ class dictionary(baseview.BaseView):
 
 
 class exportdoc(baseview.SuperUserpermissions):
+
     '''
-    导出数据字典为docx文档
+    :argument 导出数据字典为docx文档
     '''
+
     @grained_permissions
     def post(self, request, args=None):
         try:

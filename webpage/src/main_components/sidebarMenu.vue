@@ -33,10 +33,12 @@
           <span class="layout-text">{{ item.title }}</span>
         </template>
   <template v-for="child in item.children">
+    <template v-if="filtermenulist[child.name] === '1'">
           <MenuItem :name="child.name" :key="child.name" style="margin-left: -5%">
             <Icon :type="child.icon" :size="iconSize" :key="child.name"></Icon>
             <span class="layout-text" :key="child.name + 1">{{ child.title }}</span>
           </MenuItem>
+    </template>
         </template>
   </Submenu>
   </template>
@@ -49,11 +51,27 @@
 <script>
 import Cookies from 'js-cookie'
 import util from '../libs/util'
+import axios from 'axios'
 export default {
   name: 'sidebarMenu',
   props: {
     menuList: Array,
     iconSize: Number
+  },
+  data () {
+    return {
+      filtermenulist: {
+        'ddledit': '',
+        'dmledit': '',
+        'indexedit': '',
+        'view-dml': '',
+        'serach-sql': '',
+        'management-user': '',
+        'management-database': '',
+        'managerment-audit': '1',
+        'management-record': '1'
+      }
+    }
   },
   computed: {
     theme () {
@@ -79,6 +97,18 @@ export default {
       }
     }
   },
-  mounted () {}
+  created () {
+    axios.get(`${util.url}/homedata/menu`)
+      .then(res => {
+        let c = JSON.parse(res.data)
+        this.filtermenulist.ddledit = c.ddl
+        this.filtermenulist.indexedit = c.ddl
+        this.filtermenulist.dmledit = c.dml
+        this.filtermenulist['view-dml'] = c.dic
+        this.filtermenulist['serach-sql'] = c.query
+        this.filtermenulist['management-user'] = c.user
+        this.filtermenulist['management-database'] = c.base
+      })
+  }
 }
 </script>

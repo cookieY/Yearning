@@ -100,8 +100,8 @@
               <Input v-model="formItem.text" placeholder="最多不超过20个字"></Input>
             </FormItem>
             <FormItem label="指定审核人:" required>
-              <Select v-model="formItem.assigned" filterable>
-                <Option v-for="i in this.assigned" :value="i.username" :key="i.username">{{i.username}}</Option>
+              <Select v-model="formItem.assigned" filterable transfer>
+                <Option v-for="i in this.assigned" :value="i" :key="i">{{i}}</Option>
               </Select>
             </FormItem>
             <FormItem label="是否备份">
@@ -276,7 +276,7 @@
         axios.put(`${util.url}/workorder/connection`, {'permissions_type': 'ddl'})
           .then(res => {
             this.item = res.data['connection']
-            this.assigned = res.data['person']
+            this.assigned = res.data['assigend']
           })
           .catch(error => {
             util.ajanxerrorcode(this, error)

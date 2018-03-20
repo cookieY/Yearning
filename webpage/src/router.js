@@ -83,7 +83,8 @@ export const appRouter = [
         }
       }
     ]
-  }, {
+  },
+  {
     path: '/order',
     icon: 'folder',
     name: 'order',

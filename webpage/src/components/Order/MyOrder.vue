@@ -12,11 +12,11 @@
       </p>
       <Row>
         <Col span="24">
-        <Table border :columns="columns6" :data="applytable" stripe size="small"></Table>
+        <Table border :columns="columns" :data="table_data" stripe size="small"></Table>
         </Col>
       </Row>
       <br>
-      <Page :total="pagenumber" show-elevator @on-change="currentpage" :page-size="20"></Page>
+      <Page :total="page_number" show-elevator @on-change="currentpage" :page-size="20"></Page>
     </Card>
   </Row>
 </div>
@@ -29,7 +29,7 @@ export default {
   name: 'put',
   data () {
     return {
-      columns6: [
+      columns: [
         {
           title: '工单编号:',
           key: 'work_id',
@@ -62,16 +62,16 @@ export default {
             let text = ''
             if (row.status === 2) {
               color = 'blue'
-              text = '审核中'
+              text = '待审核'
             } else if (row.status === 0) {
               color = 'red'
-              text = '拒绝'
+              text = '驳回'
             } else if (row.status === 1) {
               color = 'green'
-              text = '同意'
+              text = '已执行'
             } else {
               color = 'yellow'
-              text = '进行中'
+              text = '执行中'
             }
 
             return h('Tag', {
@@ -83,19 +83,19 @@ export default {
           },
           sortable: true,
           filters: [{
-              label: '同意',
+              label: '已执行',
               value: 1
             },
             {
-              label: '拒绝',
+              label: '驳回',
               value: 0
             },
             {
-              label: '审核中',
+              label: '待审核',
               value: 2
             },
             {
-              label: '进行中',
+              label: '执行中',
               value: 3
             }
           ],
@@ -136,21 +136,18 @@ export default {
           }
         }
       ],
-      sql: [],
-      pagenumber: 1,
+      page_number: 1,
       computer_room: util.computer_room,
-      applytable: [],
-      openswitch: false,
-      modaltext: {},
-      editsql: ''
+      table_data: []
     }
   },
   methods: {
-    currentpage (vl) {
-      axios.get(`${util.url}/workorder/?user=${Cookies.get('user')}&page=${vl}`)
+    currentpage (vl = 1) {
+      axios.get(`${util.url}/myorder/?user=${Cookies.get('user')}&page=${vl}`)
         .then(res => {
-          this.applytable = res.data.data
-          this.pagenumber = parseInt(res.data.page.alter_number)
+          this.table_data = res.data.data
+          this.table_data.forEach((item) => { (item.backup === 1) ? item.backup = '是' : item.backup = '否' })
+          this.page_number = parseInt(res.data.page.alter_number)
         })
         .catch(error => {
           util.ajanxerrorcode(this, error)
@@ -158,15 +155,7 @@ export default {
     }
   },
   mounted () {
-    axios.get(`${util.url}/workorder/?user=${Cookies.get('user')}&page=1`)
-      .then(res => {
-        this.applytable = res.data.data
-        this.applytable.forEach((item) => { (item.backup === 1) ? item.backup = '是' : item.backup = '否' })
-        this.pagenumber = res.data.page.alter_number
-      })
-      .catch(error => {
-        util.ajanxerrorcode(this, error)
-      })
+    this.currentpage()
   }
 }
 </script>

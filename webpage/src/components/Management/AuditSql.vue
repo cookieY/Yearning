@@ -1,6 +1,38 @@
 <style lang="less">
 @import '../../styles/common.less';
 @import '../Order/components/table.less';
+.demo-Circle-custom{
+  & h1{
+    color: #3f414d;
+    font-size: 28px;
+    font-weight: normal;
+  }
+  & p{
+    color: #657180;
+    font-size: 14px;
+    margin: 10px 0 15px;
+  }
+  & span{
+    display: block;
+    padding-top: 15px;
+    color: #657180;
+    font-size: 14px;
+    &:before{
+      content: '';
+      display: block;
+      width: 50px;
+      height: 1px;
+      margin: 0 auto;
+      background: #e0e3e6;
+      position: relative;
+      top: -15px;
+    };
+  }
+  & span i{
+    font-style: normal;
+    color: #3f414d;
+  }
+}
 </style>
 <template>
 <div>
@@ -22,7 +54,7 @@
         <Button type="text" style="margin-left: -1%" @click.native="mou_data()">刷新</Button>
         <Table border :columns="columns6" :data="tmp" stripe ref="selection" @on-selection-change="delrecordList"></Table>
         <br>
-        <Page :total="pagenumber" show-elevator @on-change="splicpage" :page-size="20" ref="page"></Page>
+        <Page :total="pagenumber" show-elevator @on-change="mou_data" :page-size="20" ref="page"></Page>
         </Col>
       </Row>
     </Card>
@@ -65,9 +97,11 @@
     <Table :columns="columnsName" :data="dataId" stripe border></Table>
     <div slot="footer">
       <Button type="warning" @click.native="test_button()">检测sql</Button>
-      <Button @click="cancel_button">取消</Button>
+      <Button @click="modal2 = false">取消</Button>
+      <template v-if="switch_show">
       <Button type="error" @click="out_button()" :disabled="summit">驳回</Button>
       <Button type="success" @click="put_button()" :disabled="summit">同意</Button>
+      </template>
     </div>
   </Modal>
 
@@ -78,13 +112,54 @@
     </p>
     <Input v-model="reject.textarea" type="textarea" :autosize="{minRows: 15,maxRows: 15}" placeholder="请填写驳回说明"></Input>
   </Modal>
+
+  <Modal
+    v-model="osc"
+    title="osc进度查看窗口"
+    :closable="false"
+    :mask-closable="false"
+    @on-cancel="callback_method"
+    @on-ok="stop_osc"
+    ok-text="终止osc"
+    cancel-text="关闭窗口">
+    <Form>
+      <FormItem label="SQL语句SHA1值">
+        <Select v-model="oscsha1" style="width:70%" @on-change="oscsetp" transfer>
+          <Option v-for="item in osclist" :value="item.SQLSHA1" :key="item.SQLSHA1">{{ item.SQLSHA1 }}</Option>
+        </Select>
+      </FormItem>
+      <FormItem label="osc进度详情图表">
+        <i-circle
+          :size="250"
+          :trail-width="4"
+          :stroke-width="5"
+          :percent="percent"
+          stroke-linecap="square"
+          stroke-color="#43a3fb">
+          <div class="demo-Circle-custom">
+            <p>已完成</p>
+            <h1>{{percent}}%</h1>
+            <br>
+            <span>
+                距离完成还差
+                <i>{{consuming}}</i>
+            </span>
+          </div>
+        </i-circle>
+      </FormItem>
+    </Form>
+  </Modal>
+
+
 </div>
 </template>
 <script>
 import axios from 'axios'
 import Cookies from 'js-cookie'
 import util from '../../libs/util'
+import ICircle from 'iview/src/components/circle/circle'
 export default {
+  components: {ICircle},
   name: 'Sqltable',
   data () {
     return {
@@ -131,16 +206,16 @@ export default {
             let text = ''
             if (row.status === 2) {
               color = 'blue'
-              text = '审核中'
+              text = '待审核'
             } else if (row.status === 0) {
               color = 'red'
-              text = '拒绝'
+              text = '驳回'
             } else if (row.status === 1) {
               color = 'green'
-              text = '同意'
+              text = '已执行'
             } else {
               color = 'yellow'
-              text = '进行中'
+              text = '执行中'
             }
             return h('Tag', {
               props: {
@@ -151,19 +226,19 @@ export default {
           },
           sortable: true,
           filters: [{
-              label: '同意',
+              label: '已执行',
               value: 1
             },
             {
-              label: '拒绝',
+              label: '驳回',
               value: 0
             },
             {
-              label: '审核中',
+              label: '待审核',
               value: 2
             },
             {
-              label: '进行中',
+              label: '执行中',
               value: 3
             }
           ],
@@ -183,22 +258,80 @@ export default {
         {
           title: '操作',
           key: 'action',
-          width: 100,
+          width: 200,
           align: 'center',
           render: (h, params) => {
-            return h('div', [
-              h('Button', {
-                props: {
-                  size: 'small',
-                  type: 'text'
-                },
-                on: {
-                  click: () => {
-                    this.edit_tab(params.index)
+            if (params.row.status !== 1) {
+              if (params.row.status === 3 && params.row.type === 0) {
+                return h('div', [
+                  h('Button', {
+                    props: {
+                      size: 'small',
+                      type: 'text'
+                    },
+                    on: {
+                      click: () => {
+                        this.edit_tab(params.index)
+                      }
+                    }
+                  }, '查看'),
+                  h('Button', {
+                    props: {
+                      size: 'small',
+                      type: 'text'
+                    },
+                    on: {
+                      click: () => {
+                        this.oscsha1 = ''
+                        this.osc = true
+                      }
+                    }
+                  }, 'osc进度')
+                ])
+              } else {
+                return h('div', [
+                  h('Button', {
+                    props: {
+                      size: 'small',
+                      type: 'text'
+                    },
+                    on: {
+                      click: () => {
+                        this.edit_tab(params.index)
+                      }
+                    }
+                  }, '查看')
+                ])
+              }
+            } else {
+              return h('div', [
+                h('Button', {
+                  props: {
+                    size: 'small',
+                    type: 'text'
+                  },
+                  on: {
+                    click: () => {
+                      this.edit_tab(params.index)
+                    }
                   }
-                }
-              }, '查看')
-            ])
+                }, '查看'),
+                h('Button', {
+                  props: {
+                    size: 'small',
+                    type: 'text'
+                  },
+                  on: {
+                    click: () => {
+                      this.$router.push({
+                        name: 'orderlist',
+                        query: {workid: params.row.work_id, id: params.row.id, status: 1, type: params.row.type}
+                      })
+                    }
+                  }
+                }, '执行结果')
+              ])
+            }
           }
         }
       ],
@@ -213,7 +346,7 @@ export default {
         att: '',
         id: null
       },
-      summit: false,
+      summit: true,
       columnsName: [
         {
           title: 'ID',
@@ -245,6 +378,10 @@ export default {
         {
           title: '预计影响的SQL',
           key: 'affected_rows'
+        },
+        {
+          title: 'SQLSHA1',
+          key: 'SQLSHA1'
         }
       ],
       dataId: [],
@@ -255,7 +392,14 @@ export default {
       tmp: [],
       pagenumber: 1,
       delrecord: [],
-      togoing: null
+      togoing: null,
+      osc: false,
+      oscsha1: '',
+      osclist: JSON.parse(sessionStorage.getItem('osc')),
+      percent: 0,
+      consuming: '00:00',
+      callback_time: null,
+      switch_show: true
     }
   },
   methods: {
@@ -263,18 +407,9 @@ export default {
       this.togoing = index
       this.dataId = []
       this.modal2 = true
-      if (this.tmp[index].status === 2) {
-        this.summit = false
-        this.formitem = this.tmp[index]
-        this.sql = this.tmp[index].sql.split(';')
-      } else {
-        this.formitem = this.tmp[index]
-        this.sql = this.tmp[index].sql.split(';')
-        this.summit = true
-      }
-    },
-    cancel_button () {
-      this.modal2 = false
+      this.formitem = this.tmp[index]
+      this.tmp[index].status === 2 ? this.switch_show = true : this.switch_show = false
+      this.sql = this.tmp[index].sql.split(';')
     },
     put_button () {
       this.modal2 = false
@@ -320,6 +455,7 @@ export default {
         })
     },
     test_button () {
+      this.osclist = []
       axios.put(`${util.url}/audit_sql`, {
           'type': 'test',
           'base': this.formitem.basename,
@@ -327,7 +463,16 @@ export default {
         })
         .then(res => {
           if (res.data.status === 200) {
+            let osclist
             this.dataId = res.data.result
+            osclist = this.dataId.filter(vl => {
+              if (vl.SQLSHA1 !== '') {
+                return vl
+              }
+            })
+            this.osclist = osclist
+            this.summit = false
+            sessionStorage.setItem('osc', JSON.stringify(osclist))
           } else {
             this.$Notice.error({
               title: '警告',
@@ -338,9 +483,6 @@ export default {
         .catch(error => {
           util.ajanxerrorcode(this, error)
         })
-    },
-    splicpage (page) {
-      this.mou_data(page)
     },
     mou_data (vl = 1) {
       axios.get(`${util.url}/audit_sql?page=${vl}&username=${Cookies.get('user')}`)
@@ -370,6 +512,35 @@ export default {
         .catch(error => {
           util.ajanxerrorcode(this, error)
         })
+    },
+    oscsetp (vl) {
+      let vm = this
+      this.callback_time = setInterval(function () {
+        axios.get(`${util.url}/osc/${vl}`)
+          .then(res => {
+            if (res.data[0].PERCENT === 99) {
+              vm.percent = 100
+              clearInterval(vm.callback_time)
+            } else {
+              vm.percent = res.data[0].PERCENT
+            }
+            vm.consuming = res.data[0].REMAINTIME
+          })
+          .catch(error => console.log(error))
+      }, 2000)
+    },
+    callback_method () {
+      clearInterval(this.callback_time)
+    },
+    stop_osc () {
+      axios.delete(`${util.url}/osc/${this.oscsha1}`)
+        .then(res => {
+            this.$Notice.info({
+              title: '通知',
+              desc: res.data
+            })
+        })
+        .catch(error => console.log(error))
     }
   },
   mounted () {
