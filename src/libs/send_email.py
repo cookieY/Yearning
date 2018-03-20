@@ -21,13 +21,13 @@ class send_email(object):
         return formataddr((Header(name, 'utf-8').encode(), addr))
 
     def send_mail(self,mail_data=None,type=None):
-        if type == 0: #同意
-            text = '<html><body><h1>Yearning 工单同意通知</h1>' \
+        if type == 0: #执行
+            text = '<html><body><h1>Yearning 工单执行通知</h1>' \
                    '<br><p>工单号: %s</p>' \
                    '<br><p>发起人: %s</p>' \
                    '<br><p>地址: <a href="%s">%s</a></p>' \
                    '<br><p>工单备注: %s</p>' \
-                   '<br><p>状态: 同意</p>' \
+                   '<br><p>状态: 已执行</p>' \
                    '<br><p>备注: %s</p>' \
                    '</body></html>' %(
                 mail_data['workid'],
@@ -74,5 +74,3 @@ class send_email(object):
         server.login(from_addr, password)
         server.sendmail(from_addr, [self.to_addr], msg.as_string())
         server.quit()
-
-        

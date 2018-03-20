@@ -9,6 +9,7 @@ cookie
 
 import pymysql
 
+
 class SQLgo(object):
     def __init__(self, ip=None, user=None, password=None, db=None, port=None):
         self.ip = ip
@@ -52,15 +53,15 @@ class SQLgo(object):
             cursor.execute(sqllist)
             result = cursor.fetchall()
             for field in cursor.description:
-                if id  == 0:
+                if id == 0:
                     data_dict.append({'title': field[0], "key": field[0], "fixed": "left", "width": 150})
-                    id +=1
+                    id += 1
                 else:
                     data_dict.append({'title': field[0], "key": field[0], "width": 200})
             len = cursor.rowcount
-        return {'data':result,'title':data_dict,'len':len}
+        return {'data': result, 'title': data_dict, 'len': len}
 
-    def rolldata(self, sql=None):
+    def dic_data(self, sql=None):
         with self.con.cursor(cursor=pymysql.cursors.DictCursor) as cursor:
             sqllist = sql
             cursor.execute(sqllist)

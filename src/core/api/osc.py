@@ -1,7 +1,7 @@
 import logging
 from django.http import HttpResponse
 from rest_framework.response import Response
-from libs import baseview, call_inception
+from libs import baseview, call_inception, con_database
 CUSTOM_ERROR = logging.getLogger('Yearning.core.views')
 
 
@@ -45,7 +45,7 @@ class osc_step(baseview.SuperUserpermissions):
                 'db': '',
                 'port': ''
             }) as f:
-                f.oscstep(sql="inception stop alter '%s';" % args)
+                f.oscstep(sql=f"inception stop alter '{args}';")
                 return Response('osc已终止,请刷新后查看详细信息')
         except Exception as e:
             CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')

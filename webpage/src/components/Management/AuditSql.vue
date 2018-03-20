@@ -54,7 +54,7 @@
         <Button type="text" style="margin-left: -1%" @click.native="mou_data()">刷新</Button>
         <Table border :columns="columns6" :data="tmp" stripe ref="selection" @on-selection-change="delrecordList"></Table>
         <br>
-        <Page :total="pagenumber" show-elevator @on-change="splicpage" :page-size="20" ref="page"></Page>
+        <Page :total="pagenumber" show-elevator @on-change="mou_data" :page-size="20" ref="page"></Page>
         </Col>
       </Row>
     </Card>
@@ -97,9 +97,11 @@
     <Table :columns="columnsName" :data="dataId" stripe border></Table>
     <div slot="footer">
       <Button type="warning" @click.native="test_button()">检测sql</Button>
-      <Button @click="cancel_button">取消</Button>
+      <Button @click="modal2 = false">取消</Button>
+      <template v-if="switch_show">
       <Button type="error" @click="out_button()" :disabled="summit">驳回</Button>
       <Button type="success" @click="put_button()" :disabled="summit">同意</Button>
+      </template>
     </div>
   </Modal>
 
@@ -204,16 +206,16 @@ export default {
             let text = ''
             if (row.status === 2) {
               color = 'blue'
-              text = '审核中'
+              text = '待审核'
             } else if (row.status === 0) {
               color = 'red'
-              text = '拒绝'
+              text = '驳回'
             } else if (row.status === 1) {
               color = 'green'
-              text = '同意'
+              text = '已执行'
             } else {
               color = 'yellow'
-              text = '进行中'
+              text = '执行中'
             }
             return h('Tag', {
               props: {
@@ -224,19 +226,19 @@ export default {
           },
           sortable: true,
           filters: [{
-              label: '同意',
+              label: '已执行',
               value: 1
             },
             {
-              label: '拒绝',
+              label: '驳回',
               value: 0
             },
             {
-              label: '审核中',
+              label: '待审核',
               value: 2
             },
             {
-              label: '进行中',
+              label: '执行中',
               value: 3
             }
           ],
@@ -344,7 +346,7 @@ export default {
         att: '',
         id: null
       },
-      summit: false,
+      summit: true,
       columnsName: [
         {
           title: 'ID',
@@ -396,7 +398,8 @@ export default {
       osclist: JSON.parse(sessionStorage.getItem('osc')),
       percent: 0,
       consuming: '00:00',
-      callback_time: null
+      callback_time: null,
+      switch_show: true
     }
   },
   methods: {
@@ -404,18 +407,9 @@ export default {
       this.togoing = index
       this.dataId = []
       this.modal2 = true
-      if (this.tmp[index].status === 2) {
-        this.summit = false
-        this.formitem = this.tmp[index]
-        this.sql = this.tmp[index].sql.split(';')
-      } else {
-        this.formitem = this.tmp[index]
-        this.sql = this.tmp[index].sql.split(';')
-        this.summit = true
-      }
-    },
-    cancel_button () {
-      this.modal2 = false
+      this.formitem = this.tmp[index]
+      this.tmp[index].status === 2 ? this.switch_show = true : this.switch_show = false
+      this.sql = this.tmp[index].sql.split(';')
     },
     put_button () {
       this.modal2 = false
@@ -477,6 +471,7 @@ export default {
               }
             })
             this.osclist = osclist
+            this.summit = false
             sessionStorage.setItem('osc', JSON.stringify(osclist))
           } else {
             this.$Notice.error({
@@ -488,9 +483,6 @@ export default {
         .catch(error => {
           util.ajanxerrorcode(this, error)
         })
-    },
-    splicpage (page) {
-      this.mou_data(page)
     },
     mou_data (vl = 1) {
       axios.get(`${util.url}/audit_sql?page=${vl}&username=${Cookies.get('user')}`)
@@ -526,7 +518,12 @@ export default {
       this.callback_time = setInterval(function () {
         axios.get(`${util.url}/osc/${vl}`)
           .then(res => {
-            vm.percent = res.data[0].PERCENT
+            if (res.data[0].PERCENT === 99) {
+              vm.percent = 100
+              clearInterval(vm.callback_time)
+            } else {
+              vm.percent = res.data[0].PERCENT
+            }
             vm.consuming = res.data[0].REMAINTIME
           })
           .catch(error => console.log(error))

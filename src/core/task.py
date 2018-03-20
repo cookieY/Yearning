@@ -140,7 +140,7 @@ class order_push_message(threading.Thread):
             try:
                 if content.url:
                     util.dingding(
-                        content='工单执行通知\n工单编号:%s\n发起人:%s\n地址:%s\n工单备注:%s\n状态:同意\n备注:%s'
+                        content='工单执行通知\n工单编号:%s\n发起人:%s\n地址:%s\n工单备注:%s\n状态:已执行\n备注:%s'
                                 % (self.order.work_id, self.order.username, self.addr_ip, self.order.text, content.after), url=content.url)
             except Exception as e:
                 CUSTOM_ERROR.error(f'{e.__class__.__name__}--钉钉推送失败: {e}')

@@ -62,16 +62,16 @@ export default {
             let text = ''
             if (row.status === 2) {
               color = 'blue'
-              text = '审核中'
+              text = '待审核'
             } else if (row.status === 0) {
               color = 'red'
-              text = '拒绝'
+              text = '驳回'
             } else if (row.status === 1) {
               color = 'green'
-              text = '同意'
+              text = '已执行'
             } else {
               color = 'yellow'
-              text = '进行中'
+              text = '执行中'
             }
 
             return h('Tag', {
@@ -83,19 +83,19 @@ export default {
           },
           sortable: true,
           filters: [{
-              label: '同意',
+              label: '已执行',
               value: 1
             },
             {
-              label: '拒绝',
+              label: '驳回',
               value: 0
             },
             {
-              label: '审核中',
+              label: '待审核',
               value: 2
             },
             {
-              label: '进行中',
+              label: '执行中',
               value: 3
             }
           ],

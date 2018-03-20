@@ -102,7 +102,7 @@
       <Table :columns="columns" :data="rowdata" height="550"></Table>
     </div>
     <br>
-    <Page :total="pagenumber" show-elevator @on-change="splicpage" :page-size="10"></Page>
+    <Page :total="pagenumber" show-elevator @on-change="mountdata" :page-size="10"></Page>
   </Card>
   </Col>
   <Modal v-model="delbaseModal" :width="500">
@@ -515,9 +515,6 @@ export default {
           content: '请确认输入的连接名称一致！'
         })
       }
-    },
-    splicpage (page) {
-      this.mountdata(page)
     },
     mountdata (vl = 1) {
       axios.get(`${util.url}/management_db?page=${vl}&permissions_type=base`)
