@@ -61,8 +61,32 @@ install() {
 Data="01) Install Dependency Packages, Please wait..."
 echo -n $Data
 rm -fr /var/run/yum.pid &> /dev/null
+rm -fr /var/tmp/* &> /dev/null
+yum install -y perl-IO-Socket-SSL perl-DBD-MySQL perl-Time-HiRes perl-TermReadKey perl-IO-Socket-SSL &> /dev/null
+if [ ! $? = 0 ];then
+    failure "$Data"
+fi
 yum install -y epel-release wget gcc openssl-devel git python-pip net-tools &> /dev/null
-yum install -y zlib zlib-devel tar gzip bzip2 xz zip &>/dev/null && success "$Data" || failure "$Data" 
+if [ ! $? = 0 ];then
+    failure "$Data"
+fi
+yum install -y zlib zlib-devel tar gzip bzip2 xz zip &>/dev/null
+if [ ! $? = 0 ];then
+    failure "$Data"
+fi
+if [ -e /tmp/percona-toolkit-2.2.20-1.noarch.rpm ];then
+    cd /tmp
+    yum localinstall -y percona-toolkit-2.2.20-1.noarch.rpm &> /dev/null
+else
+    cd /tmp
+    wget https://www.percona.com/downloads/percona-toolkit/2.2.20/RPM/percona-toolkit-2.2.20-1.noarch.rpm &> /dev/null
+    yum localinstall -y percona-toolkit-2.2.20-1.noarch.rpm &> /dev/null
+fi
+if [ ! $? = 0 ];then
+    failure "$Data"
+else
+    success "$Data"
+fi
 
 # 02
 Data="02) Install Nginx, Please wait..."
@@ -200,6 +224,7 @@ else
   read -p "10) Input Localhost IP Address[Default: $ADDRESS]: " ADDRESS 
   ADDRESS=`netstat -anplt | grep "sshd" | grep ESTABLISHED | awk '{print $4}' | awk -F':' '{print $1}' | head -n1`
 fi
+yes | cp -fr deploy.conf.template deploy.conf &> /dev/null
 cd /opt/Yearning/src && sed -i "s/backuppassword =.*/backuppassword = $MYSQLPASSWORD/" deploy.conf &> /dev/null
 cd /opt/Yearning/src && sed -i "s/ipaddress = .*/ipaddress = ${ADDRESS}:8000/" deploy.conf &> /dev/null
 cd /opt/Yearning/src && sed -i "s/password =.*/password = $MYSQLPASSWORD/" deploy.conf &> /dev/null 
@@ -217,7 +242,7 @@ if [ -z $PASSWORD ];then
    read -p "Set Yearning admin User Passwrod: " PASSWORD
 fi
 echo "from core.models import Account; Account.objects.create_user(username='admin', password="$PASSWORD", group='admin',is_staff=1)" | python3 manage.py shell &> /dev/null
-echo "from core.models import grained;grained.objects.get_or_create(username='admin', permissions={'ddl': '1', 'ddlcon': [], 'dml': '1', 'dmlcon': [], 'dic': '1', 'diccon': [], 'dicedit': '0', 'query': '1', 'querycon': [], 'user': '1', 'base': '1', 'dicexport': '0'})" | python3 manage.py shell &> /dev/null
+echo "from core.models import grained;grained.objects.get_or_create(username='admin', permissions={'ddl': '1', 'ddlcon': [], 'dml': '1', 'dmlcon': [], 'dic': '1', 'diccon': [], 'dicedit': '0', 'query': '1', 'querycon': [], 'user': '1', 'base': '1', 'dicexport': '0', 'person': []})" | python3 manage.py shell &> /dev/null
 
 # 13
 Data="13) Start Inception, Please wait..."
