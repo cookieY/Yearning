@@ -108,7 +108,6 @@ export default {
         .then(res => {
             axios.defaults.headers.common['Authorization'] = 'JWT ' + res.data['token']
             Cookies.set('user', this.formInline.user)
-            Cookies.set('password', this.formInline.password)
             Cookies.set('jwt', 'JWT ' + res.data['token'])
             let auth = res.data['permissions']
             if (auth === 'admin') {
@@ -138,7 +137,6 @@ export default {
           } else {
             axios.defaults.headers.common['Authorization'] = 'JWT ' + res.data['token']
             Cookies.set('user', this.formInline.user)
-            Cookies.set('password', this.formInline.password)
             Cookies.set('jwt', 'JWT ' + res.data['token'])
             let auth = res.data['permissions']
             if (auth === 'admin') {

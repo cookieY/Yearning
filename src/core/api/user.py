@@ -284,36 +284,32 @@ class ldapauth(baseview.AnyLogin):
     '''
     def post(self, request, args: str = None):
         try:
-            user = request.data['username']
+            username = request.data['username']
             password = request.data['password']
         except KeyError as e:
             CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
         else:
             jwt_payload_handler = api_settings.JWT_PAYLOAD_HANDLER
             jwt_encode_handler = api_settings.JWT_ENCODE_HANDLER
-            valite = util.auth(username=user,password=password)
+            valite = util.auth(username=username,password=password)
             if valite:
                 try:
-                    user = Account.objects.filter(username=user).get()
-                    permissions = authenticate(username=user, password=password)
-                    if permissions is not None and permissions.is_active:
-                        permissions.set_password(password)
-                        permissions.save()
-                        payload = jwt_payload_handler(permissions)
+                    user = Account.objects.filter(username=username).get()
+                    if user is not None and user.is_active:
+                        payload = jwt_payload_handler(user)
                         token = jwt_encode_handler(payload)
                         return Response({'token': token, 'res': '','permissions':user.group})
                     else:
                         return Response({'token':'null', 'res': '账号认证失败!'})
                 except:
-                    permissions = Account.objects.create_user(
-                        username=user,
-                        password=password,
+                    user = Account.objects.create_user(
+                        username=username,
                         is_staff=0,
                         group='guest')
-                    permissions.save()
-                    grained.objects.get_or_create(username=user, permissions=PERMISSION)
-                    _user = authenticate(username=user, password=password)
-                    token = jwt_encode_handler(jwt_payload_handler(_user))
+                    user.set_unusable_password()
+                    user.save()
+                    grained.objects.get_or_create(username=user.username, permissions=PERMISSION)
+                    token = jwt_encode_handler(jwt_payload_handler(user))
                     return Response({'token':token,'res': '', 'permissions': 'guest'})
             else:
                 return Response({'token':'null', 'res': 'ldap账号认证失败,请检查ldap账号或ldap配置!'})
