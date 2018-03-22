@@ -33,6 +33,11 @@
     color: #3f414d;
   }
 }
+p{
+  word-wrap: break-word;
+  word-break: break-all;
+  overflow: hidden;
+}
 </style>
 <template>
 <div>
@@ -44,17 +49,24 @@
       </p>
       <Row>
         <Col span="24">
-        <Poptip
-          confirm
-          title="您确认删除这些工单信息吗?"
-          @on-ok="delrecordData"
-          >
-        <Button type="text" style="margin-left: -1%">删除记录</Button>
-        </Poptip>
-        <Button type="text" style="margin-left: -1%" @click.native="mou_data()">刷新</Button>
-        <Table border :columns="columns6" :data="tmp" stripe ref="selection" @on-selection-change="delrecordList"></Table>
-        <br>
-        <Page :total="pagenumber" show-elevator @on-change="mou_data" :page-size="20" ref="page"></Page>
+        <Tabs type="card">
+          <TabPane label="工单执行申请">
+            <Poptip
+              confirm
+              title="您确认删除这些工单信息吗?"
+              @on-ok="delrecordData"
+            >
+              <Button type="text" style="margin-left: -1%">删除记录</Button>
+            </Poptip>
+            <Button type="text" style="margin-left: -1%" @click.native="mou_data()">刷新</Button>
+            <Table border :columns="columns6" :data="tmp" stripe ref="selection" @on-selection-change="delrecordList"></Table>
+            <br>
+            <Page :total="pagenumber" show-elevator @on-change="mou_data" :page-size="20" ref="page"></Page>
+          </TabPane>
+          <TabPane label="权限申请">
+            <Table border :columns="usercolums" :data="userdata" stripe></Table>
+          </TabPane>
+        </Tabs>
         </Col>
       </Row>
     </Card>

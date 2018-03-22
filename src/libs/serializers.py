@@ -8,6 +8,7 @@ from core.models import SqlDictionary
 from core.models import SqlRecord
 from core.models import Account
 from core.models import SqlOrder
+from core.models import applygrained
 
 
 class MessagesUser(serializers.HyperlinkedModelSerializer):
@@ -84,3 +85,16 @@ class Recordinfo(serializers.HyperlinkedModelSerializer):
     class Meta:
         model = SqlOrder
         fields = ('workid', 'username', 'text', 'data', 'basename', 'assigned')
+
+
+class audit_grained_serializers(serializers.HyperlinkedModelSerializer):
+
+    '''
+
+    获得权限申请数据
+
+    '''
+
+    class Meta:
+        model = applygrained
+        fields = ('username', 'permissions')
