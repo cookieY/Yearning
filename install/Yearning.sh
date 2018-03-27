@@ -28,7 +28,7 @@ export PATH=/usr/local/sbin:/sbin:/bin:/usr/sbin:/usr/bin:/usr/local/bin:/root/b
 
 # Set output color
 COLUMENS=80
-SPACE_COL=$[ $COLUMENS-21 ]
+SPACE_COL=$[ $COLUMENS-15 ]
 VERSION=`uname -r | awk -F'.' '{print $1}'`
  
 RED='\033[1;5;31m'
@@ -58,7 +58,7 @@ help() {
 
 install() {
 # 01
-Data="01) Install Dependency Packages, Please wait..."
+Data="01) 安装依赖包, 请等待..."
 echo -n $Data
 rm -fr /var/run/yum.pid &> /dev/null
 rm -fr /var/tmp/* &> /dev/null
@@ -89,12 +89,12 @@ else
 fi
 
 # 02
-Data="02) Install Nginx, Please wait..."
+Data="02) 安装Nginx, 请等待..."
 echo -n $Data
 yum install -y nginx &>/dev/null && success "$Data" || failure "$Data"
 
 # 03
-Data="03) Install MySQL, Please wait..."
+Data="03) 安装MySQL, 请等待..."
 echo -n $Data
 if [ $VERSION = 2 ];then
 echo '
@@ -115,15 +115,15 @@ fi
 which mysqld &> /dev/null
 if [ $? = 0 ];then
   echo ""
-  read -p "MySQL/MariaDB already exists, uninstall and delete data after reinstall[y/n]: " SELECT
+  read -p "MySQL/MariaDB已经存在,是否卸载和删除所有数据后重新安装[y/n]: " SELECT
   case $SELECT in
     y|Y)
-      Data="Remove MySQL, Please wait..."
+      Data="卸载MySQL中, 请等待..."
       echo -n $Data
       yum remove mysql-community-* MariaDB* -y &> /dev/null && success "$Data" || failure "$Data" 
       rm -fr /tmp/mysql_back &> /dev/null
       mv /var/lib/mysql /tmp/mysql_back &> /dev/null
-      Data="Install MySQL, Please wait..."
+      Data="安装MySQL中, 请等待..."
       echo -n $Data
       yum install -y mysql-community-server &>/dev/null && success "$Data" || failure "$Data" 
       ;;
@@ -138,7 +138,7 @@ else
 fi
 
 # 04
-Data="04) Install Python 3.6, Please wait..."
+Data="04) 安装Python 3.6, 请等待..."
 echo -n $Data
 which python3.6 &> /dev/null
 if [ $? = 0 ]; then
@@ -153,7 +153,7 @@ else
 fi
 
 # 05
-Data="05) Git Clone Yearning, Please wait..."
+Data="05) 下载Yearning包, 请等待..."
 echo -n $Data
 cd /opt && rm -fr Yearning_back &> /dev/null && mv Yearning Yearning_back &> /dev/null
 git clone https://github.com/cookieY/Yearning.git &>/dev/null || failure "$Data"
@@ -161,7 +161,7 @@ cd /opt/Yearning/src &> /dev/null
 pip3 install -r requirements.txt &>/dev/null && success "$Data" || failure "$Data" 
 
 # 06
-Data="06) Copy Yearning File, Please wait..."
+Data="06) 复制Yearning文件, 请等待..."
 echo -n $Data
 ps aux | grep runserver | grep -v grep | awk '{print $2}' | xargs kill -9 &> /dev/null
 rm -fr /usr/share/nginx/html/* &> /dev/null
@@ -170,7 +170,7 @@ yes | cp -fnr /opt/Yearning/install/cursors.py /usr/local/lib/python3.6/site-pac
 yes | cp -fnr /opt/Yearning/webpage/dist/* /usr/share/nginx/html/ &>/dev/null && success "$Data" || failure "$Data"
 
 # 07
-Data="07) Start Nginx, Please wait..."
+Data="07) 启动Ningx, 请等待..."
 echo -n $Data
 if [ $VERSION = 2 ];then
   service nginx restart &>/dev/null && success "$Data" || failure "$Data"
@@ -179,7 +179,7 @@ else
 fi  
 
 # 08
-Data="08) Start MySQL, Please wait..."
+Data="08) 启动MySQL, 请等待..."
 echo -n $Data
 if [ $VERSION = 2 ];then
   service mysqld restart &>/dev/null && success "$Data" || failure "$Data"
@@ -189,16 +189,16 @@ fi
 
 # 09
 if [ "$V" = 1 ];then
-read -p "09) Input MySQL root Password: " MYSQLPASSWORD
+read -p "09) 输入MySQL的root用户密码: " MYSQLPASSWORD
 if [ -z $MYSQLPASSWORD ];then
-   echo "Input cannot empty, please enter again"
-   read -p "Input MySQL root Password: " MYSQLPASSWORD
+   echo "输入不能为空,请再次输入"
+   read -p "输入MySQL的root用户密码: " MYSQLPASSWORD
 fi
 else
-read -p "09) Set MySQL root Password: " MYSQLPASSWORD
+read -p "09) 设置MySQL的root用户密码: " MYSQLPASSWORD
 if [ -z $MYSQLPASSWORD ];then
-   echo "Input cannot empty, please enter again"
-   read -p "Set MySQL root Password: " MYSQLPASSWORD
+   echo "输入不能为空,请再次输入"
+   read -p "设置MySQL的root用户密码: " MYSQLPASSWORD
 fi
 fi
 
@@ -213,7 +213,7 @@ fi
 ADDRESS=`netstat -anplt | grep "sshd" | grep ESTABLISHED | awk '{print $4}' | awk -F':' '{print $1}' | head -n1`
 if [ -z $ADDRESS ];then
   ADDRESS="127.0.0.1"
-  read -p "10) Input Localhost IP Address[Default: $ADDRESS]: " ADDRESS 
+  read -p "10) 输入你要通过浏览器访问的IP地址[默认: $ADDRESS]: " ADDRESS 
   if [ -z $ADDRESS ];then
     ADDRESS=`netstat -anplt | grep "sshd" | grep ESTABLISHED | awk '{print $4}' | awk -F':' '{print $1}' | head -n1`
     if [ -z $ADDRESS ];then
@@ -221,7 +221,7 @@ if [ -z $ADDRESS ];then
     fi
   fi
 else
-  read -p "10) Input Localhost IP Address[Default: $ADDRESS]: " ADDRESS 
+  read -p "10) 输入你要通过浏览器访问的IP地址[默认: $ADDRESS]: " ADDRESS 
   ADDRESS=`netstat -anplt | grep "sshd" | grep ESTABLISHED | awk '{print $4}' | awk -F':' '{print $1}' | head -n1`
 fi
 yes | cp -fr deploy.conf.template deploy.conf &> /dev/null
@@ -230,24 +230,24 @@ cd /opt/Yearning/src && sed -i "s/ipaddress = .*/ipaddress = ${ADDRESS}:8000/" d
 cd /opt/Yearning/src && sed -i "s/password =.*/password = $MYSQLPASSWORD/" deploy.conf &> /dev/null 
 
 # 11
-Data="11) Migrate Yearning Tables, Please wait..."
+Data="11) 初始化Yeanring表, 请等待..."
 echo -n $Data
 cd /opt/Yearning/src
 python3 manage.py makemigrations &> /dev/null && python3 manage.py migrate &> /dev/null && success "$Data" || failure "$Data"
 
 # 12
-read -p "12) Set Yearning admin User Passwrod: " PASSWORD
+read -p "12) 设置Yearning的admin用户密码: " PASSWORD
 if [ -z $PASSWORD ];then
-   echo -e "Input cannot empty, please enter again"
-   read -p "Set Yearning admin User Passwrod: " PASSWORD
+   echo -e "输入不能为空,请再次输入"
+   read -p "设置Yearning的admin用户密码: " PASSWORD
 fi
 echo "from core.models import Account; Account.objects.create_user(username='admin', password="$PASSWORD", group='admin',is_staff=1)" | python3 manage.py shell &> /dev/null
 echo "from core.models import grained;grained.objects.get_or_create(username='admin', permissions={'ddl': '1', 'ddlcon': [], 'dml': '1', 'dmlcon': [], 'dic': '1', 'diccon': [], 'dicedit': '0', 'query': '1', 'querycon': [], 'user': '1', 'base': '1', 'dicexport': '0', 'person': []})" | python3 manage.py shell &> /dev/null
 
 # 13
-Data="13) Start Inception, Please wait..."
+Data="13) 启动Inception, 请等待..."
 echo -n $Data
-cd /opt/Yearning/install/ && tar xvf inception.tar &> /dev/null
+cd /opt/Yearning/install/ && rm -fr inception && tar xvf inception.tar &> /dev/null
 ps aux | grep Inception | grep -v grep | awk '{print $2}' | xargs kill -9 &> /dev/null
 /opt/Yearning/install/inception/bin/Inception --defaults-file=/opt/Yearning/install/inception/bin/inc.cnf &> /dev/null & 
 if [ $? = 0 ];then
@@ -257,7 +257,7 @@ else
 fi
 
 # 14
-Data="14) Start Yearning, Please wait..."
+Data="14) 启动Yearning, 请等待..."
 echo -n $Data
 cd /opt/Yearning/src
 ps aux | grep runserver | grep -v grep | awk '{print $2}' | xargs kill -9 &> /dev/null

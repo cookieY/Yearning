@@ -227,7 +227,7 @@
     </Form>
     <div slot="footer">
       <Button type="text" @click="editInfodModal=false">取消</Button>
-      <Button type="primary">保存</Button>
+      <Button type="primary" @click="PutPermissionData">保存</Button>
     </div>
   </Modal>
 </div>
@@ -442,6 +442,19 @@ export default {
       } else {
         this.permission[name] = [];
       }
+    },
+    PutPermissionData () {
+      axios.post(`${util.url}/apply_grained/`, {'grained_list': JSON.stringify(this.permission)})
+        .then(res => {
+          this.$Notice.info({
+            title: '通知',
+            desc: res.data
+          })
+          this.editInfodModal = false
+        })
+        .catch(error => {
+          util.ajanxerrorcode(this, error)
+        })
     }
   },
   mounted () {

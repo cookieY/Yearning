@@ -20,7 +20,7 @@ class send_email(object):
         name, addr = parseaddr(s)
         return formataddr((Header(name, 'utf-8').encode(), addr))
 
-    def send_mail(self,mail_data=None,type=None):
+    def send_mail(self,mail_data=None, type=None):
         if type == 0: #执行
             text = '<html><body><h1>Yearning 工单执行通知</h1>' \
                    '<br><p>工单号: %s</p>' \

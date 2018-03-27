@@ -1,28 +1,35 @@
 import logging
 import json
 import configparser
+import threading
 from libs import baseview, send_email, util
 from django.http import HttpResponse
 from rest_framework.response import Response
 from core.models import Account, applygrained, grained
-from libs.serializers import audit_grained_serializers
 
 CUSTOM_ERROR = logging.getLogger('Yearning.core.views')
 
 CONF = configparser.ConfigParser()
 CONF.read('deploy.conf')
-WEBHOOK = CONF.get('dingding', 'webhook')
+WEBHOOK = CONF.get('webhook', 'dingding')
+
 
 class audit_grained(baseview.SuperUserpermissions):
 
     def get(self, request, args: str = None):
 
         user_id = Account.objects.filter(username=request.user).first().id
-
-        if user_id == 0:
-            user_list = applygrained.objects.all()
-            serializers = audit_grained_serializers(user_list, many=True)
-            return Response(serializers.data)
+        page = request.GET.get('page')
+        if user_id == 1:
+            pn = applygrained.objects.all().values('id')
+            pn.query.distinct = ['id']
+            start = int(page) * 10 - 10
+            end = int(page) * 10
+            user_list = applygrained.objects.all().order_by('-id')[start:end]
+            ser = []
+            for i in user_list:
+                ser.append({'work_id': i.work_id, 'status': i.status, 'username': i.username, 'permissions': i.permissions})
+            return Response({'data': ser, 'pn': len(pn)})
 
         else:
             return Response([])
@@ -30,7 +37,7 @@ class audit_grained(baseview.SuperUserpermissions):
     def post(self, request, args: str = None):
 
         user = request.data['user']
-
+        work_id = request.data['work_id']
         if request.data['status'] == 0:
             try:
                 grained_list = json.loads(request.data['grained_list'])
@@ -39,15 +46,24 @@ class audit_grained(baseview.SuperUserpermissions):
                 return HttpResponse(status=500)
             else:
                 grained.objects.filter(username=user).update(permissions=grained_list)
-                mail = Account.objects.filter(username=user).first().email
-                put_mess = send_email.send_email(to_addr=mail)
-                put_mess.send_mail(mail_data={'to_user': user}, type=3)
+                applygrained.objects.filter(work_id=work_id).update(status=1)
+                mail = Account.objects.filter(username=user).first()
+                thread = threading.Thread(target=push_message, args=({'to_user': request.user, 'workid': work_id}, 3, request.user, mail.email, work_id, '同意'))
+                thread.start()
                 return Response('权限已更新成功!')
         else:
-            mail = Account.objects.filter(username=user).first().email
-            put_mess = send_email.send_email(to_addr=mail)
-            put_mess.send_mail(mail_data={'to_user': user}, type=4)
+            applygrained.objects.filter(work_id=work_id).update(status=0)
+            mail = Account.objects.filter(username=user).first()
+            thread = threading.Thread(target=push_message, args=({'to_user': request.user, 'workid': work_id}, 4, request.user, mail.email, work_id, '驳回'))
+            thread.start()
             return Response('权限已驳回!')
+
+    def put(self, request, args: str = None):
+
+        work_id_list = json.loads(request.data['work_id'])
+        for i in work_id_list:
+            applygrained.objects.filter(work_id=i).delete()
+        return Response('申请记录已删除!')
 
 
 class apply_grained(baseview.BaseView):
@@ -56,13 +72,21 @@ class apply_grained(baseview.BaseView):
 
         grained_list = json.loads(request.data['grained_list'])
         work_id = util.workId()
-        applygrained.objects.get_or_create(work_id=work_id, username=request.user, permissions=grained_list)
-        mail = Account.objects.filter(id=0).first().email
-        if mail != '':
-            put_mess = send_email.send_email(to_addr=mail)
-            put_mess.send_mail(mail_data={'to_user': request.user}, type=4)
-
-        if WEBHOOK != '':
-            util.dingding(content='权限申请通知\n工单编号:%s\n发起人:%s\n状态:已执行' % (work_id, request.user))
+        applygrained.objects.get_or_create(work_id=work_id, username=request.user, permissions=grained_list, status=2)
+        mail = Account.objects.filter(id=1).first()
+        thread = threading.Thread(target=push_message, args=({'to_user': request.user, 'workid': work_id}, 2, request.user, mail.email, work_id, '已提交'))
+        thread.start()
         return Response('权限申请已提交!')
 
+
+def push_message(message=None, type=None, user=None, to_addr=None, work_id=None, status=None):
+    try:
+        put_mess = send_email.send_email(to_addr=to_addr)
+        put_mess.send_mail(mail_data=message, type=type)
+    except Exception as e:
+        CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
+    else:
+        try:
+            util.dingding(content='权限申请通知\n工单编号:%s\n发起人:%s\n状态:%s' % (work_id, user, status), url=WEBHOOK)
+        except ValueError as e:
+            CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
