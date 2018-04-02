@@ -1,4 +1,4 @@
-Yearning Version  v1.1.0
+Yearning Version  v1.1.1
 
 update:
 1.新增权限申请 审核功能。权限可由用户自己申请并由超级管理员批准
