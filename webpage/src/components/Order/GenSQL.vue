@@ -4,6 +4,11 @@
 .demo-spin-icon-load {
     animation: ani-demo-spin 1s linear infinite;
 }
+p{
+  word-wrap: break-word;
+  word-break: break-all;
+  overflow: hidden;
+}
 </style>
 <template>
 <div>

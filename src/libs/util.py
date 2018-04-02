@@ -19,9 +19,13 @@ import configparser
 
 
 def dingding(content: str = None, url: str = None):
+
     '''
-    dingding webhook 
+
+    dingding webhook
+
     '''
+
     pdata = {"msgtype": "text", "text": {"content": content}}
     binary_data = json.dumps(pdata).encode(encoding='UTF8')
     headers = {"Content-Type": "application/json"}

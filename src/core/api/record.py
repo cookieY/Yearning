@@ -27,7 +27,7 @@ class record_order(baseview.SuperUserpermissions):
             return HttpResponse(status=500)
         else:
             try:
-                pagenumber = SqlOrder.objects.filter(status=1).all().values('id')
+                pagenumber = SqlOrder.objects.filter(status=1, assigned=username).all().values('id')
                 pagenumber.query.distinct = ['id']
                 start = int(page) * 10 - 10
                 end = int(page) * 10

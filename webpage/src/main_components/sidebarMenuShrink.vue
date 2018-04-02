@@ -75,8 +75,9 @@ export default {
         'serach-sql': '',
         'management-user': '',
         'management-database': '',
-        'managerment-audit': '1',
-        'management-record': '1'
+        'audit-audit': '1',
+        'audit-record': '1',
+        'audit-permissions': '1'
       }
     };
   },

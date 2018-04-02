@@ -139,3 +139,10 @@ class globalpermissions(models.Model):
 class grained(models.Model):
     username = models.CharField(max_length=50,db_index=True)
     permissions = JSONField()
+
+
+class applygrained(models.Model):
+    username = models.CharField(max_length=50, db_index=True)
+    work_id = models.CharField(max_length=50, null=True)
+    status = models.IntegerField(blank=True, null=True) # 工单状态 0 disagree 1 agree 2 indeterminate
+    permissions = JSONField()

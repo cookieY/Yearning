@@ -33,6 +33,10 @@ from core.api.record import (
     record_order,
     order_detail
 )
+from core.api.applygrained import (
+    audit_grained,
+    apply_grained
+)
 from core.api.sqlorder import sqlorder
 from core.api.serachsql import search
 from core.api.osc import osc_step
@@ -42,6 +46,8 @@ from core.api.general import addressing
 
 urlpatterns = [
     url(r'^api/v1/userinfo/(.*)', userinfo.as_view()),
+    url(r'^api/v1/audit_grained/(.*)', audit_grained.as_view()),
+    url(r'^api/v1/apply_grained/(.*)', apply_grained.as_view()),
     url(r'^api/v1/workorder/(.*)', addressing.as_view()),
     url(r'^api/v1/myorder', order.as_view()),
     url(r'^api/v1/gensql/(.*)', gen_sql.as_view()),

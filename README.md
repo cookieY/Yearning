@@ -1,5 +1,5 @@
 <p align="center">
-        <img width="300" src="http://oy0f4k5qi.bkt.clouddn.com/git_logo2.svg">
+        <img width="300" src="http://oy0f4k5qi.bkt.clouddn.com/logo.png">
 </p>
 
 # Yearning SQL审核平台
@@ -11,9 +11,13 @@
 ![](https://img.shields.io/badge/python-3.6-brightgreen.svg)
 ![](https://img.shields.io/badge/Django-2.0-brightgreen.svg)
 
-基于Inception的整套sql审核平台解决方案。
+##### 基于Inception的企业级web SQL审核平台。
 
-## Feature 功能：
+## Website 官网
+
+[www.yearning.io](http://yearning.io)
+
+## Feature 功能
 
 - 数据库字典自动生成
 - SQL查询
@@ -37,6 +41,7 @@
     - LDAP登陆   
 - 用户权限及管理
     - 拼图式权限划分(共12项独立权限,可随意组合)
+
 ## Environment 环境
 
 - Python 3.6
@@ -46,31 +51,8 @@
 - Django 2.0
 
 ## Install 安装及使用日志
-- [Yearning使用及安装文档](https://cookiey.github.io/Yearning-document/)
 
-- 体验及快速测试(docker)
-
-```
-
-docker run -it -d -p 80:80 -p 8000:8000 -e "HOST=宿主机ip" registry.cn-hangzhou.aliyuncs.com/cookie/yearning:v1.0.0
-
-docker exec -it  container_id /bin/bash 
-
-echo "from core.models import grained;grained.objects.get_or_create(username='admin', permissions={'ddl': '1', 'ddlcon': [], 'dml': '1', 'dmlcon': [], 'dic': '1', 'diccon': [], 'dicedit': '0', 'query': '1', 'querycon': [], 'user': '1', 'base': '1', 'dicexport': '0'})" | python3 manage.py shell
-
-初始账号: admin  密码: Yearning_admin
-```
-- [一键安装脚本(由 运维那点事 贡献)](https://github.com/cookieY/Yearning/blob/master/install/Yearning.sh)
-
-注意: 
-
-docker版本不支持e-mail推送及ldap登陆
-
-由于目前镜像并没有将数据库数据存放目录挂载到宿主机所以不建议在正式环境中使用docker
-
-建议在使用前评估及测试中使用
-## Update 更新日志
-  - [Yearning更新日志](https://cookiey.github.io/Yearning-document/update/)
+详细安装步骤请访问[www.yearning.io](http://yearning.io)获得帮助
 
 ## Support 支持Yearning
 
@@ -89,7 +71,7 @@ docker版本不支持e-mail推送及ldap登陆
 
 - Login
 
-![login -w1200](http://oy0f4k5qi.bkt.clouddn.com/logo.png)
+![login](http://oy0f4k5qi.bkt.clouddn.com/login_yearning.png)
 
 
 - Dashboard
@@ -103,8 +85,8 @@ docker版本不支持e-mail推送及ldap登陆
 - 细粒度的权限分配
 ![](http://oy0f4k5qi.bkt.clouddn.com/per.png)
 
-- 工单页面
-![](http://oy0f4k5qi.bkt.clouddn.com/order.png)
+- 我的工单
+![](http://oy0f4k5qi.bkt.clouddn.com/myorder.png)
 
 
 ## License

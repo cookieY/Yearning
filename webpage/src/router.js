@@ -117,7 +117,8 @@ export const appRouter = [
         }
       }
     ]
-  }, {
+  },
+  {
     path: '/view',
     icon: 'search',
     name: 'view',
@@ -143,7 +144,45 @@ export const appRouter = [
         }
       }
     ]
-  }, {
+  },
+  {
+    path: '/audit',
+    icon: 'android-open',
+    name: 'audit',
+    title: '审核',
+    component: Index,
+    access: 0,
+    children: [
+      {
+        path: 'audit-order',
+        name: 'audit-audit',
+        title: '工单审核',
+        'icon': 'edit',
+        component: resolve => {
+          require(['./components/Audit/AuditSql.vue'], resolve)
+        }
+      },
+      {
+        path: 'audit-record',
+        name: 'audit-record',
+        title: '工单记录',
+        'icon': 'android-drafts',
+        component: resolve => {
+          require(['./components/Audit/Record.vue'], resolve)
+        }
+      },
+      {
+        path: 'audit-permissions',
+        name: 'audit-permissions',
+        title: '权限审核',
+        'icon': 'android-share-alt',
+        component: resolve => {
+          require(['./components/Audit/Permissions.vue'], resolve)
+        }
+      }
+    ]
+  },
+  {
     path: '/management',
     icon: 'social-buffer',
     name: 'management',
@@ -166,22 +205,6 @@ export const appRouter = [
         'icon': 'social-buffer',
         component: resolve => {
           require(['./components/Management/MamagementBase.vue'], resolve)
-        }
-      }, {
-        path: 'management-audit',
-        name: 'managerment-audit',
-        title: '审核',
-        'icon': 'edit',
-        component: resolve => {
-          require(['./components/Management/AuditSql.vue'], resolve)
-        }
-      }, {
-        path: 'management-record',
-        name: 'management-record',
-        title: '执行记录',
-        'icon': 'android-drafts',
-        component: resolve => {
-          require(['./components/Management/Record.vue'], resolve)
         }
       }
     ]

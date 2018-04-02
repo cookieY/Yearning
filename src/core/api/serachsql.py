@@ -39,8 +39,8 @@ class search(baseview.BaseView):
                     query_sql = replace_limit(check[-1].strip(), conf.limit)
                     data_set = f.search(sql=query_sql)
                     return Response(data_set)
-            except Exception as e:
-                return Response({'error': str(e)})
+            except:
+                return Response({'error': '管理员已将最大limit限制为%s!' % conf.limit})
 
 
 def replace_limit(sql, limit):
@@ -65,7 +65,7 @@ def replace_limit(sql, limit):
     else:
         sql = sql.rstrip(';') + ' limit %s;'%limit
         return sql
-    if int(length) < int(limit):
+    if int(length) <= int(limit):
         return sql
     else:
         sql = re.sub(r'limit\s.*\d.*;', 'limit %s;' % limit)
