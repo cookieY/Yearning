@@ -32,7 +32,7 @@ class addressing(baseview.BaseView):
 
         if args == 'connection':
             try:
-                if request.data['permissions_type'] == 'user':
+                if request.data['permissions_type'] == 'user' or request.data['permissions_type'] == 'own_space':
                     info = DatabaseList.objects.all()
                     con_name = Area(info, many=True).data
                     dic = SqlDictionary.objects.all().values('Name')

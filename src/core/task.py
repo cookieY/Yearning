@@ -33,11 +33,14 @@ def grained_permissions(func):
                 permissions_type = request.GET.get('permissions_type')
             else:
                 permissions_type = request.data['permissions_type']
-            user = grained.objects.filter(username=request.user).first()
-            if user is not None and user.permissions[permissions_type] == '1':
+            if permissions_type == 'own_space':
                 return func(self, request, args)
             else:
-                return HttpResponse(status=401)
+                user = grained.objects.filter(username=request.user).first()
+                if user is not None and user.permissions[permissions_type] == '1':
+                    return func(self, request, args)
+                else:
+                    return HttpResponse(status=401)
     return wrapper
 
 

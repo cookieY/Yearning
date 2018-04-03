@@ -459,7 +459,7 @@ export default {
   },
   mounted () {
     this.init();
-    axios.put(`${util.url}/workorder/connection`, {'permissions_type': 'user'})
+    axios.put(`${util.url}/workorder/connection`, {'permissions_type': 'own_space'})
       .then(res => {
         this.connectionList.connection = res.data['connection']
         this.connectionList.dic = res.data['dic']
