@@ -41,9 +41,10 @@
             let edittingRow = vm.edittingStore[index]
             edittingRow.editting = false
             edittingRow.saving = false
+            let data = vm.thisTableData[index]
             vm.thisTableData = JSON.parse(JSON.stringify(vm.edittingStore))
             vm.$emit('input', vm.handleBackdata(vm.thisTableData))
-            vm.$emit('on-change', vm.handleBackdata(vm.thisTableData), index)
+            vm.$emit('on-change', data)
           }
         }
       }

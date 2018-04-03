@@ -98,7 +98,7 @@ p{
             </div>
           </TabPane>
           <TabPane label="生成修改&删除字段" name="order4" icon="edit">
-            <edittable refs="table2" v-model="TableDataNew" :columns-list="tabcolumns" @index="remove"></edittable>
+            <edittable refs="table2" v-model="TableDataNew" :columns-list="tabcolumns" @index="remove" @on-change="cell_change"></edittable>
           </TabPane>
         </Tabs>
       </div>
@@ -168,7 +168,6 @@ export default {
       item: {},
       basename: [],
       sqlname: [],
-      TableDataOld: [],
       TableDataNew: [],
       tableform: {
         sqlname: [],
@@ -520,8 +519,7 @@ export default {
               'id': this.id[0].id
             })
             .then(res => {
-              this.TableDataOld = res.data
-              this.TableDataNew = Array.from(this.TableDataOld)
+              this.TableDataNew = res.data
               this.$Spin.hide()
             })
             .catch(() => {
@@ -570,12 +568,7 @@ export default {
     canel () {
       this.sql = []
       this.pass = false
-    },
-    edit_tab (col) {
-      this.TableDataNew[col.index] = col.row
-      this.$Notice.success({
-        title: `${col.row.Field}-字段修改成功!`
-      })
+      this.getinfo()
     },
     confirmsql () {
       if (this.Add_tmp.Field !== '') {
@@ -584,18 +577,6 @@ export default {
           desc: '请将需要添加的字段添加进入临时表或者删除!'
         })
       } else {
-        this.TableDataNew.forEach((item, i) => {
-          if (this.TableDataNew[i].Type === this.TableDataOld[i].Type &&
-            this.TableDataNew[i].Field === this.TableDataOld[i].Field &&
-            this.TableDataNew[i].Default === this.TableDataOld[i].Default &&
-            this.TableDataNew[i].Extra === this.TableDataOld[i].Extra &&
-            this.TableDataNew[i].Null === this.TableDataOld[i].Null) {} else {
-            this.putdata.push({
-              'edit': this.TableDataNew[i],
-              'table_name': this.formItem.tablename
-            })
-          }
-        })
         this.putdata.push({
           'add': this.add_row,
           'table_name': this.formItem.tablename
@@ -610,7 +591,6 @@ export default {
             }
             this.putdata = []
             this.add_row = []
-            this.TableDataNew = Array.from(this.TableDataOld)
           }).catch(error => {
             util.ajanxerrorcode(this, error)
           })
@@ -652,6 +632,12 @@ export default {
           })
         }
       }
+    },
+    cell_change (data) {
+      this.putdata.push({
+        'edit': data,
+        'table_name': this.formItem.tablename
+      })
     }
   },
   mounted () {
