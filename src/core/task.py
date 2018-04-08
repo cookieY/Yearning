@@ -287,6 +287,6 @@ class submit_push_messages(threading.Thread):
                     'note': content.before}
                 try:
                     put_mess = send_email.send_email(to_addr=mail.email)
-                    put_mess.send_mail(mail_data=mess_info, type=2)
+                    put_mess.send_mail(mail_data=mess_info, type=5)
                 except Exception as e:
                     CUSTOM_ERROR.error(f'{e.__class__.__name__}--邮箱推送失败: {e}')
