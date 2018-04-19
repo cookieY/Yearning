@@ -74,8 +74,11 @@ class apply_grained(baseview.BaseView):
         work_id = util.workId()
         applygrained.objects.get_or_create(work_id=work_id, username=request.user, permissions=grained_list, status=2)
         mail = Account.objects.filter(id=1).first()
-        thread = threading.Thread(target=push_message, args=({'to_user': request.user, 'workid': work_id}, 2, request.user, mail.email, work_id, '已提交'))
-        thread.start()
+        try:
+            thread = threading.Thread(target=push_message, args=({'to_user': request.user, 'workid': work_id}, 2, request.user, mail.email, work_id, '已提交'))
+            thread.start()
+        except:
+            pass
         return Response('权限申请已提交!')
 
 

@@ -6,6 +6,8 @@
 <template>
   <div>
     <Row>
+      <flow></flow>
+      <template v-if="birdstep">
       <Col span="4">
       <Card>
         <p slot="title">
@@ -67,10 +69,12 @@
         <Page :total="total" show-total @on-change="splice_arr" ref="totol"></Page>
       </Card>
       </Col>
+      </template>
     </Row>
   </div>
 </template>
 <script>
+  import flow from './work_flow'
   import ICol from '../../../node_modules/iview/src/components/grid/col.vue'
   import axios from 'axios'
   import util from '../../libs/util'
@@ -105,6 +109,7 @@
   export default {
   components: {
       ICol,
+      flow,
       editor: require('../../libs/editor')
     },
     name: 'SearchSQL',
@@ -148,8 +153,9 @@
         },
         id: null,
         total: 0,
-        allsearchdata: []
-      }
+        allsearchdata: [],
+        birdstep: false
+    }
     },
     methods: {
       editorInit: function () {

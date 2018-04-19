@@ -90,17 +90,15 @@ class userinfo(baseview.SuperUserpermissions):
         if args == 'changepwd':
             try:
                 username = request.data['username']
-                old_password = request.data['old']
                 new_password = request.data['new']
             except KeyError as e:
                 CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
                 return HttpResponse(status=500)
             else:
                 try:
-                    user = authenticate(username=username, password=old_password)
-                    if user is not None and user.is_active:
-                        user.set_password(new_password)
-                        user.save()
+                    user = Account.objects.get(username__exact=username)
+                    user.set_password(new_password)
+                    user.save()
                     return Response('%s--密码修改成功!' % username)
                 except Exception as e:
                     CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')

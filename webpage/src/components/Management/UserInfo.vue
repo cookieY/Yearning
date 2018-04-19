@@ -58,9 +58,6 @@
       <FormItem label="用户名">
         <Input v-model="username" readonly="readonly"></Input>
       </FormItem>
-      <FormItem label="原密码" prop="oldPass">
-        <Input v-model="editPasswordForm.oldPass" placeholder="请输入现在使用的密码"></Input>
-      </FormItem>
       <FormItem label="新密码" prop="newPass">
         <Input v-model="editPasswordForm.newPass" placeholder="请输入新密码，至少6位字符"></Input>
       </FormItem>
@@ -469,7 +466,6 @@ export default {
       editPasswordModal: false,
       // 更改密码
       editPasswordForm: {
-        oldPass: '',
         newPass: '',
         rePass: ''
       },
@@ -477,11 +473,6 @@ export default {
       savePassLoading: false,
       // 更改密码表单验证规则
       passwordValidate: {
-        oldPass: [{
-          required: true,
-          message: '请输入原密码',
-          trigger: 'blur'
-        }],
         newPass: [{
             required: true,
             message: '请输入新密码',
@@ -650,8 +641,7 @@ export default {
           this.savePassLoading = true;
           axios.put(util.url + '/userinfo/changepwd', {
               'username': this.username,
-              'new': this.editPasswordForm.newPass,
-              'old': this.editPasswordForm.oldPass
+              'new': this.editPasswordForm.newPass
             })
             .then(res => {
               this.$Notice.success({

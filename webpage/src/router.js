@@ -99,7 +99,8 @@ export const appRouter = [
         component: resolve => {
           require(['./components/Order/GenSQL.vue'], resolve)
         }
-      }, {
+      },
+      {
         path: 'dmledit',
         name: 'dmledit',
         title: 'DML',
@@ -107,7 +108,8 @@ export const appRouter = [
         component: resolve => {
           require(['./components/Order/SQLsyntax.vue'], resolve)
         }
-      }, {
+      },
+      {
         path: 'indexedit',
         name: 'indexedit',
         title: '索引',
@@ -138,7 +140,7 @@ export const appRouter = [
         path: 'serach-sql',
         name: 'serach-sql',
         title: 'SQL查询',
-        'icon': 'qr-scanner',
+        'icon': 'podium',
         component: resolve => {
           require(['./components/Search/SearchSQL.vue'], resolve)
         }
