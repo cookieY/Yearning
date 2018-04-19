@@ -148,5 +148,7 @@ class applygrained(models.Model):
     permissions = JSONField()
 
 
-
-class querypermissions()
+class querypermissions(models.Model):
+    work_id = models.CharField(max_length=50, null=True)
+    username = models.CharField(max_length=100, null=True)
+    statements = models.TextField()
