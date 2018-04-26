@@ -181,6 +181,15 @@ export const appRouter = [
         component: resolve => {
           require(['./components/Audit/Permissions.vue'], resolve)
         }
+      },
+      {
+        path: 'query-review',
+        name: 'query-review',
+        title: '查询审计',
+        'icon': 'arrow-graph-up-right',
+        component: resolve => {
+          require(['./components/Audit/Query.vue'], resolve)
+        }
       }
     ]
   },
@@ -232,6 +241,25 @@ export const orderList = {
   ]
 }
 
+export const queryList = {
+  path: '/',
+  icon: 'home',
+  name: 'main',
+  title: '首页',
+  component: Index,
+  redirect: '/home',
+  children: [
+    {
+      path: 'querylist',
+      title: '查询审计详情',
+      name: 'querylist',
+      component: resolve => {
+        require(['./components/Audit/expend.vue'], resolve)
+      }
+    }
+  ]
+}
+
 export const myorder = {
   path: '/',
   icon: 'home',
@@ -256,6 +284,7 @@ export const myorder = {
   locking,
   ...appRouter,
   orderList,
+  queryList,
   myorder,
   page404,
   page401,

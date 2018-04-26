@@ -38,13 +38,14 @@ from core.api.applygrained import (
     apply_grained
 )
 from core.api.sqlorder import sqlorder
-from core.api.serachsql import search
+from core.api.serachsql import search, query_worklf
 from core.api.osc import osc_step
 from core.api.myorder import order
 from core.api.gensql import gen_sql
 from core.api.general import addressing
 
 urlpatterns = [
+    url(r'^api/v1/query_worklf', query_worklf.as_view()),
     url(r'^api/v1/userinfo/(.*)', userinfo.as_view()),
     url(r'^api/v1/audit_grained/(.*)', audit_grained.as_view()),
     url(r'^api/v1/apply_grained/(.*)', apply_grained.as_view()),

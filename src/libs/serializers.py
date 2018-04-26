@@ -7,7 +7,7 @@ from core.models import DatabaseList
 from core.models import SqlDictionary
 from core.models import SqlRecord
 from core.models import Account
-from core.models import SqlOrder
+from core.models import SqlOrder, query_order, querypermissions
 
 
 class MessagesUser(serializers.HyperlinkedModelSerializer):
@@ -84,3 +84,29 @@ class Recordinfo(serializers.HyperlinkedModelSerializer):
     class Meta:
         model = SqlOrder
         fields = ('workid', 'username', 'text', 'data', 'basename', 'assigned')
+
+
+class Query_review(serializers.HyperlinkedModelSerializer):
+
+    '''
+
+    查询审计
+
+    '''
+
+    class Meta:
+        model = query_order
+        fields = ('work_id', 'username', 'timer', 'date', 'instructions')
+
+
+class Query_list(serializers.HyperlinkedModelSerializer):
+    '''
+
+    查询审计
+
+    '''
+
+    class Meta:
+        model = querypermissions
+        fields = ('id', 'statements')
+
