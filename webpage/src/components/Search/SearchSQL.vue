@@ -6,8 +6,8 @@
 <template>
   <div>
     <Row>
-      <flow></flow>
-      <template v-if="birdstep">
+      <flow @render="render_data" v-if="turn.onestep" @res="res_return"></flow>
+      <template v-if="turn.birdstep">
       <Col span="4">
       <Card>
         <p slot="title">
@@ -154,8 +154,13 @@
         id: null,
         total: 0,
         allsearchdata: [],
-        birdstep: false
-    }
+        turn: {
+          birdstep: false,
+          onestep: true,
+          work_id: null,
+          timer: null
+        }
+      }
     },
     methods: {
       editorInit: function () {
@@ -230,7 +235,8 @@
         }
         axios.post(`${util.url}/search`, {
           'sql': this.formItem.textarea,
-          'address': JSON.stringify(address)
+          'address': JSON.stringify(address),
+          'render': this.turn.work_id
         })
           .then(res => {
             if (res.data['error']) {
@@ -256,6 +262,20 @@
           data: this.allsearchdata,
           columns: this.columnsName
         })
+      },
+      render_data (vl) {
+        this.turn.work_id = vl
+        this.turn.birdstep = true
+        this.turn.onestep = false
+      },
+      res_return (vl) {
+        if (vl === 1) {
+          this.turn.onestep = false
+          this.turn.birdstep = true
+        } else {
+          this.turn.birdstep = false
+          this.turn.onestep = true
+        }
       }
     },
     mounted () {

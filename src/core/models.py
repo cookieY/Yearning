@@ -34,6 +34,7 @@ class Account(AbstractUser):
     '''
     group = models.CharField(max_length=40)   #权限组 guest/admin
     department = models.CharField(max_length=40) #部门
+    query_per = models.SmallIntegerField(null=True, default=0)
 
 
 class SqlDictionary(models.Model):   
@@ -149,6 +150,14 @@ class applygrained(models.Model):
 
 
 class querypermissions(models.Model):
-    work_id = models.CharField(max_length=50, null=True)
+    work_id = models.CharField(max_length=50, null=True, db_index=True)
     username = models.CharField(max_length=100, null=True)
     statements = models.TextField()
+
+
+class query_order(models.Model):
+    work_id = models.CharField(max_length=50, null=True, db_index=True)
+    username = models.CharField(max_length=100, null=True)
+    date = models.CharField(max_length=50)
+    timer = models.CharField(max_length=50)
+    instructions = models.TextField(null=True)

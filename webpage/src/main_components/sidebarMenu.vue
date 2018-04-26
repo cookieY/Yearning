@@ -71,7 +71,8 @@ export default {
         'audit-audit': '1',
         'audit-record': '1',
         'audit-permissions': '1',
-        'search_order': '1'
+        'search_order': '1',
+        'query-review': '1'
       }
     }
   },

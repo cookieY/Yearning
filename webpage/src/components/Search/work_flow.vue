@@ -7,18 +7,18 @@
           <h5>{{ stepData.describe }}</h5>
         </div>
         <p class="step-content" v-html="stepData.content"></p>
-        <Form class="step-form" ref="step" :model="step" :rules="stepRules" :label-width="100">
+        <Form class="step-form" ref="step" :model="step" :rules="stepRules" :label-width="150">
           <FormItem label="查询说明：" prop="opinion">
-            <Input :disabled="hasSubmit" v-model="step.opinion" type="textarea" :autosize="{minRows: 2,maxRows: 5}" placeholder="请填写查询说明" />
+            <Input v-model="step.opinion" type="textarea" :autosize="{minRows: 2,maxRows: 5}" placeholder="请填写查询说明" />
           </FormItem>
           <FormItem label="查询时限：" prop="timer">
-            <Input :disabled="hasSubmit" v-model="step.timer" :autosize="{minRows: 2,maxRows: 5}" placeholder="请填写查询时限 单位: 分钟"  style="width: 15%"/>
+            <Input v-model="step.timer"  placeholder="请填写查询时限，单位：分钟 （只填写数字）" style="width: 25%;"/>
           </FormItem>
           <FormItem label="">
-            <Button :disabled="hasSubmit" @click="handleSubmit" style="width:100px;" type="primary">提交</Button>
+            <Button  @click="handleSubmit" style="width:100px;" type="primary">提交</Button>
           </FormItem>
         </Form>
-        <Steps :current="currentStep" :status="status">
+        <Steps>
           <Step v-for="item in stepList1" :title="item.title" :content="item.describe + '审核并通过'" :key="item.title"></Step>
         </Steps>
       </Card>
@@ -28,8 +28,11 @@
 
 <script>
   import Cookies from 'js-cookie'
+  import axios from 'axios'
+  import util from '../../libs/util'
   export default {
     name: 'work_flow',
+    props: ['msg'],
     data () {
       return {
         stepData: {
@@ -65,15 +68,18 @@
       handleSubmit () {
         this.$refs['step'].validate((valid) => {
           if (valid) {
-            if (this.step.pass === '通过') {
-              this.currentStep += 1;
-            } else {
-              this.status = 'error';
-            }
-            this.hasSubmit = true;
+            let workid = 1000000000 * 100000000 * Math.random()
+            axios.get(`${util.url}/search?timer=${this.step.timer}&mode=put&workid=${workid}&instructions=${this.step.opinion}`)
+            this.$emit('render', workid)
           }
         });
       }
+    },
+    mounted () {
+      axios.get(`${util.url}/search?timer=${this.step.timer}&mode=get`)
+        .then(res => {
+          this.$emit('res', res.data)
+        })
     }
   }
 </script>
