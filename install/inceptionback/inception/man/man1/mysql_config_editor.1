@@ -1,0 +1,793 @@
+'\" t
+.\"     Title: \fBmysql_config_editor\fR
+.\"    Author: [FIXME: author] [see http://docbook.sf.net/el/author]
+.\" Generator: DocBook XSL Stylesheets v1.77.1 <http://docbook.sf.net/>
+.\"      Date: 01/22/2013
+.\"    Manual: MySQL Database System
+.\"    Source: MySQL 5.6
+.\"  Language: English
+.\"
+.TH "\FBMYSQL_CONFIG_EDIT" "1" "01/22/2013" "MySQL 5\&.6" "MySQL Database System"
+.\" -----------------------------------------------------------------
+.\" * Define some portability stuff
+.\" -----------------------------------------------------------------
+.\" ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+.\" http://bugs.debian.org/507673
+.\" http://lists.gnu.org/archive/html/groff/2009-02/msg00013.html
+.\" ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+.ie \n(.g .ds Aq \(aq
+.el       .ds Aq '
+.\" -----------------------------------------------------------------
+.\" * set default formatting
+.\" -----------------------------------------------------------------
+.\" disable hyphenation
+.nh
+.\" disable justification (adjust text to left margin only)
+.ad l
+.\" -----------------------------------------------------------------
+.\" * MAIN CONTENT STARTS HERE *
+.\" -----------------------------------------------------------------
+.\" mysql_config_editor
+.\" .mylogin.cnf file
+.SH "NAME"
+mysql_config_editor \- configure authentication information for connecting to MySQL server
+.SH "SYNOPSIS"
+.HP \w'\fBmysql_config_editor\ \fR\fB\fIoptions\ command\fR\fR\ 'u
+\fBmysql_config_editor \fR\fB\fIoptions command\fR\fR
+.SH "DESCRIPTION"
+.PP
+The
+\fBmysql_config_editor\fR
+utility (available as of MySQL 5\&.6\&.6) enables you to store authentication credentials in an encrypted login file named
+\&.mylogin\&.cnf\&. The file location is the
+%APPDATA%\eMySQL
+directory on Windows and the current user\*(Aqs home directory on non\-Windows systems\&. The file can be read later by MySQL client programs to obtain authentication credentials for connecting to MySQL Server\&.
+.PP
+To specify an alternate file name, set the
+MYSQL_TEST_LOGIN_FILE
+environment variable\&. This variable is used by the
+\fBmysql\-test\-run\&.pl\fR
+testing utility, but also is recognized by
+mysql_config_editor
+and by MySQL clients such as
+\fBmysql\fR,
+\fBmysqladmin\fR, and so forth\&.
+.PP
+\fBmysql_config_editor\fR
+encrypts the
+\&.mylogin\&.cnf
+file so it cannot be read as clear text, and its contents when decrypted by client programs are used only in memory\&. In this way, passwords can be stored in a file in non\-cleartext format and used later without ever needing to be exposed on the command line or in an environment variable\&.
+\fBmysql_config_editor\fR
+provides a
+print
+command that enables the user to display the file contents, but even in this case, password values are masked so as never to appear in a way that other users can see them\&.
+.PP
+The encryption used by
+\fBmysql_config_editor\fR
+prevents passwords from appearing in
+\&.mylogin\&.cnf
+as clear text and provides a measure of security by preventing inadvertent password exposure\&. For example, if you display a regular unencrypted
+my\&.cnf
+option file on the screen, any passwords it contains are visible for anyone to see\&. With
+\&.mylogin\&.cnf, that is not true\&. But the encryption used will not deter a determined attacker and you should not consider it unbreakable\&. A user who can gain system administration privileges on your machine to access your files could decrypt the
+\&.mylogin\&.cnf
+file with some effort\&.
+.PP
+The login file must be readable and writable to the current user, and inaccessible to other users\&. Otherwise,
+\fBmysql_config_editor\fR
+ignores it, and the file is not used by client programs, either\&. On Windows, this constraint does not apply; instead, the user must have access to the
+%APPDATA%\eMySQL
+directory\&.
+.PP
+The unencrypted format of the
+\&.mylogin\&.cnf
+login file consists of option groups, similar to other option files\&. Each option group in
+\&.mylogin\&.cnf
+is called a
+\(lqlogin path,\(rq
+which is a group that permits only a limited set of options:
+\fBhost\fR,
+\fBuser\fR, and
+\fBpassword\fR\&. Think of a login path as a set of values that indicate the server host and the credentials for authenticating with the server\&. Here is an example:
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+[myloginpath]
+user = myname
+password = mypass
+host = 127\&.0\&.0\&.1
+.fi
+.if n \{\
+.RE
+.\}
+.PP
+When you invoke a client program to connect to the server,
+\&.mylogin\&.cnf
+is used in conjunction with other option files\&. Its precedence is higher than other option files, but less than options specified explicitly on the client command line\&. For information about the order in which option files are used, see
+Section\ \&4.2.3.3, \(lqUsing Option Files\(rq\&.
+.PP
+Invoke
+mysql_config_editor
+like this:
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+shell> \fBmysql_config_editor \fR\fB\fIcommand\fR\fR\fB [\fR\fB\fIoptions\fR\fR\fB]\fR
+.fi
+.if n \{\
+.RE
+.\}
+.PP
+The command indicates what action to perform on the
+\&.mylogin\&.cnf
+login file\&. For example,
+set
+writes a login path to the file,
+remove
+removes a login path, and
+print
+displays login path contents\&. Any options given provide information to the command, such as the login path name and the values to use in the login path\&.
+.PP
+Suppose that you want to establish two login paths named
+local
+and
+remote
+for connecting to the local MySQL server and a server on the host
+remote\&.example\&.com\&. You want to authenticate to the local server with a user name and password of
+localuser
+and
+localpass, and to the remote server with a user name and password of
+remoteuser
+and
+remotepass\&. To set up the login paths in the
+\&.mylogin\&.cnf
+file, use the following
+set
+commands\&. Enter each command on a single line, then enter the appropriate password when prompted\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+shell> \fBmysql_config_editor set \-\-login\-path=local
+         \-\-host=localhost \-\-user=localuser \-\-password\fR
+Enter password: \fIenter password "localpass" here\fR
+shell> \fBmysql_config_editor set \-\-login\-path=remote
+         \-\-host=remote\&.example\&.com \-\-user=remoteuser \-\-password\fR
+Enter password: \fIenter password "remotepass" here\fR
+.fi
+.if n \{\
+.RE
+.\}
+.PP
+To see what
+\fBmysql_config_editor\fR
+wrote to the
+\&.mylogin\&.cnf
+file, use the
+print
+command:
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+shell> mysql_config_editor print \-\-all
+[local]
+user = localuser
+password = *****
+host = localhost
+[remote]
+user = remoteuser
+password = *****
+host = remote\&.example\&.com
+.fi
+.if n \{\
+.RE
+.\}
+.PP
+The
+print
+command displays each login path as a set of lines beginning with a group header indicating the login path name in square brackets, followed by the option values for the login path\&. Password values are masked and do not appear as clear text\&.
+.PP
+As shown by the preceding examples, the
+\&.mylogin\&.cnf
+file can contain multiple login paths\&. In this way,
+\fBmysql_config_editor\fR
+makes it easy to set up multiple
+\(lqpersonalities\(rq
+for connecting to different MySQL servers\&. Any of these can be selected by name later using the
+\fB\-\-login\-path\fR
+option when you invoke a client program\&. For example, to connect to the local server, use this command:
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+shell> \fBmysql \-\-login\-path=local\fR
+.fi
+.if n \{\
+.RE
+.\}
+.PP
+To connect to the remote server, use this command:
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+shell> \fBmysql \-\-login\-path=remote\fR
+.fi
+.if n \{\
+.RE
+.\}
+.PP
+When you use the
+set
+command with
+\fBmysql_config_editor\fR
+to create a login path, you need not specify all three possible option values (host name, user name, and password)\&. Only those values given are written to the path\&. Any missing values required later can be specified when you invoke a client path to connect to the MySQL server, either in other option files or on the command line\&. Also, any options specified on the command line override those in option files, including the
+\&.mylogin\&.cnf
+file\&. For example, if the credentials in the
+remote
+login path also apply for the host
+remote2\&.example\&.com, you can connect to the server on that host like this:
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+shell> \fBmysql \-\-login\-path=remote \-\-host=remote2\&.example\&.com\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+        \fBmysql_config_editor\fR Commands
+.PP
+This section describes the permitted
+\fBmysql_config_editor\fR
+commands, and the interpretation of options that have a command\-specific meaning\&. In addition,
+\fBmysql_config_editor\fR
+takes other options that can be used with any command, such as
+\fB\-\-verbose\fR
+to produce more information as
+\fBmysql_config_editor\fR
+executes\&. This option may be helpful in diagnosing problems if an operation does not have the effect you expect\&. For a list of supported options, see
+\fBmysql_config_editor\fR Options\&.
+.PP
+On the command line, the position of the command name within the set of program arguments does not matter\&. Options given on the command line are interpreted in the context of the command given\&. For example, these command lines are equivalent:
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+mysql_config_editor print \-\-all
+mysql_config_editor \-\-all print
+.fi
+.if n \{\
+.RE
+.\}
+.PP
+\fBmysql_config_editor\fR
+supports these commands:
+.sp
+.RS 4
+.ie n \{\
+\h'-04'\(bu\h'+03'\c
+.\}
+.el \{\
+.sp -1
+.IP \(bu 2.3
+.\}
+help
+.sp
+Display a help message and exit\&.
+.RE
+.sp
+.RS 4
+.ie n \{\
+\h'-04'\(bu\h'+03'\c
+.\}
+.el \{\
+.sp -1
+.IP \(bu 2.3
+.\}
+print [\fIoptions\fR]
+.sp
+Print the contents of
+\&.mylogin\&.cnf
+in unencrypted form\&. Passwords are displayed as
+*****\&.
+.sp
+The
+print
+command takes these options:
+.sp
+.RS 4
+.ie n \{\
+\h'-04'\(bu\h'+03'\c
+.\}
+.el \{\
+.sp -1
+.IP \(bu 2.3
+.\}
+\fB\-\-all\fR
+.sp
+Print all login paths\&.
+.RE
+.sp
+.RS 4
+.ie n \{\
+\h'-04'\(bu\h'+03'\c
+.\}
+.el \{\
+.sp -1
+.IP \(bu 2.3
+.\}
+\fB\-\-login\-path=\fR\fB\fIname\fR\fR
+.sp
+Print the named login path\&.
+.RE
+.sp
+If no login path is specified, the default path name is
+client\&. If both
+\fB\-\-all\fR
+and
+\fB\-\-login\-path\fR
+are given,
+\fB\-\-all\fR
+takes precedence\&.
+.RE
+.sp
+.RS 4
+.ie n \{\
+\h'-04'\(bu\h'+03'\c
+.\}
+.el \{\
+.sp -1
+.IP \(bu 2.3
+.\}
+remove [\fIoptions\fR]
+.sp
+Remove a login path from the
+\&.mylogin\&.cnf
+file\&.
+.sp
+The
+remove
+command takes these options:
+.sp
+.RS 4
+.ie n \{\
+\h'-04'\(bu\h'+03'\c
+.\}
+.el \{\
+.sp -1
+.IP \(bu 2.3
+.\}
+\fB\-\-host\fR
+.sp
+Remove the host name from the login path\&.
+.RE
+.sp
+.RS 4
+.ie n \{\
+\h'-04'\(bu\h'+03'\c
+.\}
+.el \{\
+.sp -1
+.IP \(bu 2.3
+.\}
+\fB\-\-login\-path=\fR\fB\fIname\fR\fR
+.sp
+The login path to remove\&. If this option is not given, the default path name is
+client\&.
+.RE
+.sp
+.RS 4
+.ie n \{\
+\h'-04'\(bu\h'+03'\c
+.\}
+.el \{\
+.sp -1
+.IP \(bu 2.3
+.\}
+\fB\-\-password\fR
+.sp
+Remove the password from the login path\&.
+.RE
+.sp
+.RS 4
+.ie n \{\
+\h'-04'\(bu\h'+03'\c
+.\}
+.el \{\
+.sp -1
+.IP \(bu 2.3
+.\}
+\fB\-\-user\fR
+.sp
+Remove the user name from the login path\&.
+.RE
+.sp
+The
+\fB\-\-host\fR,
+\fB\-\-user\fR, and
+\fB\-\-password\fR
+options are supported for the
+remove
+command as of MySQL 5\&.6\&.9\&. If any of these options are given, the
+remove
+command removes only the requested values from the login path\&. If none of them is given,
+remove
+removes the entire
+client
+login path\&. For example, this command removes only the
+\fBuser\fR
+value from the
+client
+login path rather than the entire
+client
+login path:
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+mysql_config_editor remove \-\-login\-path=client \-\-user
+.fi
+.if n \{\
+.RE
+.\}
+.RE
+.sp
+.RS 4
+.ie n \{\
+\h'-04'\(bu\h'+03'\c
+.\}
+.el \{\
+.sp -1
+.IP \(bu 2.3
+.\}
+reset
+.sp
+Empty the contents of the
+\&.mylogin\&.cnf
+file\&. The file is created if it does not exist\&.
+.RE
+.sp
+.RS 4
+.ie n \{\
+\h'-04'\(bu\h'+03'\c
+.\}
+.el \{\
+.sp -1
+.IP \(bu 2.3
+.\}
+set [\fIoptions\fR]
+.sp
+Write a login path to the
+\&.mylogin\&.cnf
+file\&.
+.sp
+The
+set
+command takes these options:
+.sp
+.RS 4
+.ie n \{\
+\h'-04'\(bu\h'+03'\c
+.\}
+.el \{\
+.sp -1
+.IP \(bu 2.3
+.\}
+\fB\-\-host=\fR\fB\fIhost_name\fR\fR
+.sp
+The host name to write to the login path\&.
+.RE
+.sp
+.RS 4
+.ie n \{\
+\h'-04'\(bu\h'+03'\c
+.\}
+.el \{\
+.sp -1
+.IP \(bu 2.3
+.\}
+\fB\-\-login\-path=\fR\fB\fIname\fR\fR
+.sp
+The login path to create\&. If this option is not given, the default path name is
+client\&.
+.RE
+.sp
+.RS 4
+.ie n \{\
+\h'-04'\(bu\h'+03'\c
+.\}
+.el \{\
+.sp -1
+.IP \(bu 2.3
+.\}
+\fB\-\-password\fR
+.sp
+Prompt for a password to write to the login path\&.
+.RE
+.sp
+.RS 4
+.ie n \{\
+\h'-04'\(bu\h'+03'\c
+.\}
+.el \{\
+.sp -1
+.IP \(bu 2.3
+.\}
+\fB\-\-user=\fR\fB\fIuser_name\fR\fR
+.sp
+The user name to write to the login path\&.
+.RE
+.sp
+The
+set
+command writes to the login path only such values as are specified with the
+\fB\-\-host\fR,
+\fB\-\-password\fR, and
+\fB\-\-user\fR
+options\&. If none of those options are given,
+\fBmysql_config_editor\fR
+writes the login path as an empty group\&.
+.sp
+To specify an empty password, use the
+set
+command with the
+\fB\-\-password\fR
+option, then press Enter at the password prompt\&. The resulting login path written to
+\&.mylogin\&.cnf
+will include a line like this:
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+password =
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+If the login path already exists in
+\&.mylogin\&.cnf, the
+set
+command replaces it\&. To ensure that this is what the user wants,
+\fBmysql_config_editor\fR
+prints a warning and prompts for confirmation\&. To suppress the warning and prompt, use the
+\fB\-\-skip\-warn\fR
+option\&.
+.RE
+        \fBmysql_config_editor\fR Options
+.PP
+\fBmysql_config_editor\fR
+supports the following options\&.
+.sp
+.RS 4
+.ie n \{\
+\h'-04'\(bu\h'+03'\c
+.\}
+.el \{\
+.sp -1
+.IP \(bu 2.3
+.\}
+.\" mysql_config_editor: help option
+.\" help option: mysql_config_editor
+\fB\-\-help\fR,
+\fB\-?\fR
+.sp
+Display a help message and exit\&.
+.RE
+.sp
+.RS 4
+.ie n \{\
+\h'-04'\(bu\h'+03'\c
+.\}
+.el \{\
+.sp -1
+.IP \(bu 2.3
+.\}
+.\" mysql_config_editor: all option
+.\" all option: mysql_config_editor
+\fB\-\-all\fR
+.sp
+For the
+print
+command, print all login paths in the login file\&.
+.RE
+.sp
+.RS 4
+.ie n \{\
+\h'-04'\(bu\h'+03'\c
+.\}
+.el \{\
+.sp -1
+.IP \(bu 2.3
+.\}
+.\" mysql_config_editor: debug option
+.\" debug option: mysql_config_editor
+\fB\-\-debug[=\fR\fB\fIdebug_options\fR\fR\fB]\fR,
+\fB\-# \fR\fB\fIdebug_options\fR\fR
+.sp
+Write a debugging log\&. A typical
+\fIdebug_options\fR
+string is
+\*(Aqd:t:o,\fIfile_name\fR\*(Aq\&. The default is
+\*(Aqd:t:o,/tmp/mysql_config_editor\&.trace\*(Aq\&.
+.RE
+.sp
+.RS 4
+.ie n \{\
+\h'-04'\(bu\h'+03'\c
+.\}
+.el \{\
+.sp -1
+.IP \(bu 2.3
+.\}
+.\" mysql_config_editor: host option
+.\" host option: mysql_config_editor
+\fB\-\-host=\fR\fB\fIhost_name\fR\fR,
+\fB\-h \fR\fB\fIhost_name\fR\fR
+.sp
+For the
+set
+command, the host name to write to to the login path\&.
+.RE
+.sp
+.RS 4
+.ie n \{\
+\h'-04'\(bu\h'+03'\c
+.\}
+.el \{\
+.sp -1
+.IP \(bu 2.3
+.\}
+.\" mysql_config_editor: login-path option
+.\" login-path option: mysql_config_editor
+\fB\-\-login\-path=\fR\fB\fIname\fR\fR,
+\fB\-G \fR\fB\fIname\fR\fR
+.sp
+For the
+print,
+remove, and
+set
+commands, the login path to use in the
+\&.mylogin\&.cnf
+login file\&.
+.sp
+Client programs also support the
+\fB\-\-login\-path\fR
+option, to enable users to specify which login path to use for connecting to a MySQL server\&. For client programs,
+\fB\-\-login\-path\fR
+must be the first option given, which is not true for
+\fBmysql_config_editor\fR\&. See
+Section\ \&4.2.3.4, \(lqCommand-Line Options that Affect Option-File Handling\(rq\&.
+.RE
+.sp
+.RS 4
+.ie n \{\
+\h'-04'\(bu\h'+03'\c
+.\}
+.el \{\
+.sp -1
+.IP \(bu 2.3
+.\}
+.\" mysql_config_editor: password option
+.\" password option: mysql_config_editor
+\fB\-\-password\fR,
+\fB\-p\fR
+.sp
+For the
+set
+command, cause
+\fBmysql_config_editor\fR
+to prompt for a password and write the value entered by the user to the login path\&. After
+\fBmysql_config_editor\fR
+starts and displays the prompt, the user should type the password and press Enter\&. To prevent other users from seeing the password,
+\fBmysql_config_editor\fR
+does not echo it\&.
+.sp
+This option does not permit a password value following the option name\&. That is, with
+\fBmysql_config_editor\fR, you never enter a password on the command line where it might be seen by other users\&. This differs from most other MySQL programs, which permit the password to be given on the command line as
+\fB\-\-password=\fR\fB\fIpass_val\fR\fR
+or
+\fB\-p\fR\fB\fIpass_val\fR\fR\&. (That practice is insecure and should be avoided, however\&.)
+.RE
+.sp
+.RS 4
+.ie n \{\
+\h'-04'\(bu\h'+03'\c
+.\}
+.el \{\
+.sp -1
+.IP \(bu 2.3
+.\}
+.\" mysql_config_editor: user option
+.\" user option: mysql_config_editor
+\fB\-\-user=\fR\fB\fIuser_name\fR\fR,
+\fB\-u \fR\fB\fIuser_name\fR\fR
+.sp
+For the
+set
+command, the user name to write to the login path\&.
+.RE
+.sp
+.RS 4
+.ie n \{\
+\h'-04'\(bu\h'+03'\c
+.\}
+.el \{\
+.sp -1
+.IP \(bu 2.3
+.\}
+.\" mysql_config_editor: verbose option
+.\" verbose option: mysql_config_editor
+\fB\-\-verbose\fR,
+\fB\-v\fR
+.sp
+Verbose mode\&. Print more information about what the program does\&.
+.RE
+.sp
+.RS 4
+.ie n \{\
+\h'-04'\(bu\h'+03'\c
+.\}
+.el \{\
+.sp -1
+.IP \(bu 2.3
+.\}
+.\" mysql_config_editor: version option
+.\" version option: mysql_config_editor
+\fB\-\-version\fR,
+\fB\-V\fR
+.sp
+Display version information and exit\&.
+.RE
+.sp
+.RS 4
+.ie n \{\
+\h'-04'\(bu\h'+03'\c
+.\}
+.el \{\
+.sp -1
+.IP \(bu 2.3
+.\}
+.\" mysql_config_editor: warn option
+.\" warn option: mysql_config_editor
+\fB\-\-warn\fR,
+\fB\-w\fR
+.sp
+For the
+set
+command, warn and prompt the user for confirmation if the command attempts to overwrite an existing login path\&. This option is enabled by default; use
+\fB\-\-skip\-warn\fR
+to disable it\&.
+.RE
+.SH "COPYRIGHT"
+.br
+.PP
+Copyright \(co 1997, 2013, Oracle and/or its affiliates. All rights reserved.
+.PP
+This documentation is free software; you can redistribute it and/or modify it only under the terms of the GNU General Public License as published by the Free Software Foundation; version 2 of the License.
+.PP
+This documentation is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details.
+.PP
+You should have received a copy of the GNU General Public License along with the program; if not, write to the Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA or see http://www.gnu.org/licenses/.
+.sp
+.SH "SEE ALSO"
+For more information, please refer to the MySQL Reference Manual,
+which may already be installed locally and which is also available
+online at http://dev.mysql.com/doc/.
+.SH AUTHOR
+Oracle Corporation (http://dev.mysql.com/).

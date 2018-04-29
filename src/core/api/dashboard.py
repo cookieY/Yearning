@@ -80,6 +80,7 @@ class dashboard(baseview.BaseView):
 
         elif args == 'menu':
             permissions = grained.objects.filter(username=request.user).first()
+            print(json.dumps(permissions.permissions))
             return Response(json.dumps(permissions.permissions))
 
     def put(self, request, args=None):

@@ -23,7 +23,8 @@ from core.api.dashboard import (
 from core.api.managerdb import (
     management_db,
     push_permissions,
-    dingding
+    dingding,
+    management_ssh
 )
 from core.api.auditorder import (
     audit,
@@ -43,8 +44,18 @@ from core.api.osc import osc_step
 from core.api.myorder import order
 from core.api.gensql import gen_sql
 from core.api.general import addressing
+#from rest_framework_swagger.views import get_swagger_view
+from libs.swagger_views import SwaggerSchemaView
+
+from core.api.advisorsql import advisorsql
+from core.api.sqlarchive import sqlarchive
+
+
+#schema_view = get_swagger_view(title='Yearning API')
 
 urlpatterns = [
+    #url('^$', schema_view),
+    url(r'^api-doc/$', SwaggerSchemaView.as_view(), name='docs'),
     url(r'^api/v1/userinfo/(.*)', userinfo.as_view()),
     url(r'^api/v1/audit_grained/(.*)', audit_grained.as_view()),
     url(r'^api/v1/apply_grained/(.*)', apply_grained.as_view()),
@@ -52,6 +63,7 @@ urlpatterns = [
     url(r'^api/v1/myorder', order.as_view()),
     url(r'^api/v1/gensql/(.*)', gen_sql.as_view()),
     url(r'^api/v1/management_db', management_db.as_view()),
+    url(r'^api/v1/management_ssh', management_ssh.as_view()),
     url(r'^api/v1/audit_sql', audit.as_view()),
     url(r'^api/v1/sqldic/(.*)', dictionary.as_view()),
     url(r'^api/v1/auth_twice', authgroup.as_view()),
@@ -71,5 +83,7 @@ urlpatterns = [
     url(r'^api/v1/osc/(.*)', osc_step.as_view()),
     url(r'^api/v1/download', downloadFile),
     url(r'^api-token-auth/', login_auth.as_view()),
+    url(r'^api/v1/adviorsql',advisorsql.as_view()),
+    url(r'^api/v1/sql-archive', sqlarchive.as_view()),
 ]
 urlpatterns = format_suffix_patterns(urlpatterns)

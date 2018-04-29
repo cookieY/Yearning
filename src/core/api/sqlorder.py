@@ -2,7 +2,7 @@ import logging
 import json
 from libs import send_email
 from libs import baseview
-from libs import call_inception
+from libs import call_inception,call_advisor
 from libs import util
 from core.task import submit_push_messages
 from rest_framework.response import Response
@@ -69,6 +69,7 @@ class sqlorder(baseview.BaseView):
                 except Exception as e:
                     CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
                     return Response({'status': '500'})
+        
 
     def post(self, request, args=None):
         try:

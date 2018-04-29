@@ -8,6 +8,7 @@ from core.models import SqlDictionary
 from core.models import SqlRecord
 from core.models import Account
 from core.models import SqlOrder
+from core.models import ArchiveInfo,ArchiveLog,Sshlist
 
 
 class MessagesUser(serializers.HyperlinkedModelSerializer):
@@ -47,6 +48,31 @@ class Sqllist(serializers.HyperlinkedModelSerializer):
         model = DatabaseList
         fields = ('id', 'connection_name', 'ip', 'computer_room', 'password', 'port', 'username')
 
+
+class Sqlssh(serializers.HyperlinkedModelSerializer):
+    '''
+    数据库连接信息serializers
+    '''
+    class Meta:
+        model =  Sshlist
+        fields = ('id', 'connection_name', 'ip', 'computer_room', 'password', 'port', 'username')
+
+
+class SqlArchiveInfo(serializers.HyperlinkedModelSerializer):
+    '''
+    数据库连接信息serializers
+    '''
+    class Meta:
+        model =  ArchiveInfo
+        fields = ('id', 'source_id', 'dest_id', 'table_source', 'table_dest', 'status', 'type','ssh_hostid','created_user','created_time')
+
+class SqlArchiveLog(serializers.HyperlinkedModelSerializer):
+    '''
+    数据库连接信息serializers
+    '''
+    class Meta:
+        model =  ArchiveLog
+        fields = ('id', 'archive_info_id', 'ip', 'computer_room', 'password', 'port', 'username')
 
 class Area(serializers.HyperlinkedModelSerializer):
     '''

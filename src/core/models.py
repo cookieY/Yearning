@@ -36,6 +36,73 @@ class Account(AbstractUser):
     department = models.CharField(max_length=40) #部门
 
 
+class ArchiveInfo(models.Model):
+    source_id = models.IntegerField()
+    db_source = models.CharField(max_length=64, blank=True, null=True)
+    table_source = models.CharField(max_length=128)
+    dest_id = models.IntegerField()
+    db_dest = models.CharField(max_length=64, blank=True, null=True)
+    table_dest = models.CharField(max_length=128, blank=True, null=True)
+    archive_condition = models.CharField(max_length=1000, blank=True, null=True)
+    status = models.IntegerField(blank=True, null=True)
+    type = models.IntegerField(blank=True, null=True)
+    ssh_host_id = models.IntegerField()
+    created_user = models.CharField(max_length=128, blank=True, null=True)
+    created_time = models.DateTimeField(blank=True, null=True)
+    update_user = models.CharField(max_length=128, blank=True, null=True)
+    updated_time = models.DateTimeField(blank=True, null=True)
+
+    class Meta:
+        managed = False
+        db_table = 'core_archive_info'
+
+
+
+class ArchiveLog(models.Model):
+    core_archive_info_id = models.IntegerField()
+    server_source = models.CharField(max_length=640, blank=True, null=True)
+    db_source = models.CharField(max_length=64, blank=True, null=True)
+    table_source = models.CharField(max_length=128, blank=True, null=True)
+    server_dest = models.CharField(max_length=640, blank=True, null=True)
+    db_dest = models.CharField(max_length=64, blank=True, null=True)
+    table_dest = models.CharField(max_length=128, blank=True, null=True)
+    archive_qty = models.IntegerField(blank=True, null=True)
+    archive_cmd = models.CharField(max_length=5000, blank=True, null=True)
+    archive_log = models.CharField(max_length=5000, blank=True, null=True)
+    archive_start = models.DateTimeField(blank=True, null=True)
+    archive_end = models.DateTimeField(blank=True, null=True)
+    archive_startid = models.IntegerField(blank=True, null=True)
+    archive_endid = models.IntegerField(blank=True, null=True)
+    archive_status = models.CharField(max_length=2, blank=True, null=True)
+    archive_error = models.CharField(max_length=5000, blank=True, null=True)
+    state = models.CharField(max_length=255, blank=True, null=True)
+    created_user = models.CharField(max_length=128, blank=True, null=True)
+    created_time = models.DateTimeField(blank=True, null=True)
+    updated_user = models.CharField(max_length=128, blank=True, null=True)
+    updated_time = models.DateTimeField(blank=True, null=True)
+
+    class Meta:
+        managed = False
+        db_table = 'core_archive_log'
+
+
+class Sshlist(models.Model):
+    connection_name = models.CharField(max_length=50)
+    computer_room = models.CharField(max_length=50)
+    ip = models.CharField(max_length=100)
+    port = models.IntegerField() #端口
+    username = models.CharField(max_length=64)
+    ssh_key_file = models.CharField(max_length=50)
+    password = models.CharField(max_length=50)
+    is_sudo = models.IntegerField(blank=True, null=True)
+    sudo_user = models.CharField(max_length=64, blank=True, null=True)
+
+    class Meta:
+        managed = False
+        db_table = 'core_sshlist'
+
+
+
 class SqlDictionary(models.Model):   
     '''
     数据库字典表
@@ -104,6 +171,18 @@ class SqlRecord(models.Model):
     execute_time = models.CharField(max_length=150, null=True)
     SQLSHA1 = models.TextField(null=True)
 
+class SqlAdvisor(models.Model):
+    '''
+     sqladvosor sql 
+    '''
+    username = models.CharField(max_length=50)
+    db_id = models.IntegerField() 
+    connection_name = models.CharField(max_length=48)
+    original_sql = models.TextField(null=True)
+    analysis_reuslt = models.TextField(max_length=50)
+    status = models.CharField(max_length=50)
+    create_time = models.CharField(max_length=100, blank=True)
+    SQLSHA1 = models.TextField(null=True)
 
 class Todolist(models.Model):
     '''

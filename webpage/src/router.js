@@ -142,6 +142,15 @@ export const appRouter = [
         component: resolve => {
           require(['./components/Search/SearchSQL.vue'], resolve)
         }
+      },
+      {
+        path: 'advisorsql',
+        name: 'advisorsql',
+        title: 'SQL优化',
+        'icon': 'qr-scanner',
+        component: resolve => {
+          require(['./components/Search/Sqladvisor.vue'], resolve)
+        }
       }
     ]
   },
@@ -206,7 +215,16 @@ export const appRouter = [
         component: resolve => {
           require(['./components/Management/MamagementBase.vue'], resolve)
         }
+      }, {
+        path: 'management-ssh',
+        name: 'management-ssh',
+        title: '主机',
+        'icon': 'social-buffer',
+        component: resolve => {
+          require(['./components/Management/MamagementSsh.vue'], resolve)
+        }
       }
+
     ]
   }
 ]

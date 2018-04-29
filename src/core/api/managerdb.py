@@ -1,19 +1,22 @@
 import logging
 import json
 from libs import baseview
-from libs import con_database
+from libs import con_database,call_ssh
 from core.task import grained_permissions
 from rest_framework.response import Response
 from django.http import HttpResponse
 from django.db.models import Count
-from libs.serializers import Sqllist, Getdingding
+from libs.serializers import Sqllist, Getdingding, Sqlssh
 from core.models import (
     DatabaseList,
     SqlDictionary,
     SqlRecord,
     SqlOrder,
     globalpermissions,
-    grained
+    grained,
+    Sshlist,
+    ArchiveInfo
+
 )
 
 CUSTOM_ERROR = logging.getLogger('Yearning.core.views')
@@ -230,3 +233,152 @@ class dingding(baseview.SuperUserpermissions):
             except Exception as e:
                 CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
                 return HttpResponse(status=500)
+
+
+
+class management_ssh(baseview.SuperUserpermissions):
+
+
+    '''
+
+    :argument 数据库管理页面api 接口
+
+    '''
+
+
+    @grained_permissions
+    def get(self, request, args=None):
+
+        '''
+
+        :argument 管理页面数据展示
+
+        :return
+
+                {
+                        'page': page_number,
+                        'data': serializers.data,
+                        'diclist': data,
+                        'ding_switch': switch_dingding,
+                        'mail_switch': switch_email
+                }
+
+        '''
+
+        try:
+            page = request.GET.get('page')
+        except KeyError as e:
+            CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
+            return HttpResponse(status=500)
+        else:
+            try:
+                page_number = Sshlist.objects.aggregate(alter_number=Count('id'))
+                start = int(page) * 10 - 10
+                end = int(page) * 10
+                info = Sshlist.objects.all()[start:end]
+                serializers = Sqlssh(info, many=True)
+
+                switch = globalpermissions.objects.filter(authorization='global').first()
+                switch_dingding = False
+                switch_email = False
+                if switch is not None:
+                    if switch.dingding == 1:
+                        switch_dingding = True
+                    if switch.email == 1:
+                        switch_email = True
+
+                return Response(
+                    {
+                        'page': page_number,
+                        'data': serializers.data
+                    }
+                )
+            except Exception as e:
+                CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
+                return HttpResponse(status=500)
+
+    def post(self, request, args=None):
+
+        '''
+
+        :argument 添加ssh连接信息,并保存至sshlist表
+
+        :return: ok
+
+        '''
+
+        try:
+            data = json.loads(request.data['data'])
+        except KeyError as e:
+            CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
+            return HttpResponse(status=500)
+        else:
+            try:
+                Sshlist.objects.get_or_create(
+                    connection_name=data['connection_name'],
+                    ip=data['ip'],
+                    computer_room=data['computer_room'],
+                    username=data['username'],
+                    password=data['password'],
+                    port=data['port'],
+                    ssh_key_file=data['ssh_key_file']
+                    )
+                return Response('ok')
+            except Exception as e:
+                CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
+                return HttpResponse(status=500)
+
+    def put(self, request, args=None):
+
+        '''
+
+        :argument 测试数据库连接,并返回测试结果数据
+
+        :return: success or fail
+
+        '''
+
+        try:
+            ssh_key_file = request.data['ssh_key_file']
+            ip = request.data['ip']
+            user = request.data['user']
+            password = request.data['password']
+            port = request.data['port']
+
+        except KeyError as e:
+            CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
+            return HttpResponse(status=500)
+        else:
+            try:
+                ssh=call_ssh.Ssh()
+                ssh.login(ip,user,password,port,ssh_key_file)
+                return Response('ssh连接成功!')
+            except Exception as e:
+                CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
+                return Response('ssh连接失败!')
+
+    def delete(self, request, args=None):
+
+        '''
+
+        :argument 删除数据库连接,并删除改数据库连接相关的工单记录,执行记录，以及权限表等相关所有数据
+
+        :return: success or fail
+
+        '''
+
+        try:
+            connection_name = request.GET.get('del')
+            con_id = Sshlist.objects.filter(connection_name=connection_name).first()
+            ArchiveInfo.objects.filter(soure_id=con_id.id).delete()
+            ArchiveInfo.objects.filter(dest_id=con_id.id).delete()
+            per = grained.objects.all().values('username', 'permissions')
+            for i in per:
+                for c in i['permissions']:
+                    if isinstance(i['permissions'][c], list) and c != 'diccon':
+                        i['permissions'][c] = list(filter(lambda x: x != connection_name, i['permissions'][c]))
+                grained.objects.filter(username=i['username']).update(permissions=i['permissions'])
+            return Response('ssh信息已删除!')
+        except Exception as e:
+            CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
+            return HttpResponse(status=500)

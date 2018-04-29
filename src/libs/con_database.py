@@ -37,10 +37,26 @@ class SQLgo(object):
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.con.close()
 
-    def execute(self, sql=None):
+    def query_one(self, sql):
+        with self.con.cursor() as cursor:
+            cursor.execute(sql)
+            result = cursor.fetchone()
+        return result
+
+    def query_multi(self, sql, params=None):
+        with self.con.cursor() as cursor:
+            cursor.execute(sql, params)
+            result = cursor.fetchall()
+        return result
+
+
+    def execute(self, sql=None,args=None):
         with self.con.cursor() as cursor:
             sqllist = sql
-            cursor.execute(sqllist)
+            if args:
+                cursor.execute(sqllist,args)
+            else:
+                cursor.execute(sqllist)
             result = cursor.fetchall()
             self.con.commit()
         return result
@@ -177,3 +193,59 @@ class SQLgo(object):
             result = cursor.fetchall()
             data = [c for i in result for c in i]
             return data
+
+    def get_tables(self,schema):
+        sql = 'select table_name, engine, table_collation, table_comment from information_schema.tables where ' \
+              'table_schema = %s and table_type = \'{0}\''.format(schema,'BASE TABLE')
+        return self.query_multi(sql)
+
+    def get_columns(self, schema,table_name):
+        sql = 'select column_name, is_nullable, column_key, ' \
+              'column_default, column_comment, column_type ' \
+              'from information_schema.columns where table_schema = %s and table_name = %s'.format(schema,table_name)
+        # params = (schema, table_name)
+        return self.query_multi(sql)
+
+    def update_column(self, column, modify_type, table_name, is_execute):
+        column_name = column['column_name']
+        is_nullable = column['is_nullable']
+        column_type = column['column_type']
+        column_default = column['column_default']
+        column_comment = column['column_comment']
+
+        sql = 'alter table {0} '.format(table_name)
+        if 'add' == modify_type:
+            sql += 'add column {column} '.format(column=column_name)
+        elif 'update' == modify_type:
+            sql += 'change column {column} {column} '.format(column=column_name)
+        else:
+            sql += 'drop column {column}'.format(column=column_name)
+
+        if 'drop' != modify_type:
+            sql += '{column_type} '.format(column_type=column_type)
+
+            if 'YES' == is_nullable:
+                sql += 'null '
+            else:
+                sql += 'not null '
+
+            if column_default is not None:
+                sql += 'default {default} '.format(default=column_default)
+
+            if column_comment is not None:
+                sql += 'comment \'{comment}\''.format(comment=column_comment)
+
+        print(sql)
+        if is_execute:
+            self.execute(sql)
+
+    def generate_create_sql(self, table_name):
+        sql = 'show create table {0}'.format(table_name)
+        result = self.query_one(sql)
+        return result['Create Table']
+
+    def create_table(self, sql, is_execute):
+        print(sql)
+        print('\n')
+        if is_execute:
+            self.execute(sql)

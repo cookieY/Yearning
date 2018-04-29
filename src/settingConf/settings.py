@@ -12,6 +12,10 @@ https://docs.djangoproject.com/en/1.10/ref/settings/
 import os
 import datetime
 from libs import util
+
+#codig: utf-8
+
+
 CONF_DATA = util.conf_path()
 
 # Build paths inside the project like this: os.path.join(BASE_DIR, ...)
@@ -36,7 +40,8 @@ INSTALLED_APPS = [
     'django.contrib.auth',
     'django.contrib.contenttypes',
     'core.apps.CoreConfig',
-    'rest_framework'
+    'rest_framework',
+    'rest_framework_swagger',
 ]
 
 MIDDLEWARE = [
@@ -81,7 +86,33 @@ DATABASES = {
         "HOST": CONF_DATA.address
     }
 }
+#
+#
+# TEMPLATES = [
+#     {
+#         'BACKEND': 'django.template.backends.django.DjangoTemplates',
+#         'DIRS': [os.path.join(BASE_DIR, 'templates')]
+#         ,
+#         'APP_DIRS': True,
+#         'OPTIONS': {
+#             'context_processors': [
+#                 'django.template.context_processors.debug',
+#                 'django.template.context_processors.request',
+#                 'django.contrib.auth.context_processors.auth',
+#                 'django.contrib.messages.context_processors.messages',
+#             ],
+#         },
+#     },
+# ]
 
+SWAGGER_SETTINGS = {
+    'JSON_EDITOR': True,
+    'LOGIN_URL': 'login',
+    'LOGOUT_URL': 'logout',
+}
+
+
+API_DOC_PATH = os.path.join(BASE_DIR, "api-doc/swagger.json")
 # Password validation
 # https://docs.djangoproject.com/en/1.10/ref/settings/#auth-password-validators
 

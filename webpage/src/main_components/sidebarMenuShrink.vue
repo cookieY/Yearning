@@ -73,6 +73,7 @@ export default {
         'indexedit': '',
         'view-dml': '',
         'serach-sql': '',
+        'advisorsql': '',
         'management-user': '',
         'management-database': '',
         'audit-audit': '1',
@@ -106,6 +107,7 @@ export default {
         this.filtermenulist.dmledit = c.dml
         this.filtermenulist['view-dml'] = c.dic
         this.filtermenulist['serach-sql'] = c.query
+        this.filtermenulist['advisorsql'] = c.query
         this.filtermenulist['management-user'] = c.user
         this.filtermenulist['management-database'] = c.base
       })
