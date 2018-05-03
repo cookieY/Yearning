@@ -154,7 +154,7 @@ export default {
       showFullScreenBtn: window.navigator.userAgent.indexOf('MSIE') < 0,
       isFullScreen: false,
       lockScreenSize: 0,
-      avatorPath: 'static/bird-fast-v2.png',
+      avatorPath: 'static/avatar.png',
       getc: false,
       statement: false
     };

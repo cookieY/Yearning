@@ -6,7 +6,7 @@
 <transition name="show-unlock">
   <div class="unlock-body-con" v-if="showUnlock" @keydown.enter="handleUnlock">
     <div @click="handleClickAvator" class="unlock-avator-con" :style="{marginLeft: avatorLeft}">
-      <img class="unlock-avator-img" src="../assets/bird-fast-v2.png">
+      <img class="unlock-avator-img" src="../assets/avatar.png">
       <div class="unlock-avator-cover">
         <span><Icon type="unlocked" :size="30"></Icon></span>
         <p>解锁</p>

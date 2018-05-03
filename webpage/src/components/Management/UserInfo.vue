@@ -48,7 +48,7 @@
       <Table border :columns="columns6" :data="data5" stripe height="550"></Table>
     </div>
     <br>
-    <Page :total="pagenumber" show-elevator @on-change="splicpage" :page-size="10"></Page>
+    <Page :total="pagenumber" show-elevator @on-change="splicpage" :page-size="10" ref="totol"></Page>
   </Card>
   </Col>
 
@@ -173,27 +173,6 @@
           </CheckboxGroup>
         </FormItem>
       </template>
-        <hr style="height:1px;border:none;border-top:1px dashed #dddee1;" />
-        <br>
-      <FormItem label="数据查询权限:">
-        <RadioGroup v-model="permission.query">
-          <Radio label="1">是</Radio>
-          <Radio label="0">否</Radio>
-        </RadioGroup>
-      </FormItem>
-      <template v-if="permission.query === '1'">
-        <FormItem label="连接名:">
-          <div style="border-bottom: 1px solid #e9e9e9;padding-bottom:6px;margin-bottom:6px;">
-            <Checkbox
-              :indeterminate="indeterminate.query"
-              :value="checkAll.query"
-              @click.prevent.native="ddlCheckAll('querycon', 'query', 'connection')">全选</Checkbox>
-          </div>
-          <CheckboxGroup v-model="permission.querycon">
-            <Checkbox  v-for="i in connectionList.connection" :label="i.connection_name" :key="i.connection_name">{{i.connection_name}}</Checkbox>
-          </CheckboxGroup>
-        </FormItem>
-      </template>
       </template>
       <template v-if="this.editInfodForm.group === 'admin'">
         <hr style="height:1px;border:none;border-top:1px dashed #dddee1;" />
@@ -283,8 +262,6 @@ export default {
         dicexport: '0',
         index: '0',
         indexcon: [],
-        query: '0',
-        querycon: [],
         user: '0',
         base: '0'
       },
@@ -571,6 +548,7 @@ export default {
             title: res.data
           })
           this.editemail = false
+          this.$refs.totol.currentPage = 1
           this.refreshuser()
         })
         .catch(error => {
@@ -669,6 +647,7 @@ export default {
             title: '通知',
             desc: res.data
           })
+          this.$refs.totol.currentPage = 1
           this.refreshuser()
         })
         .catch(error => {
@@ -685,6 +664,7 @@ export default {
               desc: res.data
             })
             this.deluserModal = false
+            this.$refs.totol.currentPage = 1
             this.refreshuser()
           })
           .catch(error => {

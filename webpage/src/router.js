@@ -142,7 +142,7 @@ export const appRouter = [
         title: 'SQL查询',
         'icon': 'podium',
         component: resolve => {
-          require(['./components/Search/SearchSQL.vue'], resolve)
+          require(['./components/Search/work_flow.vue'], resolve)
         }
       }
     ]
@@ -158,10 +158,47 @@ export const appRouter = [
       {
         path: 'audit-order',
         name: 'audit-audit',
-        title: '工单审核',
+        title: '工单',
         'icon': 'edit',
         component: resolve => {
           require(['./components/Audit/AuditSql.vue'], resolve)
+        }
+      },
+      {
+        path: 'audit-permissions',
+        name: 'audit-permissions',
+        title: '权限',
+        'icon': 'android-share-alt',
+        component: resolve => {
+          require(['./components/Audit/Permissions.vue'], resolve)
+        }
+      },
+      {
+        path: 'query-audit',
+        name: 'query-audit',
+        title: '查询',
+        'icon': 'social-rss',
+        component: resolve => {
+          require(['./components/Audit/Query_audit.vue'], resolve)
+        }
+      }
+    ]
+  },
+  {
+    path: '/record',
+    icon: 'pie-graph',
+    name: 'record',
+    title: '记录',
+    component: Index,
+    access: 0,
+    children: [
+      {
+        path: 'query-review',
+        name: 'query-review',
+        title: '查询审计',
+        'icon': 'arrow-graph-up-right',
+        component: resolve => {
+          require(['./components/Audit/Query_record.vue'], resolve)
         }
       },
       {
@@ -171,24 +208,6 @@ export const appRouter = [
         'icon': 'android-drafts',
         component: resolve => {
           require(['./components/Audit/Record.vue'], resolve)
-        }
-      },
-      {
-        path: 'audit-permissions',
-        name: 'audit-permissions',
-        title: '权限审核',
-        'icon': 'android-share-alt',
-        component: resolve => {
-          require(['./components/Audit/Permissions.vue'], resolve)
-        }
-      },
-      {
-        path: 'query-review',
-        name: 'query-review',
-        title: '查询审计',
-        'icon': 'arrow-graph-up-right',
-        component: resolve => {
-          require(['./components/Audit/Query.vue'], resolve)
         }
       }
     ]
@@ -260,6 +279,44 @@ export const queryList = {
   ]
 }
 
+export const querypage = {
+  path: '/',
+  icon: 'home',
+  name: 'main',
+  title: '首页',
+  component: Index,
+  redirect: '/home',
+  children: [
+    {
+      path: 'querypage',
+      title: '查询',
+      name: 'querypage',
+      component: resolve => {
+        require(['./components/Search/QuerySQL.vue'], resolve)
+      }
+    }
+  ]
+}
+
+export const queryready = {
+  path: '/',
+  icon: 'home',
+  name: 'main',
+  title: '首页',
+  component: Index,
+  redirect: '/home',
+  children: [
+    {
+      path: 'queryready',
+      title: '查询申请进度',
+      name: 'queryready',
+      component: resolve => {
+        require(['./components/Search/PutReady.vue'], resolve)
+      }
+    }
+  ]
+}
+
 export const myorder = {
   path: '/',
   icon: 'home',
@@ -285,6 +342,8 @@ export const myorder = {
   ...appRouter,
   orderList,
   queryList,
+  queryready,
+  querypage,
   myorder,
   page404,
   page401,

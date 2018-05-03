@@ -4,7 +4,7 @@
       <Card>
         <p slot="title">
           <Icon type="person"></Icon>
-          审核工单
+          权限审核
         </p>
         <Row>
           <Col span="24">
@@ -69,17 +69,6 @@
             </FormItem>
             <FormItem label="连接名:">
               <span v-for="i in permission.diccon" style="margin-left: 1%">{{i}}</span>
-            </FormItem>
-          </template>
-          <hr style="height:1px;border:none;border-top:1px dashed #dddee1;" />
-          <br>
-          <FormItem label="数据查询权限:">
-            <p v-if="permission.query === '0'">否</p>
-            <p v-else>是</p>
-          </FormItem>
-          <template v-if="permission.query === '1'">
-            <FormItem label="连接名:">
-              <span v-for="i in permission.querycon" style="margin-left: 1%">{{i}}</span>
             </FormItem>
           </template>
         </template>

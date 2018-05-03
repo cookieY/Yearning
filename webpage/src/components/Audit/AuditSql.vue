@@ -45,7 +45,7 @@ p{
     <Card>
       <p slot="title">
         <Icon type="person"></Icon>
-        审核工单
+        工单审核
       </p>
       <Row>
         <Col span="24">

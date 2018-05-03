@@ -27,8 +27,6 @@ PERMISSION = {
     'dic': '0',
     'diccon': [],
     'dicedit': '0',
-    'query': '0',
-    'querycon': [],
     'user': '0',
     'base': '0',
     'dicexport': '0',

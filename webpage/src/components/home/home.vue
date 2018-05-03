@@ -24,14 +24,14 @@
         <Row type="flex" class="user-infor">
           <Col span="8">
           <Row class-name="made-child-con-middle" type="flex" align="middle">
-            <img class="avator-img" src="../../assets/bird-fast-v2.png" />
+            <img class="avator-img" src="../../assets/avatar.png" />
           </Row>
           </Col>
           <Col span="16" style="padding-left:6px;">
           <Row class-name="made-child-con-middle" type="flex" align="middle">
             <div>
               <b class="card-user-infor-name">{{username}}</b>
-              <p>It's a nice day .</p>
+              <p>Go confidently in the direction.</p>
             </div>
           </Row>
           </Col>
@@ -49,7 +49,7 @@
       <Card>
         <p slot="title" class="card-title">
           <Icon type="android-checkbox-outline"></Icon>
-          ToDo List
+          待办事项
         </p>
         <a type="text" slot="extra" @click.prevent="addNewToDoItem">
           <Icon type="plus-round"></Icon>
@@ -83,7 +83,7 @@
       <infor-card id-name="collection_count" :end-val="count.dic" iconType="upload" color="#ffd572" intro-text="数据字典采集字段"></infor-card>
       </Col>
       <Col span="6" class-name="padding-left-5">
-      <infor-card id-name="transfer_count" :end-val="count.order" iconType="shuffle" color="#f25e43" intro-text="工单总数"></infor-card>
+      <infor-card id-name="transfer_count" :end-val="count.order" iconType="shuffle" color="#f25e43" intro-text="我提交的工单"></infor-card>
       </Col>
     </Row>
     <Row class="margin-top-10">
@@ -107,7 +107,7 @@
       <Card>
         <p slot="title" class="card-title">
           <Icon type="ios-pulse-strong"></Icon>
-          申请修改表结构及SQL的工单数
+          DDL & DML 工单提交统计
         </p>
         <div class="data-source-row">
           <data-source-pie></data-source-pie>
@@ -149,7 +149,7 @@ export default {
       username: Cookies.get('user'),
       time: '',
       board: {
-        'title': ['1.DML语句生成', '2.数据库字典生成及查看', '3.SQL语句审核及回滚', '4.工单流程化', '5.数据查询', '6.细粒度的权限划分']
+        'title': ['1.DDL语句生成', '2.数据库字典生成及查看', '3.SQL语句审核及回滚', '4.工单流程化', '5.可视化数据查询', '6.细粒度的权限划分']
       }
     };
   },

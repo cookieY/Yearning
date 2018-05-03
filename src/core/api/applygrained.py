@@ -48,13 +48,13 @@ class audit_grained(baseview.SuperUserpermissions):
                 grained.objects.filter(username=user).update(permissions=grained_list)
                 applygrained.objects.filter(work_id=work_id).update(status=1)
                 mail = Account.objects.filter(username=user).first()
-                thread = threading.Thread(target=push_message, args=({'to_user': request.user, 'workid': work_id}, 3, request.user, mail.email, work_id, '同意'))
+                thread = threading.Thread(target=push_message, args=({'to_user': user, 'workid': work_id}, 3, user, mail.email, work_id, '同意'))
                 thread.start()
                 return Response('权限已更新成功!')
         else:
             applygrained.objects.filter(work_id=work_id).update(status=0)
             mail = Account.objects.filter(username=user).first()
-            thread = threading.Thread(target=push_message, args=({'to_user': request.user, 'workid': work_id}, 4, request.user, mail.email, work_id, '驳回'))
+            thread = threading.Thread(target=push_message, args=({'to_user': user, 'workid': work_id}, 4, user, mail.email, work_id, '驳回'))
             thread.start()
             return Response('权限已驳回!')
 

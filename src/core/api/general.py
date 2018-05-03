@@ -12,7 +12,8 @@ from core.models import (
 )
 from libs.serializers import (
     Area,
-    UserINFO
+    UserINFO,
+    query_con
 )
 
 CUSTOM_ERROR = logging.getLogger('Yearning.core.views')
@@ -37,6 +38,12 @@ class addressing(baseview.BaseView):
                     con_name = Area(info, many=True).data
                     dic = SqlDictionary.objects.all().values('Name')
                     dic.query.distinct = ['Name']
+
+                elif request.data['permissions_type'] == 'query':
+                    datalist = DatabaseList.objects.all()
+                    serializers = query_con(datalist, many=True)
+                    assigned = grained.objects.filter(username=request.user).first()
+                    return Response({'assigend': assigned.permissions['person'],'connection': serializers.data})
                 else:
                     con_name = []
                     _type = request.data['permissions_type'] + 'con'

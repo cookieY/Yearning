@@ -48,6 +48,14 @@ class Sqllist(serializers.HyperlinkedModelSerializer):
         fields = ('id', 'connection_name', 'ip', 'computer_room', 'password', 'port', 'username')
 
 
+class query_con(serializers.HyperlinkedModelSerializer):
+    '''
+    查询连接信息serializers
+    '''
+    class Meta:
+        model = DatabaseList
+        fields = ('connection_name', 'computer_room')
+
 class Area(serializers.HyperlinkedModelSerializer):
     '''
     SQL提交及表结构修改页面数据库连接信息返回serializers
@@ -96,7 +104,7 @@ class Query_review(serializers.HyperlinkedModelSerializer):
 
     class Meta:
         model = query_order
-        fields = ('work_id', 'username', 'timer', 'date', 'instructions')
+        fields = ('work_id', 'username', 'timer', 'date', 'instructions', 'query_per', 'connection_name', 'computer_room', 'export', 'time')
 
 
 class Query_list(serializers.HyperlinkedModelSerializer):

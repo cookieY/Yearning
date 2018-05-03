@@ -102,7 +102,7 @@
       <Table :columns="columns" :data="rowdata" height="550"></Table>
     </div>
     <br>
-    <Page :total="pagenumber" show-elevator @on-change="mountdata" :page-size="10"></Page>
+    <Page :total="pagenumber" show-elevator @on-change="mountdata" :page-size="10" ref="totol"></Page>
   </Card>
   </Col>
   <Modal v-model="delbaseModal" :width="500">
@@ -340,6 +340,7 @@ export default {
                 title: '通知',
                 desc: '数据库信息添加成功!'
               })
+              this.$refs.totol.currentPage = 1
               this.mountdata()
             })
             .catch(error => {
@@ -505,6 +506,7 @@ export default {
             })
             this.delbaseModal = false
             this.delconfirmbasename = ''
+            this.$refs.totol.currentPage = 1
             this.mountdata()
           })
           .catch(error => {

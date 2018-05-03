@@ -6,20 +6,62 @@
           <h3>{{ stepData.title }}</h3>
           <h5>{{ stepData.describe }}</h5>
         </div>
-        <p class="step-content" v-html="stepData.content"></p>
-        <Form class="step-form" ref="step" :model="step" :rules="stepRules" :label-width="150">
-          <FormItem label="查询说明：" prop="opinion">
-            <Input v-model="step.opinion" type="textarea" :autosize="{minRows: 2,maxRows: 5}" placeholder="请填写查询说明" />
-          </FormItem>
-          <FormItem label="查询时限：" prop="timer">
-            <Input v-model="step.timer"  placeholder="请填写查询时限，单位：分钟 （只填写数字）" style="width: 25%;"/>
-          </FormItem>
-          <FormItem label="">
-            <Button  @click="handleSubmit" style="width:100px;" type="primary">提交</Button>
-          </FormItem>
-        </Form>
-        <Steps>
-          <Step v-for="item in stepList1" :title="item.title" :content="item.describe + '审核并通过'" :key="item.title"></Step>
+        <p class="step-content"></p>
+        <Row>
+        <i-col span="8">
+          <Alert type="warning" show-icon>
+            注意事项:
+            <span slot="desc">
+              1.必须填写查询说明
+              <br>
+              2.根据查询条件预估所需的查询时间
+              <br>
+              3.所有提交的查询语句均会进行审计记录
+              <br>
+              4.仅支持select语句,不可使用非查询语句
+              <br>
+              5.已限制最大limit数，如自己输入的limit数大于平台配置的最大limit数则已平台配置的Limit数为准
+            </span>
+          </Alert>
+        </i-col>
+        <i-col span="12">
+          <Form ref="step" :model="step" :rules="stepRules" :label-width="150">
+            <FormItem label="机房:" prop="computer_room">
+              <Select v-model="step.computer_room" @on-change="Connection_Name">
+                <Option v-for="i in datalist.computer_roomlist" :key="i" :value="i" >{{i}}</Option>
+              </Select>
+            </FormItem>
+
+            <FormItem label="连接名:" prop="connection_name">
+              <Select v-model="step.connection_name" filterable>
+                <Option v-for="i in datalist.connection_name_list" :value="i.connection_name" :key="i.connection_name">{{ i.connection_name }}</Option>
+              </Select>
+            </FormItem>
+            <FormItem label="审核人:" prop="person">
+              <Select v-model="step.person" filterable>
+                <Option v-for="i in personlist" :value="i" :key="i">{{ i }}</Option>
+              </Select>
+            </FormItem>
+            <FormItem label="是否需要导出数据:" prop="export">
+              <RadioGroup v-model="step.export">
+                <Radio label="1">是</Radio>
+                <Radio label="0">否</Radio>
+              </RadioGroup>
+            </FormItem>
+            <FormItem label="查询说明：" prop="opinion">
+              <Input v-model="step.opinion" type="textarea" :autosize="{minRows: 4,maxRows: 8}" placeholder="请填写查询说明"/>
+            </FormItem>
+            <FormItem label="查询时限：" prop="timer">
+              <Input v-model="step.timer"  placeholder="请填写查询时限，单位：分钟 （只填写数字）"/>
+            </FormItem>
+            <FormItem label="">
+              <Button  @click="handleSubmit" style="width:100px;" type="primary">提交</Button>
+            </FormItem>
+          </Form>
+        </i-col>
+        </Row>
+        <Steps style="margin-left: 10%">
+          <Step v-for="item in stepList1" :title="item.title" :content="item.describe" :key="item.title"></Step>
         </Steps>
       </Card>
     </Row>
@@ -36,22 +78,29 @@
     data () {
       return {
         stepData: {
-          title: 'Yearning自助SQL查询系统',
-          describe: Cookies.get('user'),
-          content: '欢迎使用Yearning自助SQL查询系统</br></br>   请在使用中遵守以下注意事项：</br></br>  1.必须填写查询说明</br></br>  2.根据查询条件预估所需的查询时间 </br></br>  3.不可提交慢查询等严重影响性能的查询语句 </br></br> 4.所有提交的查询语句均会进行审计记录'
+          title: 'Yearning SQL查询系统',
+          describe: `欢迎你！ ${Cookies.get('user')}`
         },
         step: {
           remark: '',
-          timer: ''
+          timer: '',
+          computer_room: '',
+          connection_name: '',
+          person: '',
+          export: '0'
         },
         stepList1: [
           {
-            title: '填写工单',
-            describe: '提交'
+            title: '提交',
+            describe: '提交查询申请'
           },
           {
-            title: '进入查询页面',
-            describe: '自助'
+            title: '审核',
+            describe: '等待审核结果'
+          },
+          {
+            title: '查询',
+            describe: '审核完毕，进入查询页面'
           }
         ],
         stepRules: {
@@ -60,25 +109,97 @@
           ],
           timer: [
             { required: true, message: '请填写查询时限', trigger: 'blur' }
-          ]
+          ],
+          computer_room: [{
+            required: true,
+            message: '机房地址不得为空',
+            trigger: 'change'
+          }],
+          connection_name: [{
+            required: true,
+            message: '连接名不得为空',
+            trigger: 'change'
+          }],
+          basename: [{
+            required: true,
+            message: '数据库名不得为空',
+            trigger: 'change'
+          }],
+          person: [{
+            required: true,
+            message: '审核人不得为空',
+            trigger: 'change'
+          }]
+        },
+        item: {},
+        personlist: [],
+        computer_roomlist: util.computer_room,
+        datalist: {
+          connection_name_list: [],
+          basenamelist: [],
+          sqllist: [],
+          computer_roomlist: util.computer_room
         }
       }
     },
     methods: {
+      Connection_Name (val) {
+        this.datalist.connection_name_list = []
+        this.datalist.basenamelist = []
+        this.step.connection_name = ''
+        this.step.basename = ''
+        if (val) {
+          this.ScreenConnection(val)
+        }
+      },
+      ScreenConnection (val) {
+        this.datalist.connection_name_list = this.item.filter(item => {
+          if (item.computer_room === val) {
+            return item
+          }
+        })
+      },
       handleSubmit () {
         this.$refs['step'].validate((valid) => {
           if (valid) {
-            let workid = 1000000000 * 100000000 * Math.random()
-            axios.get(`${util.url}/search?timer=${this.step.timer}&mode=put&workid=${workid}&instructions=${this.step.opinion}`)
-            this.$emit('render', workid)
+            axios.put(`${util.url}/query_worklf`, {
+              'mode': 'put',
+              'instructions': this.step.opinion,
+              'timer': this.step.timer,
+              'connection_name': this.step.connection_name,
+              'computer_room': this.step.computer_room,
+              'export': this.step.export,
+              'audit': this.step.person
+            })
+              .then(() => {
+                this.$router.push({
+                    name: 'queryready'
+                  })
+              })
           }
         });
       }
     },
     mounted () {
-      axios.get(`${util.url}/search?timer=${this.step.timer}&mode=get`)
+      axios.put(`${util.url}/workorder/connection`, {'permissions_type': 'query'})
         .then(res => {
-          this.$emit('res', res.data)
+          this.item = res.data['connection']
+          this.personlist = res.data['assigend']
+        })
+        .catch(error => {
+          util.ajanxerrorcode(this, error)
+        })
+      axios.put(`${util.url}/query_worklf`, {'mode': 'status'})
+        .then(res => {
+          if (res.data === 1) {
+            this.$router.push({
+              name: 'querypage'
+            });
+          } else if (res.data === 2) {
+            this.$router.push({
+              name: 'queryready'
+            });
+          }
         })
     }
   }

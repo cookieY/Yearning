@@ -73,6 +73,30 @@ class send_email(object):
                    '</body></html>' % (
                        mail_data['workid'],
                        mail_data['to_user'])
+        elif type == 5: ##查询申请
+            text = '<html><body><h1>Yearning 查询申请通知</h1>' \
+                   '<br><p>工单号: %s</p>' \
+                   '<br><p>发起人: %s</p>' \
+                   '<br><p>状态: 提交</p>' \
+                   '</body></html>' % (
+                       mail_data['workid'],
+                       mail_data['to_user'])
+        elif type == 6: ##查询同意
+            text = '<html><body><h1>Yearning 查询同意通知</h1>' \
+                   '<br><p>工单号: %s</p>' \
+                   '<br><p>发起人: %s</p>' \
+                   '<br><p>状态: 同意</p>' \
+                   '</body></html>' % (
+                       mail_data['workid'],
+                       mail_data['to_user'])
+        elif type == 7: ##查询驳回
+            text = '<html><body><h1>Yearning 查询驳回通知</h1>' \
+                   '<br><p>工单号: %s</p>' \
+                   '<br><p>发起人: %s</p>' \
+                   '<br><p>状态: 驳回</p>' \
+                   '</body></html>' % (
+                       mail_data['workid'],
+                       mail_data['to_user'])
         else: #提交
             text = '<html><body><h1>Yearning 工单提交通知</h1>' \
                    '<br><p>工单号: %s</p>' \

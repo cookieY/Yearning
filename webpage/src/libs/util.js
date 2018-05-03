@@ -11,7 +11,7 @@ util.url = 'http://' + document.domain + ':8000/api/v1'
 
 util.auth = 'http://' + document.domain + ':8000/api-token-auth/'
 
-util.computer_room = ['AWS', 'Aliyun', 'Own', 'Other', 'cn-closeli-qd-ali']
+util.computer_room = ['AWS', 'Aliyun', 'Own', 'Other']
 
 util.ajanxerrorcode = function (vm, error) {
   if (error.response) {

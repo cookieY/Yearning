@@ -13,7 +13,7 @@
       <Form ref="userForm" :model="userForm" :label-width="100" label-position="right">
         <FormItem label="用户名：" prop="name">
           <div style="display:inline-block;width:300px;">
-            <span>{{ userForm.name }}</span>
+            <span>{{ userForm.username }}</span>
           </div>
         </FormItem>
         <FormItem label="部门：">
@@ -21,6 +21,9 @@
         </FormItem>
         <FormItem label="权限分类：">
           <span>{{ userForm.group }}</span>
+        </FormItem>
+        <FormItem label="邮箱：">
+          <span>{{ userForm.email }}</span>
         </FormItem>
         <FormItem label="具体权限：">
           <br>
@@ -41,12 +44,6 @@
           </FormItem>
           <FormItem label="可访问的连接名:" v-if="formItem.dic === '是'">
             <p>{{formItem.diccon}}</p>
-          </FormItem>
-          <FormItem label="查询是否可见:">
-            <p>{{formItem.query}}</p>
-          </FormItem>
-          <FormItem label="可访问的连接名:" v-if="formItem.query === '是'">
-            <p>{{formItem.querycon}}</p>
           </FormItem>
           <FormItem label="用户管理权限:">
             <p>{{formItem.user}}</p>
@@ -184,27 +181,6 @@
             </CheckboxGroup>
           </FormItem>
         </template>
-        <hr style="height:1px;border:none;border-top:1px dashed #dddee1;" />
-        <br>
-        <FormItem label="数据查询权限:">
-          <RadioGroup v-model="permission.query">
-            <Radio label="1">是</Radio>
-            <Radio label="0">否</Radio>
-          </RadioGroup>
-        </FormItem>
-        <template v-if="permission.query === '1'">
-          <FormItem label="连接名:">
-            <div style="border-bottom: 1px solid #e9e9e9;padding-bottom:6px;margin-bottom:6px;">
-              <Checkbox
-                :indeterminate="indeterminate.query"
-                :value="checkAll.query"
-                @click.prevent.native="ddlCheckAll('querycon', 'query', 'connection')">全选</Checkbox>
-            </div>
-            <CheckboxGroup v-model="permission.querycon">
-              <Checkbox  v-for="i in connectionList.connection" :label="i.connection_name" :key="i.connection_name">{{i.connection_name}}</Checkbox>
-            </CheckboxGroup>
-          </FormItem>
-        </template>
       </template>
       <template v-if="this.userForm.group === 'admin'">
         <hr style="height:1px;border:none;border-top:1px dashed #dddee1;" />
@@ -263,12 +239,7 @@ export default {
       editEmailForm: {
         mail: ''
       },
-      userForm: {
-        name: '',
-        group: '',
-        department: '',
-        permisson: []
-      },
+      userForm: {},
       formItem: {
         ddl: '',
         ddlcon: ''
@@ -329,8 +300,6 @@ export default {
         dicexport: '0',
         index: '0',
         indexcon: [],
-        query: '0',
-        querycon: [],
         user: '0',
         base: '0'
       },
@@ -402,9 +371,7 @@ export default {
           'user': Cookies.get('user')
         })
         .then(res => {
-          this.userForm.name = Cookies.get('user');
-          this.userForm.group = res.data.userinfo.group;
-          this.userForm.department = res.data.userinfo.department;
+          this.userForm = res.data.userinfo
           this.formItem.ddl = exchangetype(res.data.permissons.ddl)
           this.formItem.ddlcon = exchangetype(res.data.permissons.ddlcon)
           this.formItem.dml = exchangetype(res.data.permissons.dml)

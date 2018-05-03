@@ -34,7 +34,6 @@ class Account(AbstractUser):
     '''
     group = models.CharField(max_length=40)   #权限组 guest/admin
     department = models.CharField(max_length=40) #部门
-    query_per = models.SmallIntegerField(null=True, default=0)
 
 
 class SqlDictionary(models.Model):   
@@ -58,7 +57,7 @@ class SqlOrder(models.Model):
     工单提交表
     '''
     work_id = models.CharField(max_length=50, blank=True) #工单id
-    username = models.CharField(max_length=50, blank=True) #账号
+    username = models.CharField(max_length=50, blank=True) #提交人
     status = models.IntegerField(blank=True) # 工单状态 0 disagree 1 agree 2 indeterminate 3 ongoing
     type = models.SmallIntegerField(blank=True) #工单类型 0 DDL 1 DML
     backup = models.SmallIntegerField(blank=True)  # 工单是否备份 0 not backup 1 backup
@@ -161,3 +160,9 @@ class query_order(models.Model):
     date = models.CharField(max_length=50)
     timer = models.CharField(max_length=50)
     instructions = models.TextField(null=True)
+    query_per = models.SmallIntegerField(null=True, default=0)
+    connection_name = models.CharField(max_length=50,null=True)  # 连接名
+    computer_room = models.CharField(max_length=50,null=True)  # 机房
+    export = models.SmallIntegerField(null=True, default=0)
+    audit = models.CharField(max_length=100, null=True)
+    time = models.CharField(max_length=100, null=True)

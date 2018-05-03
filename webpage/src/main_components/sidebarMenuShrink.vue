@@ -72,14 +72,15 @@ export default {
         'dmledit': '',
         'indexedit': '',
         'view-dml': '',
-        'serach-sql': '',
+        'serach-sql': '1',
         'management-user': '',
         'management-database': '',
         'audit-audit': '1',
         'audit-record': '1',
         'audit-permissions': '1',
         'search_order': '1',
-        'query-review': '1'
+        'query-review': '1',
+        'query-audit': '1'
       }
     };
   },
@@ -107,7 +108,6 @@ export default {
         this.filtermenulist.indexedit = c.ddl
         this.filtermenulist.dmledit = c.dml
         this.filtermenulist['view-dml'] = c.dic
-        this.filtermenulist['serach-sql'] = c.query
         this.filtermenulist['management-user'] = c.user
         this.filtermenulist['management-database'] = c.base
       })
