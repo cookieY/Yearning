@@ -110,12 +110,6 @@
         id: null,
         total: 0,
         allsearchdata: [],
-        turn: {
-          birdstep: false,
-          onestep: true,
-          work_id: null,
-          timer: null
-        },
         put_info: {
           base: '',
           tablename: ''
@@ -189,8 +183,7 @@
         }
         axios.post(`${util.url}/search`, {
           'sql': this.formItem.textarea,
-          'address': JSON.stringify(address),
-          'render': this.turn.work_id
+          'address': JSON.stringify(address)
         })
           .then(res => {
             if (res.data['error']) {

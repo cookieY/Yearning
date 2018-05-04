@@ -35,7 +35,6 @@ class search(baseview.BaseView):
             if check[-1].strip().lower().startswith('s') != 1:
                 return Response({'error': '只支持查询功能或删除不必要的空白行！'})
             else:
-                render = str(request.data['render'])
                 address = json.loads(request.data['address'])
                 _c = DatabaseList.objects.filter(
                     connection_name=user.connection_name,
@@ -52,14 +51,14 @@ class search(baseview.BaseView):
                         query_sql = replace_limit(check[-1].strip(), conf.limit)
                         data_set = f.search(sql=query_sql)
                         querypermissions.objects.create(
-                            work_id=render,
+                            work_id=user.work_id,
                             username=request.user,
                             statements=query_sql
                         )
                         return Response(data_set)
                 except Exception as e:
                     CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
-                    return Response({'error': '管理员已将最大limit限制为%s!' % conf.limit})
+                    return Response({'error': '信息不存在或limit超出管理员设置的最大limit限制%s!' % conf.limit})
         else:
             return Response({'error': '已超过申请时限请刷新页面后重新提交申请'})
 
