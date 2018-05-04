@@ -58,7 +58,7 @@ class search(baseview.BaseView):
                         return Response(data_set)
                 except Exception as e:
                     CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
-                    return Response({'error': '信息不存在或limit超出管理员设置的最大limit限制%s!' % conf.limit})
+                    return Response({'error': '查询失败，请查看错误日志定位具体问题'})
         else:
             return Response({'error': '已超过申请时限请刷新页面后重新提交申请'})
 
@@ -97,7 +97,7 @@ def replace_limit(sql, limit):
 
     if sql[-1] != ';':
         sql += ';'
-    if sql.startswith('show') != -1:
+    if sql.startswith('show') == -1:
         return sql
     sql_re = re.search(r'limit\s.*\d.*;',sql.lower())
     length = ''
@@ -108,14 +108,15 @@ def replace_limit(sql, limit):
                 length = c.group()[-2]
             else:
                 length = c.group().rstrip(';')
+        if int(length) <= int(limit):
+            return sql
+        else:
+            sql = re.sub(r'limit\s.*\d.*;', 'limit %s;' % limit, sql)
+            return sql
     else:
         sql = sql.rstrip(';') + ' limit %s;'%limit
         return sql
-    if int(length) <= int(limit):
-        return sql
-    else:
-        sql = re.sub(r'limit\s.*\d.*;', 'limit %s;' % limit)
-        return sql
+
 
 
 class query_worklf(baseview.BaseView):
