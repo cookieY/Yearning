@@ -236,14 +236,14 @@ cd /opt/Yearning/src
 python3 manage.py makemigrations &> /dev/null && python3 manage.py migrate &> /dev/null && success "$Data" || failure "$Data"
 
 # 12
-read -p "12) 设置Yearning的admin用户密码[大于6位, 不支持特殊符号]: " PASSWORD
+read -p "12) 设置Yearning的admin用户密码[必须大于6位]: " PASSWORD
 if [ -z $PASSWORD ];then
-   echo -e "输入不能为空,请再次输入[大于6位, 不支持特殊符号]"
-   read -p "设置Yearning的admin用户密码[大于6位, 不支持特殊符号]: " PASSWORD
+   echo -e "输入不能为空,请再次输入[必须大于6位]"
+   read -p "设置Yearning的admin用户密码[必须大于6位]: " PASSWORD
 fi
 cd /opt/Yearning/src
-echo "from core.models import Account; Account.objects.create_user(username='admin', password="$PASSWORD", group='admin',is_staff=1)" | python3 manage.py shell &> /dev/null
-echo "from core.models import grained;grained.objects.get_or_create(username='admin', permissions={'ddl': '1', 'ddlcon': [], 'dml': '1', 'dmlcon': [], 'dic': '1', 'diccon': [], 'dicedit': '0', 'query': '1', 'querycon': [], 'user': '1', 'base': '1', 'dicexport': '0', 'person': []})" | python3 manage.py shell &> /dev/null
+echo "from core.models import Account; Account.objects.create_user(username='admin', password='"$PASSWORD"', group='admin',is_staff=1)" | python3 manage.py shell
+echo "from core.models import grained;grained.objects.get_or_create(username='admin', permissions={'ddl': '1', 'ddlcon': [], 'dml': '1', 'dmlcon': [], 'dic': '1', 'diccon': [], 'dicedit': '0', 'query': '1', 'querycon': [], 'user': '1', 'base': '1', 'dicexport': '0', 'person': []})" | python3 manage.py shell
 
 # 13
 Data="13) 启动Inception, 请等待..."
