@@ -1,5 +1,5 @@
 <p align="center">
-        <img width="300" src="http://oy0f4k5qi.bkt.clouddn.com/logo.png">
+        <img width="300" src="logo.png">
 </p>
 
 # Yearning SQL审核平台
