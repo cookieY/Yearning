@@ -21,17 +21,19 @@
 
 - 数据库字典自动生成
 - SQL查询
-    - 查询导出
-    - 查询自动补全 
+    - 查询工单 
+    - 导出
+    - 自动补全，智能提示 
 - SQL可视化自动生成
-    - INDEX 索引语句
-    - ALTER 更改表结构语句
+    - 索引语句自动生成
+    - DDL语句自动生成
 - SQL审核
     - 流程化工单
     - SQL语句检测
     - SQL语句执行
     - SQL回滚
     - 历史审核记录
+    - 查询语句审计
 - 推送
     - 站内信工单通知
     - E-mail工单推送
@@ -53,6 +55,8 @@
 ## Install 安装及使用日志
 
 详细安装步骤请访问[www.yearning.io](http://yearning.io)获得帮助
+
+[使用说明](http://supermancookie.com/Yearning-document/)
 
 ## Support 支持Yearning
 

@@ -190,7 +190,7 @@ class userinfo(baseview.SuperUserpermissions):
                     return Response('%s 用户注册成功!' % username)
             except Exception as e:
                 CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
-                return HttpResponse(status=500)
+                return Response(e)
 
     def delete(self, request, args=None):
         try:

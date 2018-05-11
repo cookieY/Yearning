@@ -579,10 +579,10 @@ export default {
                 department: '',
                 email: ''}
             })
-            .catch(() => {
+            .catch(error => {
               this.$Notice.error({
                 title: '警告',
-                desc: '用户名已注册过,请更换其他用户名注册！'
+                desc: error
               })
             })
         }
