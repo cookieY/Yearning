@@ -50,6 +50,15 @@
                 <Radio label="0">否</Radio>
               </RadioGroup>
             </FormItem>
+
+            <FormItem label="延迟执行">
+              <InputNumber
+                v-model="formItem.delay"
+                :formatter="value => `${value}分钟`"
+                :parser="value => value.replace('分钟', '')">
+              </InputNumber>
+            </FormItem>
+
           </Form>
           <Form :label-width="30">
             <FormItem>
@@ -113,28 +122,23 @@ export default {
         basename: '',
         text: '',
         backup: '0',
-        assigned: ''
+        assigned: '',
+        delay: 0
       },
       columnsName: [
         {
           title: 'ID',
           key: 'ID',
-          width: '50'
-        },
-        {
-          title: '阶段',
-          key: 'stage',
-          width: '100'
+          width: 50
         },
         {
           title: '错误等级',
           key: 'errlevel',
-          width: '100'
+          width: 85
         },
         {
           title: '阶段状态',
-          key: 'stagestatus',
-          width: '150'
+          key: 'stagestatus'
         },
         {
           title: '错误信息',
@@ -146,8 +150,11 @@ export default {
         },
         {
           title: '预计影响的SQL',
-          key: 'affected_rows',
-          width: '130'
+          key: 'affected_rows'
+        },
+        {
+          title: 'SQLSHA1',
+          key: 'SQLSHA1'
         }
       ],
       Testresults: [],

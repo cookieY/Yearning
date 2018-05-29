@@ -14,7 +14,7 @@ export default {
       axios.get(`${util.url}/homedata/pie`)
         .then(res => {
           let piedata = [{
-              value: parseInt(res.data[0].alter_number),
+              value: parseInt(res.data[0]),
               name: 'DDL工单提交数',
               itemStyle: {
                 normal: {
@@ -23,7 +23,7 @@ export default {
               }
             },
             {
-              value: parseInt(res.data[1].sql_number),
+              value: parseInt(res.data[1]),
               name: 'DML工单提交数',
               itemStyle: {
                 normal: {

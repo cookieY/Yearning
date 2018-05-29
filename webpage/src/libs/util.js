@@ -46,19 +46,21 @@ util.openPage = function (vm, name) {
 
 util.taglist = function (vm, name) {
   vm.$store.state.pageOpenedList.forEach((vl, index) => {
-    if (vl.name === name) {
+    if (vl.name === name && name !== 'home_index') {
       vm.$store.state.pageOpenedList.splice(index, 1)
     }
   })
-
+  if (name === 'myorder') {
+    vm.$store.state.pageOpenedList.push({'title': '我的工单', 'name': 'myorder'})
+  }
   appRouter.forEach((val) => {
-    for (let i of val.children) {
-      if (i.name === name) {
-        vm.$store.state.pageOpenedList.push({'title': i.title, 'name': i.name})
+      for (let i of val.children) {
+        if (i.name === name && name !== 'home_index') {
+          vm.$store.state.pageOpenedList.push({'title': i.title, 'name': i.name})
+        }
       }
-    }
-  })
-  localStorage.setItem('pageOpenedList', JSON.stringify(vm.$store.state.pageOpenedList))
+    })
+    localStorage.setItem('pageOpenedList', JSON.stringify(vm.$store.state.pageOpenedList))
 }
 
 export default util;

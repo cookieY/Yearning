@@ -25,7 +25,7 @@ class order(baseview.BaseView):
         else:
             try:
                 page_number = SqlOrder.objects.filter(
-                    username=username).aggregate(alter_number=Count('id'))
+                    username=username).count()
                 start = (int(page) - 1) * 20
                 end = int(page) * 20
                 info = SqlOrder.objects.raw(

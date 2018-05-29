@@ -67,6 +67,7 @@ class SqlOrder(models.Model):
     sql = models.TextField(blank=True) #sql语句
     text = models.CharField(max_length=100) # 工单备注
     assigned = models.CharField(max_length=50, blank=True)# 工单执行人
+    delay = models.IntegerField(null=True,default=0) #延迟时间
 
 
 class DatabaseList(models.Model):
@@ -88,19 +89,12 @@ class SqlRecord(models.Model):
     '''
     工单执行记录表
     '''
-    date = models.CharField(max_length=50) #执行时间 下个版本可废弃
     state = models.CharField(max_length=100) #执行状态
     sql = models.TextField(blank=True) #
-    area = models.CharField(max_length=50)#下个版本可废弃
-    name = models.CharField(max_length=50)#下个版本可废弃
-    base = models.CharField(max_length=50)#下个版本可废弃
     error = models.TextField(null=True)
     workid = models.CharField(max_length=50, null=True)
-    person = models.CharField(max_length=50, null=True) #下个版本可废弃
-    reviewer = models.CharField(max_length=50, null=True) #下个版本可废弃
     affectrow = models.CharField(max_length=100, null=True)
     sequence = models.CharField(max_length=50, null=True)
-    backup_dbname = models.CharField(max_length=100, null=True) #下个版本可废弃
     execute_time = models.CharField(max_length=150, null=True)
     SQLSHA1 = models.TextField(null=True)
 

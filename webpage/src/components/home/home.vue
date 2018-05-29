@@ -58,14 +58,10 @@
           <Row type="flex" justify="center">
             <Input v-model="newToDoItemValue" icon="compose" placeholder="请输入..." style="width: 300px" />
           </Row>
-          <Row slot="footer">
-            <Button type="text" @click="cancelAdd">取消</Button>
-            <Button type="primary" @click="addNew">确定</Button>
-          </Row>
         </Modal>
         <div class="to-do-list-con">
           <div v-for="(item, index) in toDoList" :key="index" class="to-do-item">
-            <to-do-list-item :content="item.title" @deltodo="deltodo"></to-do-list-item>
+            <to-do-list-item :content="item.title" :todoitem="false" @deltodo="deltodo"></to-do-list-item>
           </div>
         </div>
       </Card>
@@ -122,8 +118,8 @@
 
 <script>
 import axios from 'axios'
-import util from '../../libs/util'
 import Cookies from 'js-cookie'
+import util from '../../libs/util'
 import dataSourcePie from './components/dataSourcePie.vue';
 import inforCard from './components/inforCard.vue';
 import toDoListItem from './components/toDoListItem.vue';
@@ -146,8 +142,8 @@ export default {
       },
       showAddNewTodo: false,
       newToDoItemValue: '',
-      username: Cookies.get('user'),
       time: '',
+      username: Cookies.get('user'),
       board: {
         'title': ['1.DDL语句生成', '2.数据库字典生成及查看', '3.SQL语句审核及回滚', '4.工单流程化', '5.可视化数据查询', '6.细粒度的权限划分']
       }
@@ -170,15 +166,15 @@ export default {
     addNew () {
       if (this.newToDoItemValue.length !== 0) {
         axios.post(`${util.url}/homedata/todolist/`, {
-            'username': Cookies.get('user'),
             'todo': this.newToDoItemValue
           })
           .then(() => {
+            let vm = this
             this.toDoList.unshift({
               title: this.newToDoItemValue
             });
             setTimeout(function () {
-              this.newToDoItemValue = '';
+              vm.newToDoItemValue = '';
             }, 200);
             this.showAddNewTodo = false;
           })
@@ -195,7 +191,6 @@ export default {
     },
     deltodo (val) {
       axios.put(`${util.url}/homedata/deltodo`, {
-          'username': Cookies.get('user'),
           'todo': val
         })
         .then(() => {
@@ -206,9 +201,7 @@ export default {
         })
     },
     gettodo () {
-      axios.put(`${util.url}/homedata/todolist`, {
-          'username': Cookies.get('user')
-        })
+      axios.put(`${util.url}/homedata/todolist`)
         .then(res => {
           this.toDoList = res.data
         })
@@ -220,10 +213,10 @@ export default {
   mounted () {
     axios.get(`${util.url}/homedata/infocard`)
       .then(res => {
-        this.count.dic = res.data[0].dic_number
-        this.count.createUser = res.data[1].user
-        this.count.order = res.data[2].order
-        this.count.link = res.data[3].link
+        this.count.dic = res.data[0]
+        this.count.createUser = res.data[1]
+        this.count.order = res.data[2]
+        this.count.link = res.data[3]
       })
       .catch(error => {
         util.ajanxerrorcode(this, error)

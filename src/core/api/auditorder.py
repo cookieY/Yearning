@@ -46,7 +46,7 @@ class audit(baseview.SuperUserpermissions):
             return HttpResponse(status=500)
         else:
             try:
-                page_number = SqlOrder.objects.filter(assigned=username).aggregate(alter_number=Count('id'))
+                page_number = SqlOrder.objects.filter(assigned=username).count()
                 start = (int(page) - 1) * 20
                 end = int(page) * 20
                 info = SqlOrder.objects.raw(

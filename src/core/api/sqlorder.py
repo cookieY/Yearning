@@ -97,7 +97,8 @@ class sqlorder(baseview.BaseView):
                     text=data['text'],
                     backup=data['backup'],
                     bundle_id=id,
-                    assigned=data['assigned']
+                    assigned=data['assigned'],
+                    delay=data['delay']
                     )
                 submit_push_messages(
                     workId=workId,

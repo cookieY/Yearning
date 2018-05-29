@@ -147,7 +147,7 @@ export default {
         .then(res => {
           this.table_data = res.data.data
           this.table_data.forEach((item) => { (item.backup === 1) ? item.backup = '是' : item.backup = '否' })
-          this.page_number = parseInt(res.data.page.alter_number)
+          this.page_number = parseInt(res.data.page)
         })
         .catch(error => {
           util.ajanxerrorcode(this, error)

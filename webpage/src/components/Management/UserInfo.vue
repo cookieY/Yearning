@@ -592,7 +592,7 @@ export default {
       axios.get(`${util.url}/userinfo/all?page=${vl}`)
         .then(res => {
           this.data5 = res.data.data
-          this.pagenumber = parseInt(res.data.page.alter_number)
+          this.pagenumber = parseInt(res.data.page)
         })
         .catch(error => {
           util.ajanxerrorcode(this, error)

@@ -18,7 +18,7 @@
     "config": "^1.27.0",
     "countup": "^1.8.2",
     "echarts": "^3.7.2",
-    "iview": "^2.9.2",
+    "iview": "^2.13.1",
     "js-cookie": "^2.2.0",
     "particles.js": "^2.0.0",
     "stylus": "^0.54.5",

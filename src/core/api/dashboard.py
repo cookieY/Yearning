@@ -39,8 +39,8 @@ class dashboard(baseview.BaseView):
     def get(self, request, args=None):
         if args == 'pie':
             try:
-                alter = SqlOrder.objects.filter(type=0,username=request.user).aggregate(alter_number=Count('id'))
-                sql = SqlOrder.objects.filter(type=1,username=request.user).aggregate(sql_number=Count('id'))
+                alter = SqlOrder.objects.filter(type=0,username=request.user).count()
+                sql = SqlOrder.objects.filter(type=1,username=request.user).count()
                 return Response([alter, sql])
             except Exception as e:
                 CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
@@ -48,10 +48,10 @@ class dashboard(baseview.BaseView):
 
         elif args == 'infocard':
             try:
-                dic = SqlDictionary.objects.aggregate(dic_number=Count('id'))
-                user = Account.objects.aggregate(user=Count('id'))
-                order = SqlOrder.objects.filter(username=request.user).aggregate(order=Count('id'))
-                link = DatabaseList.objects.aggregate(link=Count('id'))
+                dic = SqlDictionary.objects.count()
+                user = Account.objects.count()
+                order = SqlOrder.objects.filter(username=request.user).count()
+                link = DatabaseList.objects.count()
                 return Response([dic, user, order, link])
             except Exception as e:
                 CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
@@ -86,28 +86,21 @@ class dashboard(baseview.BaseView):
 
         if args == 'todolist':
             try:
-                user = request.data['username']
-            except KeyError as e:
+                todo = Todolist.objects.filter(username=request.user).all()
+                return Response([{'title': i.content} for i in todo])
+            except Exception as e:
                 CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
                 return HttpResponse(status=500)
-            else:
-                try:
-                    todo = Todolist.objects.filter(username=user).all()
-                    return Response([{'title': i.content} for i in todo])
-                except Exception as e:
-                    CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
-                    return HttpResponse(status=500)
 
         elif args == 'deltodo':
             try:
-                user = request.data['username']
                 todo = request.data['todo']
             except KeyError as e:
                 CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
                 return HttpResponse(status=500)
             else:
                 try:
-                    Todolist.objects.filter(username=user, content=todo).delete()
+                    Todolist.objects.filter(username=request.user, content=todo).delete()
                     return Response('')
                 except Exception as e:
                     CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
@@ -126,13 +119,12 @@ class dashboard(baseview.BaseView):
 
     def post(self, request, args=None):
         try:
-            user = request.data['username']
             todo = request.data['todo']
         except Exception as e:
             CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
         else:
             try:
-                Todolist.objects.get_or_create(username=user, content=todo)
+                Todolist.objects.get_or_create(username=request.user, content=todo)
                 return Response('')
             except Exception as e:
                 CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')

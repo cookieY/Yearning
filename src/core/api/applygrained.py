@@ -21,15 +21,14 @@ class audit_grained(baseview.SuperUserpermissions):
         user_id = Account.objects.filter(username=request.user).first().id
         page = request.GET.get('page')
         if user_id == 1:
-            pn = applygrained.objects.all().values('id')
-            pn.query.distinct = ['id']
+            pn = applygrained.objects.count()
             start = int(page) * 10 - 10
             end = int(page) * 10
             user_list = applygrained.objects.all().order_by('-id')[start:end]
             ser = []
             for i in user_list:
                 ser.append({'work_id': i.work_id, 'status': i.status, 'username': i.username, 'permissions': i.permissions})
-            return Response({'data': ser, 'pn': len(pn)})
+            return Response({'data': ser, 'pn': pn})
 
         else:
             return Response([])

@@ -4,7 +4,6 @@ import time
 import re
 import threading
 import configparser
-from django.db.models import Count
 from libs import util
 from rest_framework.response import Response
 from libs.serializers import Query_review, Query_list
@@ -118,7 +117,6 @@ def replace_limit(sql, limit):
         return sql
 
 
-
 class query_worklf(baseview.BaseView):
 
     @staticmethod
@@ -129,13 +127,19 @@ class query_worklf(baseview.BaseView):
         except:
             time.sleep(60)
         finally:
-            query_order.objects.filter(work_id=work_id).update(query_per=3)
+            t_close = threading.Thread(target=query_worklf.conn_close, args=(work_id,))
+            t_close.start()
+            t_close.join()
+
+    @staticmethod
+    def conn_close(work_id=None):
+        query_order.objects.filter(work_id=work_id).update(query_per=3)
 
     def get(self, request, args: str = None):
         page = request.GET.get('page')
-        page_number = query_order.objects.aggregate(alter_number=Count('id'))
-        start = int(page) * 10 - 10
-        end = int(page) * 10
+        page_number = query_order.objects.count()
+        start = int(page) * 20 - 20
+        end = int(page) * 20
         info = query_order.objects.all().order_by('-id')[start:end]
         serializers = Query_review(info, many=True)
         return Response({'page': page_number, 'data': serializers.data})
@@ -197,9 +201,9 @@ class query_worklf(baseview.BaseView):
             work_id = request.data['work_id']
             query_info = query_order.objects.filter(work_id=work_id).order_by('-id').first()
             t = threading.Thread(target=query_worklf.query_callback, args=(query_info.timer, work_id))
+            t.start()
             userinfo = Account.objects.filter(username=query_info.username).first()
             thread = threading.Thread(target=push_message, args=({'to_user': query_info.username, 'workid': query_info.work_id}, 6, query_info.username, userinfo.email, work_id, '同意'))
-            t.start()
             thread.start()
             return Response('查询工单状态已更新！')
 
@@ -283,13 +287,12 @@ class Query_order(baseview.SuperUserpermissions):
 
     def get(self, request, args: str = None):
         page = request.GET.get('page')
-        pn = query_order.objects.filter(audit=request.user).all().values('id')
-        pn.query.distinct = ['id']
+        pn = query_order.objects.filter(audit=request.user).count()
         start = int(page) * 10 - 10
         end = int(page) * 10
         user_list = query_order.objects.all().order_by('-id')[start:end]
         serializers = Query_review(user_list, many=True)
-        return Response({'data': serializers.data, 'pn': len(pn)})
+        return Response({'data': serializers.data, 'pn': pn})
 
     def post(self, request, args: str = None):
 

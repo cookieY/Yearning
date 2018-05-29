@@ -59,7 +59,7 @@
         <div class="edittable-testauto-con">
           <Form :model="dictionary" :label-width="80" ref="generation">
             <FormItem label="连接名:" prop="dic">
-              <Select v-model="dictionary.name" placeholder="请选择数据库连接名" style="width: 60%" @on-change="BaseList">
+              <Select v-model="dictionary.name" placeholder="请选择数据库连接名" style="width: 60%" @on-change="BaseList" transfer>
               <Option v-for="i in rowdata" :value="i.id" :key="i.connection_name">{{i.connection_name}}</Option>
             </Select>
             </FormItem>
@@ -77,7 +77,7 @@
       <TabPane label="字典删除" name="name2">
         <Form :model="dictionary" :label-width="80">
           <FormItem label="连接名:">
-            <Select v-model="dictionary.delname" placeholder="请选择数据库连接名" style="width: 60%" @on-change="getdiclist">
+            <Select v-model="dictionary.delname" placeholder="请选择数据库连接名" style="width: 60%" @on-change="getdiclist" transfer>
             <Option v-for="i in diclist" :value="i.Name" :key="i.Name">{{i.Name}}</Option>
           </Select>
           </FormItem>
@@ -522,7 +522,7 @@ export default {
       axios.get(`${util.url}/management_db?page=${vl}&permissions_type=base`)
         .then(res => {
           this.rowdata = res.data.data
-          this.pagenumber = parseInt(res.data.page.alter_number)
+          this.pagenumber = parseInt(res.data.page)
           this.diclist = res.data.diclist
           this.mail_switch = res.data.mail_switch
           this.dingding_switch = res.data.ding_switch

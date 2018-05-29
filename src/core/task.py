@@ -2,6 +2,7 @@ from __future__ import absolute_import, unicode_literals
 import logging
 import functools
 import threading
+import time
 from django.http import HttpResponse
 from libs import util
 from libs import send_email
@@ -78,38 +79,35 @@ class order_push_message(threading.Thread):
         :return: none
 
         '''
+        time.sleep(self.order.delay * 60)
+        try:
+            detail = DatabaseList.objects.filter(id=self.order.bundle_id).first()
 
-        detail = DatabaseList.objects.filter(id=self.order.bundle_id).first()
-
-        with call_inception.Inception(
-                LoginDic={
-                    'host': detail.ip,
-                    'user': detail.username,
-                    'password': detail.password,
-                    'db': self.order.basename,
-                    'port': detail.port
-                }
-        ) as f:
-            res = f.Execute(sql=self.order.sql, backup=self.order.backup)
+            with call_inception.Inception(
+                    LoginDic={
+                        'host': detail.ip,
+                        'user': detail.username,
+                        'password': detail.password,
+                        'db': self.order.basename,
+                        'port': detail.port
+                    }
+            ) as f:
+                res = f.Execute(sql=self.order.sql, backup=self.order.backup)
+                for i in res:
+                    SqlRecord.objects.get_or_create(
+                        state=i['stagestatus'],
+                        sql=i['sql'],
+                        error=i['errormessage'],
+                        workid=self.order.work_id,
+                        affectrow=i['affected_rows'],
+                        sequence=i['sequence'],
+                        execute_time=i['execute_time'],
+                        SQLSHA1=i['SQLSHA1']
+                    )
+        except Exception as e:
+            CUSTOM_ERROR.error(f'{e.__class__.__name__}--邮箱推送失败: {e}')
+        finally:
             SqlOrder.objects.filter(id=self.id).update(status=1)
-            for i in res:
-                SqlRecord.objects.get_or_create(
-                    date=util.date(),
-                    state=i['stagestatus'],
-                    sql=i['sql'],
-                    area=detail.computer_room,
-                    name=detail.connection_name,
-                    error=i['errormessage'],
-                    base=self.order.basename,
-                    workid=self.order.work_id,
-                    person=self.order.username,
-                    reviewer=self.order.assigned,
-                    affectrow=i['affected_rows'],
-                    sequence=i['sequence'],
-                    backup_dbname=i['backup_dbname'],
-                    execute_time=i['execute_time'],
-                    SQLSHA1=i['SQLSHA1']
-                )
 
     def agreed(self):
 
@@ -126,43 +124,48 @@ class order_push_message(threading.Thread):
         :return: none
 
         '''
+        t = threading.Thread(target=order_push_message.con_close, args=(self,))
+        t.start()
+        t.join()
 
-        Usermessage.objects.get_or_create(
-            from_user=self.from_user, time=util.date(),
-            title=self.title, content='该工单已审核通过!', to_user=self.to_user,
-            state='unread'
-        )
+    def con_close(self):
 
-        content = DatabaseList.objects.filter(id=self.order.bundle_id).first()
-        mail = Account.objects.filter(username=self.to_user).first()
-        tag = globalpermissions.objects.filter(authorization='global').first()
+            Usermessage.objects.get_or_create(
+                from_user=self.from_user, time=util.date(),
+                title=self.title, content='该工单已审核通过!', to_user=self.to_user,
+                state='unread'
+            )
 
-        if tag is None or tag.dingding == 0:
-            pass
-        else:
-            try:
-                if content.url:
-                    util.dingding(
-                        content='工单执行通知\n工单编号:%s\n发起人:%s\n地址:%s\n工单备注:%s\n状态:已执行\n备注:%s'
-                                % (self.order.work_id, self.order.username, self.addr_ip, self.order.text, content.after), url=content.url)
-            except Exception as e:
-                CUSTOM_ERROR.error(f'{e.__class__.__name__}--钉钉推送失败: {e}')
+            content = DatabaseList.objects.filter(id=self.order.bundle_id).first()
+            mail = Account.objects.filter(username=self.to_user).first()
+            tag = globalpermissions.objects.filter(authorization='global').first()
 
-        if tag is None or tag.email == 0:
-            pass
-        else:
-            try:
-                if mail.email:
-                    mess_info = {
-                        'workid': self.order.work_id,
-                        'to_user': self.order.username,
-                        'addr': self.addr_ip,
-                        'text': self.order.text,
-                        'note': content.after}
-                    put_mess = send_email.send_email(to_addr=mail.email)
-                    put_mess.send_mail(mail_data=mess_info, type=0)
-            except Exception as e:
-                CUSTOM_ERROR.error(f'{e.__class__.__name__}--邮箱推送失败: {e}')
+            if tag is None or tag.dingding == 0:
+                pass
+            else:
+                try:
+                    if content.url:
+                        util.dingding(
+                            content='工单执行通知\n工单编号:%s\n发起人:%s\n地址:%s\n工单备注:%s\n状态:已执行\n备注:%s'
+                                    % (self.order.work_id, self.order.username, self.addr_ip, self.order.text, content.after), url=content.url)
+                except Exception as e:
+                    CUSTOM_ERROR.error(f'{e.__class__.__name__}--钉钉推送失败: {e}')
+
+            if tag is None or tag.email == 0:
+                pass
+            else:
+                try:
+                    if mail.email:
+                        mess_info = {
+                            'workid': self.order.work_id,
+                            'to_user': self.order.username,
+                            'addr': self.addr_ip,
+                            'text': self.order.text,
+                            'note': content.after}
+                        put_mess = send_email.send_email(to_addr=mail.email)
+                        put_mess.send_mail(mail_data=mess_info, type=0)
+                except Exception as e:
+                    CUSTOM_ERROR.error(f'{e.__class__.__name__}--邮箱推送失败: {e}')
 
 
 class rejected_push_messages(threading.Thread):

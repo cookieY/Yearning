@@ -7,7 +7,7 @@ from libs.serializers import UserINFO
 from rest_framework.response import Response
 from django.http import HttpResponse
 from django.contrib.auth import authenticate
-from django.db.models import Count
+from django.db import transaction
 from rest_framework_jwt.settings import api_settings
 from core.models import (
     Account,
@@ -69,7 +69,7 @@ class userinfo(baseview.SuperUserpermissions):
                 return HttpResponse(status=500)
             else:
                 try:
-                    page_number = Account.objects.aggregate(alter_number=Count('id'))
+                    page_number = Account.objects.count()
                     start = int(page) * 10 - 10
                     end = int(page) * 10
                     info = Account.objects.all()[start:end]
@@ -202,10 +202,11 @@ class userinfo(baseview.SuperUserpermissions):
                         if isinstance(i['permissions'][c], list) and c == 'person':
                             i['permissions'][c] = list(filter(lambda x: x != args, i['permissions'][c]))
                     grained.objects.filter(username=i['username']).update(permissions=i['permissions'])
-            Account.objects.filter(username=args).delete()
-            Usermessage.objects.filter(to_user=args).delete()
-            Todolist.objects.filter(username=args).delete()
-            grained.objects.filter(username=args).delete()
+            with transaction.atomic():
+                Account.objects.filter(username=args).delete()
+                Usermessage.objects.filter(to_user=args).delete()
+                Todolist.objects.filter(username=args).delete()
+                grained.objects.filter(username=args).delete()
             return Response('%s--用户已删除!' % args)
         except Exception as e:
             CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
@@ -289,18 +290,14 @@ class ldapauth(baseview.AnyLogin):
             jwt_encode_handler = api_settings.JWT_ENCODE_HANDLER
             valite = util.auth(username=user,password=password)
             if valite:
-                try:
-                    user = Account.objects.filter(username=user).get()
-                    permissions = authenticate(username=user, password=password)
-                    if permissions is not None and permissions.is_active:
-                        permissions.set_password(password)
-                        permissions.save()
-                        payload = jwt_payload_handler(permissions)
-                        token = jwt_encode_handler(payload)
-                        return Response({'token': token, 'res': '','permissions':user.group})
-                    else:
-                        return Response({'token':'null', 'res': '账号认证失败!'})
-                except:
+                user = Account.objects.filter(username=user).first()
+                if user is not None:
+                    user.set_password(password)
+                    user.save()
+                    payload = jwt_payload_handler(user)
+                    token = jwt_encode_handler(payload)
+                    return Response({'token': token, 'res': '','permissions':user.group})
+                else:
                     permissions = Account.objects.create_user(
                         username=user,
                         password=password,

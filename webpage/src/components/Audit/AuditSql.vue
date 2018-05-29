@@ -64,7 +64,7 @@ p{
       </Row>
     </Card>
   </Row>
-  <Modal v-model="modal2" width="800">
+  <Modal v-model="modal2" width="900">
     <p slot="header" style="color:#f60;font-size: 16px">
       <Icon type="information-circled"></Icon>
       <span>SQL工单详细信息</span>
@@ -76,12 +76,6 @@ p{
       <FormItem label="工单编号:">
         <span>{{ formitem.work_id }}</span>
       </FormItem>
-      <FormItem label="提交时间:">
-        <span>{{ formitem.date }}</span>
-      </FormItem>
-      <FormItem label="提交人:">
-        <span>{{ formitem.username }}</span>
-      </FormItem>
       <FormItem label="机房:">
         <span>{{ formitem.computer_room }}</span>
       </FormItem>
@@ -91,15 +85,19 @@ p{
       <FormItem label="数据库库名:">
         <span>{{ formitem.basename }}</span>
       </FormItem>
+      <FormItem label="延迟执行:">
+        <span>{{ formitem.delay }}分钟</span>
+      </FormItem>
       <FormItem label="工单说明:">
         <span>{{ formitem.text }}</span>
       </FormItem>
       <FormItem label="SQL语句:">
+        <br>
         <p v-for="i in sql">{{ i }}</p>
       </FormItem>
     </Form>
     <p class="pa">SQL检查结果:</p>
-    <Table :columns="columnsName" :data="dataId" stripe border></Table>
+    <Table :columns="columnsName" :data="dataId" stripe border width="860"></Table>
     <div slot="footer">
       <Button type="warning" @click.native="test_button()">检测sql</Button>
       <Button @click="modal2 = false">取消</Button>
@@ -172,14 +170,15 @@ export default {
         {
           type: 'selection',
           width: 60,
-          align: 'center'
+          align: 'center',
+          fixed: 'left'
         },
         {
           title: '工单编号:',
           key: 'work_id',
           sortable: true,
           sortType: 'desc',
-          width: 250
+          width: 200
         },
         {
           title: '工单说明:',
@@ -187,19 +186,18 @@ export default {
         },
         {
           title: '是否备份',
-          key: 'backup'
+          key: 'backup',
+          width: 100
         },
         {
           title: '提交时间:',
           key: 'date',
-          sortable: true,
-          width: 150
+          sortable: true
         },
         {
           title: '提交人',
           key: 'username',
-          sortable: true,
-          width: 150
+          sortable: true
         },
         {
           title: '状态',
@@ -230,7 +228,8 @@ export default {
             }, text)
           },
           sortable: true,
-          filters: [{
+          filters: [
+            {
               label: '已执行',
               value: 1
             },
@@ -263,7 +262,7 @@ export default {
         {
           title: '操作',
           key: 'action',
-          width: 200,
+          width: 150,
           align: 'center',
           render: (h, params) => {
             if (params.row.status !== 1) {
@@ -349,44 +348,41 @@ export default {
         dataadd: '',
         database: '',
         att: '',
-        id: null
+        id: null,
+        delay: null
       },
       summit: true,
       columnsName: [
         {
           title: 'ID',
           key: 'ID',
-          width: '50'
-        },
-        {
-          title: '阶段',
-          key: 'stage',
-          width: '100'
-        },
-        {
-          title: '错误等级',
-          key: 'errlevel',
-          width: '85'
+          width: 50,
+          fixed: 'left'
         },
         {
           title: '阶段状态',
-          key: 'stagestatus'
-        },
-        {
-          title: '错误信息',
-          key: 'errormessage'
+          key: 'stagestatus',
+          width: 150
         },
         {
           title: '当前检查的sql',
-          key: 'sql'
+          key: 'sql',
+          width: 500
         },
         {
-          title: '预计影响的SQL',
-          key: 'affected_rows'
+          title: '错误信息',
+          key: 'errormessage',
+          width: 300
+        },
+        {
+          title: '影响行数',
+          key: 'affected_rows',
+          width: 90
         },
         {
           title: 'SQLSHA1',
-          key: 'SQLSHA1'
+          key: 'SQLSHA1',
+          width: 200
         }
       ],
       dataId: [],
@@ -494,7 +490,7 @@ export default {
         .then(res => {
           this.tmp = res.data.data
           this.tmp.forEach((item) => { (item.backup === 1) ? item.backup = '是' : item.backup = '否' })
-          this.pagenumber = res.data.page.alter_number
+          this.pagenumber = res.data.page
         })
         .catch(error => {
           util.ajanxerrorcode(this, error)

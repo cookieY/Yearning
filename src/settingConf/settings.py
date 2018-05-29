@@ -26,8 +26,8 @@ SECRET_KEY = 'u)zall!ag&mci+ja5u&-6*1e^ufyu)l4i8+^=mw$845@k!ie+3.txt'
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = [str(CONF_DATA.ipaddress).split(':')[0]]
-# ALLOWED_HOSTS = ['*']
+# ALLOWED_HOSTS = [str(CONF_DATA.ipaddress).split(':')[0]]
+ALLOWED_HOSTS = ['*']
 
 # Application definition
 AUTH_USER_MODEL = 'core.Account'
@@ -46,15 +46,16 @@ MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware',
     'django.middleware.common.CommonMiddleware'
 ]
-# CORS_ORIGIN_ALLOW_ALL = True
-CORS_ORIGIN_WHITELIST = (
-    CONF_DATA.ipaddress
-)
+CORS_ORIGIN_ALLOW_ALL = True
+CSRF_ORIGIN_ALLOW_ALL = True
+# CORS_ORIGIN_WHITELIST = (
+#     CONF_DATA.ipaddress
+# )
 
-CSRF_TRUSTED_ORIGINS = (
-    CONF_DATA.ipaddress,
-    '127.0.0.1:8080'
-)
+# CSRF_TRUSTED_ORIGINS = (
+#     CONF_DATA.ipaddress,
+#     '127.0.0.1:8080'
+# )
 
 CORS_ALLOW_METHODS = (
     'DELETE',
@@ -156,7 +157,7 @@ LOGGING = {
             'formatter':'standard',                   #使用哪种formatters日志格式
             },
         'console': {
-            'level': 'INFO',
+            'level': 'DEBUG',
             'class': 'logging.StreamHandler',
             'formatter': 'standard'
             }

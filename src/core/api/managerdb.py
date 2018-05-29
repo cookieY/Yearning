@@ -55,7 +55,7 @@ class management_db(baseview.SuperUserpermissions):
             return HttpResponse(status=500)
         else:
             try:
-                page_number = DatabaseList.objects.aggregate(alter_number=Count('id'))
+                page_number = DatabaseList.objects.count()
                 start = int(page) * 10 - 10
                 end = int(page) * 10
                 info = DatabaseList.objects.all()[start:end]

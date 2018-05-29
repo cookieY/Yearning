@@ -48,6 +48,19 @@
   overflow: hidden;
   background: #f0f0f0;
 }
+.main .tags-con .close-all-tag-con {
+  position: absolute;
+  right: 0;
+  top: 62%;
+  box-sizing: border-box;
+  padding-top: 8px;
+  text-align: center;
+  width: 110px;
+  height: 38%;
+  background: white;
+  box-shadow: -3px 0 15px 3px rgba(0, 0, 0, 0.1);
+  z-index: 4;
+}
 .main-header {
   height: 60px;
   background: #fff;
@@ -73,11 +86,11 @@
   right: 0;
   top: 0;
   height: 100%;
-  width: 350px;
+  width: 360px;
 }
 .main-header .header-avator-con .switch-theme-con {
   display: inline-block;
-  width: 40px;
+  width: 30px;
   height: 100%;
 }
 .main-header .header-avator-con .message-con {
@@ -104,6 +117,7 @@
   top: 0;
   width: 150px;
   height: 100%;
+  z-index: 5;
 }
 .main-header .header-avator-con .user-dropdown-menu-con .main-user-name {
   display: inline-block;
