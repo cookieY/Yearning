@@ -7,9 +7,9 @@ util.title = function (title) {
   window.document.title = title;
 };
 
-util.url = location.protocol + "//" + document.domain + ':8000/api/v1'
+util.url = location.protocol + '//' + document.domain + ':8000/api/v1'
 
-util.auth = location.protocol + "//" + document.domain + ':8000/api-token-auth/'
+util.auth = location.protocol + '//' + document.domain + ':8000/api-token-auth/'
 
 util.computer_room = ['AWS', 'Aliyun', 'Own', 'Other']
 
