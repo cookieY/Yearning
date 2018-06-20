@@ -74,10 +74,15 @@ class sqlorder(baseview.BaseView):
         try:
             data = json.loads(request.data['data'])
             tmp = json.loads(request.data['sql'])
+            if not tmp:
+                raise Exception('sql is empty!') 
             user = request.data['user']
             type = request.data['type']
             id = request.data['id']
         except KeyError as e:
+            CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
+            return HttpResponse(status=500)
+        except Exception as e:
             CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
             return HttpResponse(status=500)
         else:
