@@ -59,6 +59,10 @@ class SQLgo(object):
                 else:
                     data_dict.append({'title': field[0], "key": field[0], "width": 200})
             len = cursor.rowcount
+        for row in result:
+            for k, v in row.items():
+                if isinstance(v, int):
+                    row[k] = str(v)
         return {'data': result, 'title': data_dict, 'len': len}
 
     def dic_data(self, sql=None):
