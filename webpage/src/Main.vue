@@ -133,7 +133,7 @@ import breadcrumbNav from './main_components/breadcrumbNav.vue';
 import themeDropdownMenu from './main_components/themeDropdownMenu.vue';
 import sidebarMenuShrink from './main_components/sidebarMenuShrink.vue';
 import axios from 'axios';
-import Cookies from 'js-cookie';
+// ;
 import util from './libs/util.js';
 
 export default {
@@ -150,7 +150,7 @@ export default {
       spanRight: 20,
       currentPageName: '',
       hideMenuText: false,
-      userName: Cookies.get('user'),
+      userName: sessionStorage.getItem('user'),
       showFullScreenBtn: window.navigator.userAgent.indexOf('MSIE') < 0,
       isFullScreen: false,
       lockScreenSize: 0,
@@ -187,11 +187,8 @@ export default {
         util.openPage(this, 'ownspace_index', '个人中心');
       } else if (name === 'loginout') {
         // 退出登录
-        Cookies.remove('user');
-        Cookies.remove('password');
-        Cookies.remove('hasGreet');
-        Cookies.remove('access');
         localStorage.clear()
+        sessionStorage.clear()
         this.$router.push({
           name: 'login'
         });
@@ -234,7 +231,7 @@ export default {
       lockScreenBack.style.boxShadow = '0 0 0 ' + this.lockScreenSize + 'px #667aa6 inset';
       this.showUnlock = true;
       this.$store.commit('lock');
-      Cookies.set('last_page_name', this.$route.name); // 本地存储锁屏之前打开的页面以便解锁后打开
+      sessionStorage.setItem('last_page_name', this.$route.name); // 本地存储锁屏之前打开的页面以便解锁后打开
       setTimeout(() => {
         lockScreenBack.style.transition = 'all 0s';
         this.$router.push({
@@ -274,14 +271,14 @@ export default {
       });
       lockScreenBack.style.width = lockScreenBack.style.height = size + 'px';
       // 问候信息相关
-      if (!Cookies.get('hasGreet')) {
+      if (!sessionStorage.getItem('hasGreet')) {
         let now = new Date();
         let hour = now.getHours();
         let greetingWord = {
           title: '',
           words: ''
         };
-        let userName = Cookies.get('user');
+        let userName = sessionStorage.getItem('user');
         if (hour < 6) {
           greetingWord = {
             title: '凌晨好~' + userName,
@@ -332,7 +329,7 @@ export default {
           duration: 4,
           name: 'greeting'
         });
-        Cookies.set('hasGreet', 1);
+        sessionStorage.setItem('hasGreet', 1);
       }
     },
     statementput () {
@@ -352,7 +349,7 @@ export default {
       }]
     }
     this.init()
-    axios.get(`${util.url}/homedata/messages?username=${Cookies.get('user')}`)
+    axios.get(`${util.url}/homedata/messages?username=${sessionStorage.getItem('user')}`)
       .then(res => {
         this.$store.state.messageCount = res.data.count.messagecount
         if (res.data.statement !== '1') {
@@ -363,7 +360,7 @@ export default {
   created () {
     // 权限菜单过滤相关
     this.$store.commit('Menulist');
-    axios.defaults.headers.common['Authorization'] = Cookies.get('jwt')
+    axios.defaults.headers.common['Authorization'] = sessionStorage.getItem('jwt')
   }
 };
 </script>

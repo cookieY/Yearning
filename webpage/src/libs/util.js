@@ -7,11 +7,23 @@ util.title = function (title) {
   window.document.title = title;
 };
 
-util.url = location.protocol + "//" + document.domain + ':8000/api/v1'
+util.err_notice = function (err) {
+  Notice.error({
+    title: '错误',
+    desc: err
+  })
+}
 
-util.auth = location.protocol + "//" + document.domain + ':8000/api-token-auth/'
+util.notice = function (vl) {
+  Notice.info({
+    title: '通知',
+    desc: vl
+  })
+}
 
-util.computer_room = ['AWS', 'Aliyun', 'Own', 'Other']
+util.url = location.protocol + '//' + document.domain + ':8000/api/v1'
+
+util.auth = location.protocol + '//' + document.domain + ':8000/api-token-auth/'
 
 util.ajanxerrorcode = function (vm, error) {
   if (error.response) {
@@ -28,6 +40,14 @@ util.ajanxerrorcode = function (vm, error) {
     }
   }
 };
+
+util.oneOf = function (ele, targetArr) {
+  if (targetArr.indexOf(ele) >= 0) {
+    return true;
+  } else {
+    return false;
+  }
+}
 
 util.showThisRoute = function (itAccess, currentAccess) {
   if (typeof itAccess === 'object' && itAccess.isArray()) {

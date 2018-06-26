@@ -1,14 +1,17 @@
 import logging
 import json
-from libs import baseview, util, call_inception
+import ast
+import threading
+from libs import baseview, call_inception, util, serializers, send_email
 from rest_framework.response import Response
-from django.db.models import Count
 from django.http import HttpResponse
 from core.models import (
     SqlOrder,
     Usermessage,
     DatabaseList,
-    SqlRecord
+    SqlRecord,
+    Account,
+    globalpermissions
 )
 
 from core.task import order_push_message,rejected_push_messages
@@ -46,6 +49,8 @@ class audit(baseview.SuperUserpermissions):
             return HttpResponse(status=500)
         else:
             try:
+                un_init = util.init_conf()
+                custom_com = ast.literal_eval(un_init['other'])
                 page_number = SqlOrder.objects.filter(assigned=username).count()
                 start = (int(page) - 1) * 20
                 end = int(page) * 20
@@ -59,7 +64,9 @@ class audit(baseview.SuperUserpermissions):
                     '''%username
                 )[start:end]
                 data = util.ser(info)
-                return Response({'page': page_number, 'data': data})
+                info = Account.objects.filter(group='perform').all()
+                ser = serializers.UserINFO(info, many=True)
+                return Response({'page': page_number, 'data': data, 'multi': custom_com['multi'], 'multi_list': ser.data})
             except Exception as e:
                 CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
                 return HttpResponse(status=500)
@@ -128,6 +135,19 @@ class audit(baseview.SuperUserpermissions):
                     except Exception as e:
                         CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
                         return HttpResponse(status=500)
+            elif category == 2:
+                try:
+                    perform = request.data['perform']
+                    work_id = request.data['work_id']
+                    username = request.data['username']
+                except KeyError as e:
+                    CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
+                    return HttpResponse(status=500)
+                else:
+                    mail = Account.objects.filter(username=username).first()
+                    SqlOrder.objects.filter(work_id=work_id).update(assigned=perform)
+                    threading.Thread(target=push_message, args=({'to_user': request.user, 'workid': work_id}, 2, request.user, mail.email, work_id, '已同意')).start()
+                    return Response('工单已提交执行人！')
 
             elif category == 'test':
                 try:
@@ -138,6 +158,8 @@ class audit(baseview.SuperUserpermissions):
                     return HttpResponse(status=500)
                 else:
                     sql = SqlOrder.objects.filter(id=order_id).first()
+                    if not sql.sql:
+                        return Response({'status': '工单内无sql语句!'})
                     data = DatabaseList.objects.filter(id=sql.bundle_id).first()
                     info = {
                         'host': data.ip,
@@ -152,7 +174,7 @@ class audit(baseview.SuperUserpermissions):
                             return Response({'result': res, 'status': 200})
                     except Exception as e:
                         CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
-                        return Response({'status': '500'})
+                        return Response({'status': e})
 
 
 class del_order(baseview.BaseView):
@@ -186,3 +208,21 @@ class del_order(baseview.BaseView):
             except Exception as e:
                 CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
                 return HttpResponse(status=500)
+
+
+def push_message(message=None, type=None, user=None, to_addr=None, work_id=None, status=None):
+    try:
+        tag = globalpermissions.objects.filter(authorization='global').first()
+        if tag.message['mail']:
+            put_mess = send_email.send_email(to_addr=to_addr)
+            put_mess.send_mail(mail_data=message, type=type)
+    except Exception as e:
+        CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
+    else:
+        try:
+            if tag.message['ding']:
+                un_init = util.init_conf()
+                webhook = ast.literal_eval(un_init['message'])
+                util.dingding(content='工单审核通知\n工单编号:%s\n发起人:%s\n状态:%s' % (work_id, user, status), url=webhook['webhook'])
+        except ValueError as e:
+            CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')

@@ -180,7 +180,6 @@ class SQLgo(object):
 
     def query_info(self, sql=None):
         with self.con.cursor(cursor=pymysql.cursors.DictCursor) as cursor:
-            sqllist = sql
-            cursor.execute(sqllist)
+            cursor.execute(sql)
             result = cursor.fetchall()
         return result

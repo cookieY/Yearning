@@ -158,7 +158,7 @@ p{
 </template>
 
 <script>
-import Cookies from 'js-cookie'
+//
 import axios from 'axios'
 import util from '../../libs/util'
 import edittable from './components/editTable'
@@ -171,7 +171,7 @@ export default {
   },
   data () {
     return {
-      dataset: util.computer_room,
+      dataset: [],
       item: {},
       basename: [],
       sqlname: [],
@@ -265,7 +265,7 @@ export default {
         Species: null
       },
       add_row: [],
-      username: Cookies.get('user'),
+      username: sessionStorage.getItem('user'),
       addcolums: [
         {
           title: '字段名',
@@ -499,6 +499,7 @@ export default {
         .then(res => {
           this.item = res.data['connection']
           this.assigned = res.data['assigend']
+          this.dataset = res.data['custom']
         })
         .catch(error => {
           util.ajanxerrorcode(this, error)
@@ -618,7 +619,7 @@ export default {
           axios.post(`${util.url}/sqlsyntax/`, {
             'data': JSON.stringify(this.formItem),
             'sql': JSON.stringify(this.sql),
-            'user': Cookies.get('user'),
+            'user': sessionStorage.getItem('user'),
             'type': 0,
             'id': this.id[0].id
           })

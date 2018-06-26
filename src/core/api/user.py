@@ -1,7 +1,6 @@
 import logging
 import json
-from libs import baseview
-from libs import util
+from libs import baseview, util
 from core.task import grained_permissions
 from libs.serializers import UserINFO
 from rest_framework.response import Response
@@ -34,7 +33,7 @@ PERMISSION = {
 }
 
 
-class userinfo(baseview.SuperUserpermissions):
+class userinfo(baseview.BaseView):
 
     '''
         User Management interface
@@ -122,13 +121,13 @@ class userinfo(baseview.SuperUserpermissions):
                                     i['permissions'][c] = list(filter(lambda x: x != username, i['permissions'][c]))
                             grained.objects.filter(username=i['username']).update(permissions=i['permissions'])
                     grained.objects.filter(username=username).update(permissions=permission)
-                    if group == 'admin':
+                    if group == 'admin' or group == 'perform':
                         Account.objects.filter(username=username).update(
                             group=group,
                             department=department,
                             is_staff=1
                             )
-                    elif group == 'guest':
+                    else:
                         Account.objects.filter(username=username).update(
                             group=group,
                             department=department, 
@@ -288,7 +287,7 @@ class ldapauth(baseview.AnyLogin):
         else:
             jwt_payload_handler = api_settings.JWT_PAYLOAD_HANDLER
             jwt_encode_handler = api_settings.JWT_ENCODE_HANDLER
-            valite = util.auth(username=user,password=password)
+            valite = util.auth(username=user, password=password)
             if valite:
                 user = Account.objects.filter(username=user).first()
                 if user is not None:

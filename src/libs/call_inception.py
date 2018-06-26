@@ -11,10 +11,9 @@ cookie
 from libs import util
 import pymysql
 import sqlparse
+import ast
 
 pymysql.install_as_MySQLdb()
-
-conf = util.conf_path()
 
 
 class Inception(object):
@@ -23,10 +22,12 @@ class Inception(object):
         self.con = object
 
     def __enter__(self):
-        self.con = pymysql.connect(host=conf.inc_host,
-                                   user=conf.inc_user,
-                                   passwd=conf.inc_pwd,
-                                   port=int(conf.inc_port),
+        un_init = util.init_conf()
+        inception = ast.literal_eval(un_init['inception'])
+        self.con = pymysql.connect(host=inception['host'],
+                                   user=inception['user'],
+                                   passwd=inception['password'],
+                                   port=int(inception['port']),
                                    db='',
                                    charset="utf8")
         return self

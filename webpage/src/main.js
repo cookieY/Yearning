@@ -1,7 +1,6 @@
 // The Vue build version to load with the `import` command
 // (runtime-only or standalone) has been set in webpack.base.conf with an alias.
 import Vue from 'vue'
-import Cookies from 'js-cookie'
 import Subnet from './Subnet.vue'
 import iView from 'iview'
 import Vuex from 'vuex'
@@ -28,18 +27,18 @@ const router = new VueRouter(RouterConfig)
 router.beforeEach((to, from, next) => {
   iView.LoadingBar.start()
   util.title(to.meta.title)
-  if (Cookies.get('locking') === '1' && to.name !== 'locking') { // 判断当前是否是锁定状态
+  if (sessionStorage.getItem('locking') === '1' && to.name !== 'locking') { // 判断当前是否是锁定状态
     iView.LoadingBar.finish()
     next(false)
     router.replace({name: 'login'})
-  } else if (Cookies.get('locking') === '0' && to.name === 'locking') {
+  } else if (sessionStorage.getItem('locking') === '0' && to.name === 'locking') {
     iView.LoadingBar.finish()
     next(false)
   } else {
-    if (!Cookies.get('user') && to.name !== 'login') { // 判断是否已经登录且前往的页面不是登录页
+    if (!sessionStorage.getItem('user') && to.name !== 'login') { // 判断是否已经登录且前往的页面不是登录页
       next({name: 'login'});
       iView.LoadingBar.finish()
-    } else if (Cookies.get('user') && to.name === 'login') { // 判断是否已经登录且前往的是登录页
+    } else if (sessionStorage.getItem('user') && to.name === 'login') { // 判断是否已经登录且前往的是登录页
       next({name: 'login'});
       iView.LoadingBar.finish()
     } else {

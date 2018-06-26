@@ -4,8 +4,7 @@ import functools
 import threading
 import time
 from django.http import HttpResponse
-from libs import util
-from libs import send_email
+from libs import send_email, util
 from libs import call_inception
 from .models import (
     Usermessage,
@@ -94,6 +93,8 @@ class order_push_message(threading.Thread):
             ) as f:
                 res = f.Execute(sql=self.order.sql, backup=self.order.backup)
                 for i in res:
+                    if i['errlevel'] != 0:
+                        SqlOrder.objects.filter(work_id=self.order.work_id).update(status=4)
                     SqlRecord.objects.get_or_create(
                         state=i['stagestatus'],
                         sql=i['sql'],
@@ -107,7 +108,9 @@ class order_push_message(threading.Thread):
         except Exception as e:
             CUSTOM_ERROR.error(f'{e.__class__.__name__}--邮箱推送失败: {e}')
         finally:
-            SqlOrder.objects.filter(id=self.id).update(status=1)
+            status = SqlOrder.objects.filter(work_id=self.order.work_id).first()
+            if status.status != 4:
+                SqlOrder.objects.filter(id=self.id).update(status=1)
 
     def agreed(self):
 
@@ -140,9 +143,7 @@ class order_push_message(threading.Thread):
             mail = Account.objects.filter(username=self.to_user).first()
             tag = globalpermissions.objects.filter(authorization='global').first()
 
-            if tag is None or tag.dingding == 0:
-                pass
-            else:
+            if tag.message['ding']:
                 try:
                     if content.url:
                         util.dingding(
@@ -151,9 +152,7 @@ class order_push_message(threading.Thread):
                 except Exception as e:
                     CUSTOM_ERROR.error(f'{e.__class__.__name__}--钉钉推送失败: {e}')
 
-            if tag is None or tag.email == 0:
-                pass
-            else:
+            if tag.message['mail']:
                 try:
                     if mail.email:
                         mess_info = {
@@ -204,9 +203,7 @@ class rejected_push_messages(threading.Thread):
         content = DatabaseList.objects.filter(id=self._tmpData['bundle_id']).first()
         mail = Account.objects.filter(username=self.to_user).first()
         tag = globalpermissions.objects.filter(authorization='global').first()
-        if tag is None or tag.dingding == 0:
-            pass
-        else:
+        if tag.message['ding']:
             try:
                 if content.url:
                     util.dingding(
@@ -214,9 +211,7 @@ class rejected_push_messages(threading.Thread):
                                 % (self._tmpData['work_id'], self.to_user, self.addr_ip, self.text), url=content.url)
             except Exception as e:
                 CUSTOM_ERROR.error(f'{e.__class__.__name__}--钉钉推送失败: {e}')
-        if tag is None or tag.email == 0:
-            pass
-        else:
+        if tag.message['mail']:
             try:
                 if mail.email:
                     mess_info = {
@@ -268,9 +263,7 @@ class submit_push_messages(threading.Thread):
         content = DatabaseList.objects.filter(id=self.id).first()
         mail = Account.objects.filter(username=self.assigned).first()
         tag = globalpermissions.objects.filter(authorization='global').first()
-        if tag is None or tag.dingding == 0:
-            pass
-        else:
+        if tag.message['ding']:
             if content.url:
                 try:
                     util.dingding(
@@ -278,9 +271,7 @@ class submit_push_messages(threading.Thread):
                                 % (self.workId, self.user, self.addr_ip, self.text, content.before), url=content.url)
                 except Exception as e:
                     CUSTOM_ERROR.error(f'{e.__class__.__name__}--钉钉推送失败: {e}')
-        if tag is None or tag.email == 0:
-            pass
-        else:
+        if tag.message['mail']:
             if mail.email:
                 mess_info = {
                     'workid': self.workId,

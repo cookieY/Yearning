@@ -40,7 +40,7 @@
 
 <script>
 import axios from 'axios'
-import Cookies from 'js-cookie'
+//
 import util from '../../libs/util'
 export default {
   data () {
@@ -198,7 +198,7 @@ export default {
       }
     },
     getContent (title, time) {
-      axios.put(`${util.url}/messages/${Cookies.get('user')}`, {
+      axios.put(`${util.url}/messages/${sessionStorage.getItem('user')}`, {
           'title': title,
           'time': time
         })
@@ -211,7 +211,7 @@ export default {
         })
     },
     updateread (title, time) {
-      axios.post(`${util.url}/messages/${Cookies.get('user')}/`, {
+      axios.post(`${util.url}/messages/${sessionStorage.getItem('user')}/`, {
           'title': title,
           'time': time,
           'state': 'read'
@@ -221,11 +221,11 @@ export default {
         })
     },
     deleteread (title, time) {
-      axios.delete(`${util.url}/messages/${Cookies.get('user')}_${title}_${time}`)
+      axios.delete(`${util.url}/messages/${sessionStorage.getItem('user')}_${title}_${time}`)
     }
   },
   mounted () {
-    axios.get(`${util.url}/messages/${Cookies.get('user')}`)
+    axios.get(`${util.url}/messages/${sessionStorage.getItem('user')}`)
       .then(res => {
         this.unreadMesList = res.data.unread
         this.hasreadMesList = res.data.read

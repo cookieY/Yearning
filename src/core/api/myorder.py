@@ -1,6 +1,5 @@
 import logging
 from libs import baseview, util
-from django.db.models import Count
 from core.models import SqlOrder
 from django.http import HttpResponse
 from rest_framework.response import Response

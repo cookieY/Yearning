@@ -3,19 +3,16 @@ import logging
 import time
 import re
 import threading
-import configparser
-from libs import util
+import simplejson
+import ast
+from django.http import HttpResponse
 from rest_framework.response import Response
 from libs.serializers import Query_review, Query_list
-from libs import baseview, send_email
+from libs import baseview, send_email, util
 from libs import con_database
-from core.models import DatabaseList, Account, querypermissions, query_order
+from core.models import DatabaseList, Account, querypermissions, query_order, globalpermissions
 
 CUSTOM_ERROR = logging.getLogger('Yearning.core.views')
-conf = util.conf_path()
-CONF = configparser.ConfigParser()
-CONF.read('deploy.conf')
-WEBHOOK = CONF.get('webhook', 'dingding')
 
 
 class search(baseview.BaseView):
@@ -27,9 +24,13 @@ class search(baseview.BaseView):
     '''
 
     def post(self, request, args=None):
+        un_init = util.init_conf()
+        limit = ast.literal_eval(un_init['other'])
         sql = request.data['sql']
         check = str(sql).strip().split(';\n')
         user = query_order.objects.filter(username=request.user).order_by('-id').first()
+        un_init = util.init_conf()
+        custom_com = ast.literal_eval(un_init['other'])
         if user.query_per == 1:
             if check[-1].strip().lower().startswith('s') != 1:
                 return Response({'error': '只支持查询功能或删除不必要的空白行！'})
@@ -47,17 +48,26 @@ class search(baseview.BaseView):
                             port=_c.port,
                             db=address['basename']
                     ) as f:
-                        query_sql = replace_limit(check[-1].strip(), conf.limit)
+                        query_sql = replace_limit(check[-1].strip(), limit['limit'])
                         data_set = f.search(sql=query_sql)
+                        for l in data_set['data']:
+                            for k, v in l.items():
+                                if isinstance(v, bytes):
+                                    for n in range(data_set['len']):
+                                        data_set['data'][n].update({k:'blob字段为不可呈现类型'})
+                                for i in custom_com['sensitive_list']:
+                                    if k == i:
+                                        for n in range(data_set['len']):
+                                            data_set['data'][n].update({k: '********'})
                         querypermissions.objects.create(
                             work_id=user.work_id,
                             username=request.user,
                             statements=query_sql
                         )
-                        return Response(data_set)
+                        return HttpResponse(simplejson.dumps(data_set, bigint_as_string=True))
                 except Exception as e:
                     CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
-                    return Response({'error': '查询失败，请查看错误日志定位具体问题'})
+                    return Response({'error': e})
         else:
             return Response({'error': '已超过申请时限请刷新页面后重新提交申请'})
 
@@ -158,42 +168,37 @@ class query_worklf(baseview.BaseView):
             instructions = request.data['instructions']
             connection_name = request.data['connection_name']
             computer_room = request.data['computer_room']
-            timer = request.data['timer']
+            timer = int(request.data['timer'])
             export = request.data['export']
             audit = request.data['audit']
+            un_init = util.init_conf()
+            query_switch = ast.literal_eval(un_init['other'])
+            query_per = 2
             work_id = util.workId()
-            try:
-                timer = int(timer)
-                query_order.objects.create(
-                    work_id=work_id,
-                    instructions=instructions,
-                    username=request.user,
-                    timer=timer,
-                    date=util.date(),
-                    query_per=2,
-                    connection_name=connection_name,
-                    computer_room=computer_room,
-                    export= export,
-                    audit=audit,
-                    time=util.date()
+            if not query_switch['query']:
+                query_per = 1
+                userinfo = Account.objects.filter(username=audit, group='admin').first()
+                thread = threading.Thread(
+                    target=push_message,
+                    args=({'to_user': request.user, 'workid': work_id}, 5, request.user, userinfo.email, work_id, '提交')
                 )
-            except:
-                query_order.objects.create(
-                    work_id=work_id,
-                    instructions=instructions,
-                    username=request.user,
-                    timer=1,
-                    date=util.date(),
-                    query_per=2,
-                    connection_name=connection_name,
-                    computer_room=computer_room,
-                    export=export,
-                    audit=audit,
-                    time=util.date()
-                )
-            userinfo = Account.objects.filter(username=audit, group='admin').first()
-            thread = threading.Thread(target=push_message, args=({'to_user': request.user, 'workid': work_id}, 5, request.user, userinfo.email, work_id, '提交'))
-            thread.start()
+                thread.start()
+            query_order.objects.create(
+                work_id=work_id,
+                instructions=instructions,
+                username=request.user,
+                timer=timer,
+                date=util.date(),
+                query_per=query_per,
+                connection_name=connection_name,
+                computer_room=computer_room,
+                export= export,
+                audit=audit,
+                time=util.date()
+            )
+            if not query_switch['query']:
+                t = threading.Thread(target=query_worklf.query_callback, args=(timer, work_id))
+                t.start()
             ## 钉钉及email站内信推送
             return Response('查询工单已提交，等待管理员审核！')
 
@@ -217,8 +222,8 @@ class query_worklf(baseview.BaseView):
             return Response('查询工单状态已更新！')
 
         elif request.data['mode'] == 'status':
-            status = query_order.objects.filter(username=request.user).order_by('-id').first()
             try:
+                status = query_order.objects.filter(username=request.user).order_by('-id').first()
                 return Response(status.query_per)
             except:
                 return Response(0)
@@ -272,13 +277,18 @@ class query_worklf(baseview.BaseView):
 
 def push_message(message=None, type=None, user=None, to_addr=None, work_id=None, status=None):
     try:
-        put_mess = send_email.send_email(to_addr=to_addr)
-        put_mess.send_mail(mail_data=message, type=type)
+        tag = globalpermissions.objects.filter(authorization='global').first()
+        if tag.message['mail']:
+            put_mess = send_email.send_email(to_addr=to_addr)
+            put_mess.send_mail(mail_data=message, type=type)
     except Exception as e:
         CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
     else:
         try:
-            util.dingding(content='查询申请通知\n工单编号:%s\n发起人:%s\n状态:%s' % (work_id, user, status), url=WEBHOOK)
+            if tag.message['ding']:
+                un_init = util.init_conf()
+                webhook = ast.literal_eval(un_init['message'])
+                util.dingding(content='查询申请通知\n工单编号:%s\n发起人:%s\n状态:%s' % (work_id, user, status), url=webhook['webhook'])
         except ValueError as e:
             CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
 

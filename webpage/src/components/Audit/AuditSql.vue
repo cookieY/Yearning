@@ -38,6 +38,13 @@ p{
   word-break: break-all;
   overflow: hidden;
 }
+.tree{
+  word-wrap:break-word;
+  word-break:break-all;
+  overflow-y: scroll;
+  overflow-x: scroll;
+  max-height: 200px;
+}
 </style>
 <template>
 <div>
@@ -64,15 +71,13 @@ p{
       </Row>
     </Card>
   </Row>
+
   <Modal v-model="modal2" width="900">
     <p slot="header" style="color:#f60;font-size: 16px">
       <Icon type="information-circled"></Icon>
       <span>SQL工单详细信息</span>
     </p>
     <Form label-position="right">
-      <FormItem label="id:">
-        <span>{{ formitem.id }}</span>
-      </FormItem>
       <FormItem label="工单编号:">
         <span>{{ formitem.work_id }}</span>
       </FormItem>
@@ -93,17 +98,35 @@ p{
       </FormItem>
       <FormItem label="SQL语句:">
         <br>
-        <p v-for="i in sql">{{ i }}</p>
+        <div class="tree" >
+          <p v-for="i in sql">{{ i }}</p>
+        </div>
+      </FormItem>
+      <FormItem label="选择执行人:" v-if="multi && auth === 'admin'">
+        <Select v-model="multi_name" style="width: 20%">
+          <Option v-for="i in multi_list" :value="i.username" :key="i.username">{{i.username}}</Option>
+        </Select>
       </FormItem>
     </Form>
-    <p class="pa">SQL检查结果:</p>
-    <Table :columns="columnsName" :data="dataId" stripe border width="860"></Table>
+    <template v-if="auth === 'admin'">
+      <p class="pa">SQL检查结果:</p>
+      <Table :columns="columnsName" :data="dataId" stripe border width="860" height="200"></Table>
+    </template>
+
     <div slot="footer">
-      <Button type="warning" @click.native="test_button()">检测sql</Button>
+      <Button type="warning" @click.native="test_button()" v-if="auth === 'admin'">检测sql</Button>
       <Button @click="modal2 = false">取消</Button>
       <template v-if="switch_show">
-      <Button type="error" @click="out_button()" :disabled="summit">驳回</Button>
-      <Button type="success" @click="put_button()" :disabled="summit">同意</Button>
+        <template v-if="multi">
+          <Button type="error" @click="out_button()" :disabled="summit" v-if="auth === 'admin'">驳回</Button>
+          <Button type="error" @click="out_button()" v-else>驳回</Button>
+          <Button type="success" @click="agreed_button()" :disabled="summit" v-if="auth === 'admin'">同意</Button>
+          <Button type="success" @click="put_button()" v-else-if="auth === 'perform'">执行</Button>
+        </template>
+        <template v-else>
+          <Button type="error" @click="out_button()" :disabled="summit">驳回</Button>
+          <Button type="success" @click="put_button()" :disabled="summit">执行</Button>
+        </template>
       </template>
     </div>
   </Modal>
@@ -158,7 +181,6 @@ p{
 </template>
 <script>
 import axios from 'axios'
-import Cookies from 'js-cookie'
 import util from '../../libs/util'
 import ICircle from 'iview/src/components/circle/circle'
 export default {
@@ -216,6 +238,9 @@ export default {
             } else if (row.status === 1) {
               color = 'green'
               text = '已执行'
+            } else if (row.status === 4) {
+              color = 'red'
+              text = '执行失败'
             } else {
               color = 'yellow'
               text = '执行中'
@@ -244,6 +269,10 @@ export default {
             {
               label: '执行中',
               value: 3
+            },
+            {
+              label: '执行失败',
+              value: 4
             }
           ],
           //            filterMultiple: false 禁止多选,
@@ -256,6 +285,8 @@ export default {
               return row.status === 0
             } else if (value === 3) {
               return row.status === 3
+            } else {
+              return row.status === 4
             }
           }
         },
@@ -265,7 +296,7 @@ export default {
           width: 150,
           align: 'center',
           render: (h, params) => {
-            if (params.row.status !== 1) {
+            if (params.row.status !== 1 && params.row.status !== 4) {
               if (params.row.status === 3 && params.row.type === 0) {
                 return h('div', [
                   h('Button', {
@@ -275,6 +306,7 @@ export default {
                     },
                     on: {
                       click: () => {
+                        this.summit = true
                         this.edit_tab(params.index)
                       }
                     }
@@ -301,6 +333,7 @@ export default {
                     },
                     on: {
                       click: () => {
+                        this.summit = true
                         this.edit_tab(params.index)
                       }
                     }
@@ -316,6 +349,7 @@ export default {
                   },
                   on: {
                     click: () => {
+                      this.summit = true
                       this.edit_tab(params.index)
                     }
                   }
@@ -356,7 +390,7 @@ export default {
         {
           title: 'ID',
           key: 'ID',
-          width: 50,
+          width: 60,
           fixed: 'left'
         },
         {
@@ -400,7 +434,12 @@ export default {
       percent: 0,
       consuming: '00:00',
       callback_time: null,
-      switch_show: true
+      switch_show: true,
+      multi: Boolean,
+      auth: sessionStorage.getItem('auth'),
+      multi_list: {},
+      multi_name: '',
+      reboot: null
     }
   },
   methods: {
@@ -412,24 +451,36 @@ export default {
       this.tmp[index].status === 2 ? this.switch_show = true : this.switch_show = false
       this.sql = this.tmp[index].sql.split(';')
     },
+    agreed_button () {
+      axios.put(`${util.url}/audit_sql`, {
+        'type': 2,
+        'perform': this.multi_name,
+        'work_id': this.formitem.work_id,
+        'username': this.formitem.username
+      })
+        .then(res => {
+          util.notice(res.data)
+          this.modal2 = false
+        })
+        .catch(error => {
+          util.err_notice(error)
+        })
+    },
     put_button () {
       this.modal2 = false
       this.tmp[this.togoing].status = 3
       axios.put(`${util.url}/audit_sql`, {
           'type': 1,
-          'from_user': Cookies.get('user'),
+          'from_user': sessionStorage.getItem('user'),
           'to_user': this.formitem.username,
           'id': this.formitem.id
         })
         .then(res => {
-          this.$Notice.success({
-            title: '执行成功',
-            desc: res.data
-          })
+          util.notice(res.data)
           this.$refs.page.currentPage = 1
         })
         .catch(error => {
-          util.ajanxerrorcode(this, error)
+          util.err_notice(error)
         })
     },
     out_button () {
@@ -439,15 +490,13 @@ export default {
     rejecttext () {
       axios.put(`${util.url}/audit_sql`, {
           'type': 0,
-          'from_user': Cookies.get('user'),
+          'from_user': sessionStorage.getItem('user'),
           'text': this.reject.textarea,
           'to_user': this.formitem.username,
           'id': this.formitem.id
         })
         .then(res => {
-          this.$Notice.warning({
-            title: res.data
-          })
+          util.err_notice(res)
           this.mou_data()
           this.$refs.page.currentPage = 1
         })
@@ -475,25 +524,24 @@ export default {
             this.summit = false
             sessionStorage.setItem('osc', JSON.stringify(osclist))
           } else {
-            this.$Notice.error({
-              title: '警告',
-              desc: '无法连接到Inception!'
-            })
+            util.err_notice(res.data.status)
           }
         })
         .catch(error => {
-          util.ajanxerrorcode(this, error)
+          util.err_notice(error)
         })
     },
     mou_data (vl = 1) {
-      axios.get(`${util.url}/audit_sql?page=${vl}&username=${Cookies.get('user')}`)
+      axios.get(`${util.url}/audit_sql?page=${vl}&username=${sessionStorage.getItem('user')}`)
         .then(res => {
           this.tmp = res.data.data
           this.tmp.forEach((item) => { (item.backup === 1) ? item.backup = '是' : item.backup = '否' })
           this.pagenumber = res.data.page
+          this.multi = res.data.multi
+          this.multi_list = res.data.multi_list
         })
         .catch(error => {
-          util.ajanxerrorcode(this, error)
+          util.err_notice(error)
         })
     },
     delrecordList (vl) {
@@ -504,10 +552,7 @@ export default {
         'id': JSON.stringify(this.delrecord)
       })
         .then(res => {
-          this.$Notice.info({
-            title: '信息',
-            desc: res.data
-          })
+          util.notice(res.data)
           this.mou_data()
         })
         .catch(error => {
@@ -536,16 +581,20 @@ export default {
     stop_osc () {
       axios.delete(`${util.url}/osc/${this.oscsha1}`)
         .then(res => {
-            this.$Notice.info({
-              title: '通知',
-              desc: res.data
-            })
+            util.notice(res.data)
         })
-        .catch(error => console.log(error))
+        .catch(error => util.err_notice(error))
     }
   },
   mounted () {
+    let vm = this
     this.mou_data()
+    this.reboot = setInterval(function () {
+      vm.mou_data(vm.$refs.page.currentPage)
+    }, 5000)
+  },
+  destroyed () {
+    clearInterval(this.reboot)
   }
 }
 </script>

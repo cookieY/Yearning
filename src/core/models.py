@@ -58,7 +58,7 @@ class SqlOrder(models.Model):
     '''
     work_id = models.CharField(max_length=50, blank=True) #工单id
     username = models.CharField(max_length=50, blank=True) #提交人
-    status = models.IntegerField(blank=True) # 工单状态 0 disagree 1 agree 2 indeterminate 3 ongoing
+    status = models.IntegerField(blank=True) # 工单状态 0 disagree 1 agree 2 indeterminate 3 ongoing 4 faild
     type = models.SmallIntegerField(blank=True) #工单类型 0 DDL 1 DML
     backup = models.SmallIntegerField(blank=True)  # 工单是否备份 0 not backup 1 backup
     bundle_id = models.IntegerField(db_index=True, null=True) # Matching with Database_list id Field
@@ -126,8 +126,10 @@ class globalpermissions(models.Model):
 
     '''
     authorization = models.CharField(max_length=50, null=True, db_index=True)
-    dingding = models.SmallIntegerField(default=0)
-    email = models.SmallIntegerField(default=0)
+    inception = JSONField(null=True)
+    ldap = JSONField(null=True)
+    message = JSONField(null=True)
+    other = JSONField(null=True)
 
 
 class grained(models.Model):
@@ -154,7 +156,7 @@ class query_order(models.Model):
     date = models.CharField(max_length=50)
     timer = models.CharField(max_length=50)
     instructions = models.TextField(null=True)
-    query_per = models.SmallIntegerField(null=True, default=0)
+    query_per = models.SmallIntegerField(null=True, default=0) #0拒绝 1同意 2待审核 3完毕
     connection_name = models.CharField(max_length=50,null=True)  # 连接名
     computer_room = models.CharField(max_length=50,null=True)  # 机房
     export = models.SmallIntegerField(null=True, default=0)

@@ -7,39 +7,3 @@ password =
 
 [host]
 ipaddress = 127.0.0.1:8080
-
-[Inception]
-
-ip = 127.0.0.1
-port = 6669
-user = root
-password  = x
-backupdb = 127.0.0.1
-backupport = 3306
-backupuser = root
-backuppassword =
-
-[LDAP]
-LDAP_SERVER =
-LDAP_SCBASE =
-LDAP_DOMAIN =
-LDAP_TYPE = 1
-
-[email]
-
-username =
-
-password =
-
-smtp_server =
-
-
-smtp_port = 25
-
-[sql]
-
-limit = 1000
-
-[webhook]
-
-dingding =

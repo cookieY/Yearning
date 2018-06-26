@@ -1,8 +1,9 @@
 import json
 import logging
+import ast
 from django.http import HttpResponse
 from rest_framework.response import Response
-from libs import baseview, con_database
+from libs import baseview, con_database, util
 from core.task import grained_permissions
 from core.models import (
     DatabaseList,
@@ -33,6 +34,9 @@ class addressing(baseview.BaseView):
 
         if args == 'connection':
             try:
+                assigned = grained.objects.filter(username=request.user).first()
+                un_init = util.init_conf()
+                custom_com = ast.literal_eval(un_init['other'])
                 if request.data['permissions_type'] == 'user' or request.data['permissions_type'] == 'own_space':
                     info = DatabaseList.objects.all()
                     con_name = Area(info, many=True).data
@@ -43,7 +47,7 @@ class addressing(baseview.BaseView):
                     datalist = DatabaseList.objects.all()
                     serializers = query_con(datalist, many=True)
                     assigned = grained.objects.filter(username=request.user).first()
-                    return Response({'assigend': assigned.permissions['person'],'connection': serializers.data})
+                    return Response({'assigend': assigned.permissions['person'],'connection': serializers.data, 'custom': custom_com['con_room']})
                 else:
                     con_name = []
                     _type = request.data['permissions_type'] + 'con'
@@ -59,10 +63,18 @@ class addressing(baseview.BaseView):
                                     'computer_room': con_instance.computer_room
                                 })
                     dic = ''
-                info = Account.objects.filter(is_staff=1).all()
+                info = Account.objects.filter(group='admin').all()
                 serializers = UserINFO(info, many=True)
-                assigned = grained.objects.filter(username=request.user).first()
-                return Response({'connection': con_name, 'person': serializers.data, 'dic': dic, 'assigend': assigned.permissions['person']})
+                return Response(
+                    {
+                        'connection': con_name,
+                        'person': serializers.data,
+                        'dic': dic,
+                        'assigend': assigned.permissions['person'],
+                        'custom': custom_com['con_room'],
+                        'multi': custom_com['multi']
+                    }
+                )
             except Exception as e:
                 CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
                 return HttpResponse(status=500)

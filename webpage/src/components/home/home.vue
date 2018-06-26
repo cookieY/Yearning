@@ -118,7 +118,7 @@
 
 <script>
 import axios from 'axios'
-import Cookies from 'js-cookie'
+//
 import util from '../../libs/util'
 import dataSourcePie from './components/dataSourcePie.vue';
 import inforCard from './components/inforCard.vue';
@@ -143,7 +143,7 @@ export default {
       showAddNewTodo: false,
       newToDoItemValue: '',
       time: '',
-      username: Cookies.get('user'),
+      username: sessionStorage.getItem('user'),
       board: {
         'title': ['1.DDL语句生成', '2.数据库字典生成及查看', '3.SQL语句审核及回滚', '4.工单流程化', '5.可视化数据查询', '6.细粒度的权限划分']
       }

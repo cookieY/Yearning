@@ -210,7 +210,7 @@
 </template>
 
 <script>
-import Cookies from 'js-cookie'
+//
 import util from '../../libs/util'
 import axios from 'axios'
 const exchangetype = function typeok (vl) {
@@ -330,7 +330,7 @@ export default {
         if (valid) {
           this.savePassLoading = true;
           axios.post(`${util.url}/otheruser/changepwd`, {
-              'username': Cookies.get('user'),
+              'username': sessionStorage.getItem('user'),
               'new': this.editPasswordForm.newPass,
               'old': this.editPasswordForm.oldPass
             })
@@ -368,7 +368,7 @@ export default {
     },
     init () {
       axios.put(`${util.url}/homedata/ownspace`, {
-          'user': Cookies.get('user')
+          'user': sessionStorage.getItem('user')
         })
         .then(res => {
           this.userForm = res.data.userinfo
@@ -386,7 +386,7 @@ export default {
     },
     ApplyForPermission () {
       this.editInfodModal = true
-      axios.get(`${util.url}/userinfo/permissions?user=${Cookies.get('user')}`)
+      axios.get(`${util.url}/userinfo/permissions?user=${sessionStorage.getItem('user')}`)
         .then(res => {
           this.permission = res.data
         })

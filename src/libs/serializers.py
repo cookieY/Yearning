@@ -7,7 +7,16 @@ from core.models import DatabaseList
 from core.models import SqlDictionary
 from core.models import SqlRecord
 from core.models import Account
-from core.models import SqlOrder, query_order, querypermissions
+from core.models import SqlOrder, query_order, querypermissions,globalpermissions
+
+
+class Globalpermissions(serializers.HyperlinkedModelSerializer):
+    '''
+    站内信列表serializers
+    '''
+    class Meta:
+        model = globalpermissions
+        fields = ('inception', 'ldap','other','message')
 
 
 class MessagesUser(serializers.HyperlinkedModelSerializer):
@@ -56,6 +65,7 @@ class query_con(serializers.HyperlinkedModelSerializer):
         model = DatabaseList
         fields = ('connection_name', 'computer_room')
 
+
 class Area(serializers.HyperlinkedModelSerializer):
     '''
     SQL提交及表结构修改页面数据库连接信息返回serializers
@@ -63,6 +73,7 @@ class Area(serializers.HyperlinkedModelSerializer):
     class Meta:
         model = DatabaseList
         fields = ('id', 'connection_name', 'ip', 'computer_room')
+
 
 class Record(serializers.HyperlinkedModelSerializer):
     '''

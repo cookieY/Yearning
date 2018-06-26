@@ -22,7 +22,7 @@
 </template>
 
 <script>
-  import Cookies from 'js-cookie'
+  //
   import axios from 'axios'
   import util from '../../libs/util'
   export default {
@@ -32,7 +32,7 @@
       return {
         stepData: {
           title: 'Yearning SQL查询系统',
-          describe: `欢迎你！ ${Cookies.get('user')}`,
+          describe: `欢迎你！ ${sessionStorage.getItem('user')}`,
           content: '你的工单已提交审核，请等待管理员批准！'
         },
         step: {
@@ -69,6 +69,16 @@
             })
           })
       }
+    },
+    mounted () {
+      axios.put(`${util.url}/query_worklf`, {'mode': 'status'})
+        .then(res => {
+          if (res.data === 1) {
+            this.$router.push({
+              name: 'querypage'
+            });
+          }
+        })
     }
   }
 </script>

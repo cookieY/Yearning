@@ -35,18 +35,6 @@
         <Form-item label="密码:" prop="password">
           <Input v-model="formItem.password" placeholder="请输入" type="password"></Input>
         </Form-item>
-        <Form-item label="email推送开关:">
-          <i-switch v-model="mail_switch" size="large" @on-change="mail_switching">
-            <span slot="open">开</span>
-            <span slot="close">关</span>
-          </i-switch>
-        </Form-item>
-        <Form-item label="钉钉推送开关:">
-          <i-switch v-model="dingding_switch" size="large" @on-change="dingding_switching">
-            <span slot="open">开</span>
-            <span slot="close">关</span>
-          </i-switch>
-        </Form-item>
         <Button type="info" @click="testlink()">测试连接</Button>
         <Button type="success" @click="add()" style="margin-left: 5%">确定</Button>
         <Button type="warning" @click="del()" style="margin-left: 5%">取消</Button>
@@ -338,7 +326,7 @@ export default {
             .then(() => {
               this.$Notice.success({
                 title: '通知',
-                desc: '数据库信息添加成功!'
+                desc: '数据库信息添加成功,请对相应用户赋予该数据库访问权限!'
               })
               this.$refs.totol.currentPage = 1
               this.mountdata()
@@ -558,40 +546,6 @@ export default {
             desc: '钉钉推送消息已设置成功!'
           })
           this.addDingding = false
-        })
-        .catch(error => {
-          util.ajanxerrorcode(this, error)
-        })
-    },
-    mail_switching (status) {
-      let id = null
-      status ? id = 1 : id = 0
-      axios.post(`${util.url}/global_switch`, {
-        'type': '1',
-        'id': id
-      })
-        .then(res => {
-          this.$Notice.info({
-            title: '信息',
-            desc: res.data
-          })
-        })
-        .catch(error => {
-          util.ajanxerrorcode(this, error)
-        })
-    },
-    dingding_switching (status) {
-      let id = null
-      status ? id = 1 : id = 0
-      axios.post(`${util.url}/global_switch`, {
-        'type': '0',
-        'id': id
-      })
-        .then(res => {
-          this.$Notice.info({
-            title: '信息',
-            desc: res.data
-          })
         })
         .catch(error => {
           util.ajanxerrorcode(this, error)

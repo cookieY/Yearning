@@ -12,6 +12,7 @@ https://docs.djangoproject.com/en/1.10/ref/settings/
 import os
 import datetime
 from libs import util
+
 CONF_DATA = util.conf_path()
 
 # Build paths inside the project like this: os.path.join(BASE_DIR, ...)

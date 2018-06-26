@@ -4,7 +4,9 @@
   .tree{
     word-wrap:break-word;
     word-break:break-all;
-    overflow-y: hidden;
+    overflow-y: scroll;
+    overflow-x: scroll;
+    height: 600px;
   }
 </style>
 
@@ -199,7 +201,7 @@
             }
           })
           .catch(error => {
-            util.ajanxerrorcode(this, error)
+            util.err_notice(error)
           })
       },
       exportdata () {

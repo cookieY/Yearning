@@ -104,7 +104,6 @@
 <script>
 import ICol from '../../../node_modules/iview/src/components/grid/col.vue'
 import axios from 'axios'
-import Cookies from 'js-cookie'
 import util from '../../libs/util'
 export default {
   components: {
@@ -163,7 +162,7 @@ export default {
         connection_name_list: [],
         basenamelist: [],
         sqllist: [],
-        computer_roomlist: util.computer_room
+        computer_roomlist: []
       },
       ruleValidate: {
         computer_room: [{
@@ -294,15 +293,10 @@ export default {
                  } else {
                    this.validate_gen = true
                  }
-               } else {
-                 this.$Notice.error({
-                   title: '警告',
-                   desc: '无法连接到Inception!'
-                 })
                }
               })
-              .catch(error => {
-               util.ajanxerrorcode(this, error)
+              .catch(() => {
+                util.err_notice('无法连接到Inception!')
               })
           } else {
             this.$Message.error('请填写sql语句后再测试!');
@@ -318,7 +312,7 @@ export default {
             axios.post(`${util.url}/sqlsyntax/`, {
                 'data': JSON.stringify(this.formItem),
                 'sql': JSON.stringify(this.datalist.sqllist),
-                'user': Cookies.get('user'),
+                'user': sessionStorage.getItem('user'),
                 'type': 1,
                 'id': this.id[0].id
               })
@@ -350,6 +344,7 @@ export default {
       .then(res => {
         this.item = res.data['connection']
         this.assigned = res.data['assigend']
+        this.datalist.computer_roomlist = res.data['custom']
       })
       .catch(error => {
         util.ajanxerrorcode(this, error)

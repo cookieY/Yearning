@@ -1,17 +1,13 @@
 import logging
 import json
-from libs import send_email
-from libs import baseview
+from libs import baseview, util
 from libs import call_inception
-from libs import util
 from core.task import submit_push_messages
 from rest_framework.response import Response
 from django.http import HttpResponse
 from core.models import (
     DatabaseList,
-    SqlOrder,
-    Account,
-    globalpermissions
+    SqlOrder
 )
 
 CUSTOM_ERROR = logging.getLogger('Yearning.core.views')
@@ -68,7 +64,7 @@ class sqlorder(baseview.BaseView):
                         return Response({'result': res, 'status': 200})
                 except Exception as e:
                     CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
-                    return Response({'status': '500'})
+                    return Response(e)
 
     def post(self, request, args=None):
         try:
