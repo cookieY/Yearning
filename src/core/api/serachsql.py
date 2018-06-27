@@ -1,5 +1,6 @@
 import json
 import logging
+import datetime
 import time
 import re
 import threading
@@ -15,7 +16,16 @@ from core.models import DatabaseList, Account, querypermissions, query_order, gl
 CUSTOM_ERROR = logging.getLogger('Yearning.core.views')
 
 
+class DateEncoder(simplejson.JSONEncoder):  #感谢的凉夜贡献
+
+    def default(self, o):
+        if isinstance(o, datetime.datetime):
+            return o.__str__()
+        return simplejson.JSONEncoder.default(self, o)
+
+
 class search(baseview.BaseView):
+
 
     '''
     :argument   sql查询接口, 过滤非查询语句并返回查询结果。
@@ -64,7 +74,7 @@ class search(baseview.BaseView):
                             username=request.user,
                             statements=query_sql
                         )
-                        return HttpResponse(simplejson.dumps(data_set, bigint_as_string=True))
+                        return HttpResponse(simplejson.dumps(data_set, cls=DateEncoder, bigint_as_string=True))
                 except Exception as e:
                     CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
                     return Response({'error': e})

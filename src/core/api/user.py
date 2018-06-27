@@ -165,7 +165,7 @@ class userinfo(baseview.BaseView):
             return HttpResponse(status=500)
         else:
             try:
-                if group == 'admin':
+                if group == 'admin' or group == 'perform':
                     user = Account.objects.create_user(
                         username=username,
                         password=password,

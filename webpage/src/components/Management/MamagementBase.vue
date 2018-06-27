@@ -245,7 +245,7 @@ export default {
         }]
       },
       // 生成字典规则
-      dataset: util.computer_room,
+      dataset: [],
       Generate: {
         textarea: '',
         add: '',
@@ -273,9 +273,7 @@ export default {
       dingdingid: null,
       dingurl: '',
       tmp_id: null,
-      diclist: [],
-      mail_switch: false,
-      dingding_switch: false
+      diclist: []
     }
   },
   methods: {
@@ -512,8 +510,7 @@ export default {
           this.rowdata = res.data.data
           this.pagenumber = parseInt(res.data.page)
           this.diclist = res.data.diclist
-          this.mail_switch = res.data.mail_switch
-          this.dingding_switch = res.data.ding_switch
+          this.dataset = res.data['custom']
         })
         .catch(error => {
           util.ajanxerrorcode(this, error)

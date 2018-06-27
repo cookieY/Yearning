@@ -1,8 +1,10 @@
 import logging
 import json
+import ast
 from libs import baseview
 from libs import con_database
 from core.task import grained_permissions
+from libs import util
 from rest_framework.response import Response
 from django.http import HttpResponse
 from django.db import transaction
@@ -54,6 +56,8 @@ class management_db(baseview.SuperUserpermissions):
             return HttpResponse(status=500)
         else:
             try:
+                un_init = util.init_conf()
+                custom_com = ast.literal_eval(un_init['other'])
                 page_number = DatabaseList.objects.count()
                 start = int(page) * 10 - 10
                 end = int(page) * 10
@@ -66,7 +70,8 @@ class management_db(baseview.SuperUserpermissions):
                     {
                         'page': page_number,
                         'data': serializers.data,
-                        'diclist': data
+                        'diclist': data,
+                        'custom': custom_com['con_room']
                     }
                 )
             except Exception as e:
