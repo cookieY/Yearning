@@ -27,7 +27,7 @@
 </template>
 
 <script>
-import Cookies from 'js-cookie';
+// ;
 export default {
   name: 'Unlock',
   data () {
@@ -50,7 +50,7 @@ export default {
       this.$refs.inputEle.focus();
     },
     handleUnlock () {
-      if (Cookies.get('password') === this.password) {
+      if (sessionStorage.getItem('password') === this.password) {
         this.avatorLeft = '0px';
         this.inputLeft = '400px';
         this.password = '';

@@ -1,16 +1,16 @@
-from libs import con_database
-from libs import util
-
-conf = util.conf_path()
+from libs import con_database, util
+import ast
 
 
 def rollbackSQL(db=None, opid=None):
+    un_init = util.init_conf()
+    inception = ast.literal_eval(un_init['inception'])
     with con_database.SQLgo(
-        ip=conf.backupdb,
-        user=conf.backupuser,
-        password=conf.backuppassword,
+        ip=inception["back_host"],
+        user=inception["back_user"],
+        password=inception["back_password"],
         db=db,
-        port=conf.backupport
+        port=inception["back_port"]
         ) as f:
         data = f.execute(
             sql=
@@ -21,11 +21,13 @@ def rollbackSQL(db=None, opid=None):
 
 
 def roll(backdb=None, opid=None):
+    un_init = util.init_conf()
+    inception = ast.literal_eval(un_init['inception'])
     with con_database.SQLgo(
-        ip=conf.backupdb,
-        user=conf.backupuser,
-        password=conf.backuppassword,
-        port=conf.backupport
+        ip=inception["back_host"],
+        user=inception["back_user"],
+        password=inception["back_password"],
+        port=inception["back_port"]
         ) as f:
         data = f.dic_data(
             sql=

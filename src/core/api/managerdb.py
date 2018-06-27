@@ -1,18 +1,19 @@
 import logging
 import json
+import ast
 from libs import baseview
 from libs import con_database
 from core.task import grained_permissions
+from libs import util
 from rest_framework.response import Response
 from django.http import HttpResponse
-from django.db.models import Count
+from django.db import transaction
 from libs.serializers import Sqllist, Getdingding
 from core.models import (
     DatabaseList,
     SqlDictionary,
     SqlRecord,
     SqlOrder,
-    globalpermissions,
     grained
 )
 
@@ -55,29 +56,22 @@ class management_db(baseview.SuperUserpermissions):
             return HttpResponse(status=500)
         else:
             try:
-                page_number = DatabaseList.objects.aggregate(alter_number=Count('id'))
+                un_init = util.init_conf()
+                custom_com = ast.literal_eval(un_init['other'])
+                page_number = DatabaseList.objects.count()
                 start = int(page) * 10 - 10
                 end = int(page) * 10
                 info = DatabaseList.objects.all()[start:end]
                 serializers = Sqllist(info, many=True)
                 data = SqlDictionary.objects.all().values('Name')
                 data.query.group_by = ['Name']  # 不重复表名
-                switch = globalpermissions.objects.filter(authorization='global').first()
-                switch_dingding = False
-                switch_email = False
-                if switch is not None:
-                    if switch.dingding == 1:
-                        switch_dingding = True
-                    if switch.email == 1:
-                        switch_email = True
 
                 return Response(
                     {
                         'page': page_number,
                         'data': serializers.data,
                         'diclist': data,
-                        'ding_switch': switch_dingding,
-                        'mail_switch': switch_email
+                        'custom': custom_com['con_room']
                     }
                 )
             except Exception as e:
@@ -152,43 +146,22 @@ class management_db(baseview.SuperUserpermissions):
 
         try:
             connection_name = request.GET.get('del')
-            con_id = DatabaseList.objects.filter(connection_name=connection_name).first()
-            SqlOrder.objects.filter(bundle_id=con_id.id).delete()
-            SqlRecord.objects.filter(name=connection_name).delete()
-            DatabaseList.objects.filter(connection_name=connection_name).delete()
-            per = grained.objects.all().values('username', 'permissions')
-            for i in per:
-                for c in i['permissions']:
-                    if isinstance(i['permissions'][c], list) and c != 'diccon':
-                        i['permissions'][c] = list(filter(lambda x: x != connection_name, i['permissions'][c]))
-                grained.objects.filter(username=i['username']).update(permissions=i['permissions'])
+            with transaction.atomic():
+                con_id = DatabaseList.objects.filter(connection_name=connection_name).first()
+                work_id = SqlOrder.objects.filter(bundle_id=con_id.id).first()
+                SqlRecord.objects.filter(workid=work_id).delete()
+                SqlOrder.objects.filter(bundle_id=con_id.id).delete()
+                DatabaseList.objects.filter(connection_name=connection_name).delete()
+                per = grained.objects.all().values('username', 'permissions')
+                for i in per:
+                    for c in i['permissions']:
+                        if isinstance(i['permissions'][c], list) and c != 'diccon':
+                            i['permissions'][c] = list(filter(lambda x: x != connection_name, i['permissions'][c]))
+                    grained.objects.filter(username=i['username']).update(permissions=i['permissions'])
             return Response('数据库信息已删除!')
         except Exception as e:
             CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
             return HttpResponse(status=500)
-
-
-class push_permissions(baseview.SuperUserpermissions):
-
-    def post(self, request, args: str = None):
-
-        '''
-
-        :argument 邮件与钉钉开关
-
-        '''
-
-        id = request.data['id']
-        category = request.data['type']
-        data = globalpermissions.objects.filter(authorization='global').first()
-        if data is None:
-            globalpermissions.objects.get_or_create(authorization='global', dingding=0, email=0)
-        if category == '0':
-            globalpermissions.objects.update(dingding=id)
-            return Response('钉钉推送设置已更新!')
-        else:
-            globalpermissions.objects.update(email=id)
-            return Response('邮件推送设置已更新!')
 
 
 class dingding(baseview.SuperUserpermissions):

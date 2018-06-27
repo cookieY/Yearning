@@ -1,17 +1,13 @@
 import logging
 import json
-import configparser
 import threading
+import ast
 from libs import baseview, send_email, util
 from django.http import HttpResponse
 from rest_framework.response import Response
-from core.models import Account, applygrained, grained
+from core.models import Account, applygrained, grained,globalpermissions
 
 CUSTOM_ERROR = logging.getLogger('Yearning.core.views')
-
-CONF = configparser.ConfigParser()
-CONF.read('deploy.conf')
-WEBHOOK = CONF.get('webhook', 'dingding')
 
 
 class audit_grained(baseview.SuperUserpermissions):
@@ -21,15 +17,14 @@ class audit_grained(baseview.SuperUserpermissions):
         user_id = Account.objects.filter(username=request.user).first().id
         page = request.GET.get('page')
         if user_id == 1:
-            pn = applygrained.objects.all().values('id')
-            pn.query.distinct = ['id']
+            pn = applygrained.objects.count()
             start = int(page) * 10 - 10
             end = int(page) * 10
             user_list = applygrained.objects.all().order_by('-id')[start:end]
             ser = []
             for i in user_list:
                 ser.append({'work_id': i.work_id, 'status': i.status, 'username': i.username, 'permissions': i.permissions})
-            return Response({'data': ser, 'pn': len(pn)})
+            return Response({'data': ser, 'pn': pn})
 
         else:
             return Response([])
@@ -84,12 +79,17 @@ class apply_grained(baseview.BaseView):
 
 def push_message(message=None, type=None, user=None, to_addr=None, work_id=None, status=None):
     try:
-        put_mess = send_email.send_email(to_addr=to_addr)
-        put_mess.send_mail(mail_data=message, type=type)
+        tag = globalpermissions.objects.filter(authorization='global').first()
+        if tag.message['mail']:
+            put_mess = send_email.send_email(to_addr=to_addr)
+            put_mess.send_mail(mail_data=message, type=type)
     except Exception as e:
         CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
     else:
         try:
-            util.dingding(content='权限申请通知\n工单编号:%s\n发起人:%s\n状态:%s' % (work_id, user, status), url=WEBHOOK)
+            if tag.message['ding']:
+                un_init = util.init_conf()
+                webhook = ast.literal_eval(un_init['message'])
+                util.dingding(content='权限申请通知\n工单编号:%s\n发起人:%s\n状态:%s' % (work_id, user, status), url=webhook['webhook'])
         except ValueError as e:
             CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')

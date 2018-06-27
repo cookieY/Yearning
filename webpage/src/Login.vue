@@ -66,7 +66,7 @@
 import axios from 'axios'
 import util from './libs/util'
 import ICol from '../node_modules/iview/src/components/grid/col.vue'
-import Cookies from 'js-cookie'
+//
 export default {
   components: {
     ICol
@@ -107,14 +107,15 @@ export default {
         })
         .then(res => {
             axios.defaults.headers.common['Authorization'] = 'JWT ' + res.data['token']
-            Cookies.set('user', this.formInline.user)
-            Cookies.set('password', this.formInline.password)
-            Cookies.set('jwt', 'JWT ' + res.data['token'])
+            sessionStorage.setItem('user', this.formInline.user)
+            sessionStorage.setItem('password', this.formInline.password)
+            sessionStorage.setItem('jwt', `JWT ${res.data['token']}`)
+            sessionStorage.setItem('auth', res.data['permissions'])
             let auth = res.data['permissions']
-            if (auth === 'admin') {
-              Cookies.set('access', 0)
+            if (auth === 'admin' || auth === 'perform') {
+              sessionStorage.setItem('access', 0)
             } else {
-              Cookies.set('access', 1)
+              sessionStorage.setItem('access', 1)
             }
             this.$router.push({
               name: 'home_index'
@@ -137,14 +138,15 @@ export default {
             })
           } else {
             axios.defaults.headers.common['Authorization'] = 'JWT ' + res.data['token']
-            Cookies.set('user', this.formInline.user)
-            Cookies.set('password', this.formInline.password)
-            Cookies.set('jwt', 'JWT ' + res.data['token'])
+            sessionStorage.setItem('user', this.formInline.user)
+            sessionStorage.setItem('password', this.formInline.password)
+            sessionStorage.setItem('jwt', `JWT ${res.data['token']}`)
+            sessionStorage.setItem('auth', res.data['permissions'])
             let auth = res.data['permissions']
             if (auth === 'admin') {
-              Cookies.set('access', 0)
+              sessionStorage.setItem('access', 0)
             } else {
-              Cookies.set('access', 1)
+              sessionStorage.setItem('access', 1)
             }
             this.$router.push({
               name: 'home_index'

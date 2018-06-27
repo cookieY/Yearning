@@ -228,13 +228,23 @@ export const appRouter = [
         component: resolve => {
           require(['./components/Management/UserInfo.vue'], resolve)
         }
-      }, {
+      },
+      {
         path: 'management-database',
         name: 'management-database',
         title: '数据库',
         'icon': 'social-buffer',
         component: resolve => {
           require(['./components/Management/MamagementBase.vue'], resolve)
+        }
+      },
+      {
+        path: 'setting',
+        name: 'setting',
+        title: '设置',
+        'icon': 'android-settings',
+        component: resolve => {
+          require(['./components/Management/Setting.vue'], resolve)
         }
       }
     ]

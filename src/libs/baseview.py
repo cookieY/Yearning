@@ -57,18 +57,3 @@ class AnyLogin(APIView):
 
     def delete(self, request, args: str = None):
         pass
-
-
-'''
-
-平台页面权限permission
-
-'''
-
-
-class WebPermission(BasePermission):
-
-    def has_permission(self, request, view):
-        permission = globalpermissions.objects.filter(authorization=request.user).first()
-        if permission is not None and permission.dingding == 0:
-            return True

@@ -27,7 +27,8 @@
         <FormItem label="权限" prop="group">
           <Select v-model="userinfo.group" placeholder="请选择">
               <Option value="admin">管理员</Option>
-              <Option value="guest">使用者</Option>
+              <Option value="perform" v-if="connectionList.multi">执行人</Option>
+              <Option value="guest">使用人</Option>
             </Select>
         </FormItem>
         <FormItem label="电子邮箱">
@@ -80,6 +81,7 @@
       <FormItem label="权限">
         <Select v-model="editInfodForm.group" placeholder="请选择">
             <Option value="admin">管理员</Option>
+            <Option value="perform" v-if="connectionList.multi && this.userid !== 1">执行人</Option>
             <Option value="guest" v-if="this.userid !== 1">使用者</Option>
           </Select>
       </FormItem>
@@ -178,7 +180,7 @@
         <hr style="height:1px;border:none;border-top:1px dashed #dddee1;" />
         <br>
         <FormItem label="用户管理权限:">
-          <RadioGroup v-model="permission.user">
+          <RadioGroup v-model="permission.user" v-if="editInfodForm.group === 'admin'">
             <Radio label="1">是</Radio>
             <Radio label="0">否</Radio>
           </RadioGroup>
@@ -186,7 +188,7 @@
         <hr style="height:1px;border:none;border-top:1px dashed #dddee1;" />
         <br>
         <FormItem label="数据库管理权限:">
-          <RadioGroup v-model="permission.base">
+          <RadioGroup v-model="permission.base" v-if="editInfodForm.group === 'admin'">
             <Radio label="1">是</Radio>
             <Radio label="0">否</Radio>
           </RadioGroup>
@@ -509,7 +511,8 @@ export default {
       connectionList: {
         connection: [],
         dic: [],
-        person: []
+        person: [],
+        multi: Boolean
       }
     }
   },
@@ -592,7 +595,7 @@ export default {
       axios.get(`${util.url}/userinfo/all?page=${vl}`)
         .then(res => {
           this.data5 = res.data.data
-          this.pagenumber = parseInt(res.data.page.alter_number)
+          this.pagenumber = parseInt(res.data.page)
         })
         .catch(error => {
           util.ajanxerrorcode(this, error)
@@ -636,7 +639,7 @@ export default {
       });
     },
     saveEditInfo () {
-      axios.put(util.url + '/userinfo/changegroup', {
+      axios.put(`${util.url}/userinfo/changegroup`, {
           'username': this.username,
           'group': this.editInfodForm.group,
           'department': this.editInfodForm.department,
@@ -651,7 +654,7 @@ export default {
           this.refreshuser()
         })
         .catch(error => {
-          util.ajanxerrorcode(this, error)
+          util.err_notice(error)
         })
       this.editInfodModal = false
     },
@@ -700,6 +703,7 @@ export default {
         this.connectionList.connection = res.data['connection']
         this.connectionList.dic = res.data['dic']
         this.connectionList.person = res.data['person']
+        this.connectionList.multi = res.data['multi']
       })
       .catch(error => {
         util.ajanxerrorcode(this, error)

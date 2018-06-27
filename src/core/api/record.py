@@ -1,6 +1,6 @@
 import logging
 import json
-from libs import baseview, util, rollback
+from libs import baseview, rollback, util
 from rest_framework.response import Response
 from django.http import HttpResponse
 from core.models import SqlOrder, SqlRecord
@@ -27,8 +27,7 @@ class record_order(baseview.SuperUserpermissions):
             return HttpResponse(status=500)
         else:
             try:
-                pagenumber = SqlOrder.objects.filter(status=1, assigned=username).all().values('id')
-                pagenumber.query.distinct = ['id']
+                pagenumber = SqlOrder.objects.filter(status=1, assigned=username).count()
                 start = int(page) * 10 - 10
                 end = int(page) * 10
                 sql = SqlOrder.objects.raw(
@@ -41,7 +40,7 @@ class record_order(baseview.SuperUserpermissions):
                     '''%username
                 )[start:end]
                 data = util.ser(sql)
-                return Response({'data': data, 'page': len(pagenumber)})
+                return Response({'data': data, 'page': pagenumber})
             except Exception as e:
                 CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
                 return HttpResponse(status=500)

@@ -22,7 +22,7 @@
 </div>
 </template>
 <script>
-import Cookies from 'js-cookie'
+//
 import axios from 'axios'
 import util from '../../libs/util'
 export default {
@@ -143,11 +143,11 @@ export default {
   },
   methods: {
     currentpage (vl = 1) {
-      axios.get(`${util.url}/myorder/?user=${Cookies.get('user')}&page=${vl}`)
+      axios.get(`${util.url}/myorder/?user=${sessionStorage.getItem('user')}&page=${vl}`)
         .then(res => {
           this.table_data = res.data.data
           this.table_data.forEach((item) => { (item.backup === 1) ? item.backup = '是' : item.backup = '否' })
-          this.page_number = parseInt(res.data.page.alter_number)
+          this.page_number = parseInt(res.data.page)
         })
         .catch(error => {
           util.ajanxerrorcode(this, error)

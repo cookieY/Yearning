@@ -7,11 +7,23 @@ util.title = function (title) {
   window.document.title = title;
 };
 
+util.err_notice = function (err) {
+  Notice.error({
+    title: '错误',
+    desc: err
+  })
+}
+
+util.notice = function (vl) {
+  Notice.info({
+    title: '通知',
+    desc: vl
+  })
+}
+
 util.url = location.protocol + '//' + document.domain + ':8000/api/v1'
 
 util.auth = location.protocol + '//' + document.domain + ':8000/api-token-auth/'
-
-util.computer_room = ['AWS', 'Aliyun', 'Own', 'Other']
 
 util.ajanxerrorcode = function (vm, error) {
   if (error.response) {
@@ -28,6 +40,14 @@ util.ajanxerrorcode = function (vm, error) {
     }
   }
 };
+
+util.oneOf = function (ele, targetArr) {
+  if (targetArr.indexOf(ele) >= 0) {
+    return true;
+  } else {
+    return false;
+  }
+}
 
 util.showThisRoute = function (itAccess, currentAccess) {
   if (typeof itAccess === 'object' && itAccess.isArray()) {
@@ -46,19 +66,21 @@ util.openPage = function (vm, name) {
 
 util.taglist = function (vm, name) {
   vm.$store.state.pageOpenedList.forEach((vl, index) => {
-    if (vl.name === name) {
+    if (vl.name === name && name !== 'home_index') {
       vm.$store.state.pageOpenedList.splice(index, 1)
     }
   })
-
+  if (name === 'myorder') {
+    vm.$store.state.pageOpenedList.push({'title': '我的工单', 'name': 'myorder'})
+  }
   appRouter.forEach((val) => {
-    for (let i of val.children) {
-      if (i.name === name) {
-        vm.$store.state.pageOpenedList.push({'title': i.title, 'name': i.name})
+      for (let i of val.children) {
+        if (i.name === name && name !== 'home_index') {
+          vm.$store.state.pageOpenedList.push({'title': i.title, 'name': i.name})
+        }
       }
-    }
-  })
-  localStorage.setItem('pageOpenedList', JSON.stringify(vm.$store.state.pageOpenedList))
+    })
+    localStorage.setItem('pageOpenedList', JSON.stringify(vm.$store.state.pageOpenedList))
 }
 
 export default util;

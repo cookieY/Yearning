@@ -51,8 +51,12 @@
             <FormItem label="查询说明：" prop="opinion">
               <Input v-model="step.opinion" type="textarea" :autosize="{minRows: 4,maxRows: 8}" placeholder="请填写查询说明"/>
             </FormItem>
-            <FormItem label="查询时限：" prop="timer">
-              <Input v-model="step.timer"  placeholder="请填写查询时限，单位：分钟 （只填写数字）"/>
+            <FormItem label="查询时限：">
+                <InputNumber
+                  v-model="step.timer"
+                  :formatter="value => `${value}分钟`"
+                  :parser="value => value.replace('分钟', '')">
+                </InputNumber>
             </FormItem>
             <FormItem label="">
               <Button  @click="handleSubmit" style="width:100px;" type="primary">提交</Button>
@@ -69,7 +73,7 @@
 </template>
 
 <script>
-  import Cookies from 'js-cookie'
+  //
   import axios from 'axios'
   import util from '../../libs/util'
   export default {
@@ -79,11 +83,11 @@
       return {
         stepData: {
           title: 'Yearning SQL查询系统',
-          describe: `欢迎你！ ${Cookies.get('user')}`
+          describe: `欢迎你！ ${sessionStorage.getItem('user')}`
         },
         step: {
           remark: '',
-          timer: '',
+          timer: 1,
           computer_room: '',
           connection_name: '',
           person: '',
@@ -106,9 +110,6 @@
         stepRules: {
           opinion: [
             { required: true, message: '请填写查询说明', trigger: 'blur' }
-          ],
-          timer: [
-            { required: true, message: '请填写查询时限', trigger: 'blur' }
           ],
           computer_room: [{
             required: true,
@@ -133,7 +134,6 @@
         },
         item: {},
         personlist: [],
-        computer_roomlist: util.computer_room,
         datalist: {
           connection_name_list: [],
           basenamelist: [],
@@ -185,6 +185,7 @@
         .then(res => {
           this.item = res.data['connection']
           this.personlist = res.data['assigend']
+          this.datalist.computer_roomlist = res.data['custom']
         })
         .catch(error => {
           util.ajanxerrorcode(this, error)

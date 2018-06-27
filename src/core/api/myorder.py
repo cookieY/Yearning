@@ -1,6 +1,5 @@
 import logging
 from libs import baseview, util
-from django.db.models import Count
 from core.models import SqlOrder
 from django.http import HttpResponse
 from rest_framework.response import Response
@@ -25,7 +24,7 @@ class order(baseview.BaseView):
         else:
             try:
                 page_number = SqlOrder.objects.filter(
-                    username=username).aggregate(alter_number=Count('id'))
+                    username=username).count()
                 start = (int(page) - 1) * 20
                 end = int(page) * 20
                 info = SqlOrder.objects.raw(

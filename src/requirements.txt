@@ -6,3 +6,4 @@ PyMySQL==0.8.0
 sqlparse==0.2.4
 python-docx==0.8.6
 ldap3==2.4.1
+simplejson==3.15.0

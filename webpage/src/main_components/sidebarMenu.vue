@@ -49,7 +49,7 @@
 </Menu>
 </template>
 <script>
-import Cookies from 'js-cookie'
+//
 import util from '../libs/util'
 import axios from 'axios'
 export default {
@@ -73,7 +73,8 @@ export default {
         'audit-permissions': '1',
         'search_order': '1',
         'query-review': '1',
-        'query-audit': '1'
+        'query-audit': '1',
+        'setting': '1'
       }
     }
   },
@@ -88,13 +89,10 @@ export default {
   methods: {
     currentPageTab (val) {
       if (val === 'login') {
-        Cookies.remove('user');
-        Cookies.remove('password');
-        Cookies.remove('hasGreet');
-        Cookies.remove('access');
         localStorage.clear()
+        sessionStorage.clear()
         this.$router.push({
-          name: val
+          name: 'login'
         })
       } else {
         util.openPage(this, val)

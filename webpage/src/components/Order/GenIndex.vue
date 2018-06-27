@@ -85,7 +85,7 @@
       <Row>
         <Card>
           <div class="step-header-con">
-            <h3 style="margin-left: 35%">Yearning SQL平台审核工单</h3>
+            <h3>Yearning SQL平台审核工单</h3>
           </div>
           <p class="step-content"></p>
           <Form class="step-form" :label-width="100">
@@ -109,6 +109,13 @@
                 <Option v-for="i in this.assigned" :value="i" :key="i">{{i}}</Option>
               </Select>
             </FormItem>
+            <FormItem label="延迟执行">
+              <InputNumber
+                v-model="formItem.delay"
+                :formatter="value => `${value}分钟`"
+                :parser="value => value.replace('分钟', '')">
+              </InputNumber>
+            </FormItem>
             <FormItem label="是否备份">
               <RadioGroup v-model="formItem.backup">
                 <Radio label="1">是</Radio>
@@ -126,7 +133,7 @@
 </template>
 
 <script>
-  import Cookies from 'js-cookie'
+  //
   import axios from 'axios'
   import util from '../../libs/util'
   import editindex from './components/ModifyIndex.vue'
@@ -170,7 +177,7 @@
             }
           ]
         },
-        dataset: util.computer_room,
+        dataset: [],
         item: {},
         basename: [],
         sqlname: [],
@@ -210,7 +217,7 @@
             key: 'Extra'
           }
         ],
-        username: Cookies.get('user'),
+        username: sessionStorage.getItem('user'),
         indexinfo: [],
         sql: [],
         openswitch: false,
@@ -221,8 +228,9 @@
           connection_name: '',
           basename: '',
           tablename: '',
-          backup: 0,
-          assigned: ''
+          backup: '0',
+          assigned: '',
+          delay: 0
         },
         id: null,
         tabs: 'order1',
@@ -282,6 +290,7 @@
           .then(res => {
             this.item = res.data['connection']
             this.assigned = res.data['assigend']
+            this.dataset = res.data['custom']
           })
           .catch(error => {
             util.ajanxerrorcode(this, error)
@@ -362,7 +371,7 @@
             axios.post(`${util.url}/sqlsyntax/`, {
               'data': JSON.stringify(this.formItem),
               'sql': JSON.stringify(this.sql),
-              'user': Cookies.get('user'),
+              'user': sessionStorage.getItem('user'),
               'type': 1,
               'id': this.id[0].id
             })

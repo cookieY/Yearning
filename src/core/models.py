@@ -58,7 +58,7 @@ class SqlOrder(models.Model):
     '''
     work_id = models.CharField(max_length=50, blank=True) #工单id
     username = models.CharField(max_length=50, blank=True) #提交人
-    status = models.IntegerField(blank=True) # 工单状态 0 disagree 1 agree 2 indeterminate 3 ongoing
+    status = models.IntegerField(blank=True) # 工单状态 0 disagree 1 agree 2 indeterminate 3 ongoing 4 faild
     type = models.SmallIntegerField(blank=True) #工单类型 0 DDL 1 DML
     backup = models.SmallIntegerField(blank=True)  # 工单是否备份 0 not backup 1 backup
     bundle_id = models.IntegerField(db_index=True, null=True) # Matching with Database_list id Field
@@ -67,6 +67,7 @@ class SqlOrder(models.Model):
     sql = models.TextField(blank=True) #sql语句
     text = models.CharField(max_length=100) # 工单备注
     assigned = models.CharField(max_length=50, blank=True)# 工单执行人
+    delay = models.IntegerField(null=True,default=0) #延迟时间
 
 
 class DatabaseList(models.Model):
@@ -88,19 +89,12 @@ class SqlRecord(models.Model):
     '''
     工单执行记录表
     '''
-    date = models.CharField(max_length=50) #执行时间 下个版本可废弃
     state = models.CharField(max_length=100) #执行状态
     sql = models.TextField(blank=True) #
-    area = models.CharField(max_length=50)#下个版本可废弃
-    name = models.CharField(max_length=50)#下个版本可废弃
-    base = models.CharField(max_length=50)#下个版本可废弃
     error = models.TextField(null=True)
     workid = models.CharField(max_length=50, null=True)
-    person = models.CharField(max_length=50, null=True) #下个版本可废弃
-    reviewer = models.CharField(max_length=50, null=True) #下个版本可废弃
     affectrow = models.CharField(max_length=100, null=True)
     sequence = models.CharField(max_length=50, null=True)
-    backup_dbname = models.CharField(max_length=100, null=True) #下个版本可废弃
     execute_time = models.CharField(max_length=150, null=True)
     SQLSHA1 = models.TextField(null=True)
 
@@ -132,8 +126,10 @@ class globalpermissions(models.Model):
 
     '''
     authorization = models.CharField(max_length=50, null=True, db_index=True)
-    dingding = models.SmallIntegerField(default=0)
-    email = models.SmallIntegerField(default=0)
+    inception = JSONField(null=True)
+    ldap = JSONField(null=True)
+    message = JSONField(null=True)
+    other = JSONField(null=True)
 
 
 class grained(models.Model):
@@ -160,7 +156,7 @@ class query_order(models.Model):
     date = models.CharField(max_length=50)
     timer = models.CharField(max_length=50)
     instructions = models.TextField(null=True)
-    query_per = models.SmallIntegerField(null=True, default=0)
+    query_per = models.SmallIntegerField(null=True, default=0) #0拒绝 1同意 2待审核 3完毕
     connection_name = models.CharField(max_length=50,null=True)  # 连接名
     computer_room = models.CharField(max_length=50,null=True)  # 机房
     export = models.SmallIntegerField(null=True, default=0)

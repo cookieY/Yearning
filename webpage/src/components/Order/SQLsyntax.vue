@@ -50,6 +50,15 @@
                 <Radio label="0">否</Radio>
               </RadioGroup>
             </FormItem>
+
+            <FormItem label="延迟执行">
+              <InputNumber
+                v-model="formItem.delay"
+                :formatter="value => `${value}分钟`"
+                :parser="value => value.replace('分钟', '')">
+              </InputNumber>
+            </FormItem>
+
           </Form>
           <Form :label-width="30">
             <FormItem>
@@ -95,7 +104,6 @@
 <script>
 import ICol from '../../../node_modules/iview/src/components/grid/col.vue'
 import axios from 'axios'
-import Cookies from 'js-cookie'
 import util from '../../libs/util'
 export default {
   components: {
@@ -113,28 +121,23 @@ export default {
         basename: '',
         text: '',
         backup: '0',
-        assigned: ''
+        assigned: '',
+        delay: 0
       },
       columnsName: [
         {
           title: 'ID',
           key: 'ID',
-          width: '50'
-        },
-        {
-          title: '阶段',
-          key: 'stage',
-          width: '100'
+          width: 50
         },
         {
           title: '错误等级',
           key: 'errlevel',
-          width: '100'
+          width: 85
         },
         {
           title: '阶段状态',
-          key: 'stagestatus',
-          width: '150'
+          key: 'stagestatus'
         },
         {
           title: '错误信息',
@@ -146,8 +149,11 @@ export default {
         },
         {
           title: '预计影响的SQL',
-          key: 'affected_rows',
-          width: '130'
+          key: 'affected_rows'
+        },
+        {
+          title: 'SQLSHA1',
+          key: 'SQLSHA1'
         }
       ],
       Testresults: [],
@@ -156,7 +162,7 @@ export default {
         connection_name_list: [],
         basenamelist: [],
         sqllist: [],
-        computer_roomlist: util.computer_room
+        computer_roomlist: []
       },
       ruleValidate: {
         computer_room: [{
@@ -287,15 +293,10 @@ export default {
                  } else {
                    this.validate_gen = true
                  }
-               } else {
-                 this.$Notice.error({
-                   title: '警告',
-                   desc: '无法连接到Inception!'
-                 })
                }
               })
-              .catch(error => {
-               util.ajanxerrorcode(this, error)
+              .catch(() => {
+                util.err_notice('无法连接到Inception!')
               })
           } else {
             this.$Message.error('请填写sql语句后再测试!');
@@ -311,7 +312,7 @@ export default {
             axios.post(`${util.url}/sqlsyntax/`, {
                 'data': JSON.stringify(this.formItem),
                 'sql': JSON.stringify(this.datalist.sqllist),
-                'user': Cookies.get('user'),
+                'user': sessionStorage.getItem('user'),
                 'type': 1,
                 'id': this.id[0].id
               })
@@ -343,6 +344,7 @@ export default {
       .then(res => {
         this.item = res.data['connection']
         this.assigned = res.data['assigend']
+        this.datalist.computer_roomlist = res.data['custom']
       })
       .catch(error => {
         util.ajanxerrorcode(this, error)

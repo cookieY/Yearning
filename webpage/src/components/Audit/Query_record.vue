@@ -16,7 +16,7 @@
         </Col>
       </Row>
       <br>
-      <Page :total="page_number" show-elevator @on-change="currentpage" :page-size="10"></Page>
+      <Page :total="page_number" show-elevator @on-change="currentpage" :page-size="20"></Page>
     </Card>
   </Row>
 </div>
@@ -85,7 +85,7 @@ export default {
       axios.get(`${util.url}/query_worklf?page=${vl}`)
         .then(res => {
           this.table_data = res.data.data
-          this.page_number = parseInt(res.data.page.alter_number)
+          this.page_number = res.data.page
         })
         .catch(error => {
           util.ajanxerrorcode(this, error)

@@ -22,7 +22,6 @@ from core.api.dashboard import (
 )
 from core.api.managerdb import (
     management_db,
-    push_permissions,
     dingding
 )
 from core.api.auditorder import (
@@ -43,8 +42,10 @@ from core.api.osc import osc_step
 from core.api.myorder import order
 from core.api.gensql import gen_sql
 from core.api.general import addressing
+from core.api.setting import *
 
 urlpatterns = [
+    url(r'^api/v1/setting/(.*)', setting_view.as_view()),
     url(r'^api/v1/query_order', Query_order.as_view()),
     url(r'^api/v1/query_worklf', query_worklf.as_view()),
     url(r'^api/v1/userinfo/(.*)', userinfo.as_view()),
@@ -68,7 +69,6 @@ urlpatterns = [
     url(r'^api/v1/detail', order_detail.as_view()),
     url(r'^api/v1/search', search.as_view()),
     url(r'^api/v1/ldapauth', ldapauth.as_view()),
-    url(r'^api/v1/global_switch', push_permissions.as_view()),
     url(r'^api/v1/undoOrder', del_order.as_view()),
     url(r'^api/v1/osc/(.*)', osc_step.as_view()),
     url(r'^api/v1/download', downloadFile),

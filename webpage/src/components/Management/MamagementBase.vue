@@ -35,18 +35,6 @@
         <Form-item label="密码:" prop="password">
           <Input v-model="formItem.password" placeholder="请输入" type="password"></Input>
         </Form-item>
-        <Form-item label="email推送开关:">
-          <i-switch v-model="mail_switch" size="large" @on-change="mail_switching">
-            <span slot="open">开</span>
-            <span slot="close">关</span>
-          </i-switch>
-        </Form-item>
-        <Form-item label="钉钉推送开关:">
-          <i-switch v-model="dingding_switch" size="large" @on-change="dingding_switching">
-            <span slot="open">开</span>
-            <span slot="close">关</span>
-          </i-switch>
-        </Form-item>
         <Button type="info" @click="testlink()">测试连接</Button>
         <Button type="success" @click="add()" style="margin-left: 5%">确定</Button>
         <Button type="warning" @click="del()" style="margin-left: 5%">取消</Button>
@@ -59,7 +47,7 @@
         <div class="edittable-testauto-con">
           <Form :model="dictionary" :label-width="80" ref="generation">
             <FormItem label="连接名:" prop="dic">
-              <Select v-model="dictionary.name" placeholder="请选择数据库连接名" style="width: 60%" @on-change="BaseList">
+              <Select v-model="dictionary.name" placeholder="请选择数据库连接名" style="width: 60%" @on-change="BaseList" transfer>
               <Option v-for="i in rowdata" :value="i.id" :key="i.connection_name">{{i.connection_name}}</Option>
             </Select>
             </FormItem>
@@ -77,7 +65,7 @@
       <TabPane label="字典删除" name="name2">
         <Form :model="dictionary" :label-width="80">
           <FormItem label="连接名:">
-            <Select v-model="dictionary.delname" placeholder="请选择数据库连接名" style="width: 60%" @on-change="getdiclist">
+            <Select v-model="dictionary.delname" placeholder="请选择数据库连接名" style="width: 60%" @on-change="getdiclist" transfer>
             <Option v-for="i in diclist" :value="i.Name" :key="i.Name">{{i.Name}}</Option>
           </Select>
           </FormItem>
@@ -257,7 +245,7 @@ export default {
         }]
       },
       // 生成字典规则
-      dataset: util.computer_room,
+      dataset: [],
       Generate: {
         textarea: '',
         add: '',
@@ -285,9 +273,7 @@ export default {
       dingdingid: null,
       dingurl: '',
       tmp_id: null,
-      diclist: [],
-      mail_switch: false,
-      dingding_switch: false
+      diclist: []
     }
   },
   methods: {
@@ -338,7 +324,7 @@ export default {
             .then(() => {
               this.$Notice.success({
                 title: '通知',
-                desc: '数据库信息添加成功!'
+                desc: '数据库信息添加成功,请对相应用户赋予该数据库访问权限!'
               })
               this.$refs.totol.currentPage = 1
               this.mountdata()
@@ -522,10 +508,9 @@ export default {
       axios.get(`${util.url}/management_db?page=${vl}&permissions_type=base`)
         .then(res => {
           this.rowdata = res.data.data
-          this.pagenumber = parseInt(res.data.page.alter_number)
+          this.pagenumber = parseInt(res.data.page)
           this.diclist = res.data.diclist
-          this.mail_switch = res.data.mail_switch
-          this.dingding_switch = res.data.ding_switch
+          this.dataset = res.data['custom']
         })
         .catch(error => {
           util.ajanxerrorcode(this, error)
@@ -558,40 +543,6 @@ export default {
             desc: '钉钉推送消息已设置成功!'
           })
           this.addDingding = false
-        })
-        .catch(error => {
-          util.ajanxerrorcode(this, error)
-        })
-    },
-    mail_switching (status) {
-      let id = null
-      status ? id = 1 : id = 0
-      axios.post(`${util.url}/global_switch`, {
-        'type': '1',
-        'id': id
-      })
-        .then(res => {
-          this.$Notice.info({
-            title: '信息',
-            desc: res.data
-          })
-        })
-        .catch(error => {
-          util.ajanxerrorcode(this, error)
-        })
-    },
-    dingding_switching (status) {
-      let id = null
-      status ? id = 1 : id = 0
-      axios.post(`${util.url}/global_switch`, {
-        'type': '0',
-        'id': id
-      })
-        .then(res => {
-          this.$Notice.info({
-            title: '信息',
-            desc: res.data
-          })
         })
         .catch(error => {
           util.ajanxerrorcode(this, error)

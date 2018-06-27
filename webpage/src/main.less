@@ -54,6 +54,19 @@
     z-index: -1;
     overflow: hidden;
     background: #f0f0f0;
+    .close-all-tag-con{
+      position: absolute;
+      right: 0;
+      top: 62%;
+      box-sizing: border-box;
+      padding-top: 8px;
+      text-align: center;
+      width: 110px;
+      height: 38%;
+      background: white;
+      box-shadow: -3px 0 15px 3px rgba(0, 0, 0, .1);
+      z-index: 4;
+    }
   }
 
   &-header {
@@ -83,11 +96,11 @@
       right: 0;
       top: 0;
       height: 100%;
-      width: 350px;
+      width:360px;
 
       .switch-theme-con {
         display: inline-block;
-        width: 40px;
+        width: 30px;
         height: 100%;
       }
 
@@ -120,6 +133,7 @@
           top: 0;
           width: 150px;
           height: 100%;
+          z-index: 5;
 
           .main-user-name {
             display: inline-block;

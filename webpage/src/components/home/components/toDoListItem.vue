@@ -22,11 +22,12 @@ export default {
   name: 'toDoListItem',
   data () {
     return {
-      todoitem: false
+      itemkey: false
     };
   },
   props: {
-    content: String
+    content: String,
+    todoitem: Boolean
   },
   methods: {
     handleHasDid (val) {
