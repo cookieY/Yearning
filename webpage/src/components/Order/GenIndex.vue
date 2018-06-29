@@ -113,7 +113,8 @@
               <InputNumber
                 v-model="formItem.delay"
                 :formatter="value => `${value}分钟`"
-                :parser="value => value.replace('分钟', '')">
+                :parser="value => value.replace('分钟', '')"
+                :min="0">
               </InputNumber>
             </FormItem>
             <FormItem label="是否备份">

@@ -37,7 +37,7 @@
       <Row>
         <Card>
           <div class="step-header-con">
-            <h3 style="margin-left: 35%">Yearning SQL平台审核工单</h3>
+            <h3>Yearning SQL平台审核工单</h3>
           </div>
           <p class="step-content"></p>
           <Form class="step-form" :label-width="100">

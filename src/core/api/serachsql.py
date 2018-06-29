@@ -19,7 +19,7 @@ CUSTOM_ERROR = logging.getLogger('Yearning.core.views')
 class DateEncoder(simplejson.JSONEncoder):  #感谢的凉夜贡献
 
     def default(self, o):
-        if isinstance(o, datetime.datetime):
+        if isinstance(o, datetime.datetime) or isinstance(o, datetime.date) or isinstance(o, datetime.time):
             return o.__str__()
         return simplejson.JSONEncoder.default(self, o)
 
@@ -237,6 +237,13 @@ class query_worklf(baseview.BaseView):
                 return Response(status.query_per)
             except:
                 return Response(0)
+
+        elif request.data['mode'] == 'end':
+            try:
+                query_order.objects.filter(username=request.user).order_by('-id').update(query_per=3)
+                return Response('结束查询工单成功！')
+            except Exception as e:
+                return Response(e)
 
         elif request.data['mode'] == 'info':
             tablelist = []

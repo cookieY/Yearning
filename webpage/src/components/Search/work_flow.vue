@@ -55,7 +55,8 @@
                 <InputNumber
                   v-model="step.timer"
                   :formatter="value => `${value}分钟`"
-                  :parser="value => value.replace('分钟', '')">
+                  :parser="value => value.replace('分钟', '')"
+                  :min="1">
                 </InputNumber>
             </FormItem>
             <FormItem label="">

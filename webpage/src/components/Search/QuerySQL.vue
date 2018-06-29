@@ -42,6 +42,7 @@
         <Button type="info" icon="paintbucket" @click.native="beautify()">美化</Button>
         <Button type="success" icon="ios-redo" @click.native="Search_sql()">查询</Button>
         <Button type="primary" icon="ios-cloud-download" @click.native="exportdata()" v-if="export_data">导出查询数据</Button>
+        <Button type="error" icon="backspace-outline" @click.native="End_sql()">结束查询</Button>
         <br>
         <br>
         <p>查询结果:</p>
@@ -211,6 +212,14 @@
           data: this.allsearchdata,
           columns: this.columnsName
         })
+      },
+      End_sql () {
+        axios.put(`${util.url}/query_worklf`, {'mode': 'end'})
+          .then(res => util.notice(res.data))
+          .catch(err => util.err_notice(err))
+          this.$router.push({
+            name: 'serach-sql'
+          })
       }
     },
     mounted () {

@@ -110,7 +110,7 @@ p{
     <Row>
       <Card>
         <div class="step-header-con">
-          <h3 style="margin-left: 35%">Yearning SQL平台审核工单</h3>
+          <h3>Yearning SQL平台审核工单</h3>
         </div>
         <p class="step-content"></p>
         <Form class="step-form" :label-width="100">
@@ -138,7 +138,8 @@ p{
             <InputNumber
               v-model="formItem.delay"
               :formatter="value => `${value}分钟`"
-              :parser="value => value.replace('分钟', '')">
+              :parser="value => value.replace('分钟', '')"
+              :min="0">
             </InputNumber>
           </FormItem>
           <FormItem label="是否备份">

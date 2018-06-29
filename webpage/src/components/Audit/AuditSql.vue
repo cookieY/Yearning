@@ -452,19 +452,23 @@ export default {
       this.sql = this.tmp[index].sql.split(';')
     },
     agreed_button () {
-      axios.put(`${util.url}/audit_sql`, {
-        'type': 2,
-        'perform': this.multi_name,
-        'work_id': this.formitem.work_id,
-        'username': this.formitem.username
-      })
-        .then(res => {
-          util.notice(res.data)
-          this.modal2 = false
+      if (this.multi_name === '') {
+        this.$Message.error('请选择执行人!')
+      } else {
+        axios.put(`${util.url}/audit_sql`, {
+          'type': 2,
+          'perform': this.multi_name,
+          'work_id': this.formitem.work_id,
+          'username': this.formitem.username
         })
-        .catch(error => {
-          util.err_notice(error)
-        })
+          .then(res => {
+            util.notice(res.data)
+            this.modal2 = false
+          })
+          .catch(error => {
+            util.err_notice(error)
+          })
+      }
     },
     put_button () {
       this.modal2 = false
@@ -496,7 +500,7 @@ export default {
           'id': this.formitem.id
         })
         .then(res => {
-          util.err_notice(res)
+          util.err_notice(res.data)
           this.mou_data()
           this.$refs.page.currentPage = 1
         })

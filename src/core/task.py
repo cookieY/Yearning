@@ -103,7 +103,8 @@ class order_push_message(threading.Thread):
                         affectrow=i['affected_rows'],
                         sequence=i['sequence'],
                         execute_time=i['execute_time'],
-                        SQLSHA1=i['SQLSHA1']
+                        SQLSHA1=i['SQLSHA1'],
+                        backup_dbname=i['backup_dbname']
                     )
         except Exception as e:
             CUSTOM_ERROR.error(f'{e.__class__.__name__}--邮箱推送失败: {e}')

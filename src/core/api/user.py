@@ -280,35 +280,35 @@ class ldapauth(baseview.AnyLogin):
     '''
     def post(self, request, args: str = None):
         try:
-            user = request.data['username']
+            username = request.data['username']
             password = request.data['password']
         except KeyError as e:
             CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
         else:
             jwt_payload_handler = api_settings.JWT_PAYLOAD_HANDLER
             jwt_encode_handler = api_settings.JWT_ENCODE_HANDLER
-            valite = util.auth(username=user, password=password)
+            valite = util.auth(username=username, password=password)
             if valite:
-                user = Account.objects.filter(username=user).first()
-                if user is not None:
+                try:
+                    user = Account.objects.filter(username=username).first()
                     user.set_password(password)
                     user.save()
                     payload = jwt_payload_handler(user)
                     token = jwt_encode_handler(payload)
-                    return Response({'token': token, 'res': '','permissions':user.group})
-                else:
+                    return Response({'token': token, 'res': '', 'permissions': user.group})
+                except:
                     permissions = Account.objects.create_user(
-                        username=user,
+                        username=username,
                         password=password,
                         is_staff=0,
                         group='guest')
                     permissions.save()
-                    grained.objects.get_or_create(username=user, permissions=PERMISSION)
-                    _user = authenticate(username=user, password=password)
+                    grained.objects.get_or_create(username=username, permissions=PERMISSION)
+                    _user = authenticate(username=username, password=password)
                     token = jwt_encode_handler(jwt_payload_handler(_user))
-                    return Response({'token':token,'res': '', 'permissions': 'guest'})
+                    return Response({'token': token, 'res': '', 'permissions': 'guest'})
             else:
-                return Response({'token':'null', 'res': 'ldap账号认证失败,请检查ldap账号或ldap配置!'})
+                return Response({'token': 'null', 'res': 'ldap账号认证失败,请检查ldap账号或ldap配置!'})
 
 
 class login_auth(baseview.AnyLogin):

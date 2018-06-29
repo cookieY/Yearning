@@ -174,7 +174,7 @@ class audit(baseview.SuperUserpermissions):
                             return Response({'result': res, 'status': 200})
                     except Exception as e:
                         CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
-                        return Response({'status': e})
+                        return Response({'status': '请检查inception信息是否正确!'})
 
 
 class del_order(baseview.BaseView):

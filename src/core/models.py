@@ -96,6 +96,7 @@ class SqlRecord(models.Model):
     affectrow = models.CharField(max_length=100, null=True)
     sequence = models.CharField(max_length=50, null=True)
     execute_time = models.CharField(max_length=150, null=True)
+    backup_dbname = models.CharField(max_length=100, null=True)
     SQLSHA1 = models.TextField(null=True)
 
 
