@@ -1,9 +1,10 @@
 <style lang="less">
   @import '../../styles/common.less';
   @import '../Order/components/table.less';
-  .tree{
-    word-wrap:break-word;
-    word-break:break-all;
+
+  .tree {
+    word-wrap: break-word;
+    word-break: break-all;
     overflow-y: scroll;
     overflow-x: scroll;
     height: 600px;
@@ -14,42 +15,44 @@
   <div>
     <Row>
       <Col span="6">
-      <Card>
-        <p slot="title">
-          <Icon type="ios-redo"></Icon>
-          选择数据库
-        </p>
-        <div class="edittable-test-con">
-          <div id="showImage" class="margin-bottom-10">
-            <div class="tree">
-            <Tree :data="data1" @on-select-change="Getbasename" @on-toggle-expand="choseName" @empty-text="数据加载中"></Tree>
+        <Card>
+          <p slot="title">
+            <Icon type="ios-redo"></Icon>
+            选择数据库
+          </p>
+          <div class="edittable-test-con">
+            <div id="showImage" class="margin-bottom-10">
+              <div class="tree">
+                <Tree :data="data1" @on-select-change="Getbasename" @on-toggle-expand="choseName"
+                      @empty-text="数据加载中"></Tree>
+              </div>
             </div>
           </div>
-        </div>
-      </Card>
+        </Card>
       </Col>
       <Col span="18" class="padding-left-10">
-      <Card>
-        <p slot="title">
-          <Icon type="ios-crop-strong"></Icon>
-          填写sql语句
-        </p>
-        <editor v-model="formItem.textarea" @init="editorInit"></editor>
-        <br>
-        <p>当前选择的库: {{put_info.base}}</p>
-        <br>
-        <Button type="error" icon="trash-a" @click.native="ClearForm()">清除</Button>
-        <Button type="info" icon="paintbucket" @click.native="beautify()">美化</Button>
-        <Button type="success" icon="ios-redo" @click.native="Search_sql()">查询</Button>
-        <Button type="primary" icon="ios-cloud-download" @click.native="exportdata()" v-if="export_data">导出查询数据</Button>
-        <Button type="error" icon="backspace-outline" @click.native="End_sql()">结束查询</Button>
-        <br>
-        <br>
-        <p>查询结果:</p>
-        <Table :columns="columnsName" :data="Testresults" highlight-row ref="table"></Table>
-        <br>
-        <Page :total="total" show-total @on-change="splice_arr" ref="totol"></Page>
-      </Card>
+        <Card>
+          <p slot="title">
+            <Icon type="ios-crop-strong"></Icon>
+            填写sql语句
+          </p>
+          <editor v-model="formItem.textarea" @init="editorInit"></editor>
+          <br>
+          <p>当前选择的库: {{put_info.base}}</p>
+          <br>
+          <Button type="error" icon="trash-a" @click.native="ClearForm()">清除</Button>
+          <Button type="info" icon="paintbucket" @click.native="beautify()">美化</Button>
+          <Button type="success" icon="ios-redo" @click.native="Search_sql()">查询</Button>
+          <Button type="primary" icon="ios-cloud-download" @click.native="exportdata()" v-if="export_data">导出查询数据
+          </Button>
+          <Button type="error" icon="backspace-outline" @click.native="End_sql()">结束查询</Button>
+          <br>
+          <br>
+          <p>查询结果:</p>
+          <Table :columns="columnsName" :data="Testresults" highlight-row ref="table"></Table>
+          <br>
+          <Page :total="total" show-total @on-change="splice_arr" ref="totol"></Page>
+        </Card>
       </Col>
     </Row>
   </div>
@@ -60,35 +63,36 @@
   import axios from 'axios'
   import util from '../../libs/util'
   import Csv from '../../../node_modules/iview/src/utils/csv'
-  import ExportCsv from '../../../node_modules/iview/src/components/table/export-csv';
+  import ExportCsv from '../../../node_modules/iview/src/components/table/export-csv'
+
   const exportcsv = function exportCsv (params) {
     if (params.filename) {
       if (params.filename.indexOf('.csv') === -1) {
-        params.filename += '.csv';
+        params.filename += '.csv'
       }
     } else {
-      params.filename = 'table.csv';
+      params.filename = 'table.csv'
     }
 
-    let columns = [];
-    let datas = [];
+    let columns = []
+    let datas = []
     if (params.columns && params.data) {
-      columns = params.columns;
-      datas = params.data;
+      columns = params.columns
+      datas = params.data
     } else {
-      columns = this.columns;
-      if (!('original' in params)) params.original = true;
-      datas = params.original ? this.data : this.rebuildData;
+      columns = this.columns
+      if (!('original' in params)) params.original = true
+      datas = params.original ? this.data : this.rebuildData
     }
 
-    let noHeader = false;
-    if ('noHeader' in params) noHeader = params.noHeader;
-    const data = Csv(columns, datas, params, noHeader);
-    if (params.callback) params.callback(data);
-    else ExportCsv.download(params.filename, data);
+    let noHeader = false
+    if ('noHeader' in params) noHeader = params.noHeader
+    const data = Csv(columns, datas, params, noHeader)
+    if (params.callback) params.callback(data)
+    else ExportCsv.download(params.filename, data)
   }
   export default {
-  components: {
+    components: {
       ICol,
       flow,
       editor: require('../../libs/editor')
@@ -128,19 +132,16 @@
       },
       Getbasename (vl) {
         for (let i of this.data1[0].children) {
-            for (let c of i.children) {
-              if (c.title === vl[0].title && c.nodeKey === vl[0].nodeKey) {
-                this.put_info.base = i.title
-              }
+          for (let c of i.children) {
+            if (c.title === vl[0].title && c.nodeKey === vl[0].nodeKey) {
+              this.put_info.base = i.title
             }
+          }
         }
         axios.put(`${util.url}/search`, {'base': this.put_info.base, 'table': vl[0].title})
           .then(res => {
             if (res.data['error']) {
-              this.$Notice.error({
-                title: '错误',
-                desc: res.data['error']
-              })
+              util.err_notice(res.data['error'])
             } else {
               this.columnsName = res.data['title']
               this.allsearchdata = res.data['data']
@@ -149,7 +150,7 @@
             }
           })
           .catch(error => {
-            util.ajanxerrorcode(this, error)
+            util.err_notice(error)
           })
       },
       editorInit: function () {
@@ -164,10 +165,7 @@
             this.formItem.textarea = res.data
           })
           .catch(error => {
-            this.$Notice.error({
-              title: '警告',
-              desc: error
-            })
+            util.err_notice(error)
           })
       },
       splice_arr (page) {
@@ -190,10 +188,7 @@
         })
           .then(res => {
             if (res.data['error']) {
-              this.$Notice.error({
-                title: '错误',
-                desc: res.data['error']
-              })
+              util.err_notice(res.data['error'])
             } else {
               this.columnsName = res.data['title']
               this.allsearchdata = res.data['data']
@@ -217,9 +212,9 @@
         axios.put(`${util.url}/query_worklf`, {'mode': 'end'})
           .then(res => util.notice(res.data))
           .catch(err => util.err_notice(err))
-          this.$router.push({
-            name: 'serach-sql'
-          })
+        this.$router.push({
+          name: 'serach-sql'
+        })
       }
     },
     mounted () {
@@ -228,13 +223,13 @@
           if (res.data !== 1) {
             this.$router.push({
               name: 'serach-sql'
-            });
+            })
           } else {
-           axios.put(`${util.url}/query_worklf`, {'mode': 'info'})
-             .then(res => {
-               this.data1 = JSON.parse(res.data['info'])
-               res.data['status'] === 1 ? this.export_data = true : this.export_data = false
-             })
+            axios.put(`${util.url}/query_worklf`, {'mode': 'info'})
+              .then(res => {
+                this.data1 = JSON.parse(res.data['info'])
+                res.data['status'] === 1 ? this.export_data = true : this.export_data = false
+              })
           }
         })
     }

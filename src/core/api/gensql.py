@@ -8,7 +8,6 @@ CUSTOM_ERROR = logging.getLogger('Yearning.core.views')
 
 
 class gen_sql(baseview.BaseView):
-
     '''
 
     :argument 调用gen_ddl库 生成DDL语句 生成索引语句。并将生成的sql返回

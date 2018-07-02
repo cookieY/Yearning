@@ -21,7 +21,6 @@ CUSTOM_ERROR = logging.getLogger('Yearning.core.views')
 
 
 class adminpremisson(baseview.SuperUserpermissions):
-
     '''
 
     :argument 数据库字典
@@ -38,11 +37,11 @@ class adminpremisson(baseview.SuperUserpermissions):
         '''
 
         with con_database.SQLgo(
-            ip=_connection.ip,
-            user=_connection.username,
-            password=_connection.password,
-            db=basename,
-            port=_connection.port
+                ip=_connection.ip,
+                user=_connection.username,
+                password=_connection.password,
+                db=basename,
+                port=_connection.port
         ) as f:
             res = f.tablename()
             for i in res:
@@ -151,8 +150,9 @@ class adminpremisson(baseview.SuperUserpermissions):
                 return HttpResponse(status=500)
             else:
                 try:
-                    SqlDictionary.objects.filter(BaseName=data['basename'],TableName=data['tablename'],Name= data['name'],Field=data['field']).delete()
-                    return Response('%s 该字段已删除!'%data['field'])
+                    SqlDictionary.objects.filter(BaseName=data['basename'], TableName=data['tablename'],
+                                                 Name=data['name'], Field=data['field']).delete()
+                    return Response('%s 该字段已删除!' % data['field'])
                 except Exception as e:
                     CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
                     return HttpResponse(status=500)
@@ -256,9 +256,9 @@ class adminpremisson(baseview.SuperUserpermissions):
                         return Response('请选择对应数据库后提交!')
                     for i in text:
                         SqlDictionary.objects.get_or_create(
-                            BaseName = basename, TableName = tablename,
-                            Field = i['value'], Type = i['type'],Name = name,
-                            Extra = i['extra'], TableComment = tablecomment
+                            BaseName=basename, TableName=tablename,
+                            Field=i['value'], Type=i['type'], Name=name,
+                            Extra=i['extra'], TableComment=tablecomment
                         )
                     return Response('表数据已添加成功!')
                 except Exception as e:
@@ -283,12 +283,12 @@ class adminpremisson(baseview.SuperUserpermissions):
 
 
 class dictionary(baseview.BaseView):
-
     '''
 
     :argument 数据字典展示相关数据
 
     '''
+
     def put(self, request, args=None):
 
         if args == 'info':
@@ -305,14 +305,14 @@ class dictionary(baseview.BaseView):
                     DictionaryInfo = SqlDictionary.objects.filter(
                         BaseName=basename,
                         Name=name
-                        ).values('TableName')
+                    ).values('TableName')
                     DictionaryInfo.query.group_by = ['TableName']  # 不重复表名
                     all = []
                     for i in DictionaryInfo:
                         tmp = SqlDictionary.objects.filter(
                             TableName=i['TableName'],
                             BaseName=basename
-                            ).all()
+                        ).all()
                         _serializers = SQLGeneratDic(tmp, many=True)
                         all.append(_serializers.data)
                     dic = []
@@ -320,7 +320,7 @@ class dictionary(baseview.BaseView):
                         tmp = SqlDictionary.objects.filter(
                             TableName=i['TableName'],
                             BaseName=basename
-                            ).all()
+                        ).all()
                         _serializers = SQLGeneratDic(tmp, many=True)
                         dic.append(_serializers.data)
                     tablecomment = []
@@ -329,7 +329,7 @@ class dictionary(baseview.BaseView):
                             TableName=i['TableName'],
                             BaseName=basename,
                             Name=name
-                            ).values('TableComment')
+                        ).values('TableComment')
                         tmp.query.group_by = ['TableComment']
                         tablecomment.append({'table': i, 'comment': tmp})
                     return Response({
@@ -337,7 +337,7 @@ class dictionary(baseview.BaseView):
                         'tablelist': tablecomment,
                         'tablepage': len(DictionaryInfo),
                         'all': all
-                        })
+                    })
                 except Exception as e:
                     CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
                     return HttpResponse(status=500)
@@ -355,7 +355,7 @@ class dictionary(baseview.BaseView):
                     DictionaryInfo = SqlDictionary.objects.filter(
                         BaseName=basename,
                         Name=name
-                        ).values('TableName')
+                    ).values('TableName')
                     DictionaryInfo.query.group_by = ['TableName']  # 不重复表名
                     tablecomment = []
                     for i in DictionaryInfo[TableList * 10 - 10:TableList * 10]:
@@ -363,7 +363,7 @@ class dictionary(baseview.BaseView):
                             TableName=i['TableName'],
                             BaseName=basename,
                             Name=name
-                            ).values('TableComment')
+                        ).values('TableComment')
                         tmp.query.group_by = ['TableComment']
                         tablecomment.append({'table': i, 'comment': tmp})
                     return Response(tablecomment)
@@ -385,7 +385,7 @@ class dictionary(baseview.BaseView):
                         BaseName=basename,
                         Name=name,
                         TableName=tablename
-                        ).all()
+                    ).all()
                     _serializers = SQLGeneratDic(tmp, many=True)
                     return Response([_serializers.data])
                 except Exception as e:
@@ -406,7 +406,7 @@ class dictionary(baseview.BaseView):
                         basename=basename,
                         name=name,
                         signal=signal
-                        )
+                    )
                     return Response(tmp)
                 except Exception as e:
                     CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
@@ -455,7 +455,6 @@ class dictionary(baseview.BaseView):
 
 
 class exportdoc(baseview.SuperUserpermissions):
-
     '''
     :argument 导出数据字典为docx文档
     '''

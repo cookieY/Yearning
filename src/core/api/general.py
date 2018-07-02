@@ -21,7 +21,6 @@ CUSTOM_ERROR = logging.getLogger('Yearning.core.views')
 
 
 class addressing(baseview.BaseView):
-
     '''
 
     :argument 连接名 库名 表名 字段名 索引名 api接口
@@ -44,10 +43,21 @@ class addressing(baseview.BaseView):
                     dic.query.distinct = ['Name']
 
                 elif request.data['permissions_type'] == 'query':
-                    datalist = DatabaseList.objects.all()
-                    serializers = query_con(datalist, many=True)
+                    con_name = []
+                    permission_spec = grained.objects.filter(username=request.user).first()
+                    for i in permission_spec.permissions['querycon']:
+                        con_instance = DatabaseList.objects.filter(connection_name=i).first()
+                        if con_instance:
+                            con_name.append(
+                                {
+                                    'id': con_instance.id,
+                                    'connection_name': con_instance.connection_name,
+                                    'ip': con_instance.ip,
+                                    'computer_room': con_instance.computer_room
+                                })
                     assigned = grained.objects.filter(username=request.user).first()
-                    return Response({'assigend': assigned.permissions['person'],'connection': serializers.data, 'custom': custom_com['con_room']})
+                    return Response({'assigend': assigned.permissions['person'], 'connection': con_name,
+                                     'custom': custom_com['con_room']})
                 else:
                     con_name = []
                     _type = request.data['permissions_type'] + 'con'
@@ -89,10 +99,10 @@ class addressing(baseview.BaseView):
                 _connection = DatabaseList.objects.filter(id=con_id).first()
                 try:
                     with con_database.SQLgo(
-                        ip=_connection.ip,
-                        user=_connection.username,
-                        password=_connection.password,
-                        port=_connection.port
+                            ip=_connection.ip,
+                            user=_connection.username,
+                            password=_connection.password,
+                            port=_connection.port
                     ) as f:
                         res = f.basename()
                         return Response(res)
@@ -111,11 +121,11 @@ class addressing(baseview.BaseView):
                 _connection = DatabaseList.objects.filter(id=con_id).first()
                 try:
                     with con_database.SQLgo(
-                        ip=_connection.ip,
-                        user=_connection.username,
-                        password=_connection.password,
-                        port=_connection.port,
-                        db=basename
+                            ip=_connection.ip,
+                            user=_connection.username,
+                            password=_connection.password,
+                            port=_connection.port,
+                            db=basename
                     ) as f:
                         res = f.tablename()
                         return Response(res)
@@ -135,11 +145,11 @@ class addressing(baseview.BaseView):
                 try:
                     _connection = DatabaseList.objects.filter(id=con_id).first()
                     with con_database.SQLgo(
-                        ip=_connection.ip,
-                        user=_connection.username,
-                        password=_connection.password,
-                        port=_connection.port,
-                        db=basename
+                            ip=_connection.ip,
+                            user=_connection.username,
+                            password=_connection.password,
+                            port=_connection.port,
+                            db=basename
                     ) as f:
                         res = f.gen_alter(table_name=table)
                         return Response(res)
@@ -159,16 +169,14 @@ class addressing(baseview.BaseView):
                 try:
                     _connection = DatabaseList.objects.filter(id=con_id).first()
                     with con_database.SQLgo(
-                        ip=_connection.ip,
-                        user=_connection.username,
-                        password=_connection.password,
-                        port=_connection.port,
-                        db=basename
+                            ip=_connection.ip,
+                            user=_connection.username,
+                            password=_connection.password,
+                            port=_connection.port,
+                            db=basename
                     ) as f:
                         res = f.index(table_name=table)
                         return Response(res)
                 except Exception as e:
                     CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
                     return Response(e)
-
-

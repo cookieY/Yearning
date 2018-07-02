@@ -63,7 +63,7 @@ export default {
           });
         })
         .catch(error => {
-          util.ajanxerrorcode(this, error)
+          util.err_notice(error)
         })
     });
   }

@@ -2,6 +2,7 @@ import logging
 from django.http import HttpResponse
 from rest_framework.response import Response
 from libs import baseview, call_inception, con_database
+
 CUSTOM_ERROR = logging.getLogger('Yearning.core.views')
 
 
@@ -17,13 +18,13 @@ class osc_step(baseview.SuperUserpermissions):
 
         try:
             with call_inception.Inception(LoginDic={
-                        'host': '',
-                        'user': '',
-                        'password': '',
-                        'db': '',
-                        'port': ''
-                    }) as f:
-                data = f.oscstep(sql="inception get osc_percent '%s';"% args)
+                'host': '',
+                'user': '',
+                'password': '',
+                'db': '',
+                'port': ''
+            }) as f:
+                data = f.oscstep(sql="inception get osc_percent '%s';" % args)
                 return Response(data)
         except Exception as e:
             CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')

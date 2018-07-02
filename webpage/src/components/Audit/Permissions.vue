@@ -8,22 +8,23 @@
         </p>
         <Row>
           <Col span="24">
-              <Poptip
-                confirm
-                title="您确认删除这些工单信息吗?"
-                @on-ok="delrecordData"
-              >
-                <Button type="text" style="margin-left: -1%">删除记录</Button>
-              </Poptip>
-              <Table border :columns="permissoncolums" :data="permissondata" stripe ref="selection" @on-selection-change="delrecordList"></Table>
-              <br>
-              <Page :total="per_pn" show-elevator @on-change="permisson_list" :page-size="20" ref="perpage"></Page>
+            <Poptip
+              confirm
+              title="您确认删除这些工单信息吗?"
+              @on-ok="delrecordData"
+            >
+              <Button type="text" style="margin-left: -1%">删除记录</Button>
+            </Poptip>
+            <Table border :columns="permissoncolums" :data="permissondata" stripe ref="selection"
+                   @on-selection-change="delrecordList"></Table>
+            <br>
+            <Page :total="per_pn" show-elevator @on-change="permisson_list" :page-size="20" ref="perpage"></Page>
           </Col>
         </Row>
       </Card>
     </Row>
 
-    <Modal v-model="editInfodModal"  :width="800">
+    <Modal v-model="editInfodModal" :width="800">
       <h3 slot="header" style="color:#2D8CF0">权限申请单</h3>
       <Form :label-width="120" label-position="right">
         <template>
@@ -36,7 +37,7 @@
               <span v-for="i in permission.ddlcon" style="margin-left: 1%">{{i}}</span>
             </FormItem>
           </template>
-          <hr style="height:1px;border:none;border-top:1px dashed #dddee1;" />
+          <hr style="height:1px;border:none;border-top:1px dashed #dddee1;"/>
           <br>
           <FormItem label="DML权限:">
             <p v-if="permission.dml === '0'">否</p>
@@ -47,12 +48,23 @@
               <span v-for="i in permission.dmlcon" style="margin-left: 1%">{{i}}</span>
             </FormItem>
           </template>
-          <hr style="height:1px;border:none;border-top:1px dashed #dddee1;" />
+          <hr style="height:1px;border:none;border-top:1px dashed #dddee1;"/>
           <br>
           <FormItem label="上级审核人范围:">
             <span v-for="i in permission.person" style="margin-left: 1%">{{i}}</span>
           </FormItem>
-          <hr style="height:1px;border:none;border-top:1px dashed #dddee1;" />
+          <hr style="height:1px;border:none;border-top:1px dashed #dddee1;"/>
+          <br>
+          <FormItem label="数据查询权限:">
+            <p v-if="permission.query === '0'">否</p>
+            <p v-else>是</p>
+          </FormItem>
+          <template v-if="permission.query === '1'">
+            <FormItem label="连接名:">
+              <span v-for="i in permission.querycon" style="margin-left: 1%">{{i}}</span>
+            </FormItem>
+          </template>
+          <hr style="height:1px;border:none;border-top:1px dashed #dddee1;"/>
           <br>
           <FormItem label="数据字典权限:">
             <p v-if="permission.dic === '0'">否</p>
@@ -72,18 +84,18 @@
             </FormItem>
           </template>
         </template>
-          <hr style="height:1px;border:none;border-top:1px dashed #dddee1;" />
-          <br>
-          <FormItem label="用户管理权限:">
-            <p v-if="permission.user === '0'">否</p>
-            <p v-else>是</p>
-          </FormItem>
-          <hr style="height:1px;border:none;border-top:1px dashed #dddee1;" />
-          <br>
-          <FormItem label="数据库管理权限:">
-            <p v-if="permission.base === '0'">否</p>
-            <p v-else>是</p>
-          </FormItem>
+        <hr style="height:1px;border:none;border-top:1px dashed #dddee1;"/>
+        <br>
+        <FormItem label="用户管理权限:">
+          <p v-if="permission.user === '0'">否</p>
+          <p v-else>是</p>
+        </FormItem>
+        <hr style="height:1px;border:none;border-top:1px dashed #dddee1;"/>
+        <br>
+        <FormItem label="数据库管理权限:">
+          <p v-if="permission.base === '0'">否</p>
+          <p v-else>是</p>
+        </FormItem>
       </Form>
       <div slot="footer">
         <Button type="primary" @click="editInfodModal=false">取消</Button>
@@ -98,6 +110,7 @@
 <script>
   import axios from 'axios'
   import util from '../../libs/util'
+
   export default {
     name: 'permission',
     data () {
@@ -214,20 +227,17 @@
             this.per_pn = res.data['pn']
           })
           .catch(error => {
-            util.ajanxerrorcode(this, error)
+            util.err_notice(error)
           })
       },
       delrecordData () {
         axios.put(`${util.url}/audit_grained/`, {'work_id': JSON.stringify(this.delrecord)})
           .then(res => {
-            this.$Notice.info({
-              title: '通知',
-              desc: res.data
-            })
+            util.notice(res.data)
             this.permisson_list()
           })
           .catch(error => {
-            util.ajanxerrorcode(this, error)
+            util.err_notice(error)
           })
       },
       delrecordList (vl) {
@@ -248,15 +258,12 @@
             'grained_list': JSON.stringify(this.permission)
           })
           .then(res => {
-            this.$Notice.info({
-              title: '通知',
-              desc: res.data
-            })
+            util.notice(res.data)
             this.editInfodModal = false
             this.permisson_list()
           })
           .catch(error => {
-            util.ajanxerrorcode(this, error)
+            util.err_notice(error)
           })
       },
       reject () {
@@ -267,15 +274,12 @@
             'work_id': this.work_id
           })
           .then(res => {
-            this.$Notice.info({
-              title: '通知',
-              desc: res.data
-            })
+            util.notice(res.data)
             this.editInfodModal = false
             this.permisson_list()
           })
           .catch(error => {
-            util.ajanxerrorcode(this, error)
+            util.err_notice(error)
           })
       }
     },

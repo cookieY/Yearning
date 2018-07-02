@@ -28,15 +28,15 @@ class setting_view(baseview.SuperUserpermissions):
     def put(self, request, args: str = None):
 
         try:
-            if args == '1': #ldap测试
+            if args == '1':  # ldap测试
                 ldap = json.loads(request.data['ldap'])
                 ldap_test = util.test_auth(
-                            username=ldap['user'],
-                            password=ldap['password'],
-                            host=ldap['host'],
-                            type=ldap['type'],
-                            sc=ldap['sc'],
-                            domain=ldap['domain'])
+                    username=ldap['user'],
+                    password=ldap['password'],
+                    host=ldap['host'],
+                    type=ldap['type'],
+                    sc=ldap['sc'],
+                    domain=ldap['domain'])
                 if ldap_test:
                     return Response('ldap连接成功!')
                 else:

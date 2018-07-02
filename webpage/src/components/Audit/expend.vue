@@ -1,20 +1,22 @@
 <template>
   <div>
     <Card>
-  <p slot="title" style="height: 45px">
-    <Icon type="android-send"></Icon>
-    工单{{ this.$route.query.workid }}详细信息
-    <br>
-    <Button type="text"  @click.native="$router.go(-1)">返回</Button>
-  </p>
-  <Table border :columns="tabcolumns" :data="TableDataNew" class="tabletop" style="background: #5cadff" size="large"></Table>
-      </Card>
+      <p slot="title" style="height: 45px">
+        <Icon type="android-send"></Icon>
+        工单{{ this.$route.query.workid }}详细信息
+        <br>
+        <Button type="text" @click.native="$router.go(-1)">返回</Button>
+      </p>
+      <Table border :columns="tabcolumns" :data="TableDataNew" class="tabletop" style="background: #5cadff"
+             size="large"></Table>
+    </Card>
   </div>
 </template>
 
 <script>
   import axios from 'axios'
   import util from '../../libs/util'
+
   export default {
     name: 'expend',
     data () {
@@ -40,10 +42,7 @@
           this.TableDataNew = res.data
         })
         .catch(error => {
-          this.$Notice.error({
-            title: '警告',
-            desc: error
-          })
+          util.err_notice(error)
         })
     }
   }

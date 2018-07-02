@@ -8,7 +8,6 @@ from rest_framework.views import APIView
 
 
 class BaseView(APIView):
-
     permission_classes = (IsAuthenticated,)
 
     def get(self, request, args: str = None):
@@ -25,7 +24,6 @@ class BaseView(APIView):
 
 
 class SuperUserpermissions(APIView):
-    
     permission_classes = (IsAdminUser,)
 
     def get(self, request, args: str = None):
@@ -42,7 +40,6 @@ class SuperUserpermissions(APIView):
 
 
 class AnyLogin(APIView):
-
     permission_classes = ()
     authentication_classes = ()
 

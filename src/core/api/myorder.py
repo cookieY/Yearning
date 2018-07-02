@@ -8,14 +8,13 @@ CUSTOM_ERROR = logging.getLogger('Yearning.core.views')
 
 
 class order(baseview.BaseView):
-
     '''
 
     :argument 我的工单展示接口api
 
     '''
 
-    def get(self, request, args: str=None):
+    def get(self, request, args: str = None):
         try:
             username = request.GET.get('user')
             page = request.GET.get('page')

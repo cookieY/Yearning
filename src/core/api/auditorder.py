@@ -14,7 +14,7 @@ from core.models import (
     globalpermissions
 )
 
-from core.task import order_push_message,rejected_push_messages
+from core.task import order_push_message, rejected_push_messages
 
 conf = util.conf_path()
 addr_ip = conf.ipaddress
@@ -22,14 +22,13 @@ CUSTOM_ERROR = logging.getLogger('Yearning.core.views')
 
 
 class audit(baseview.SuperUserpermissions):
-
     '''
 
     :argument 审核页面相关操作api接口
 
     '''
 
-    def get(self, request, args: str=None):
+    def get(self, request, args: str = None):
 
         '''
 
@@ -61,17 +60,18 @@ class audit(baseview.SuperUserpermissions):
                     INNER JOIN core_databaselist on \
                     core_sqlorder.bundle_id = core_databaselist.id where core_sqlorder.assigned = '%s'\
                     ORDER BY core_sqlorder.id desc
-                    '''%username
+                    ''' % username
                 )[start:end]
                 data = util.ser(info)
                 info = Account.objects.filter(group='perform').all()
                 ser = serializers.UserINFO(info, many=True)
-                return Response({'page': page_number, 'data': data, 'multi': custom_com['multi'], 'multi_list': ser.data})
+                return Response(
+                    {'page': page_number, 'data': data, 'multi': custom_com['multi'], 'multi_list': ser.data})
             except Exception as e:
                 CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
                 return HttpResponse(status=500)
 
-    def put(self, request, args: str=None):
+    def put(self, request, args: str = None):
 
         '''
 
@@ -146,7 +146,9 @@ class audit(baseview.SuperUserpermissions):
                 else:
                     mail = Account.objects.filter(username=username).first()
                     SqlOrder.objects.filter(work_id=work_id).update(assigned=perform)
-                    threading.Thread(target=push_message, args=({'to_user': request.user, 'workid': work_id}, 2, request.user, mail.email, work_id, '已同意')).start()
+                    threading.Thread(target=push_message, args=(
+                        {'to_user': request.user, 'workid': work_id}, 2, request.user, mail.email, work_id,
+                        '已同意')).start()
                     return Response('工单已提交执行人！')
 
             elif category == 'test':
@@ -178,7 +180,6 @@ class audit(baseview.SuperUserpermissions):
 
 
 class del_order(baseview.BaseView):
-
     '''
 
     :argument 审核页面工单删除操作请求api
@@ -223,6 +224,7 @@ def push_message(message=None, type=None, user=None, to_addr=None, work_id=None,
             if tag.message['ding']:
                 un_init = util.init_conf()
                 webhook = ast.literal_eval(un_init['message'])
-                util.dingding(content='工单审核通知\n工单编号:%s\n发起人:%s\n状态:%s' % (work_id, user, status), url=webhook['webhook'])
+                util.dingding(content='工单审核通知\n工单编号:%s\n发起人:%s\n状态:%s' % (work_id, user, status),
+                              url=webhook['webhook'])
         except ValueError as e:
             CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')

@@ -25,6 +25,7 @@
   //
   import axios from 'axios'
   import util from '../../libs/util'
+
   export default {
     name: 'put_ready',
     props: ['msg'],
@@ -76,7 +77,7 @@
           if (res.data === 1) {
             this.$router.push({
               name: 'querypage'
-            });
+            })
           }
         })
     }
@@ -84,22 +85,22 @@
 </script>
 
 <style lang="less">
-  .step{
-    &-header-con{
+  .step {
+    &-header-con {
       text-align: center;
-      h3{
+      h3 {
         margin: 10px 0;
       }
-      h5{
+      h5 {
         margin: 0 0 5px;
       }
     }
-    &-content{
+    &-content {
       padding: 5px 20px 26px;
       margin-bottom: 20px;
       border-bottom: 1px solid #dbdddf;
     }
-    &-form{
+    &-form {
       padding-bottom: 10px;
       border-bottom: 1px solid #dbdddf;
       margin-bottom: 20px;

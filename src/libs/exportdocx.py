@@ -21,12 +21,12 @@ class DbInfo(object):
 
     def connMysql(self):
         self.conn = pymysql.connect(
-            host=self.host, 
-            user=self.user, 
-            password=self.password, 
+            host=self.host,
+            user=self.user,
+            password=self.password,
             database=self.database,
             charset=self.charset
-            )
+        )
         return self.conn
 
     def closesql(self):
@@ -75,12 +75,12 @@ class ToWord:
 
     def __init__(self, Host=None, User=None, Password=None, Database=None, Charset=None):
         self.turnOjb = DbInfo(
-            host=Host, 
-            user=User, 
-            password=Password, 
-            database=Database, 
+            host=Host,
+            user=User,
+            password=Password,
+            database=Database,
             charset=Charset
-            )
+        )
         self.createDoc()
 
     def createDoc(self):
@@ -101,8 +101,8 @@ class ToWord:
                 TableName=tableName)
             self.document.add_page_break()
             self.document.add_heading(
-                '%s' %[TB[0] for TB in tabSet][0], level=2
-                )
+                '%s' % [TB[0] for TB in tabSet][0], level=2
+            )
             table = self.document.add_table(rows=1, cols=5)
             table.style = 'LightShading-Accent1'
             table.rows[0].cells[0].text = '字段名'
@@ -131,8 +131,8 @@ class ToWord:
             table.rows[0].cells[3].text = '默认值'
             table.rows[0].cells[4].text = '备注'
             columnSet = self.turnOjb.getTableInfo(
-                ConnName=Conn, 
-                SchemalName=Schemal, 
+                ConnName=Conn,
+                SchemalName=Schemal,
                 TableName='%s' % tableName[0])
             for index, column in enumerate(columnSet):
                 cells = table.add_row().cells

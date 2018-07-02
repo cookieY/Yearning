@@ -7,9 +7,9 @@ export const loginRouter = {
     title: 'Login - 登录'
   },
   component: resolve => {
-    require(['./Login.vue'], resolve);
+    require(['./Login.vue'], resolve)
   }
-};
+}
 export const locking = {
   path: '/locking',
   name: 'locking',
@@ -25,9 +25,9 @@ export const page404 = {
     title: '404-页面不存在'
   },
   component: resolve => {
-    require(['./components/Error/404.vue'], resolve);
+    require(['./components/Error/404.vue'], resolve)
   }
-};
+}
 
 export const page401 = {
   path: '/401',
@@ -36,9 +36,9 @@ export const page401 = {
   },
   name: 'error_401',
   component: resolve => {
-    require(['./components/Error/401.vue'], resolve);
+    require(['./components/Error/401.vue'], resolve)
   }
-};
+}
 
 export const page500 = {
   path: '/500',
@@ -47,9 +47,9 @@ export const page500 = {
   },
   name: 'error_500',
   component: resolve => {
-    require(['./components/Error/500.vue'], resolve);
+    require(['./components/Error/500.vue'], resolve)
   }
-};
+}
 
 export const appRouter = [
   {
@@ -65,21 +65,23 @@ export const appRouter = [
         title: '首页',
         name: 'home_index',
         component: resolve => {
-          require(['./components/home/home.vue'], resolve);
+          require(['./components/home/home.vue'], resolve)
         }
-      }, {
+      },
+      {
         path: 'ownspace',
         title: '个人中心',
         name: 'ownspace_index',
         component: resolve => {
-          require(['./components/Myself/own-space.vue'], resolve);
+          require(['./components/Myself/own-space.vue'], resolve)
         }
-      }, {
+      },
+      {
         path: 'message',
         title: '消息中心',
         name: 'message_index',
         component: resolve => {
-          require(['./components/Myself/message.vue'], resolve);
+          require(['./components/Myself/message.vue'], resolve)
         }
       }
     ]
@@ -91,7 +93,7 @@ export const appRouter = [
     title: '工单提交',
     component: Index,
     children: [
-    {
+      {
         path: 'ddledit',
         name: 'ddledit',
         title: 'DDL',
@@ -346,7 +348,7 @@ export const myorder = {
     }
   ]
 }
-  export const MainRoute = [
+export const MainRoute = [
   loginRouter,
   locking,
   ...appRouter,

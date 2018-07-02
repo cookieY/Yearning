@@ -14,6 +14,7 @@ from core.models import (
     Todolist,
     grained
 )
+
 CUSTOM_ERROR = logging.getLogger('Yearning.core.views')
 
 jwt_payload_handler = api_settings.JWT_PAYLOAD_HANDLER
@@ -34,7 +35,6 @@ PERMISSION = {
 
 
 class userinfo(baseview.BaseView):
-
     '''
         User Management interface
 
@@ -59,6 +59,7 @@ class userinfo(baseview.BaseView):
             del user
       
     '''
+
     def get(self, request, args=None):
         if args == 'all':
             try:
@@ -80,7 +81,7 @@ class userinfo(baseview.BaseView):
 
         elif args == 'permissions':
             user = request.GET.get('user')
-            user=grained.objects.filter(username=user).first()
+            user = grained.objects.filter(username=user).first()
             return Response(user.permissions)
 
     def put(self, request, args=None):
@@ -126,13 +127,13 @@ class userinfo(baseview.BaseView):
                             group=group,
                             department=department,
                             is_staff=1
-                            )
+                        )
                     else:
                         Account.objects.filter(username=username).update(
                             group=group,
-                            department=department, 
+                            department=department,
                             is_staff=0
-                            )
+                        )
                     return Response('%s--权限修改成功!' % username)
                 except Exception as e:
                     CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
@@ -183,7 +184,7 @@ class userinfo(baseview.BaseView):
                         department=department,
                         group=group,
                         email=email
-                        )
+                    )
                     user.save()
                     grained.objects.get_or_create(username=username, permissions=PERMISSION)
                     return Response('%s 用户注册成功!' % username)
@@ -194,7 +195,7 @@ class userinfo(baseview.BaseView):
     def delete(self, request, args=None):
         try:
             pr = Account.objects.filter(username=args).first()
-            if pr.is_staff ==1:
+            if pr.is_staff == 1:
                 per = grained.objects.all().values('username', 'permissions')
                 for i in per:
                     for c in i['permissions']:
@@ -210,7 +211,7 @@ class userinfo(baseview.BaseView):
         except Exception as e:
             CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
             return HttpResponse(status=500)
-        
+
 
 class generaluser(baseview.BaseView):
     '''
@@ -278,6 +279,7 @@ class ldapauth(baseview.AnyLogin):
     ldap用户认证
 
     '''
+
     def post(self, request, args: str = None):
         try:
             username = request.data['username']

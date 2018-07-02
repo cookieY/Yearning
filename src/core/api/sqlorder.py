@@ -54,7 +54,7 @@ class sqlorder(baseview.BaseView):
                     'password': data.password,
                     'db': base,
                     'port': data.port
-                    }
+                }
             except KeyError as e:
                 CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
             else:
@@ -95,7 +95,7 @@ class sqlorder(baseview.BaseView):
                     bundle_id=id,
                     assigned=data['assigned'],
                     delay=data['delay']
-                    )
+                )
                 submit_push_messages(
                     workId=workId,
                     user=user,

@@ -17,8 +17,8 @@ class send_email(object):
         name, addr = parseaddr(s)
         return formataddr((Header(name, 'utf-8').encode(), addr))
 
-    def send_mail(self,mail_data=None, type=None):
-        if type == 0: #执行
+    def send_mail(self, mail_data=None, type=None):
+        if type == 0:  # 执行
             text = '<html><body><h1>Yearning 工单执行通知</h1>' \
                    '<br><p>工单号: %s</p>' \
                    '<br><p>发起人: %s</p>' \
@@ -26,14 +26,14 @@ class send_email(object):
                    '<br><p>工单备注: %s</p>' \
                    '<br><p>状态: 已执行</p>' \
                    '<br><p>备注: %s</p>' \
-                   '</body></html>' %(
-                mail_data['workid'],
-                mail_data['to_user'],
-                mail_data['addr'],
-                mail_data['addr'],
-                mail_data['text'],
-                mail_data['note'])
-        elif type == 1: #驳回
+                   '</body></html>' % (
+                       mail_data['workid'],
+                       mail_data['to_user'],
+                       mail_data['addr'],
+                       mail_data['addr'],
+                       mail_data['text'],
+                       mail_data['note'])
+        elif type == 1:  # 驳回
             text = '<html><body><h1>Yearning 工单驳回通知</h1>' \
                    '<br><p>工单号: %s</p>' \
                    '<br><p>发起人: %s</p>' \
@@ -46,7 +46,7 @@ class send_email(object):
                        mail_data['addr'],
                        mail_data['addr'],
                        mail_data['rejected'])
-        elif type == 2: ##权限申请
+        elif type == 2:  ##权限申请
             text = '<html><body><h1>Yearning 权限申请通知</h1>' \
                    '<br><p>工单号: %s</p>' \
                    '<br><p>发起人: %s</p>' \
@@ -62,7 +62,7 @@ class send_email(object):
                    '</body></html>' % (
                        mail_data['workid'],
                        mail_data['to_user'])
-        elif type == 4: ##权限驳回
+        elif type == 4:  ##权限驳回
             text = '<html><body><h1>Yearning 权限驳回通知</h1>' \
                    '<br><p>工单号: %s</p>' \
                    '<br><p>发起人: %s</p>' \
@@ -70,7 +70,7 @@ class send_email(object):
                    '</body></html>' % (
                        mail_data['workid'],
                        mail_data['to_user'])
-        elif type == 5: ##查询申请
+        elif type == 5:  ##查询申请
             text = '<html><body><h1>Yearning 查询申请通知</h1>' \
                    '<br><p>工单号: %s</p>' \
                    '<br><p>发起人: %s</p>' \
@@ -78,7 +78,7 @@ class send_email(object):
                    '</body></html>' % (
                        mail_data['workid'],
                        mail_data['to_user'])
-        elif type == 6: ##查询同意
+        elif type == 6:  ##查询同意
             text = '<html><body><h1>Yearning 查询同意通知</h1>' \
                    '<br><p>工单号: %s</p>' \
                    '<br><p>发起人: %s</p>' \
@@ -86,7 +86,7 @@ class send_email(object):
                    '</body></html>' % (
                        mail_data['workid'],
                        mail_data['to_user'])
-        elif type == 7: ##查询驳回
+        elif type == 7:  ##查询驳回
             text = '<html><body><h1>Yearning 查询驳回通知</h1>' \
                    '<br><p>工单号: %s</p>' \
                    '<br><p>发起人: %s</p>' \
@@ -94,7 +94,7 @@ class send_email(object):
                    '</body></html>' % (
                        mail_data['workid'],
                        mail_data['to_user'])
-        else: #提交
+        else:  # 提交
             text = '<html><body><h1>Yearning 工单提交通知</h1>' \
                    '<br><p>工单号: %s</p>' \
                    '<br><p>发起人: %s</p>' \

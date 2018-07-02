@@ -93,7 +93,7 @@ class Inception(object):
                     'backup_dbname': row[8],
                     'execute_time': row[9],
                     'SQLSHA1': row[10]
-                } 
+                }
                 for row in result
             ]
         return Dataset
@@ -105,16 +105,16 @@ class Inception(object):
             result = cursor.fetchall()
             Dataset = [
                 {
-                    'ID': row[0], 
-                    'stage': row[1], 
-                    'errlevel': row[2], 
+                    'ID': row[0],
+                    'stage': row[1],
+                    'errlevel': row[2],
                     'stagestatus': row[3],
-                    'errormessage': row[4], 
-                    'sql': row[5], 
+                    'errormessage': row[4],
+                    'sql': row[5],
                     'affected_rows': row[6],
                     'SQLSHA1': row[10]
-                } 
-                for row in result 
+                }
+                for row in result
             ]
         return Dataset
 

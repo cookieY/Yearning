@@ -18,12 +18,10 @@ from libs.serializers import (
     MessagesUser
 )
 
-
 CUSTOM_ERROR = logging.getLogger('Yearning.core.views')
 
 
 class dashboard(baseview.BaseView):
-
     '''
 
     :argument 主页面展示数据接口api
@@ -39,8 +37,8 @@ class dashboard(baseview.BaseView):
     def get(self, request, args=None):
         if args == 'pie':
             try:
-                alter = SqlOrder.objects.filter(type=0,username=request.user).count()
-                sql = SqlOrder.objects.filter(type=1,username=request.user).count()
+                alter = SqlOrder.objects.filter(type=0, username=request.user).count()
+                sql = SqlOrder.objects.filter(type=1, username=request.user).count()
                 return Response([alter, sql])
             except Exception as e:
                 CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
@@ -68,10 +66,10 @@ class dashboard(baseview.BaseView):
                     count = Usermessage.objects.filter(
                         state='unread',
                         to_user=user
-                        ).aggregate(messagecount=Count('id'))
+                    ).aggregate(messagecount=Count('id'))
                     statement = Account.objects.filter(username=request.user).first()
                     if statement.id == 1:
-                        return Response({'count':count,'statement':statement.last_name})
+                        return Response({'count': count, 'statement': statement.last_name})
                     else:
                         return Response({'count': count, 'statement': '1'})
                 except Exception as e:
@@ -111,7 +109,7 @@ class dashboard(baseview.BaseView):
             info = Account.objects.filter(username=user).get()
             _serializers = UserINFO(info)
             permissions = grained.objects.filter(username=request.user).first()
-            return Response({'userinfo':_serializers.data, 'permissons': permissions.permissions})
+            return Response({'userinfo': _serializers.data, 'permissons': permissions.permissions})
 
         elif args == 'statement':
             Account.objects.filter(username=request.user).update(last_name='1')
@@ -151,17 +149,17 @@ class messages(baseview.BaseView):
             unread = Usermessage.objects.filter(
                 state='unread',
                 to_user=args
-                ).all().order_by('-time')
+            ).all().order_by('-time')
             serializers_unread = MessagesUser(unread, many=True)
             read = Usermessage.objects.filter(
                 state='read',
                 to_user=args
-                ).all().order_by('-time')
+            ).all().order_by('-time')
             serializers_read = MessagesUser(read, many=True)
             recovery = Usermessage.objects.filter(
                 state='recovery',
                 to_user=args
-                ).all().order_by('-time')
+            ).all().order_by('-time')
             serializers_recovery = MessagesUser(recovery, many=True)
             data = {'unread': serializers_unread.data, 'read': serializers_read.data,
                     'recovery': serializers_recovery.data}
@@ -199,7 +197,7 @@ class messages(baseview.BaseView):
                     to_user=str(args).rstrip('/'),
                     title=title,
                     time=time
-                    ).update(state=state)
+                ).update(state=state)
                 return Response('')
             except Exception as e:
                 CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
@@ -212,10 +210,8 @@ class messages(baseview.BaseView):
                 to_user=data[0],
                 title=data[1],
                 time=data[2]
-                ).update(state='recovery')
+            ).update(state='recovery')
             return Response('')
         except Exception as e:
             CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
             return HttpResponse(status=500)
-
-

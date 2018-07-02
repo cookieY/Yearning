@@ -136,32 +136,32 @@ LOGGING = {
         'standard': {
             'format': '%(asctime)s [%(threadName)s:%(thread)d] \
                       [%(name)s:%(lineno)d] [%(levelname)s]- %(message)s'}
-                    # 日志格式
+        # 日志格式
     },
     'filters': {
     },
     'handlers': {
         'error': {
-            'level':'ERROR',
-            'class':'logging.handlers.RotatingFileHandler',
+            'level': 'ERROR',
+            'class': 'logging.handlers.RotatingFileHandler',
             'filename': 'log/error.log',
-            'maxBytes':1024*1024*100,
+            'maxBytes': 1024 * 1024 * 100,
             'backupCount': 1,
-            'formatter':'standard'
-            },
+            'formatter': 'standard'
+        },
         'default': {
-            'level':'INFO',
-            'class':'logging.handlers.RotatingFileHandler',
-            'filename': 'log/all.log',     #日志输出文件
-            'maxBytes': 1024*1024*100,                  #文件大小
-            'backupCount': 1,                         #备份份数
-            'formatter':'standard',                   #使用哪种formatters日志格式
-            },
+            'level': 'INFO',
+            'class': 'logging.handlers.RotatingFileHandler',
+            'filename': 'log/all.log',  # 日志输出文件
+            'maxBytes': 1024 * 1024 * 100,  # 文件大小
+            'backupCount': 1,  # 备份份数
+            'formatter': 'standard',  # 使用哪种formatters日志格式
+        },
         'console': {
             'level': 'DEBUG',
             'class': 'logging.StreamHandler',
             'formatter': 'standard'
-            }
+        }
     },
     'loggers': {
         'django': {

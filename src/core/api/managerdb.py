@@ -21,14 +21,11 @@ CUSTOM_ERROR = logging.getLogger('Yearning.core.views')
 
 
 class management_db(baseview.SuperUserpermissions):
-
-
     '''
 
     :argument 数据库管理页面api 接口
 
     '''
-
 
     @grained_permissions
     def get(self, request, args=None):
@@ -102,7 +99,7 @@ class management_db(baseview.SuperUserpermissions):
                     username=data['username'],
                     password=data['password'],
                     port=data['port']
-                    )
+                )
                 return Response('ok')
             except Exception as e:
                 CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
@@ -165,7 +162,6 @@ class management_db(baseview.SuperUserpermissions):
 
 
 class dingding(baseview.SuperUserpermissions):
-
     '''
 
     dingding 相关

@@ -4,9 +4,9 @@
 
 <script>
   require(['emmet/emmet'], function (data) {
-    window.emmet = data.emmet;
-  });
-  const ace = require('brace');
+    window.emmet = data.emmet
+  })
+  const ace = require('brace')
   export default {
     name: 'editor',
     props: {
@@ -24,36 +24,37 @@
     watch: {
       value (val) {
         if (this.contentBackup !== val) {
-          this.editor.setValue(val, 1);
+          this.editor.setValue(val, 1)
         }
       },
       theme: function (newTheme) {
-        this.editor.setTheme('ace/theme/' + newTheme);
+        this.editor.setTheme('ace/theme/' + newTheme)
       },
       lang: function (newLang) {
-        this.editor.getSession().setMode('ace/mode/' + newLang);
+        this.editor.getSession().setMode('ace/mode/' + newLang)
       }
     },
     mounted () {
-      let vm = this;
-      require('brace/ext/emmet');
-      require('brace/ext/language_tools');
-      let editor = vm.editor = ace.edit(this.$el);
-      this.$emit('init', editor);
+      let vm = this
+      require('brace/ext/emmet')
+      require('brace/ext/language_tools')
+      let editor = vm.editor = ace.edit(this.$el)
+      this.$emit('init', editor)
       editor.setOptions({
         enableBasicAutocompletion: true,
-        enableLiveAutocompletion: true})
-      editor.$blockScrolling = Infinity;
-      editor.setFontSize(14);
-      editor.setOption('enableEmmet', true);
-      editor.getSession().setMode('ace/mode/mysql');
-      editor.setTheme('ace/theme/xcode');
-      editor.setValue(this.value, 1);
+        enableLiveAutocompletion: true
+      })
+      editor.$blockScrolling = Infinity
+      editor.setFontSize(14)
+      editor.setOption('enableEmmet', true)
+      editor.getSession().setMode('ace/mode/mysql')
+      editor.setTheme('ace/theme/xcode')
+      editor.setValue(this.value, 1)
       editor.on('change', function () {
-        let content = editor.getValue();
-        vm.$emit('input', content);
-        vm.contentBackup = content;
-      });
+        let content = editor.getValue()
+        vm.$emit('input', content)
+        vm.contentBackup = content
+      })
     }
   }
 </script>

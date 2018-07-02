@@ -16,7 +16,7 @@ from core.models import DatabaseList, Account, querypermissions, query_order, gl
 CUSTOM_ERROR = logging.getLogger('Yearning.core.views')
 
 
-class DateEncoder(simplejson.JSONEncoder):  #感谢的凉夜贡献
+class DateEncoder(simplejson.JSONEncoder):  # 感谢的凉夜贡献
 
     def default(self, o):
         if isinstance(o, datetime.datetime) or isinstance(o, datetime.date) or isinstance(o, datetime.time):
@@ -25,8 +25,6 @@ class DateEncoder(simplejson.JSONEncoder):  #感谢的凉夜贡献
 
 
 class search(baseview.BaseView):
-
-
     '''
     :argument   sql查询接口, 过滤非查询语句并返回查询结果。
                 可以自由limit数目 当limit数目超过配置文件规定的最大数目时将会采用配置文件的最大数目
@@ -64,7 +62,7 @@ class search(baseview.BaseView):
                             for k, v in l.items():
                                 if isinstance(v, bytes):
                                     for n in range(data_set['len']):
-                                        data_set['data'][n].update({k:'blob字段为不可呈现类型'})
+                                        data_set['data'][n].update({k: 'blob字段为不可呈现类型'})
                                 for i in custom_com['sensitive_list']:
                                     if k == i:
                                         for n in range(data_set['len']):
@@ -89,7 +87,7 @@ class search(baseview.BaseView):
             _c = DatabaseList.objects.filter(
                 connection_name=query_per.connection_name,
                 computer_room=query_per.computer_room
-                ).first()
+            ).first()
             try:
                 with con_database.SQLgo(
                         ip=_c.ip,
@@ -98,7 +96,7 @@ class search(baseview.BaseView):
                         port=_c.port,
                         db=base
                 ) as f:
-                    data_set = f.search(sql='desc %s'%table)
+                    data_set = f.search(sql='desc %s' % table)
                 return Response(data_set)
             except:
                 return Response('')
@@ -107,7 +105,6 @@ class search(baseview.BaseView):
 
 
 def replace_limit(sql, limit):
-
     '''
 
     :argument 根据正则匹配分析输入信息 当limit数目超过配置文件规定的最大数目时将会采用配置文件的最大数目
@@ -118,7 +115,7 @@ def replace_limit(sql, limit):
         sql += ';'
     if sql.startswith('show') == -1:
         return sql
-    sql_re = re.search(r'limit\s.*\d.*;',sql.lower())
+    sql_re = re.search(r'limit\s.*\d.*;', sql.lower())
     length = ''
     if sql_re is not None:
         c = re.search(r'\d.*', sql_re.group())
@@ -133,7 +130,7 @@ def replace_limit(sql, limit):
             sql = re.sub(r'limit\s.*\d.*;', 'limit %s;' % limit, sql)
             return sql
     else:
-        sql = sql.rstrip(';') + ' limit %s;'%limit
+        sql = sql.rstrip(';') + ' limit %s;' % limit
         return sql
 
 
@@ -168,7 +165,7 @@ class query_worklf(baseview.BaseView):
 
         work_id = request.data['workid']
         user = request.data['user']
-        data = querypermissions.objects.filter(work_id=work_id,username=user).all().order_by('-id')
+        data = querypermissions.objects.filter(work_id=work_id, username=user).all().order_by('-id')
         serializers = Query_list(data, many=True)
         return Response(serializers.data)
 
@@ -202,7 +199,7 @@ class query_worklf(baseview.BaseView):
                 query_per=query_per,
                 connection_name=connection_name,
                 computer_room=computer_room,
-                export= export,
+                export=export,
                 audit=audit,
                 time=util.date()
             )
@@ -218,7 +215,9 @@ class query_worklf(baseview.BaseView):
             t = threading.Thread(target=query_worklf.query_callback, args=(query_info.timer, work_id))
             t.start()
             userinfo = Account.objects.filter(username=query_info.username).first()
-            thread = threading.Thread(target=push_message, args=({'to_user': query_info.username, 'workid': query_info.work_id}, 6, query_info.username, userinfo.email, work_id, '同意'))
+            thread = threading.Thread(target=push_message, args=(
+            {'to_user': query_info.username, 'workid': query_info.work_id}, 6, query_info.username, userinfo.email,
+            work_id, '同意'))
             thread.start()
             return Response('查询工单状态已更新！')
 
@@ -227,7 +226,9 @@ class query_worklf(baseview.BaseView):
             query_order.objects.filter(work_id=work_id).update(query_per=0)
             query_info = query_order.objects.filter(work_id=work_id).order_by('-id').first()
             userinfo = Account.objects.filter(username=query_info.username).first()
-            thread = threading.Thread(target=push_message, args=({'to_user': query_info.username, 'workid': query_info.work_id}, 7, query_info.username, userinfo.email,work_id, '驳回'))
+            thread = threading.Thread(target=push_message, args=(
+            {'to_user': query_info.username, 'workid': query_info.work_id}, 7, query_info.username, userinfo.email,
+            work_id, '驳回'))
             thread.start()
             return Response('查询工单状态已更新！')
 
@@ -250,13 +251,13 @@ class query_worklf(baseview.BaseView):
             database = query_order.objects.filter(username=request.user).order_by('-id').first()
             _connection = DatabaseList.objects.filter(connection_name=database.connection_name).first()
             with con_database.SQLgo(ip=_connection.ip,
-                        user=_connection.username,
-                        password=_connection.password,
-                        port=_connection.port) as f:
+                                    user=_connection.username,
+                                    password=_connection.password,
+                                    port=_connection.port) as f:
                 dataname = f.query_info(sql='show databases')
             children = []
             ignore = ['information_schema', 'sys', 'performance_schema', 'mysql']
-            for index,uc in enumerate(dataname):
+            for index, uc in enumerate(dataname):
                 for cc in ignore:
                     if uc['Database'] == cc:
                         del dataname[index]
@@ -269,7 +270,7 @@ class query_worklf(baseview.BaseView):
                                         db=i['Database']) as f:
                     tablename = f.query_info(sql='show tables')
                 for c in tablename:
-                    key = 'Tables_in_%s'%i['Database']
+                    key = 'Tables_in_%s' % i['Database']
                     children.append({
                         'title': c[key]
                     })
@@ -283,7 +284,7 @@ class query_worklf(baseview.BaseView):
                 'expand': 'true',
                 'children': tablelist
             }]
-            return Response({'info':json.dumps(data),'status': database.export})
+            return Response({'info': json.dumps(data), 'status': database.export})
 
     def delete(self, request, args: str = None):
 
@@ -305,7 +306,8 @@ def push_message(message=None, type=None, user=None, to_addr=None, work_id=None,
             if tag.message['ding']:
                 un_init = util.init_conf()
                 webhook = ast.literal_eval(un_init['message'])
-                util.dingding(content='查询申请通知\n工单编号:%s\n发起人:%s\n状态:%s' % (work_id, user, status), url=webhook['webhook'])
+                util.dingding(content='查询申请通知\n工单编号:%s\n发起人:%s\n状态:%s' % (work_id, user, status),
+                              url=webhook['webhook'])
         except ValueError as e:
             CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
 
@@ -322,7 +324,6 @@ class Query_order(baseview.SuperUserpermissions):
         return Response({'data': serializers.data, 'pn': pn})
 
     def post(self, request, args: str = None):
-
         work_id_list = json.loads(request.data['work_id'])
         for i in work_id_list:
             query_order.objects.filter(work_id=i).delete()

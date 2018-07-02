@@ -31,7 +31,7 @@ class SQLgo(object):
             db=self.db,
             charset='utf8mb4',
             port=self.port
-            )
+        )
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
@@ -46,7 +46,7 @@ class SQLgo(object):
         return result
 
     def search(self, sql=None):
-        data_dict=[]
+        data_dict = []
         id = 0
         with self.con.cursor(cursor=pymysql.cursors.DictCursor) as cursor:
             sqllist = sql
@@ -83,12 +83,12 @@ class SQLgo(object):
             result = cursor.fetchall()
             td = [
                 {
-                    'Field': i[0], 
+                    'Field': i[0],
                     'Type': i[1],
                     'Extra': i[2],
                     'TableComment': i[3]
                 } for i in result
-                ]
+            ]
         return td
 
     def gen_alter(self, table_name):
@@ -130,21 +130,21 @@ class SQLgo(object):
             result = cursor.fetchall()
             di = [
                 {
-                    'Non_unique': '是', 
-                    'key_name': i[2], 
-                    'column_name': i[4], 
+                    'Non_unique': '是',
+                    'key_name': i[2],
+                    'column_name': i[4],
                     'index_type': i[10]
                 }
                 if i[1] == 0
-                else 
+                else
                 {
-                    'Non_unique': '否', 
-                    'key_name': i[2], 
-                    'column_name': i[4], 
+                    'Non_unique': '否',
+                    'key_name': i[2],
+                    'column_name': i[4],
                     'index_type': i[10]
                 }
-                for i in result 
-                ]
+                for i in result
+            ]
 
             dic = {}
             c = []

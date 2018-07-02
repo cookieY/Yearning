@@ -1,7 +1,8 @@
 <style lang="less">
   @import '../../styles/common.less';
   @import '../Order/components/table.less';
-  .top{
+
+  .top {
     padding: 10px;
     background: rgba(0, 153, 229, .7);
     color: #fff;
@@ -18,13 +19,16 @@
           工单{{ this.$route.query.workid }}详细信息
           <br>
           <Button type="text" v-if="this.$route.query.status === 1" @click.native="_RollBack()">查看回滚语句</Button>
-          <Button type="text" v-else-if="this.$route.query.status === 0 && this.$route.query.type === 1" @click.native="PutData()">重新提交</Button>
+          <Button type="text" v-else-if="this.$route.query.status === 0 && this.$route.query.type === 1"
+                  @click.native="PutData()">重新提交
+          </Button>
           <Button type="text" v-if="this.$route.query.status === 2" @click.native="delorder()">工单撤销</Button>
-          <Button type="text"  @click.native="$router.go(-1)">返回</Button>
+          <Button type="text" @click.native="$router.go(-1)">返回</Button>
         </p>
         <Row>
           <Col span="24">
-            <Table border :columns="tabcolumns" :data="TableDataNew" class="tabletop" style="background: #5cadff" size="large"></Table>
+            <Table border :columns="tabcolumns" :data="TableDataNew" class="tabletop" style="background: #5cadff"
+                   size="large"></Table>
           </Col>
         </Row>
       </Card>
@@ -33,7 +37,7 @@
       <div class="top">返回顶端</div>
     </BackTop>
 
-    <Modal v-model="reloadsql"  :ok-text="'提交工单'" width="800" @on-ok="_Putorder">
+    <Modal v-model="reloadsql" :ok-text="'提交工单'" width="800" @on-ok="_Putorder">
       <Row>
         <Card>
           <div class="step-header-con">
@@ -55,7 +59,7 @@
             </FormItem>
             <FormItem label="执行SQL:">
               <template v-if="sqltype===0">
-              <Input v-model="sql" type="textarea" :rows="8"></Input>
+                <Input v-model="sql" type="textarea" :rows="8"></Input>
               </template>
               <template v-else>
                 <p v-for="i in ddlsql">{{i}}</p>
@@ -78,160 +82,145 @@
 </template>
 
 <script>
-import util from '../../libs/util'
-import axios from 'axios'
-//
-export default {
-  name: 'myorder-list',
-  data () {
-    return {
-      tabcolumns: [
-        {
-          title: 'sql语句',
-          key: 'sql'
+  import util from '../../libs/util'
+  import axios from 'axios'
+  //
+  export default {
+    name: 'myorder-list',
+    data () {
+      return {
+        tabcolumns: [
+          {
+            title: 'sql语句',
+            key: 'sql'
+          },
+          {
+            title: '状态',
+            key: 'state',
+            width: 250
+          },
+          {
+            title: '错误信息',
+            key: 'error',
+            width: 400
+          },
+          {
+            title: '影响行数',
+            key: 'affectrow',
+            width: 100
+          },
+          {
+            title: '执行时间/秒',
+            key: 'execute_time',
+            width: 200
+          }
+        ],
+        TableDataNew: [],
+        sql: '',
+        openswitch: false,
+        single: false,
+        reloadsql: false,
+        formItem: {
+          computer_room: '',
+          connection_name: '',
+          basename: '',
+          username: '',
+          bundle_id: null
         },
-        {
-          title: '状态',
-          key: 'state',
-          width: 250
-        },
-        {
-          title: '错误信息',
-          key: 'error',
-          width: 400
-        },
-        {
-          title: '影响行数',
-          key: 'affectrow',
-          width: 100
-        },
-        {
-          title: '执行时间/秒',
-          key: 'execute_time',
-          width: 200
+        ddlsql: [],
+        sqltype: null,
+        dmlorddl: null
+      }
+    },
+    methods: {
+      _RollBack () {
+        if (this.TableDataNew[1].state.length === 40) {
+          this.openswitch = true
+          let opid = this.TableDataNew.map(item => item.sequence)
+          opid.splice(0, 1)
+          axios.post(`${util.url}/detail/`, {'opid': JSON.stringify(opid), 'id': this.$route.query.id})
+            .then(res => {
+              this.formItem = res.data.data
+              this.formItem.backup = '0'
+              this.ddlsql = res.data.sql
+              this.sqltype = res.data.type
+              this.reloadsql = true
+            })
+            .catch(() => {
+              util.err_notice('无法获得相关回滚数据,请确认备份库配置正确及备份规则')
+            })
+        } else {
+          this.$Message.error('此工单没有备份或语句执行失败!')
         }
-      ],
-      TableDataNew: [],
-      sql: '',
-      openswitch: false,
-      single: false,
-      reloadsql: false,
-      formItem: {
-        computer_room: '',
-        connection_name: '',
-        basename: '',
-        username: '',
-        bundle_id: null
       },
-      ddlsql: [],
-      sqltype: null,
-      dmlorddl: null
-    }
-  },
-  methods: {
-    _RollBack () {
-      if (this.TableDataNew[1].state.length === 40) {
-        this.openswitch = true
-        let opid = this.TableDataNew.map(item => item.sequence)
-        opid.splice(0, 1)
-        axios.post(`${util.url}/detail/`, {'opid': JSON.stringify(opid), 'id': this.$route.query.id})
-        .then(res => {
-          this.formItem = res.data.data
-          this.formItem.backup = '0'
-          this.ddlsql = res.data.sql
-          this.sqltype = res.data.type
-          this.reloadsql = true
-        })
-        .catch(() => {
-          this.$Notice.error({
-            title: '警告',
-            desc: '无法获得相关回滚数据,请确认备份库配置正确及备份规则'
-          })
-        })
-      } else {
-        this.$Message.error('此工单没有备份或语句执行失败!')
-      }
-    },
-    PutData () {
-      axios.put(`${util.url}/detail`, {'id': this.$route.query.id})
-        .then(res => {
-          this.formItem = res.data.data
-          this.sql = res.data.sql
-          this.sqltype = res.data.type
-        })
-        .catch(error => {
-          util.ajanxerrorcode(this, error)
-        })
-      this.reloadsql = true
-    },
-    _Putorder () {
-      if (this.sqltype === 0) {
-        let _tmpsql = this.sql.replace(/(;|；)$/gi, '').replace(/\s/g, ' ').replace(/；/g, ';').split(';')
-        axios.post(`${util.url}/sqlsyntax/`, {
-          'data': JSON.stringify(this.formItem),
-          'sql': JSON.stringify(_tmpsql),
-          'user': sessionStorage.getItem('user'),
-          'type': this.dmlorddl,
-          'id': this.formItem.bundle_id
-        })
-          .then(() => {
-            this.$Notice.info({
-              title: '通知',
-              desc: '工单已提交成功'
-            })
+      PutData () {
+        axios.put(`${util.url}/detail`, {'id': this.$route.query.id})
+          .then(res => {
+            this.formItem = res.data.data
+            this.sql = res.data.sql
+            this.sqltype = res.data.type
           })
           .catch(error => {
-            util.ajanxerrorcode(this, error)
+            util.err_notice(error)
           })
-      } else {
-        axios.post(`${util.url}/sqlsyntax/`, {
-          'data': JSON.stringify(this.formItem),
-          'sql': JSON.stringify(this.ddlsql),
-          'user': sessionStorage.getItem('user'),
-          'type': this.dmlorddl,
-          'id': this.formItem.bundle_id
-        })
-          .then(() => {
-            this.$Notice.info({
-              title: '通知',
-              desc: '工单已提交成功'
+        this.reloadsql = true
+      },
+      _Putorder () {
+        if (this.sqltype === 0) {
+          let _tmpsql = this.sql.replace(/(;|；)$/gi, '').replace(/\s/g, ' ').replace(/；/g, ';').split(';')
+          axios.post(`${util.url}/sqlsyntax/`, {
+            'data': JSON.stringify(this.formItem),
+            'sql': JSON.stringify(_tmpsql),
+            'user': sessionStorage.getItem('user'),
+            'type': this.dmlorddl,
+            'id': this.formItem.bundle_id
+          })
+            .then(() => {
+              util.notice('工单已提交成功')
             })
+            .catch(error => {
+              util.err_notice(error)
+            })
+        } else {
+          axios.post(`${util.url}/sqlsyntax/`, {
+            'data': JSON.stringify(this.formItem),
+            'sql': JSON.stringify(this.ddlsql),
+            'user': sessionStorage.getItem('user'),
+            'type': this.dmlorddl,
+            'id': this.formItem.bundle_id
+          })
+            .then(() => {
+              util.notice('工单已提交成功')
+            })
+            .catch(error => {
+              util.err_notice(error)
+            })
+        }
+      },
+      delorder () {
+        let _list = []
+        _list.push({'status': this.$route.query.status, 'id': this.$route.query.id})
+        axios.post(`${util.url}/undoOrder`, {
+          'id': JSON.stringify(_list)
+        })
+          .then(res => {
+            util.notice(res.data)
+            this.$router.go(-1)
           })
           .catch(error => {
-            util.ajanxerrorcode(this, error)
+            util.err_notice(error)
           })
       }
     },
-    delorder () {
-      let _list = []
-      _list.push({'status': this.$route.query.status, 'id': this.$route.query.id})
-      axios.post(`${util.url}/undoOrder`, {
-        'id': JSON.stringify(_list)
-      })
+    mounted () {
+      axios.get(`${util.url}/detail?workid=${this.$route.query.workid}&status=${this.$route.query.status}&id=${this.$route.query.id}`)
         .then(res => {
-          this.$Notice.info({
-            title: '信息',
-            desc: res.data
-          })
-          this.$router.go(-1)
+          this.TableDataNew = res.data.data
+          this.dmlorddl = res.data.type
         })
         .catch(error => {
-          util.ajanxerrorcode(this, error)
+          util.err_notice(error)
         })
     }
-  },
-  mounted () {
-   axios.get(`${util.url}/detail?workid=${this.$route.query.workid}&status=${this.$route.query.status}&id=${this.$route.query.id}`)
-     .then(res => {
-       this.TableDataNew = res.data.data
-       this.dmlorddl = res.data.type
-     })
-     .catch(error => {
-       this.$Notice.error({
-         title: '警告',
-         desc: error
-       })
-     })
   }
-}
 </script>

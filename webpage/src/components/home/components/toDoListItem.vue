@@ -22,17 +22,16 @@ export default {
   name: 'toDoListItem',
   data () {
     return {
-      itemkey: false
+      todoitem: false
     };
   },
   props: {
-    content: String,
-    todoitem: Boolean
+    content: String
   },
   methods: {
     handleHasDid (val) {
       let vm = this
-      this.todoitem = true
+      this.todoitem = false
       setTimeout(function () {
         vm.$emit('deltodo', val)
       }, 2000)

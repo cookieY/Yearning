@@ -15,7 +15,8 @@
             >
               <Button type="text" style="margin-left: -1%">删除记录</Button>
             </Poptip>
-            <Table border :columns="permissoncolums" :data="query_info" stripe ref="selection" @on-selection-change="delrecordList"></Table>
+            <Table border :columns="permissoncolums" :data="query_info" stripe ref="selection"
+                   @on-selection-change="delrecordList"></Table>
             <br>
             <Page :total="per_pn" show-elevator @on-change="permisson_list" :page-size="20" ref="perpage"></Page>
           </Col>
@@ -23,29 +24,29 @@
       </Card>
     </Row>
 
-    <Modal v-model="editInfodModal"  :width="800">
+    <Modal v-model="editInfodModal" :width="800">
       <h3 slot="header" style="color:#2D8CF0">查询申请单详细内容</h3>
       <Form :label-width="120" label-position="right">
-          <FormItem label="机房">
-            <p>{{query.computer_room}}</p>
-          </FormItem>
-          <hr style="height:1px;border:none;border-top:1px dashed #dddee1;" />
-          <br>
-          <FormItem label="连接名:">
-            <p>{{query.connection_name}}</p>
-          </FormItem>
-          <hr style="height:1px;border:none;border-top:1px dashed #dddee1;" />
-          <br>
-          <FormItem label="查询时限:">
-            <p>{{query.timer}}分钟</p>
-          </FormItem>
-          <hr style="height:1px;border:none;border-top:1px dashed #dddee1;" />
-          <br>
-          <FormItem label="导出数据:">
-            <p v-if="query.export === 1">是</p>
-            <p v-else>否</p>
-          </FormItem>
-        <hr style="height:1px;border:none;border-top:1px dashed #dddee1;" />
+        <FormItem label="机房">
+          <p>{{query.computer_room}}</p>
+        </FormItem>
+        <hr style="height:1px;border:none;border-top:1px dashed #dddee1;"/>
+        <br>
+        <FormItem label="连接名:">
+          <p>{{query.connection_name}}</p>
+        </FormItem>
+        <hr style="height:1px;border:none;border-top:1px dashed #dddee1;"/>
+        <br>
+        <FormItem label="查询时限:">
+          <p>{{query.timer}}分钟</p>
+        </FormItem>
+        <hr style="height:1px;border:none;border-top:1px dashed #dddee1;"/>
+        <br>
+        <FormItem label="导出数据:">
+          <p v-if="query.export === 1">是</p>
+          <p v-else>否</p>
+        </FormItem>
+        <hr style="height:1px;border:none;border-top:1px dashed #dddee1;"/>
         <br>
         <FormItem label="查询说明:">
           <Input v-model="query.instructions" type="textarea" :autosize="{minRows: 5,maxRows: 8}" readonly></Input>
@@ -64,6 +65,7 @@
 <script>
   import axios from 'axios'
   import util from '../../libs/util'
+
   export default {
     name: 'Query_audit',
     data () {
@@ -182,21 +184,18 @@
             this.per_pn = res.data['pn']
           })
           .catch(error => {
-            util.ajanxerrorcode(this, error)
+            util.err_notice(error)
           })
       },
       delrecordData () {
         axios.post(`${util.url}/query_order/`, {'work_id': JSON.stringify(this.delrecord)})
           .then(res => {
-            this.$Notice.info({
-              title: '通知',
-              desc: res.data
-            })
+            util.notice(res.data)
             this.$refs.perpage.currentPage = 1
             this.permisson_list()
           })
           .catch(error => {
-            util.ajanxerrorcode(this, error)
+            util.err_notice(error)
           })
       },
       delrecordList (vl) {
@@ -213,16 +212,13 @@
             'work_id': this.query.work_id
           })
           .then(res => {
-            this.$Notice.info({
-              title: '通知',
-              desc: res.data
-            })
+            util.notice(res.data)
             this.editInfodModal = false
             this.$refs.perpage.currentPage = 1
             this.permisson_list()
           })
           .catch(error => {
-            util.ajanxerrorcode(this, error)
+            util.err_notice(error)
           })
       },
       reject () {
@@ -232,16 +228,13 @@
             'work_id': this.query.work_id
           })
           .then(res => {
-            this.$Notice.info({
-              title: '通知',
-              desc: res.data
-            })
+            util.notice(res.data)
             this.editInfodModal = false
             this.$refs.perpage.currentPage = 1
             this.permisson_list()
           })
           .catch(error => {
-            util.ajanxerrorcode(this, error)
+            util.err_notice(error)
           })
       }
     },

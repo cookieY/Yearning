@@ -7,22 +7,24 @@ from core.models import DatabaseList
 from core.models import SqlDictionary
 from core.models import SqlRecord
 from core.models import Account
-from core.models import SqlOrder, query_order, querypermissions,globalpermissions
+from core.models import SqlOrder, query_order, querypermissions, globalpermissions
 
 
 class Globalpermissions(serializers.HyperlinkedModelSerializer):
     '''
     站内信列表serializers
     '''
+
     class Meta:
         model = globalpermissions
-        fields = ('inception', 'ldap','other','message')
+        fields = ('inception', 'ldap', 'other', 'message')
 
 
 class MessagesUser(serializers.HyperlinkedModelSerializer):
     '''
     站内信列表serializers
     '''
+
     class Meta:
         model = Usermessage
         fields = ('title', 'time')
@@ -32,26 +34,29 @@ class UserINFO(serializers.HyperlinkedModelSerializer):
     '''
     平台用户信息列表serializers
     '''
+
     class Meta:
         model = Account
-        fields = ('id','username', 'group', 'department', 'email')
+        fields = ('id', 'username', 'group', 'department', 'email')
 
 
 class SQLGeneratDic(serializers.HyperlinkedModelSerializer):
     '''
     数据库字典信息serializers
     '''
+
     class Meta:
         model = SqlDictionary
         fields = (
-            'BaseName', 'TableName', 'Field', 'Type','Extra', 'TableComment'
-            )
+            'BaseName', 'TableName', 'Field', 'Type', 'Extra', 'TableComment'
+        )
 
 
 class Sqllist(serializers.HyperlinkedModelSerializer):
     '''
     数据库连接信息serializers
     '''
+
     class Meta:
         model = DatabaseList
         fields = ('id', 'connection_name', 'ip', 'computer_room', 'password', 'port', 'username')
@@ -61,6 +66,7 @@ class query_con(serializers.HyperlinkedModelSerializer):
     '''
     查询连接信息serializers
     '''
+
     class Meta:
         model = DatabaseList
         fields = ('connection_name', 'computer_room')
@@ -70,6 +76,7 @@ class Area(serializers.HyperlinkedModelSerializer):
     '''
     SQL提交及表结构修改页面数据库连接信息返回serializers
     '''
+
     class Meta:
         model = DatabaseList
         fields = ('id', 'connection_name', 'ip', 'computer_room')
@@ -79,15 +86,17 @@ class Record(serializers.HyperlinkedModelSerializer):
     '''
     执行工单的详细信息serializers
     '''
+
     class Meta:
         model = SqlRecord
-        fields = ('sql', 'state', 'error', 'affectrow','sequence','execute_time')
+        fields = ('sql', 'state', 'error', 'affectrow', 'sequence', 'execute_time')
 
 
 class Getdingding(serializers.HyperlinkedModelSerializer):
     '''
     dingding webhook serializers
     '''
+
     class Meta:
         model = DatabaseList
         fields = ('id', 'before', 'after', 'url')
@@ -106,7 +115,6 @@ class Recordinfo(serializers.HyperlinkedModelSerializer):
 
 
 class Query_review(serializers.HyperlinkedModelSerializer):
-
     '''
 
     查询审计
@@ -115,7 +123,9 @@ class Query_review(serializers.HyperlinkedModelSerializer):
 
     class Meta:
         model = query_order
-        fields = ('work_id', 'username', 'timer', 'date', 'instructions', 'query_per', 'connection_name', 'computer_room', 'export', 'time')
+        fields = (
+        'work_id', 'username', 'timer', 'date', 'instructions', 'query_per', 'connection_name', 'computer_room',
+        'export', 'time')
 
 
 class Query_list(serializers.HyperlinkedModelSerializer):
@@ -128,4 +138,3 @@ class Query_list(serializers.HyperlinkedModelSerializer):
     class Meta:
         model = querypermissions
         fields = ('id', 'statements')
-

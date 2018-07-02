@@ -1,5 +1,5 @@
 <style>
-  label{
+  label {
     font-size: 30px;
   }
 </style>
@@ -15,39 +15,39 @@
           </p>
           <Row>
             <Col span="12">
-          <Card>
-            <p slot="title">Inception配置</p>
-          <Form :label-width="120">
-            <FormItem label="地址:">
-              <Input placeholder="Inception ip地址" v-model="inception.host"></Input>
-            </FormItem>
-            <FormItem label="端口:">
-              <Input placeholder="Inception 端口" v-model="inception.port"></Input>
-            </FormItem>
-            <FormItem label="用户名:">
-              <Input placeholder="Inception 用户名" v-model="inception.user"></Input>
-            </FormItem>
-            <FormItem label="密码:">
-              <Input placeholder="Inception 密码(如未设置密码则不填写)" type="password" v-model="inception.password"></Input>
-            </FormItem>
-            <FormItem label="备份库地址:">
-              <Input placeholder="备份库 地址" v-model="inception.back_host"></Input>
-            </FormItem>
-            <FormItem label="备份库端口:">
-              <Input placeholder="备份库 端口" v-model="inception.back_port"></Input>
-            </FormItem>
-            <FormItem label="备份库用户名:">
-              <Input placeholder="备份库 用户名" v-model="inception.back_user"></Input>
-            </FormItem>
-            <FormItem label="备份库密码:">
-              <Input placeholder="备份库 密码(如未设置密码则不填写)" type="password" v-model="inception.back_password"></Input>
-            </FormItem>
-          </Form>
-          </Card>
+              <Card>
+                <p slot="title">Inception配置</p>
+                <Form :label-width="120">
+                  <FormItem label="地址:">
+                    <Input placeholder="Inception ip地址" v-model="inception.host"></Input>
+                  </FormItem>
+                  <FormItem label="端口:">
+                    <Input placeholder="Inception 端口" v-model="inception.port"></Input>
+                  </FormItem>
+                  <FormItem label="用户名:">
+                    <Input placeholder="Inception 用户名" v-model="inception.user"></Input>
+                  </FormItem>
+                  <FormItem label="密码:">
+                    <Input placeholder="Inception 密码(如未设置密码则不填写)" type="password" v-model="inception.password"></Input>
+                  </FormItem>
+                  <FormItem label="备份库地址:">
+                    <Input placeholder="备份库 地址" v-model="inception.back_host"></Input>
+                  </FormItem>
+                  <FormItem label="备份库端口:">
+                    <Input placeholder="备份库 端口" v-model="inception.back_port"></Input>
+                  </FormItem>
+                  <FormItem label="备份库用户名:">
+                    <Input placeholder="备份库 用户名" v-model="inception.back_user"></Input>
+                  </FormItem>
+                  <FormItem label="备份库密码:">
+                    <Input placeholder="备份库 密码(如未设置密码则不填写)" type="password" v-model="inception.back_password"></Input>
+                  </FormItem>
+                </Form>
+              </Card>
             </Col>
             <Col span="12">
-          <Card style="margin-left: 5%">
-            <p slot="title">LDAP设置</p>
+              <Card style="margin-left: 5%">
+                <p slot="title">LDAP设置</p>
                 <Form :label-width="120">
                   <FormItem label="LDAP认证类型:">
                     <Select v-model="ldap.type">
@@ -73,7 +73,7 @@
                   </FormItem>
                   <Button type="primary" @click="ldap_test()">ldap测试</Button>
                 </Form>
-          </Card>
+              </Card>
               <br>
               <Alert style="margin-left: 5%" type="warning" show-icon>
                 注意事项：
@@ -146,16 +146,20 @@
                     <Input placeholder="查询最大的Limit数。" v-model="other.limit"></Input>
                   </FormItem>
                   <FormItem label="自定义机房:">
-                    <Tag v-for="item in other.con_room" :key="item" :name="item" type="border" closable color="blue" @on-close="handleClose2" >{{ item }}</Tag>
+                    <Tag v-for="item in other.con_room" :key="item" :name="item" type="border" closable color="blue"
+                         @on-close="handleClose2">{{ item }}
+                    </Tag>
                     <br>
                     <Input placeholder="机房名称" v-model="other.foce" style="width: 30%"></Input>
-                    <Button icon="ios-plus-empty" type="dashed" size="small" @click="handleAdd" >添加机房</Button>
+                    <Button icon="ios-plus-empty" type="dashed" size="small" @click="handleAdd">添加机房</Button>
                   </FormItem>
                   <FormItem label="脱敏字段:">
-                    <Tag v-for="v in other.sensitive_list" :key="v" :name="v" type="border" closable color="blue" @on-close="handleClose3" >{{ v }}</Tag>
+                    <Tag v-for="v in other.sensitive_list" :key="v" :name="v" type="border" closable color="blue"
+                         @on-close="handleClose3">{{ v }}
+                    </Tag>
                     <br>
                     <Input placeholder="脱敏字段设置" v-model="other.sensitive" style="width: 30%"></Input>
-                    <Button icon="ios-plus-empty" type="dashed" size="small" @click="handleAdd1" >添加脱敏字段</Button>
+                    <Button icon="ios-plus-empty" type="dashed" size="small" @click="handleAdd1">添加脱敏字段</Button>
                   </FormItem>
                   <Form-item label="多级审核开关:">
                     <i-switch size="large" @on-change="multi_switching" v-model="other.multi">
@@ -202,6 +206,7 @@
 <script>
   import util from '../../libs/util'
   import axios from 'axios'
+
   export default {
     name: 'Setting',
     data () {
@@ -247,23 +252,23 @@
     },
     methods: {
       handleAdd () {
-        this.other.con_room.push(this.other.foce);
+        this.other.con_room.push(this.other.foce)
         this.other.foce = ''
       },
       handleAdd1 () {
-        this.other.sensitive_list.push(this.other.sensitive);
+        this.other.sensitive_list.push(this.other.sensitive)
         this.other.sensitive = ''
       },
       handleClose2 (event, name) {
-        const index = this.other.con_room.indexOf(name);
-        this.other.con_room.splice(index, 1);
+        const index = this.other.con_room.indexOf(name)
+        this.other.con_room.splice(index, 1)
       },
       handleClose3 (event, name) {
-        const index = this.other.sensitive_list.indexOf(name);
-        this.other.sensitive_list.splice(index, 1);
+        const index = this.other.sensitive_list.indexOf(name)
+        this.other.sensitive_list.splice(index, 1)
       },
       multi_switching (status) {
-         this.other.multi = status
+        this.other.multi = status
       },
       multi_query (status) {
         this.other.query = status

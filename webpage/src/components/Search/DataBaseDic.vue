@@ -309,7 +309,7 @@ export default {
                               this.ResetData()
                             })
                             .catch(error => {
-                              util.ajanxerrorcode(this, error)
+                              util.err_notice(error)
                             })
                         } else {
                           this.$Notice.error({
@@ -357,10 +357,7 @@ export default {
           if (res.data === '1') {
             this.AddTable.open = true
           } else {
-            this.$Notice.error({
-              title: '警告:',
-              desc: '账号权限不足，无法提供修改功能！'
-            })
+            util.err_notice('账号权限不足，无法提供修改功能！')
           }
         })
     },
@@ -381,13 +378,10 @@ export default {
             'tablecomment': this.formDynamic.tablecomment
           })
             .then(res => {
-              this.$Notice.success({
-                title: '通知:',
-                desc: res.data
-              })
+              util.notice(res.data)
             })
             .catch(error => {
-              util.ajanxerrorcode(this, error)
+              util.err_notice(error)
             })
         } else {
           this.$Message.error('请填下相关必填项之后再提交!');
@@ -424,10 +418,7 @@ export default {
         })
         .then(res => {
           this.ExportData.urloff = true
-          this.$Notice.success({
-            title: '通知',
-            desc: res.data.status
-          })
+          util.notice(res.data.status)
           if (res.data.url === '') {
             this.ExportData.urloff = false
           } else {
@@ -436,7 +427,7 @@ export default {
           this.$Spin.hide();
         })
         .catch(error => {
-          util.ajanxerrorcode(this, error)
+          util.err_notice(error)
           this.$Spin.hide();
         })
     },
@@ -493,9 +484,7 @@ export default {
           this.$Spin.hide()
         })
         .catch(error => {
-          this.$Notice.error({
-            title: error
-          })
+          util.err_notice(error)
         })
     },
     // 表结构数据分页处理
@@ -510,10 +499,7 @@ export default {
           this.formItem.data = res.data
         })
         .catch(() => {
-          this.$Notice.error({
-            title: '警告',
-            desc: '分页获取失败!'
-          })
+          util.err_notice('分页获取失败!')
         })
       this.EditTableinfo.singleid = '0'
     },
@@ -528,10 +514,7 @@ export default {
           this.TmpData = res.data
         })
         .catch(() => {
-          this.$Notice.error({
-            title: '警告',
-            desc: '分页获取失败!'
-          })
+          util.err_notice('分页获取失败!')
         })
     },
     // 获得点击表名后获得的单表数据
@@ -548,10 +531,7 @@ export default {
             this.EditTableinfo.singleid = '1'
           })
           .catch(() => {
-            this.$Notice.error({
-              title: '警告',
-              desc: '表单数据获取失败!'
-            })
+            util.err_notice('表单数据获取失败!')
           })
       }
     },
@@ -567,10 +547,7 @@ export default {
           this.EditTableinfo.singleid = '1'
         })
         .catch(() => {
-          this.$Notice.error({
-            title: '警告',
-            desc: '表单数据获取失败!'
-          })
+          util.err_notice('表单数据获取失败!')
         })
     },
     // 重置按钮
@@ -594,10 +571,7 @@ export default {
             this.EditTableinfo.basename = c[0].BaseName
             this.EditTableinfo.tablename = c[0].TableName
           } else {
-            this.$Notice.error({
-              title: '警告:',
-              desc: '账号权限不足，无法提供修改功能！'
-            })
+            util.err_notice('账号权限不足，无法提供修改功能！')
           }
         })
     },
@@ -616,20 +590,14 @@ export default {
                 'ConnectionName': this.formItem.namedata
               })
               .then(() => {
-                this.$Notice.success({
-                  title: '通知',
-                  desc: `${c[0].TableName}表删除成功!`
-                })
+                util.notice(`${c[0].TableName}表删除成功!`)
                 this.ShowTableInfo()
               })
               .catch(error => {
-                util.ajanxerrorcode(this, error)
+                util.err_notice(error)
               })
           } else {
-            this.$Notice.error({
-              title: '警告:',
-              desc: '账号权限不足，无法提供删除功能！'
-            })
+            util.err_notice('账号权限不足，无法提供删除功能！')
           }
         })
     },
@@ -644,16 +612,11 @@ export default {
           'singleid': this.EditTableinfo.singleid
         })
         .then(res => {
-          this.$Notice.success({
-            title: '提示',
-            desc: `${this.EditTableinfo.tablename}表备注修改成功`
-          })
+          util.notice(`${this.EditTableinfo.tablename}表备注修改成功`)
           this.formItem.data = res.data
         })
         .catch(error => {
-          this.$Notice.error({
-            title: error
-          })
+          util.err_notice(error)
         })
       this.EditTableinfo.Onoff = false
     },
@@ -672,10 +635,7 @@ export default {
             this.EditTableinfo.tableName = row.TableName
             this.EditTableinfo.baseName = row.BaseName
           } else {
-            this.$Notice.error({
-              title: '警告:',
-              desc: '账号权限不足，无法提供修改功能！'
-            })
+            util.err_notice('账号权限不足，无法提供修改功能！')
           }
         })
     },
@@ -691,10 +651,7 @@ export default {
           'singleid': this.EditTableinfo.singleid
         })
         .then(res => {
-          this.$Notice.success({
-            title: '提示',
-            desc: `${this.EditTableinfo.tableName}字段更新成功`
-          })
+          util.notice(`${this.EditTableinfo.tableName}字段更新成功`)
           this.formItem.data = res.data
         })
         .catch(error => {
@@ -716,10 +673,7 @@ export default {
           this.formItem.info = res.data.map(item => item.BaseName)
         })
         .catch(error => {
-          this.$Notice.error({
-            title: '警告',
-            desc: error
-          })
+          util.err_notice(error)
         })
     }
   },
@@ -729,7 +683,7 @@ export default {
         this.TableList = res.data
       })
       .catch(error => {
-       util.ajanxerrorcode(this, error)
+       util.err_notice(error)
       })
   }
 }

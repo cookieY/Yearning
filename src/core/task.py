@@ -15,6 +15,7 @@ from .models import (
     SqlRecord,
     grained
 )
+
 CUSTOM_ERROR = logging.getLogger('Yearning.core.views')
 
 
@@ -24,6 +25,7 @@ def grained_permissions(func):
     :argument 装饰器函数,校验细化权限。非法请求直接返回401交由前端判断状态码
 
     '''
+
     @functools.wraps(func)
     def wrapper(self, request, args=None):
         if request.method == "PUT" and args != 'connection':
@@ -41,11 +43,11 @@ def grained_permissions(func):
                     return func(self, request, args)
                 else:
                     return HttpResponse(status=401)
+
     return wrapper
 
 
 class order_push_message(threading.Thread):
-
     '''
 
     :argument 同意执行工单调用该方法异步处理数据
@@ -134,42 +136,43 @@ class order_push_message(threading.Thread):
 
     def con_close(self):
 
-            Usermessage.objects.get_or_create(
-                from_user=self.from_user, time=util.date(),
-                title=self.title, content='该工单已审核通过!', to_user=self.to_user,
-                state='unread'
-            )
+        Usermessage.objects.get_or_create(
+            from_user=self.from_user, time=util.date(),
+            title=self.title, content='该工单已审核通过!', to_user=self.to_user,
+            state='unread'
+        )
 
-            content = DatabaseList.objects.filter(id=self.order.bundle_id).first()
-            mail = Account.objects.filter(username=self.to_user).first()
-            tag = globalpermissions.objects.filter(authorization='global').first()
+        content = DatabaseList.objects.filter(id=self.order.bundle_id).first()
+        mail = Account.objects.filter(username=self.to_user).first()
+        tag = globalpermissions.objects.filter(authorization='global').first()
 
-            if tag.message['ding']:
-                try:
-                    if content.url:
-                        util.dingding(
-                            content='工单执行通知\n工单编号:%s\n发起人:%s\n地址:%s\n工单备注:%s\n状态:已执行\n备注:%s'
-                                    % (self.order.work_id, self.order.username, self.addr_ip, self.order.text, content.after), url=content.url)
-                except Exception as e:
-                    CUSTOM_ERROR.error(f'{e.__class__.__name__}--钉钉推送失败: {e}')
+        if tag.message['ding']:
+            try:
+                if content.url:
+                    util.dingding(
+                        content='工单执行通知\n工单编号:%s\n发起人:%s\n地址:%s\n工单备注:%s\n状态:已执行\n备注:%s'
+                                % (
+                                self.order.work_id, self.order.username, self.addr_ip, self.order.text, content.after),
+                        url=content.url)
+            except Exception as e:
+                CUSTOM_ERROR.error(f'{e.__class__.__name__}--钉钉推送失败: {e}')
 
-            if tag.message['mail']:
-                try:
-                    if mail.email:
-                        mess_info = {
-                            'workid': self.order.work_id,
-                            'to_user': self.order.username,
-                            'addr': self.addr_ip,
-                            'text': self.order.text,
-                            'note': content.after}
-                        put_mess = send_email.send_email(to_addr=mail.email)
-                        put_mess.send_mail(mail_data=mess_info, type=0)
-                except Exception as e:
-                    CUSTOM_ERROR.error(f'{e.__class__.__name__}--邮箱推送失败: {e}')
+        if tag.message['mail']:
+            try:
+                if mail.email:
+                    mess_info = {
+                        'workid': self.order.work_id,
+                        'to_user': self.order.username,
+                        'addr': self.addr_ip,
+                        'text': self.order.text,
+                        'note': content.after}
+                    put_mess = send_email.send_email(to_addr=mail.email)
+                    put_mess.send_mail(mail_data=mess_info, type=0)
+            except Exception as e:
+                CUSTOM_ERROR.error(f'{e.__class__.__name__}--邮箱推送失败: {e}')
 
 
 class rejected_push_messages(threading.Thread):
-
     '''
 
     :argument 驳回工单调用该方法异步处理数据
@@ -227,7 +230,6 @@ class rejected_push_messages(threading.Thread):
 
 
 class submit_push_messages(threading.Thread):
-
     '''
 
     :argument 提交工单调用该方法异步处理数据

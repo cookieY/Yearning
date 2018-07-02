@@ -24,7 +24,6 @@ _conf.read('deploy.conf')
 
 
 def dingding(content: str = None, url: str = None):
-
     '''
 
     dingding webhook

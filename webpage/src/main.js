@@ -6,11 +6,12 @@ import iView from 'iview'
 import Vuex from 'vuex'
 import VueRouter from 'vue-router'
 import axios from 'axios'
-import {MainRoute} from './router'
+import { MainRoute } from './router'
 import store from './aspsm'
 import 'iview/dist/styles/iview.css'
 import util from './libs/util'
 import particles from 'particles.js/particles'
+
 Vue.config.productionTip = false
 Vue.use(particles)
 Vue.use(Vuex)
@@ -36,10 +37,10 @@ router.beforeEach((to, from, next) => {
     next(false)
   } else {
     if (!sessionStorage.getItem('user') && to.name !== 'login') { // 判断是否已经登录且前往的页面不是登录页
-      next({name: 'login'});
+      next({name: 'login'})
       iView.LoadingBar.finish()
     } else if (sessionStorage.getItem('user') && to.name === 'login') { // 判断是否已经登录且前往的是登录页
-      next({name: 'login'});
+      next({name: 'login'})
       iView.LoadingBar.finish()
     } else {
       next()
@@ -55,7 +56,7 @@ router.afterEach(() => {
 new Vue({
   el: '#Subnet',
   template: '<Subnet/>',
-  components: { Subnet },
+  components: {Subnet},
   store: store,
   router: router
 })
