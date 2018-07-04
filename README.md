@@ -5,7 +5,7 @@
 # Yearning SQL审核平台
 
 ![](https://img.shields.io/badge/build-release-brightgreen.svg)  
-![](https://img.shields.io/badge/version-v1.1.2-brightgreen.svg)  
+![](https://img.shields.io/badge/version-v1.2.0-brightgreen.svg)  
 ![](https://img.shields.io/badge/vue.js-2.5.0-brightgreen.svg) 
 ![](https://img.shields.io/badge/iview-2.8.0-brightgreen.svg?style=flat-square) 
 ![](https://img.shields.io/badge/python-3.6-brightgreen.svg)
@@ -56,7 +56,7 @@
 
 详细安装步骤请访问[www.yearning.io](http://yearning.io)获得帮助
 
-[使用说明](http://supermancookie.com/Yearning-document/)
+[使用及安装文档](http://supermancookie.com/Yearning-document/)
 
 ## Support 支持Yearning
 
