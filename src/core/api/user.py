@@ -30,7 +30,9 @@ PERMISSION = {
     'user': '0',
     'base': '0',
     'dicexport': '0',
-    'person': []
+    'person': [],
+    'query': '0',
+    'querycon': ''
 }
 
 

@@ -115,21 +115,45 @@ class management_db(baseview.SuperUserpermissions):
 
         '''
 
-        try:
-            ip = request.data['ip']
-            user = request.data['user']
-            password = request.data['password']
-            port = request.data['port']
-        except KeyError as e:
-            CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
-            return HttpResponse(status=500)
-        else:
+        if args == 'test':
+
             try:
-                with con_database.SQLgo(ip=ip, user=user, password=password, port=port):
-                    return Response('连接成功!')
-            except Exception as e:
+                ip = request.data['ip']
+                user = request.data['user']
+                password = request.data['password']
+                port = request.data['port']
+            except KeyError as e:
                 CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
-                return Response('连接失败!')
+                return HttpResponse(status=500)
+            else:
+                try:
+                    with con_database.SQLgo(ip=ip, user=user, password=password, port=port):
+                        return Response('连接成功!')
+                except Exception as e:
+                    CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
+                    return Response('连接失败!')
+
+        elif args == 'update':
+
+            try:
+                update_data = json.loads(request.data['data'])
+            except KeyError as e:
+                CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
+                return HttpResponse(status=500)
+            else:
+                try:
+                    DatabaseList.objects.filter(
+                        connection_name=update_data['connection_name'],
+                        computer_room=update_data['computer_room']).update(
+                        ip=update_data['ip'],
+                        username=update_data['username'],
+                        password=update_data['password'],
+                        port=update_data['port']
+                    )
+                    return Response('数据信息更新成功！')
+                except Exception as e:
+                    CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
+                    return HttpResponse(status=500)
 
     def delete(self, request, args=None):
 

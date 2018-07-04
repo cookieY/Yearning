@@ -149,9 +149,6 @@
               this.total = res.data['len']
             }
           })
-          .catch(error => {
-            util.err_notice(error)
-          })
       },
       editorInit: function () {
         require('brace/mode/mysql')

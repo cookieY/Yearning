@@ -194,7 +194,7 @@
                   7.设置脱敏字段后，查询时如匹配到对应字段则该字段将只会以******显示
                 </template>
               </Alert>
-              <Button style="margin-left: 5%;width: 95%" type="dashed" @click="save_upload">保存</Button>
+              <Button style="margin-left: 5%;width: 95%" type="primary" @click="save_upload">保存</Button>
             </Col>
           </Row>
         </Card>

@@ -134,6 +134,31 @@
         <Button type="primary" @click="savedingding()">添加</Button>
       </div>
     </Modal>
+
+    <Modal v-model="baseinfo" :width="500" okText="保存" @on-ok="update_base">
+      <h3 slot="header" style="color:#2D8CF0">数据库连接信息</h3>
+      <Form :label-width="100" label-position="right">
+        <FormItem label="机房">
+          <Input v-model="editbaseinfo.computer_room" readonly></Input>
+        </FormItem>
+        <FormItem label="连接名称:">
+          <Input v-model="editbaseinfo.connection_name" readonly></Input>
+        </FormItem>
+        <FormItem label="数据库地址:">
+          <Input v-model="editbaseinfo.ip"></Input>
+        </FormItem>
+        <FormItem label="端口:">
+          <Input v-model="editbaseinfo.port"></Input>
+        </FormItem>
+        <FormItem label="用户名:">
+          <Input v-model="editbaseinfo.username"></Input>
+        </FormItem>
+        <FormItem label="密码:">
+          <Input v-model="editbaseinfo.password" type="password"></Input>
+        </FormItem>
+      </Form>
+    </Modal>
+
   </div>
 </template>
 <script>
@@ -279,7 +304,9 @@
         dingdingid: null,
         dingurl: '',
         tmp_id: null,
-        diclist: []
+        diclist: [],
+        baseinfo: false,
+        editbaseinfo: {}
       }
     },
     methods: {
@@ -288,7 +315,7 @@
         this.formItem = {}
       },
       testlink () {
-        axios.put(util.url + '/management_db/', {
+        axios.put(util.url + '/management_db/test', {
           'ip': this.formItem.ip,
           'user': this.formItem.username,
           'password': this.formItem.password,
@@ -334,11 +361,8 @@
         })
       },
       edit_tab (index) {
-        this.$Modal.info({
-          title: '数据库连接信息',
-          content: `机房: ${this.rowdata[index].computer_room}<br> 连接名称：${this.rowdata[index].connection_name}<br>
-                  数据库地址：${this.rowdata[index].ip}<br>端口: ${this.rowdata[index].port}<br>用户名: ${this.rowdata[index].username}`
-        })
+        this.baseinfo = true
+        this.editbaseinfo = this.rowdata[index]
       },
       // 删除数据库
       deldatabases (index) {
@@ -526,6 +550,13 @@
           .catch(error => {
             util.err_notice(error)
           })
+      },
+      update_base () {
+        axios.put(`${util.url}/management_db/update`, {
+          'data': JSON.stringify(this.editbaseinfo)
+        })
+          .then(res => util.notice(res.data))
+          .catch(err => util.err_notice(err))
       }
     },
     mounted () {

@@ -54,7 +54,7 @@ urlpatterns = [
     url(r'^api/v1/workorder/(.*)', addressing.as_view()),
     url(r'^api/v1/myorder', order.as_view()),
     url(r'^api/v1/gensql/(.*)', gen_sql.as_view()),
-    url(r'^api/v1/management_db', management_db.as_view()),
+    url(r'^api/v1/management_db/(.*)', management_db.as_view()),
     url(r'^api/v1/audit_sql', audit.as_view()),
     url(r'^api/v1/sqldic/(.*)', dictionary.as_view()),
     url(r'^api/v1/auth_twice', authgroup.as_view()),
