@@ -124,7 +124,7 @@
             })
           })
           .catch(error => {
-            util.err_notice(error)
+            util.ajanxerrorcode(this, error)
           })
       },
       ldap_login () {
@@ -156,7 +156,7 @@
             }
           })
           .catch(error => {
-            util.err_notice(error)
+            util.ajanxerrorcode(this, error)
           })
       }
     },
