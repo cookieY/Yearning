@@ -50,7 +50,7 @@ urlpatterns = [
     url(r'^api/v1/query_worklf', query_worklf.as_view()),
     url(r'^api/v1/userinfo/(.*)', userinfo.as_view()),
     url(r'^api/v1/audit_grained/(.*)', audit_grained.as_view()),
-    url(r'^api/v1/apply_grained/(.*)', apply_grained.as_view()),
+    url(r'^api/v1/apply_grained', apply_grained.as_view()),
     url(r'^api/v1/workorder/(.*)', addressing.as_view()),
     url(r'^api/v1/myorder', order.as_view()),
     url(r'^api/v1/gensql/(.*)', gen_sql.as_view()),
