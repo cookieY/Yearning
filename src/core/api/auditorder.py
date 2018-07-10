@@ -147,8 +147,8 @@ class audit(baseview.SuperUserpermissions):
                     mail = Account.objects.filter(username=username).first()
                     SqlOrder.objects.filter(work_id=work_id).update(assigned=perform)
                     threading.Thread(target=push_message, args=(
-                        {'to_user': request.user, 'workid': work_id}, 2, request.user, mail.email, work_id,
-                        '已同意')).start()
+                        {'to_user': request.user, 'workid': work_id}, 99, request.user, mail.email, work_id,
+                        '已提交执行人')).start()
                     return Response('工单已提交执行人！')
 
             elif category == 'test':
@@ -224,7 +224,7 @@ def push_message(message=None, type=None, user=None, to_addr=None, work_id=None,
             if tag.message['ding']:
                 un_init = util.init_conf()
                 webhook = ast.literal_eval(un_init['message'])
-                util.dingding(content='工单审核通知\n工单编号:%s\n发起人:%s\n状态:%s' % (work_id, user, status),
+                util.dingding(content='工单转移通知\n工单编号:%s\n发起人:%s\n状态:%s' % (work_id, user, status),
                               url=webhook['webhook'])
         except ValueError as e:
             CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
