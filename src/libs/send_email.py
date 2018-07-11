@@ -94,21 +94,17 @@ class send_email(object):
                    '</body></html>' % (
                        mail_data['workid'],
                        mail_data['to_user'])
-        elif type == 99:
+        elif type == 9:
             text = '<html><body><h1>Yearning 工单转移通知</h1>' \
                    '<br><p>工单号: %s</p>' \
                    '<br><p>发起人: %s</p>' \
                    '<br><p>地址: <a href="%s">%s</a></p>' \
-                   '<br><p>工单备注: %s</p>' \
                    '<br><p>状态: 提交至执行人</p>' \
-                   '<br><p>备注: %s</p>' \
                    '</body></html>' % (
                        mail_data['workid'],
                        mail_data['to_user'],
                        mail_data['addr'],
-                       mail_data['addr'],
-                       mail_data['text'],
-                       mail_data['note'])
+                       mail_data['addr'])
         else:  # 提交
             text = '<html><body><h1>Yearning 工单提交通知</h1>' \
                    '<br><p>工单号: %s</p>' \
@@ -126,9 +122,7 @@ class send_email(object):
                        mail_data['note'])
         msg = MIMEText(text, 'html', 'utf-8')
         msg['From'] = self._format_addr('Yearning_Admin <%s>' % self.email['user'])
-        msg['To'] = self._format_addr('Dear_guest <%s>' % self.to_addr)
         msg['Subject'] = Header('Yearning 工单消息推送', 'utf-8').encode()
-
         server = smtplib.SMTP(self.email['smtp_host'], int(self.email['smtp_port']))
         server.set_debuglevel(1)
         server.login(self.email['user'], self.email['password'])

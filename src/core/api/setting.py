@@ -59,7 +59,6 @@ class setting_view(baseview.SuperUserpermissions):
 
                 msg = MIMEText('Yearning test Message!', 'plain', 'utf-8')
                 msg['From'] = _format_addr('Yearning_Admin <%s>' % mail['user'])
-                msg['To'] = _format_addr('Dear_guest <%s>' % [mail['to_user']])
                 msg['Subject'] = Header('Yearning 消息推送测试', 'utf-8').encode()
                 server = smtplib.SMTP(mail['smtp_host'], mail['smtp_port'])  # SMTP协议默认端口是25
                 server.set_debuglevel(1)
