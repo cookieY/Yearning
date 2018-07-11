@@ -147,7 +147,7 @@ class audit(baseview.SuperUserpermissions):
                     mail = Account.objects.filter(username=username).first()
                     SqlOrder.objects.filter(work_id=work_id).update(assigned=perform)
                     threading.Thread(target=push_message, args=(
-                        {'to_user': request.user, 'workid': work_id, 'addr': addr_ip}, 9, request.user, mail.email,
+                        {'to_user': perform, 'workid': work_id, 'addr': addr_ip}, 9, request.user, mail.email,
                         work_id,
                         '已提交执行人')).start()
                     return Response('工单已提交执行人！')
