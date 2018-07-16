@@ -108,8 +108,8 @@ class dashboard(baseview.BaseView):
             user = request.data['user']
             info = Account.objects.filter(username=user).get()
             _serializers = UserINFO(info)
-            permissions = grained.objects.filter(username=request.user).first()
-            return Response({'userinfo': _serializers.data, 'permissons': permissions.permissions})
+            permissions = grained.objects.filter(username=user).first()
+            return Response({'userinfo': _serializers.data, 'permissions': permissions.permissions})
 
         elif args == 'statement':
             Account.objects.filter(username=request.user).update(last_name='1')

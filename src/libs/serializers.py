@@ -6,7 +6,7 @@ from core.models import Usermessage
 from core.models import DatabaseList
 from core.models import SqlDictionary
 from core.models import SqlRecord
-from core.models import Account
+from core.models import Account, Auth_Group
 from core.models import SqlOrder, query_order, querypermissions, globalpermissions
 
 
@@ -37,7 +37,7 @@ class UserINFO(serializers.HyperlinkedModelSerializer):
 
     class Meta:
         model = Account
-        fields = ('id', 'username', 'group', 'department', 'email')
+        fields = ('id', 'username', 'group', 'department', 'email', 'auth_group')
 
 
 class SQLGeneratDic(serializers.HyperlinkedModelSerializer):
@@ -138,3 +138,13 @@ class Query_list(serializers.HyperlinkedModelSerializer):
     class Meta:
         model = querypermissions
         fields = ('id', 'statements')
+
+
+class AuthGroup_Serializers(serializers.HyperlinkedModelSerializer):
+    """
+    序列化权限组
+    """
+
+    class Meta:
+        model = Auth_Group
+        fields = ('id', 'group_name', 'permissions',)

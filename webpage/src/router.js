@@ -248,6 +248,15 @@ export const appRouter = [
         component: resolve => {
           require(['./components/Management/Setting.vue'], resolve)
         }
+      },
+      {
+        path: 'auth-group',
+        name: 'auth-group',
+        title: '权限组',
+        'icon': 'hammer',
+        component: resolve => {
+          require(['./components/Management/AuthGroup.vue'], resolve)
+        }
       }
     ]
   }
