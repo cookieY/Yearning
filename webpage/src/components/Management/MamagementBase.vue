@@ -135,7 +135,7 @@
       </div>
     </Modal>
 
-    <Modal v-model="baseinfo" :width="500" okText="保存" @on-ok="update_base">
+    <Modal v-model="baseinfo" :width="500">
       <h3 slot="header" style="color:#2D8CF0">数据库连接信息</h3>
       <Form :label-width="100" label-position="right">
         <FormItem label="机房">
@@ -157,6 +157,11 @@
           <Input v-model="editbaseinfo.password" type="password"></Input>
         </FormItem>
       </Form>
+      <div slot="footer">
+        <Button type="info" @click="testlink()">测试连接</Button>
+        <Button type="warning" @click="baseinfo = false">取消</Button>
+        <Button type="primary" @click="update_base()">保存</Button>
+      </div>
     </Modal>
 
   </div>
@@ -203,7 +208,7 @@
                       this.edit_tab(params.index)
                     }
                   }
-                }, '查看信息'),
+                }, '编辑信息'),
                 h('Button', {
                   style: {
                     marginLeft: '8px'
@@ -315,12 +320,24 @@
         this.formItem = {}
       },
       testlink () {
-        axios.put(util.url + '/management_db/test', {
-          'ip': this.formItem.ip,
-          'user': this.formItem.username,
-          'password': this.formItem.password,
-          'port': this.formItem.port
-        })
+        let params = {};
+        if (this.baseinfo === true) {
+          params = {
+            'ip': this.editbaseinfo.ip,
+            'user': this.editbaseinfo.username,
+            'password': this.editbaseinfo.password,
+            'port': this.editbaseinfo.port
+        }
+        } else {
+          params = {
+            'ip': this.formItem.ip,
+            'user': this.formItem.username,
+            'password': this.formItem.password,
+            'port': this.formItem.port
+          }
+        }
+        console.log(params)
+        axios.put(util.url + '/management_db/test', params)
           .then(res => {
             util.notice(res.data)
           })
