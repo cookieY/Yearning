@@ -144,10 +144,10 @@ class audit(baseview.SuperUserpermissions):
                     CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
                     return HttpResponse(status=500)
                 else:
-                    mail = Account.objects.filter(username=perform).first()
+                    mail = Account.objects.filter(username=username).first()
                     SqlOrder.objects.filter(work_id=work_id).update(assigned=perform)
                     threading.Thread(target=push_message, args=(
-                        {'to_user': username, 'workid': work_id, 'addr': addr_ip}, 9, request.user, mail.email,
+                        {'to_user': perform, 'workid': work_id, 'addr': addr_ip}, 9, request.user, mail.email,
                         work_id,
                         '已提交执行人')).start()
                     return Response('工单已提交执行人！')
