@@ -104,43 +104,6 @@ class userinfo(baseview.BaseView):
                     CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
                     return HttpResponse(status=500)
 
-        elif args == 'changegroup':
-            try:
-                username = request.data['username']
-                group = request.data['group']
-                department = request.data['department']
-                permission = json.loads(request.data['permission'])
-                brfore = Account.objects.filter(username=username).first()
-            except KeyError as e:
-                CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
-                return HttpResponse(status=500)
-            else:
-                try:
-                    if brfore.group == 'admin' and group == 'guest':
-                        per = grained.objects.all().values('username', 'permissions')
-                        for i in per:
-                            for c in i['permissions']:
-                                if isinstance(i['permissions'][c], list) and c == 'person':
-                                    i['permissions'][c] = list(filter(lambda x: x != username, i['permissions'][c]))
-                            grained.objects.filter(username=i['username']).update(permissions=i['permissions'])
-                    grained.objects.filter(username=username).update(permissions=permission)
-                    if group == 'admin' or group == 'perform':
-                        Account.objects.filter(username=username).update(
-                            group=group,
-                            department=department,
-                            is_staff=1
-                        )
-                    else:
-                        Account.objects.filter(username=username).update(
-                            group=group,
-                            department=department,
-                            is_staff=0
-                        )
-                    return Response('%s--权限修改成功!' % username)
-                except Exception as e:
-                    CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
-                    return HttpResponse(status=500)
-
         elif args == 'changemail':
             try:
                 username = request.data['username']
@@ -177,7 +140,6 @@ class userinfo(baseview.BaseView):
                         is_staff=1,
                         email=email)
                     user.save()
-                    grained.objects.get_or_create(username=username, permissions=PERMISSION)
                     return Response('%s 用户注册成功!' % username)
                 elif group == 'guest':
                     user = Account.objects.create_user(
@@ -188,11 +150,10 @@ class userinfo(baseview.BaseView):
                         email=email
                     )
                     user.save()
-                    grained.objects.get_or_create(username=username, permissions=PERMISSION)
                     return Response('%s 用户注册成功!' % username)
             except Exception as e:
                 CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
-                return Response(e)
+                return HttpResponse(e)
 
     def delete(self, request, args=None):
         try:
@@ -293,14 +254,14 @@ class ldapauth(baseview.AnyLogin):
             jwt_encode_handler = api_settings.JWT_ENCODE_HANDLER
             valite = util.auth(username=username, password=password)
             if valite:
-                try:
-                    user = Account.objects.filter(username=username).first()
+                user = Account.objects.filter(username=username).first()
+                if user is not None:
                     user.set_password(password)
                     user.save()
                     payload = jwt_payload_handler(user)
                     token = jwt_encode_handler(payload)
                     return Response({'token': token, 'res': '', 'permissions': user.group})
-                except:
+                else:
                     permissions = Account.objects.create_user(
                         username=username,
                         password=password,

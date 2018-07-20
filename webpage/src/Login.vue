@@ -30,8 +30,7 @@
                 </Input>
               </Form-item>
               <Form-item prop="password" style="width: 100%">
-                <Input type="password" v-model="formInline.password" placeholder="Password"
-                       @on-keyup.enter="authdata()">
+                <Input type="password" v-model="formInline.password" placeholder="Password">
                 </Input>
               </Form-item>
               <Form-item style="width: 100%">

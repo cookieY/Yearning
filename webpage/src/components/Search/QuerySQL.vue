@@ -36,7 +36,8 @@
             <Icon type="ios-crop-strong"></Icon>
             填写sql语句
           </p>
-          <editor v-model="formItem.textarea" @init="editorInit"></editor>
+          <editor v-model="formItem.textarea" @init="editorInit" @setCompletions="setCompletions"
+                  :autoComplete=true></editor>
           <br>
           <p>当前选择的库: {{put_info.base}}</p>
           <br>
@@ -45,7 +46,7 @@
           <Button type="success" icon="ios-redo" @click.native="Search_sql()">查询</Button>
           <Button type="primary" icon="ios-cloud-download" @click.native="exportdata()" v-if="export_data">导出查询数据
           </Button>
-          <Button type="error" icon="backspace-outline" @click.native="End_sql()">结束查询</Button>
+          <Button type="error" icon="backspace-outline" @click.native="End_sql()">结束会话</Button>
           <br>
           <br>
           <p>查询结果:</p>
@@ -121,10 +122,22 @@
           base: '',
           tablename: ''
         },
-        export_data: false
+        export_data: false,
+        wordList: []
       }
     },
     methods: {
+      setCompletions (editor, session, pos, prefix, callback) {
+        let wordList = []
+        wordList = this.wordList
+        callback(null, wordList.map(function (word) {
+          return {
+            caption: word.vl,
+            value: word.vl,
+            meta: word.meta
+          }
+        }))
+      },
       choseName (vl) {
         if (vl.expand === true) {
           this.put_info.base = vl.title
@@ -184,17 +197,14 @@
           'address': JSON.stringify(address)
         })
           .then(res => {
-            if (res.data['error']) {
-              util.err_notice(res.data['error'])
+            if (!res.data['data']) {
+              util.err_notice(res.data)
             } else {
               this.columnsName = res.data['title']
               this.allsearchdata = res.data['data']
               this.Testresults = this.allsearchdata.slice(0, 10)
               this.total = res.data['len']
             }
-          })
-          .catch(error => {
-            util.err_notice(error)
           })
       },
       exportdata () {
@@ -225,6 +235,11 @@
             axios.put(`${util.url}/query_worklf`, {'mode': 'info'})
               .then(res => {
                 this.data1 = JSON.parse(res.data['info'])
+                let tWord = util.highlight.split('|')
+                for (let i of tWord) {
+                  this.wordList.push({'vl': i, 'meta': '关键字'})
+                }
+                this.wordList = this.wordList.concat(res.data.highlight)
                 res.data['status'] === 1 ? this.export_data = true : this.export_data = false
               })
           }

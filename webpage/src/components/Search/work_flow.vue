@@ -54,14 +54,6 @@
                 <Input v-model="step.opinion" type="textarea" :autosize="{minRows: 4,maxRows: 8}"
                        placeholder="请填写查询说明"/>
               </FormItem>
-              <FormItem label="查询时限：">
-                <InputNumber
-                  v-model="step.timer"
-                  :formatter="value => `${value}分钟`"
-                  :parser="value => value.replace('分钟', '')"
-                  :min="1">
-                </InputNumber>
-              </FormItem>
               <FormItem label="">
                 <Button @click="handleSubmit" style="width:100px;" type="primary">提交</Button>
               </FormItem>
@@ -92,7 +84,6 @@
         },
         step: {
           remark: '',
-          timer: 1,
           computer_room: '',
           connection_name: '',
           person: '',
@@ -170,7 +161,6 @@
             axios.put(`${util.url}/query_worklf`, {
               'mode': 'put',
               'instructions': this.step.opinion,
-              'timer': this.step.timer,
               'connection_name': this.step.connection_name,
               'computer_room': this.step.computer_room,
               'export': this.step.export,

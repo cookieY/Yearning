@@ -41,23 +41,27 @@ class search(baseview.BaseView):
         custom_com = ast.literal_eval(un_init['other'])
         if user.query_per == 1:
             if check[-1].strip().lower().startswith('s') != 1:
-                return Response({'error': '只支持查询功能或删除不必要的空白行！'})
+                return Response('只支持查询功能或删除不必要的空白行！')
             else:
                 address = json.loads(request.data['address'])
                 _c = DatabaseList.objects.filter(
                     connection_name=user.connection_name,
                     computer_room=user.computer_room
                 ).first()
-                try:
-                    with con_database.SQLgo(
-                            ip=_c.ip,
-                            password=_c.password,
-                            user=_c.username,
-                            port=_c.port,
-                            db=address['basename']
-                    ) as f:
+                with con_database.SQLgo(
+                        ip=_c.ip,
+                        password=_c.password,
+                        user=_c.username,
+                        port=_c.port,
+                        db=address['basename']
+                ) as f:
+                    try:
                         query_sql = replace_limit(check[-1].strip(), limit['limit'])
                         data_set = f.search(sql=query_sql)
+                    except Exception as e:
+                        CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
+                        return HttpResponse(e)
+                    else:
                         for l in data_set['data']:
                             for k, v in l.items():
                                 if isinstance(v, bytes):
@@ -72,12 +76,9 @@ class search(baseview.BaseView):
                             username=request.user,
                             statements=query_sql
                         )
-                        return HttpResponse(simplejson.dumps(data_set, cls=DateEncoder, bigint_as_string=True))
-                except Exception as e:
-                    CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
-                    return Response({'error': e})
+                    return HttpResponse(simplejson.dumps(data_set, cls=DateEncoder, bigint_as_string=True))
         else:
-            return Response({'error': '已超过申请时限请刷新页面后重新提交申请'})
+            return Response('已超过申请时限请刷新页面后重新提交申请')
 
     def put(self, request, args: str = None):
         base = request.data['base']
@@ -136,22 +137,6 @@ def replace_limit(sql, limit):
 
 class query_worklf(baseview.BaseView):
 
-    @staticmethod
-    def query_callback(timer, work_id):
-        query_order.objects.filter(work_id=work_id).update(query_per=1)
-        try:
-            time.sleep(int(timer) * 60)
-        except:
-            time.sleep(60)
-        finally:
-            t_close = threading.Thread(target=query_worklf.conn_close, args=(work_id,))
-            t_close.start()
-            t_close.join()
-
-    @staticmethod
-    def conn_close(work_id=None):
-        query_order.objects.filter(work_id=work_id).update(query_per=3)
-
     def get(self, request, args: str = None):
         page = request.GET.get('page')
         page_number = query_order.objects.count()
@@ -175,7 +160,6 @@ class query_worklf(baseview.BaseView):
             instructions = request.data['instructions']
             connection_name = request.data['connection_name']
             computer_room = request.data['computer_room']
-            timer = int(request.data['timer'])
             export = request.data['export']
             audit = request.data['audit']
             un_init = util.init_conf()
@@ -185,16 +169,19 @@ class query_worklf(baseview.BaseView):
             if not query_switch['query']:
                 query_per = 1
                 userinfo = Account.objects.filter(username=audit, group='admin').first()
-                thread = threading.Thread(
-                    target=push_message,
-                    args=({'to_user': request.user, 'workid': work_id}, 5, request.user, userinfo.email, work_id, '提交')
-                )
-                thread.start()
+                try:
+                    thread = threading.Thread(
+                        target=push_message,
+                        args=(
+                        {'to_user': request.user, 'workid': work_id}, 5, request.user, userinfo.email, work_id, '提交')
+                    )
+                    thread.start()
+                except Exception as e:
+                    CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
             query_order.objects.create(
                 work_id=work_id,
                 instructions=instructions,
                 username=request.user,
-                timer=timer,
                 date=util.date(),
                 query_per=query_per,
                 connection_name=connection_name,
@@ -204,21 +191,23 @@ class query_worklf(baseview.BaseView):
                 time=util.date()
             )
             if not query_switch['query']:
-                t = threading.Thread(target=query_worklf.query_callback, args=(timer, work_id))
-                t.start()
+                query_order.objects.filter(work_id=work_id).update(query_per=1)
             ## 钉钉及email站内信推送
             return Response('查询工单已提交，等待管理员审核！')
 
         elif request.data['mode'] == 'agree':
             work_id = request.data['work_id']
             query_info = query_order.objects.filter(work_id=work_id).order_by('-id').first()
-            t = threading.Thread(target=query_worklf.query_callback, args=(query_info.timer, work_id))
-            t.start()
+            query_order.objects.filter(work_id=work_id).update(query_per=1)
             userinfo = Account.objects.filter(username=query_info.username).first()
-            thread = threading.Thread(target=push_message, args=(
-            {'to_user': query_info.username, 'workid': query_info.work_id}, 6, query_info.username, userinfo.email,
-            work_id, '同意'))
-            thread.start()
+            try:
+                thread = threading.Thread(target=push_message, args=(
+                    {'to_user': query_info.username, 'workid': query_info.work_id}, 6, query_info.username,
+                    userinfo.email,
+                    work_id, '同意'))
+                thread.start()
+            except Exception as e:
+                CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
             return Response('查询工单状态已更新！')
 
         elif request.data['mode'] == 'disagree':
@@ -226,10 +215,13 @@ class query_worklf(baseview.BaseView):
             query_order.objects.filter(work_id=work_id).update(query_per=0)
             query_info = query_order.objects.filter(work_id=work_id).order_by('-id').first()
             userinfo = Account.objects.filter(username=query_info.username).first()
-            thread = threading.Thread(target=push_message, args=(
-            {'to_user': query_info.username, 'workid': query_info.work_id}, 7, query_info.username, userinfo.email,
-            work_id, '驳回'))
-            thread.start()
+            try:
+                thread = threading.Thread(target=push_message, args=(
+                    {'to_user': query_info.username, 'workid': query_info.work_id}, 7, query_info.username, userinfo.email,
+                    work_id, '驳回'))
+                thread.start()
+            except Exception as e:
+                CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
             return Response('查询工单状态已更新！')
 
         elif request.data['mode'] == 'status':
@@ -244,10 +236,11 @@ class query_worklf(baseview.BaseView):
                 query_order.objects.filter(username=request.user).order_by('-id').update(query_per=3)
                 return Response('结束查询工单成功！')
             except Exception as e:
-                return Response(e)
+                return HttpResponse(e)
 
         elif request.data['mode'] == 'info':
             tablelist = []
+            highlist = []
             database = query_order.objects.filter(username=request.user).order_by('-id').first()
             _connection = DatabaseList.objects.filter(connection_name=database.connection_name).first()
             with con_database.SQLgo(ip=_connection.ip,
@@ -269,8 +262,10 @@ class query_worklf(baseview.BaseView):
                                         port=_connection.port,
                                         db=i['Database']) as f:
                     tablename = f.query_info(sql='show tables')
+                highlist.append({'vl':i['Database'],'meta': '库名'})
                 for c in tablename:
                     key = 'Tables_in_%s' % i['Database']
+                    highlist.append({'vl':c[key],'meta': '表名'})
                     children.append({
                         'title': c[key]
                     })
@@ -284,7 +279,7 @@ class query_worklf(baseview.BaseView):
                 'expand': 'true',
                 'children': tablelist
             }]
-            return Response({'info': json.dumps(data), 'status': database.export})
+            return Response({'info': json.dumps(data), 'status': database.export, 'highlight': highlist})
 
     def delete(self, request, args: str = None):
 

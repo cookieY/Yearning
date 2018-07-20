@@ -24,11 +24,16 @@
             <FormItem label="部门" prop="department">
               <Input v-model="userinfo.department" placeholder="请输入"></Input>
             </FormItem>
-            <FormItem label="权限" prop="group">
+            <FormItem label="角色" prop="group">
               <Select v-model="userinfo.group" placeholder="请选择">
                 <Option value="admin">管理员</Option>
                 <Option value="perform" v-if="connectionList.multi">执行人</Option>
                 <Option value="guest">使用人</Option>
+              </Select>
+            </FormItem>
+            <FormItem label="权限组" prop="authgroup">
+              <Select v-model="userinfo.authgroup" placeholder="请选择">
+                <Option v-for="list in groupset" :value="list" :key="list">{{ list }}</Option>
               </Select>
             </FormItem>
             <FormItem label="电子邮箱">
@@ -49,7 +54,7 @@
           <Table border :columns="columns6" :data="data5" stripe height="550"></Table>
         </div>
         <br>
-        <Page :total="pagenumber" show-elevator @on-change="splicpage" :page-size="10" ref="totol"></Page>
+        <Page :total="pagenumber" show-elevator @on-change="splicpage" :page-size="10" ref="total"></Page>
       </Card>
     </Col>
 
@@ -61,10 +66,10 @@
           <Input v-model="username" readonly="readonly"></Input>
         </FormItem>
         <FormItem label="新密码" prop="newPass">
-          <Input v-model="editPasswordForm.newPass" placeholder="请输入新密码，至少6位字符"></Input>
+          <Input v-model="editPasswordForm.newPass" placeholder="请输入新密码，至少6位字符" type="password"></Input>
         </FormItem>
         <FormItem label="确认新密码" prop="rePass">
-          <Input v-model="editPasswordForm.rePass" placeholder="请再次输入新密码"></Input>
+          <Input v-model="editPasswordForm.rePass" placeholder="请再次输入新密码" type="password"></Input>
         </FormItem>
       </Form>
       <div slot="footer">
@@ -73,165 +78,69 @@
       </div>
     </Modal>
 
-    <Modal v-model="editInfodModal" :width="900">
-      <h3 slot="header" style="color:#2D8CF0">权限设定</h3>
-      <Form :model="editInfodForm" :label-width="100" label-position="right">
+    <Modal v-model="editAuthModal" :width="900">
+      <h3 slot="header" style="color:#2D8CF0">权限组设置</h3>
+      <Form :model="editAuthForm" :label-width="100" label-position="right">
         <FormItem label="用户名">
-          <Input v-model="username" readonly="readonly"></Input>
+          <Input v-model="editAuthForm.username" readonly="readonly"></Input>
         </FormItem>
-        <FormItem label="权限">
-          <Select v-model="editInfodForm.group" placeholder="请选择">
+        <FormItem label="角色">
+          <Select v-model="editAuthForm.group" placeholder="请选择">
             <Option value="admin">管理员</Option>
             <Option value="perform" v-if="connectionList.multi && this.userid !== 1">执行人</Option>
             <Option value="guest" v-if="this.userid !== 1">使用者</Option>
           </Select>
         </FormItem>
         <FormItem label="部门">
-          <Input v-model="editInfodForm.department" placeholder="请输入新部门"></Input>
+          <Input v-model="editAuthForm.department" placeholder="请输入新部门"></Input>
         </FormItem>
-        <template>
-          <FormItem label="DDL及索引权限:">
-            <RadioGroup v-model="permission.ddl">
-              <Radio label="1">是</Radio>
-              <Radio label="0">否</Radio>
-            </RadioGroup>
-          </FormItem>
-          <template v-if="permission.ddl === '1'">
-            <FormItem label="连接名:">
-              <div style="border-bottom: 1px solid #e9e9e9;padding-bottom:6px;margin-bottom:6px;">
-                <Checkbox
-                  :indeterminate="indeterminate.ddl"
-                  :value="checkAll.ddl"
-                  @click.prevent.native="ddlCheckAll('ddlcon', 'ddl', 'connection')">全选
-                </Checkbox>
-              </div>
-              <CheckboxGroup v-model="permission.ddlcon">
-                <Checkbox v-for="i in connectionList.connection" :label="i.connection_name" :key="i.connection_name">
-                  {{i.connection_name}}
-                </Checkbox>
-              </CheckboxGroup>
+        <FormItem label="权限组" prop="authgroup">
+          <Select v-model="editAuthForm.authgroup" multiple @on-change="getgrouplist" placeholder="请选择">
+            <Option v-for="list in groupset" :value="list" :key="list">{{ list }}</Option>
+          </Select>
+          <template>
+            <FormItem label="所拥有的权限:">
+              <br>
+              <FormItem label="DDL是否可见:">
+                <p>{{formItem.ddl}}</p>
+              </FormItem>
+              <FormItem label="可访问的连接名:" v-if="formItem.ddl === '是'">
+                <p>{{formItem.ddlcon}}</p>
+              </FormItem>
+              <FormItem label="DML是否可见:">
+                <p>{{formItem.dml}}</p>
+              </FormItem>
+              <FormItem label="可访问的连接名:" v-if="formItem.dml === '是'">
+                <p>{{formItem.dmlcon}}</p>
+              </FormItem>
+              <FormItem label="查询是否可见:">
+                <p>{{formItem.query}}</p>
+              </FormItem>
+              <FormItem label="可访问的连接名:" v-if="formItem.query === '是'">
+                <p>{{formItem.querycon}}</p>
+              </FormItem>
+              <FormItem label="字典是否可见:">
+                <p>{{formItem.dic}}</p>
+              </FormItem>
+              <FormItem label="上级审核人:">
+                <p>{{formItem.person}}</p>
+              </FormItem>
+              <FormItem label="可访问的连接名:" v-if="formItem.dic === '是'">
+                <p>{{formItem.diccon}}</p>
+              </FormItem>
+              <FormItem label="用户管理权限:">
+                <p>{{formItem.user}}</p>
+              </FormItem>
+              <FormItem label="数据库管理权限:">
+                <p>{{formItem.base}}</p>
+              </FormItem>
             </FormItem>
           </template>
-          <hr style="height:1px;border:none;border-top:1px dashed #dddee1;"/>
-          <br>
-          <FormItem label="DML权限:">
-            <RadioGroup v-model="permission.dml">
-              <Radio label="1">是</Radio>
-              <Radio label="0">否</Radio>
-            </RadioGroup>
-          </FormItem>
-          <template v-if="permission.dml === '1'">
-            <FormItem label="连接名:">
-              <div style="border-bottom: 1px solid #e9e9e9;padding-bottom:6px;margin-bottom:6px;">
-                <Checkbox
-                  :indeterminate="indeterminate.dml"
-                  :value="checkAll.dml"
-                  @click.prevent.native="ddlCheckAll('dmlcon', 'dml', 'connection')">全选
-                </Checkbox>
-              </div>
-              <CheckboxGroup v-model="permission.dmlcon">
-                <Checkbox v-for="i in connectionList.connection" :label="i.connection_name" :key="i.connection_name">
-                  {{i.connection_name}}
-                </Checkbox>
-              </CheckboxGroup>
-            </FormItem>
-          </template>
-          <hr style="height:1px;border:none;border-top:1px dashed #dddee1;"/>
-          <br>
-          <FormItem label="选择上级审核人:">
-            <div style="border-bottom: 1px solid #e9e9e9;padding-bottom:6px;margin-bottom:6px;">
-              <Checkbox
-                :indeterminate="indeterminate.person"
-                :value="checkAll.person"
-                @click.prevent.native="ddlCheckAll('person', 'person', 'person')">全选
-              </Checkbox>
-            </div>
-            <CheckboxGroup v-model="permission.person">
-              <Checkbox v-for="i in connectionList.person" :label="i.username" :key="i.username">{{i.username}}
-              </Checkbox>
-            </CheckboxGroup>
-          </FormItem>
-          <hr style="height:1px;border:none;border-top:1px dashed #dddee1;"/>
-          <br>
-          <FormItem label="数据查询权限:">
-            <RadioGroup v-model="permission.query">
-              <Radio label="1">是</Radio>
-              <Radio label="0">否</Radio>
-            </RadioGroup>
-          </FormItem>
-          <template v-if="permission.query === '1'">
-            <FormItem label="连接名:">
-              <div style="border-bottom: 1px solid #e9e9e9;padding-bottom:6px;margin-bottom:6px;">
-                <Checkbox
-                  :indeterminate="indeterminate.query"
-                  :value="checkAll.query"
-                  @click.prevent.native="ddlCheckAll('querycon', 'query', 'connection')">全选
-                </Checkbox>
-              </div>
-              <CheckboxGroup v-model="permission.querycon">
-                <Checkbox v-for="i in connectionList.connection" :label="i.connection_name" :key="i.connection_name">
-                  {{i.connection_name}}
-                </Checkbox>
-              </CheckboxGroup>
-            </FormItem>
-          </template>
-          <hr style="height:1px;border:none;border-top:1px dashed #dddee1;"/>
-          <br>
-          <FormItem label="数据字典权限:">
-            <RadioGroup v-model="permission.dic">
-              <Radio label="1">是</Radio>
-              <Radio label="0">否</Radio>
-            </RadioGroup>
-          </FormItem>
-          <template v-if="permission.dic === '1'">
-            <FormItem label="数据字典修改权限:">
-              <RadioGroup v-model="permission.dicedit">
-                <Radio label="1">是</Radio>
-                <Radio label="0">否</Radio>
-              </RadioGroup>
-            </FormItem>
-            <FormItem label="数据字典导出权限:">
-              <RadioGroup v-model="permission.dicexport">
-                <Radio label="1">是</Radio>
-                <Radio label="0">否</Radio>
-              </RadioGroup>
-            </FormItem>
-            <FormItem label="连接名:">
-              <div style="border-bottom: 1px solid #e9e9e9;padding-bottom:6px;margin-bottom:6px;">
-                <Checkbox
-                  :indeterminate="indeterminate.dic"
-                  :value="checkAll.dic"
-                  @click.prevent.native="ddlCheckAll('diccon', 'dic', 'dic')">全选
-                </Checkbox>
-              </div>
-              <CheckboxGroup v-model="permission.diccon">
-                <Checkbox v-for="i in connectionList.dic" :label="i.Name" :key="i.Name">{{i.Name}}</Checkbox>
-              </CheckboxGroup>
-            </FormItem>
-          </template>
-        </template>
-        <template v-if="this.editInfodForm.group === 'admin'">
-          <hr style="height:1px;border:none;border-top:1px dashed #dddee1;"/>
-          <br>
-          <FormItem label="用户管理权限:">
-            <RadioGroup v-model="permission.user" v-if="editInfodForm.group === 'admin'">
-              <Radio label="1">是</Radio>
-              <Radio label="0">否</Radio>
-            </RadioGroup>
-          </FormItem>
-          <hr style="height:1px;border:none;border-top:1px dashed #dddee1;"/>
-          <br>
-          <FormItem label="数据库管理权限:">
-            <RadioGroup v-model="permission.base" v-if="editInfodForm.group === 'admin'">
-              <Radio label="1">是</Radio>
-              <Radio label="0">否</Radio>
-            </RadioGroup>
-          </FormItem>
-        </template>
+        </FormItem>
       </Form>
       <div slot="footer">
-        <Button type="text" @click="cancelEditInfo">取消</Button>
-        <Button type="primary" @click="saveEditInfo">保存</Button>
+        <Button type="text" @click="cancelAuthModal">取消</Button>
+        <Button type="primary" :loading="savePassLoading" @click="saveAuthInfo">保存</Button>
       </div>
     </Modal>
 
@@ -293,6 +202,7 @@
           ddlcon: [],
           dml: '0',
           dmlcon: [],
+          query: '0',
           dic: '0',
           diccon: [],
           dicedit: '0',
@@ -310,8 +220,13 @@
             sortable: true
           },
           {
-            title: '权限',
+            title: '角色',
             key: 'group',
+            sortable: true
+          },
+          {
+            title: '权限组',
+            key: 'auth_group',
             sortable: true
           },
           {
@@ -327,7 +242,7 @@
           {
             title: '操作',
             key: 'action',
-            width: 400,
+            width: 300,
             align: 'center',
             render: (h, params) => {
               if (params.row.id !== 1) {
@@ -356,10 +271,10 @@
                     },
                     on: {
                       click: () => {
-                        this.editgroup(params.index)
+                        this.editauth(params.index)
                       }
                     }
-                  }, '权限'),
+                  }, '权限组'),
                   h('Button', {
                     props: {
                       type: 'success',
@@ -398,10 +313,10 @@
                     },
                     on: {
                       click: () => {
-                        this.editgroup(params.index)
+                        this.editauth(params.index)
                       }
                     }
-                  }, '权限'),
+                  }, '权限组'),
                   h('Button', {
                     props: {
                       type: 'success',
@@ -431,8 +346,10 @@
           group: '',
           checkbox: '',
           department: '',
-          email: ''
+          email: '',
+          authgroup: ''
         },
+        groupset: [],
         userinfoValidate: {
           username: [{
             required: true,
@@ -473,6 +390,11 @@
           department: [{
             required: true,
             message: '请输入部门名称',
+            trigger: 'blur'
+          }],
+          authgroup: [{
+            required: true,
+            message: '请选择权限组',
             trigger: 'blur'
           }]
         },
@@ -515,12 +437,27 @@
           ]
         },
         // 更改部门及权限
-        editInfodForm: {
+        editAuthForm: {
+          username: '',
           group: '',
-          department: ''
+          department: '',
+          authgroup: []
+        },
+        formItem: {
+          ddl: '',
+          ddlcon: '',
+          dml: '',
+          dmlcon: '',
+          dic: '',
+          diccon: '',
+          query: '',
+          querycon: '',
+          user: '',
+          base: '',
+          person: ''
         },
         // 更改部门及权限遮罩层状态
-        editInfodModal: false,
+        editAuthModal: false,
         editemail: false,
         email: '',
         // 用户名
@@ -548,24 +485,49 @@
           dic: [],
           person: [],
           multi: Boolean
-        }
+        },
+        permission_list: {}
       }
     },
     methods: {
+      getgrouplist () {
+        axios.put(`${util.url}/authgroup/group_list`, {'group_list': JSON.stringify(this.editAuthForm.authgroup)})
+          .then(res => {
+            this.permission_list = res.data.permissions
+            this.formItem = util.mode(res.data.permissions)
+          })
+          .catch(error => {
+            util.err_notice(error)
+          })
+      },
+      cancelAuthModal () {
+        this.editAuthModal = false
+        this.editAuthForm.authgroup = []
+      },
+      getauthgroup () {
+        axios.get(`${util.url}/authgroup/group_name`)
+          .then(res => {
+            this.groupset = res.data.authgroup
+          })
+          .catch(error => {
+            util.err_notice(error)
+          })
+      },
       edituser (index) {
         this.editPasswordModal = true
         this.username = this.data5[index].username
       },
-      editgroup (index) {
-        this.editInfodModal = true
+      editauth (index) {
+        this.editAuthModal = true
         this.userid = this.data5[index].id
-        this.username = this.data5[index].username
-        this.editInfodForm.department = this.data5[index].department
-        this.editInfodForm.group = this.data5[index].group
-        axios.get(`${util.url}/userinfo/permissions?user=${this.username}`)
-          .then(res => {
-            this.permission = res.data
-          })
+        this.editAuthForm.username = this.data5[index].username
+        this.editAuthForm.department = this.data5[index].department
+        this.editAuthForm.group = this.data5[index].group
+        if (this.data5[index].auth_group !== null) {
+          this.editAuthForm.authgroup = this.data5[index].auth_group.split(',')
+        } else {
+          this.editAuthForm.authgroup = []
+        }
       },
       deleteUser (index) {
         this.deluserModal = true
@@ -584,7 +546,7 @@
           .then(res => {
             util.notice(res.data)
             this.editemail = false
-            this.$refs.totol.currentPage = 1
+            this.$refs.total.currentPage = 1
             this.refreshuser()
           })
           .catch(error => {
@@ -599,7 +561,8 @@
               'password': this.userinfo.password,
               'group': this.userinfo.group,
               'department': this.userinfo.department,
-              'email': this.userinfo.email
+              'email': this.userinfo.email,
+              'auth_group': this.userinfo.authgroup
             })
               .then(res => {
                 util.notice(res.data)
@@ -611,7 +574,8 @@
                   group: '',
                   checkbox: '',
                   department: '',
-                  email: ''
+                  email: '',
+                  auth_group: ''
                 }
               })
               .catch(error => {
@@ -637,10 +601,6 @@
         this.editPasswordForm = {}
         this.editPasswordModal = false
       },
-      cancelEditInfo () {
-        this.editInfodModal = false
-        this.editInfodForm = {}
-      },
       cancelDelInfo () {
         this.deluserModal = false
         this.confirmuser = ''
@@ -664,22 +624,25 @@
           }
         })
       },
-      saveEditInfo () {
-        axios.put(`${util.url}/userinfo/changegroup`, {
-          'username': this.username,
-          'group': this.editInfodForm.group,
-          'department': this.editInfodForm.department,
-          'permission': JSON.stringify(this.permission)
+      saveAuthInfo () {
+        this.savePassLoading = true
+        axios.put(`${util.url}/authgroup/save_info`, {
+          'username': this.editAuthForm.username,
+          'group': this.editAuthForm.group,
+          'department': this.editAuthForm.department,
+          'auth_group': this.editAuthForm.authgroup,
+          'permission_list': JSON.stringify(this.permission_list)
         })
           .then(res => {
             util.notice(res.data)
-            this.$refs.totol.currentPage = 1
+            this.editAuthModal = false
+            this.editAuthForm.authgroup = []
             this.refreshuser()
           })
           .catch(error => {
             util.err_notice(error)
           })
-        this.editInfodModal = false
+        this.savePassLoading = false
       },
       delUser () {
         if (this.username === this.confirmuser) {
@@ -687,7 +650,7 @@
             .then(res => {
               util.notice(res.data)
               this.deluserModal = false
-              this.$refs.totol.currentPage = 1
+              this.$refs.total.currentPage = 1
               this.refreshuser()
             })
             .catch(error => {
@@ -718,6 +681,7 @@
       }
     },
     mounted () {
+      this.getauthgroup()
       axios.put(`${util.url}/workorder/connection`, {'permissions_type': 'user'})
         .then(res => {
           this.connectionList.connection = res.data['connection']
@@ -732,4 +696,3 @@
     }
   }
 </script>
-<!-- reder put request  render_group put request  remove delete request-->

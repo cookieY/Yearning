@@ -64,7 +64,7 @@ class sqlorder(baseview.BaseView):
                         return Response({'result': res, 'status': 200})
                 except Exception as e:
                     CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
-                    return Response(e)
+                    return HttpResponse(e)
 
     def post(self, request, args=None):
         try:

@@ -37,9 +37,6 @@
         </FormItem>
         <hr style="height:1px;border:none;border-top:1px dashed #dddee1;"/>
         <br>
-        <FormItem label="查询时限:">
-          <p>{{query.timer}}分钟</p>
-        </FormItem>
         <hr style="height:1px;border:none;border-top:1px dashed #dddee1;"/>
         <br>
         <FormItem label="导出数据:">
@@ -154,19 +151,46 @@
             width: 200,
             align: 'center',
             render: (h, params) => {
-              return h('div', [
-                h('Button', {
-                  props: {
-                    size: 'small',
-                    type: 'text'
-                  },
-                  on: {
-                    click: () => {
-                      this.modalinfo(params.row)
+              if (params.row.query_per === 1) {
+                return h('div', [
+                  h('Button', {
+                    props: {
+                      size: 'small',
+                      type: 'text'
+                    },
+                    on: {
+                      click: () => {
+                        this.modalinfo(params.row)
+                      }
                     }
-                  }
-                }, '查看')
-              ])
+                  }, '查看'),
+                  h('Button', {
+                    props: {
+                      size: 'small',
+                      type: 'text'
+                    },
+                    on: {
+                      click: () => {
+                        this.stop_query(params.row)
+                      }
+                    }
+                  }, '中止查询')
+                ])
+              } else {
+                return h('div', [
+                  h('Button', {
+                    props: {
+                      size: 'small',
+                      type: 'text'
+                    },
+                    on: {
+                      click: () => {
+                        this.modalinfo(params.row)
+                      }
+                    }
+                  }, '查看')
+                ])
+              }
             }
           }
         ],
@@ -236,6 +260,12 @@
           .catch(error => {
             util.err_notice(error)
           })
+      },
+      stop_query () {
+        axios.put(`${util.url}/query_worklf`, {'mode': 'end'})
+          .then(res => util.notice(res.data))
+          .catch(err => util.err_notice(err))
+        this.permisson_list()
       }
     },
     mounted () {

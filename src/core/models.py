@@ -34,6 +34,7 @@ class Account(AbstractUser):
     '''
     group = models.CharField(max_length=40)  # 权限组 guest/admin
     department = models.CharField(max_length=40)  # 部门
+    auth_group = models.CharField(max_length=100, null=True) #细粒化权限组
 
 
 class SqlDictionary(models.Model):
@@ -82,7 +83,6 @@ class DatabaseList(models.Model):
     password = models.CharField(max_length=50)  # 数据库密码
     before = models.TextField(null=True)  # 提交工单 钉钉webhook发送内容
     after = models.TextField(null=True)  # 工单执行成功后 钉钉webhook发送内容
-    url = models.TextField(blank=True)  # 钉钉webhook url地址
 
 
 class SqlRecord(models.Model):
@@ -143,6 +143,7 @@ class applygrained(models.Model):
     work_id = models.CharField(max_length=50, null=True)
     status = models.IntegerField(blank=True, null=True)  # 工单状态 0 disagree 1 agree 2 indeterminate
     permissions = JSONField()
+    auth_group = models.CharField(max_length=50, null=True)
 
 
 class querypermissions(models.Model):
@@ -155,7 +156,6 @@ class query_order(models.Model):
     work_id = models.CharField(max_length=50, null=True, db_index=True)
     username = models.CharField(max_length=100, null=True)
     date = models.CharField(max_length=50)
-    timer = models.CharField(max_length=50)
     instructions = models.TextField(null=True)
     query_per = models.SmallIntegerField(null=True, default=0)  # 0拒绝 1同意 2待审核 3完毕
     connection_name = models.CharField(max_length=50, null=True)  # 连接名

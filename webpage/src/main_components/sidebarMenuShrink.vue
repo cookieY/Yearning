@@ -83,7 +83,8 @@
           'audit-permissions': '1',
           'search_order': '1',
           'query-review': '1',
-          'query-audit': '1'
+          'query-audit': '1',
+          'auth-group': '1'
         }
       }
     },

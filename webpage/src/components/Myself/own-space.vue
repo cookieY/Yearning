@@ -19,8 +19,11 @@
           <FormItem label="部门：">
             <span>{{ userForm.department }}</span>
           </FormItem>
-          <FormItem label="权限分类：">
+          <FormItem label="角色：">
             <span>{{ userForm.group }}</span>
+          </FormItem>
+          <FormItem label="权限组：">
+            <span>{{ userForm.auth_group }}</span>
           </FormItem>
           <FormItem label="邮箱：">
             <span>{{ userForm.email }}</span>
@@ -47,6 +50,9 @@
             </FormItem>
             <FormItem label="字典是否可见:">
               <p>{{formItem.dic}}</p>
+            </FormItem>
+            <FormItem label="上级审核人:">
+              <p>{{formItem.person}}</p>
             </FormItem>
             <FormItem label="可访问的连接名:" v-if="formItem.dic === '是'">
               <p>{{formItem.diccon}}</p>
@@ -98,149 +104,56 @@
       </div>
     </Modal>
 
-    <Modal v-model="editInfodModal" :width="1000">
+    <Modal v-model="editInfoModal" :width="1000">
       <h3 slot="header" style="color:#2D8CF0">权限申请单</h3>
-      <Form :label-width="120" label-position="right">
-        <template>
-          <FormItem label="DDL及索引权限:">
-            <RadioGroup v-model="permission.ddl">
-              <Radio label="1">是</Radio>
-              <Radio label="0">否</Radio>
-            </RadioGroup>
-          </FormItem>
-          <template v-if="permission.ddl === '1'">
-            <FormItem label="连接名:">
-              <div style="border-bottom: 1px solid #e9e9e9;padding-bottom:6px;margin-bottom:6px;">
-                <Checkbox
-                  :indeterminate="indeterminate.ddl"
-                  :value="checkAll.ddl"
-                  @click.prevent.native="ddlCheckAll('ddlcon', 'ddl', 'connection')">全选
-                </Checkbox>
-              </div>
-              <CheckboxGroup v-model="permission.ddlcon">
-                <Checkbox v-for="i in connectionList.connection" :label="i.connection_name" :key="i.connection_name">
-                  {{i.connection_name}}
-                </Checkbox>
-              </CheckboxGroup>
+      <Form :model="editAuthForm" :label-width="120" label-position="right">
+        <FormItem label="权限组" prop="authgroup">
+          <Select v-model="editAuthForm.authgroup" multiple @on-change="getgrouplist"  placeholder="请选择">
+            <Option v-for="list in groupset" :value="list" :key="list">{{ list }}</Option>
+          </Select>
+          <template>
+            <FormItem label="所拥有的权限:">
+              <br>
+              <FormItem label="DDL是否可见:">
+                <p>{{permission.ddl}}</p>
+              </FormItem>
+              <FormItem label="可访问的连接名:" v-if="permission.ddl === '是'">
+                <p>{{permission.ddlcon}}</p>
+              </FormItem>
+              <FormItem label="DML是否可见:">
+                <p>{{permission.dml}}</p>
+              </FormItem>
+              <FormItem label="可访问的连接名:" v-if="permission.dml === '是'">
+                <p>{{permission.dmlcon}}</p>
+              </FormItem>
+              <FormItem label="查询是否可见:">
+                <p>{{permission.query}}</p>
+              </FormItem>
+              <FormItem label="可访问的连接名:" v-if="permission.query === '是'">
+                <p>{{permission.querycon}}</p>
+              </FormItem>
+              <FormItem label="字典是否可见:">
+                <p>{{permission.dic}}</p>
+              </FormItem>
+              <FormItem label="上级审核人:">
+                <p>{{permission.person}}</p>
+              </FormItem>
+              <FormItem label="可访问的连接名:" v-if="permission.dic === '是'">
+                <p>{{permission.diccon}}</p>
+              </FormItem>
+              <FormItem label="用户管理权限:">
+                <p>{{permission.user}}</p>
+              </FormItem>
+              <FormItem label="数据库管理权限:">
+                <p>{{permission.base}}</p>
+              </FormItem>
             </FormItem>
           </template>
-          <hr style="height:1px;border:none;border-top:1px dashed #dddee1;"/>
-          <br>
-          <FormItem label="DML权限:">
-            <RadioGroup v-model="permission.dml">
-              <Radio label="1">是</Radio>
-              <Radio label="0">否</Radio>
-            </RadioGroup>
-          </FormItem>
-          <template v-if="permission.dml === '1'">
-            <FormItem label="连接名:">
-              <div style="border-bottom: 1px solid #e9e9e9;padding-bottom:6px;margin-bottom:6px;">
-                <Checkbox
-                  :indeterminate="indeterminate.dml"
-                  :value="checkAll.dml"
-                  @click.prevent.native="ddlCheckAll('dmlcon', 'dml', 'connection')">全选
-                </Checkbox>
-              </div>
-              <CheckboxGroup v-model="permission.dmlcon">
-                <Checkbox v-for="i in connectionList.connection" :label="i.connection_name" :key="i.connection_name">
-                  {{i.connection_name}}
-                </Checkbox>
-              </CheckboxGroup>
-            </FormItem>
-          </template>
-          <hr style="height:1px;border:none;border-top:1px dashed #dddee1;" />
-          <br>
-          <FormItem label="数据查询权限:">
-            <RadioGroup v-model="permission.query">
-              <Radio label="1">是</Radio>
-              <Radio label="0">否</Radio>
-            </RadioGroup>
-          </FormItem>
-          <template v-if="permission.query === '1'">
-            <FormItem label="连接名:">
-              <div style="border-bottom: 1px solid #e9e9e9;padding-bottom:6px;margin-bottom:6px;">
-                <Checkbox
-                  :indeterminate="indeterminate.query"
-                  :value="checkAll.query"
-                  @click.prevent.native="ddlCheckAll('querycon', 'query', 'connection')">全选</Checkbox>
-              </div>
-              <CheckboxGroup v-model="permission.querycon">
-                <Checkbox  v-for="i in connectionList.connection" :label="i.connection_name" :key="i.connection_name">{{i.connection_name}}</Checkbox>
-              </CheckboxGroup>
-            </FormItem>
-          </template>
-          <hr style="height:1px;border:none;border-top:1px dashed #dddee1;"/>
-          <br>
-          <FormItem label="选择上级审核人:">
-            <div style="border-bottom: 1px solid #e9e9e9;padding-bottom:6px;margin-bottom:6px;">
-              <Checkbox
-                :indeterminate="indeterminate.person"
-                :value="checkAll.person"
-                @click.prevent.native="ddlCheckAll('person', 'person', 'person')">全选
-              </Checkbox>
-            </div>
-            <CheckboxGroup v-model="permission.person">
-              <Checkbox v-for="i in connectionList.person" :label="i.username" :key="i.username">{{i.username}}
-              </Checkbox>
-            </CheckboxGroup>
-          </FormItem>
-          <hr style="height:1px;border:none;border-top:1px dashed #dddee1;"/>
-          <br>
-          <FormItem label="数据字典权限:">
-            <RadioGroup v-model="permission.dic">
-              <Radio label="1">是</Radio>
-              <Radio label="0">否</Radio>
-            </RadioGroup>
-          </FormItem>
-          <template v-if="permission.dic === '1'">
-            <FormItem label="数据字典修改权限:">
-              <RadioGroup v-model="permission.dicedit">
-                <Radio label="1">是</Radio>
-                <Radio label="0">否</Radio>
-              </RadioGroup>
-            </FormItem>
-            <FormItem label="数据字典导出权限:">
-              <RadioGroup v-model="permission.dicexport">
-                <Radio label="1">是</Radio>
-                <Radio label="0">否</Radio>
-              </RadioGroup>
-            </FormItem>
-            <FormItem label="连接名:">
-              <div style="border-bottom: 1px solid #e9e9e9;padding-bottom:6px;margin-bottom:6px;">
-                <Checkbox
-                  :indeterminate="indeterminate.dic"
-                  :value="checkAll.dic"
-                  @click.prevent.native="ddlCheckAll('diccon', 'dic', 'dic')">全选
-                </Checkbox>
-              </div>
-              <CheckboxGroup v-model="permission.diccon">
-                <Checkbox v-for="i in connectionList.dic" :label="i.Name" :key="i.Name">{{i.Name}}</Checkbox>
-              </CheckboxGroup>
-            </FormItem>
-          </template>
-        </template>
-        <template v-if="this.userForm.group === 'admin'">
-          <hr style="height:1px;border:none;border-top:1px dashed #dddee1;"/>
-          <br>
-          <FormItem label="用户管理权限:">
-            <RadioGroup v-model="permission.user">
-              <Radio label="1">是</Radio>
-              <Radio label="0">否</Radio>
-            </RadioGroup>
-          </FormItem>
-          <hr style="height:1px;border:none;border-top:1px dashed #dddee1;"/>
-          <br>
-          <FormItem label="数据库管理权限:">
-            <RadioGroup v-model="permission.base">
-              <Radio label="1">是</Radio>
-              <Radio label="0">否</Radio>
-            </RadioGroup>
-          </FormItem>
-        </template>
+        </FormItem>
       </Form>
       <div slot="footer">
-        <Button type="text" @click="editInfodModal=false">取消</Button>
-        <Button type="primary" @click="PutPermissionData">保存</Button>
+        <Button type="text" @click="editInfoModal=false">取消</Button>
+        <Button type="primary"  :loading="savePassLoading"  @click="PutPermissionData">提交</Button>
       </div>
     </Modal>
   </div>
@@ -250,18 +163,6 @@
   //
   import util from '../../libs/util'
   import axios from 'axios'
-
-  const exchangetype = function typeok (vl) {
-    if (typeof vl === 'string') {
-      if (vl === '1') {
-        return '是'
-      } else {
-        return '否'
-      }
-    } else {
-      return vl.toString()
-    }
-  }
   export default {
     name: 'own-space',
     data () {
@@ -273,6 +174,10 @@
         }
       }
       return {
+        editAuthForm: {
+          authgroup: []
+        },
+        groupset: [],
         editEmailModal: false,
         editEmailForm: {
           mail: ''
@@ -326,12 +231,14 @@
             }
           ]
         },
-        editInfodModal: false,
+        editInfoModal: false,
         permission: {
           ddl: '0',
           ddlcon: [],
           dml: '0',
           dmlcon: [],
+          query: '0',
+          querycon: [],
           dic: '0',
           diccon: [],
           dicedit: '0',
@@ -359,10 +266,30 @@
           connection: [],
           dic: [],
           person: []
-        }
+        },
+        permission_list: {}
       }
     },
     methods: {
+      getgrouplist () {
+        axios.put(`${util.url}/authgroup/group_list`, {'group_list': JSON.stringify(this.editAuthForm.authgroup)})
+          .then(res => {
+            this.permission_list = res.data.permissions
+            this.permission = util.mode(res.data.permissions)
+          })
+          .catch(error => {
+            util.err_notice(error)
+          })
+      },
+      getauthgroup () {
+        axios.get(`${util.url}/authgroup/group_name`)
+          .then(res => {
+            this.groupset = res.data.authgroup
+          })
+          .catch(error => {
+            util.err_notice(error)
+          })
+      },
       saveEditPass () {
         this.$refs['editPasswordForm'].validate((valid) => {
           if (valid) {
@@ -399,29 +326,15 @@
         this.savePassLoading = false
       },
       init () {
-        axios.put(`${util.url}/homedata/ownspace`, {
-          'user': sessionStorage.getItem('user')
-        })
+        axios.put(`${util.url}/homedata/ownspace`)
           .then(res => {
             this.userForm = res.data.userinfo
-            this.formItem.ddl = exchangetype(res.data.permissons.ddl)
-            this.formItem.ddlcon = exchangetype(res.data.permissons.ddlcon)
-            this.formItem.dml = exchangetype(res.data.permissons.dml)
-            this.formItem.dmlcon = exchangetype(res.data.permissons.dmlcon)
-            this.formItem.dic = exchangetype(res.data.permissons.dic)
-            this.formItem.diccon = exchangetype(res.data.permissons.diccon)
-            this.formItem.query = exchangetype(res.data.permissons.query)
-            this.formItem.querycon = exchangetype(res.data.permissons.querycon)
-            this.formItem.user = exchangetype(res.data.permissons.user)
-            this.formItem.base = exchangetype(res.data.permissons.base)
+            this.formItem = util.mode(res.data.permissons)
           })
       },
       ApplyForPermission () {
-        this.editInfodModal = true
-        axios.get(`${util.url}/userinfo/permissions?user=${sessionStorage.getItem('user')}`)
-          .then(res => {
-            this.permission = res.data
-          })
+        this.editInfoModal = true
+        this.editAuthForm.authgroup = this.userForm.auth_group.split(',')
       },
       ddlCheckAll (name, indeterminate, ty) {
         if (this.indeterminate[indeterminate]) {
@@ -443,18 +356,24 @@
         }
       },
       PutPermissionData () {
-        axios.post(`${util.url}/apply_grained/`, {'grained_list': JSON.stringify(this.permission)})
+        this.savePassLoading = true
+        axios.post(`${util.url}/apply_grained/`, {
+          'auth_group': this.editAuthForm.authgroup,
+          'grained_list': JSON.stringify(this.permission_list)
+        })
           .then(res => {
             util.notice(res.data)
-            this.editInfodModal = false
+            this.editInfoModal = false
           })
           .catch(error => {
             util.err_notice(error)
           })
+        this.savePassLoading = false
       }
     },
     mounted () {
-      this.init()
+      this.init();
+      this.getauthgroup();
       axios.put(`${util.url}/workorder/connection`, {'permissions_type': 'own_space'})
         .then(res => {
           this.connectionList.connection = res.data['connection']

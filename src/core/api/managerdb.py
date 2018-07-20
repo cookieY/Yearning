@@ -212,13 +212,12 @@ class dingding(baseview.SuperUserpermissions):
             con_id = request.data['id']
             before = request.data['before']
             after = request.data['after']
-            url = request.data['url']
         except KeyError as e:
             CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
             return HttpResponse(status=500)
         else:
             try:
-                DatabaseList.objects.filter(id=con_id).update(before=before, after=after, url=url)
+                DatabaseList.objects.filter(id=con_id).update(before=before, after=after)
                 return Response('ok')
             except Exception as e:
                 CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')

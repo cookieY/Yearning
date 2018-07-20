@@ -10,13 +10,13 @@ from core.models import (
     Usermessage,
     Account,
     DatabaseList,
-    Todolist,
-    grained
+    Todolist
 )
 from libs.serializers import (
     UserINFO,
     MessagesUser
 )
+from core.task import set_auth_group
 
 CUSTOM_ERROR = logging.getLogger('Yearning.core.views')
 
@@ -77,8 +77,9 @@ class dashboard(baseview.BaseView):
                     return HttpResponse(status=500)
 
         elif args == 'menu':
-            permissions = grained.objects.filter(username=request.user).first()
-            return Response(json.dumps(permissions.permissions))
+
+            permissions = set_auth_group(request.user)
+            return Response(json.dumps(permissions))
 
     def put(self, request, args=None):
 
@@ -105,11 +106,10 @@ class dashboard(baseview.BaseView):
                     return HttpResponse(status=500)
 
         elif args == 'ownspace':
-            user = request.data['user']
-            info = Account.objects.filter(username=user).get()
+            info = Account.objects.filter(username=request.user).get()
             _serializers = UserINFO(info)
-            permissions = grained.objects.filter(username=request.user).first()
-            return Response({'userinfo': _serializers.data, 'permissons': permissions.permissions})
+            permissions = set_auth_group(request.user)
+            return Response({'userinfo': _serializers.data, 'permissons': permissions})
 
         elif args == 'statement':
             Account.objects.filter(username=request.user).update(last_name='1')

@@ -27,6 +27,9 @@
     <Modal v-model="editInfodModal" :width="800">
       <h3 slot="header" style="color:#2D8CF0">权限申请单</h3>
       <Form :label-width="120" label-position="right">
+        <FormItem label="权限组:">
+          <p>{{auth_group}}</p>
+        </FormItem>
         <template>
           <FormItem label="DDL及索引权限:">
             <p v-if="permission.ddl === '0'">否</p>
@@ -99,8 +102,8 @@
       </Form>
       <div slot="footer">
         <Button type="primary" @click="editInfodModal=false">取消</Button>
-        <Button type="error" @click="reject">驳回</Button>
-        <Button type="success" @click="savedata">保存</Button>
+        <Button type="error" @click="reject" v-if="status === 2">驳回</Button>
+        <Button type="success" @click="savedata" v-if="status === 2">同意</Button>
       </div>
     </Modal>
 
@@ -110,7 +113,6 @@
 <script>
   import axios from 'axios'
   import util from '../../libs/util'
-
   export default {
     name: 'permission',
     data () {
@@ -216,7 +218,9 @@
         editInfodModal: false,
         permission: {},
         user: '',
-        work_id: ''
+        work_id: '',
+        auth_group: '',
+        status: 9
       }
     },
     methods: {
@@ -248,6 +252,8 @@
         this.permission = vl.permissions
         this.user = vl.username
         this.work_id = vl.work_id
+        this.auth_group = vl.auth_group
+        this.status = vl.status
       },
       savedata () {
         axios.post(`${util.url}/audit_grained/`,
@@ -255,6 +261,7 @@
             'status': 0,
             'user': this.user,
             'work_id': this.work_id,
+            'auth_group': this.auth_group,
             'grained_list': JSON.stringify(this.permission)
           })
           .then(res => {
@@ -290,5 +297,4 @@
 </script>
 
 <style scoped>
-
 </style>

@@ -7,7 +7,7 @@ from core.models import DatabaseList
 from core.models import SqlDictionary
 from core.models import SqlRecord
 from core.models import Account
-from core.models import SqlOrder, query_order, querypermissions, globalpermissions
+from core.models import SqlOrder, query_order, querypermissions, globalpermissions, grained
 
 
 class Globalpermissions(serializers.HyperlinkedModelSerializer):
@@ -37,7 +37,7 @@ class UserINFO(serializers.HyperlinkedModelSerializer):
 
     class Meta:
         model = Account
-        fields = ('id', 'username', 'group', 'department', 'email')
+        fields = ('id', 'username', 'group', 'department', 'email', 'auth_group')
 
 
 class SQLGeneratDic(serializers.HyperlinkedModelSerializer):
@@ -124,8 +124,8 @@ class Query_review(serializers.HyperlinkedModelSerializer):
     class Meta:
         model = query_order
         fields = (
-        'work_id', 'username', 'timer', 'date', 'instructions', 'query_per', 'connection_name', 'computer_room',
-        'export', 'time')
+            'work_id', 'username', 'date', 'instructions', 'query_per', 'connection_name', 'computer_room',
+            'export', 'time')
 
 
 class Query_list(serializers.HyperlinkedModelSerializer):
@@ -138,3 +138,13 @@ class Query_list(serializers.HyperlinkedModelSerializer):
     class Meta:
         model = querypermissions
         fields = ('id', 'statements')
+
+
+class AuthGroup_Serializers(serializers.HyperlinkedModelSerializer):
+    """
+    序列化权限组
+    """
+
+    class Meta:
+        model = grained
+        fields = ('id', 'username', 'permissions',)

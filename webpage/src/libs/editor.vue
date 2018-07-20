@@ -40,6 +40,12 @@
       require('brace/ext/language_tools')
       let editor = vm.editor = ace.edit(this.$el)
       this.$emit('init', editor)
+      let staticWordCompleter = {
+        getCompletions: function (editor, session, pos, prefix, callback) {
+          vm.$emit('setCompletions', editor, session, pos, prefix, callback)
+        }
+      }
+      editor.completers = [staticWordCompleter]
       editor.setOptions({
         enableBasicAutocompletion: true,
         enableLiveAutocompletion: true
@@ -60,5 +66,4 @@
 </script>
 
 <style scoped>
-
 </style>

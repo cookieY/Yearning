@@ -119,9 +119,6 @@
         <FormItem label="数据库连接名">
           <Input v-model="dingname" readonly="readonly"></Input>
         </FormItem>
-        <FormItem label="钉钉Webhook:">
-          <Input v-model="dingurl"></Input>
-        </FormItem>
         <FormItem label="提交工单推送的消息内容:">
           <Input v-model="dingdingbeforetext" type="textarea" :autosize="{minRows: 2,maxRows: 5}"></Input>
         </FormItem>
@@ -217,7 +214,7 @@
                       this.dingding(params.row)
                     }
                   }
-                }, '钉钉推送'),
+                }, '钉钉推送信息'),
                 h('Button', {
                   style: {
                     marginLeft: '8px'
@@ -302,7 +299,6 @@
         dingdingaftertext: '',
         dingname: '',
         dingdingid: null,
-        dingurl: '',
         tmp_id: null,
         diclist: [],
         baseinfo: false,
@@ -540,8 +536,7 @@
         axios.post(`${util.url}/dingding/`, {
           'before': this.dingdingbeforetext,
           'after': this.dingdingaftertext,
-          'id': this.dingdingid,
-          'url': this.dingurl
+          'id': this.dingdingid
         })
           .then(() => {
             util.notice('钉钉推送消息已设置成功!')
