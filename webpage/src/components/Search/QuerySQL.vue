@@ -36,8 +36,7 @@
             <Icon type="ios-crop-strong"></Icon>
             填写sql语句
           </p>
-          <editor v-model="formItem.textarea" @init="editorInit" @setCompletions="setCompletions"
-                  :autoComplete=true></editor>
+          <editor v-model="formItem.textarea" @init="editorInit" @setCompletions="setCompletions"></editor>
           <br>
           <p>当前选择的库: {{put_info.base}}</p>
           <br>

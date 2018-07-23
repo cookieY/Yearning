@@ -97,7 +97,7 @@
             <Icon type="ios-crop-strong"></Icon>
             填写sql语句
           </p>
-          <editor v-model="formItem.textarea" @init="editorInit"></editor>
+          <editor v-model="formItem.textarea" @init="editorInit" @setCompletions="setCompletions"></editor>
           <br>
           <br>
           <Table :columns="columnsName" :data="Testresults" highlight-row></Table>
@@ -205,10 +205,20 @@
           }]
         },
         id: null,
-        assigned: []
+        assigned: [],
+        wordList: []
       }
     },
     methods: {
+      setCompletions (editor, session, pos, prefix, callback) {
+        callback(null, this.wordList.map(function (word) {
+          return {
+            caption: word.vl,
+            value: word.vl,
+            meta: word.meta
+          }
+        }))
+      },
       editorInit: function () {
         require('brace/mode/mysql')
         require('brace/theme/xcode')
@@ -349,6 +359,9 @@
         .catch(error => {
           util.err_notice(error)
         })
+      for (let i of util.highlight.split('|')) {
+        this.wordList.push({'vl': i, 'meta': '关键字'})
+      }
     }
   }
 </script>

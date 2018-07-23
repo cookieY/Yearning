@@ -74,7 +74,7 @@
               <TabPane label="手动模式" name="order1" icon="edit">
                 <Form>
                   <FormItem>
-                    <editor v-model="formDynamic" @init="editorInit"></editor>
+                    <editor v-model="formDynamic" @init="editorInit" @setCompletions="setCompletions"></editor>
                   </FormItem>
                   <FormItem>
                     <Table :columns="columnsName" :data="Testresults" highlight-row></Table>
@@ -394,10 +394,20 @@
         ],
         assigned: [],
         formDynamic: '',
-        validate_gen: true
+        validate_gen: true,
+        wordList: []
       }
     },
     methods: {
+      setCompletions (editor, session, pos, prefix, callback) {
+        callback(null, this.wordList.map(function (word) {
+          return {
+            caption: word.vl,
+            value: word.vl,
+            meta: word.meta
+          }
+        }))
+      },
       editorInit: function () {
         require('brace/mode/mysql')
         require('brace/theme/xcode')
@@ -640,6 +650,9 @@
       }
     },
     mounted () {
+      for (let i of util.highlight.split('|')) {
+        this.wordList.push({'vl': i, 'meta': '关键字'})
+      }
       this.getdatabases()
     }
   }

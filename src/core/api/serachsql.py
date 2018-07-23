@@ -168,12 +168,14 @@ class query_worklf(baseview.BaseView):
             work_id = util.workId()
             if not query_switch['query']:
                 query_per = 1
+            else:
                 userinfo = Account.objects.filter(username=audit, group='admin').first()
                 try:
                     thread = threading.Thread(
                         target=push_message,
                         args=(
-                        {'to_user': request.user, 'workid': work_id}, 5, request.user, userinfo.email, work_id, '提交')
+                            {'to_user': request.user, 'workid': work_id}, 5, request.user, userinfo.email, work_id,
+                            '提交')
                     )
                     thread.start()
                 except Exception as e:
@@ -217,7 +219,8 @@ class query_worklf(baseview.BaseView):
             userinfo = Account.objects.filter(username=query_info.username).first()
             try:
                 thread = threading.Thread(target=push_message, args=(
-                    {'to_user': query_info.username, 'workid': query_info.work_id}, 7, query_info.username, userinfo.email,
+                    {'to_user': query_info.username, 'workid': query_info.work_id}, 7, query_info.username,
+                    userinfo.email,
                     work_id, '驳回'))
                 thread.start()
             except Exception as e:
@@ -262,10 +265,10 @@ class query_worklf(baseview.BaseView):
                                         port=_connection.port,
                                         db=i['Database']) as f:
                     tablename = f.query_info(sql='show tables')
-                highlist.append({'vl':i['Database'],'meta': '库名'})
+                highlist.append({'vl': i['Database'], 'meta': '库名'})
                 for c in tablename:
                     key = 'Tables_in_%s' % i['Database']
-                    highlist.append({'vl':c[key],'meta': '表名'})
+                    highlist.append({'vl': c[key], 'meta': '表名'})
                     children.append({
                         'title': c[key]
                     })

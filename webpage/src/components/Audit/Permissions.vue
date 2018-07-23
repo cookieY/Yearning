@@ -225,7 +225,7 @@
     },
     methods: {
       permisson_list (vl = 1) {
-        axios.get(`${util.url}/audit_grained?page=${vl}`)
+        axios.get(`${util.url}/audit_grained/all/?page=${vl}`)
           .then(res => {
             this.permissondata = res.data['data']
             this.per_pn = res.data['pn']
