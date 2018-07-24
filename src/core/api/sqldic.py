@@ -43,7 +43,7 @@ class adminpremisson(baseview.SuperUserpermissions):
                 db=basename,
                 port=_connection.port
         ) as f:
-            res = f.tablename()
+            res = f.baseItems(sql='show tables')
             for i in res:
                 EveryData = f.showtable(table_name=i)
                 for c in EveryData:

@@ -104,7 +104,7 @@ class addressing(baseview.BaseView):
                             password=_connection.password,
                             port=_connection.port
                     ) as f:
-                        res = f.basename()
+                        res = f.baseItems(sql='show databases')
                         return Response(res)
                 except Exception as e:
                     CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
@@ -127,7 +127,7 @@ class addressing(baseview.BaseView):
                             port=_connection.port,
                             db=basename
                     ) as f:
-                        res = f.tablename()
+                        res = f.baseItems(sql='show tables')
                         return Response(res)
                 except Exception as e:
                     CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')

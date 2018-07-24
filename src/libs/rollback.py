@@ -29,7 +29,7 @@ def roll(backdb=None, opid=None):
             password=inception["back_password"],
             port=inception["back_port"]
     ) as f:
-        data = f.dic_data(
+        data = f.query_info(
             sql=
             '''
             select rollback_statement from %s where opid_time =%s;
