@@ -54,7 +54,7 @@
 
 ## Install 安装及使用日志
 
-[一键安装脚本](instsall/Yearning.sh)
+[一键安装脚本](install/Yearning.sh)
 
 详细安装步骤请访问[www.yearning.io](http://yearning.io)获得帮助
 
