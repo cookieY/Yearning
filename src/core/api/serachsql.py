@@ -237,7 +237,7 @@ class query_worklf(baseview.BaseView):
         elif request.data['mode'] == 'end':
             try:
                 query_order.objects.filter(username=request.user).order_by('-id').update(query_per=3)
-                return Response('结束查询工单成功！')
+                return Response('已结束查询！')
             except Exception as e:
                 return HttpResponse(e)
 

@@ -54,6 +54,8 @@
 
 ## Install 安装及使用日志
 
+[一键安装脚本](instsall/Yearning.sh)
+
 详细安装步骤请访问[www.yearning.io](http://yearning.io)获得帮助
 
 [使用及安装文档](http://supermancookie.com/Yearning-document/)
