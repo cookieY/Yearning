@@ -525,7 +525,6 @@
             this.dingdingid = res.data.id
             this.dingdingbeforetext = res.data.before
             this.dingdingaftertext = res.data.after
-            this.dingurl = res.data.url
           })
           .catch(error => {
             util.err_notice(error)

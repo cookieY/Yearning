@@ -99,7 +99,7 @@ class Getdingding(serializers.HyperlinkedModelSerializer):
 
     class Meta:
         model = DatabaseList
-        fields = ('id', 'before', 'after', 'url')
+        fields = ('id', 'before', 'after')
 
 
 class Recordinfo(serializers.HyperlinkedModelSerializer):
