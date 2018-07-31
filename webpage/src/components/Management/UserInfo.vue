@@ -31,8 +31,8 @@
                 <Option value="guest">使用人</Option>
               </Select>
             </FormItem>
-            <FormItem label="权限组" prop="authgroup">
-              <Select v-model="userinfo.authgroup" placeholder="请选择">
+            <FormItem label="权限组">
+              <Select v-model="userinfo.authgroup" placeholder="请选择" multiple>
                 <Option v-for="list in groupset" :value="list" :key="list">{{ list }}</Option>
               </Select>
             </FormItem>
@@ -347,7 +347,7 @@
           checkbox: '',
           department: '',
           email: '',
-          authgroup: ''
+          authgroup: []
         },
         groupset: [],
         userinfoValidate: {
@@ -390,11 +390,6 @@
           department: [{
             required: true,
             message: '请输入部门名称',
-            trigger: 'blur'
-          }],
-          authgroup: [{
-            required: true,
-            message: '请选择权限组',
             trigger: 'blur'
           }]
         },
@@ -562,7 +557,7 @@
               'group': this.userinfo.group,
               'department': this.userinfo.department,
               'email': this.userinfo.email,
-              'auth_group': this.userinfo.authgroup
+              'auth_group': JSON.stringify(this.userinfo.authgroup)
             })
               .then(res => {
                 util.notice(res.data)

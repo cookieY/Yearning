@@ -126,6 +126,7 @@ class userinfo(baseview.BaseView):
             group = request.data['group']
             department = request.data['department']
             email = request.data['email']
+            auth_group = ','.join(json.loads(request.data['auth_group']))
         except KeyError as e:
             CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
             return HttpResponse(status=500)
@@ -138,7 +139,8 @@ class userinfo(baseview.BaseView):
                         department=department,
                         group=group,
                         is_staff=1,
-                        email=email)
+                        email=email,
+                        auth_group=auth_group)
                     user.save()
                     return Response('%s 用户注册成功!' % username)
                 elif group == 'guest':
@@ -147,7 +149,8 @@ class userinfo(baseview.BaseView):
                         password=password,
                         department=department,
                         group=group,
-                        email=email
+                        email=email,
+                        auth_group=auth_group
                     )
                     user.save()
                     return Response('%s 用户注册成功!' % username)

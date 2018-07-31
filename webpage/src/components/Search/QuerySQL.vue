@@ -7,7 +7,7 @@
     word-break: break-all;
     overflow-y: scroll;
     overflow-x: scroll;
-    height: 600px;
+    min-height: 600px;
   }
 </style>
 

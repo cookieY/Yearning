@@ -5,9 +5,9 @@
 # Yearning SQL审核平台
 
 ![](https://img.shields.io/badge/build-release-brightgreen.svg)  
-![](https://img.shields.io/badge/version-v1.2.0-brightgreen.svg)  
-![](https://img.shields.io/badge/vue.js-2.5.0-brightgreen.svg) 
-![](https://img.shields.io/badge/iview-2.8.0-brightgreen.svg?style=flat-square) 
+![](https://img.shields.io/badge/version-v1.3.0-brightgreen.svg)  
+![](https://img.shields.io/badge/vue.js-2.5.13-brightgreen.svg) 
+![](https://img.shields.io/badge/iview-2.13.1-brightgreen.svg?style=flat-square) 
 ![](https://img.shields.io/badge/python-3.6-brightgreen.svg)
 ![](https://img.shields.io/badge/Django-2.0-brightgreen.svg)
 
@@ -40,9 +40,11 @@
     - 钉钉webhook机器人工单推送
 - 其他
     - todoList
-    - LDAP登陆   
+    - LDAP登陆  
+    - 动态配置 
 - 用户权限及管理
     - 拼图式权限划分(共12项独立权限,可随意组合)
+    - 组合式权限组
 
 ## Environment 环境
 
@@ -53,6 +55,8 @@
 - Django 2.0
 
 ## Install 安装及使用日志
+
+[一键安装脚本](install/Yearning.sh)
 
 详细安装步骤请访问[www.yearning.io](http://yearning.io)获得帮助
 

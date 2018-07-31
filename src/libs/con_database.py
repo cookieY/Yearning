@@ -37,14 +37,6 @@ class SQLgo(object):
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.con.close()
 
-    def execute(self, sql=None):
-        with self.con.cursor() as cursor:
-            sqllist = sql
-            cursor.execute(sqllist)
-            result = cursor.fetchall()
-            self.con.commit()
-        return result
-
     def search(self, sql=None):
         data_dict = []
         id = 0
@@ -60,13 +52,6 @@ class SQLgo(object):
                     data_dict.append({'title': field[0], "key": field[0], "width": 200})
             len = cursor.rowcount
         return {'data': result, 'title': data_dict, 'len': len}
-
-    def dic_data(self, sql=None):
-        with self.con.cursor(cursor=pymysql.cursors.DictCursor) as cursor:
-            sqllist = sql
-            cursor.execute(sqllist)
-            result = cursor.fetchall()
-        return result
 
     def showtable(self, table_name):
         with self.con.cursor() as cursor:
@@ -93,36 +78,32 @@ class SQLgo(object):
 
     def gen_alter(self, table_name):
         with self.con.cursor() as cursor:
-            sqllist = '''
-                           select aa.COLUMN_NAME,aa.COLUMN_DEFAULT,aa.IS_NULLABLE,
-                           aa.COLUMN_TYPE,aa.COLUMN_KEY,aa.COLUMN_COMMENT, cc.TABLE_COMMENT 
-                           from information_schema.`COLUMNS` aa LEFT JOIN 
-                           (select DISTINCT bb.TABLE_SCHEMA,bb.TABLE_NAME,bb.TABLE_COMMENT 
-                           from information_schema.`TABLES` bb ) cc  
-                           ON (aa.TABLE_SCHEMA=cc.TABLE_SCHEMA and aa.TABLE_NAME = cc.TABLE_NAME )
-                           where aa.TABLE_SCHEMA = '%s' and aa.TABLE_NAME = '%s';
-                           ''' % (self.db, table_name)
+            sqllist = 'desc %s.%s;' % (self.db, table_name)
             cursor.execute(sqllist)
             result = cursor.fetchall()
             td = [
                 {
                     'Field': i[0],
-                    'Type': i[3],
+                    'Type': i[1],
                     'Null': i[2],
-                    'Key': i[4],
-                    'Default': i[1],
-                    'Extra': i[5],
-                    'TableComment': i[6]
+                    'Key': i[3],
+                    'Default': i[4]
                 } for i in result
             ]
-        return td
-
-    def basename(self):
-        with self.con.cursor() as cursor:
-            cursor.execute('show databases')
+            sqllist = 'show table status where NAME="%s";' % (table_name)
+            cursor.execute(sqllist)
             result = cursor.fetchall()
-            data = [c for i in result for c in i]
-            return data
+            tablecomment = result[0][-1]
+            [item.update(TableComment=tablecomment) for item in td]
+            sqllist = 'show full columns from %s;' % (table_name)
+            cursor.execute(sqllist)
+            result = cursor.fetchall()
+            for item in td:
+                for item1 in result:
+                    if item['Field'] == item1[0]:
+                        item['Extra'] = item1[-1]
+                        break
+        return td
 
     def index(self, table_name):
         with self.con.cursor() as cursor:
@@ -171,9 +152,10 @@ class SQLgo(object):
                 c.append(temp)
             return c
 
-    def tablename(self):
+    def baseItems(self, sql=None):
+
         with self.con.cursor() as cursor:
-            cursor.execute('show tables')
+            cursor.execute(sql)
             result = cursor.fetchall()
             data = [c for i in result for c in i]
             return data
