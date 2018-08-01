@@ -164,4 +164,5 @@ class SQLgo(object):
         with self.con.cursor(cursor=pymysql.cursors.DictCursor) as cursor:
             cursor.execute(sql)
             result = cursor.fetchall()
+            self.con.commit()
         return result
