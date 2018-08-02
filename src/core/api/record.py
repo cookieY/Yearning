@@ -150,7 +150,7 @@ class order_detail(baseview.BaseView):
                     data = util.ser(info)
                     _data = SqlRecord.objects.filter(sequence=i).first()
                     roll = rollback.rollbackSQL(db=_data.backup_dbname, opid=i)
-                    link = _data.backup_dbname + '.' + roll
+                    link = _data.backup_dbname + '.' + roll['tablename']
                     sql.append(rollback.roll(backdb=link, opid=i))
                 for i in sql:
                     for c in i:

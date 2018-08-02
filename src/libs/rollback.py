@@ -17,7 +17,7 @@ def rollbackSQL(db=None, opid=None):
             '''
             select tablename from $_$Inception_backup_information$_$ where opid_time =%s;
             ''' % opid)
-        return data[0][0]
+        return data[0]
 
 
 def roll(backdb=None, opid=None):

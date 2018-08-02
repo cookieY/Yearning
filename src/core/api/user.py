@@ -271,7 +271,6 @@ class ldapauth(baseview.AnyLogin):
                         is_staff=0,
                         group='guest')
                     permissions.save()
-                    grained.objects.get_or_create(username=username, permissions=PERMISSION)
                     _user = authenticate(username=username, password=password)
                     token = jwt_encode_handler(jwt_payload_handler(_user))
                     return Response({'token': token, 'res': '', 'permissions': 'guest'})
