@@ -43,9 +43,9 @@ class addressing(baseview.BaseView):
 
                 elif request.data['permissions_type'] == 'query':
                     con_name = []
-                    permission_spec = grained.objects.filter(username=request.user).first()
-                    if permission_spec.permissions['query'] == '1':
-                        for i in permission_spec.permissions['querycon']:
+                    permission_spec = set_auth_group(request.user)
+                    if permission_spec['query'] == '1':
+                        for i in permission_spec['querycon']:
                             con_instance = DatabaseList.objects.filter(connection_name=i).first()
                             if con_instance:
                                 con_name.append(

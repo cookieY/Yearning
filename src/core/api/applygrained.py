@@ -46,7 +46,6 @@ class audit_grained(baseview.SuperUserpermissions):
             else:
                 with transaction.atomic():
                     Account.objects.filter(username=user).update(auth_group=auth_group)
-                    grained.objects.filter(username=user).update(permissions=grained_list)
                     applygrained.objects.filter(work_id=work_id).update(status=1)
                 mail = Account.objects.filter(username=user).first()
                 thread = threading.Thread(target=push_message, args=(
