@@ -1,0 +1,29 @@
+version: '2'
+
+services:
+  db:
+    image: mysql:5.7
+    volumes:
+      - ./docker/etc/mysql/:/etc/mysql/conf.d/
+      - ./db_data/:/var/lib/mysql/
+      - ./init-sql/:/docker-entrypoint-initdb.d/
+    restart: always
+    ports:
+      - "3306:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: yearning
+      MYSQL_DATABASE: Yearning
+      MYSQL_USER: yearning
+      MYSQL_PASSWORD: yearning
+  yearning:
+    image: registry.cn-hangzhou.aliyuncs.com/cookie/yearning:v1.3.0
+    ports:
+      - "80:80"
+      - "8000:8000"
+    environment:
+      HOST: localhost
+      MYSQL_PASSWORD: yearning
+      MYSQL_USER: yearning
+      MYSQL_ADDR: db
+
+# 默认账号：admin，默认密码：Yearning_admin

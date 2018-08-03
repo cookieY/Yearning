@@ -489,7 +489,7 @@
       },
       delbaselink () {
         if (this.delbasename === this.delconfirmbasename) {
-          axios.delete(`${util.url}/management_db?del=${this.delbasename}`)
+          axios.delete(`${util.url}/management_db/${this.delbasename}`)
             .then(res => {
               util.notice(res.data)
               this.delbaseModal = false
