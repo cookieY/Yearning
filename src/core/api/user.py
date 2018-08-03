@@ -145,6 +145,14 @@ class userinfo(baseview.BaseView):
 
     def delete(self, request, args=None):
         try:
+            pr = Account.objects.filter(username=args).first()
+            if pr.is_staff == 1:
+                per = grained.objects.all().values('username', 'permissions')
+                for i in per:
+                    for c in i['permissions']:
+                        if isinstance(i['permissions'][c], list) and c == 'person':
+                            i['permissions'][c] = list(filter(lambda x: x != args, i['permissions'][c]))
+                    grained.objects.filter(username=i['username']).update(permissions=i['permissions'])
             with transaction.atomic():
                 Account.objects.filter(username=args).delete()
                 Usermessage.objects.filter(to_user=args).delete()

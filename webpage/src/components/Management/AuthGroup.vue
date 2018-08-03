@@ -352,9 +352,11 @@
       },
       deleteAuthGroup (vl) {
         axios.delete(`${util.url}/authgroup/${vl.username}`)
-          .then(res => util.notice(res.data))
+          .then(res => {
+            util.notice(res.data)
+            this.refreshgroup()
+          })
           .catch(err => util.err_notice(err))
-        this.refreshgroup()
       }
     },
     mounted () {

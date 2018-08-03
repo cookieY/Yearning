@@ -146,5 +146,13 @@ class auth_group(baseview.BaseView):
                 return HttpResponse(e)
 
     def delete(self, request, args: str = None):
+        user = Account.objects.all().values('username', 'auth_group')
+        for i in user:
+            if i['auth_group'] is not None:
+                auth_list = i['auth_group'].split(',')
+                for c in auth_list:
+                    if c == args:
+                        auth_list.remove(c)
+                Account.objects.filter(username=i['username']).update(auth_group=','.join(auth_list))
         grained.objects.filter(username=args).delete()
         return Response('权限组删除成功！')
