@@ -46,7 +46,7 @@ class DbInfo(object):
         sql = f'''
         select  BaseName  from core_sqldictionary where Name='{ConnName}'  group by BaseName
         '''
-        return self.query_info(sql)
+        return self.execute(sql)
 
     def getTableName(self, ConnName, SchemalName, TableName=None):
         '''根据数据库链接名 和数据库名 获取此连接下的schemal的表名称信息'''
@@ -56,18 +56,18 @@ class DbInfo(object):
             from core_sqldictionary where Name='{ConnName}' and \
             BaseName ='{SchemalName}' and TableName = '{TableName}' group by `TableName`
             '''
-            return self.query_info(sql)
+            return self.execute(sql)
         else:
             sql = f"select  `TableName`  from core_sqldictionary \
             where Name='{ConnName}' and BaseName ='{SchemalName}' and TableName = '{TableName}' \
             group by TableName limit 1"
-            return self.query_info(sql)
+            return self.execute(sql)
 
     def getTableInfo(self, ConnName, SchemalName=None, TableName=None):
         sql = f"""select `Name`, `BaseName`, `TableName`, `TableComment`, \
         `Field`, `Type`, `Extra` from core_sqldictionary \
         where Name = '{ConnName}' and BaseName='{SchemalName}' and TableName='{TableName}' """
-        return self.query_info(sql)
+        return self.execute(sql)
 
 
 class ToWord:

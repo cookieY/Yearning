@@ -19,21 +19,6 @@ CUSTOM_ERROR = logging.getLogger('Yearning.core.views')
 
 jwt_payload_handler = api_settings.JWT_PAYLOAD_HANDLER
 jwt_encode_handler = api_settings.JWT_ENCODE_HANDLER
-PERMISSION = {
-    'ddl': '0',
-    'ddlcon': [],
-    'dml': '0',
-    'dmlcon': [],
-    'dic': '0',
-    'diccon': [],
-    'dicedit': '0',
-    'user': '0',
-    'base': '0',
-    'dicexport': '0',
-    'person': [],
-    'query': '0',
-    'querycon': ''
-}
 
 
 class userinfo(baseview.BaseView):
@@ -160,19 +145,10 @@ class userinfo(baseview.BaseView):
 
     def delete(self, request, args=None):
         try:
-            pr = Account.objects.filter(username=args).first()
-            if pr.is_staff == 1:
-                per = grained.objects.all().values('username', 'permissions')
-                for i in per:
-                    for c in i['permissions']:
-                        if isinstance(i['permissions'][c], list) and c == 'person':
-                            i['permissions'][c] = list(filter(lambda x: x != args, i['permissions'][c]))
-                    grained.objects.filter(username=i['username']).update(permissions=i['permissions'])
             with transaction.atomic():
                 Account.objects.filter(username=args).delete()
                 Usermessage.objects.filter(to_user=args).delete()
                 Todolist.objects.filter(username=args).delete()
-                grained.objects.filter(username=args).delete()
             return Response('%s--用户已删除!' % args)
         except Exception as e:
             CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
