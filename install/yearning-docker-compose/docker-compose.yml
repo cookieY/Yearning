@@ -18,7 +18,7 @@ services:
   yearning:
     image: registry.cn-hangzhou.aliyuncs.com/cookie/yearning:v1.3.0
     ports:
-      - "80:80"
+      - "8080:80"
       - "8000:8000"
     environment:
       HOST: localhost
