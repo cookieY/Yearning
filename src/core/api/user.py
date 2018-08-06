@@ -1,7 +1,7 @@
 import logging
 import json
 from libs import baseview, util
-from core.task import grained_permissions
+from core.task import grained_permissions,set_auth_group
 from libs.serializers import UserINFO
 from rest_framework.response import Response
 from django.http import HttpResponse
@@ -67,9 +67,8 @@ class userinfo(baseview.BaseView):
                     return HttpResponse(e)
 
         elif args == 'permissions':
-            user = request.GET.get('user')
-            user = grained.objects.filter(username=user).first()
-            return Response(user.permissions)
+            user = set_auth_group(request.GET.get('user'))
+            return Response(user)
 
     def put(self, request, args=None):
         if args == 'changepwd':
@@ -216,8 +215,8 @@ class authgroup(baseview.BaseView):
     def post(self, request, args=None):
         try:
             _type = request.data['permissions_type'] + 'edit'
-            permission = grained.objects.filter(username=request.user).first()
-            return Response(permission.permissions[_type])
+            permission = set_auth_group(request.user)
+            return Response(permission[_type])
         except Exception as e:
             CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
             return HttpResponse(status=500)

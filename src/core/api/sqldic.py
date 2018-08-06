@@ -15,7 +15,7 @@ from core.models import (
     DatabaseList,
     grained
 )
-from core.task import grained_permissions
+from core.task import grained_permissions,set_auth_group
 
 CUSTOM_ERROR = logging.getLogger('Yearning.core.views')
 
@@ -431,7 +431,7 @@ class dictionary(baseview.BaseView):
     def get(self, request, args=None):
         try:
             _type = request.GET.get('permissions_type') + 'con'
-            permission = grained.objects.filter(username=request.user).first()
+            permission = set_auth_group(request.uer)
             _c = [x for x in permission.permissions[_type]]
             return Response(_c)
         except Exception as e:
@@ -474,7 +474,7 @@ class exportdoc(baseview.SuperUserpermissions):
         else:
             try:
                 _c = request.data['permissions_type'] + 'export'
-                permissions = grained.objects.filter(username=request.user).first()
+                permissions = set_auth_group(request.user)
                 if permissions.permissions[_c] == '0':
                     return Response(
                         {
