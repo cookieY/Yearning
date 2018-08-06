@@ -8,7 +8,6 @@ from core.task import grained_permissions, set_auth_group
 from core.models import (
     DatabaseList,
     Account,
-    grained,
     SqlDictionary
 )
 from libs.serializers import (

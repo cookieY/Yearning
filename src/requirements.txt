@@ -2,7 +2,7 @@ Django==2.0.1
 django-cors-headers==2.1.0
 djangorestframework==3.7.7
 djangorestframework-jwt==1.11.0
-PyMySQL==0.8.0
+PyMySQL==0.9.2
 sqlparse==0.2.4
 python-docx==0.8.6
 ldap3==2.4.1

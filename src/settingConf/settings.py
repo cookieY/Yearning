@@ -49,15 +49,6 @@ MIDDLEWARE = [
 ]
 CORS_ORIGIN_ALLOW_ALL = True
 CSRF_ORIGIN_ALLOW_ALL = True
-# CORS_ORIGIN_WHITELIST = (
-#     CONF_DATA.ipaddress
-# )
-
-# CSRF_TRUSTED_ORIGINS = (
-#     CONF_DATA.ipaddress,
-#     '127.0.0.1:8080'
-# )
-
 CORS_ALLOW_METHODS = (
     'DELETE',
     'GET',

@@ -6,7 +6,7 @@ from libs import baseview, send_email, util
 from django.http import HttpResponse
 from django.db import transaction
 from rest_framework.response import Response
-from core.models import Account, applygrained, grained, globalpermissions
+from core.models import Account, applygrained, globalpermissions
 
 CUSTOM_ERROR = logging.getLogger('Yearning.core.views')
 
@@ -39,7 +39,6 @@ class audit_grained(baseview.SuperUserpermissions):
         if request.data['status'] == 0:
             try:
                 auth_group = request.data['auth_group']
-                grained_list = json.loads(request.data['grained_list'])
             except KeyError as e:
                 CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
                 return HttpResponse(status=500)

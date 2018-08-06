@@ -78,7 +78,7 @@ class search(baseview.BaseView):
                         )
                     return HttpResponse(simplejson.dumps(data_set, cls=DateEncoder, bigint_as_string=True))
         else:
-            return Response('已超过申请时限请刷新页面后重新提交申请')
+            return Response('非法请求,账号无查询权限！')
 
     def put(self, request, args: str = None):
         base = request.data['base']
@@ -102,7 +102,7 @@ class search(baseview.BaseView):
             except:
                 return Response('')
         else:
-            return Response({'error': '已超过申请时限请刷新页面后重新提交申请'})
+            return Response({'error': '非法请求,账号无查询权限！'})
 
 
 def replace_limit(sql, limit):
