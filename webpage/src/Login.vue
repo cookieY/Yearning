@@ -26,12 +26,10 @@
           <TabPane label="普通登陆" name="custom">
             <Form ref="formInline" :model="formInline" :rules="ruleInline" inline>
               <Form-item prop="user" style="width: 100%">
-                <Input v-model="formInline.user" placeholder="Username">
-                </Input>
+                <Input v-model="formInline.user" placeholder="Username"></Input>
               </Form-item>
               <Form-item prop="password" style="width: 100%">
-                <Input type="password" v-model="formInline.password" placeholder="Password">
-                </Input>
+                <Input type="password" v-model="formInline.password" placeholder="Password"></Input>
               </Form-item>
               <Form-item style="width: 100%">
                 <Button type="primary" @click="authdata()" style="width: 100%" size="large">登录</Button>
@@ -40,16 +38,46 @@
               </Form-item>
             </Form>
           </TabPane>
+          <!--自己添加-->
+          <TabPane label="用户注册" name="register">
+            <Form ref="userinfova" :model="userinfo" :rules="userinfoValidate" inline>
+
+              <Form-item prop="username" style="width: 100%">
+                <Input v-model="userinfo.username" placeholder="用户名"></Input>
+              </Form-item>
+
+              <Form-item prop="password" style="width: 100%">
+                <Input type="password" v-model="userinfo.password" placeholder="密码" @on-keyup.enter="authdata()"></Input>
+              </Form-item>
+
+              <Form-item prop="confirmpassword" style="width: 100%">
+                <Input v-model="userinfo.confirmpassword" placeholder="确认密码" type="password"></Input>
+              </Form-item>
+
+              <Form-item prop="realname" style="width: 100%">
+                <Input v-model="userinfo.realname" placeholder="真实姓名"></Input>
+              </Form-item>
+
+              <Form-item prop="email" style="width: 100%">
+                <Input v-model="userinfo.email" placeholder="E-mail"></Input>
+              </Form-item>
+
+              <Form-item style="width: 100%">
+                <Button type="primary" @click="LoginRegister()" style="width: 100%" size="large">注册</Button>
+                <p style="margin-left: 22%;margin-top: 2%">如需注册账号请联系平台管理员</p>
+                <p style="margin-left: 5%;">2018 © Power By Cookie.Ye 使用chrome获得最佳体验</p>
+              </Form-item>
+            </Form>
+          </TabPane>
+          <!--自己添加-->
           <TabPane label="LDAP登陆" name="ldap">
             <Form ref="formInline" :model="formInline" :rules="ruleInline" inline>
               <Form-item prop="user" style="width: 100%">
-                <Input v-model="formInline.user" placeholder="ldap_Username">
-                </Input>
+                <Input v-model="formInline.user" placeholder="ldap_Username"></Input>
               </Form-item>
               <Form-item prop="password" style="width: 100%">
                 <Input type="password" v-model="formInline.password" placeholder="ldap_Password"
-                       @on-keyup.enter="authdata()">
-                </Input>
+                       @on-keyup.enter="authdata()"></Input>
               </Form-item>
               <Form-item style="width: 100%">
                 <Button type="primary" @click="ldap_login()" style="width: 100%" size="large">登录</Button>
@@ -74,7 +102,65 @@
     },
     name: 'Login',
     data () {
+      const valideuserinfoPassword = (rule, value, callback) => {
+        if (value !== this.userinfo.password) {
+          callback(new Error('两次输入密码不一致'))
+        } else {
+          callback()
+        }
+      }
       return {
+        userinfo: {
+          username: '',
+          password: '',
+          confirmpassword: '',
+          realname: '',
+          email: '',
+          authgroup: []
+        },
+        userinfoValidate: {
+          username: [{
+            required: true,
+            message: '请输入用户名',
+            trigger: 'blur'
+          }],
+          password: [{
+            required: true,
+            message: '请输入密码',
+            trigger: 'blur'
+          },
+            {
+              min: 6,
+              message: '请至少输入6个字符',
+              trigger: 'blur'
+            },
+            {
+              max: 32,
+              message: '最多输入32个字符',
+              trigger: 'blur'
+            }
+          ],
+          confirmpassword: [{
+            required: true,
+            message: '请再次输入新密码',
+            trigger: 'blur'
+          },
+            {
+              validator: valideuserinfoPassword,
+              trigger: 'blur'
+            }
+          ],
+          realname: [{
+            required: true,
+            message: '请输入真实姓名',
+            trigger: 'blur'
+          }],
+          email: [{
+            required: true,
+            message: '请输入邮箱名称',
+            trigger: 'blur'
+          }]
+        },
         formInline: {
           user: '',
           password: ''
@@ -101,6 +187,33 @@
       }
     },
     methods: {
+      LoginRegister () {
+        this.$refs['userinfova'].validate((valid) => {
+          if (valid) {
+            axios.post(util.url + '/loginregister/', {
+              'username': this.userinfo.username,
+              'password': this.userinfo.password,
+              'confirmpassword': this.userinfo.confirmpassword,
+              'realname': this.userinfo.realname,
+              'email': this.userinfo.email,
+              'auth_group': JSON.stringify(this.userinfo.authgroup)
+            })
+              .then(res => {
+                util.notice(res.data)
+                this.userinfo = {
+                  username: '',
+                  password: '',
+                  confirmpassword: '',
+                  realname: '',
+                  email: ''
+                }
+              })
+              .catch(error => {
+                util.err_notice(error)
+              })
+          }
+        })
+      },
       authdata () {
         axios.post(util.auth, {
           'username': this.formInline.user,

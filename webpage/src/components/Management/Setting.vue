@@ -153,6 +153,22 @@
                     <Input placeholder="机房名称" v-model="other.foce" style="width: 30%"></Input>
                     <Button icon="ios-plus-empty" type="dashed" size="small" @click="handleAdd">添加机房</Button>
                   </FormItem>
+                  <FormItem label="排除数据库:">
+                    <Tag v-for="v in other.exclued_db_list" :key="v" :name="v" type="border" closable color="blue"
+                         @on-close="handleClose_exclued_db">{{ v }}
+                    </Tag>
+                    <br>
+                    <Input placeholder="排除数据库" v-model="other.exclued_db" style="width: 30%"></Input>
+                    <Button icon="ios-plus-empty" type="dashed" size="small" @click="handleAdd_exclued_db">添加排除数据库</Button>
+                  </FormItem>
+                  <FormItem label="可注册邮箱后缀:">
+                    <Tag v-for="v in other.email_suffix_list" :key="v" :name="v" type="border" closable color="blue"
+                         @on-close="handleCloseemail">{{ v }}
+                    </Tag>
+                    <br>
+                    <Input placeholder="可注册邮箱后缀" v-model="other.email_suffix" style="width: 30%"></Input>
+                    <Button icon="ios-plus-empty" type="dashed" size="small" @click="handleAddemail">添加邮箱后缀</Button>
+                  </FormItem>
                   <FormItem label="脱敏字段:">
                     <Tag v-for="v in other.sensitive_list" :key="v" :name="v" type="border" closable color="blue"
                          @on-close="handleClose3">{{ v }}
@@ -259,6 +275,14 @@
         this.other.sensitive_list.push(this.other.sensitive)
         this.other.sensitive = ''
       },
+      handleAdd_exclued_db () {
+        this.other.exclued_db_list.push(this.other.exclued_db)
+        this.other.exclued_db = ''
+      },
+      handleAddemail () {
+        this.other.email_suffix_list.push(this.other.email_suffix)
+        this.other.email_suffix = ''
+      },
       handleClose2 (event, name) {
         const index = this.other.con_room.indexOf(name)
         this.other.con_room.splice(index, 1)
@@ -266,6 +290,16 @@
       handleClose3 (event, name) {
         const index = this.other.sensitive_list.indexOf(name)
         this.other.sensitive_list.splice(index, 1)
+      },
+      handleClose_exclued_db (event, name) {
+        const index = this.other.exclued_db_list.indexOf(name)
+        this.other.exclued_db_list.splice(index, 1)
+      },
+      handleCloseemail (event, name) {
+        const index = this.other.email_suffix_list.indexOf(name)
+        this.other.email_suffix_list.splice(index, 1)
+        console.log(this.other.email_suffix)
+        console.log(this.other.email_suffix_list)
       },
       multi_switching (status) {
         this.other.multi = status
@@ -342,6 +376,10 @@
             this.other = res.data.other
             this.other.multi ? this.other.multi = true : this.other.multi = false
             this.other.query ? this.other.query = true : this.other.query = false
+            this.other.exclued_db_list ? this.other.exclued_db_list = this.other.exclued_db_list : this.other.exclued_db_list = []
+            this.other.exclued_db ? this.other.exclued_db = this.other.exclued_db : this.other.exclued_db = ''
+            this.other.email_suffix_list ? this.other.email_suffix_list = this.other.email_suffix_list : this.other.email_suffix_list = []
+            this.other.email_suffix ? this.other.email_suffix = this.other.email_suffix : this.other.email_suffix = ''
             this.ldap = res.data.ldap
           }
         })
