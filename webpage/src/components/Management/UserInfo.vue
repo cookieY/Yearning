@@ -4,7 +4,7 @@
 </style>
 <template>
   <div>
-    <Col span="6">
+    <Col span="5">
       <Card>
         <p slot="title">
           <Icon type="load-b"></Icon>
@@ -20,6 +20,9 @@
             </FormItem>
             <FormItem label="确认密码" prop="confirmpassword">
               <Input v-model="userinfo.confirmpassword" placeholder="请输入" type="password"></Input>
+            </FormItem>
+            <FormItem label="真实姓名" prop="realname">
+              <Input v-model="userinfo.realname" placeholder="请输入"></Input>
             </FormItem>
             <FormItem label="部门" prop="department">
               <Input v-model="userinfo.department" placeholder="请输入"></Input>
@@ -44,7 +47,7 @@
         </div>
       </Card>
     </Col>
-    <Col span="18" class="padding-left-10">
+    <Col span="19" class="padding-left-10">
       <Card>
         <p slot="title">
           <Icon type="ios-crop-strong"></Icon>
@@ -161,8 +164,11 @@
     </Modal>
 
     <Modal v-model="editemail" :closable='false' :mask-closable=false :width="500">
-      <h3 slot="header" style="color:#2D8CF0">更改email邮箱</h3>
+      <h3 slot="header" style="color:#2D8CF0">更改实名&email邮箱</h3>
       <Form :label-width="100" label-position="right">
+        <FormItem label="真实姓名">
+          <Input v-model="realname"></Input>
+        </FormItem>
         <FormItem label="E-mail">
           <Input v-model="email"></Input>
         </FormItem>
@@ -235,6 +241,11 @@
             sortable: true
           },
           {
+            title: '真实姓名',
+            key: 'realname',
+            sortable: true
+          },
+          {
             title: 'email',
             key: 'email',
             sortable: true
@@ -242,7 +253,7 @@
           {
             title: '操作',
             key: 'action',
-            width: 300,
+            width: 400,
             align: 'center',
             render: (h, params) => {
               if (params.row.id !== 1) {
@@ -288,7 +299,7 @@
                         this.editEmail(params.index)
                       }
                     }
-                  }, 'email更改'),
+                  }, '实名&email更改'),
                   h('Button', {
                     props: {
                       type: 'warning',
@@ -330,7 +341,7 @@
                         this.editEmail(params.index)
                       }
                     }
-                  }, 'email更改')
+                  }, '实名&email更改')
                 ])
               }
             }
@@ -343,6 +354,7 @@
           username: '',
           password: '',
           confirmpassword: '',
+          realname: '',
           group: '',
           checkbox: '',
           department: '',
@@ -391,7 +403,47 @@
             required: true,
             message: '请输入部门名称',
             trigger: 'blur'
-          }]
+          },
+            {
+              min: 2,
+              message: '请至少输入6个字符',
+              trigger: 'blur'
+            },
+            {
+              max: 32,
+              message: '最多输入32个字符',
+              trigger: 'blur'
+            }],
+          realname: [{
+            required: true,
+            message: '请输入真实姓名',
+            trigger: 'blur'
+          },
+            {
+              min: 2,
+              message: '请至少输入2个字符',
+              trigger: 'blur'
+            },
+            {
+              max: 32,
+              message: '最多输入32个字符',
+              trigger: 'blur'
+            }],
+          email: [{
+            required: true,
+            message: '请输入工作邮箱',
+            trigger: 'blur'
+          },
+            {
+              min: 2,
+              message: '请至少输入2个字符',
+              trigger: 'blur'
+            },
+            {
+              max: 32,
+              message: '最多输入32个字符',
+              trigger: 'blur'
+            }]
         },
         // 更改密码遮罩层状态
         editPasswordModal: false,
@@ -454,6 +506,7 @@
         // 更改部门及权限遮罩层状态
         editAuthModal: false,
         editemail: false,
+        realname: '',
         email: '',
         // 用户名
         username: '',
@@ -531,11 +584,13 @@
       editEmail (index) {
         this.editemail = true
         this.username = this.data5[index].username
+        this.realname = this.data5[index].realname
         this.email = this.data5[index].email
       },
       putemail () {
         axios.put(`${util.url}/userinfo/changemail`, {
           'username': this.username,
+          'realname': this.realname,
           'mail': this.email
         })
           .then(res => {
@@ -554,6 +609,7 @@
             axios.post(util.url + '/userinfo/', {
               'username': this.userinfo.username,
               'password': this.userinfo.password,
+              'realname': this.userinfo.realname,
               'group': this.userinfo.group,
               'department': this.userinfo.department,
               'email': this.userinfo.email,
@@ -566,6 +622,7 @@
                   username: '',
                   password: '',
                   confirmpassword: '',
+                  realname: '',
                   group: '',
                   checkbox: '',
                   department: '',
@@ -645,7 +702,8 @@
             .then(res => {
               util.notice(res.data)
               this.deluserModal = false
-              this.$refs.total.currentPage = 1
+              this.confirmuser = ''
+              this.$refs.totol.currentPage = 1
               this.refreshuser()
             })
             .catch(error => {
