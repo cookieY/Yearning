@@ -13,6 +13,15 @@ from libs import baseview, send_email, util
 from libs import con_database
 from core.models import DatabaseList, Account, querypermissions, query_order, globalpermissions
 
+try:
+    from core.models import globalpermissions
+
+    setting = globalpermissions.objects.filter(authorization='global').first()
+    exclued_database_name = setting.other.get('exclued_db_list', [])
+except Exception:
+    logging.error("exclued_database_name配置错误.")
+    exclued_database_name = []
+
 CUSTOM_ERROR = logging.getLogger('Yearning.core.views')
 
 
@@ -56,7 +65,7 @@ class search(baseview.BaseView):
                         db=address['basename']
                 ) as f:
                     try:
-                        query_sql = replace_limit(check[-1].strip(), limit['limit'])
+                        query_sql = replace_limit(check[-1].strip(), limit.get('limit', '1024'))
                         data_set = f.search(sql=query_sql)
                     except Exception as e:
                         CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
@@ -167,7 +176,7 @@ class query_worklf(baseview.BaseView):
             query_per = 2
             work_id = util.workId()
             if not query_switch['query']:
-                query_per = 1
+                query_per = 2
             else:
                 userinfo = Account.objects.filter(username=audit, group='admin').first()
                 try:
@@ -252,12 +261,11 @@ class query_worklf(baseview.BaseView):
                                     port=_connection.port) as f:
                 dataname = f.query_info(sql='show databases')
             children = []
-            ignore = ['information_schema', 'sys', 'performance_schema', 'mysql']
-            for index, uc in enumerate(dataname):
+            ignore = exclued_database_name
+            for index, uc in sorted(enumerate(dataname), reverse=True):
                 for cc in ignore:
                     if uc['Database'] == cc:
                         del dataname[index]
-                        index = index - 1
             for i in dataname:
                 with con_database.SQLgo(ip=_connection.ip,
                                         user=_connection.username,

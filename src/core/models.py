@@ -32,6 +32,7 @@ class Account(AbstractUser):
     '''
     User table
     '''
+    realname= models.CharField(max_length=64,default="") # 实名
     group = models.CharField(max_length=40)  # 权限组 guest/admin
     department = models.CharField(max_length=40)  # 部门
     auth_group = models.CharField(max_length=100, null=True) #细粒化权限组
