@@ -37,7 +37,7 @@ class UserINFO(serializers.HyperlinkedModelSerializer):
 
     class Meta:
         model = Account
-        fields = ('id', 'username', 'group', 'department', 'email', 'auth_group')
+        fields = ('id', 'username', 'group', 'department', 'email', 'realname', 'auth_group')
 
 
 class SQLGeneratDic(serializers.HyperlinkedModelSerializer):

@@ -3,6 +3,7 @@ import json
 from libs import baseview, util
 from core.task import grained_permissions,set_auth_group
 from libs.serializers import UserINFO
+from libs.send_email import send_email
 from rest_framework.response import Response
 from django.http import HttpResponse
 from django.contrib.auth import authenticate
@@ -19,6 +20,52 @@ CUSTOM_ERROR = logging.getLogger('Yearning.core.views')
 
 jwt_payload_handler = api_settings.JWT_PAYLOAD_HANDLER
 jwt_encode_handler = api_settings.JWT_ENCODE_HANDLER
+
+def __adduser__(request, args=None):
+    try:
+        username = request.data['username']
+        password = request.data['password']
+        group = request.data.get('group', 'guest')
+        email = request.data['email']
+        realname = request.data.get('realname', '')
+        department = request.data.get('department', 'Unkonw')
+        auth_group = ','.join(json.loads(request.data.get('auth_group','[]')))
+        _send_mail = send_email(to_addr=email)
+        _status, _message = _send_mail.email_check()
+        if _status != 200:
+            return Response(data=_message)
+    except KeyError as e:
+        CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
+        return HttpResponse(status=500)
+    else:
+        try:
+            if group == 'admin' or group == 'perform':
+                user = Account.objects.create_user(
+                    username=username,
+                    password=password,
+                    department=department,
+                    group=group,
+                    is_staff=1,
+                    email=email,
+                    realname=realname,
+                    auth_group=auth_group)
+                user.save()
+                return Response('%s 用户注册成功!' % username)
+            elif group == 'guest':
+                user = Account.objects.create_user(
+                    username=username,
+                    password=password,
+                    department=department,
+                    group=group,
+                    email=email,
+                    realname=realname,
+                    auth_group=auth_group
+                )
+                user.save()
+                return Response('%s 用户注册成功!' % username)
+        except Exception as e:
+            CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
+            return HttpResponse(e)
 
 
 class userinfo(baseview.BaseView):
@@ -92,13 +139,14 @@ class userinfo(baseview.BaseView):
             try:
                 username = request.data['username']
                 mail = request.data['mail']
+                realname = request.data['realname']
             except KeyError as e:
                 CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
                 return HttpResponse(status=500)
             else:
                 try:
-                    Account.objects.filter(username=username).update(email=mail)
-                    return Response('%s--E-mail修改成功!' % username)
+                    Account.objects.filter(username=username).update(email=mail, realname=realname)
+                    return Response('%s--实名 & E-mail修改成功!' % username)
                 except Exception as e:
                     CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
                     return HttpResponse(status=500)
@@ -107,10 +155,15 @@ class userinfo(baseview.BaseView):
         try:
             username = request.data['username']
             password = request.data['password']
-            group = request.data['group']
-            department = request.data['department']
+            group = request.data.get('group', 'guest')
             email = request.data['email']
+            realname = request.data.get('realname', '')
+            department = request.data.get('department', 'Unkonw')
             auth_group = ','.join(json.loads(request.data['auth_group']))
+            _send_mail = send_email(to_addr=email)
+            _status, _message = _send_mail.email_check()
+            if _status != 200:
+                return Response(data=_message)
         except KeyError as e:
             CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
             return HttpResponse(status=500)
@@ -124,6 +177,7 @@ class userinfo(baseview.BaseView):
                         group=group,
                         is_staff=1,
                         email=email,
+                        realname=realname,
                         auth_group=auth_group)
                     user.save()
                     return Response('%s 用户注册成功!' % username)
@@ -134,6 +188,7 @@ class userinfo(baseview.BaseView):
                         department=department,
                         group=group,
                         email=email,
+                        realname=realname,
                         auth_group=auth_group
                     )
                     user.save()
@@ -259,6 +314,12 @@ class ldapauth(baseview.AnyLogin):
                     return Response({'token': token, 'res': '', 'permissions': 'guest'})
             else:
                 return Response({'token': 'null', 'res': 'ldap账号认证失败,请检查ldap账号或ldap配置!'})
+
+
+class login_register(baseview.AnyLogin):
+
+    def post(self, request, args=None):
+        return __adduser__(request, args)
 
 
 class login_auth(baseview.AnyLogin):
