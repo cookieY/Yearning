@@ -144,7 +144,7 @@
   //
   import axios from 'axios'
   import util from '../../libs/util'
-  import editindex from './components/ModifyIndex.vue'
+  import editindex from './components/modifyIndex.vue'
 
   export default {
     components: {

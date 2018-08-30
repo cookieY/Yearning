@@ -4,10 +4,10 @@
 <template>
   <div id="main" class="main" :class="{'main-hide-text': hideMenuText}">
     <div class="sidebar-menu-con"
-         :style="{width: hideMenuText?'60px':'200px', overflow: hideMenuText ? 'visible' : 'auto', background: $store.state.menuTheme === 'dark'?'#495060':'white'}">
+         :style="{width: hideMenuText?'60px':'200px', overflow: hideMenuText ? 'visible' : 'auto', background: '#515a6e'}">
       <div class="logo-con">
       </div>
-      <sidebar-menu v-if="!hideMenuText" :menuList="menuList" :iconSize="14"/>
+      <sidebar-menu v-if="!hideMenuText" :menuList="menuList" :iconSize="18"/>
       <sidebar-menu-shrink :icon-color="menuIconColor" v-else :menuList="menuList"/>
     </div>
     <div class="main-header-con" :style="{paddingLeft: hideMenuText?'60px':'200px'}">
@@ -15,7 +15,7 @@
         <div class="navicon-con">
           <Button :style="{transform: 'rotateZ(' + (this.hideMenuText ? '-90' : '0') + 'deg)'}" type="text"
                   @click="toggleClick">
-            <Icon type="navicon" size="32"></Icon>
+            <Icon type="md-menu" size="32"></Icon>
           </Button>
         </div>
         <div class="header-middle-con">
@@ -37,32 +37,20 @@
           <a href="https://cookiey.github.io/Yearning-document/used/" target="_Blank">使用说明</a>
           <div @click="handleFullScreen" v-if="showFullScreenBtn" class="full-screen-btn-con">
             <Tooltip :content="isFullScreen ? '退出全屏' : '全屏'" placement="bottom">
-              <Icon :type="isFullScreen ? 'arrow-shrink' : 'arrow-expand'" :size="23"></Icon>
+              <Icon :type="isFullScreen ? 'md-contract' : 'md-expand'" :size="23"></Icon>
             </Tooltip>
           </div>
           <div @click="lockScreen" class="lock-screen-btn-con">
             <Tooltip content="锁屏" placement="bottom">
-              <Icon type="locked" :size="20"></Icon>
+              <Icon type="md-lock" :size="20"></Icon>
             </Tooltip>
-          </div>
-          <div @click="showMessage" class="message-con">
-            <Tooltip :content="messageCount > 0 ? '有' + messageCount + '条未读消息' : '无未读消息'" placement="bottom">
-              <Badge :count="messageCount" dot>
-                <Icon type="ios-bell" :size="22"></Icon>
-              </Badge>
-            </Tooltip>
-          </div>
-          <div class="switch-theme-con">
-            <Row class="switch-theme" type="flex" justify="center" align="middle">
-              <theme-dropdown-menu></theme-dropdown-menu>
-            </Row>
           </div>
           <div class="user-dropdown-menu-con">
             <Row type="flex" justify="end" align="middle" class="user-dropdown-innercon">
               <Dropdown trigger="click" @on-click="handleClickUserDropdown">
                 <a href="javascript:void(0)">
                   <span class="main-user-name">{{ userName }}</span>
-                  <Icon type="arrow-down-b"></Icon>
+                  <Icon type="md-arrow-dropdown" />
                 </a>
                 <DropdownMenu slot="list">
                   <DropdownItem name="ownSpace">个人中心</DropdownItem>
@@ -132,7 +120,6 @@
   import sidebarMenu from './main_components/sidebarMenu.vue'
   import tagsPageOpened from './main_components/tagsPageOpened.vue'
   import breadcrumbNav from './main_components/breadcrumbNav.vue'
-  import themeDropdownMenu from './main_components/themeDropdownMenu.vue'
   import sidebarMenuShrink from './main_components/sidebarMenuShrink.vue'
   import axios from 'axios'
   // ;
@@ -143,7 +130,6 @@
       sidebarMenu,
       tagsPageOpened,
       breadcrumbNav,
-      themeDropdownMenu,
       sidebarMenuShrink
     },
     data () {
@@ -172,7 +158,7 @@
         return this.$store.state.currentPath // 当前面包屑数组
       },
       menuIconColor () {
-        return this.$store.state.menuTheme === 'dark' ? 'white' : '#495060'
+        return 'white'
       },
       messageCount () {
         return this.$store.state.messageCount
@@ -351,9 +337,8 @@
         }]
       }
       this.init()
-      axios.get(`${util.url}/homedata/messages?username=${sessionStorage.getItem('user')}`)
+      axios.get(`${util.url}/homedata/messages`)
         .then(res => {
-          this.$store.state.messageCount = res.data.count.messagecount
           if (res.data.statement !== '1') {
             this.statement = true
           }

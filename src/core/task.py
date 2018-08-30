@@ -8,7 +8,6 @@ from django.http import HttpResponse
 from libs import send_email, util
 from libs import call_inception
 from .models import (
-    Usermessage,
     DatabaseList,
     Account,
     globalpermissions,
@@ -166,12 +165,6 @@ class order_push_message(threading.Thread):
         t.join()
 
     def con_close(self):
-
-        Usermessage.objects.get_or_create(
-            from_user=self.from_user, time=util.date(),
-            title=self.title, content='该工单已审核通过!', to_user=self.to_user,
-            state='unread'
-        )
 
         content = DatabaseList.objects.filter(id=self.order.bundle_id).first()
         mail = Account.objects.filter(username=self.to_user).first()

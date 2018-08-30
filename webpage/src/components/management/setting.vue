@@ -262,7 +262,12 @@
           foce: '',
           multi: '',
           query: '',
-          sensitive: ''
+          sensitive: '',
+          exclued_db_list: [],
+          exclued_db: '',
+          email_suffix_list: [],
+          email_suffix: ''
+
         }
       }
     },
@@ -376,10 +381,6 @@
             this.other = res.data.other
             this.other.multi ? this.other.multi = true : this.other.multi = false
             this.other.query ? this.other.query = true : this.other.query = false
-            this.other.exclued_db_list ? this.other.exclued_db_list = this.other.exclued_db_list : this.other.exclued_db_list = []
-            this.other.exclued_db ? this.other.exclued_db = this.other.exclued_db : this.other.exclued_db = ''
-            this.other.email_suffix_list ? this.other.email_suffix_list = this.other.email_suffix_list : this.other.email_suffix_list = []
-            this.other.email_suffix ? this.other.email_suffix = this.other.email_suffix : this.other.email_suffix = ''
             this.ldap = res.data.ldap
           }
         })

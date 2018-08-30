@@ -1,6 +1,6 @@
 <style lang="less">
   @import '../../styles/common.less';
-  @import '../Order/components/table.less';
+  @import '../order/components/table.less';
 </style>
 <template>
   <div>

@@ -1,6 +1,6 @@
 <style lang="less">
   @import '../../styles/common.less';
-  @import '../Order/components/table.less';
+  @import '../order/components/table.less';
 
   .demo-spin-icon-load {
     animation: ani-demo-spin 1s linear infinite;

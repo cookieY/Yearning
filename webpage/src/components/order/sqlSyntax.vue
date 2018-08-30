@@ -65,12 +65,12 @@
               </Form>
               <Form :label-width="30">
                 <FormItem>
-                  <Button type="info" icon="paintbucket" @click.native="beautify()">美化</Button>
-                  <Button type="error" icon="trash-a" @click.native="ClearForm()" style="margin-left: 10%">清除</Button>
+                  <Button type="info" icon="md-brush" @click.native="beautify()">美化</Button>
+                  <Button type="error" icon="md-trash" @click.native="ClearForm()" style="margin-left: 10%">清除</Button>
                 </FormItem>
 
                 <FormItem>
-                  <Button type="warning" icon="android-search" @click.native="test_sql()">检测</Button>
+                  <Button type="warning" icon="md-search" @click.native="test_sql()">检测</Button>
                   <Button type="success" icon="ios-redo" @click.native="SubmitSQL()" style="margin-left: 10%"
                           :disabled="this.validate_gen">提交
                   </Button>

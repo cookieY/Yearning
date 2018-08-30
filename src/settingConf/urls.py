@@ -18,8 +18,7 @@ from core.api.user import (
     login_register
 )
 from core.api.dashboard import (
-    dashboard,
-    messages
+    dashboard
 )
 from core.api.managerdb import (
     management_db,
@@ -66,7 +65,6 @@ urlpatterns = [
     url(r'^api/v1/adminsql/(.*)', adminpremisson.as_view()),
     url(r'^api/v1/record/(.*)', record_order.as_view()),
     url(r'^api/v1/homedata/(.*)', dashboard.as_view()),
-    url(r'^api/v1/messages/(.*)', messages.as_view()),
     url(r'^api/v1/otheruser/(.*)', generaluser.as_view()),
     url(r'^api/v1/exportdocx/', exportdoc.as_view()),
     url(r'^api/v1/dingding', dingding.as_view()),

@@ -73,7 +73,7 @@
       <Col span="16" class-name="padding-left-5">
         <Row>
           <Col span="6">
-            <infor-card id-name="user_created_count" :end-val="count.createUser" iconType="android-person-add"
+            <infor-card id-name="user_created_count" :end-val="count.createUser" iconType="md-person-add"
                         color="#2d8cf0" intro-text="平台用户"></infor-card>
           </Col>
           <Col span="6" class-name="padding-left-5">
@@ -81,11 +81,11 @@
                         intro-text="数据库连接地址"></infor-card>
           </Col>
           <Col span="6" class-name="padding-left-5">
-            <infor-card id-name="collection_count" :end-val="count.dic" iconType="upload" color="#ffd572"
+            <infor-card id-name="collection_count" :end-val="count.dic" iconType="md-cloud-upload" color="#ffd572"
                         intro-text="数据字典采集字段"></infor-card>
           </Col>
           <Col span="6" class-name="padding-left-5">
-            <infor-card id-name="transfer_count" :end-val="count.order" iconType="shuffle" color="#f25e43"
+            <infor-card id-name="transfer_count" :end-val="count.order" iconType="md-shuffle" color="#f25e43"
                         intro-text="我提交的工单"></infor-card>
           </Col>
         </Row>

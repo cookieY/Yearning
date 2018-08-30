@@ -79,6 +79,8 @@ class sqlorder(baseview.BaseView):
         else:
             try:
                 x = [x.rstrip(';') for x in tmp]
+                if str(x[0]).lstrip().startswith('use'):
+                    del x[0]
                 sql = ';'.join(x)
                 sql = sql.strip(' ').rstrip(';')
                 workId = util.workId()

@@ -17,12 +17,12 @@
   <div id="band" class="div-relative">
     <div class="div-a">
       <div style='margin-left: 10%'>
-        <Icon type="cube" size="60" style="margin-top:5%"></Icon>
+        <Icon type="md-cube" size="60" style="margin-top:5%"></Icon>
         <p style="margin-left: 20%;margin-top: -10%;font-size: 20px">Yearning SQL 审核平台</p>
       </div>
       <br>
       <Card>
-        <Tabs value="custom">
+        <Tabs value="custom" style="max-height: 280px;overflow:scroll;">
           <TabPane label="普通登陆" name="custom">
             <Form ref="formInline" :model="formInline" :rules="ruleInline" inline>
               <Form-item prop="user" style="width: 100%">
@@ -33,8 +33,23 @@
               </Form-item>
               <Form-item style="width: 100%">
                 <Button type="primary" @click="authdata()" style="width: 100%" size="large">登录</Button>
-                <p style="margin-left: 22%;margin-top: 2%">如需注册账号请联系平台管理员</p>
-                <p style="margin-left: 5%;">2018 © Power By Cookie.Ye 使用chrome获得最佳体验</p>
+                <p style="margin-left: 5%;margin-top: 5%">2018 © Power By Cookie.Ye 使用chrome获得最佳体验</p>
+              </Form-item>
+            </Form>
+          </TabPane>
+          <!--自己添加-->
+          <TabPane label="LDAP登陆" name="ldap">
+            <Form ref="formInline" :model="formInline" :rules="ruleInline" inline>
+              <Form-item prop="user" style="width: 100%">
+                <Input v-model="formInline.user" placeholder="ldap_Username"></Input>
+              </Form-item>
+              <Form-item prop="password" style="width: 100%">
+                <Input type="password" v-model="formInline.password" placeholder="ldap_Password"
+                       @on-keyup.enter="authdata()"></Input>
+              </Form-item>
+              <Form-item style="width: 100%">
+                <Button type="primary" @click="ldap_login()" style="width: 100%" size="large">登录</Button>
+                <p style="margin-left: 5%;margin-top: 5%">2018 © Power By Cookie.Ye 使用chrome获得最佳体验</p>
               </Form-item>
             </Form>
           </TabPane>
@@ -54,35 +69,13 @@
                 <Input v-model="userinfo.confirmpassword" placeholder="确认密码" type="password"></Input>
               </Form-item>
 
-              <Form-item prop="realname" style="width: 100%">
-                <Input v-model="userinfo.realname" placeholder="真实姓名"></Input>
-              </Form-item>
-
               <Form-item prop="email" style="width: 100%">
                 <Input v-model="userinfo.email" placeholder="E-mail"></Input>
               </Form-item>
 
               <Form-item style="width: 100%">
                 <Button type="primary" @click="LoginRegister()" style="width: 100%" size="large">注册</Button>
-                <p style="margin-left: 22%;margin-top: 2%">如需注册账号请联系平台管理员</p>
-                <p style="margin-left: 5%;">2018 © Power By Cookie.Ye 使用chrome获得最佳体验</p>
-              </Form-item>
-            </Form>
-          </TabPane>
-          <!--自己添加-->
-          <TabPane label="LDAP登陆" name="ldap">
-            <Form ref="formInline" :model="formInline" :rules="ruleInline" inline>
-              <Form-item prop="user" style="width: 100%">
-                <Input v-model="formInline.user" placeholder="ldap_Username"></Input>
-              </Form-item>
-              <Form-item prop="password" style="width: 100%">
-                <Input type="password" v-model="formInline.password" placeholder="ldap_Password"
-                       @on-keyup.enter="authdata()"></Input>
-              </Form-item>
-              <Form-item style="width: 100%">
-                <Button type="primary" @click="ldap_login()" style="width: 100%" size="large">登录</Button>
-                <p style="margin-left: 22%;margin-top: 2%">如需注册账号请联系平台管理员</p>
-                <p style="margin-left: 5%;">2018 © Power By Cookie.Ye 使用chrome获得最佳体验</p>
+                <p style="margin-left: 5%;margin-top: 5%">2018 © Power By Cookie.Ye 使用chrome获得最佳体验</p>
               </Form-item>
             </Form>
           </TabPane>
@@ -114,7 +107,6 @@
           username: '',
           password: '',
           confirmpassword: '',
-          realname: '',
           email: '',
           authgroup: []
         },
@@ -150,11 +142,6 @@
               trigger: 'blur'
             }
           ],
-          realname: [{
-            required: true,
-            message: '请输入真实姓名',
-            trigger: 'blur'
-          }],
           email: [{
             required: true,
             message: '请输入邮箱名称',
@@ -194,7 +181,6 @@
               'username': this.userinfo.username,
               'password': this.userinfo.password,
               'confirmpassword': this.userinfo.confirmpassword,
-              'realname': this.userinfo.realname,
               'email': this.userinfo.email,
               'auth_group': JSON.stringify(this.userinfo.authgroup)
             })
@@ -204,7 +190,6 @@
                   username: '',
                   password: '',
                   confirmpassword: '',
-                  realname: '',
                   email: ''
                 }
               })

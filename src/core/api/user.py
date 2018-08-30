@@ -11,7 +11,6 @@ from django.db import transaction
 from rest_framework_jwt.settings import api_settings
 from core.models import (
     Account,
-    Usermessage,
     Todolist,
     grained
 )
@@ -21,13 +20,13 @@ CUSTOM_ERROR = logging.getLogger('Yearning.core.views')
 jwt_payload_handler = api_settings.JWT_PAYLOAD_HANDLER
 jwt_encode_handler = api_settings.JWT_ENCODE_HANDLER
 
+
 def __adduser__(request, args=None):
     try:
         username = request.data['username']
         password = request.data['password']
         group = request.data.get('group', 'guest')
         email = request.data['email']
-        realname = request.data.get('realname', '')
         department = request.data.get('department', 'Unkonw')
         auth_group = ','.join(json.loads(request.data.get('auth_group','[]')))
         _send_mail = send_email(to_addr=email)
@@ -47,7 +46,6 @@ def __adduser__(request, args=None):
                     group=group,
                     is_staff=1,
                     email=email,
-                    realname=realname,
                     auth_group=auth_group)
                 user.save()
                 return Response('%s 用户注册成功!' % username)
@@ -58,7 +56,6 @@ def __adduser__(request, args=None):
                     department=department,
                     group=group,
                     email=email,
-                    realname=realname,
                     auth_group=auth_group
                 )
                 user.save()
@@ -139,13 +136,12 @@ class userinfo(baseview.BaseView):
             try:
                 username = request.data['username']
                 mail = request.data['mail']
-                realname = request.data['realname']
             except KeyError as e:
                 CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
                 return HttpResponse(status=500)
             else:
                 try:
-                    Account.objects.filter(username=username).update(email=mail, realname=realname)
+                    Account.objects.filter(username=username).update(email=mail)
                     return Response('%s--实名 & E-mail修改成功!' % username)
                 except Exception as e:
                     CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
@@ -157,7 +153,6 @@ class userinfo(baseview.BaseView):
             password = request.data['password']
             group = request.data.get('group', 'guest')
             email = request.data['email']
-            realname = request.data.get('realname', '')
             department = request.data.get('department', 'Unkonw')
             auth_group = ','.join(json.loads(request.data['auth_group']))
             _send_mail = send_email(to_addr=email)
@@ -177,7 +172,6 @@ class userinfo(baseview.BaseView):
                         group=group,
                         is_staff=1,
                         email=email,
-                        realname=realname,
                         auth_group=auth_group)
                     user.save()
                     return Response('%s 用户注册成功!' % username)
@@ -188,7 +182,6 @@ class userinfo(baseview.BaseView):
                         department=department,
                         group=group,
                         email=email,
-                        realname=realname,
                         auth_group=auth_group
                     )
                     user.save()
@@ -209,7 +202,6 @@ class userinfo(baseview.BaseView):
                     grained.objects.filter(username=i['username']).update(permissions=i['permissions'])
             with transaction.atomic():
                 Account.objects.filter(username=args).delete()
-                Usermessage.objects.filter(to_user=args).delete()
                 Todolist.objects.filter(username=args).delete()
             return Response('%s--用户已删除!' % args)
         except Exception as e:

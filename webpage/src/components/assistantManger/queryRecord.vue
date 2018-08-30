@@ -1,6 +1,6 @@
 <style lang="less">
   @import '../../styles/common.less';
-  @import '../Order/components/table.less';
+  @import '../order/components/table.less';
 </style>
 <template>
   <div>
@@ -47,10 +47,6 @@
             title: '提交时间:',
             key: 'date',
             sortable: true
-          },
-          {
-            title: '查询时限',
-            key: 'timer'
           },
           {
             title: '操作',

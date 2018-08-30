@@ -32,10 +32,9 @@ class Account(AbstractUser):
     '''
     User table
     '''
-    realname= models.CharField(max_length=64,default="") # 实名
     group = models.CharField(max_length=40)  # 权限组 guest/admin
     department = models.CharField(max_length=40)  # 部门
-    auth_group = models.CharField(max_length=100, null=True) #细粒化权限组
+    auth_group = models.CharField(max_length=100, null=True)  # 细粒化权限组
 
 
 class SqlDictionary(models.Model):
@@ -70,6 +69,7 @@ class SqlOrder(models.Model):
     text = models.CharField(max_length=100)  # 工单备注
     assigned = models.CharField(max_length=50, blank=True)  # 工单执行人
     delay = models.IntegerField(null=True, default=0)  # 延迟时间
+    rejected = models.TextField(blank=True)  # 驳回说明
 
 
 class DatabaseList(models.Model):
@@ -107,18 +107,6 @@ class Todolist(models.Model):
     '''
     username = models.CharField(max_length=50)  # 账户
     content = models.CharField(max_length=200)  # 内容
-
-
-class Usermessage(models.Model):
-    '''
-    user  message
-    '''
-    to_user = models.CharField(max_length=50)  # 收信人
-    from_user = models.CharField(max_length=50)  # 发件人
-    content = models.TextField(max_length=500)  # 内容
-    time = models.CharField(max_length=50)  # 发送时间
-    state = models.CharField(max_length=10)  # 发送状态
-    title = models.CharField(max_length=100)  # 站内信标题
 
 
 class globalpermissions(models.Model):

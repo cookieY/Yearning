@@ -7,7 +7,6 @@ from rest_framework.response import Response
 from django.http import HttpResponse
 from core.models import (
     SqlOrder,
-    Usermessage,
     DatabaseList,
     SqlRecord,
     Account,
@@ -90,7 +89,6 @@ class audit(baseview.SuperUserpermissions):
         else:
             if category == 0:
                 try:
-                    from_user = request.data['from_user']
                     to_user = request.data['to_user']
                     text = request.data['text']
                     order_id = request.data['id']
@@ -99,20 +97,11 @@ class audit(baseview.SuperUserpermissions):
                     return HttpResponse(status=500)
                 else:
                     try:
-                        SqlOrder.objects.filter(id=order_id).update(status=0)
+                        SqlOrder.objects.filter(id=order_id).update(status=0,rejected=text)
                         _tmpData = SqlOrder.objects.filter(id=order_id).values(
                             'work_id',
                             'bundle_id'
                         ).first()
-                        title = '工单:' + _tmpData['work_id'] + '驳回通知'
-                        Usermessage.objects.get_or_create(
-                            from_user=from_user,
-                            time=util.date(),
-                            title=title,
-                            content=text,
-                            to_user=to_user,
-                            state='unread'
-                        )
                         rejected_push_messages(_tmpData, to_user, addr_ip, text).start()
                         return Response('操作成功，该请求已驳回！')
                     except Exception as e:
@@ -129,9 +118,13 @@ class audit(baseview.SuperUserpermissions):
                     return HttpResponse(status=500)
                 else:
                     try:
-                        SqlOrder.objects.filter(id=order_id).update(status=3)
-                        order_push_message(addr_ip, order_id, from_user, to_user).start()
-                        return Response('工单执行成功!请通过记录页面查看具体执行结果')
+                        idempotent = SqlOrder.objects.filter(id=order_id).first()
+                        if idempotent.status != 2:
+                            return Response('非法传参，触发幂等操作')
+                        else:
+                            SqlOrder.objects.filter(id=order_id).update(status=3)
+                            order_push_message(addr_ip, order_id, from_user, to_user).start()
+                            return Response('工单执行成功!请通过记录页面查看具体执行结果')
                     except Exception as e:
                         CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
                         return HttpResponse(status=500)
