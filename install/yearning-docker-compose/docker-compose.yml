@@ -19,6 +19,8 @@ services:
     image: registry.cn-hangzhou.aliyuncs.com/cookie/yearning:v1.3.0
     depends_on: 
       - db
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
     ports:
       - "8080:80"
       - "8000:8000"
@@ -29,4 +31,4 @@ services:
       MYSQL_ADDR: db
 
 # 默认账号：admin，默认密码：Yearning_admin
-# 感谢 eacdy 贡献
+# 感谢 eacdy 张功震 贡献
