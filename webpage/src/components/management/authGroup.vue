@@ -3,7 +3,7 @@
     <Row>
       <Card>
         <div>
-          <Button type="primary" icon="person-stalker" @click="createModel">添加权限组</Button>
+          <Button type="primary" icon="md-people" @click="createModel">添加权限组</Button>
           <br>
           <br/>
           <Table border :columns="columns" :data="data6" stripe height="550"></Table>

@@ -51,11 +51,11 @@
         <Row class="margin-top-10">
           <Card>
             <p slot="title" class="card-title">
-              <Icon type="android-checkbox-outline"></Icon>
+              <Icon type="md-checkbox-outline"></Icon>
               待办事项
             </p>
             <a type="text" slot="extra" @click.prevent="addNewToDoItem">
-              <Icon type="plus-round"></Icon>
+              <Icon type="md-add"></Icon>
             </a>
             <Modal v-model="showAddNewTodo" title="添加新的待办事项" @on-ok="addNew" @on-cancel="cancelAdd">
               <Row type="flex" justify="center">

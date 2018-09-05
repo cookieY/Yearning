@@ -47,7 +47,7 @@
     <Row>
       <Card>
         <p slot="title">
-          <Icon type="person"></Icon>
+          <Icon type="md-person"></Icon>
           工单审核
         </p>
         <Row>

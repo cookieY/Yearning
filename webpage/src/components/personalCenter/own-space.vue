@@ -6,7 +6,7 @@
   <div>
     <Card>
       <p slot="title">
-        <Icon type="person"></Icon>
+        <Icon type="md-person"></Icon>
         个人信息
       </p>
       <div>

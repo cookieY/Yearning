@@ -94,7 +94,7 @@
       <Col span="18" class="padding-left-10">
         <Card>
           <p slot="title">
-            <Icon type="ios-crop-strong"></Icon>
+            <Icon type="ios-crop"></Icon>
             填写sql语句
           </p>
           <editor v-model="formItem.textarea" @init="editorInit" @setCompletions="setCompletions"></editor>
@@ -190,18 +190,12 @@
             required: true,
             message: '说明不得为空',
             trigger: 'blur'
-          },
-            {
-              type: 'string',
-              max: 20,
-              message: '最多20个字',
-              trigger: 'blur'
-            }
+          }
           ],
           assigned: [{
             required: true,
-            message: '说明不得为空',
-            trigger: 'blur'
+            message: '审核人不得为空',
+            trigger: 'change'
           }]
         },
         id: null,

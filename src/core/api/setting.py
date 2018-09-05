@@ -2,6 +2,7 @@ import logging
 import json
 from libs import baseview, util
 from rest_framework.response import Response
+from core.task import set_auth_group
 from core.models import globalpermissions, Account
 from django.http import HttpResponse
 
@@ -56,11 +57,13 @@ class setting_view(baseview.SuperUserpermissions):
                 def _format_addr(s):
                     name, addr = parseaddr(s)
                     return formataddr((Header(name, 'utf-8').encode(), addr))
-
                 msg = MIMEText('Yearning test Message!', 'plain', 'utf-8')
                 msg['From'] = _format_addr('Yearning_Admin <%s>' % mail['user'])
                 msg['Subject'] = Header('Yearning 消息推送测试', 'utf-8').encode()
-                server = smtplib.SMTP(mail['smtp_host'], mail['smtp_port'])  # SMTP协议默认端口是25
+                if mail['ssl']:
+                    server = smtplib.SMTP_SSL(mail['smtp_host'], mail['smtp_port'])  # SMTP协议默认端口是25
+                else:
+                    server = smtplib.SMTP(mail['smtp_host'], mail['smtp_port'])  # SMTP协议默认端口是25
                 server.set_debuglevel(1)
                 server.login(mail['user'], mail['password'])
                 server.sendmail(mail['user'], [mail['to_user']], msg.as_string())

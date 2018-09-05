@@ -7,7 +7,7 @@
     <Col span="5">
       <Card>
         <p slot="title">
-          <Icon type="load-b"></Icon>
+          <Icon type="md-settings"></Icon>
           添加用户
         </p>
         <div class="edittable-testauto-con">
@@ -47,7 +47,7 @@
     <Col span="19" class="padding-left-10">
       <Card>
         <p slot="title">
-          <Icon type="ios-crop-strong"></Icon>
+          <Icon type="md-people"></Icon>
           系统用户表
         </p>
         <div class="edittable-con-1">

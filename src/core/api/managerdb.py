@@ -58,7 +58,7 @@ class management_db(baseview.SuperUserpermissions):
                 page_number = DatabaseList.objects.count()
                 start = int(page) * 10 - 10
                 end = int(page) * 10
-                info = DatabaseList.objects.all()[start:end]
+                info = DatabaseList.objects.all().order_by('connection_name')[start:end]
                 serializers = Sqllist(info, many=True)
                 data = SqlDictionary.objects.all().values('Name')
                 data.query.group_by = ['Name']  # 不重复表名

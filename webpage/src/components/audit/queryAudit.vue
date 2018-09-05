@@ -3,7 +3,7 @@
     <Row>
       <Card>
         <p slot="title">
-          <Icon type="person"></Icon>
+          <Icon type="md-person"></Icon>
           查询审核
         </p>
         <Row>

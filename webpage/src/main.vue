@@ -159,9 +159,6 @@
       },
       menuIconColor () {
         return 'white'
-      },
-      messageCount () {
-        return this.$store.state.messageCount
       }
     },
     methods: {
@@ -206,10 +203,6 @@
             main.msRequestFullscreen()
           }
         }
-      },
-      // 消息中心
-      showMessage () {
-        util.openPage(this, 'message_index', '消息中心')
       },
       // 锁屏
       lockScreen () {

@@ -7,7 +7,7 @@
     <Row>
       <Card>
         <p slot="title">
-          <Icon type="person"></Icon>
+          <Icon type="md-person"></Icon>
           我的工单
         </p>
         <Row>

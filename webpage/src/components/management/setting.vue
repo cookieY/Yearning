@@ -10,7 +10,7 @@
       <Col span="24">
         <Card>
           <p slot="title">
-            <Icon type="android-settings"></Icon>
+            <Icon type="md-settings"></Icon>
             基础设置
           </p>
           <Row>
@@ -108,6 +108,9 @@
                   </FormItem>
                   <FormItem label="邮件SMTP服务地址:">
                     <Input placeholder="STMP服务 地址" v-model="message.smtp_host"></Input>
+                  </FormItem>
+                  <FormItem >
+                    <Checkbox v-model="message.ssl">启用ssl端口</Checkbox>
                   </FormItem>
                   <FormItem label="SMTP服务端口:">
                     <Input placeholder="STMP服务 端口" v-model="message.smtp_port"></Input>
