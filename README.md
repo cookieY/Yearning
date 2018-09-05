@@ -97,7 +97,7 @@
 
 ## License
 
-- Apache 2.0
+- AGPLv3
 
 2018 © Cookie
 
