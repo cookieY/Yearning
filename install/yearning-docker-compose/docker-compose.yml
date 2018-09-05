@@ -29,3 +29,4 @@ services:
       MYSQL_ADDR: db
 
 # 默认账号：admin，默认密码：Yearning_admin
+# 感谢 eacdy 贡献
