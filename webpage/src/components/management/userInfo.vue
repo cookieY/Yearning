@@ -24,6 +24,9 @@
             <FormItem label="部门" prop="department">
               <Input v-model="userinfo.department" placeholder="请输入"></Input>
             </FormItem>
+            <FormItem label="姓名" prop="realname">
+              <Input v-model="userinfo.realname" placeholder="请输入"></Input>
+            </FormItem>
             <FormItem label="角色" prop="group">
               <Select v-model="userinfo.group" placeholder="请选择">
                 <Option value="admin">管理员</Option>
@@ -31,13 +34,13 @@
                 <Option value="guest">使用人</Option>
               </Select>
             </FormItem>
+            <FormItem label="电子邮箱" prop="email">
+              <Input v-model="userinfo.email" placeholder="请输入"></Input>
+            </FormItem>
             <FormItem label="权限组">
               <Select v-model="userinfo.authgroup" placeholder="请选择" multiple>
                 <Option v-for="list in groupset" :value="list" :key="list">{{ list }}</Option>
               </Select>
-            </FormItem>
-            <FormItem label="电子邮箱">
-              <Input v-model="userinfo.email" placeholder="请输入"></Input>
             </FormItem>
             <Button type="primary" @click.native="Registered" style="margin-left: 35%">注册</Button>
           </Form>
@@ -54,7 +57,8 @@
           <Table border :columns="columns6" :data="data5" stripe height="550"></Table>
         </div>
         <br>
-        <Page :total="pagenumber" show-elevator @on-change="splicpage" :page-size="10" ref="total"></Page>
+        <Page :total="pagenumber" show-elevator @on-change="splicpage" :page-size="10" ref="total"
+              :current="current_page"></Page>
       </Card>
     </Col>
 
@@ -99,35 +103,45 @@
             <Option v-for="list in groupset" :value="list" :key="list">{{ list }}</Option>
           </Select>
           <template>
-            <FormItem label="所拥有的权限:">
-              <br>
+            <FormItem>
+              <Divider orientation="left">DDL权限</Divider>
               <FormItem label="DDL是否可见:">
                 <p>{{formItem.ddl}}</p>
               </FormItem>
               <FormItem label="可访问的连接名:" v-if="formItem.ddl === '是'">
-                <p>{{formItem.ddlcon}}</p>
+                <Tag color="blue" v-for="i in formItem.ddlcon" :key="i">{{i}}</Tag>
               </FormItem>
+              <Divider orientation="left">DML权限</Divider>
               <FormItem label="DML是否可见:">
                 <p>{{formItem.dml}}</p>
               </FormItem>
               <FormItem label="可访问的连接名:" v-if="formItem.dml === '是'">
-                <p>{{formItem.dmlcon}}</p>
+                <Tag color="blue" v-for="i in formItem.dmlcon" :key="i">{{i}}</Tag>
               </FormItem>
+              <Divider orientation="left">查询权限</Divider>
               <FormItem label="查询是否可见:">
                 <p>{{formItem.query}}</p>
               </FormItem>
               <FormItem label="可访问的连接名:" v-if="formItem.query === '是'">
-                <p>{{formItem.querycon}}</p>
+                <Tag color="blue" v-for="i in formItem.querycon" :key="i">{{i}}</Tag>
               </FormItem>
+              <Divider orientation="left">字典权限</Divider>
               <FormItem label="字典是否可见:">
                 <p>{{formItem.dic}}</p>
               </FormItem>
               <FormItem label="上级审核人:">
-                <p>{{formItem.person}}</p>
+                <Tag color="blue" v-for="i in formItem.person" :key="i">{{i}}</Tag>
               </FormItem>
               <FormItem label="可访问的连接名:" v-if="formItem.dic === '是'">
-                <p>{{formItem.diccon}}</p>
+                <Tag color="blue" v-for="i in formItem.diccon" :key="i">{{i}}</Tag>
               </FormItem>
+              <FormItem label="字典修改权限:">
+                <p>{{formItem.dicedit}}</p>
+              </FormItem>
+              <FormItem label="字典导出权限:">
+                <p>{{formItem.dicexport}}</p>
+              </FormItem>
+              <Divider orientation="left">管理权限</Divider>
               <FormItem label="用户管理权限:">
                 <p>{{formItem.user}}</p>
               </FormItem>
@@ -212,6 +226,7 @@
           user: '0',
           base: '0'
         },
+        current_page: 1,
         con: [],
         columns6: [
           {
@@ -222,6 +237,11 @@
           {
             title: '角色',
             key: 'group',
+            sortable: true
+          },
+          {
+            title: '姓名',
+            key: 'real_name',
             sortable: true
           },
           {
@@ -347,7 +367,8 @@
           checkbox: '',
           department: '',
           email: '',
-          authgroup: []
+          authgroup: [],
+          realname: ''
         },
         groupset: [],
         userinfoValidate: {
@@ -356,11 +377,12 @@
             message: '请输入用户名',
             trigger: 'blur'
           }],
-          password: [{
-            required: true,
-            message: '请输入密码',
-            trigger: 'blur'
-          },
+          password: [
+            {
+              required: true,
+              message: '请输入密码',
+              trigger: 'blur'
+            },
             {
               min: 6,
               message: '请至少输入6个字符',
@@ -372,26 +394,30 @@
               trigger: 'blur'
             }
           ],
-          confirmpassword: [{
-            required: true,
-            message: '请再次输入新密码',
-            trigger: 'blur'
-          },
+          confirmpassword: [
+            {
+              required: true,
+              message: '请再次输入新密码',
+              trigger: 'blur'
+            },
             {
               validator: valideuserinfoPassword,
               trigger: 'blur'
             }
           ],
-          group: [{
-            required: true,
-            message: '请输入权限',
-            trigger: 'blur'
-          }],
-          department: [{
-            required: true,
-            message: '请输入部门名称',
-            trigger: 'blur'
-          },
+          group: [
+            {
+              required: true,
+              message: '请输入权限',
+              trigger: 'blur'
+            }
+          ],
+          department: [
+            {
+              required: true,
+              message: '请输入部门名称',
+              trigger: 'blur'
+            },
             {
               min: 2,
               message: '请至少输入6个字符',
@@ -401,8 +427,14 @@
               max: 32,
               message: '最多输入32个字符',
               trigger: 'blur'
-            }],
+            }
+          ],
           realname: [
+            {
+              required: true,
+              message: '请输入姓名',
+              trigger: 'blur'
+            },
             {
               min: 2,
               message: '请至少输入2个字符',
@@ -413,11 +445,12 @@
               message: '最多输入32个字符',
               trigger: 'blur'
             }],
-          email: [{
-            required: true,
-            message: '请输入工作邮箱',
-            trigger: 'blur'
-          },
+          email: [
+            {
+              required: true,
+              message: '请输入工作邮箱',
+              trigger: 'blur'
+            },
             {
               min: 2,
               message: '请至少输入2个字符',
@@ -476,13 +509,13 @@
         },
         formItem: {
           ddl: '',
-          ddlcon: '',
+          ddlcon: [],
           dml: '',
-          dmlcon: '',
+          dmlcon: [],
           dic: '',
-          diccon: '',
+          diccon: [],
           query: '',
-          querycon: '',
+          querycon: [],
           user: '',
           base: '',
           person: ''
@@ -526,6 +559,7 @@
           .then(res => {
             this.permission_list = res.data.permissions
             this.formItem = util.mode(res.data.permissions)
+            console.log(this.formItem)
           })
           .catch(error => {
             util.err_notice(error)
@@ -577,7 +611,7 @@
           .then(res => {
             util.notice(res.data)
             this.editemail = false
-            this.$refs.total.currentPage = 1
+            this.current_page = 1
             this.refreshuser()
           })
           .catch(error => {
@@ -593,7 +627,8 @@
               'group': this.userinfo.group,
               'department': this.userinfo.department,
               'email': this.userinfo.email,
-              'auth_group': JSON.stringify(this.userinfo.authgroup)
+              'auth_group': JSON.stringify(this.userinfo.authgroup),
+              'realname': this.userinfo.realname
             })
               .then(res => {
                 util.notice(res.data)
@@ -682,7 +717,7 @@
               util.notice(res.data)
               this.deluserModal = false
               this.confirmuser = ''
-              this.$refs.totol.currentPage = 1
+              this.current_page = 1
               this.refreshuser()
             })
             .catch(error => {

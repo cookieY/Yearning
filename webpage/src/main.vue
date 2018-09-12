@@ -24,7 +24,7 @@
           </div>
         </div>
         <div class="header-avator-con">
-          <a @mouseover="getc = true">捐助</a>
+          <a @click="getc = true">捐助</a>
           <Modal
             v-model="getc"
             title="捐助Yearning"
@@ -100,11 +100,12 @@
       <H3>关于二次开发的声明:</H3>
       <br>
       <p>作为一款开源平台。Yearning很希望有更多的开发者一起参与到开发中。同时也鼓励各公司根据自身业务对平台进行二次开发及定制。
-        Yearning v1.0.0 采用Apache2.0许可证,以下为许可中相关的义务与责任。</p>
-      <p>1.需要给代码的用户一份Apache Licence</p>
+        Yearning v1.3.1 采用AGPL 3.0许可证,以下为许可中相关的义务与责任。</p>
+      <br>
+      <p>1.未经原作者授权不得将Yearning 用于任何商业目的。包括通过网络提供任何基于yearning的商业服务。</p>
       <p>2.如果你修改了代码，需要在被修改的文件中说明。</p>
-      <p>3.在延伸的代码中（修改和有源代码衍生的代码中）需要带有原来代码中的协议，商标，专利声明和其他原来作者规定需要包含的说明。</p>
-      <p>4.如果再发布的产品中包含一个Notice文件，则在Notice文件中需要带有Apache Licence。你可以在Notice中增加自己的许可，但不可以表现为对Apache Licence构成更改。</p>
+      <p>3.如二次开发并公布的情况下(内部使用不在该条款之内)，该软件必须为开源项目，不可为任何商业性质的商业软件。如需商业化必须获得原作者授权。</p>
+      <p>4.本平台所有条款符合相应开源许可，请严格按照相关许可使用及开发。</p>
       <br>
       <h3>免责声明:</h3>
       <br>
@@ -210,7 +211,6 @@
         lockScreenBack.style.transition = 'all 3s'
         lockScreenBack.style.zIndex = 10000
         lockScreenBack.style.boxShadow = '0 0 0 ' + this.lockScreenSize + 'px #667aa6 inset'
-        this.showUnlock = true
         this.$store.commit('lock')
         sessionStorage.setItem('last_page_name', this.$route.name) // 本地存储锁屏之前打开的页面以便解锁后打开
         setTimeout(() => {
@@ -332,7 +332,8 @@
       this.init()
       axios.get(`${util.url}/homedata/messages`)
         .then(res => {
-          if (res.data.statement !== '1') {
+          console.log(res.data.statement)
+          if (res.data.statement !== 'pass') {
             this.statement = true
           }
         })

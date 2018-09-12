@@ -618,7 +618,7 @@
             axios.post(`${util.url}/sqlsyntax/`, {
               'data': JSON.stringify(this.formItem),
               'sql': JSON.stringify(this.sql),
-              'user': sessionStorage.getItem('user'),
+              'real_name': sessionStorage.getItem('real_name'),
               'type': 0,
               'id': this.id[0].id
             })

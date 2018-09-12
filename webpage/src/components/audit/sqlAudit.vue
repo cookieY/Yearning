@@ -219,10 +219,16 @@
             sortable: true
           },
           {
-            title: '提交人',
+            title: '提交账号',
             key: 'username',
             sortable: true
           },
+          {
+            title: '提交人姓名',
+            key: 'real_name',
+            sortable: true
+          },
+
           {
             title: '状态',
             key: 'status',

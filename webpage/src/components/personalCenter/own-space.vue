@@ -28,35 +28,45 @@
           <FormItem label="邮箱：">
             <span>{{ userForm.email }}</span>
           </FormItem>
-          <FormItem label="具体权限：">
-            <br>
+          <FormItem>
+            <Divider orientation="left">DDL权限</Divider>
             <FormItem label="DDL是否可见:">
               <p>{{formItem.ddl}}</p>
             </FormItem>
             <FormItem label="可访问的连接名:" v-if="formItem.ddl === '是'">
-              <p>{{formItem.ddlcon}}</p>
+              <Tag color="blue" v-for="i in formItem.ddlcon" :key="i">{{i}}</Tag>
             </FormItem>
+            <Divider orientation="left">DML权限</Divider>
             <FormItem label="DML是否可见:">
               <p>{{formItem.dml}}</p>
             </FormItem>
             <FormItem label="可访问的连接名:" v-if="formItem.dml === '是'">
-              <p>{{formItem.dmlcon}}</p>
+              <Tag color="blue" v-for="i in formItem.dmlcon" :key="i">{{i}}</Tag>
             </FormItem>
+            <Divider orientation="left">查询权限</Divider>
             <FormItem label="查询是否可见:">
               <p>{{formItem.query}}</p>
             </FormItem>
             <FormItem label="可访问的连接名:" v-if="formItem.query === '是'">
-              <p>{{formItem.querycon}}</p>
+              <Tag color="blue" v-for="i in formItem.querycon" :key="i">{{i}}</Tag>
             </FormItem>
+            <Divider orientation="left">字典权限</Divider>
             <FormItem label="字典是否可见:">
               <p>{{formItem.dic}}</p>
             </FormItem>
             <FormItem label="上级审核人:">
-              <p>{{formItem.person}}</p>
+              <Tag color="blue" v-for="i in formItem.person" :key="i">{{i}}</Tag>
             </FormItem>
             <FormItem label="可访问的连接名:" v-if="formItem.dic === '是'">
-              <p>{{formItem.diccon}}</p>
+              <Tag color="blue" v-for="i in formItem.diccon" :key="i">{{i}}</Tag>
             </FormItem>
+            <FormItem label="字典修改权限:">
+              <p>{{formItem.dicedit}}</p>
+            </FormItem>
+            <FormItem label="字典导出权限:">
+              <p>{{formItem.dicexport}}</p>
+            </FormItem>
+            <Divider orientation="left">管理权限</Divider>
             <FormItem label="用户管理权限:">
               <p>{{formItem.user}}</p>
             </FormItem>
@@ -112,35 +122,45 @@
             <Option v-for="list in groupset" :value="list" :key="list">{{ list }}</Option>
           </Select>
           <template>
-            <FormItem label="所拥有的权限:">
-              <br>
+            <FormItem>
+              <Divider orientation="left">DDL权限</Divider>
               <FormItem label="DDL是否可见:">
                 <p>{{permission.ddl}}</p>
               </FormItem>
               <FormItem label="可访问的连接名:" v-if="permission.ddl === '是'">
-                <p>{{permission.ddlcon}}</p>
+                <Tag color="blue" v-for="i in permission.ddlcon" :key="i">{{i}}</Tag>
               </FormItem>
+              <Divider orientation="left">DML权限</Divider>
               <FormItem label="DML是否可见:">
                 <p>{{permission.dml}}</p>
               </FormItem>
               <FormItem label="可访问的连接名:" v-if="permission.dml === '是'">
-                <p>{{permission.dmlcon}}</p>
+                <Tag color="blue" v-for="i in permission.dmlcon" :key="i">{{i}}</Tag>
               </FormItem>
+              <Divider orientation="left">查询权限</Divider>
               <FormItem label="查询是否可见:">
                 <p>{{permission.query}}</p>
               </FormItem>
               <FormItem label="可访问的连接名:" v-if="permission.query === '是'">
-                <p>{{permission.querycon}}</p>
+                <Tag color="blue" v-for="i in permission.querycon" :key="i">{{i}}</Tag>
               </FormItem>
+              <Divider orientation="left">字典权限</Divider>
               <FormItem label="字典是否可见:">
                 <p>{{permission.dic}}</p>
               </FormItem>
               <FormItem label="上级审核人:">
-                <p>{{permission.person}}</p>
+                <Tag color="blue" v-for="i in permission.person" :key="i">{{i}}</Tag>
               </FormItem>
               <FormItem label="可访问的连接名:" v-if="permission.dic === '是'">
-                <p>{{permission.diccon}}</p>
+                <Tag color="blue" v-for="i in permission.diccon" :key="i">{{i}}</Tag>
               </FormItem>
+              <FormItem label="字典修改权限:">
+                <p>{{permission.dicedit}}</p>
+              </FormItem>
+              <FormItem label="字典导出权限:">
+                <p>{{permission.dicexport}}</p>
+              </FormItem>
+              <Divider orientation="left">管理权限</Divider>
               <FormItem label="用户管理权限:">
                 <p>{{permission.user}}</p>
               </FormItem>

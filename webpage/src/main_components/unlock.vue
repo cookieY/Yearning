@@ -8,7 +8,7 @@
       <div @click="handleClickAvator" class="unlock-avator-con" :style="{marginLeft: avatorLeft}">
         <img class="unlock-avator-img" src="../assets/avatar.png">
         <div class="unlock-avator-cover">
-          <span><Icon type="unlocked" :size="30"></Icon></span>
+          <span><Icon type="md-unlock" :size="30"></Icon></span>
           <p>解锁</p>
         </div>
       </div>
@@ -19,7 +19,7 @@
             <input ref="inputEle" v-model="password" class="unlock-input" type="password" placeholder="密码同登录密码"/>
             <button ref="unlockBtn" @mousedown="unlockMousedown" @mouseup="unlockMouseup" @click="handleUnlock"
                     class="unlock-btn">
-              <Icon color="white" type="key"></Icon>
+              <Icon color="white" type="md-key" :size="14"></Icon>
             </button>
           </div>
         </div>

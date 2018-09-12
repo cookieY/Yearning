@@ -59,7 +59,7 @@ class dashboard(baseview.BaseView):
                 if statement.id == 1:
                     return Response({'statement': statement.last_name})
                 else:
-                    return Response({'statement': '1'})
+                    return Response({'statement': 'pass'})
             except Exception as e:
                 CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
                 return HttpResponse(status=500)
@@ -100,7 +100,7 @@ class dashboard(baseview.BaseView):
             return Response({'userinfo': _serializers.data, 'permissons': permissions})
 
         elif args == 'statement':
-            Account.objects.filter(username=request.user).update(last_name='1')
+            Account.objects.filter(username=request.user).update(last_name='pass')
             return Response('')
 
     def post(self, request, args=None):
