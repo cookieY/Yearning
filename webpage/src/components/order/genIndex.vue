@@ -2,10 +2,6 @@
   @import '../../styles/common.less';
   @import 'components/table.less';
 
-  .demo-spin-icon-load {
-    animation: ani-demo-spin 1s linear infinite;
-  }
-
   p {
     word-wrap: break-word;
     word-break: break-all;
@@ -66,15 +62,15 @@
       <Col span="18" class="padding-left-10">
         <Card>
           <p slot="title">
-            <Icon type="android-remove"></Icon>
+            <Icon type="md-remove"></Icon>
             表结构详情
           </p>
           <div class="edittable-table-height-con">
             <Tabs :value="tabs">
-              <TabPane label="表字段详情" name="order1" icon="folder">
+              <TabPane label="表字段详情" name="order1" icon="md-apps">
                 <Table :columns="tabcolumns" :data="TableDataNew"></Table>
               </TabPane>
-              <TabPane label="添加&删除索引" name="order2" icon="ios-unlocked">
+              <TabPane label="添加&删除索引" name="order2" icon="md-add">
                 <editindex :tabledata="indexinfo" :table_name="formItem.tablename"
                            @on-indexdata="getindexconfirm"></editindex>
                 <br>
@@ -90,9 +86,11 @@
 
     <Modal v-model="openswitch" @on-ok="commitorder" :ok-text="'提交工单'" width="800">
       <Row>
+        <br>
         <Card>
           <div class="step-header-con">
             <h3>Yearning SQL平台审核工单</h3>
+            <Divider />
           </div>
           <p class="step-content"></p>
           <Form class="step-form" :label-width="100">
@@ -109,7 +107,7 @@
               <p v-for="i in sql">{{i}}</p>
             </FormItem>
             <FormItem label="工单提交说明:" required>
-              <Input v-model="formItem.text" placeholder="最多不超过20个字"></Input>
+              <Input v-model="formItem.text" placeholder="请输入工单说明"></Input>
             </FormItem>
             <FormItem label="指定审核人:" required>
               <Select v-model="formItem.assigned" filterable transfer>
@@ -144,7 +142,7 @@
   //
   import axios from 'axios'
   import util from '../../libs/util'
-  import editindex from './components/ModifyIndex.vue'
+  import editindex from './components/modifyIndex.vue'
 
   export default {
     components: {
@@ -309,10 +307,12 @@
               render: (h) => {
                 return h('div', [
                   h('Icon', {
-                    'class': 'demo-spin-icon-load',
                     props: {
-                      type: 'load-c',
-                      size: 30
+                      size: 30,
+                      type: 'ios-loading'
+                    },
+                    style: {
+                      animation: 'ani-demo-spin 1s linear infinite'
                     }
                   }),
                   h('div', '数据库连接中,请稍后........')
@@ -329,6 +329,7 @@
                 this.$Spin.hide()
               })
               .catch(() => {
+                this.$Spin.hide()
                 util.err_notice('连接失败！详细信息请查看日志')
               })
             this.getindex()
@@ -371,7 +372,7 @@
             axios.post(`${util.url}/sqlsyntax/`, {
               'data': JSON.stringify(this.formItem),
               'sql': JSON.stringify(this.sql),
-              'user': sessionStorage.getItem('user'),
+              'real_name': sessionStorage.getItem('real_name'),
               'type': 1,
               'id': this.id[0].id
             })

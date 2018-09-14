@@ -1,6 +1,6 @@
 <style lang="less">
   @import '../../styles/common.less';
-  @import '../Order/components/table.less';
+  @import '../order/components/table.less';
 
   .demo-Circle-custom {
     & h1 {
@@ -41,21 +41,13 @@
     word-break: break-all;
     overflow: hidden;
   }
-
-  .tree {
-    word-wrap: break-word;
-    word-break: break-all;
-    overflow-y: scroll;
-    overflow-x: scroll;
-    max-height: 200px;
-  }
 </style>
 <template>
   <div>
     <Row>
       <Card>
         <p slot="title">
-          <Icon type="person"></Icon>
+          <Icon type="md-person"></Icon>
           工单审核
         </p>
         <Row>
@@ -77,7 +69,7 @@
       </Card>
     </Row>
 
-    <Modal v-model="modal2" width="900">
+    <Modal v-model="modal2" width="1000" draggable>
       <p slot="header" style="color:#f60;font-size: 16px">
         <Icon type="information-circled"></Icon>
         <span>SQL工单详细信息</span>
@@ -101,11 +93,8 @@
         <FormItem label="工单说明:">
           <span>{{ formitem.text }}</span>
         </FormItem>
-        <FormItem label="SQL语句:">
-          <br>
-          <div class="tree">
-            <p v-for="i in sql">{{ i }}</p>
-          </div>
+        <FormItem>
+            <Table :columns="sql_columns" :data="sql" height="200"></Table>
         </FormItem>
         <FormItem label="选择执行人:" v-if="multi && auth === 'admin'">
           <Select v-model="multi_name" style="width: 20%">
@@ -195,6 +184,12 @@
     name: 'Sqltable',
     data () {
       return {
+        sql_columns: [
+          {
+            title: 'sql语句',
+            key: 'sql'
+          }
+        ],
         columns6: [
           {
             type: 'selection',
@@ -224,10 +219,16 @@
             sortable: true
           },
           {
-            title: '提交人',
+            title: '提交账号',
             key: 'username',
             sortable: true
           },
+          {
+            title: '提交人姓名',
+            key: 'real_name',
+            sortable: true
+          },
+
           {
             title: '状态',
             key: 'status',
@@ -237,19 +238,19 @@
               let color = ''
               let text = ''
               if (row.status === 2) {
-                color = 'blue'
+                color = 'primary'
                 text = '待审核'
               } else if (row.status === 0) {
-                color = 'red'
+                color = 'error'
                 text = '驳回'
               } else if (row.status === 1) {
-                color = 'green'
+                color = 'success'
                 text = '已执行'
               } else if (row.status === 4) {
-                color = 'red'
+                color = 'error'
                 text = '执行失败'
               } else {
-                color = 'yellow'
+                color = 'warning'
                 text = '执行中'
               }
               return h('Tag', {
@@ -381,7 +382,7 @@
           }
         ],
         modal2: false,
-        sql: null,
+        sql: [],
         formitem: {
           workid: '',
           date: '',
@@ -451,12 +452,16 @@
     },
     methods: {
       edit_tab: function (index) {
+        this.sql = []
         this.togoing = index
         this.dataId = []
         this.modal2 = true
         this.formitem = this.tmp[index]
         this.tmp[index].status === 2 ? this.switch_show = true : this.switch_show = false
-        this.sql = this.tmp[index].sql.split(';')
+        let tmpSql = this.tmp[index].sql.split(';')
+        for (let i of tmpSql) {
+          this.sql.push({'sql': i})
+        }
       },
       agreed_button () {
         if (this.multi_name === '') {

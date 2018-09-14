@@ -73,7 +73,7 @@ class order_detail(baseview.BaseView):
         else:
             type_id = SqlOrder.objects.filter(id=order_id).first()
             try:
-                if status == '1':
+                if status == '1' or status == '4':
                     data = SqlRecord.objects.filter(workid=work_id).all()
                     _serializers = Record(data, many=True)
                     return Response({'data': _serializers.data, 'type': type_id.type})

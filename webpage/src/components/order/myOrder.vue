@@ -1,13 +1,13 @@
 <style lang="less">
   @import '../../styles/common.less';
-  @import '../Order/components/table.less';
+  @import '/components/table.less';
 </style>
 <template>
   <div>
     <Row>
       <Card>
         <p slot="title">
-          <Icon type="person"></Icon>
+          <Icon type="md-person"></Icon>
           我的工单
         </p>
         <Row>
@@ -62,19 +62,19 @@
               let color = ''
               let text = ''
               if (row.status === 2) {
-                color = 'blue'
+                color = 'primary'
                 text = '待审核'
               } else if (row.status === 0) {
-                color = 'red'
+                color = 'error'
                 text = '驳回'
               } else if (row.status === 1) {
-                color = 'green'
+                color = 'success'
                 text = '已执行'
               } else if (row.status === 4) {
-                color = 'red'
+                color = 'error'
                 text = '执行失败'
               } else {
-                color = 'yellow'
+                color = 'warning'
                 text = '执行中'
               }
 
@@ -127,27 +127,65 @@
             key: 'action',
             align: 'center',
             render: (h, params) => {
-              return h('div', [
-                h('Button', {
-                  props: {
-                    size: 'small',
-                    type: 'text'
-                  },
-                  on: {
-                    click: () => {
-                      this.$router.push({
-                        name: 'orderlist',
-                        query: {
-                          workid: params.row.work_id,
-                          id: params.row.id,
-                          status: params.row.status,
-                          type: params.row.type
-                        }
-                      })
+              if (params.row.status === 0) {
+                return h('div', [
+                  h('Button', {
+                    props: {
+                      size: 'small',
+                      type: 'text'
+                    },
+                    on: {
+                      click: () => {
+                        this.$router.push({
+                          name: 'orderlist',
+                          query: {
+                            workid: params.row.work_id,
+                            id: params.row.id,
+                            status: params.row.status,
+                            type: params.row.type
+                          }
+                        })
+                      }
                     }
-                  }
-                }, '详细信息')
-              ])
+                  }, '详细信息'),
+                  h('Button', {
+                    props: {
+                      size: 'small',
+                      type: 'text'
+                    },
+                    on: {
+                      click: () => {
+                        this.$Modal.error({
+                          title: '驳回理由',
+                          content: params.row.rejected
+                        })
+                      }
+                    }
+                  }, '驳回理由')
+                ])
+              } else {
+                return h('div', [
+                  h('Button', {
+                    props: {
+                      size: 'small',
+                      type: 'text'
+                    },
+                    on: {
+                      click: () => {
+                        this.$router.push({
+                          name: 'orderlist',
+                          query: {
+                            workid: params.row.work_id,
+                            id: params.row.id,
+                            status: params.row.status,
+                            type: params.row.type
+                          }
+                        })
+                      }
+                    }
+                  }, '详细信息')
+                ])
+              }
             }
           }
         ],

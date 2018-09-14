@@ -14,11 +14,11 @@ from core.api.user import (
     generaluser,
     authgroup,
     ldapauth,
-    login_auth
+    login_auth,
+    login_register
 )
 from core.api.dashboard import (
-    dashboard,
-    messages
+    dashboard
 )
 from core.api.managerdb import (
     management_db,
@@ -51,6 +51,7 @@ urlpatterns = [
     url(r'^api/v1/query_order', Query_order.as_view()),
     url(r'^api/v1/query_worklf', query_worklf.as_view()),
     url(r'^api/v1/userinfo/(.*)', userinfo.as_view()),
+    url(r'^api/v1/loginregister/(.*)', login_register.as_view()),
     url(r'^api/v1/audit_grained/(.*)', audit_grained.as_view()),
     url(r'^api/v1/apply_grained', apply_grained.as_view()),
     url(r'^api/v1/workorder/(.*)', addressing.as_view()),
@@ -64,7 +65,6 @@ urlpatterns = [
     url(r'^api/v1/adminsql/(.*)', adminpremisson.as_view()),
     url(r'^api/v1/record/(.*)', record_order.as_view()),
     url(r'^api/v1/homedata/(.*)', dashboard.as_view()),
-    url(r'^api/v1/messages/(.*)', messages.as_view()),
     url(r'^api/v1/otheruser/(.*)', generaluser.as_view()),
     url(r'^api/v1/exportdocx/', exportdoc.as_view()),
     url(r'^api/v1/dingding', dingding.as_view()),

@@ -1,17 +1,27 @@
+<style>
+
+  .btn_hover {
+    width: 60px;
+    margin-left: 30%;
+    padding:10px 0;
+  }
+
+</style>
+
 <template>
   <div>
-    <Icon type="cube" size="40" class="MenuIcon"></Icon>
+    <Icon type="md-cube" size="40" class="MenuIcon"></Icon>
     <template v-for="(item, index) in menuList">
       <Dropdown v-if="item.children.length >= 1 && item.name != 'main'" placement="right-start" :key="index"
                 @on-click="changeMenu">
-        <Button style="width: 70px;margin-left: -5px;padding:10px 0;" type="text">
-          <Icon :size="20" :color="iconColor" :type="item.icon"></Icon>
-        </Button>
+        <div class="btn_hover">
+          <Icon size="20" :color="iconColor" :type="item.icon"></Icon>
+        </div>
         <DropdownMenu style="width: 200px;" slot="list">
           <template v-for="child in item.children">
             <template v-if="filtermenulist[child.name] === '1'">
               <DropdownItem :name="child.name" :key="child.title">
-                <Icon :type="child.icon"></Icon>
+                <Icon :type="child.icon" size="20"></Icon>
                 <span style="padding-left:10px;">{{ child.title }}</span>
               </DropdownItem>
             </template>
@@ -19,30 +29,29 @@
         </DropdownMenu>
       </Dropdown>
       <Dropdown v-else placement="right-start" :key="index" @on-click="changeMenu">
-        <Button @click="changeMenu(item.children[0].name)" style="width: 70px;margin-left: -5px;padding:10px 0;"
-                type="text">
+        <div @click="changeMenu(item.children[0].name)" class="btn_hover">
           <Icon :size="20" :color="iconColor" :type="item.icon"></Icon>
-        </Button>
+        </div>
         <DropdownMenu style="width: 200px;" slot="list">
           <DropdownItem :name="item.children[0].name" :key="item.children[0].title">
-            <Icon :type="item.icon"></Icon>
+            <Icon :type="item.icon" size="20"></Icon>
             <span style="padding-left:10px;">{{ item.children[0].title }}</span>
           </DropdownItem>
         </DropdownMenu>
       </Dropdown>
     </template>
     <Dropdown placement="right-start" @on-click="changeMenu">
-      <Button @click="changeMenu()" style="width: 70px;margin-left: -5px;padding:10px 0;" type="text">
-        <Icon type="person" size="20" :color="iconColor"></Icon>
-      </Button>
+      <div @click="changeMenu()" class="btn_hover">
+        <Icon type="md-person" size="20" :color="iconColor"></Icon>
+      </div>
       <DropdownMenu slot="list">
         <DropdownItem name="myorder" key="myorder">我的工单</DropdownItem>
       </DropdownMenu>
     </Dropdown>
     <Dropdown placement="right-start" @on-click="changeMenu">
-      <Button @click="changeMenu('login')" style="width: 70px;margin-left: -5px;padding:10px 0;" type="text">
-        <Icon type="log-out" size="20" :color="iconColor"></Icon>
-      </Button>
+      <div @click="changeMenu('login')" class="btn_hover">
+        <Icon type="md-log-out" size="20" :color="iconColor"></Icon>
+      </div>
       <DropdownMenu slot="list">
         <DropdownItem name="login" key="login">退出</DropdownItem>
       </DropdownMenu>

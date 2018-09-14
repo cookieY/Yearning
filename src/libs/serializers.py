@@ -2,7 +2,6 @@
 serializers 
 '''
 from rest_framework import serializers
-from core.models import Usermessage
 from core.models import DatabaseList
 from core.models import SqlDictionary
 from core.models import SqlRecord
@@ -19,17 +18,6 @@ class Globalpermissions(serializers.HyperlinkedModelSerializer):
         model = globalpermissions
         fields = ('inception', 'ldap', 'other', 'message')
 
-
-class MessagesUser(serializers.HyperlinkedModelSerializer):
-    '''
-    站内信列表serializers
-    '''
-
-    class Meta:
-        model = Usermessage
-        fields = ('title', 'time')
-
-
 class UserINFO(serializers.HyperlinkedModelSerializer):
     '''
     平台用户信息列表serializers
@@ -37,7 +25,7 @@ class UserINFO(serializers.HyperlinkedModelSerializer):
 
     class Meta:
         model = Account
-        fields = ('id', 'username', 'group', 'department', 'email', 'auth_group')
+        fields = ('id', 'username', 'group', 'department', 'email', 'auth_group', 'real_name')
 
 
 class SQLGeneratDic(serializers.HyperlinkedModelSerializer):

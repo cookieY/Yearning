@@ -3,7 +3,7 @@
     <Row>
       <Card>
         <p slot="title">
-          <Icon type="person"></Icon>
+          <Icon type="md-person"></Icon>
           查询审核
         </p>
         <Row>
@@ -95,16 +95,16 @@
               let color = ''
               let text = ''
               if (row.query_per === 2) {
-                color = 'blue'
+                color = 'primary'
                 text = '待审核'
               } else if (row.query_per === 0) {
-                color = 'red'
+                color = 'error'
                 text = '驳回'
               } else if (row.query_per === 1) {
-                color = 'green'
+                color = 'success'
                 text = '同意'
               } else {
-                color = 'yellow'
+                color = 'warning'
                 text = '查询结束'
               }
               return h('Tag', {
@@ -261,11 +261,13 @@
             util.err_notice(error)
           })
       },
-      stop_query () {
-        axios.put(`${util.url}/query_worklf`, {'mode': 'end'})
-          .then(res => util.notice(res.data))
+      stop_query (vl) {
+        axios.put(`${util.url}/query_worklf`, {'mode': 'end', 'username': vl.username})
+          .then(res => {
+            util.notice(res.data)
+            this.permisson_list()
+          })
           .catch(err => util.err_notice(err))
-        this.permisson_list()
       }
     },
     mounted () {

@@ -12,18 +12,18 @@
   }
 </style>
 <template>
-  <Menu width="auto" :theme="theme" @on-select="currentPageTab" :active-name="currentPageName" accordion>
+  <Menu width="auto" theme="dark" @on-select="currentPageTab" :active-name="currentPageName" accordion>
     <MenuItem name="main">
-      <Icon type="cube" size="50" class="MenuIcon"></Icon>
+      <Icon type="md-cube" size="50" class="MenuIcon"></Icon>
       <br>
       <span>Yearning SQL审核平台</span>
     </MenuItem>
     <MenuItem name="home_index">
-      <Icon type="home" :size="iconSize"></Icon>
+      <Icon type="md-home" :size="iconSize"></Icon>
       <span class="layout-text">首页</span>
     </MenuItem>
     <MenuItem name="myorder">
-      <Icon type="person" :size="iconSize"></Icon>
+      <Icon type="md-person" :size="iconSize"></Icon>
       <span class="layout-text">我的工单</span>
     </MenuItem>
     <template v-for="item in menuList">
@@ -43,7 +43,7 @@
       </Submenu>
     </template>
     <Menu-item name="login">
-      <Icon type="log-out" :size="iconSize"></Icon>
+      <Icon type="md-log-out" :size="iconSize"></Icon>
       <span class="layout-text">退出</span>
     </Menu-item>
   </Menu>
@@ -81,9 +81,6 @@
       }
     },
     computed: {
-      theme () {
-        return this.$store.state.menuTheme
-      },
       currentPageName () {
         return this.$store.state.currentPageName
       }

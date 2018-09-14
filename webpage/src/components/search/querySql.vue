@@ -1,6 +1,6 @@
 <style lang="less">
   @import '../../styles/common.less';
-  @import '../Order/components/table.less';
+  @import '../order/components/table.less';
 
   .tree {
     word-wrap: break-word;
@@ -40,12 +40,12 @@
           <br>
           <p>当前选择的库: {{put_info.base}}</p>
           <br>
-          <Button type="error" icon="trash-a" @click.native="ClearForm()">清除</Button>
-          <Button type="info" icon="paintbucket" @click.native="beautify()">美化</Button>
+          <Button type="error" icon="md-trash" @click.native="ClearForm()">清除</Button>
+          <Button type="info" icon="md-brush" @click.native="beautify()">美化</Button>
           <Button type="success" icon="ios-redo" @click.native="Search_sql()">查询</Button>
           <Button type="primary" icon="ios-cloud-download" @click.native="exportdata()" v-if="export_data">导出查询数据
           </Button>
-          <Button type="error" icon="backspace-outline" @click.native="End_sql()">结束会话</Button>
+          <Button type="error" icon="md-backspace" @click.native="End_sql()">结束会话</Button>
           <br>
           <br>
           <p>查询结果:</p>
@@ -58,7 +58,7 @@
   </div>
 </template>
 <script>
-  import flow from './work_flow'
+  import flow from './workFlow'
   import ICol from '../../../node_modules/iview/src/components/grid/col.vue'
   import axios from 'axios'
   import util from '../../libs/util'
@@ -215,7 +215,7 @@
         })
       },
       End_sql () {
-        axios.put(`${util.url}/query_worklf`, {'mode': 'end'})
+        axios.put(`${util.url}/query_worklf`, {'mode': 'end','username': sessionStorage.getItem('user')})
           .then(res => util.notice(res.data))
           .catch(err => util.err_notice(err))
         this.$router.push({

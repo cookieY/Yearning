@@ -22,7 +22,6 @@ const store = new Vuex.Store({
     routers: [
       MainRoute, ...appRouter
     ],
-    menuTheme: 'dark',
     currentPageName: 'home_index',
     currentPath: [
       {
@@ -39,8 +38,7 @@ const store = new Vuex.Store({
       }
     ],
     tagsList: [...appRouter],
-    cachePage: [],
-    messageCount: 0
+    cachePage: []
   },
   mutations: {
     clearAllTags (state) {
@@ -112,24 +110,21 @@ const store = new Vuex.Store({
       })
       state.menuList = menuList
     },
-    changeMenuTheme (state, theme) {
-      state.menuTheme = theme
-    },
-    lock (state) {
+    lock () {
       sessionStorage.setItem('locking', '1')
     },
-    unlock (state) {
+    unlock () {
       sessionStorage.setItem('locking', '0')
     },
     Breadcrumbset (state, name) {
       if (name === 'ownspace_index') {
         state.currentPath.splice(1, state.currentPath.length - 1)
         state.currentPath.push({'title': '个人中心', 'path': 'ownspace', 'name': name})
-      } else if (name === 'message_index') {
-        state.currentPath.splice(1, state.currentPath.length - 1)
-        state.currentPath.push({'title': '消息中心', 'path': 'message', 'name': name})
       } else if (name === 'home_index') {
         state.currentPath.splice(1, state.currentPath.length - 1)
+      } else if (name === 'myorder') {
+        state.currentPath.splice(1, state.currentPath.length - 1)
+        state.currentPath.push({'title': '我的工单', 'path': 'message', 'name': name})
       } else {
         state.currentPath.splice(1, state.currentPath.length - 1)
         appRouter.forEach((val) => {

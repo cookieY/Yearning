@@ -1,13 +1,13 @@
 <style lang="less">
   @import '../../styles/common.less';
-  @import '../Order/components/table.less';
+  @import '../order/components/table.less';
 </style>
 <template>
   <div>
     <Row>
       <Card>
         <p slot="title">
-          <Icon type="person"></Icon>
+          <Icon type="md-person"></Icon>
           查询审计
         </p>
         <Row>
@@ -47,10 +47,6 @@
             title: '提交时间:',
             key: 'date',
             sortable: true
-          },
-          {
-            title: '查询时限',
-            key: 'timer'
           },
           {
             title: '操作',

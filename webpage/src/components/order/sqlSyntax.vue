@@ -65,12 +65,12 @@
               </Form>
               <Form :label-width="30">
                 <FormItem>
-                  <Button type="info" icon="paintbucket" @click.native="beautify()">美化</Button>
-                  <Button type="error" icon="trash-a" @click.native="ClearForm()" style="margin-left: 10%">清除</Button>
+                  <Button type="info" icon="md-brush" @click.native="beautify()">美化</Button>
+                  <Button type="error" icon="md-trash" @click.native="ClearForm()" style="margin-left: 10%">清除</Button>
                 </FormItem>
 
                 <FormItem>
-                  <Button type="warning" icon="android-search" @click.native="test_sql()">检测</Button>
+                  <Button type="warning" icon="md-search" @click.native="test_sql()">检测</Button>
                   <Button type="success" icon="ios-redo" @click.native="SubmitSQL()" style="margin-left: 10%"
                           :disabled="this.validate_gen">提交
                   </Button>
@@ -94,7 +94,7 @@
       <Col span="18" class="padding-left-10">
         <Card>
           <p slot="title">
-            <Icon type="ios-crop-strong"></Icon>
+            <Icon type="ios-crop"></Icon>
             填写sql语句
           </p>
           <editor v-model="formItem.textarea" @init="editorInit" @setCompletions="setCompletions"></editor>
@@ -190,18 +190,12 @@
             required: true,
             message: '说明不得为空',
             trigger: 'blur'
-          },
-            {
-              type: 'string',
-              max: 20,
-              message: '最多20个字',
-              trigger: 'blur'
-            }
+          }
           ],
           assigned: [{
             required: true,
-            message: '说明不得为空',
-            trigger: 'blur'
+            message: '审核人不得为空',
+            trigger: 'change'
           }]
         },
         id: null,
@@ -322,7 +316,7 @@
               axios.post(`${util.url}/sqlsyntax/`, {
                 'data': JSON.stringify(this.formItem),
                 'sql': JSON.stringify(this.datalist.sqllist),
-                'user': sessionStorage.getItem('user'),
+                'real_name': sessionStorage.getItem('real_name'),
                 'type': 1,
                 'id': this.id[0].id
               })

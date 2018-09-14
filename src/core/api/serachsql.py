@@ -1,7 +1,6 @@
 import json
 import logging
 import datetime
-import time
 import re
 import threading
 import simplejson
@@ -14,6 +13,19 @@ from libs import con_database
 from core.models import DatabaseList, Account, querypermissions, query_order, globalpermissions
 
 CUSTOM_ERROR = logging.getLogger('Yearning.core.views')
+
+
+def exclued_db_list():
+    try:
+        from core.models import globalpermissions
+
+        setting = globalpermissions.objects.filter(authorization='global').first()
+        exclued_database_name = setting.other.get('exclued_db_list', [])
+    except Exception:
+        logging.error("exclued_database_name配置错误.")
+        exclued_database_name = []
+    finally:
+        return exclued_database_name
 
 
 class DateEncoder(simplejson.JSONEncoder):  # 感谢的凉夜贡献
@@ -56,7 +68,11 @@ class search(baseview.BaseView):
                         db=address['basename']
                 ) as f:
                     try:
-                        query_sql = replace_limit(check[-1].strip(), limit['limit'])
+                        if limit.get('limit').strip() == '':
+                            CUSTOM_ERROR.error('未设置全局最大limit值，系统自动设置为1000')
+                            query_sql = replace_limit(check[-1].strip(), 1000)
+                        else:
+                            query_sql = replace_limit(check[-1].strip(), limit.get('limit'))
                         data_set = f.search(sql=query_sql)
                     except Exception as e:
                         CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
@@ -167,7 +183,7 @@ class query_worklf(baseview.BaseView):
             query_per = 2
             work_id = util.workId()
             if not query_switch['query']:
-                query_per = 1
+                query_per = 2
             else:
                 userinfo = Account.objects.filter(username=audit, group='admin').first()
                 try:
@@ -236,7 +252,7 @@ class query_worklf(baseview.BaseView):
 
         elif request.data['mode'] == 'end':
             try:
-                query_order.objects.filter(username=request.user).order_by('-id').update(query_per=3)
+                query_order.objects.filter(username=request.data['username']).order_by('-id').update(query_per=3)
                 return Response('已结束查询！')
             except Exception as e:
                 return HttpResponse(e)
@@ -252,12 +268,11 @@ class query_worklf(baseview.BaseView):
                                     port=_connection.port) as f:
                 dataname = f.query_info(sql='show databases')
             children = []
-            ignore = ['information_schema', 'sys', 'performance_schema', 'mysql']
-            for index, uc in enumerate(dataname):
+            ignore = exclued_db_list()
+            for index, uc in sorted(enumerate(dataname), reverse=True):
                 for cc in ignore:
                     if uc['Database'] == cc:
                         del dataname[index]
-                        index = index - 1
             for i in dataname:
                 with con_database.SQLgo(ip=_connection.ip,
                                         user=_connection.username,
@@ -295,7 +310,7 @@ def push_message(message=None, type=None, user=None, to_addr=None, work_id=None,
     try:
         tag = globalpermissions.objects.filter(authorization='global').first()
         if tag.message['mail']:
-            put_mess = send_email.send_email(to_addr=to_addr)
+            put_mess = send_email.send_email(to_addr=to_addr, ssl=tag.message['ssl'])
             put_mess.send_mail(mail_data=message, type=type)
     except Exception as e:
         CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')

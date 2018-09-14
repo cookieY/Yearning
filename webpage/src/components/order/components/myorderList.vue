@@ -1,6 +1,6 @@
 <style lang="less">
-  @import '../../styles/common.less';
-  @import '../Order/components/table.less';
+  @import '../../../styles/common.less';
+  @import 'table.less';
 
   .top {
     padding: 10px;
@@ -82,7 +82,7 @@
 </template>
 
 <script>
-  import util from '../../libs/util'
+  import util from '../../../libs/util'
   import axios from 'axios'
   //
   export default {

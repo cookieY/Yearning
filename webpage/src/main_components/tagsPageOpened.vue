@@ -21,7 +21,7 @@
       <transition-group name="taglist-moving-animation">
         <Tag type="dot" v-for="item in pageTagsList" :key="item.name" :name="item.name" @on-close="closePage"
              @click.native="linkTo(item.name, item.title)" :closable="item.name==='home_index'?false:true"
-             :color="item.children?(item.children[0].name===currentPageName?'blue':'default'):(item.name===currentPageName?'blue':'default')">
+             :color="item.children?(item.children[0].name===currentPageName?'primary':'default'):(item.name===currentPageName?'primary':'default')">
           {{ item.title }}
         </Tag>
       </transition-group>

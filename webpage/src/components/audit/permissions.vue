@@ -3,7 +3,7 @@
     <Row>
       <Card>
         <p slot="title">
-          <Icon type="person"></Icon>
+          <Icon type="md-person"></Icon>
           权限审核
         </p>
         <Row>
@@ -24,7 +24,7 @@
       </Card>
     </Row>
 
-    <Modal v-model="editInfodModal" :width="800">
+    <Modal v-model="editInfodModal" :width="800" draggable>
       <h3 slot="header" style="color:#2D8CF0">权限申请单</h3>
       <Form :label-width="120" label-position="right">
         <FormItem label="权限组:">
@@ -141,16 +141,16 @@
               let color = ''
               let text = ''
               if (row.status === 2) {
-                color = 'blue'
+                color = 'primary'
                 text = '待审核'
               } else if (row.status === 0) {
-                color = 'red'
+                color = 'error'
                 text = '驳回'
               } else if (row.status === 1) {
-                color = 'green'
+                color = 'success'
                 text = '已执行'
               } else {
-                color = 'yellow'
+                color = 'warning'
                 text = '执行中'
               }
               return h('Tag', {

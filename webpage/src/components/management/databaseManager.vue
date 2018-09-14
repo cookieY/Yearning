@@ -1,17 +1,13 @@
 <style lang="less">
   @import '../../styles/common.less';
-  @import '../Order/components/table.less';
-
-  .demo-spin-icon-load {
-    animation: ani-demo-spin 1s linear infinite;
-  }
+  @import '../order/components/table.less';
 </style>
 <template>
   <div>
     <Col span="6">
       <Card>
         <p slot="title">
-          <Icon type="load-b"></Icon>
+          <Icon type="md-refresh" />
           添加数据库
         </p>
         <div class="edittable-testauto-con">
@@ -88,7 +84,7 @@
     <Col span="18" class="padding-left-10">
       <Card>
         <p slot="title">
-          <Icon type="ios-crop-strong"></Icon>
+          <Icon type="md-apps" />
           数据库详情表
         </p>
         <div class="edittable-con-1">
@@ -408,10 +404,12 @@
             render: (h) => {
               return h('div', [
                 h('Icon', {
-                  'class': 'demo-spin-icon-load',
                   props: {
-                    type: 'load-c',
-                    size: 30
+                    size: 30,
+                    type: 'ios-loading'
+                  },
+                  style: {
+                    animation: 'ani-demo-spin 1s linear infinite'
                   }
                 }),
                 h('div', '数据库字典正在生成中,请稍后........')

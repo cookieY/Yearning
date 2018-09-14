@@ -17,6 +17,8 @@ util.mode = function typeok (obj) {
       } else {
         oc[key] = '否'
       }
+    } else if (typeof obj[key] === 'object') {
+      oc[key] = obj[key]
     } else if (typeof obj[key] !== 'undefined') {
       oc[key] = obj[key].toString()
     } else {

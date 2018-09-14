@@ -3,10 +3,10 @@
     <Row>
       <Card>
         <div>
-          <Button type="primary" icon="person-stalker" @click="createModel">添加权限组</Button>
+          <Button type="primary" icon="md-people" @click="createModel">添加权限组</Button>
           <br>
           <br/>
-          <Table border :columns="columns" :data="data6" stripe  height="550"></Table>
+          <Table border :columns="columns" :data="data6" stripe height="550"></Table>
         </div>
         <br>
         <Page :total="pagenumber" show-elevator @on-change="splicpage" :page-size="10" ref="total"></Page>
@@ -17,7 +17,7 @@
       <h3 slot="header" style="color:#2D8CF0">权限组设置</h3>
       <Form :model="addAuthGroupForm" :label-width="120" label-position="right">
         <FormItem label="* 权限组名">
-          <Input v-model="addAuthGroupForm.groupname"  v-bind:readonly="isReadOnly"></Input>
+          <Input v-model="addAuthGroupForm.groupname" v-bind:readonly="isReadOnly"></Input>
         </FormItem>
         <template>
           <FormItem label="DDL及索引权限:">
@@ -66,7 +66,7 @@
               </CheckboxGroup>
             </FormItem>
           </template>
-          <hr style="height:1px;border:none;border-top:1px dashed #dddee1;" />
+          <hr style="height:1px;border:none;border-top:1px dashed #dddee1;"/>
           <br>
           <FormItem label="数据查询权限:">
             <RadioGroup v-model="permission.query">
@@ -80,10 +80,13 @@
                 <Checkbox
                   :indeterminate="indeterminate.query"
                   :value="checkAll.query"
-                  @click.prevent.native="ddlCheckAll('querycon', 'query', 'connection')">全选</Checkbox>
+                  @click.prevent.native="ddlCheckAll('querycon', 'query', 'connection')">全选
+                </Checkbox>
               </div>
               <CheckboxGroup v-model="permission.querycon">
-                <Checkbox  v-for="i in connectionList.connection" :label="i.connection_name" :key="i.connection_name">{{i.connection_name}}</Checkbox>
+                <Checkbox v-for="i in connectionList.connection" :label="i.connection_name" :key="i.connection_name">
+                  {{i.connection_name}}
+                </Checkbox>
               </CheckboxGroup>
             </FormItem>
           </template>
@@ -159,7 +162,7 @@
       <div slot="footer">
         <Button type="text" @click="addAuthGroupModal = false">取消</Button>
         <Button type="primary" @click="createAuthGroup" v-if="isAdd">创建</Button>
-        <Button type="primary" @click="saveAddGroup"  v-else>保存</Button>
+        <Button type="primary" @click="saveAddGroup" v-else>保存</Button>
       </div>
     </Modal>
   </div>
@@ -169,6 +172,7 @@
   import axios from 'axios'
   import '../../assets/tablesmargintop.css'
   import util from '../../libs/util'
+
   const structure = {
     ddl: '0',
     ddlcon: [],
@@ -270,17 +274,17 @@
     },
     methods: {
       editAuthGroup (vl) {
-        this.addAuthGroupModal = true;
-        this.isAdd = false;
-        this.isReadOnly = true;
-        this.id = vl.id;
-        this.addAuthGroupForm.groupname = vl.username;
+        this.addAuthGroupModal = true
+        this.isAdd = false
+        this.isReadOnly = true
+        this.id = vl.id
+        this.addAuthGroupForm.groupname = vl.username
         this.permission = vl.permissions
       },
       createModel () {
         this.addAuthGroupModal = true
-        this.isReadOnly = false;
-        this.isAdd = true;
+        this.isReadOnly = false
+        this.isAdd = true
         this.permission = structure
       },
       createAuthGroup () {
@@ -294,13 +298,13 @@
           'permission': JSON.stringify(this.permission)
         })
           .then(res => {
-            util.notice(res.data);
-            this.$refs.total.currentPage = 1;
+            util.notice(res.data)
+            this.$refs.total.currentPage = 1
             this.refreshgroup()
           })
           .catch(error => {
             util.err_notice(error)
-          });
+          })
         this.addAuthGroupModal = false
       },
       saveAddGroup () {
@@ -309,19 +313,19 @@
           'permission': JSON.stringify(this.permission)
         })
           .then(res => {
-            util.notice(res.data);
-            this.$refs.total.currentPage = 1;
+            util.notice(res.data)
+            this.$refs.total.currentPage = 1
             this.refreshgroup()
           })
           .catch(error => {
             util.err_notice(error)
-          });
+          })
         this.addAuthGroupModal = false
       },
       refreshgroup (vl = 1) {
         axios.get(`${util.url}/authgroup/all?page=${vl}`)
           .then(res => {
-            this.data6 = res.data.data;
+            this.data6 = res.data.data
             this.pagenumber = parseInt(res.data.page)
           })
           .catch(error => {
@@ -362,13 +366,13 @@
     mounted () {
       axios.put(`${util.url}/workorder/connection`, {'permissions_type': 'user'})
         .then(res => {
-          this.connectionList.connection = res.data['connection'];
-          this.connectionList.dic = res.data['dic'];
+          this.connectionList.connection = res.data['connection']
+          this.connectionList.dic = res.data['dic']
           this.connectionList.person = res.data['person']
         })
         .catch(error => {
           util.err_notice(error)
-        });
+        })
       this.refreshgroup()
     }
   }

@@ -17,7 +17,7 @@ a:active {
     height: 100%;
 }
 @import '../../styles/common.less';
-@import '../Order/components/table.less';
+@import '../order/components/table.less';
 </style>
 <template>
 <div>
@@ -68,7 +68,7 @@ a:active {
     <Col span="18" class="padding-left-10">
     <Card>
       <p slot="title">
-        <Icon type="android-remove"></Icon>
+        <Icon type="md-apps"></Icon>
         表结构详情
       </p>
       <div class="edittable-table-height-con" style="height: 650px;overflow: auto ">
@@ -400,10 +400,12 @@ export default {
         render: (h) => {
           return h('div', [
             h('Icon', {
-              'class': 'demo-spin-icon-load',
               props: {
-                type: 'load-c',
-                size: 30
+                size: 30,
+                type: 'ios-loading'
+              },
+              style: {
+                animation: 'ani-demo-spin 1s linear infinite'
               }
             }),
             h('div', '导出url正在生成,请稍后........')
@@ -458,10 +460,12 @@ export default {
         render: (h) => {
           return h('div', [
             h('Icon', {
-              'class': 'demo-spin-icon-load',
               props: {
-                type: 'load-c',
-                size: 30
+                size: 30,
+                type: 'ios-loading'
+              },
+              style: {
+                animation: 'ani-demo-spin 1s linear infinite'
               }
             }),
             h('div', '数据库字典正在读取中,请稍后........')

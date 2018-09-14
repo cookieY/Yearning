@@ -4,14 +4,19 @@ from email.mime.text import MIMEText
 from email.utils import parseaddr, formataddr
 import smtplib
 import ast
+import logging
+
+CUSTOM_ERROR = logging.getLogger('Yearning.core.views')
 
 
 class send_email(object):
 
-    def __init__(self, to_addr=None):
+    def __init__(self, to_addr=None, ssl=None):
         self.to_addr = to_addr
         un_init = util.init_conf()
+        self.ssl = ssl
         self.email = ast.literal_eval(un_init['message'])
+        self.email_suffix_list = ast.literal_eval(util.init_conf().get('other', '')).get('email_suffix_list',[])  # 获取可以注册邮箱后缀
 
     def _format_addr(self, s):
         name, addr = parseaddr(s)
@@ -128,3 +133,26 @@ class send_email(object):
         server.login(self.email['user'], self.email['password'])
         server.sendmail(self.email['user'], [self.to_addr], msg.as_string())
         server.quit()
+
+    def email_check(self):
+        try:
+            if self.to_addr.split('@')[1] not in self.email_suffix_list:
+                CUSTOM_ERROR.warning("邮箱地址[%s]不在允许注册邮箱范围内%s,请更换邮箱地址进行注册" % (self.to_addr, self.email_suffix_list))
+                return 300, "邮箱地址[%s]不在允许注册邮箱范围内%s,请更换邮箱地址进行注册" % (self.to_addr, self.email_suffix_list)
+            if self.ssl:
+                server = smtplib.SMTP_SSL(self.email['smtp_host'], int(self.email['smtp_port']))
+            else:
+                server = smtplib.SMTP(self.email['smtp_host'], int(self.email['smtp_port']))
+            server.login(self.email['user'], self.email['password'])
+            server.mail(sender=self.email['user'])
+            _code, _msg = server.rcpt(self.to_addr)
+            if _code in (250, 251, 452):
+                CUSTOM_ERROR.info("SMTP检查邮箱地址[%s]存在,检查通过" % (self.to_addr))
+                return 200, "SMTP检查邮箱地址[%s]存在,检查通过" % (self.to_addr)
+            else:
+                CUSTOM_ERROR.warning(
+                    "SMTP检查邮箱地址[%s]异常,请更换邮箱地址进行注册.SMTP RCPT CODE:%s MSG:%s" % (self.to_addr, _code, _msg))
+                return 300, "SMTP检查邮箱地址[%s]异常,请更换邮箱地址进行注册" % (self.to_addr)
+        except Exception as e:
+            CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
+            return 500, "邮箱检查失败"

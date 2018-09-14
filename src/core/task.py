@@ -8,7 +8,6 @@ from django.http import HttpResponse
 from libs import send_email, util
 from libs import call_inception
 from .models import (
-    Usermessage,
     DatabaseList,
     Account,
     globalpermissions,
@@ -18,7 +17,6 @@ from .models import (
 )
 
 CUSTOM_ERROR = logging.getLogger('Yearning.core.views')
-
 
 def set_auth_group(user):
     perm = {
@@ -167,12 +165,6 @@ class order_push_message(threading.Thread):
 
     def con_close(self):
 
-        Usermessage.objects.get_or_create(
-            from_user=self.from_user, time=util.date(),
-            title=self.title, content='该工单已审核通过!', to_user=self.to_user,
-            state='unread'
-        )
-
         content = DatabaseList.objects.filter(id=self.order.bundle_id).first()
         mail = Account.objects.filter(username=self.to_user).first()
         tag = globalpermissions.objects.filter(authorization='global').first()
@@ -197,7 +189,7 @@ class order_push_message(threading.Thread):
                         'addr': self.addr_ip,
                         'text': self.order.text,
                         'note': content.after}
-                    put_mess = send_email.send_email(to_addr=mail.email)
+                    put_mess = send_email.send_email(to_addr=mail.email, ssl=tag.message['ssl'])
                     put_mess.send_mail(mail_data=mess_info, type=0)
             except Exception as e:
                 CUSTOM_ERROR.error(f'{e.__class__.__name__}--邮箱推送失败: {e}')
@@ -252,7 +244,7 @@ class rejected_push_messages(threading.Thread):
                         'to_user': self.to_user,
                         'addr': self.addr_ip,
                         'rejected': self.text}
-                    put_mess = send_email.send_email(to_addr=mail.email)
+                    put_mess = send_email.send_email(to_addr=mail.email, ssl=tag.message['ssl'])
                     put_mess.send_mail(mail_data=mess_info, type=1)
             except Exception as e:
                 CUSTOM_ERROR.error(f'{e.__class__.__name__}--邮箱推送失败: {e}')
@@ -311,7 +303,7 @@ class submit_push_messages(threading.Thread):
                     'text': self.text,
                     'note': content.before}
                 try:
-                    put_mess = send_email.send_email(to_addr=mail.email)
+                    put_mess = send_email.send_email(to_addr=mail.email, ssl=tag.message['ssl'])
                     put_mess.send_mail(mail_data=mess_info, type=99)
                 except Exception as e:
                     CUSTOM_ERROR.error(f'{e.__class__.__name__}--邮箱推送失败: {e}')

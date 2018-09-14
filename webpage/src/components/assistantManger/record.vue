@@ -1,13 +1,13 @@
 <style lang="less">
   @import '../../styles/common.less';
-  @import '../Order/components/table.less';
+  @import '../order/components/table.less';
 </style>
 <template>
   <div>
     <Row>
       <Card>
         <p slot="title">
-          <Icon type="android-send"></Icon>
+          <Icon type="md-send"></Icon>
           历史工单执行记录
         </p>
         <Row>

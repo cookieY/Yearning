@@ -1,4 +1,4 @@
-import Index from './Main.vue'
+import Index from './main.vue'
 
 export const loginRouter = {
   path: '/login',
@@ -7,7 +7,7 @@ export const loginRouter = {
     title: 'Login - 登录'
   },
   component: resolve => {
-    require(['./Login.vue'], resolve)
+    require(['./login.vue'], resolve)
   }
 }
 export const version = {
@@ -35,7 +35,7 @@ export const page404 = {
     title: '404-页面不存在'
   },
   component: resolve => {
-    require(['./components/Error/404.vue'], resolve)
+    require(['./components/error/404.vue'], resolve)
   }
 }
 
@@ -46,7 +46,7 @@ export const page401 = {
   },
   name: 'error_401',
   component: resolve => {
-    require(['./components/Error/401.vue'], resolve)
+    require(['./components/error/401.vue'], resolve)
   }
 }
 
@@ -57,14 +57,14 @@ export const page500 = {
   },
   name: 'error_500',
   component: resolve => {
-    require(['./components/Error/500.vue'], resolve)
+    require(['./components/error/500.vue'], resolve)
   }
 }
 
 export const appRouter = [
   {
     path: '/',
-    icon: 'home',
+    icon: 'md-home',
     name: 'main',
     title: '首页',
     component: Index,
@@ -83,22 +83,14 @@ export const appRouter = [
         title: '个人中心',
         name: 'ownspace_index',
         component: resolve => {
-          require(['./components/Myself/own-space.vue'], resolve)
-        }
-      },
-      {
-        path: 'message',
-        title: '消息中心',
-        name: 'message_index',
-        component: resolve => {
-          require(['./components/Myself/message.vue'], resolve)
+          require(['./components/personalCenter/own-space.vue'], resolve)
         }
       }
     ]
   },
   {
     path: '/order',
-    icon: 'folder',
+    icon: 'md-folder',
     name: 'order',
     title: '工单提交',
     component: Index,
@@ -107,34 +99,34 @@ export const appRouter = [
         path: 'ddledit',
         name: 'ddledit',
         title: 'DDL',
-        'icon': 'compose',
+        'icon': 'md-git-merge',
         component: resolve => {
-          require(['./components/Order/GenSQL.vue'], resolve)
+          require(['./components/order/genSql.vue'], resolve)
         }
       },
       {
         path: 'dmledit',
         name: 'dmledit',
         title: 'DML',
-        'icon': 'code',
+        'icon': 'md-code',
         component: resolve => {
-          require(['./components/Order/SQLsyntax.vue'], resolve)
+          require(['./components/order/sqlSyntax.vue'], resolve)
         }
       },
       {
         path: 'indexedit',
         name: 'indexedit',
         title: '索引',
-        'icon': 'share',
+        'icon': 'md-share-alt',
         component: resolve => {
-          require(['./components/Order/GenIndex.vue'], resolve)
+          require(['./components/order/genIndex.vue'], resolve)
         }
       }
     ]
   },
   {
     path: '/view',
-    icon: 'search',
+    icon: 'md-search',
     name: 'view',
     title: '查询',
     component: Index,
@@ -145,23 +137,23 @@ export const appRouter = [
         title: '数据库字典',
         'icon': 'ios-book',
         component: resolve => {
-          require(['./components/Search/DataBaseDic.vue'], resolve)
+          require(['./components/search/databaseDic.vue'], resolve)
         }
       },
       {
         path: 'serach-sql',
         name: 'serach-sql',
         title: 'SQL查询',
-        'icon': 'podium',
+        'icon': 'ios-podium',
         component: resolve => {
-          require(['./components/Search/work_flow.vue'], resolve)
+          require(['./components/search/workFlow.vue'], resolve)
         }
       }
     ]
   },
   {
     path: '/audit',
-    icon: 'android-open',
+    icon: 'md-open',
     name: 'audit',
     title: '审核',
     component: Index,
@@ -171,34 +163,34 @@ export const appRouter = [
         path: 'audit-order',
         name: 'audit-audit',
         title: '工单',
-        'icon': 'edit',
+        'icon': 'md-create',
         component: resolve => {
-          require(['./components/Audit/AuditSql.vue'], resolve)
+          require(['./components/audit/sqlAudit.vue'], resolve)
         }
       },
       {
         path: 'audit-permissions',
         name: 'audit-permissions',
         title: '权限',
-        'icon': 'android-share-alt',
+        'icon': 'md-share',
         component: resolve => {
-          require(['./components/Audit/Permissions.vue'], resolve)
+          require(['./components/audit/permissions.vue'], resolve)
         }
       },
       {
         path: 'query-audit',
         name: 'query-audit',
         title: '查询',
-        'icon': 'social-rss',
+        'icon': 'logo-rss',
         component: resolve => {
-          require(['./components/Audit/Query_audit.vue'], resolve)
+          require(['./components/audit/queryAudit.vue'], resolve)
         }
       }
     ]
   },
   {
     path: '/record',
-    icon: 'pie-graph',
+    icon: 'md-pie',
     name: 'record',
     title: '记录',
     component: Index,
@@ -208,25 +200,25 @@ export const appRouter = [
         path: 'query-review',
         name: 'query-review',
         title: '查询审计',
-        'icon': 'arrow-graph-up-right',
+        'icon': 'md-pulse',
         component: resolve => {
-          require(['./components/Audit/Query_record.vue'], resolve)
+          require(['./components/assistantManger/queryRecord.vue'], resolve)
         }
       },
       {
         path: 'audit-record',
         name: 'audit-record',
         title: '工单记录',
-        'icon': 'android-drafts',
+        'icon': 'md-list',
         component: resolve => {
-          require(['./components/Audit/Record.vue'], resolve)
+          require(['./components/assistantManger/record.vue'], resolve)
         }
       }
     ]
   },
   {
     path: '/management',
-    icon: 'social-buffer',
+    icon: 'logo-buffer',
     name: 'management',
     title: '管理',
     access: 0,
@@ -236,36 +228,36 @@ export const appRouter = [
         path: 'management-user',
         name: 'management-user',
         title: '用户',
-        'icon': 'person-stalker',
+        'icon': 'md-people',
         component: resolve => {
-          require(['./components/Management/UserInfo.vue'], resolve)
+          require(['./components/management/userInfo.vue'], resolve)
         }
       },
       {
         path: 'management-database',
         name: 'management-database',
         title: '数据库',
-        'icon': 'social-buffer',
+        'icon': 'md-medal',
         component: resolve => {
-          require(['./components/Management/MamagementBase.vue'], resolve)
+          require(['./components/management/databaseManager.vue'], resolve)
         }
       },
       {
         path: 'setting',
         name: 'setting',
         title: '设置',
-        'icon': 'android-settings',
+        'icon': 'md-settings',
         component: resolve => {
-          require(['./components/Management/Setting.vue'], resolve)
+          require(['./components/management/setting.vue'], resolve)
         }
       },
       {
         path: 'auth-group',
         name: 'auth-group',
         title: '权限组',
-        'icon': 'hammer',
+        'icon': 'ios-switch',
         component: resolve => {
-          require(['./components/Management/AuthGroup.vue'], resolve)
+          require(['./components/management/authGroup.vue'], resolve)
         }
       }
     ]
@@ -285,7 +277,7 @@ export const orderList = {
       title: '工单详情',
       name: 'orderlist',
       component: resolve => {
-        require(['./components/Order/MyorderList.vue'], resolve)
+        require(['./components/order/components/myorderList.vue'], resolve)
       }
     }
   ]
@@ -304,7 +296,7 @@ export const queryList = {
       title: '查询审计详情',
       name: 'querylist',
       component: resolve => {
-        require(['./components/Audit/expend.vue'], resolve)
+        require(['./components/audit/expend.vue'], resolve)
       }
     }
   ]
@@ -323,7 +315,7 @@ export const querypage = {
       title: '查询',
       name: 'querypage',
       component: resolve => {
-        require(['./components/Search/QuerySQL.vue'], resolve)
+        require(['./components/search/querySql.vue'], resolve)
       }
     }
   ]
@@ -342,7 +334,7 @@ export const queryready = {
       title: '查询申请进度',
       name: 'queryready',
       component: resolve => {
-        require(['./components/Search/PutReady.vue'], resolve)
+        require(['./components/search/submitPage.vue'], resolve)
       }
     }
   ]
@@ -362,7 +354,7 @@ export const myorder = {
       title: '我的工单',
       'icon': 'person',
       component: resolve => {
-        require(['./components/Order/MyOrder.vue'], resolve)
+        require(['./components/order/myOrder.vue'], resolve)
       }
     }
   ]
