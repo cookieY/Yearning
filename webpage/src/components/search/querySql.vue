@@ -215,7 +215,7 @@
         })
       },
       End_sql () {
-        axios.put(`${util.url}/query_worklf`, {'mode': 'end','username': sessionStorage.getItem('user')})
+        axios.put(`${util.url}/query_worklf`, {'mode': 'end', 'username': sessionStorage.getItem('user')})
           .then(res => util.notice(res.data))
           .catch(err => util.err_notice(err))
         this.$router.push({

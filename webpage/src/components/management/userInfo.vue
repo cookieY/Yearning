@@ -42,7 +42,7 @@
                 <Option v-for="list in groupset" :value="list" :key="list">{{ list }}</Option>
               </Select>
             </FormItem>
-            <Button type="primary" @click.native="Registered" style="margin-left: 35%">注册</Button>
+            <Button type="primary" @click.native="Registered" style="margin-left: 35%" :loading="loading">注册</Button>
           </Form>
         </div>
       </Card>
@@ -210,6 +210,7 @@
         }
       }
       return {
+        loading: false,
         percent: 0,
         permission: {
           ddl: '0',
@@ -621,6 +622,7 @@
       Registered () {
         this.$refs['userinfova'].validate((valid) => {
           if (valid) {
+            this.loading = true
             axios.post(util.url + '/userinfo/', {
               'username': this.userinfo.username,
               'password': this.userinfo.password,
@@ -631,6 +633,7 @@
               'realname': this.userinfo.realname
             })
               .then(res => {
+                this.loading = false
                 util.notice(res.data)
                 this.refreshuser()
                 this.userinfo = {
@@ -645,6 +648,7 @@
                 }
               })
               .catch(error => {
+                this.loading = false
                 util.err_notice(error)
               })
           }
