@@ -13,7 +13,8 @@ from core.models import (
     Account,
     Todolist,
     grained,
-    query_order
+    query_order,
+    globalpermissions
 )
 
 CUSTOM_ERROR = logging.getLogger('Yearning.core.views')
@@ -113,7 +114,8 @@ class userinfo(baseview.BaseView):
             realname = request.data['realname']
             department = request.data['department']
             auth_group = ','.join(json.loads(request.data['auth_group']))
-            _send_mail = send_email(to_addr=email)
+            tag = globalpermissions.objects.filter(authorization='global').first()
+            _send_mail = send_email(to_addr=email, ssl=tag.message['ssl'])
             _status, _message = _send_mail.email_check()
             if _status != 200:
                 return Response(data=_message)
@@ -315,6 +317,7 @@ class login_auth(baseview.AnyLogin):
             permissions = authenticate(username=user, password=password)
             if permissions is not None and permissions.is_active:
                 token = jwt_encode_handler(jwt_payload_handler(permissions))
-                return Response({'token': token, 'res': '', 'permissions': permissions.group, 'real_name': permissions.real_name})
+                return Response(
+                    {'token': token, 'res': '', 'permissions': permissions.group, 'real_name': permissions.real_name})
             else:
                 return HttpResponse(status=400)
