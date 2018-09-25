@@ -57,13 +57,8 @@
             <FormItem label="数据库库名:">
               <p>{{formItem.basename}}</p>
             </FormItem>
-            <FormItem label="执行SQL:">
-              <template v-if="sqltype===0">
-                <Input v-model="sql" type="textarea" :rows="8"></Input>
-              </template>
-              <template v-else>
-                <p v-for="i in ddlsql">{{i}}</p>
-              </template>
+            <FormItem>
+                <Table :columns="columnsName" :data="ddlsql" stripe border></Table>
             </FormItem>
             <FormItem label="工单提交说明:">
               <Input v-model="formItem.text" placeholder="最多不超过20个字"></Input>
@@ -89,6 +84,12 @@
     name: 'myorder-list',
     data () {
       return {
+        columnsName: [
+          {
+            title: '回滚语句',
+            key: 'sql'
+          }
+        ],
         tabcolumns: [
           {
             title: 'sql语句',
@@ -171,9 +172,9 @@
           axios.post(`${util.url}/sqlsyntax/`, {
             'data': JSON.stringify(this.formItem),
             'sql': JSON.stringify(_tmpsql),
-            'user': sessionStorage.getItem('user'),
             'type': this.dmlorddl,
-            'id': this.formItem.bundle_id
+            'id': this.formItem.bundle_id,
+            'real_name': sessionStorage.getItem('real_name')
           })
             .then(() => {
               util.notice('工单已提交成功')
@@ -185,7 +186,7 @@
           axios.post(`${util.url}/sqlsyntax/`, {
             'data': JSON.stringify(this.formItem),
             'sql': JSON.stringify(this.ddlsql),
-            'user': sessionStorage.getItem('user'),
+            'real_name': sessionStorage.getItem('real_name'),
             'type': this.dmlorddl,
             'id': this.formItem.bundle_id
           })
