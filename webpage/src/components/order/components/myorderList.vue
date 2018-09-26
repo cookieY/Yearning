@@ -167,36 +167,23 @@
         this.reloadsql = true
       },
       _Putorder () {
-        if (this.sqltype === 0) {
-          let _tmpsql = this.sql.replace(/(;|；)$/gi, '').replace(/\s/g, ' ').replace(/；/g, ';').split(';')
-          axios.post(`${util.url}/sqlsyntax/`, {
-            'data': JSON.stringify(this.formItem),
-            'sql': JSON.stringify(_tmpsql),
-            'type': this.dmlorddl,
-            'id': this.formItem.bundle_id,
-            'real_name': sessionStorage.getItem('real_name')
-          })
-            .then(() => {
-              util.notice('工单已提交成功')
-            })
-            .catch(error => {
-              util.err_notice(error)
-            })
-        } else {
-          axios.post(`${util.url}/sqlsyntax/`, {
-            'data': JSON.stringify(this.formItem),
-            'sql': JSON.stringify(this.ddlsql),
-            'real_name': sessionStorage.getItem('real_name'),
-            'type': this.dmlorddl,
-            'id': this.formItem.bundle_id
-          })
-            .then(() => {
-              util.notice('工单已提交成功')
-            })
-            .catch(error => {
-              util.err_notice(error)
-            })
+        let sql = []
+        for (let i of this.ddlsql) {
+          sql.push(i.sql)
         }
+        axios.post(`${util.url}/sqlsyntax/`, {
+          'data': JSON.stringify(this.formItem),
+          'sql': JSON.stringify(sql),
+          'real_name': sessionStorage.getItem('real_name'),
+          'type': this.dmlorddl,
+          'id': this.formItem.bundle_id
+        })
+          .then(() => {
+            util.notice('工单已提交成功')
+          })
+          .catch(error => {
+            util.err_notice(error)
+          })
       },
       delorder () {
         let _list = []
