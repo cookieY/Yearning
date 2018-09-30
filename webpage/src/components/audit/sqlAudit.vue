@@ -69,7 +69,7 @@
       </Card>
     </Row>
 
-    <Modal v-model="modal2" width="1000" draggable>
+    <Modal v-model="modal2" width="1000">
       <p slot="header" style="color:#f60;font-size: 16px">
         <Icon type="information-circled"></Icon>
         <span>SQL工单详细信息</span>

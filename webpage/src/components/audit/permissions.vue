@@ -24,7 +24,7 @@
       </Card>
     </Row>
 
-    <Modal v-model="editInfodModal" :width="800" draggable>
+    <Modal v-model="editInfodModal" :width="800">
       <h3 slot="header" style="color:#2D8CF0">权限申请单</h3>
       <Form :label-width="120" label-position="right">
         <FormItem label="权限组:">
