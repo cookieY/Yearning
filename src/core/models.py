@@ -35,7 +35,7 @@ class Account(AbstractUser):
     group = models.CharField(max_length=40)  # 权限组 guest/admin
     department = models.CharField(max_length=40)  # 部门
     auth_group = models.CharField(max_length=100, null=True)  # 细粒化权限组
-    real_name = models.CharField(max_length=100,null=True)  # 真实姓名
+    real_name = models.CharField(max_length=100, null=True, default='请添加真实姓名')  # 真实姓名
 
 
 class SqlDictionary(models.Model):
@@ -71,7 +71,7 @@ class SqlOrder(models.Model):
     assigned = models.CharField(max_length=50, blank=True)  # 工单执行人
     delay = models.IntegerField(null=True, default=0)  # 延迟时间
     rejected = models.TextField(blank=True)  # 驳回说明
-    real_name = models.CharField(max_length=100,null=True) #姓名
+    real_name = models.CharField(max_length=100, null=True)  # 姓名
 
 
 class DatabaseList(models.Model):
