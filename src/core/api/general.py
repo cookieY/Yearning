@@ -5,6 +5,7 @@ from django.http import HttpResponse
 from rest_framework.response import Response
 from libs import baseview, con_database, util
 from core.task import grained_permissions, set_auth_group
+from core.api import serachsql
 from core.models import (
     DatabaseList,
     Account,
@@ -104,6 +105,10 @@ class addressing(baseview.BaseView):
                             port=_connection.port
                     ) as f:
                         res = f.baseItems(sql='show databases')
+                        exclude_db = serachsql.exclued_db_list()
+                        for db in exclude_db:
+                            if db in res:
+                                res.remove(db)
                         return Response(res)
                 except Exception as e:
                     CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
