@@ -16,7 +16,7 @@ import random
 import ssl
 import time
 import ldap3
-from ldap3 import Server, Connection, SUBTREE
+from ldap3 import Connection, SUBTREE
 import configparser
 import ast
 
@@ -129,34 +129,36 @@ def auth(username, password):
         password=LDAP_ADMIN_PASS)
     ret = c.bind()
     if ret:
-        res = c.search(
-            search_base = SEARCH_BASE,
-            search_filter = '(cn={})'.format(username),
-            search_scope = SUBTREE,
-            attributes = ['cn', 'uid', 'mail'],
-        )
-        if res:
-            entry = c.response[0]
-            dn = entry['dn']
-            attr_dict = entry['attributes']
+        if ldap['ou']:
+            res = c.search(
+                search_base=SEARCH_BASE,
+                search_filter='(cn={})'.format(username),
+                search_scope=SUBTREE,
+                attributes=['cn', 'uid', 'mail'],
+            )
+            if res:
+                entry = c.response[0]
+                dn = entry['dn']
+                attr_dict = entry['attributes']
 
-            # check password by dn
-            try:
-                conn2 = Connection(ldap3.Server(LDAP_SERVER, get_info=ldap3.ALL), user=dn, password=password, check_names=True, lazy=False, raise_exceptions=False)
-                conn2.bind()
-                if conn2.result["description"] == "success":
-                    print((True, attr_dict["mail"], attr_dict["cn"], attr_dict["uid"]))
-                    c.unbind()
-                    conn2.unbind()
-                    return True
-                else:
+                # check password by dn
+                try:
+                    conn2 = Connection(ldap3.Server(LDAP_SERVER, get_info=ldap3.ALL), user=dn, password=password,
+                                       check_names=True, lazy=False, raise_exceptions=False)
+                    conn2.bind()
+                    if conn2.result["description"] == "success":
+                        print((True, attr_dict["mail"], attr_dict["cn"], attr_dict["uid"]))
+                        c.unbind()
+                        conn2.unbind()
+                        return True
+                    else:
+                        print("auth fail")
+                        return False
+                except:
                     print("auth fail")
                     return False
-            except Exception as e:
-                print("auth fail")
-                return False
         else:
-            return False
+            return True
     else:
         return False
 

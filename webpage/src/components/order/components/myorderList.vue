@@ -19,7 +19,7 @@
           工单{{ this.$route.query.workid }}详细信息
           <br>
           <Button type="text" v-if="this.$route.query.status === 1" @click.native="_RollBack()">查看回滚语句</Button>
-          <Button type="text" v-else-if="this.$route.query.status === 0 && this.$route.query.type === 1"
+          <Button type="text" v-else-if="this.$route.query.status === 0 || this.$route.query.status ===4"
                   @click.native="PutData()">重新提交
           </Button>
           <Button type="text" v-if="this.$route.query.status === 2" @click.native="delorder()">工单撤销</Button>
@@ -58,7 +58,12 @@
               <p>{{formItem.basename}}</p>
             </FormItem>
             <FormItem>
+              <template v-if="sqltype===0">
+                <Input v-model="sql" type="textarea" :rows="8"></Input>
+              </template>
+              <template v-else>
                 <Table :columns="columnsName" :data="ddlsql" stripe border></Table>
+              </template>
             </FormItem>
             <FormItem label="工单提交说明:">
               <Input v-model="formItem.text" placeholder="最多不超过20个字"></Input>
@@ -160,6 +165,7 @@
             this.formItem = res.data.data
             this.sql = res.data.sql
             this.sqltype = res.data.type
+            this.formItem.backup = '0'
           })
           .catch(error => {
             util.err_notice(error)
@@ -167,10 +173,7 @@
         this.reloadsql = true
       },
       _Putorder () {
-        let sql = []
-        for (let i of this.ddlsql) {
-          sql.push(i.sql)
-        }
+        let sql = this.sql.replace(/(;|；)$/gi, '').replace(/\s/g, ' ').replace(/；/g, ';').split(';')
         axios.post(`${util.url}/sqlsyntax/`, {
           'data': JSON.stringify(this.formItem),
           'sql': JSON.stringify(sql),

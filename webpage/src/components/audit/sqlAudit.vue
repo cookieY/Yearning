@@ -60,6 +60,7 @@
               <Button type="text" style="margin-left: -1%">删除记录</Button>
             </Poptip>
             <Button type="text" style="margin-left: -1%" @click.native="mou_data()">刷新</Button>
+
             <Table border :columns="columns6" :data="tmp" stripe ref="selection"
                    @on-selection-change="delrecordList"></Table>
             <br>
@@ -94,7 +95,7 @@
           <span>{{ formitem.text }}</span>
         </FormItem>
         <FormItem>
-            <Table :columns="sql_columns" :data="sql" height="200"></Table>
+          <Table :columns="sql_columns" :data="sql" height="200"></Table>
         </FormItem>
         <FormItem label="选择执行人:" v-if="multi && auth === 'admin'">
           <Select v-model="multi_name" style="width: 20%">

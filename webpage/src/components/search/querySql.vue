@@ -188,6 +188,22 @@
         this.total = 0
       },
       Search_sql () {
+        this.$Spin.show({
+          render: (h) => {
+            return h('div', [
+              h('Icon', {
+                props: {
+                  size: 30,
+                  type: 'ios-loading'
+                },
+                style: {
+                  animation: 'ani-demo-spin 1s linear infinite'
+                }
+              }),
+              h('div', '正在查询,请稍后........')
+            ])
+          }
+        })
         let address = {
           'basename': this.put_info.base
         }
@@ -205,6 +221,7 @@
               this.total = res.data['len']
             }
           })
+        this.$Spin.hide()
       },
       exportdata () {
         exportcsv({
