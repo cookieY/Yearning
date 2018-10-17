@@ -37,7 +37,8 @@ class setting_view(baseview.SuperUserpermissions):
                     host=ldap['host'],
                     type=ldap['type'],
                     sc=ldap['sc'],
-                    domain=ldap['domain'])
+                    domain=ldap['domain'],
+                    ou=ldap['ou'])
                 if ldap_test:
                     return Response('ldap连接成功!')
                 else:

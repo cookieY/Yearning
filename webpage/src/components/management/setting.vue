@@ -63,7 +63,7 @@
                     <Input placeholder="LDAP dc 相关设置,采用域名认证可不填写" v-model="ldap.sc"></Input>
                   </FormItem>
                   <FormItem >
-                    <Checkbox v-model="message.ou">启用多ou</Checkbox>
+                    <Checkbox v-model="ldap.ou">启用多ou</Checkbox>
                   </FormItem>
                   <FormItem label="LDAP_域名:">
                     <Input placeholder="LDAP Domain" v-model="ldap.domain"></Input>

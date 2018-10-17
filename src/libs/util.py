@@ -84,7 +84,7 @@ def conf_path() -> object:
                     _conf.get('mysql', 'password'), _conf.get('host', 'ipaddress'))
 
 
-def test_auth(username, password, host, type, sc, domain):
+def test_auth(username, password, host, type, sc, domain, ou):
     if type == '1':
         user = username + '@' + domain
     elif type == '2':
@@ -97,8 +97,36 @@ def test_auth(username, password, host, type, sc, domain):
         password=password)
     ret = c.bind()
     if ret:
-        c.unbind()
-        return True
+        if ou:
+            res = c.search(
+                search_base=sc,
+                search_filter='(cn={})'.format(username),
+                search_scope=SUBTREE,
+                attributes=['cn', 'uid', 'mail'],
+            )
+            if res:
+                entry = c.response[0]
+                dn = entry['dn']
+                attr_dict = entry['attributes']
+
+                # check password by dn
+                try:
+                    conn2 = Connection(ldap3.Server(host, get_info=ldap3.ALL), user=dn, password=password,
+                                       check_names=True, lazy=False, raise_exceptions=False)
+                    conn2.bind()
+                    if conn2.result["description"] == "success":
+                        print((True, attr_dict["mail"], attr_dict["cn"], attr_dict["uid"]))
+                        c.unbind()
+                        conn2.unbind()
+                        return True
+                    else:
+                        print("auth fail")
+                        return False
+                except:
+                    print("auth fail")
+                    return False
+        else:
+            return True
     else:
         return False
 
@@ -109,14 +137,14 @@ def auth(username, password):
     # 后台录入的验证用户信息，连接到ldap后通过查询登陆的用户名所在的OU，DN信息，然后进一步去ldap服务器进行账户和密码验证。
     LDAP_ADMIN_USER = ldap['user']
     LDAP_ADMIN_PASS = ldap['password']
-    
+
     LDAP_SERVER = ldap['host']
     LDAP_DOMAIN = ldap['domain']
     LDAP_TYPE = ldap['type']
     LDAP_SCBASE = ldap['sc']
     # 这里前端可以做个基础DN录入，搜索范围锁定在这个DN下
     SEARCH_BASE = ldap['sc']
-    
+
     if LDAP_TYPE == '1':
         user = username + '@' + LDAP_DOMAIN
     elif LDAP_TYPE == '2':
