@@ -16,7 +16,7 @@ services:
       MYSQL_USER: yearning
       MYSQL_PASSWORD: yearning
   yearning:
-    image: registry.cn-hangzhou.aliyuncs.com/cookie/yearning:v1.3.1
+    image: registry.cn-hangzhou.aliyuncs.com/cookie/yearning:v1.3.2
     depends_on: 
       - db
     ports:
