@@ -43,7 +43,7 @@ module.exports = {
       {
         test: /\.js$/,
         loader: 'babel-loader',
-        include: [resolve('src'), resolve('test'),resolve('node_modules/iview')]
+        include: [resolve('src'), resolve('test'),resolve('node_modules/_iview@3.1.3@iview')]
       },
       {
         test: /\.(png|jpe?g|gif|svg)(\?.*)?$/,
