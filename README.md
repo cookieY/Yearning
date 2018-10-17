@@ -11,7 +11,7 @@
 ![](https://img.shields.io/badge/python-3.6-brightgreen.svg)
 ![](https://img.shields.io/badge/Django-2.0.1-brightgreen.svg)
 
-##### 基于Inception的企业级web端 SQL审核平台。
+##### 企业级MYSQL web端 SQL审核平台。
 
 ## Website 官网
 
