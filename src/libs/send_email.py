@@ -143,7 +143,8 @@ class send_email(object):
                 server = smtplib.SMTP_SSL(self.email['smtp_host'], int(self.email['smtp_port']))
             else:
                 server = smtplib.SMTP(self.email['smtp_host'], int(self.email['smtp_port']))
-            server.login(self.email['user'], self.email['password'])
+            if self.email['password']:
+                server.login(self.email['user'], self.email['password'])
             server.mail(sender=self.email['user'])
             _code, _msg = server.rcpt(self.to_addr)
             if _code in (250, 251, 452):
