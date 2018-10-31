@@ -154,7 +154,7 @@ def auth(username, password):
     c = ldap3.Connection(
         ldap3.Server(LDAP_SERVER, get_info=ldap3.ALL),
         user=user,
-        password=LDAP_ADMIN_PASS)
+        password=password)
     ret = c.bind()
     if ret:
         if ldap['ou']:
