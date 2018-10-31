@@ -66,7 +66,8 @@ class setting_view(baseview.SuperUserpermissions):
                 else:
                     server = smtplib.SMTP(mail['smtp_host'], mail['smtp_port'])  # SMTP协议默认端口是25
                 server.set_debuglevel(1)
-                server.login(mail['user'], mail['password'])
+                if mail['password']:
+                    server.login(mail['user'], mail['password'])
                 server.sendmail(mail['user'], [mail['to_user']], msg.as_string())
                 server.quit()
                 return Response('已发送测试邮件，请注意查收！')
