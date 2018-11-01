@@ -128,7 +128,10 @@ class send_email(object):
         msg = MIMEText(text, 'html', 'utf-8')
         msg['From'] = self._format_addr('Yearning_Admin <%s>' % self.email['user'])
         msg['Subject'] = Header('Yearning 工单消息推送', 'utf-8').encode()
-        server = smtplib.SMTP(self.email['smtp_host'], int(self.email['smtp_port']))
+        if self.email['ssl']:
+            server = smtplib.SMTP_SSL(self.email['smtp_host'], self.email['smtp_port'])
+        else:
+            server = smtplib.SMTP(self.email['smtp_host'], self.email['smtp_port'])
         server.set_debuglevel(1)
         server.login(self.email['user'], self.email['password'])
         server.sendmail(self.email['user'], [self.to_addr], msg.as_string())
