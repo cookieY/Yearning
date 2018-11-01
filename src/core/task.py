@@ -290,8 +290,8 @@ class submit_push_messages(threading.Thread):
         if tag.message['ding']:
             try:
                 util.dingding(
-                    content='工单提交通知\n工单编号:%s\n发起人:%s\n地址:%s\n工单说明:%s\n状态:已提交\n备注:%s'
-                            % (self.workId, self.user, self.addr_ip, self.text, content.before), url=ding_url())
+                    content='工单提交通知\n\审核人\n工单编号:%s\n发起人:%s\n地址:%s\n工单说明:%s\n状态:已提交\n备注:%s'
+                            % (self.workId,self.assigned,self.user, self.addr_ip, self.text, content.before), url=ding_url())
             except Exception as e:
                 CUSTOM_ERROR.error(f'{e.__class__.__name__}--钉钉推送失败: {e}')
         if tag.message['mail']:
