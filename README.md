@@ -5,7 +5,7 @@
 # Yearning SQL审核平台
 
 ![](https://img.shields.io/badge/build-release-brightgreen.svg)  
-![](https://img.shields.io/badge/version-v1.3.1-brightgreen.svg)  
+![](https://img.shields.io/badge/version-v1.3.3-brightgreen.svg)  
 ![](https://img.shields.io/badge/vue.js-2.5.13-brightgreen.svg) 
 ![](https://img.shields.io/badge/iview-3.1.0-brightgreen.svg?style=flat-square) 
 ![](https://img.shields.io/badge/python-3.6-brightgreen.svg)
@@ -63,8 +63,8 @@
 
 如果Yearning能够帮助到你，请支持下Yearning吧，让Yearning能够持续改善并更新
 
-![](http://oy0f4k5qi.bkt.clouddn.com/alipay.jpg)
-![](http://oy0f4k5qi.bkt.clouddn.com/wechat.jpg)
+![](img/alipay.jpg)
+![](img/wechat.jpg)
   
 ## About 联系方式
    
@@ -78,30 +78,30 @@
 
 
 
-![login](http://oy0f4k5qi.bkt.clouddn.com/687474703a2f2f6f793066346b3571692e626b742e636c6f7564646e2e636f6d2f6c6f67696e2e706e67.jpeg)
+![login](img/login.jpeg)
 
 
 - Dashboard
 
-![](http://oy0f4k5qi.bkt.clouddn.com/dash.png)
+![](img/dash.png)
 
 - 审核
 
-![](http://oy0f4k5qi.bkt.clouddn.com/order.png)
+![](img/order.png)
 
 - SQL语法高亮及自动补全
 
-![](http://oy0f4k5qi.bkt.clouddn.com/lighit.png)
+![](img/lighit.png)
 
 - 查询
 
-![](http://oy0f4k5qi.bkt.clouddn.com/query.png)
+![](img/query.png)
 
 - 细粒度的权限分配
-![](http://oy0f4k5qi.bkt.clouddn.com/PER.png)
+![](img/PER.png)
 
 - 我的工单
-![](http://oy0f4k5qi.bkt.clouddn.com/myorder.png)
+![](img/myorder.png)
 
 
 ## License

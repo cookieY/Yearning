@@ -75,7 +75,7 @@ CREATE TABLE `core_account` (
   `group` varchar(40) COLLATE utf8_bin NOT NULL,
   `department` varchar(40) COLLATE utf8_bin NOT NULL,
   `auth_group` varchar(100) COLLATE utf8_bin DEFAULT NULL,
-  `real_name` varchar(100) COLLATE utf8_bin DEFAULT NULL,
+  `real_name` varchar(100) COLLATE utf8_bin DEFAULT '请添加真实姓名' NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `username` (`username`)
 ) ENGINE=InnoDB AUTO_INCREMENT=47 DEFAULT CHARSET=utf8 COLLATE=utf8_bin;
@@ -121,6 +121,7 @@ CREATE TABLE `core_applygrained` (
   `work_id` varchar(50) COLLATE utf8_bin DEFAULT NULL,
   `status` int(11) DEFAULT NULL,
   `auth_group` varchar(50) COLLATE utf8_bin DEFAULT NULL,
+  `real_name` varchar(100) COLLATE utf8_bin DEFAULT NULL,
   PRIMARY KEY (`id`),
   KEY `core_applygrained_username_01d55fc9` (`username`)
 ) ENGINE=InnoDB AUTO_INCREMENT=25 DEFAULT CHARSET=utf8 COLLATE=utf8_bin;
@@ -185,6 +186,7 @@ CREATE TABLE `core_query_order` (
   `export` smallint(6),
   `audit` varchar(100) COLLATE utf8_bin DEFAULT NULL,
   `time` varchar(100) COLLATE utf8_bin DEFAULT NULL,
+  `real_name` varchar(100) COLLATE utf8_bin DEFAULT NULL,
   PRIMARY KEY (`id`),
   KEY `core_query_order_work_id_1ae60daa` (`work_id`)
 ) ENGINE=InnoDB AUTO_INCREMENT=86 DEFAULT CHARSET=utf8 COLLATE=utf8_bin;
