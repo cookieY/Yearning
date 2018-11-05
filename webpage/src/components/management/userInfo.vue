@@ -89,7 +89,7 @@
           <Input v-model="editAuthForm.username" readonly="readonly"></Input>
         </FormItem>
         <FormItem label="真实姓名">
-          <Input v-model="editAuthForm.real_name"></Input>
+          <Input v-model="editAuthForm.real_name" readonly="readonly"></Input>
         </FormItem>
         <FormItem label="角色">
           <Select v-model="editAuthForm.group" placeholder="请选择">
@@ -182,6 +182,9 @@
       <Form :label-width="100" label-position="right">
         <FormItem label="E-mail">
           <Input v-model="email"></Input>
+        </FormItem>
+        <FormItem label="真实姓名">
+          <Input v-model="real_name"></Input>
         </FormItem>
       </Form>
       <div slot="footer">
@@ -529,6 +532,7 @@
         editAuthModal: false,
         editemail: false,
         email: '',
+        real_name: '',
         // 用户名
         username: '',
         confirmuser: '',
@@ -602,17 +606,20 @@
         this.editemail = true
         this.username = this.data5[index].username
         this.email = this.data5[index].email
+        this.real_name = this.data5[index].real_name
       },
       putemail () {
         axios.put(`${util.url}/userinfo/changemail`, {
           'username': this.username,
-          'mail': this.email
+          'mail': this.email,
+          'real': this.real_name
         })
           .then(res => {
             util.notice(res.data)
             this.editemail = false
             this.current_page = 1
             this.refreshuser()
+            sessionStorage.setItem('real_name', this.real_name)
           })
           .catch(error => {
             util.err_notice(error)
@@ -697,7 +704,6 @@
         this.savePassLoading = true
         axios.put(`${util.url}/authgroup/save_info`, {
           'username': this.editAuthForm.username,
-          'realname': this.editAuthForm.real_name,
           'group': this.editAuthForm.group,
           'department': this.editAuthForm.department,
           'auth_group': this.editAuthForm.authgroup,

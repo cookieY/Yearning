@@ -81,7 +81,7 @@
           </FormItem>
           <FormItem label="编辑：">
             <Button type="warning" size="small" @click="editPasswordModal=true">修改密码</Button>
-            <Button type="primary" size="small" @click="editEmailModal=true">修改邮箱</Button>
+            <Button type="primary" size="small" @click="openMailChange">修改邮箱/真实姓名</Button>
             <Button type="success" size="small" @click="ApplyForPermission">权限申请</Button>
           </FormItem>
         </Form>
@@ -106,11 +106,15 @@
         <Button type="primary" :loading="savePassLoading" @click="saveEditPass">保存</Button>
       </div>
     </Modal>
+
     <Modal v-model="editEmailModal" :closable='false' :mask-closable=false :width="500">
-      <h3 slot="header" style="color:#2D8CF0">邮箱修改</h3>
+      <h3 slot="header" style="color:#2D8CF0">邮箱/真实姓名修改</h3>
       <Form :label-width="100" label-position="right">
         <FormItem label="邮箱地址">
           <Input v-model="editEmailForm.mail"></Input>
+        </FormItem>
+        <FormItem label="真实姓名">
+          <Input v-model="editEmailForm.real_name"></Input>
         </FormItem>
       </Form>
       <div slot="footer">
@@ -123,7 +127,7 @@
       <h3 slot="header" style="color:#2D8CF0">权限申请单</h3>
       <Form :model="editAuthForm" :label-width="120" label-position="right">
         <FormItem label="权限组" prop="authgroup">
-          <Select v-model="editAuthForm.authgroup" multiple @on-change="getgrouplist"  placeholder="请选择">
+          <Select v-model="editAuthForm.authgroup" multiple @on-change="getgrouplist" placeholder="请选择">
             <Option v-for="list in groupset" :value="list" :key="list">{{ list }}</Option>
           </Select>
           <template>
@@ -178,7 +182,7 @@
       </Form>
       <div slot="footer">
         <Button type="text" @click="editInfoModal=false">取消</Button>
-        <Button type="primary"  :loading="savePassLoading"  @click="PutPermissionData">提交</Button>
+        <Button type="primary" :loading="savePassLoading" @click="PutPermissionData">提交</Button>
       </div>
     </Modal>
   </div>
@@ -188,6 +192,7 @@
   //
   import util from '../../libs/util'
   import axios from 'axios'
+
   export default {
     name: 'own-space',
     data () {
@@ -205,7 +210,8 @@
         groupset: [],
         editEmailModal: false,
         editEmailForm: {
-          mail: ''
+          mail: '',
+          real_name: ''
         },
         userForm: {},
         formItem: {
@@ -296,6 +302,11 @@
       }
     },
     methods: {
+      openMailChange () {
+        this.editEmailModal = true
+        this.editEmailForm.mail = this.userForm.email
+        this.editEmailForm.real_name = this.userForm.real_name
+      },
       getgrouplist () {
         axios.put(`${util.url}/authgroup/group_list`, {'group_list': JSON.stringify(this.editAuthForm.authgroup)})
           .then(res => {
@@ -339,10 +350,15 @@
       },
       saveEmail () {
         this.savePassLoading = true
-        axios.put(`${util.url}/userinfo/changemail`, {'mail': this.editEmailForm.mail, 'username': sessionStorage.getItem('user')})
+        axios.put(`${util.url}/userinfo/changemail`, {
+          'mail': this.editEmailForm.mail,
+          'username': sessionStorage.getItem('user'),
+          'real': this.editEmailForm.real_name
+        })
           .then(res => {
             util.notice(res.data)
             this.editEmailModal = false
+            sessionStorage.setItem('real_name', this.editEmailForm.real_name)
           })
           .catch(error => {
             util.err_notice(error)
@@ -397,8 +413,8 @@
       }
     },
     mounted () {
-      this.init();
-      this.getauthgroup();
+      this.init()
+      this.getauthgroup()
       axios.put(`${util.url}/workorder/connection`, {'permissions_type': 'own_space'})
         .then(res => {
           this.connectionList.connection = res.data['connection']
