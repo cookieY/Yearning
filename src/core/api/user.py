@@ -94,13 +94,18 @@ class userinfo(baseview.BaseView):
             try:
                 username = request.data['username']
                 mail = request.data['mail']
+                real = request.data['real']
             except KeyError as e:
                 CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
                 return HttpResponse(status=500)
             else:
                 try:
-                    Account.objects.filter(username=username).update(email=mail)
-                    return Response('E-mail修改成功!')
+                    _send_mail = send_email(to_addr=mail)
+                    _status, _message = _send_mail.email_check()
+                    if _status != 200:
+                        return Response(data=_message)
+                    Account.objects.filter(username=username).update(email=mail, real_name=real)
+                    return Response('E-mail/真实姓名修改成功!')
                 except Exception as e:
                     CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
                     return HttpResponse(status=500)
