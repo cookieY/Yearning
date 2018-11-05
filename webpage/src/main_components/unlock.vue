@@ -31,6 +31,8 @@
 
 <script>
   // ;
+  import axios from 'axios'
+  import util from '../libs/util'
   export default {
     name: 'Unlock',
     data () {
@@ -53,15 +55,21 @@
         this.$refs.inputEle.focus()
       },
       handleUnlock () {
-        if (sessionStorage.getItem('password') === this.password) {
-          this.avatorLeft = '0px'
-          this.inputLeft = '400px'
-          this.password = ''
-          this.$store.commit('unlock')
-          this.$emit('on-unlock')
-        } else {
-          this.$Message.error('密码错误,请重新输入!')
-        }
+        axios.post(util.auth, {
+          'username': sessionStorage.getItem('user'),
+          'password': this.password
+        })
+          .then(res => {
+            if (res.data['token'] === 'null') {
+              this.$Message.error('密码错误,请重新输入!')
+            } else {
+              this.avatorLeft = '0px'
+              this.inputLeft = '400px'
+              this.password = ''
+              this.$store.commit('unlock')
+              this.$emit('on-unlock')
+            }
+          })
       },
       unlockMousedown () {
         this.$refs.unlockBtn.className = 'unlock-btn click-unlock-btn'

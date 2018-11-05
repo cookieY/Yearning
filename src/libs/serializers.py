@@ -18,6 +18,7 @@ class Globalpermissions(serializers.HyperlinkedModelSerializer):
         model = globalpermissions
         fields = ('inception', 'ldap', 'other', 'message')
 
+
 class UserINFO(serializers.HyperlinkedModelSerializer):
     '''
     平台用户信息列表serializers
@@ -113,7 +114,7 @@ class Query_review(serializers.HyperlinkedModelSerializer):
         model = query_order
         fields = (
             'work_id', 'username', 'date', 'instructions', 'query_per', 'connection_name', 'computer_room',
-            'export', 'time')
+            'export', 'time', 'real_name')
 
 
 class Query_list(serializers.HyperlinkedModelSerializer):

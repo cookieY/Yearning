@@ -135,7 +135,7 @@ class applygrained(models.Model):
     status = models.IntegerField(blank=True, null=True)  # 工单状态 0 disagree 1 agree 2 indeterminate
     permissions = JSONField()
     auth_group = models.CharField(max_length=50, null=True)
-
+    real_name = models.CharField(max_length=100, null=True)  # 真实姓名
 
 class querypermissions(models.Model):
     work_id = models.CharField(max_length=50, null=True, db_index=True)
@@ -154,3 +154,4 @@ class query_order(models.Model):
     export = models.SmallIntegerField(null=True, default=0)
     audit = models.CharField(max_length=100, null=True)
     time = models.CharField(max_length=100, null=True)
+    real_name = models.CharField(max_length=100, null=True)  # 真实姓名

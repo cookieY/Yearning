@@ -108,6 +108,7 @@ class auth_group(baseview.BaseView):
                 group = request.data['group']
                 department = request.data['department']
                 authgroup = request.data['auth_group']
+                realname = request.data['realname']
                 pr = 1
             except Exception as e:
                 CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
@@ -119,12 +120,13 @@ class auth_group(baseview.BaseView):
                     if not authgroup:
                         Account.objects.filter(username=username).update(group=group,
                                                                          department=department, auth_group=None,
-                                                                         is_staff=pr)
+                                                                         is_staff=pr, real_name=realname)
                     else:
                         auth_group_str = (",".join(authgroup))
                         Account.objects.filter(username=username).update(group=group,
                                                                          department=department,
-                                                                         auth_group=auth_group_str, is_staff=pr)
+                                                                         auth_group=auth_group_str, is_staff=pr,
+                                                                         real_name=realname)
                     return Response('权限保存成功!')
                 except Exception as e:
                     CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')

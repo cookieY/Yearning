@@ -100,7 +100,7 @@ class userinfo(baseview.BaseView):
             else:
                 try:
                     Account.objects.filter(username=username).update(email=mail)
-                    return Response('%s--实名 & E-mail修改成功!' % username)
+                    return Response('E-mail修改成功!')
                 except Exception as e:
                     CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
                     return HttpResponse(status=500)
@@ -114,8 +114,7 @@ class userinfo(baseview.BaseView):
             realname = request.data['realname']
             department = request.data['department']
             auth_group = ','.join(json.loads(request.data['auth_group']))
-            tag = globalpermissions.objects.filter(authorization='global').first()
-            _send_mail = send_email(to_addr=email, ssl=tag.message['ssl'])
+            _send_mail = send_email(to_addr=email)
             _status, _message = _send_mail.email_check()
             if _status != 200:
                 return Response(data=_message)
@@ -170,48 +169,6 @@ class userinfo(baseview.BaseView):
         except Exception as e:
             CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
             return HttpResponse(status=500)
-
-
-class generaluser(baseview.BaseView):
-    '''
-
-    :argument 普通用户修改密码
-
-    '''
-
-    def post(self, request, args=None):
-        if args == 'changepwd':
-            try:
-                username = request.data['username']
-                old_password = request.data['old']
-                new_password = request.data['new']
-            except KeyError as e:
-                CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
-            else:
-                try:
-                    user = authenticate(username=username, password=old_password)
-                    if user is not None and user.is_active:
-                        user.set_password(new_password)
-                        user.save()
-                        return Response('%s--密码修改成功!' % username)
-                    else:
-                        return Response('%s--原密码不正确请重新输入' % username)
-                except Exception as e:
-                    CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
-                    return HttpResponse(status=500)
-
-    def put(self, request, args: str = None):
-        try:
-            mail = request.data['mail']
-        except KeyError as e:
-            CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
-        else:
-            try:
-                Account.objects.filter(username=request.user).update(email=mail)
-                return Response('邮箱地址已更新!')
-            except Exception as e:
-                CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
-                return HttpResponse(status=500)
 
 
 class authgroup(baseview.BaseView):

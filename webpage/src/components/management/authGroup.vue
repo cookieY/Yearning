@@ -16,7 +16,7 @@
     <Modal v-model="addAuthGroupModal" :width="800">
       <h3 slot="header" style="color:#2D8CF0">权限组设置</h3>
       <Form :model="addAuthGroupForm" :label-width="120" label-position="right">
-        <FormItem label="* 权限组名">
+        <FormItem label="权限组名">
           <Input v-model="addAuthGroupForm.groupname" v-bind:readonly="isReadOnly"></Input>
         </FormItem>
         <template>
@@ -165,6 +165,21 @@
         <Button type="primary" @click="saveAddGroup" v-else>保存</Button>
       </div>
     </Modal>
+
+
+    <Modal v-model="deluserModal" :closable='false' :mask-closable=false :width="500" @on-ok="deleteAuthGroup">
+      <h3 slot="header" style="color:#2D8CF0">删除权限组</h3>
+      <Form :label-width="100" label-position="right">
+        <FormItem label="用户名">
+          <Input v-model="authgroup" readonly="readonly"></Input>
+        </FormItem>
+        <FormItem label="请输入用户名">
+          <Input v-model="confirmgroup" placeholder="请确认用户名"></Input>
+        </FormItem>
+      </Form>
+    </Modal>
+
+
   </div>
 </template>
 
@@ -192,6 +207,9 @@
     name: 'auth-group',
     data () {
       return {
+        authgroup: '',
+        confirmgroup: '',
+        deluserModal: false,
         isAdd: true,
         isReadOnly: false,
         pagenumber: 1,
@@ -238,7 +256,7 @@
                   },
                   on: {
                     click: () => {
-                      this.deleteAuthGroup(params.row)
+                      this.deleteAuth(params.row)
                     }
                   }
                 }, '删除')
@@ -354,13 +372,24 @@
           this.permission[name] = []
         }
       },
-      deleteAuthGroup (vl) {
-        axios.delete(`${util.url}/authgroup/${vl.username}`)
-          .then(res => {
-            util.notice(res.data)
-            this.refreshgroup()
+      deleteAuthGroup () {
+        if (this.authgroup === this.confirmgroup) {
+          axios.delete(`${util.url}/authgroup/${this.confirmgroup}`)
+            .then(res => {
+              util.notice(res.data)
+              this.refreshgroup()
+            })
+            .catch(err => util.err_notice(err))
+        } else {
+          this.$Message.error({
+            content: '请填写正确的权限组名称！',
+            duration: 5
           })
-          .catch(err => util.err_notice(err))
+        }
+      },
+      deleteAuth (vl) {
+        this.deluserModal = true
+        this.authgroup = vl.username
       }
     },
     mounted () {

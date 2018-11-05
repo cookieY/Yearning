@@ -58,12 +58,7 @@
               <p>{{formItem.basename}}</p>
             </FormItem>
             <FormItem>
-              <template v-if="sqltype===0">
                 <Input v-model="sql" type="textarea" :rows="8"></Input>
-              </template>
-              <template v-else>
-                <Table :columns="columnsName" :data="ddlsql" stripe border></Table>
-              </template>
             </FormItem>
             <FormItem label="工单提交说明:">
               <Input v-model="formItem.text" placeholder="最多不超过20个字"></Input>
@@ -140,6 +135,7 @@
     },
     methods: {
       _RollBack () {
+        this.sql = ''
         if (this.TableDataNew[1].state.length === 40) {
           this.openswitch = true
           let opid = this.TableDataNew.map(item => item.sequence)
@@ -148,7 +144,9 @@
             .then(res => {
               this.formItem = res.data.data
               this.formItem.backup = '0'
-              this.ddlsql = res.data.sql
+              for (let i of res.data.sql) {
+                this.sql += i.sql + '\n'
+              }
               this.sqltype = res.data.type
               this.reloadsql = true
             })

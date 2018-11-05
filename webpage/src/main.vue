@@ -24,16 +24,16 @@
           </div>
         </div>
         <div class="header-avator-con">
-          <a @click="getc = true">捐助</a>
-          <Modal
-            v-model="getc"
-            title="捐助Yearning"
-            width="640">
-            <h3>让Yearning持续提供更好的功能与服务。</h3>
-            <br>
-            <img height="300" width="300" src="./assets/alipay.jpg"/>
-            <img height="300" width="300" src="./assets/wechat.jpg"/>
-          </Modal>
+          <!--<a @click="getc = true">捐助</a>-->
+          <!--<Modal-->
+            <!--v-model="getc"-->
+            <!--title="捐助Yearning"-->
+            <!--width="640">-->
+            <!--<h3>让Yearning持续提供更好的功能与服务。</h3>-->
+            <!--<br>-->
+            <!--<img height="300" width="300" src="./assets/alipay.jpg"/>-->
+            <!--<img height="300" width="300" src="./assets/wechat.jpg"/>-->
+          <!--</Modal>-->
           <a href="https://cookiey.github.io/Yearning-document/used/" target="_Blank">使用说明</a>
           <div @click="handleFullScreen" v-if="showFullScreenBtn" class="full-screen-btn-con">
             <Tooltip :content="isFullScreen ? '退出全屏' : '全屏'" placement="bottom">
@@ -332,7 +332,6 @@
       this.init()
       axios.get(`${util.url}/homedata/messages`)
         .then(res => {
-          console.log(res.data.statement)
           if (res.data.statement !== 'pass') {
             this.statement = true
           }

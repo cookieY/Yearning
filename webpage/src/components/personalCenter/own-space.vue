@@ -16,6 +16,11 @@
               <span>{{ userForm.username }}</span>
             </div>
           </FormItem>
+          <FormItem label="姓名：" prop="name">
+            <div style="display:inline-block;width:300px;">
+              <span>{{ userForm.real_name }}</span>
+            </div>
+          </FormItem>
           <FormItem label="部门：">
             <span>{{ userForm.department }}</span>
           </FormItem>
@@ -314,10 +319,9 @@
         this.$refs['editPasswordForm'].validate((valid) => {
           if (valid) {
             this.savePassLoading = true
-            axios.post(`${util.url}/otheruser/changepwd`, {
+            axios.put(`${util.url}/userinfo/changepwd`, {
               'username': sessionStorage.getItem('user'),
-              'new': this.editPasswordForm.newPass,
-              'old': this.editPasswordForm.oldPass
+              'new': this.editPasswordForm.newPass
             })
               .then(res => {
                 util.notice(res.data)
@@ -335,7 +339,7 @@
       },
       saveEmail () {
         this.savePassLoading = true
-        axios.put(`${util.url}/otheruser/mail`, {'mail': this.editEmailForm.mail})
+        axios.put(`${util.url}/userinfo/changemail`, {'mail': this.editEmailForm.mail, 'username': sessionStorage.getItem('user')})
           .then(res => {
             util.notice(res.data)
             this.editEmailModal = false
@@ -379,7 +383,8 @@
         this.savePassLoading = true
         axios.post(`${util.url}/apply_grained/`, {
           'auth_group': this.editAuthForm.authgroup,
-          'grained_list': JSON.stringify(this.permission_list)
+          'grained_list': JSON.stringify(this.permission_list),
+          'real_name': sessionStorage.getItem('real_name')
         })
           .then(res => {
             util.notice(res.data)

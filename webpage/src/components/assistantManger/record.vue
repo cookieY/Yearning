@@ -49,6 +49,10 @@
             key: 'username'
           },
           {
+            title: '真实姓名',
+            key: 'real_name'
+          },
+          {
             title: '执行人',
             key: 'assigned'
           },

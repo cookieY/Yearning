@@ -176,6 +176,7 @@ class query_worklf(baseview.BaseView):
             instructions = request.data['instructions']
             connection_name = request.data['connection_name']
             computer_room = request.data['computer_room']
+            real = request.data['real_name']
             export = request.data['export']
             audit = request.data['audit']
             un_init = util.init_conf()
@@ -206,7 +207,8 @@ class query_worklf(baseview.BaseView):
                 computer_room=computer_room,
                 export=export,
                 audit=audit,
-                time=util.date()
+                time=util.date(),
+                real_name=real
             )
             if not query_switch['query']:
                 query_order.objects.filter(work_id=work_id).update(query_per=1)

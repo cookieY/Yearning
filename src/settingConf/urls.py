@@ -11,7 +11,6 @@ from core.api.sqldic import (
 )
 from core.api.user import (
     userinfo,
-    generaluser,
     authgroup,
     ldapauth,
     login_auth,
@@ -65,7 +64,6 @@ urlpatterns = [
     url(r'^api/v1/adminsql/(.*)', adminpremisson.as_view()),
     url(r'^api/v1/record/(.*)', record_order.as_view()),
     url(r'^api/v1/homedata/(.*)', dashboard.as_view()),
-    url(r'^api/v1/otheruser/(.*)', generaluser.as_view()),
     url(r'^api/v1/exportdocx/', exportdoc.as_view()),
     url(r'^api/v1/dingding', dingding.as_view()),
     url(r'^api/v1/detail', order_detail.as_view()),

@@ -88,11 +88,14 @@
         <FormItem label="用户名">
           <Input v-model="editAuthForm.username" readonly="readonly"></Input>
         </FormItem>
+        <FormItem label="真实姓名">
+          <Input v-model="editAuthForm.real_name"></Input>
+        </FormItem>
         <FormItem label="角色">
           <Select v-model="editAuthForm.group" placeholder="请选择">
             <Option value="admin">管理员</Option>
-            <Option value="perform" v-if="connectionList.multi && this.userid !== 1">执行人</Option>
-            <Option value="guest" v-if="this.userid !== 1">使用者</Option>
+            <Option value="perform" v-if="connectionList.multi && editAuthForm.id !== 1">执行人</Option>
+            <Option value="guest" v-if="editAuthForm.id !== 1">使用者</Option>
           </Select>
         </FormItem>
         <FormItem label="部门">
@@ -506,7 +509,8 @@
           username: '',
           group: '',
           department: '',
-          authgroup: []
+          authgroup: [],
+          real: []
         },
         formItem: {
           ddl: '',
@@ -529,7 +533,6 @@
         username: '',
         confirmuser: '',
         deluserModal: false,
-        userid: null,
         dicadd: [],
         checkAll: {
           ddl: false,
@@ -560,7 +563,6 @@
           .then(res => {
             this.permission_list = res.data.permissions
             this.formItem = util.mode(res.data.permissions)
-            console.log(this.formItem)
           })
           .catch(error => {
             util.err_notice(error)
@@ -585,10 +587,7 @@
       },
       editauth (index) {
         this.editAuthModal = true
-        this.userid = this.data5[index].id
-        this.editAuthForm.username = this.data5[index].username
-        this.editAuthForm.department = this.data5[index].department
-        this.editAuthForm.group = this.data5[index].group
+        this.editAuthForm = this.data5[index]
         if (this.data5[index].auth_group !== null) {
           this.editAuthForm.authgroup = this.data5[index].auth_group.split(',')
         } else {
@@ -698,6 +697,7 @@
         this.savePassLoading = true
         axios.put(`${util.url}/authgroup/save_info`, {
           'username': this.editAuthForm.username,
+          'realname': this.editAuthForm.real_name,
           'group': this.editAuthForm.group,
           'department': this.editAuthForm.department,
           'auth_group': this.editAuthForm.authgroup,

@@ -224,7 +224,6 @@
           .then(res => {
             axios.defaults.headers.common['Authorization'] = 'JWT ' + res.data['token']
             sessionStorage.setItem('user', this.formInline.user)
-            sessionStorage.setItem('password', this.formInline.password)
             sessionStorage.setItem('jwt', `JWT ${res.data['token']}`)
             sessionStorage.setItem('auth', res.data['permissions'])
             sessionStorage.setItem('real_name', res.data['real_name'])
@@ -256,7 +255,6 @@
             } else {
               axios.defaults.headers.common['Authorization'] = 'JWT ' + res.data['token']
               sessionStorage.setItem('user', this.formInline.user)
-              sessionStorage.setItem('password', this.formInline.password)
               sessionStorage.setItem('jwt', `JWT ${res.data['token']}`)
               sessionStorage.setItem('auth', res.data['permissions'])
               let auth = res.data['permissions']

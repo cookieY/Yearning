@@ -40,6 +40,10 @@
             key: 'username'
           },
           {
+            title: '查询人姓名',
+            key: 'real_name'
+          },
+          {
             title: '工单说明',
             key: 'instructions'
           },

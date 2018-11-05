@@ -133,6 +133,10 @@
             key: 'username'
           },
           {
+            title: '真实姓名',
+            key: 'real_name'
+          },
+          {
             title: '状态',
             key: 'status',
             width: 150,

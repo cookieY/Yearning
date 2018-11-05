@@ -309,8 +309,6 @@
       handleCloseemail (event, name) {
         const index = this.other.email_suffix_list.indexOf(name)
         this.other.email_suffix_list.splice(index, 1)
-        console.log(this.other.email_suffix)
-        console.log(this.other.email_suffix_list)
       },
       multi_switching (status) {
         this.other.multi = status

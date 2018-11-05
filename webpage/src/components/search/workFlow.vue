@@ -164,7 +164,8 @@
               'connection_name': this.step.connection_name,
               'computer_room': this.step.computer_room,
               'export': this.step.export,
-              'audit': this.step.person
+              'audit': this.step.person,
+              'real_name': sessionStorage.getItem('real_name')
             })
               .then(() => {
                 this.$router.push({

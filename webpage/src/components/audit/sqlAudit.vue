@@ -225,7 +225,7 @@
             sortable: true
           },
           {
-            title: '提交人姓名',
+            title: '真实姓名',
             key: 'real_name',
             sortable: true
           },

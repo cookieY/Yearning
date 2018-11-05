@@ -168,7 +168,7 @@ a:active {
           <Input type="text" v-model="item.extra" placeholder="请输入字段备注"></Input>
           </Col>
           <Col span="4" offset="1">
-          <Button type="ghost" @click="handleRemove(index)">删除</Button>
+          <Button @click="handleRemove(index)">删除</Button>
           </Col>
         </Row>
       </FormItem>
@@ -180,7 +180,7 @@ a:active {
         </Row>
       </FormItem>
       <FormItem>
-        <Button type="ghost" @click="handleReset('formDynamic')" style="margin-left: 8px">重置</Button>
+        <Button @click="handleReset('formDynamic')" style="margin-left: 8px">重置</Button>
       </FormItem>
     </Form>
   </Modal>

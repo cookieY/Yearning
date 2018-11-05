@@ -26,7 +26,7 @@ class audit_grained(baseview.SuperUserpermissions):
             for i in user_list:
                 ser.append(
                     {'work_id': i.work_id, 'status': i.status, 'username': i.username,
-                     'permissions': i.permissions, 'auth_group': i.auth_group})
+                     'permissions': i.permissions, 'auth_group': i.auth_group, 'real_name': i.real_name})
             return Response({'data': ser, 'pn': pn})
 
         else:
@@ -73,13 +73,15 @@ class apply_grained(baseview.BaseView):
 
         authgroup_str = (",".join(request.data['auth_group']))
         grained_list = json.loads(request.data['grained_list'])
+        real_name = request.data['real_name']
         work_id = util.workId()
         applygrained.objects.get_or_create(
             work_id=work_id,
             username=request.user,
             permissions=grained_list,
             auth_group=authgroup_str,
-            status=2)
+            status=2,
+            real_name=real_name)
         mail = Account.objects.filter(id=1).first()
         try:
             thread = threading.Thread(target=push_message, args=(
