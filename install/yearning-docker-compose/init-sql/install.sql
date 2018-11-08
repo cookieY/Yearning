@@ -74,7 +74,7 @@ CREATE TABLE `core_account` (
   `date_joined` datetime(6) NOT NULL,
   `group` varchar(40) COLLATE utf8_bin NOT NULL,
   `department` varchar(40) COLLATE utf8_bin NOT NULL,
-  `auth_group` varchar(100) COLLATE utf8_bin DEFAULT NULL,
+  `auth_group` longtext COLLATE utf8_bin DEFAULT NULL,
   `real_name` varchar(100) COLLATE utf8_bin DEFAULT '请添加真实姓名' NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `username` (`username`)

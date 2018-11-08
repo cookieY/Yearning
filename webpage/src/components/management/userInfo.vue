@@ -57,8 +57,7 @@
           <Table border :columns="columns6" :data="data5" stripe height="550"></Table>
         </div>
         <br>
-        <Page :total="pagenumber" show-elevator @on-change="splicpage" :page-size="10" ref="total"
-              :current="current_page"></Page>
+        <Page :total="pagenumber" show-elevator @on-change="splicpage" :page-size="10" ref="total"></Page>
       </Card>
     </Col>
 
@@ -233,7 +232,6 @@
           user: '0',
           base: '0'
         },
-        current_page: 1,
         con: [],
         columns6: [
           {
@@ -249,11 +247,6 @@
           {
             title: '姓名',
             key: 'real_name',
-            sortable: true
-          },
-          {
-            title: '权限组',
-            key: 'auth_group',
             sortable: true
           },
           {
@@ -617,7 +610,7 @@
           .then(res => {
             util.notice(res.data)
             this.editemail = false
-            this.current_page = 1
+            this.pagenumber = 1
             this.refreshuser()
             sessionStorage.setItem('real_name', this.real_name)
           })
@@ -714,6 +707,7 @@
             this.editAuthModal = false
             this.editAuthForm.authgroup = []
             this.refreshuser()
+            this.pagenumber = 1
           })
           .catch(error => {
             util.err_notice(error)
@@ -727,7 +721,7 @@
               util.notice(res.data)
               this.deluserModal = false
               this.confirmuser = ''
-              this.current_page = 1
+              this.pagenumber = 1
               this.refreshuser()
             })
             .catch(error => {

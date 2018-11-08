@@ -312,19 +312,19 @@ def push_message(message=None, type=None, user=None, to_addr=None, work_id=None,
     try:
         tag = globalpermissions.objects.filter(authorization='global').first()
         if tag.message['mail']:
-            put_mess = send_email.send_email(to_addr=to_addr, ssl=tag.message['ssl'])
-            put_mess.send_mail(mail_data=message, type=type)
+            try:
+                put_mess = send_email.send_email(to_addr=to_addr)
+                put_mess.send_mail(mail_data=message, type=type)
+            except:
+                pass
+
+        if tag.message['ding']:
+            un_init = util.init_conf()
+            webhook = ast.literal_eval(un_init['message'])
+            util.dingding(content='查询申请通知\n工单编号:%s\n发起人:%s\n状态:%s' % (work_id, user, status),
+                          url=webhook['webhook'])
     except Exception as e:
         CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
-    else:
-        try:
-            if tag.message['ding']:
-                un_init = util.init_conf()
-                webhook = ast.literal_eval(un_init['message'])
-                util.dingding(content='查询申请通知\n工单编号:%s\n发起人:%s\n状态:%s' % (work_id, user, status),
-                              url=webhook['webhook'])
-        except ValueError as e:
-            CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
 
 
 class Query_order(baseview.SuperUserpermissions):

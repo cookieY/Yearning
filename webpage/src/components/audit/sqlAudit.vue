@@ -105,7 +105,7 @@
       </Form>
       <template v-if="auth === 'admin'">
         <p class="pa">SQL检查结果:</p>
-        <Table :columns="columnsName" :data="dataId" stripe border width="860" height="200"></Table>
+        <Table :columns="columnsName" :data="dataId" stripe border height="200"></Table>
       </template>
 
       <div slot="footer">
