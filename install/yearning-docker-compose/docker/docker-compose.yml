@@ -1,0 +1,44 @@
+version: '2'
+
+services:
+  db:
+    image: mysql:5.7
+    ports:
+      - 3306:3306
+    volumes:
+      - d://workspace/docker_share/mysql:/var/lib/mysql
+    environment:
+      - MYSQL_ROOT_PASSWORD=root
+    container_name: mysql
+    command:
+      mysqld --sql_mode="NO_AUTO_VALUE_ON_ZERO,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_AUTO_CREATE_USER,NO_ENGINE_SUBSTITUTION,PIPES_AS_CONCAT,ANSI_QUOTES"
+    network_mode: bridge
+    restart: always
+
+  inception:
+    image: registry.cn-hangzhou.aliyuncs.com/lihuanhuan/inception
+    ports:
+      - 6669:6669
+    volumes:
+      - d://workspace/github/Yearning/install/yearning-docker-compose/docker/etc/inception/inc.cnf:/etc/inc.cnf
+    network_mode: bridge
+    restart: always
+    container_name: inception
+
+  yearning:
+    image: registry.cn-hangzhou.aliyuncs.com/cookie/yearning:v1.3.3
+    depends_on: 
+      - db
+    ports:
+      - "8080:80"
+      - "8000:8000"
+    environment:
+      HOST: localhost
+      MYSQL_PASSWORD: yearning
+      MYSQL_USER: root
+      MYSQL_ADDR: db
+    network_mode: bridge
+    restart: always
+
+# 默认账号：admin，默认密码：Yearning_admin
+# 感谢 eacdy 张功震 贡献

@@ -1,0 +1,24 @@
+[inception]
+general_log=1
+general_log_file= /var/log/inception.log
+port=6669
+character-set-client-handshake=0
+character-set-server=utf8
+
+inception_remote_backup_host=10.107.28.64
+inception_remote_backup_port=3306
+inception_remote_system_user=root
+inception_remote_system_password=root
+inception_support_charset=utf8mb4,utf8
+inception_enable_nullable=1
+inception_check_primary_key=1
+inception_check_column_comment=1
+inception_check_table_comment=1
+inception_enable_blob_type=1
+inception_check_column_default_value=0
+inception_enable_autoincrement_unsigned=0
+
+inception_enable_column_charset=on
+inception_enable_identifer_keyword=on
+inception_max_update_rows=1000000
+inception_osc_on=0

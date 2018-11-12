@@ -125,8 +125,8 @@ LOGGING = {
     'disable_existing_loggers': True,
     'formatters': {
         'standard': {
-            'format': '%(asctime)s [%(threadName)s:%(thread)d] \
-                      [%(name)s:%(lineno)d] [%(levelname)s]- %(message)s'}
+            'format': '%(asctime)s [%(threadName)s:%(thread)d] ' + \
+            '[%(name)s:%(lineno)d] [%(levelname)s]- %(message)s'}
         # 日志格式
     },
     'filters': {
@@ -161,8 +161,8 @@ LOGGING = {
             'propagate': False
         },
         'Yearning.core.views': {
-            'handlers': ['error'],
-            'level': 'ERROR',
+            'handlers': ['error', 'console'],
+            'level': 'DEBUG',
             'propagate': True
         }
 

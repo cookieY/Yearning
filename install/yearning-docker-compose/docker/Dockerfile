@@ -134,8 +134,8 @@ RUN apk add --no-cache git musl-dev libffi-dev openssl-dev gcc libxml2-dev libxs
 		&& mkdir -p /opt && cd /opt \
 		&& git clone https://github.com/DoNobody/Yearning.git \
 		&& cd /opt/Yearning/src && pip3 install -r requirements.txt \
-		&& sed -i "s/\(.*\)int(self\.server_version\.split('\.', 1)\[0\]) >= 5\(.*\/\1int(self\.server_version\.split('\.', 1)\[0\]) >= 5 or self\.server_version\.split('\.', 1)\[0\] == 'Inception2'\2/g" /usr/local/lib/python3.6/site-packages/pymysql/connections.py \
-		&& sed -i "/defer_warnings/{n;s/self\._show_warnings()/pass/g}" /usr/local/lib/python3.6/site-packages/pymysql/cursors.py \
+		&& sed -i "s#\(.*\)int(self\.server_version\.split('\.', 1)\[0\]) >= 5\(.*\)#\1int(self\.server_version\.split('\.', 1)\[0\]) >= 5 or self\.server_version\.split('\.', 1)\[0\] == 'Inception2'\2#g" /usr/local/lib/python3.6/site-packages/pymysql/connections.py \
+		&& sed -i "#defer_warnings#{n;s/self\._show_warnings()#pass#g}" /usr/local/lib/python3.6/site-packages/pymysql/cursors.py \
 		&& cp -rf /opt/Yearning/webpage/dist/* /usr/share/nginx/html/ \
 		&& mv deploy.conf.template deploy.conf \
 		&& chmod 755 /opt/Yearning/install/start_yearning.sh

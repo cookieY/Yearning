@@ -96,7 +96,7 @@ def test_auth(username, password, host, type, sc, domain, ou):
         user=user,
         password=password)
     ret = c.bind()
-    if not ret:
+    if ret:
         if ou:
             res = c.search(
                 search_base=sc,
@@ -156,7 +156,7 @@ def auth(username, password):
         user=user,
         password=LDAP_ADMIN_PASS)
     ret = c.bind()
-    if not ret:
+    if ret:
         if ldap['ou']:
             res = c.search(
                 search_base=SEARCH_BASE,
@@ -201,3 +201,4 @@ def init_conf():
         res = f.query_info("select * from core_globalpermissions where authorization = 'global'")
 
     return res[0]
+
