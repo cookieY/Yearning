@@ -106,4 +106,25 @@ util.taglist = function (vm, name) {
   localStorage.setItem('pageOpenedList', JSON.stringify(vm.$store.state.pageOpenedList))
 }
 
+util.filternode = function (node, key) {
+  let result = null
+  if (node.title.toLowerCase().indexOf(key.toLowerCase()) !== -1) {
+    result = node
+  } else if (node.children) {
+    let childs = []
+    for (let child of node.children) {
+      let childnode = util.filternode(child, key)
+      childnode && childs.push(childnode)
+    }
+    if (childs.length !== 0) {
+      if (!result) {
+        result = node
+      }
+      result.children = childs
+      result.expand = true
+    }
+  }
+  return result
+}
+
 export default util

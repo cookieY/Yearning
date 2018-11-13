@@ -7,7 +7,7 @@
     word-break: break-all;
     overflow-y: scroll;
     overflow-x: scroll;
-    min-height: 600px;
+    height: 680px;
   }
 </style>
 
@@ -16,10 +16,10 @@
     <Row>
       <Col span="6">
         <Card>
-          <p slot="title">
-            <Icon type="ios-redo"></Icon>
-            选择数据库
-          </p>
+          <div>
+            <Icon type="ios-search"></Icon>
+            <input type="text" placeholder="选择数据" class="ivu-input" style="width:90%" v-model="searchkey" value="searchkey"/>
+          </div>
           <div class="edittable-test-con">
             <div id="showImage" class="margin-bottom-10">
               <div class="tree">
@@ -64,6 +64,7 @@
   import util from '../../libs/util'
   import Csv from '../../../node_modules/iview/src/utils/csv'
   import ExportCsv from '../../../node_modules/iview/src/components/table/export-csv'
+  const _ = require('lodash')
 
   const exportcsv = function exportCsv (params) {
     if (params.filename) {
@@ -122,7 +123,8 @@
           tablename: ''
         },
         export_data: false,
-        wordList: []
+        wordList: [],
+        searchkey: ''
       }
     },
     methods: {
@@ -238,6 +240,18 @@
         this.$router.push({
           name: 'serach-sql'
         })
+      },
+      keyfilter () {
+        if (this.searchkey.length !== 0) {
+          let tdata = JSON.parse(JSON.stringify(this.data2))
+          this.data1 = []
+          for (let node of tdata) {
+            let tnode = util.filternode(node, this.searchkey)
+            tnode && this.data1.push(tnode)
+          }
+        } else {
+          this.data1 = JSON.parse(JSON.stringify(this.data2))
+        }
       }
     },
     mounted () {
@@ -251,6 +265,7 @@
             axios.put(`${util.url}/query_worklf`, {'mode': 'info'})
               .then(res => {
                 this.data1 = JSON.parse(res.data['info'])
+                this.data2 = JSON.parse(res.data['info'])
                 let tWord = util.highlight.split('|')
                 for (let i of tWord) {
                   this.wordList.push({'vl': i, 'meta': '关键字'})
@@ -260,6 +275,14 @@
               })
           }
         })
+    },
+    watch: {
+      searchkey: function (newkey, oldkey) {
+        this.debouncedFilter()
+      }
+    },
+    created: function () {
+      this.debouncedFilter = _.debounce(this.keyfilter, 500)
     }
   }
 </script>
