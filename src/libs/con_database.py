@@ -105,6 +105,14 @@ class SQLgo(object):
                         break
         return td
 
+    def get_create_sql(self, table_name):
+        with self.con.cursor() as cursor:
+            sqllist = 'show create table %s.%s;' % (self.db, table_name)
+            cursor.execute(sqllist)
+            result = cursor.fetchall()[0][1]
+        return result
+
+
     def index(self, table_name):
         with self.con.cursor() as cursor:
             cursor.execute('show keys from %s' % table_name)

@@ -105,6 +105,9 @@
                 <edittable refs="table2" v-model="TableDataNew" :columns-list="tabcolumns" @index="remove"
                            @on-change="cell_change"></edittable>
               </TabPane>
+              <TabPane label="建表语句" name="order5" icon="md-crop">
+                <p v-html="TableCreateSql"></p>
+              </TabPane>
             </Tabs>
           </div>
         </Card>
@@ -183,6 +186,7 @@
         basename: [],
         sqlname: [],
         TableDataNew: [],
+        TableCreateSql: [],
         tableform: {
           sqlname: [],
           basename: [],
@@ -535,7 +539,8 @@
               'id': this.id[0].id
             })
               .then(res => {
-                this.TableDataNew = res.data
+                this.TableDataNew = res.data.field
+                this.TableCreateSql = res.data.sql.replace(/\n/g, '<br>')
                 this.$Spin.hide()
               })
               .catch(() => {

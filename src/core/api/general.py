@@ -155,8 +155,9 @@ class addressing(baseview.BaseView):
                             port=_connection.port,
                             db=basename
                     ) as f:
-                        res = f.gen_alter(table_name=table)
-                        return Response(res)
+                        field = f.gen_alter(table_name=table)
+                        sql = f.get_create_sql(table_name=table)
+                        return Response({"field":field,"sql":sql})
                 except Exception as e:
                     CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
                     return HttpResponse(status=500)
