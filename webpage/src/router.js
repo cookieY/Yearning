@@ -61,6 +61,67 @@ export const page500 = {
   }
 }
 
+// 统一的main页面的child页面
+const mainchild = [
+  {
+    path: 'home',
+    title: '首页',
+    name: 'home_index',
+    component: resolve => {
+      require(['./components/home/home.vue'], resolve)
+    }
+  },
+  {
+    path: 'ownspace',
+    title: '个人中心',
+    name: 'ownspace_index',
+    component: resolve => {
+      require(['./components/personalCenter/own-space.vue'], resolve)
+    }
+  },
+  {
+    path: 'queryready',
+    title: '查询申请进度',
+    name: 'queryready',
+    component: resolve => {
+      require(['./components/search/submitPage.vue'], resolve)
+    }
+  },
+  {
+    path: 'querypage',
+    title: '查询',
+    name: 'querypage',
+    component: resolve => {
+      require(['./components/search/querySql.vue'], resolve)
+    }
+  },
+  {
+    path: 'querylist',
+    title: '查询审计详情',
+    name: 'querylist',
+    component: resolve => {
+      require(['./components/audit/expend.vue'], resolve)
+    }
+  },
+  {
+    path: 'orderlist',
+    title: '工单详情',
+    name: 'orderlist',
+    component: resolve => {
+      require(['./components/order/components/myorderList.vue'], resolve)
+    }
+  },
+  {
+    path: 'myorder',
+    name: 'myorder',
+    title: '我的工单',
+    'icon': 'person',
+    component: resolve => {
+      require(['./components/order/myOrder.vue'], resolve)
+    }
+  }
+]
+
 export const appRouter = [
   {
     path: '/',
@@ -70,22 +131,7 @@ export const appRouter = [
     component: Index,
     redirect: '/home',
     children: [
-      {
-        path: 'home',
-        title: '首页',
-        name: 'home_index',
-        component: resolve => {
-          require(['./components/home/home.vue'], resolve)
-        }
-      },
-      {
-        path: 'ownspace',
-        title: '个人中心',
-        name: 'ownspace_index',
-        component: resolve => {
-          require(['./components/personalCenter/own-space.vue'], resolve)
-        }
-      }
+      ...mainchild
     ]
   },
   {
@@ -264,111 +310,11 @@ export const appRouter = [
   }
 ]
 
-export const orderList = {
-  path: '/',
-  icon: 'home',
-  name: 'main',
-  title: '首页',
-  component: Index,
-  redirect: '/home',
-  children: [
-    {
-      path: 'orderlist',
-      title: '工单详情',
-      name: 'orderlist',
-      component: resolve => {
-        require(['./components/order/components/myorderList.vue'], resolve)
-      }
-    }
-  ]
-}
-
-export const queryList = {
-  path: '/',
-  icon: 'home',
-  name: 'main',
-  title: '首页',
-  component: Index,
-  redirect: '/home',
-  children: [
-    {
-      path: 'querylist',
-      title: '查询审计详情',
-      name: 'querylist',
-      component: resolve => {
-        require(['./components/audit/expend.vue'], resolve)
-      }
-    }
-  ]
-}
-
-export const querypage = {
-  path: '/',
-  icon: 'home',
-  name: 'main',
-  title: '首页',
-  component: Index,
-  redirect: '/home',
-  children: [
-    {
-      path: 'querypage',
-      title: '查询',
-      name: 'querypage',
-      component: resolve => {
-        require(['./components/search/querySql.vue'], resolve)
-      }
-    }
-  ]
-}
-
-export const queryready = {
-  path: '/',
-  icon: 'home',
-  name: 'main',
-  title: '首页',
-  component: Index,
-  redirect: '/home',
-  children: [
-    {
-      path: 'queryready',
-      title: '查询申请进度',
-      name: 'queryready',
-      component: resolve => {
-        require(['./components/search/submitPage.vue'], resolve)
-      }
-    }
-  ]
-}
-
-export const myorder = {
-  path: '/',
-  icon: 'home',
-  name: 'main',
-  title: '首页',
-  component: Index,
-  redirect: '/home',
-  children: [
-    {
-      path: 'myorder',
-      name: 'myorder',
-      title: '我的工单',
-      'icon': 'person',
-      component: resolve => {
-        require(['./components/order/myOrder.vue'], resolve)
-      }
-    }
-  ]
-}
 export const MainRoute = [
   loginRouter,
   locking,
   ...appRouter,
-  orderList,
-  queryList,
-  queryready,
-  querypage,
   version,
-  myorder,
   page404,
   page401,
   page500

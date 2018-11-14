@@ -48,7 +48,7 @@
             <br>
             <Tabs value="order1" style="height: 300px;overflow-y: scroll;">
               <TabPane label="生成语句" name="order1">
-                <p v-for="list in sql" style="font-size: 12px;color:#2b85e4"> {{ list }}<br><br></p>
+                <p v-for="list in sql" :key="list + '-order1'" style="font-size: 12px;color:#2b85e4"> {{ list }}<br><br></p>
               </TabPane>
               <TabPane label="提交工单" name="order2">
                 <Button type="primary" style="margin-left: 25%;margin-top: 20%;" @click.native="orderswitch"
@@ -104,7 +104,7 @@
               <p>{{formItem.tablename}}</p>
             </FormItem>
             <FormItem label="执行SQL:">
-              <p v-for="i in sql">{{i}}</p>
+              <p v-for="i in sql" :key="i + '-step-form'">{{i}}</p>
             </FormItem>
             <FormItem label="工单提交说明:" required>
               <Input v-model="formItem.text" placeholder="请输入工单说明"></Input>

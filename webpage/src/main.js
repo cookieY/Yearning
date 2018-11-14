@@ -20,6 +20,7 @@ Vue.use(VueRouter)
 Vue.prototype.$http = axios
 /* eslint-disable no-new */
 const RouterConfig = {
+  mode: 'history',
   routes: MainRoute
 }
 

@@ -93,9 +93,9 @@ util.taglist = function (vm, name) {
       vm.$store.state.pageOpenedList.splice(index, 1)
     }
   })
-  if (name === 'myorder') {
-    vm.$store.state.pageOpenedList.push({'title': '我的工单', 'name': 'myorder'})
-  }
+  // if (name === 'myorder') {
+  //   vm.$store.state.pageOpenedList.push({'title': '我的工单', 'name': 'myorder'})
+  // }
   appRouter.forEach((val) => {
     for (let i of val.children) {
       if (i.name === name && name !== 'home_index') {
