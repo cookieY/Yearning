@@ -47,15 +47,15 @@ class search(baseview.BaseView):
         un_init = util.init_conf()
         limit = ast.literal_eval(un_init['other'])
         sql = request.data['sql']
+        address = json.loads(request.data['address'])
         check = str(sql).strip().split(';\n')
-        user = query_order.objects.filter(username=request.user).order_by('-id').first()
+        user = query_order.objects.filter(username=request.user, connection_name=address['dbcon'], query_per=1).first()
         un_init = util.init_conf()
         custom_com = ast.literal_eval(un_init['other'])
-        if user.query_per == 1:
+        if user:
             if check[-1].strip().lower().startswith('s') != 1:
                 return Response('只支持查询功能或删除不必要的空白行！')
             else:
-                address = json.loads(request.data['address'])
                 _c = DatabaseList.objects.filter(
                     connection_name=user.connection_name,
                     computer_room=user.computer_room
@@ -99,7 +99,8 @@ class search(baseview.BaseView):
     def put(self, request, args: str = None):
         base = request.data['base']
         table = request.data['table']
-        query_per = query_order.objects.filter(username=request.user).order_by('-id').first()
+        dbcon = request.data['dbcon']
+        query_per = query_order.objects.filter(username=request.user, connection_name=dbcon, query_per=1).first()
         if query_per.query_per == 1:
             _c = DatabaseList.objects.filter(
                 connection_name=query_per.connection_name,
@@ -113,7 +114,7 @@ class search(baseview.BaseView):
                         port=_c.port,
                         db=base
                 ) as f:
-                    data_set = f.search(sql='desc %s' % table)
+                    data_set = f.search(sql='desc `%s`' % table)
                 return Response(data_set)
             except:
                 return Response('')
@@ -247,59 +248,67 @@ class query_worklf(baseview.BaseView):
 
         elif request.data['mode'] == 'status':
             try:
-                status = query_order.objects.filter(username=request.user).order_by('-id').first()
-                return Response(status.query_per)
+                status = query_order.objects.filter(username=request.user, query_per=1).order_by('-id').first()
+                if status:
+                    return Response(status.query_per)
+                else:
+                    status = query_order.objects.filter(username=request.user, query_per=2).order_by('-id').first()
+                    return Response(status.query_per)
             except:
                 return Response(0)
 
         elif request.data['mode'] == 'end':
             try:
-                query_order.objects.filter(username=request.data['username']).order_by('-id').update(query_per=3)
+                query_order.objects.filter(work_id=request.data['work_id']).update(query_per=3)
                 return Response('已结束查询！')
             except Exception as e:
                 return HttpResponse(e)
 
         elif request.data['mode'] == 'info':
-            tablelist = []
+            data = []
             highlist = []
-            database = query_order.objects.filter(username=request.user).order_by('-id').first()
-            _connection = DatabaseList.objects.filter(connection_name=database.connection_name).first()
-            with con_database.SQLgo(ip=_connection.ip,
-                                    user=_connection.username,
-                                    password=_connection.password,
-                                    port=_connection.port) as f:
-                dataname = f.query_info(sql='show databases')
-            children = []
-            ignore = exclued_db_list()
-            for index, uc in sorted(enumerate(dataname), reverse=True):
-                for cc in ignore:
-                    if uc['Database'] == cc:
-                        del dataname[index]
-            for i in dataname:
+            databaseSet = query_order.objects.filter(username=request.user, query_per=1).all()
+            for dbcon in databaseSet:
+                tablelist = []
+                _connection = DatabaseList.objects.filter(connection_name=dbcon.connection_name).first()
                 with con_database.SQLgo(ip=_connection.ip,
                                         user=_connection.username,
                                         password=_connection.password,
-                                        port=_connection.port,
-                                        db=i['Database']) as f:
-                    tablename = f.query_info(sql='show tables')
-                highlist.append({'vl': i['Database'], 'meta': '库名'})
-                for c in tablename:
-                    key = 'Tables_in_%s' % i['Database']
-                    highlist.append({'vl': c[key], 'meta': '表名'})
-                    children.append({
-                        'title': c[key]
-                    })
-                tablelist.append({
-                    'title': i['Database'],
-                    'children': children
-                })
+                                        port=_connection.port) as f:
+                    dataname = f.query_info(sql='show databases')
                 children = []
-            data = [{
-                'title': database.connection_name,
-                'expand': 'true',
-                'children': tablelist
-            }]
-            return Response({'info': json.dumps(data), 'status': database.export, 'highlight': highlist})
+                ignore = exclued_db_list()
+                for index, uc in sorted(enumerate(dataname), reverse=True):
+                    for cc in ignore:
+                        if uc['Database'] == cc:
+                            del dataname[index]
+                for i in dataname:
+                    with con_database.SQLgo(ip=_connection.ip,
+                                            user=_connection.username,
+                                            password=_connection.password,
+                                            port=_connection.port,
+                                            db=i['Database']) as f:
+                        tablename = f.query_info(sql='show tables')
+                    highlist.append({'vl': i['Database'], 'meta': '库名'})
+                    for c in tablename:
+                        key = 'Tables_in_%s' % i['Database']
+                        highlist.append({'vl': c[key], 'meta': '表名'})
+                        children.append({
+                            'title': c[key]
+                        })
+                    tablelist.append({
+                        'title': i['Database'],
+                        'children': children
+                    })
+                    children = []
+                db_info_tree = {
+                    'title': dbcon.connection_name,
+                    'expand': 'true',
+                    'children': tablelist,
+                    'export': dbcon.export
+                }
+                data.append(db_info_tree)
+            return Response({'info': json.dumps(data), 'status': 'status', 'highlight': highlist})
 
     def delete(self, request, args: str = None):
 

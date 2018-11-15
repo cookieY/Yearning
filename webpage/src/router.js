@@ -84,15 +84,16 @@ const mainchild = [
     title: '查询申请进度',
     name: 'queryready',
     component: resolve => {
-      require(['./components/search/submitPage.vue'], resolve)
+      require(['./components/search/queryPerms.vue'], resolve)
     }
   },
   {
-    path: 'querypage',
-    title: '查询',
-    name: 'querypage',
+    path: 'serach-perm',
+    name: 'serach-perm',
+    title: 'SQL查询',
+    'icon': 'ios-podium',
     component: resolve => {
-      require(['./components/search/querySql.vue'], resolve)
+      require(['./components/search/workFlow.vue'], resolve)
     }
   },
   {
@@ -178,6 +179,14 @@ export const appRouter = [
     component: Index,
     children: [
       {
+        path: 'querypage',
+        title: 'SQL查询',
+        name: 'querypage',
+        component: resolve => {
+          require(['./components/search/querySql.vue'], resolve)
+        }
+      },
+      {
         path: 'view-dml',
         name: 'view-dml',
         title: '数据库字典',
@@ -185,16 +194,8 @@ export const appRouter = [
         component: resolve => {
           require(['./components/search/databaseDic.vue'], resolve)
         }
-      },
-      {
-        path: 'serach-sql',
-        name: 'serach-sql',
-        title: 'SQL查询',
-        'icon': 'ios-podium',
-        component: resolve => {
-          require(['./components/search/workFlow.vue'], resolve)
-        }
       }
+
     ]
   },
   {

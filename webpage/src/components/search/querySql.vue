@@ -32,26 +32,30 @@
       </Col>
       <Col span="18" class="padding-left-10">
         <Card>
-          <p slot="title">
-            <Icon type="ios-crop-strong"></Icon>
-            填写sql语句
-          </p>
-          <editor v-model="formItem.textarea" @init="editorInit" @setCompletions="setCompletions"></editor>
-          <br>
-          <p>当前选择的库: {{put_info.base}}</p>
-          <br>
-          <Button type="error" icon="md-trash" @click.native="ClearForm()">清除</Button>
-          <Button type="info" icon="md-brush" @click.native="beautify()">美化</Button>
-          <Button type="success" icon="ios-redo" @click.native="Search_sql()">查询</Button>
-          <Button type="primary" icon="ios-cloud-download" @click.native="exportdata()" v-if="export_data">导出查询数据
-          </Button>
-          <Button type="error" icon="md-backspace" @click.native="End_sql()">结束会话</Button>
-          <br>
-          <br>
-          <p>查询结果:</p>
-          <Table :columns="columnsName" :data="Testresults" highlight-row ref="table"></Table>
-          <br>
-          <Page :total="total" show-total @on-change="splice_arr" ref="totol"></Page>
+            <p slot="title">
+              <Icon type="ios-crop-strong"></Icon>
+              填写sql语句
+            </p>
+            <a type="primary" icon="md-add" @click="search_perm()" slot="extra">
+              <Icon type="md-add-circle"></Icon>
+              查询权限
+            </a>
+            <editor v-model="formItem.textarea" @init="editorInit" @setCompletions="setCompletions"></editor>
+            <br>
+            <p>当前选择的库: {{put_info.base}}</p>
+            <br>
+            <Button type="error" icon="md-trash" @click.native="ClearForm()">清除</Button>
+            <Button type="info" icon="md-brush" @click.native="beautify()">美化</Button>
+            <Button type="success" icon="ios-redo" @click.native="Search_sql()">查询</Button>
+            <Button type="primary" icon="ios-cloud-download" @click.native="exportdata()" v-if="export_data">导出查询数据
+            </Button>
+            <Button type="error" icon="md-backspace" @click.native="End_sql()">结束会话</Button>
+            <br>
+            <br>
+            <p>查询结果:</p>
+            <Table :columns="columnsName" :data="Testresults" highlight-row ref="table"></Table>
+            <br>
+            <Page :total="total" show-total @on-change="splice_arr" ref="totol"></Page>
         </Card>
       </Col>
     </Row>
@@ -120,7 +124,8 @@
         allsearchdata: [],
         put_info: {
           base: '',
-          tablename: ''
+          tablename: '',
+          dbcon: ''
         },
         export_data: false,
         wordList: [],
@@ -145,14 +150,18 @@
         }
       },
       Getbasename (vl) {
-        for (let i of this.data1[0].children) {
-          for (let c of i.children) {
-            if (c.title === vl[0].title && c.nodeKey === vl[0].nodeKey) {
-              this.put_info.base = i.title
+        for (let c of this.data1) {
+          for (let i of c.children) {
+            for (let t of i.children) {
+              if (t.title === vl[0].title && t.nodeKey === vl[0].nodeKey) {
+                this.put_info.base = i.title
+                this.put_info.dbcon = c.title
+              }
             }
           }
         }
-        axios.put(`${util.url}/search`, {'base': this.put_info.base, 'table': vl[0].title})
+
+        axios.put(`${util.url}/search`, {'base': this.put_info.base, 'table': vl[0].title, 'dbcon': this.put_info.dbcon})
           .then(res => {
             if (res.data['error']) {
               util.err_notice(res.data['error'])
@@ -207,6 +216,7 @@
           }
         })
         let address = {
+          'dbcon': this.put_info.dbcon,
           'basename': this.put_info.base
         }
         axios.post(`${util.url}/search`, {
@@ -238,7 +248,12 @@
           .then(res => util.notice(res.data))
           .catch(err => util.err_notice(err))
         this.$router.push({
-          name: 'serach-sql'
+          name: 'serach-perm'
+        })
+      },
+      search_perm () {
+        this.$router.push({
+          name: 'queryready'
         })
       },
       keyfilter () {
@@ -257,11 +272,11 @@
     mounted () {
       axios.put(`${util.url}/query_worklf`, {'mode': 'status'})
         .then(res => {
-          if (res.data !== 1) {
+          if (res.data === 2) {
             this.$router.push({
-              name: 'serach-sql'
+              name: 'queryready'
             })
-          } else {
+          } else if (res.data === 1) {
             axios.put(`${util.url}/query_worklf`, {'mode': 'info'})
               .then(res => {
                 this.data1 = JSON.parse(res.data['info'])
@@ -271,8 +286,12 @@
                   this.wordList.push({'vl': i, 'meta': '关键字'})
                 }
                 this.wordList = this.wordList.concat(res.data.highlight)
-                res.data['status'] === 1 ? this.export_data = true : this.export_data = false
+                // res.data['status'] === 1 ? this.export_data = true : this.export_data = false
               })
+          } else {
+            this.$router.push({
+              name: 'serach-perm'
+            })
           }
         })
     },

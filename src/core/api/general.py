@@ -45,6 +45,7 @@ class addressing(baseview.BaseView):
                     con_name = []
                     permission_spec = set_auth_group(request.user)
                     if permission_spec['query'] == '1':
+                        # 过滤
                         for i in permission_spec['querycon']:
                             con_instance = DatabaseList.objects.filter(connection_name=i).first()
                             if con_instance:

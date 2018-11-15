@@ -66,7 +66,7 @@
           'dmledit': '',
           'indexedit': '',
           'view-dml': '',
-          'serach-sql': '1',
+          'querypage': '1',
           'management-user': '',
           'management-database': '',
           'audit-audit': '1',

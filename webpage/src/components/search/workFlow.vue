@@ -56,6 +56,7 @@
               </FormItem>
               <FormItem label="">
                 <Button @click="handleSubmit" style="width:100px;" type="primary">提交</Button>
+                <Button @click="handleCancel" style="width:100px;" type="error">取消</Button>
               </FormItem>
             </Form>
           </i-col>
@@ -174,6 +175,11 @@
               })
           }
         })
+      },
+      handleCancel () {
+        this.$router.push({
+          name: 'querypage'
+        })
       }
     },
     mounted () {
@@ -186,18 +192,18 @@
         .catch(error => {
           util.err_notice(error)
         })
-      axios.put(`${util.url}/query_worklf`, {'mode': 'status'})
-        .then(res => {
-          if (res.data === 1) {
-            this.$router.push({
-              name: 'querypage'
-            })
-          } else if (res.data === 2) {
-            this.$router.push({
-              name: 'queryready'
-            })
-          }
-        })
+      // axios.put(`${util.url}/query_worklf`, {'mode': 'status'})
+      //   .then(res => {
+      //     if (res.data === 1) {
+      //       this.$router.push({
+      //         name: 'querypage'
+      //       })
+      //     } else if (res.data === 2) {
+      //       this.$router.push({
+      //         name: 'queryready'
+      //       })
+      //     }
+      //   })
     }
   }
 </script>

@@ -4,21 +4,17 @@
       <Card>
         <p slot="title">
           <Icon type="md-person"></Icon>
-          查询审核
+          查询申请
         </p>
+        <a type="primary" icon="md-add" @click="add_query_perm()" slot="extra">
+          <Icon type="md-add-circle"></Icon>
+          添加其他权限
+        </a>
         <Row>
           <Col span="24">
-            <Poptip
-              confirm
-              title="您确认删除这些工单信息吗?"
-              @on-ok="delrecordData"
-            >
-              <Button type="text" style="margin-left: -1%">删除记录</Button>
-            </Poptip>
             <Table border :columns="permissoncolums" :data="query_info" stripe ref="selection"
                    @on-selection-change="delrecordList"></Table>
             <br>
-            <Page :total="per_pn" show-elevator @on-change="permisson_list" :page-size="20" ref="perpage"></Page>
           </Col>
         </Row>
       </Card>
@@ -50,9 +46,7 @@
         </FormItem>
       </Form>
       <div slot="footer">
-        <Button type="primary" @click="editInfodModal=false">取消</Button>
-        <Button type="error" @click="reject" v-if="query.query_per === 2">驳回</Button>
-        <Button type="success" @click="savedata" v-if="query.query_per === 2">同意</Button>
+        <Button type="primary" @click="editInfodModal=false">关闭</Button>
       </div>
     </Modal>
 
@@ -64,16 +58,11 @@
   import util from '../../libs/util'
 
   export default {
-    name: 'Query_audit',
+    name: 'submit_Page',
     data () {
       return {
         query_info: [],
         permissoncolums: [
-          {
-            type: 'selection',
-            width: 60,
-            align: 'center'
-          },
           {
             title: '申请编号',
             key: 'work_id'
@@ -120,9 +109,9 @@
             },
             sortable: true,
             filters: [{
-              label: '同意',
-              value: 1
-            },
+                label: '同意',
+                value: 1
+              },
               {
                 label: '驳回',
                 value: 0
@@ -208,70 +197,32 @@
       permisson_list (vl = 1) {
         axios.get(`${util.url}/query_order?page=${vl}`)
           .then(res => {
-            this.query_info = res.data['data']
+            this.query_info = res.data['data'].filter(item => (item.query_per === 1 || item.query_per === 2))
             this.per_pn = res.data['pn']
           })
           .catch(error => {
             util.err_notice(error)
           })
       },
-      delrecordData () {
-        axios.post(`${util.url}/query_order/`, {'work_id': JSON.stringify(this.delrecord)})
-          .then(res => {
-            util.notice(res.data)
-            this.$refs.perpage.currentPage = 1
-            this.permisson_list()
-          })
-          .catch(error => {
-            util.err_notice(error)
-          })
-      },
-      delrecordList (vl) {
-        this.delrecord = vl.map(vl => vl.work_id)
-      },
       modalinfo (vl) {
         this.editInfodModal = true
         this.query = vl
       },
-      savedata () {
-        axios.put(`${util.url}/query_worklf/`,
-          {
-            'mode': 'agree',
-            'work_id': this.query.work_id
-          })
-          .then(res => {
-            util.notice(res.data)
-            this.editInfodModal = false
-            this.$refs.perpage.currentPage = 1
-            this.permisson_list()
-          })
-          .catch(error => {
-            util.err_notice(error)
-          })
-      },
-      reject () {
-        axios.put(`${util.url}/query_worklf/`,
-          {
-            'mode': 'disagree',
-            'work_id': this.query.work_id
-          })
-          .then(res => {
-            util.notice(res.data)
-            this.editInfodModal = false
-            this.$refs.perpage.currentPage = 1
-            this.permisson_list()
-          })
-          .catch(error => {
-            util.err_notice(error)
-          })
-      },
       stop_query (vl) {
-        axios.put(`${util.url}/query_worklf`, {'mode': 'end', 'username': vl.username})
+        axios.put(`${util.url}/query_worklf`, {'mode': 'end', 'work_id': vl.work_id})
           .then(res => {
             util.notice(res.data)
             this.permisson_list()
           })
           .catch(err => util.err_notice(err))
+        this.$router.push({
+          name: 'querypage'
+        })
+      },
+      add_query_perm () {
+        this.$router.push({
+          name: 'serach-perm'
+        })
       }
     },
     mounted () {
