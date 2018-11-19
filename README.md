@@ -17,14 +17,6 @@
 
 [www.yearning.io](http://yearning.io)
 
-Yearning 入选2018年度最受欢迎中国开源软件评选
-
-如果觉得yearning能够帮助到你的工作，请投yearning一票吧
-
-以下是投票地址：
-[https://www.oschina.net/project/top_cn_2018](https://www.oschina.net/project/top_cn_2018)
-
-
 ## Feature 功能
 
 - 数据库字典自动生成
