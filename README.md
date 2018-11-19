@@ -5,7 +5,7 @@
 # Yearning SQL审核平台
 
 ![](https://img.shields.io/badge/build-release-brightgreen.svg)  
-![](https://img.shields.io/badge/version-v1.3.3-brightgreen.svg)  
+![](https://img.shields.io/badge/version-v1.3.4-brightgreen.svg)  
 ![](https://img.shields.io/badge/vue.js-2.5.13-brightgreen.svg) 
 ![](https://img.shields.io/badge/iview-3.1.0-brightgreen.svg?style=flat-square) 
 ![](https://img.shields.io/badge/python-3.6-brightgreen.svg)
@@ -16,6 +16,13 @@
 ## Website 官网
 
 [www.yearning.io](http://yearning.io)
+
+Yearning 入选2018年度最受欢迎中国开源软件评选
+
+如果觉得yearning能够帮助到你的工作，请投yearning一票吧
+
+以下是投票地址：
+[https://www.oschina.net/project/top_cn_2018](https://www.oschina.net/project/top_cn_2018)
 
 ## Feature 功能
 

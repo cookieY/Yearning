@@ -249,7 +249,8 @@
           sc: '',
           domain: '',
           user: '',
-          password: ''
+          password: '',
+          ou: null
         },
         message: {
           webhook: '',
