@@ -101,7 +101,7 @@ class search(baseview.BaseView):
         table = request.data['table']
         dbcon = request.data['dbcon']
         query_per = query_order.objects.filter(username=request.user, connection_name=dbcon, query_per=1).first()
-        if query_per.query_per == 1:
+        if query_per and query_per.query_per == 1:
             _c = DatabaseList.objects.filter(
                 connection_name=query_per.connection_name,
                 computer_room=query_per.computer_room

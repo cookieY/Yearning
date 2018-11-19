@@ -32,30 +32,21 @@
       </Col>
       <Col span="18" class="padding-left-10">
         <Card>
-            <p slot="title">
-              <Icon type="ios-crop-strong"></Icon>
-              填写sql语句
-            </p>
-            <a type="primary" icon="md-add" @click="search_perm()" slot="extra">
-              <Icon type="md-add-circle"></Icon>
-              查询权限
-            </a>
-            <editor v-model="formItem.textarea" @init="editorInit" @setCompletions="setCompletions"></editor>
-            <br>
-            <p>当前选择的库: {{put_info.base}}</p>
-            <br>
+          <div slot="title">
             <Button type="error" icon="md-trash" @click.native="ClearForm()">清除</Button>
             <Button type="info" icon="md-brush" @click.native="beautify()">美化</Button>
             <Button type="success" icon="ios-redo" @click.native="Search_sql()">查询</Button>
-            <Button type="primary" icon="ios-cloud-download" @click.native="exportdata()" v-if="export_data">导出查询数据
-            </Button>
+            <Button type="primary" icon="ios-cloud-download" @click.native="exportdata()" v-if="export_data">导出查询数据</Button>
             <Button type="error" icon="md-backspace" @click.native="End_sql()">结束会话</Button>
-            <br>
-            <br>
-            <p>查询结果:</p>
-            <Table :columns="columnsName" :data="Testresults" highlight-row ref="table"></Table>
-            <br>
-            <Page :total="total" show-total @on-change="splice_arr" ref="totol"></Page>
+            <span>
+              当前选择的库: {{put_info.base}}
+            </span>
+          </div>
+          <Button type="primary" icon="md-add" @click="search_perm()" slot="extra">查询权限</Button>
+          <editor v-model="formItem.textarea" @init="editorInit" @setCompletions="setCompletions" value="请输入SQL"></editor>
+          <br>
+          <Table :columns="columnsName" :data="Testresults" highlight-row ref="table" stripe></Table>
+          <Page :total="total" show-total @on-change="splice_arr" ref="totol"></Page>
         </Card>
       </Col>
     </Row>
@@ -149,19 +140,43 @@
           this.put_info.base = vl.title
         }
       },
+      matchNode (node, vl) {
+        return (node.title === vl[0].title && node.nodeKey === vl[0].nodeKey)
+      },
       Getbasename (vl) {
-        for (let c of this.data1) {
-          for (let i of c.children) {
-            for (let t of i.children) {
-              if (t.title === vl[0].title && t.nodeKey === vl[0].nodeKey) {
-                this.put_info.base = i.title
+        this.put_info.base = ''
+        this.put_info.dbcon = ''
+        this.put_info.tablename = ''
+        // 使用抛出异常快速退出
+        try {
+          for (let c of this.data1) {
+            if (this.matchNode(c, vl)) {
+              this.put_info.dbcon = c.title
+              throw Error('custom_return')
+            }
+            for (let i of c.children) {
+              if (this.matchNode(i, vl)) {
                 this.put_info.dbcon = c.title
+                this.put_info.base = i.title
+                throw Error('custom_return')
+              }
+              for (let t of i.children) {
+                if (this.matchNode(t, vl)) {
+                  this.put_info.base = i.title
+                  this.put_info.dbcon = c.title
+                  this.put_info.tablename = t.title
+                  throw Error('custom_return')
+                }
               }
             }
           }
+        } catch (e) {
+          if (e.message !== 'custom_return') {
+            throw e
+          }
         }
-
-        axios.put(`${util.url}/search`, {'base': this.put_info.base, 'table': vl[0].title, 'dbcon': this.put_info.dbcon})
+        if (this.put_info.dbcon !== '' && this.put_info.base !== '' && this.put_info.tablename !== '') {
+          axios.put(`${util.url}/search`, {'base': this.put_info.base, 'table': this.put_info.tablename, 'dbcon': this.put_info.dbcon})
           .then(res => {
             if (res.data['error']) {
               util.err_notice(res.data['error'])
@@ -172,6 +187,12 @@
               this.total = res.data['len']
             }
           })
+        } else {
+          this.columnsName = []
+          this.allsearchdata = []
+          this.Testresults = []
+          this.total = 0
+        }
       },
       editorInit: function () {
         require('brace/mode/mysql')
