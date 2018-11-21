@@ -14,7 +14,7 @@
 <template>
   <div>
     <Row>
-      <Col span="6">
+      <Col span="4">
         <Card>
           <div>
             <Icon type="ios-search"></Icon>
@@ -30,24 +30,34 @@
           </div>
         </Card>
       </Col>
-      <Col span="18" class="padding-left-10">
-        <Card>
-          <div slot="title">
-            <Button type="error" icon="md-trash" @click.native="ClearForm()">清除</Button>
-            <Button type="info" icon="md-brush" @click.native="beautify()">美化</Button>
-            <Button type="success" icon="ios-redo" @click.native="Search_sql()">查询</Button>
-            <Button type="primary" icon="ios-cloud-download" @click.native="exportdata()" v-if="export_data">导出查询数据</Button>
-            <Button type="error" icon="md-backspace" @click.native="End_sql()">结束会话</Button>
-            <span>
-              当前选择的库: {{put_info.base}}
-            </span>
-          </div>
-          <Button type="primary" icon="md-add" @click="search_perm()" slot="extra">查询权限</Button>
-          <editor v-model="formItem.textarea" @init="editorInit" @setCompletions="setCompletions" value="请输入SQL"></editor>
-          <br>
-          <Table :columns="columnsName" :data="Testresults" highlight-row ref="table" stripe></Table>
-          <Page :total="total" show-total @on-change="splice_arr" ref="totol"></Page>
-        </Card>
+      <Col span="20" class="padding-left-10">
+          <Row>
+            <Card>
+              <div slot="title">
+                <Button type="error" icon="md-trash" @click.native="ClearForm()">清除</Button>
+                <Button type="info" icon="md-brush" @click.native="beautify()">美化</Button>
+                <Button type="success" icon="ios-redo" @click.native="Search_sql()">查询</Button>
+                <Button type="primary" icon="ios-cloud-download" @click.native="exportdata()" v-if="export_data">导出查询数据</Button>
+                <span>
+                  <b>当前选择的库:</b>
+                  <span v-if = "put_info.base">{{put_info.dbcon}} . {{put_info.base}}</span>
+                </span>
+              </div>
+              <Button type="primary" icon="md-add" @click="search_perm()" slot="extra">查询权限</Button>
+              <editor v-model="formItem.textarea" @init="editorInit" @setCompletions="setCompletions" value="请输入SQL"></editor>
+            </Card>
+          </Row>
+          <Row>
+            <Table :columns="columnsName"
+              :data="Testresults"
+              highlight-row
+              ref="table"
+              stripe
+              no-data-text="请输入SQL"
+              border
+              ></Table>
+            <Page :total="total" show-total show-sizer @on-change="splice_arr" @on-page-size-change="splice_len"  ref="totol"></Page>
+          </Row>
       </Col>
     </Row>
   </div>
@@ -120,7 +130,8 @@
         },
         export_data: false,
         wordList: [],
-        searchkey: ''
+        searchkey: '',
+        splice_length: 10
       }
     },
     methods: {
@@ -135,15 +146,10 @@
           }
         }))
       },
-      choseName (vl) {
-        if (vl.expand === true) {
-          this.put_info.base = vl.title
-        }
-      },
       matchNode (node, vl) {
-        return (node.title === vl[0].title && node.nodeKey === vl[0].nodeKey)
+        return (node.title === vl.title && node.nodeKey === vl.nodeKey)
       },
-      Getbasename (vl) {
+      choseName (vl) {
         this.put_info.base = ''
         this.put_info.dbcon = ''
         this.put_info.tablename = ''
@@ -175,23 +181,28 @@
             throw e
           }
         }
-        if (this.put_info.dbcon !== '' && this.put_info.base !== '' && this.put_info.tablename !== '') {
-          axios.put(`${util.url}/search`, {'base': this.put_info.base, 'table': this.put_info.tablename, 'dbcon': this.put_info.dbcon})
-          .then(res => {
-            if (res.data['error']) {
-              util.err_notice(res.data['error'])
-            } else {
-              this.columnsName = res.data['title']
-              this.allsearchdata = res.data['data']
-              this.Testresults = this.allsearchdata.slice(0, 10)
-              this.total = res.data['len']
-            }
-          })
-        } else {
-          this.columnsName = []
-          this.allsearchdata = []
-          this.Testresults = []
-          this.total = 0
+      },
+      Getbasename (vl) {
+        if (vl.length !== 0) {
+          this.choseName(vl[0])
+          if (this.put_info.dbcon !== '' && this.put_info.base !== '' && this.put_info.tablename !== '') {
+            axios.put(`${util.url}/search`, {'base': this.put_info.base, 'table': this.put_info.tablename, 'dbcon': this.put_info.dbcon})
+            .then(res => {
+              if (res.data['error']) {
+                util.err_notice(res.data['error'])
+              } else {
+                this.columnsName = res.data['title']
+                this.allsearchdata = res.data['data']
+                this.Testresults = this.allsearchdata.slice(0, this.splice_length)
+                this.total = res.data['len']
+              }
+            })
+          } else {
+            this.columnsName = []
+            this.allsearchdata = []
+            this.Testresults = []
+            this.total = 0
+          }
         }
       },
       editorInit: function () {
@@ -210,7 +221,11 @@
           })
       },
       splice_arr (page) {
-        this.Testresults = this.allsearchdata.slice(page * 10 - 10, page * 10)
+        this.Testresults = this.allsearchdata.slice((page - 1) * this.splice_length, page * this.splice_length)
+      },
+      splice_len (length) {
+        this.splice_length = length
+        this.Testresults = this.allsearchdata.slice(0, this.splice_length)
       },
       ClearForm () {
         this.formItem.textarea = ''
@@ -240,20 +255,24 @@
           'dbcon': this.put_info.dbcon,
           'basename': this.put_info.base
         }
-        axios.post(`${util.url}/search`, {
-          'sql': this.formItem.textarea,
-          'address': JSON.stringify(address)
-        })
-          .then(res => {
-            if (!res.data['data']) {
-              util.err_notice(res.data)
-            } else {
-              this.columnsName = res.data['title']
-              this.allsearchdata = res.data['data']
-              this.Testresults = this.allsearchdata.slice(0, 10)
-              this.total = res.data['len']
-            }
+        if (this.put_info.dbcon && this.put_info.base) {
+          axios.post(`${util.url}/search`, {
+            'sql': this.formItem.textarea,
+            'address': JSON.stringify(address)
           })
+            .then(res => {
+              if (!res.data['data']) {
+                util.err_notice(res.data)
+              } else {
+                this.columnsName = res.data['title']
+                this.allsearchdata = res.data['data']
+                this.Testresults = this.allsearchdata.slice(0, 10)
+                this.total = res.data['len']
+              }
+            })
+        } else {
+          util.err_notice('请选择 数据库!')
+        }
         this.$Spin.hide()
       },
       exportdata () {
@@ -262,14 +281,6 @@
           original: false,
           data: this.allsearchdata,
           columns: this.columnsName
-        })
-      },
-      End_sql () {
-        axios.put(`${util.url}/query_worklf`, {'mode': 'end', 'username': sessionStorage.getItem('user')})
-          .then(res => util.notice(res.data))
-          .catch(err => util.err_notice(err))
-        this.$router.push({
-          name: 'serach-perm'
         })
       },
       search_perm () {
@@ -307,7 +318,6 @@
                   this.wordList.push({'vl': i, 'meta': '关键字'})
                 }
                 this.wordList = this.wordList.concat(res.data.highlight)
-                // res.data['status'] === 1 ? this.export_data = true : this.export_data = false
               })
           } else {
             this.$router.push({

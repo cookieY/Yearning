@@ -46,10 +46,13 @@ class SQLgo(object):
             result = cursor.fetchall()
             for field in cursor.description:
                 if id == 0:
-                    data_dict.append({'title': field[0], "key": field[0], "fixed": "left", "width": 150})
+                    head_info = {'title': field[0], "key": field[0], "fixed": "left", "minWidth": 60}
                     id += 1
                 else:
-                    data_dict.append({'title': field[0], "key": field[0], "width": 200})
+                    head_info = {'title': field[0], "key": field[0], "minWidth": 60}
+                if field[3] >= 253:
+                    head_info.update({"width" : 200})
+                data_dict.append(head_info)
             len = cursor.rowcount
         return {'data': result, 'title': data_dict, 'len': len}
 
