@@ -43,7 +43,7 @@
                   <span v-if = "put_info.base">{{put_info.dbcon}} . {{put_info.base}}</span>
                 </span>
               </div>
-              <Button type="primary" icon="md-add" @click="search_perm()" slot="extra">查询权限</Button>
+              <Button type="primary" icon="md-add" @click.native="search_perm()" slot="extra">查询权限</Button>
               <editor v-model="formItem.textarea" @init="editorInit" @setCompletions="setCompletions" value="请输入SQL"></editor>
             </Card>
           </Row>

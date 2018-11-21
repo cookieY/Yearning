@@ -223,6 +223,20 @@
         this.$router.push({
           name: 'serach-perm'
         })
+      },
+      delrecordData () {
+        axios.post(`${util.url}/query_order/`, {'work_id': JSON.stringify(this.delrecord)})
+          .then(res => {
+            util.notice(res.data)
+            this.$refs.perpage.currentPage = 1
+            this.permisson_list()
+          })
+          .catch(error => {
+            util.err_notice(error)
+          })
+      },
+      delrecordList (vl) {
+        this.delrecord = vl.map(vl => vl.work_id)
       }
     },
     mounted () {
