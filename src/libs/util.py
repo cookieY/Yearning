@@ -135,31 +135,27 @@ def auth(username, password):
     un_init = init_conf()
     ldap = ast.literal_eval(un_init['ldap'])
     # 后台录入的验证用户信息，连接到ldap后通过查询登陆的用户名所在的OU，DN信息，然后进一步去ldap服务器进行账户和密码验证。
-    LDAP_ADMIN_USER = ldap['user']
-    LDAP_ADMIN_PASS = ldap['password']
 
     LDAP_SERVER = ldap['host']
     LDAP_DOMAIN = ldap['domain']
     LDAP_TYPE = ldap['type']
     LDAP_SCBASE = ldap['sc']
-    # 这里前端可以做个基础DN录入，搜索范围锁定在这个DN下
-    SEARCH_BASE = ldap['sc']
 
     if LDAP_TYPE == '1':
         user = username + '@' + LDAP_DOMAIN
     elif LDAP_TYPE == '2':
-        user = "uid=%s,%s" % (LDAP_ADMIN_USER, LDAP_SCBASE)
+        user = "uid=%s,%s" % (username, LDAP_SCBASE)
     else:
-        user = "cn=%s,%s" % (LDAP_ADMIN_USER, LDAP_SCBASE)
+        user = "cn=%s,%s" % (username, LDAP_SCBASE)
     c = ldap3.Connection(
         ldap3.Server(LDAP_SERVER, get_info=ldap3.ALL),
         user=user,
-        password=LDAP_ADMIN_PASS)
+        password=password)
     ret = c.bind()
     if ret:
         if ldap['ou']:
             res = c.search(
-                search_base=SEARCH_BASE,
+                search_base=LDAP_SCBASE,
                 search_filter='(cn={})'.format(username),
                 search_scope=SUBTREE,
                 attributes=['cn', 'uid', 'mail'],
