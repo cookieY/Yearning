@@ -70,41 +70,18 @@ const store = new Vuex.Store({
       let accessCode = parseInt(sessionStorage.getItem('access')) // 0
       let menuList = []
       appRouter.forEach((item, index) => {
-        if (item.access !== undefined) { // item.access=0
-          if (util.showThisRoute(item.access, accessCode)) {
-            if (item.children.length <= 1) {
-              menuList.push(item)
-            } else {
-              let i = menuList.push(item)
-              let childrenArr = []
-              childrenArr = item.children.filter(child => {
-                if (child.access !== undefined) {
-                  if (child.access === accessCode) {
-                    return child
-                  }
-                } else {
-                  return child
-                }
-              })
-              menuList[i - 1].children = childrenArr
-            }
-          }
-        } else {
-          if (item.children.length <= 1) {
-            menuList.push(item)
-          } else {
-            let i = menuList.push(item)
+        if (!item.access || util.showThisRoute(item.access, accessCode)) {
+          if (item.children && item.children.length >= 1) {
             let childrenArr = []
-            childrenArr = item.children.filter(child => {
-              if (child.access !== undefined) {
-                if (util.showThisRoute(child.access, accessCode)) {
-                  return child
-                }
-              } else {
-                return child
-              }
+            childrenArr = item.children.filter((child) => {
+              return !item.access || util.showThisRoute(child.access, accessCode)
             })
-            menuList[i - 1].children = childrenArr
+            if (childrenArr.length) {
+              item.children = childrenArr
+              menuList.push(item)
+            }
+          } else if (!item.children) {
+            menuList.push(item)
           }
         }
       })

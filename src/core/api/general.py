@@ -9,7 +9,8 @@ from core.api import serachsql
 from core.models import (
     DatabaseList,
     Account,
-    SqlDictionary
+    SqlDictionary,
+    Q
 )
 from libs.serializers import (
     Area,
@@ -35,6 +36,7 @@ class addressing(baseview.BaseView):
                 assigned = set_auth_group(request.user)
                 un_init = util.init_conf()
                 custom_com = ast.literal_eval(un_init['other'])
+                
                 if request.data['permissions_type'] == 'user' or request.data['permissions_type'] == 'own_space':
                     info = DatabaseList.objects.all()
                     con_name = Area(info, many=True).data
@@ -74,7 +76,7 @@ class addressing(baseview.BaseView):
                                     'computer_room': con_instance.computer_room
                                 })
                     dic = ''
-                info = Account.objects.filter(group='admin').all()
+                info = Account.objects.filter(Q(group='admin') | Q(group='manager')).all()
                 serializers = UserINFO(info, many=True)
                 return Response(
                     {

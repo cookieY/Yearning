@@ -114,7 +114,7 @@ class userinfo(baseview.BaseView):
         try:
             username = request.data['username']
             password = request.data['password']
-            group = request.data.get('group', 'guest')
+            group = request.data.get('group', 'perform')
             email = request.data['email']
             realname = request.data['realname']
             department = request.data['department']
@@ -128,7 +128,7 @@ class userinfo(baseview.BaseView):
             return HttpResponse(status=500)
         else:
             try:
-                if group == 'admin' or group == 'perform':
+                if group == 'admin' or group == 'manager':
                     user = Account.objects.create_user(
                         username=username,
                         password=password,
@@ -140,7 +140,7 @@ class userinfo(baseview.BaseView):
                         real_name=realname)
                     user.save()
                     return Response('%s 用户注册成功!' % username)
-                elif group == 'guest':
+                elif group == 'perform':
                     user = Account.objects.create_user(
                         username=username,
                         password=password,
@@ -224,11 +224,11 @@ class ldapauth(baseview.AnyLogin):
                         username=username,
                         password=password,
                         is_staff=0,
-                        group='guest')
+                        group='perform')
                     permissions.save()
                     _user = authenticate(username=username, password=password)
                     token = jwt_encode_handler(jwt_payload_handler(_user))
-                    return Response({'token': token, 'res': '', 'permissions': 'guest'})
+                    return Response({'token': token, 'res': '', 'permissions': 'perform'})
             else:
                 return Response({'token': 'null', 'res': 'ldap账号认证失败,请检查ldap账号或ldap配置!'})
 
@@ -251,7 +251,7 @@ class login_register(baseview.AnyLogin):
                     username=userinfo['username'],
                     password=userinfo['password'],
                     department=userinfo['department'],
-                    group='guest',
+                    group='perform',
                     email=userinfo['email'],
                     real_name=userinfo['realname'])
                 user.save()

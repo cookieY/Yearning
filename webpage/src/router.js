@@ -61,6 +61,13 @@ export const page500 = {
   }
 }
 
+/* 默认菜单权限控制:
+  access:  //控制功能
+    0: perform,manager,admin所有人可见
+    1: manager,admin 可见
+    2: admin 可见
+  后端返回的permission, 对库表控制
+*/
 // 统一的main页面的child页面
 const mainchild = [
   {
@@ -177,11 +184,14 @@ export const appRouter = [
     name: 'view',
     title: '查询',
     component: Index,
+    access: 1,
     children: [
       {
         path: 'querypage',
         title: 'SQL查询',
         name: 'querypage',
+        icon: 'md-search',
+        access: 1,
         component: resolve => {
           require(['./components/search/querySql.vue'], resolve)
         }
@@ -191,6 +201,7 @@ export const appRouter = [
         name: 'view-dml',
         title: '数据库字典',
         'icon': 'ios-book',
+        access: 3,
         component: resolve => {
           require(['./components/search/databaseDic.vue'], resolve)
         }
@@ -204,13 +215,14 @@ export const appRouter = [
     name: 'audit',
     title: '审核',
     component: Index,
-    access: 0,
+    access: 2,
     children: [
       {
         path: 'audit-order',
         name: 'audit-audit',
         title: '工单',
         'icon': 'md-create',
+        access: 2,
         component: resolve => {
           require(['./components/audit/sqlAudit.vue'], resolve)
         }
@@ -220,6 +232,7 @@ export const appRouter = [
         name: 'audit-permissions',
         title: '权限',
         'icon': 'md-share',
+        access: 2,
         component: resolve => {
           require(['./components/audit/permissions.vue'], resolve)
         }
@@ -229,6 +242,7 @@ export const appRouter = [
         name: 'query-audit',
         title: '查询',
         'icon': 'logo-rss',
+        access: 2,
         component: resolve => {
           require(['./components/audit/queryAudit.vue'], resolve)
         }
@@ -241,13 +255,14 @@ export const appRouter = [
     name: 'record',
     title: '记录',
     component: Index,
-    access: 0,
+    access: 2,
     children: [
       {
         path: 'query-review',
         name: 'query-review',
         title: '查询审计',
         'icon': 'md-pulse',
+        access: 2,
         component: resolve => {
           require(['./components/assistantManger/queryRecord.vue'], resolve)
         }
@@ -257,6 +272,7 @@ export const appRouter = [
         name: 'audit-record',
         title: '工单记录',
         'icon': 'md-list',
+        access: 2,
         component: resolve => {
           require(['./components/assistantManger/record.vue'], resolve)
         }
@@ -268,7 +284,7 @@ export const appRouter = [
     icon: 'logo-buffer',
     name: 'management',
     title: '管理',
-    access: 0,
+    access: 2,
     component: Index,
     children: [
       {
@@ -276,6 +292,7 @@ export const appRouter = [
         name: 'management-user',
         title: '用户',
         'icon': 'md-people',
+        access: 3,
         component: resolve => {
           require(['./components/management/userInfo.vue'], resolve)
         }
@@ -285,6 +302,7 @@ export const appRouter = [
         name: 'management-database',
         title: '数据库',
         'icon': 'md-medal',
+        access: 3,
         component: resolve => {
           require(['./components/management/databaseManager.vue'], resolve)
         }
@@ -293,6 +311,7 @@ export const appRouter = [
         path: 'setting',
         name: 'setting',
         title: '设置',
+        access: 3,
         'icon': 'md-settings',
         component: resolve => {
           require(['./components/management/setting.vue'], resolve)
@@ -303,6 +322,7 @@ export const appRouter = [
         name: 'auth-group',
         title: '权限组',
         'icon': 'ios-switch',
+        access: 3,
         component: resolve => {
           require(['./components/management/authGroup.vue'], resolve)
         }

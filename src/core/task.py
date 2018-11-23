@@ -57,6 +57,8 @@ def grained_permissions(func):
 
     @functools.wraps(func)
     def wrapper(self, request, args=None):
+        if request.user.group == "admin":
+            return func(self, request, args)
         if request.method == "PUT" and args != 'connection':
             return func(self, request, args)
         else:
@@ -71,7 +73,7 @@ def grained_permissions(func):
                 if group is not None and group[permissions_type] == '1':
                     return func(self, request, args)
                 else:
-                    return HttpResponse(status=401)
+                    return HttpResponse(status=401,content='没有该功能权限')
 
     return wrapper
 
@@ -83,11 +85,11 @@ class order_push_message(threading.Thread):
 
     '''
 
-    def __init__(self, addr_ip, id, from_user, to_user):
+    def __init__(self, addr_ip, work_id, from_user, to_user):
         super().__init__()
-        self.id = id
+        self.work_id= work_id
         self.addr_ip = addr_ip
-        self.order = SqlOrder.objects.filter(id=id).first()
+        self.order = SqlOrder.objects.filter(work_id= work_id).first()
         self.from_user = from_user
         self.to_user = to_user
         self.title = f'工单:{self.order.work_id}审核通过通知'
@@ -138,11 +140,11 @@ class order_push_message(threading.Thread):
                         backup_dbname=i['backup_dbname']
                     )
         except Exception as e:
-            CUSTOM_ERROR.error(f'{e.__class__.__name__}--邮箱推送失败: {e}')
+            CUSTOM_ERROR.error(f'{e.__class__.__name__}--SQL执行失败: {e}')
         finally:
             status = SqlOrder.objects.filter(work_id=self.order.work_id).first()
             if status.status != 4:
-                SqlOrder.objects.filter(id=self.id).update(status=1)
+                SqlOrder.objects.filter(id=self.id).update(status=5)
 
     def agreed(self):
 

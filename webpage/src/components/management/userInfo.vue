@@ -30,8 +30,8 @@
             <FormItem label="角色" prop="group">
               <Select v-model="userinfo.group" placeholder="请选择">
                 <Option value="admin">管理员</Option>
-                <Option value="perform" v-if="connectionList.multi">执行人</Option>
-                <Option value="guest">使用人</Option>
+                <Option value="manager" v-if="connectionList.multi">审核人员</Option>
+                <Option value="perform">使用人</Option>
               </Select>
             </FormItem>
             <FormItem label="电子邮箱" prop="email">
@@ -93,8 +93,8 @@
         <FormItem label="角色">
           <Select v-model="editAuthForm.group" placeholder="请选择">
             <Option value="admin">管理员</Option>
-            <Option value="perform" v-if="connectionList.multi && editAuthForm.id !== 1">执行人</Option>
-            <Option value="guest" v-if="editAuthForm.id !== 1">使用者</Option>
+            <Option value="manager" v-if="connectionList.multi && editAuthForm.id !== 1">审批人</Option>
+            <Option value="perform" v-if="editAuthForm.id !== 1">使用者</Option>
           </Select>
         </FormItem>
         <FormItem label="部门">

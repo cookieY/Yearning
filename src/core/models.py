@@ -6,6 +6,7 @@ from django.db import models
 from django.contrib.auth.models import AbstractUser
 import ast
 
+Q = models.Q
 
 class JSONField(models.TextField):
     description = "Json"
@@ -32,7 +33,7 @@ class Account(AbstractUser):
     '''
     User table
     '''
-    group = models.CharField(max_length=40)  # 权限组 guest/admin
+    group = models.CharField(max_length=40)  # 权限组 perform:使用执行, manager:审批执行, admin:系统管理
     department = models.CharField(max_length=40)  # 部门
     auth_group = models.CharField(max_length=100, null=True)  # 细粒化权限组
     real_name = models.CharField(max_length=100, null=True, default='请添加真实姓名')  # 真实姓名
@@ -60,7 +61,7 @@ class SqlOrder(models.Model):
     '''
     work_id = models.CharField(max_length=50, blank=True)  # 工单id
     username = models.CharField(max_length=50, blank=True)  # 提交人
-    status = models.IntegerField(blank=True)  # 工单状态 0 disagree 1 agree 2 indeterminate 3 ongoing 4 faild
+    status = models.IntegerField(blank=True)  # 工单状态 0 驳回 1 同意待执行 2 待审核 3 执行中 4 失败 5 完成
     type = models.SmallIntegerField(blank=True)  # 工单类型 0 DDL 1 DML
     backup = models.SmallIntegerField(blank=True)  # 工单是否备份 0 not backup 1 backup
     bundle_id = models.IntegerField(db_index=True, null=True)  # Matching with Database_list id Field
@@ -68,10 +69,11 @@ class SqlOrder(models.Model):
     basename = models.CharField(max_length=50, blank=True)  # 数据库名
     sql = models.TextField(blank=True)  # sql语句
     text = models.TextField(blank=True)  # 工单备注
-    assigned = models.CharField(max_length=50, blank=True)  # 工单执行人
+    assigned = models.CharField(max_length=50, blank=True)  # 工单审核
     delay = models.IntegerField(null=True, default=0)  # 延迟时间
     rejected = models.TextField(blank=True)  # 驳回说明
     real_name = models.CharField(max_length=100, null=True)  # 姓名
+    exceuser = models.CharField(max_length=50, blank=True)  # 工单执行人
 
 
 class DatabaseList(models.Model):

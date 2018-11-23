@@ -98,12 +98,12 @@
           {
             title: '状态',
             key: 'state',
-            width: 250
+            width: 150
           },
           {
             title: '错误信息',
             key: 'error',
-            width: 400
+            width: 200
           },
           {
             title: '影响行数',

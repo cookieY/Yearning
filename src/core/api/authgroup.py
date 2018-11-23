@@ -114,7 +114,7 @@ class auth_group(baseview.BaseView):
                 return HttpResponse(e)
             else:
                 try:
-                    if group == "guest":
+                    if group == "perform":
                         pr = 0
                     if not authgroup:
                         Account.objects.filter(username=username).update(group=group,

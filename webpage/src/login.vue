@@ -228,8 +228,10 @@
             sessionStorage.setItem('auth', res.data['permissions'])
             sessionStorage.setItem('real_name', res.data['real_name'])
             let auth = res.data['permissions']
-            if (auth === 'admin' || auth === 'perform') {
-              sessionStorage.setItem('access', 0)
+            if (auth === 'admin') {
+              sessionStorage.setItem('access', 3)
+            } else if (auth === 'manager') {
+              sessionStorage.setItem('access', 2)
             } else {
               sessionStorage.setItem('access', 1)
             }

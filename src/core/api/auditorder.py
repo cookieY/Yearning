@@ -10,7 +10,8 @@ from core.models import (
     DatabaseList,
     SqlRecord,
     Account,
-    globalpermissions
+    globalpermissions,
+    Q
 )
 
 from core.task import order_push_message, rejected_push_messages
@@ -41,7 +42,7 @@ class audit(baseview.SuperUserpermissions):
 
         try:
             page = request.GET.get('page')
-            username = request.GET.get('username')
+            username = request.user.username
         except KeyError as e:
             CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
             return HttpResponse(status=500)
@@ -49,7 +50,7 @@ class audit(baseview.SuperUserpermissions):
             try:
                 un_init = util.init_conf()
                 custom_com = ast.literal_eval(un_init['other'])
-                page_number = SqlOrder.objects.filter(assigned=username).count()
+                page_number = SqlOrder.objects.filter(Q(assigned=username)|Q(username=username)|Q(exceuser=username)).count()
                 start = (int(page) - 1) * 20
                 end = int(page) * 20
                 info = SqlOrder.objects.raw(
@@ -62,7 +63,7 @@ class audit(baseview.SuperUserpermissions):
                     ''' % username
                 )[start:end]
                 data = util.ser(info)
-                info = Account.objects.filter(group='perform').all()
+                info = Account.objects.filter(group='manager').all()
                 ser = serializers.UserINFO(info, many=True)
                 return Response(
                     {'page': page_number, 'data': data, 'multi': custom_com['multi'], 'multi_list': ser.data})
@@ -83,77 +84,77 @@ class audit(baseview.SuperUserpermissions):
         '''
 
         try:
-            category = request.data['type']
+            work_id = request.data['work_id']
+            status = request.data['status']
+            c_user = request.user
         except KeyError as e:
             CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
         else:
-            if category == 0:
+            # 驳回
+            if status == 0:
                 try:
-                    to_user = request.data['to_user']
-                    text = request.data['text']
-                    order_id = request.data['id']
+                    order = SqlOrder.objects.filter(work_id=work_id).first()
                 except KeyError as e:
                     CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
                     return HttpResponse(status=500)
                 else:
                     try:
-                        SqlOrder.objects.filter(id=order_id).update(status=0,rejected=text)
-                        _tmpData = SqlOrder.objects.filter(id=order_id).values(
+                        text = request.data['text']
+                        SqlOrder.objects.filter(work_id=work_id).update(status=0,rejected=text)
+                        _tmpData = SqlOrder.objects.filter(work_id=work_id).values(
                             'work_id',
                             'bundle_id'
                         ).first()
-                        rejected_push_messages(_tmpData, to_user, addr_ip, text).start()
+                        rejected_push_messages(_tmpData, order.username, addr_ip, text).start()
                         return Response('操作成功，该请求已驳回！')
                     except Exception as e:
                         CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
                         return HttpResponse(status=500)
-
-            elif category == 1:
+            # 同意
+            elif status == 1:
+                to_user = None
                 try:
-                    from_user = request.data['from_user']
-                    to_user = request.data['to_user']
-                    order_id = request.data['id']
+                    to_user = Account.objects.filter(username = request.data['to_user']).first()
                 except KeyError as e:
                     CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
                     return HttpResponse(status=500)
                 else:
                     try:
-                        idempotent = SqlOrder.objects.filter(id=order_id).first()
+                        idempotent = SqlOrder.objects.filter(work_id=work_id).first()
                         if idempotent.status != 2:
                             return Response('非法传参，触发幂等操作')
                         else:
-                            SqlOrder.objects.filter(id=order_id).update(status=3)
-                            order_push_message(addr_ip, order_id, from_user, to_user).start()
-                            return Response('工单执行成功!请通过记录页面查看具体执行结果')
+                            if to_user:
+                                SqlOrder.objects.filter(work_id=work_id).update(status=1)
+                                SqlOrder.objects.filter(work_id=work_id).update(exceuser=to_user.username)
+                                mail = Account.objects.filter(username=to_user.username).first()
+                                threading.Thread(target=push_message, args=(
+                                    {'to_user': to_user.username, 'workid': work_id, 'addr': addr_ip}, 9, request.user, mail.email,
+                                    work_id,
+                                    '已提交执行人')).start()
+                                return Response('工单已提交执行人！')
+                        return HttpResponse(status=401, content="没有权限操作")
                     except Exception as e:
                         CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
                         return HttpResponse(status=500)
-            elif category == 2:
-                try:
-                    perform = request.data['perform']
-                    work_id = request.data['work_id']
-                    username = request.data['username']
-                except KeyError as e:
-                    CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
-                    return HttpResponse(status=500)
-                else:
-                    mail = Account.objects.filter(username=perform).first()
-                    SqlOrder.objects.filter(work_id=work_id).update(assigned=perform)
-                    threading.Thread(target=push_message, args=(
-                        {'to_user': username, 'workid': work_id, 'addr': addr_ip}, 9, request.user, mail.email,
-                        work_id,
-                        '已提交执行人')).start()
-                    return Response('工单已提交执行人！')
+            #直接执行
+            elif status == 3:
+                order = SqlOrder.objects.filter(work_id=work_id).first()
+                if ((order.status == 2 and order.assigned == c_user.usernameand) or
+                    (order.status == 1 and order.exceuser == c_user.username)):
+                    order_push_message(addr_ip, work_id, c_user.username, order.username).start()
+                    SqlOrder.objects.filter(work_id=work_id).update(status=3)
+                    return Response('工单审核成功!请通过记录页面查看具体执行结果')
+                return HttpResponse(status=401, content="没有权限操作")
 
-            elif category == 'test':
+            elif status == 'test':
                 try:
-                    base = request.data['base']
-                    order_id = request.data['id']
+                    work_id = request.data['work_id']
                 except KeyError as e:
                     CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
                     return HttpResponse(status=500)
                 else:
-                    sql = SqlOrder.objects.filter(id=order_id).first()
+                    sql = SqlOrder.objects.filter(work_id=work_id).first()
                     if not sql.sql:
                         return Response({'status': '工单内无sql语句!'})
                     data = DatabaseList.objects.filter(id=sql.bundle_id).first()
@@ -161,7 +162,7 @@ class audit(baseview.SuperUserpermissions):
                         'host': data.ip,
                         'user': data.username,
                         'password': data.password,
-                        'db': base,
+                        'db': sql.basename,
                         'port': data.port
                     }
                     try:

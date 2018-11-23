@@ -10,7 +10,7 @@ from rest_framework.response import Response
 from libs.serializers import Query_review, Query_list
 from libs import baseview, send_email, util
 from libs import con_database
-from core.models import DatabaseList, Account, querypermissions, query_order, globalpermissions
+from core.models import DatabaseList, Account, querypermissions, query_order, globalpermissions, Q
 
 CUSTOM_ERROR = logging.getLogger('Yearning.core.views')
 
@@ -336,19 +336,30 @@ def push_message(message=None, type=None, user=None, to_addr=None, work_id=None,
         CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
 
 
-class Query_order(baseview.SuperUserpermissions):
+class Query_order(baseview.BaseView):
 
     def get(self, request, args: str = None):
         page = request.GET.get('page')
-        pn = query_order.objects.filter(audit=request.user).count()
-        start = int(page) * 10 - 10
-        end = int(page) * 10
+        page_size = request.GET.get('page_size', 10)
+        if request.user.group == "admin":
+            pn = query_order.objects.filter(audit=request.user.username).count()
+        elif request.user.group == "manager":
+            pn = query_order.objects.filter(Q(audit=request.user.username) | Q(username=request.user.username)).count()
+        else:
+            pn = query_order.objects.filter(username=request.user.username).count()
+        start = (int(page) -1) * page_size
+        end = int(page) * page_size
         user_list = query_order.objects.all().order_by('-id')[start:end]
         serializers = Query_review(user_list, many=True)
         return Response({'data': serializers.data, 'pn': pn})
 
     def post(self, request, args: str = None):
         work_id_list = json.loads(request.data['work_id'])
-        for i in work_id_list:
-            query_order.objects.filter(work_id=i).delete()
+        CUSTOM_ERROR.error(type(request.user.username))
+        if request.user.group == "admin":
+            for i in work_id_list:
+                query_order.objects.filter(work_id=i).delete()
+        elif request.user.group == "manager":
+            for i in work_id_list:
+                query_order.objects.filter(Q(work_id=i) & (Q(username=request.user.username) | Q(audit=request.user.username))).delete()
         return Response('申请记录已删除!')

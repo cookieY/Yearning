@@ -31,14 +31,16 @@ util.mode = function typeok (obj) {
 util.err_notice = function (err) {
   Notice.error({
     title: '错误',
-    desc: err
+    desc: err.response.data ? err.response.data : err,
+    duration: 3
   })
 }
 
 util.notice = function (vl) {
   Notice.info({
     title: '通知',
-    desc: vl
+    desc: vl,
+    duration: 3
   })
 }
 
@@ -73,11 +75,7 @@ util.oneOf = function (ele, targetArr) {
 }
 
 util.showThisRoute = function (itAccess, currentAccess) {
-  if (typeof itAccess === 'object' && itAccess.isArray()) {
-    return util.oneOf(currentAccess, itAccess)
-  } else {
-    return itAccess === currentAccess
-  }
+  return itAccess <= currentAccess
 }
 
 util.openPage = function (vm, name) {

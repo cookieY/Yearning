@@ -5,7 +5,7 @@ port=6669
 character-set-client-handshake=0
 character-set-server=utf8
 
-inception_remote_backup_host=10.107.28.64
+inception_remote_backup_host=10.107.28.23
 inception_remote_backup_port=3306
 inception_remote_system_user=root
 inception_remote_system_password=root

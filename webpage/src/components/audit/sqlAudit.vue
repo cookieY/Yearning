@@ -97,29 +97,34 @@
         <FormItem>
           <Table :columns="sql_columns" :data="sql" height="200"></Table>
         </FormItem>
-        <FormItem label="选择执行人:" v-if="multi && auth === 'admin'">
-          <Select v-model="multi_name" style="width: 20%">
+        <FormItem label="选择执行人:" v-if="multi && (auth === 'admin' || auth === 'manager')">
+          <Select v-model="multi_name" style="width: 20%" clearable v-if="formitem.status !== 1">
             <Option v-for="i in multi_list" :value="i.username" :key="i.username">{{i.username}}</Option>
           </Select>
+          <span v-if="formitem.status === 1">{{ formitem.exceuser }}</span>
         </FormItem>
       </Form>
-      <template v-if="auth === 'admin'">
+      <template v-if="auth === 'admin' || auth === 'manager'">
         <p class="pa">SQL检查结果:</p>
         <Table :columns="columnsName" :data="dataId" stripe border height="200"></Table>
       </template>
 
       <div slot="footer">
-        <Button type="warning" @click.native="test_button()" v-if="auth === 'admin'">检测sql</Button>
-        <Button @click="modal2 = false">取消</Button>
-        <template v-if="switch_show">
-          <template v-if="multi">
-            <Button type="error" @click="out_button()" :disabled="summit" v-if="auth === 'admin'">驳回</Button>
-            <Button type="error" @click="out_button()" v-else>驳回</Button>
-            <Button type="success" @click="agreed_button()" :disabled="summit" v-if="auth === 'admin'">同意</Button>
-            <Button type="success" @click="put_button()" v-else-if="auth === 'perform'">执行</Button>
-          </template>
-          <template v-else>
+        <template v-if="auth === 'admin' || auth === 'manager'">
+          <Button @click="modal2 = false">取消</Button>
+          <template v-if="formitem.status === 2">
+            <Button type="warning" @click.native="test_button()" >检测sql</Button>
             <Button type="error" @click="out_button()" :disabled="summit">驳回</Button>
+            <template v-if="multi && multi_name">
+              <Button type="success" @click="agreed_button()" :disabled="summit">同意</Button>
+            </template>
+            <template v-else>
+              <Button type="success" @click="put_button()" :disabled="summit">执行</Button>
+            </template>
+          </template>
+          <template v-else-if="formitem.status === 1">
+            <Button type="warning" @click.native="test_button()" >检测sql</Button>
+            <Button type="error" @click="out_button()" :disabled="summit">拒绝</Button>
             <Button type="success" @click="put_button()" :disabled="summit">执行</Button>
           </template>
         </template>
@@ -238,21 +243,24 @@
               const row = params.row
               let color = ''
               let text = ''
-              if (row.status === 2) {
+              if (row.status === 0) {
+                color = 'error'
+                text = '已驳回'
+              } else if (row.status === 1) {
+                color = 'primary'
+                text = '待执行'
+              } else if (row.status === 2) {
                 color = 'primary'
                 text = '待审核'
-              } else if (row.status === 0) {
-                color = 'error'
-                text = '驳回'
-              } else if (row.status === 1) {
-                color = 'success'
-                text = '已执行'
-              } else if (row.status === 4) {
-                color = 'error'
-                text = '执行失败'
-              } else {
+              } else if (row.status === 3) {
                 color = 'warning'
                 text = '执行中'
+              } else if (row.status === 4) {
+                color = 'error'
+                text = '已失败'
+              } else {
+                color = 'success'
+                text = '已完成'
               }
               return h('Tag', {
                 props: {
@@ -264,12 +272,12 @@
             sortable: true,
             filters: [
               {
-                label: '已执行',
-                value: 1
-              },
-              {
                 label: '驳回',
                 value: 0
+              },
+              {
+                label: '待执行',
+                value: 1
               },
               {
                 label: '待审核',
@@ -282,6 +290,10 @@
               {
                 label: '执行失败',
                 value: 4
+              },
+              {
+                label: '执行完成',
+                value: 5
               }
             ],
             //            filterMultiple: false 禁止多选,
@@ -305,51 +317,7 @@
             width: 150,
             align: 'center',
             render: (h, params) => {
-              if (params.row.status !== 1 && params.row.status !== 4) {
-                if (params.row.status === 3 && params.row.type === 0) {
-                  return h('div', [
-                    h('Button', {
-                      props: {
-                        size: 'small',
-                        type: 'text'
-                      },
-                      on: {
-                        click: () => {
-                          this.summit = true
-                          this.edit_tab(params.index)
-                        }
-                      }
-                    }, '查看'),
-                    h('Button', {
-                      props: {
-                        size: 'small',
-                        type: 'text'
-                      },
-                      on: {
-                        click: () => {
-                          this.oscsha1 = ''
-                          this.osc = true
-                        }
-                      }
-                    }, 'osc进度')
-                  ])
-                } else {
-                  return h('div', [
-                    h('Button', {
-                      props: {
-                        size: 'small',
-                        type: 'text'
-                      },
-                      on: {
-                        click: () => {
-                          this.summit = true
-                          this.edit_tab(params.index)
-                        }
-                      }
-                    }, '查看')
-                  ])
-                }
-              } else {
+              if (params.row.status === 5 || params.row.status === 4) {
                 return h('div', [
                   h('Button', {
                     props: {
@@ -377,6 +345,48 @@
                       }
                     }
                   }, '执行结果')
+                ])
+              } else if (params.row.status === 3) {
+                return h('div', [
+                  h('Button', {
+                    props: {
+                      size: 'small',
+                      type: 'text'
+                    },
+                    on: {
+                      click: () => {
+                        this.summit = true
+                        this.edit_tab(params.index)
+                      }
+                    }
+                  }, '查看'),
+                  h('Button', {
+                    props: {
+                      size: 'small',
+                      type: 'text'
+                    },
+                    on: {
+                      click: () => {
+                        this.oscsha1 = ''
+                        this.osc = true
+                      }
+                    }
+                  }, 'osc进度')
+                ])
+              } else {
+                return h('div', [
+                  h('Button', {
+                    props: {
+                      size: 'small',
+                      type: 'text'
+                    },
+                    on: {
+                      click: () => {
+                        this.summit = true
+                        this.edit_tab(params.index)
+                      }
+                    }
+                  }, '查看')
                 ])
               }
             }
@@ -458,7 +468,7 @@
         this.dataId = []
         this.modal2 = true
         this.formitem = this.tmp[index]
-        this.tmp[index].status === 2 ? this.switch_show = true : this.switch_show = false
+        this.tmp[index].status
         let tmpSql = this.tmp[index].sql.split(';')
         for (let i of tmpSql) {
           this.sql.push({'sql': i})
@@ -469,8 +479,8 @@
           this.$Message.error('请选择执行人!')
         } else {
           axios.put(`${util.url}/audit_sql`, {
-            'type': 2,
-            'perform': this.multi_name,
+            'status': 1,
+            'to_user': this.multi_name,
             'work_id': this.formitem.work_id,
             'username': this.formitem.username
           })
@@ -487,10 +497,10 @@
         this.modal2 = false
         this.tmp[this.togoing].status = 3
         axios.put(`${util.url}/audit_sql`, {
-          'type': 1,
+          'status': 3,
           'from_user': sessionStorage.getItem('user'),
           'to_user': this.formitem.username,
-          'id': this.formitem.id
+          'work_id': this.formitem.work_id
         })
           .then(res => {
             util.notice(res.data)
@@ -506,12 +516,11 @@
       },
       rejecttext () {
         axios.put(`${util.url}/audit_sql`, {
-          'type': 0,
+          'status': 0,
           'from_user': sessionStorage.getItem('user'),
           'text': this.reject.textarea,
-          'to_user': this.formitem.username,
-          'id': this.formitem.id
-        })
+          'work_id': this.formitem.work_id
+          })
           .then(res => {
             util.err_notice(res.data)
             this.mou_data()
@@ -524,9 +533,9 @@
       test_button () {
         this.osclist = []
         axios.put(`${util.url}/audit_sql`, {
-          'type': 'test',
+          'status': 'test',
           'base': this.formitem.basename,
-          'id': this.formitem.id
+          'work_id': this.formitem.work_id
         })
           .then(res => {
             if (res.data.status === 200) {
@@ -556,6 +565,7 @@
             this.pagenumber = res.data.page
             this.multi = res.data.multi
             this.multi_list = res.data.multi_list
+            this.multi_name = res.data.exceuser
           })
           .catch(error => {
             util.err_notice(error)
