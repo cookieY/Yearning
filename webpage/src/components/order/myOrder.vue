@@ -19,6 +19,68 @@
         <Page :total="page_number" show-elevator @on-change="currentpage" :page-size="20"></Page>
       </Card>
     </Row>
+
+    <Modal v-model="modal2" width="1000">
+      <p slot="header" style="color:#f60;font-size: 16px">
+        <Icon type="information-circled"></Icon>
+        <span>SQL工单详细信息</span>
+      </p>
+      <Form label-position="right">
+        <FormItem label="工单编号:">
+          <span>{{ formitem.work_id }}</span>
+        </FormItem>
+        <FormItem label="机房:">
+          <span>{{ formitem.computer_room }}</span>
+        </FormItem>
+        <FormItem label="连接名称:">
+          <span>{{ formitem.connection_name }}</span>
+        </FormItem>
+        <FormItem label="数据库库名:">
+          <span>{{ formitem.basename }}</span>
+        </FormItem>
+        <FormItem label="延迟执行:">
+          <span>{{ formitem.delay }}分钟</span>
+        </FormItem>
+        <FormItem label="工单说明:">
+          <span>{{ formitem.text }}</span>
+        </FormItem>
+        <FormItem>
+          <Table :columns="sql_columns" :data="sql" height="200"></Table>
+          <template v-if="auth === 'admin' || auth === 'manager'">
+            <p class="pa">SQL检查结果:</p>
+            <Table :columns="columnsName" :data="dataId" stripe border height="200"></Table>
+          </template>
+        </FormItem>
+        <FormItem label="选择执行人:" v-if="multi ">
+          <Select v-model="multi_name" style="width: 20%" clearable v-if="formitem.status !== 1">
+            <Option v-for="i in multi_list" :value="i.username" :key="i.username">{{i.auth_group+':'+i.username}}</Option>
+          </Select>
+          <span v-if="formitem.status === 1">{{ formitem.exceuser }}</span>
+        </FormItem>
+      </Form>
+
+
+      <div slot="footer">
+        <template v-if="auth === 'admin' || auth === 'manager'">
+          <Button @click="modal2 = false">取消</Button>
+          <template v-if="formitem.status === 2">
+            <Button type="warning" @click.native="test_button()" >检测sql</Button>
+            <Button type="error" @click="out_button()" :disabled="summit">驳回</Button>
+            <template v-if="multi && multi_name">
+              <Button type="success" @click="agreed_button()" :disabled="summit">同意</Button>
+            </template>
+            <template v-else>
+              <Button type="success" @click="put_button()" :disabled="summit">执行</Button>
+            </template>
+          </template>
+          <template v-else-if="formitem.status === 1">
+            <Button type="warning" @click.native="test_button()" >检测sql</Button>
+            <Button type="error" @click="out_button()" :disabled="summit">拒绝</Button>
+            <Button type="success" @click="put_button()" :disabled="summit">执行</Button>
+          </template>
+        </template>
+      </div>
+    </Modal>
   </div>
 </template>
 <script>
@@ -61,23 +123,25 @@
               const row = params.row
               let color = ''
               let text = ''
-              if (row.status === 2) {
+              if (row.status === 0) {
+                color = 'error'
+                text = '已驳回'
+              } else if (row.status === 1) {
+                color = 'primary'
+                text = '待执行'
+              } else if (row.status === 2) {
                 color = 'primary'
                 text = '待审核'
-              } else if (row.status === 0) {
-                color = 'error'
-                text = '驳回'
-              } else if (row.status === 1) {
-                color = 'success'
-                text = '已执行'
-              } else if (row.status === 4) {
-                color = 'error'
-                text = '执行失败'
-              } else {
+              } else if (row.status === 3) {
                 color = 'warning'
                 text = '执行中'
+              } else if (row.status === 4) {
+                color = 'error'
+                text = '已失败'
+              } else {
+                color = 'success'
+                text = '已完成'
               }
-
               return h('Tag', {
                 props: {
                   type: 'dot',
@@ -86,13 +150,14 @@
               }, text)
             },
             sortable: true,
-            filters: [{
-              label: '已执行',
-              value: 1
-            },
+            filters: [
               {
                 label: '驳回',
                 value: 0
+              },
+              {
+                label: '待执行',
+                value: 1
               },
               {
                 label: '待审核',
@@ -105,6 +170,10 @@
               {
                 label: '执行失败',
                 value: 4
+              },
+              {
+                label: '执行完成',
+                value: 5
               }
             ],
             //            filterMultiple: false 禁止多选,
@@ -163,7 +232,7 @@
                     }
                   }, '驳回理由')
                 ])
-              } else {
+              } else if (params.row.status === 5 || params.row.status === 4) {
                 return h('div', [
                   h('Button', {
                     props: {
@@ -185,13 +254,37 @@
                     }
                   }, '详细信息')
                 ])
+              } else {
+                return h('div', [
+                  h('Button', {
+                    props: {
+                      size: 'small',
+                      type: 'text'
+                    },
+                    on: {
+                      click: () => {
+                        this.summit = true
+                        this.edit_tab(params.index)
+                      }
+                    }
+                  }, '查看')
+                ])
               }
             }
           }
         ],
         page_number: 1,
         computer_room: util.computer_room,
-        table_data: []
+        table_data: [],
+        modal2: false,
+        summit: false,
+        formitem: {},
+        multi: Boolean,
+        auth: sessionStorage.getItem('auth'),
+        sql: [],
+        sql_columns: [],
+        multi_list: {},
+        multi_name: ''
       }
     },
     methods: {
@@ -205,6 +298,18 @@
           .catch(error => {
             util.err_notice(error)
           })
+      },
+      edit_tab: function (index) {
+        this.sql = []
+        this.togoing = index
+        this.dataId = []
+        this.modal2 = true
+        this.formitem = this.table_data[index]
+        this.table_data[index].status
+        let tmpSql = this.table_data[index].sql.split(';')
+        for (let i of tmpSql) {
+          this.sql.push({'sql': i})
+        }
       }
     },
     mounted () {

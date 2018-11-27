@@ -144,7 +144,7 @@ class order_push_message(threading.Thread):
         finally:
             status = SqlOrder.objects.filter(work_id=self.order.work_id).first()
             if status.status != 4:
-                SqlOrder.objects.filter(id=self.id).update(status=5)
+                SqlOrder.objects.filter(work_id=self.order.work_id).update(status=5)
 
     def agreed(self):
 

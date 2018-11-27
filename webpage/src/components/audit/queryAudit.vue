@@ -266,7 +266,7 @@
           })
       },
       stop_query (vl) {
-        axios.put(`${util.url}/query_worklf`, {'mode': 'end', 'username': vl.username})
+        axios.put(`${util.url}/query_worklf`, {'mode': 'end', 'username': vl.username, 'work_id': vl.work_id})
           .then(res => {
             util.notice(res.data)
             this.permisson_list()

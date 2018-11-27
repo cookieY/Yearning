@@ -125,7 +125,7 @@ const mainchild = [
     title: '我的工单',
     'icon': 'person',
     component: resolve => {
-      require(['./components/order/myOrder.vue'], resolve)
+      require(['./components/audit/sqlAudit.vue'], resolve)
     }
   }
 ]

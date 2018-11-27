@@ -21,4 +21,4 @@ inception_enable_autoincrement_unsigned=0
 inception_enable_column_charset=on
 inception_enable_identifer_keyword=on
 inception_max_update_rows=1000000
-inception_osc_on=0
+inception_osc_on=1

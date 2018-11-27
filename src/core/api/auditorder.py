@@ -21,7 +21,7 @@ addr_ip = conf.ipaddress
 CUSTOM_ERROR = logging.getLogger('Yearning.core.views')
 
 
-class audit(baseview.SuperUserpermissions):
+class audit(baseview.BaseView):
     '''
 
     :argument 审核页面相关操作api接口
@@ -56,15 +56,18 @@ class audit(baseview.SuperUserpermissions):
                 info = SqlOrder.objects.raw(
                     '''
                     select core_sqlorder.*,core_databaselist.connection_name, \
-                    core_databaselist.computer_room from core_sqlorder \
-                    INNER JOIN core_databaselist on \
-                    core_sqlorder.bundle_id = core_databaselist.id where core_sqlorder.assigned = '%s'\
+                    core_databaselist.computer_room from core_sqlorder,core_databaselist
+                    where core_sqlorder.bundle_id = core_databaselist.id and \
+                    core_sqlorder.delete_yn = 1 and \
+                    (core_sqlorder.assigned = '%s' or \
+                    core_sqlorder.username = '%s' or \
+                    core_sqlorder.exceuser = '%s') \
                     ORDER BY core_sqlorder.id desc
-                    ''' % username
+                    ''' % (username, username, username)
                 )[start:end]
                 data = util.ser(info)
-                info = Account.objects.filter(group='manager').all()
-                ser = serializers.UserINFO(info, many=True)
+                users = Account.objects.filter(Q(group = 'perform') | Q(group = 'manager')).all()
+                ser = serializers.UserINFO(users, many=True)
                 return Response(
                     {'page': page_number, 'data': data, 'multi': custom_com['multi'], 'multi_list': ser.data})
             except Exception as e:
@@ -90,26 +93,26 @@ class audit(baseview.SuperUserpermissions):
         except KeyError as e:
             CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
         else:
+            try:
+                sql_str = Q(work_id=work_id)&(Q(username=c_user.username)|Q(assigned=c_user.username)|Q(exceuser=c_user.username))
+                order = SqlOrder.objects.filter(sql_str).first()
+            except KeyError as e:
+                CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
+                return HttpResponse(status=500)
             # 驳回
             if status == 0:
                 try:
-                    order = SqlOrder.objects.filter(work_id=work_id).first()
-                except KeyError as e:
+                    text = request.data['text']
+                    SqlOrder.objects.filter(work_id=work_id).update(status=0,rejected=text)
+                    _tmpData = SqlOrder.objects.filter(work_id=work_id).values(
+                        'work_id',
+                        'bundle_id'
+                    ).first()
+                    rejected_push_messages(_tmpData, order.username, addr_ip, text).start()
+                    return Response('操作成功，该请求已驳回！')
+                except Exception as e:
                     CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
                     return HttpResponse(status=500)
-                else:
-                    try:
-                        text = request.data['text']
-                        SqlOrder.objects.filter(work_id=work_id).update(status=0,rejected=text)
-                        _tmpData = SqlOrder.objects.filter(work_id=work_id).values(
-                            'work_id',
-                            'bundle_id'
-                        ).first()
-                        rejected_push_messages(_tmpData, order.username, addr_ip, text).start()
-                        return Response('操作成功，该请求已驳回！')
-                    except Exception as e:
-                        CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
-                        return HttpResponse(status=500)
             # 同意
             elif status == 1:
                 to_user = None
@@ -120,8 +123,7 @@ class audit(baseview.SuperUserpermissions):
                     return HttpResponse(status=500)
                 else:
                     try:
-                        idempotent = SqlOrder.objects.filter(work_id=work_id).first()
-                        if idempotent.status != 2:
+                        if order.status != 2:
                             return Response('非法传参，触发幂等操作')
                         else:
                             if to_user:
@@ -139,8 +141,7 @@ class audit(baseview.SuperUserpermissions):
                         return HttpResponse(status=500)
             #直接执行
             elif status == 3:
-                order = SqlOrder.objects.filter(work_id=work_id).first()
-                if ((order.status == 2 and order.assigned == c_user.usernameand) or
+                if ((order.status == 2 and order.assigned == c_user.username) or
                     (order.status == 1 and order.exceuser == c_user.username)):
                     order_push_message(addr_ip, work_id, c_user.username, order.username).start()
                     SqlOrder.objects.filter(work_id=work_id).update(status=3)
@@ -148,30 +149,23 @@ class audit(baseview.SuperUserpermissions):
                 return HttpResponse(status=401, content="没有权限操作")
 
             elif status == 'test':
+                if not order.sql:
+                    return Response({'status': '工单内无sql语句!'})
+                data = DatabaseList.objects.filter(id=order.bundle_id).first()
+                info = {
+                    'host': data.ip,
+                    'user': data.username,
+                    'password': data.password,
+                    'db': order.basename,
+                    'port': data.port
+                }
                 try:
-                    work_id = request.data['work_id']
-                except KeyError as e:
+                    with call_inception.Inception(LoginDic=info) as test:
+                        res = test.Check(sql=order.sql)
+                        return Response({'result': res, 'status': 200})
+                except Exception as e:
                     CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
-                    return HttpResponse(status=500)
-                else:
-                    sql = SqlOrder.objects.filter(work_id=work_id).first()
-                    if not sql.sql:
-                        return Response({'status': '工单内无sql语句!'})
-                    data = DatabaseList.objects.filter(id=sql.bundle_id).first()
-                    info = {
-                        'host': data.ip,
-                        'user': data.username,
-                        'password': data.password,
-                        'db': sql.basename,
-                        'port': data.port
-                    }
-                    try:
-                        with call_inception.Inception(LoginDic=info) as test:
-                            res = test.Check(sql=sql.sql)
-                            return Response({'result': res, 'status': 200})
-                    except Exception as e:
-                        CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
-                        return Response({'status': '请检查inception信息是否正确!'})
+                    return Response({'status': '请检查inception信息是否正确!'})
 
 
 class del_order(baseview.BaseView):
@@ -194,12 +188,7 @@ class del_order(baseview.BaseView):
         else:
             try:
                 for i in data_id:
-                    if i['status'] == 1:
-                        work_id = SqlOrder.objects.filter(id=i['id']).first()
-                        SqlRecord.objects.filter(workid=work_id.work_id).delete()
-                        SqlOrder.objects.filter(id=i['id']).delete()
-                    else:
-                        SqlOrder.objects.filter(id=i['id']).delete()
+                    SqlOrder.objects.filter(Q(id=i['id'])&(Q(status=0)|Q(status=4)|Q(status=5))).update(delete_yn = 0)
                 return Response('工单数据删除成功!')
             except Exception as e:
                 CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')

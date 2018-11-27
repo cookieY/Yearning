@@ -52,15 +52,15 @@
         </p>
         <Row>
           <Col span="24">
-            <Poptip
-              confirm
-              title="您确认删除这些工单信息吗?"
-              @on-ok="delrecordData"
-            >
-              <Button type="text" style="margin-left: -1%">删除记录</Button>
-            </Poptip>
-            <Button type="text" style="margin-left: -1%" @click.native="mou_data()">刷新</Button>
-
+            <template v-if="auth === 'manager' || auth === 'admin'">
+              <Poptip
+                confirm
+                title="您确认删除这些工单信息吗?"
+                @on-ok="delrecordData">
+                <Button type="text" >逻辑删除</Button>
+              </Poptip>
+              <Button type="success" @click.native="mou_data()">刷新</Button>
+            </template>
             <Table border :columns="columns6" :data="tmp" stripe ref="selection"
                    @on-selection-change="delrecordList"></Table>
             <br>
@@ -96,23 +96,24 @@
         </FormItem>
         <FormItem>
           <Table :columns="sql_columns" :data="sql" height="200"></Table>
+          <template v-if="auth === 'admin' || auth === 'manager'">
+            <p class="pa">SQL检查结果:</p>
+            <Table :columns="columnsName" :data="dataId" stripe border height="200"></Table>
+          </template>
         </FormItem>
-        <FormItem label="选择执行人:" v-if="multi && (auth === 'admin' || auth === 'manager')">
+        <FormItem label="选择执行人:" v-if="multi ">
           <Select v-model="multi_name" style="width: 20%" clearable v-if="formitem.status !== 1">
-            <Option v-for="i in multi_list" :value="i.username" :key="i.username">{{i.username}}</Option>
+            <Option v-for="i in multi_list" :value="i.username" :key="i.username">{{i.auth_group+':'+i.username}}</Option>
           </Select>
           <span v-if="formitem.status === 1">{{ formitem.exceuser }}</span>
         </FormItem>
       </Form>
-      <template v-if="auth === 'admin' || auth === 'manager'">
-        <p class="pa">SQL检查结果:</p>
-        <Table :columns="columnsName" :data="dataId" stripe border height="200"></Table>
-      </template>
+
 
       <div slot="footer">
-        <template v-if="auth === 'admin' || auth === 'manager'">
-          <Button @click="modal2 = false">取消</Button>
-          <template v-if="formitem.status === 2">
+        <Button @click="modal2 = false">取消</Button>
+        <template v-if="formitem.status === 2">
+          <template v-if="auth === 'admin' || auth === 'manager'">
             <Button type="warning" @click.native="test_button()" >检测sql</Button>
             <Button type="error" @click="out_button()" :disabled="summit">驳回</Button>
             <template v-if="multi && multi_name">
@@ -122,12 +123,13 @@
               <Button type="success" @click="put_button()" :disabled="summit">执行</Button>
             </template>
           </template>
-          <template v-else-if="formitem.status === 1">
-            <Button type="warning" @click.native="test_button()" >检测sql</Button>
-            <Button type="error" @click="out_button()" :disabled="summit">拒绝</Button>
-            <Button type="success" @click="put_button()" :disabled="summit">执行</Button>
-          </template>
         </template>
+        <template v-else-if="formitem.status === 1">
+          <Button type="warning" @click.native="test_button()" >检测sql</Button>
+          <Button type="error" @click="out_button()" :disabled="summit">拒绝</Button>
+          <Button type="success" @click="put_button()" :disabled="summit">执行</Button>
+        </template>
+
       </div>
     </Modal>
 
@@ -230,11 +232,15 @@
             sortable: true
           },
           {
-            title: '真实姓名',
-            key: 'real_name',
+            title: '审核人',
+            key: 'assigned',
             sortable: true
           },
-
+          {
+            title: '执行人',
+            key: 'exceuser',
+            sortable: true
+          },
           {
             title: '状态',
             key: 'status',
@@ -618,7 +624,7 @@
       this.mou_data()
       this.reboot = setInterval(function () {
         vm.mou_data(vm.$refs.page.currentPage)
-      }, 5000)
+      }, 10000)
     },
     destroyed () {
       clearInterval(this.reboot)

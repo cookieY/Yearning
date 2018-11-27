@@ -74,6 +74,7 @@ class SqlOrder(models.Model):
     rejected = models.TextField(blank=True)  # 驳回说明
     real_name = models.CharField(max_length=100, null=True)  # 姓名
     exceuser = models.CharField(max_length=50, blank=True)  # 工单执行人
+    delete_yn = models.IntegerField(null=False, default=1)  # 1:显示, 0:不显示
 
 
 class DatabaseList(models.Model):

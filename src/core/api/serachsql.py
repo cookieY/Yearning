@@ -172,6 +172,8 @@ class query_worklf(baseview.BaseView):
         return Response(serializers.data)
 
     def put(self, request, args: str = None):
+        
+        c_user = request.user
 
         if request.data['mode'] == 'put':
             instructions = request.data['instructions']
@@ -187,12 +189,12 @@ class query_worklf(baseview.BaseView):
             if not query_switch['query']:
                 query_per = 2
             else:
-                userinfo = Account.objects.filter(username=audit, group='admin').first()
+                audit_user = Account.objects.filter(Q(username=audit)&(Q(group='admin')|Q(group='manager'))).first()
                 try:
                     thread = threading.Thread(
                         target=push_message,
                         args=(
-                            {'to_user': request.user, 'workid': work_id}, 5, request.user, userinfo.email, work_id,
+                            {'to_user': c_user.username, 'workid': work_id}, 5, c_user.username, audit_user.email, work_id,
                             '提交')
                     )
                     thread.start()
@@ -201,7 +203,7 @@ class query_worklf(baseview.BaseView):
             query_order.objects.create(
                 work_id=work_id,
                 instructions=instructions,
-                username=request.user,
+                username=c_user,
                 date=util.date(),
                 query_per=query_per,
                 connection_name=connection_name,
@@ -217,11 +219,15 @@ class query_worklf(baseview.BaseView):
             return Response('查询工单已提交，等待管理员审核！')
 
         elif request.data['mode'] == 'agree':
-            work_id = request.data['work_id']
-            query_info = query_order.objects.filter(work_id=work_id).order_by('-id').first()
-            query_order.objects.filter(work_id=work_id).update(query_per=1)
-            userinfo = Account.objects.filter(username=query_info.username).first()
             try:
+                work_id = request.data['work_id']
+                if c_user.group == "admin":
+                    sql_str = Q(work_id=work_id)
+                else:
+                    sql_str = Q(work_id=work_id)& Q(audit=request.user.username)
+                query_info = query_order.objects.filter(sql_str).order_by('-id').first()
+                query_order.objects.filter(sql_str).update(query_per=1)
+                userinfo = Account.objects.filter(username=query_info.username).first()
                 thread = threading.Thread(target=push_message, args=(
                     {'to_user': query_info.username, 'workid': query_info.work_id}, 6, query_info.username,
                     userinfo.email,
@@ -232,11 +238,15 @@ class query_worklf(baseview.BaseView):
             return Response('查询工单状态已更新！')
 
         elif request.data['mode'] == 'disagree':
-            work_id = request.data['work_id']
-            query_order.objects.filter(work_id=work_id).update(query_per=0)
-            query_info = query_order.objects.filter(work_id=work_id).order_by('-id').first()
-            userinfo = Account.objects.filter(username=query_info.username).first()
-            try:
+            try:            
+                work_id = request.data['work_id']
+                if c_user.group == "admin":
+                    sql_str = Q(work_id=work_id)
+                else:
+                    sql_str = Q(work_id=work_id)& Q(audit=request.user.username)
+                query_info = query_order.objects.filter(sql_str).order_by('-id').first()
+                query_order.objects.filter(sql_str).update(query_per=0)
+                userinfo = Account.objects.filter(username=query_info.username).first()
                 thread = threading.Thread(target=push_message, args=(
                     {'to_user': query_info.username, 'workid': query_info.work_id}, 7, query_info.username,
                     userinfo.email,
@@ -259,7 +269,11 @@ class query_worklf(baseview.BaseView):
 
         elif request.data['mode'] == 'end':
             try:
-                query_order.objects.filter(work_id=request.data['work_id']).update(query_per=3)
+                if c_user.group == "admin":
+                    sql_str = Q(work_id=request.data['work_id'])
+                else:
+                    sql_str = Q(work_id=request.data['work_id'])&(Q(username = c_user.username)|Q(audit = c_user.username))
+                query_order.objects.filter(sql_str).update(query_per=3)
                 return Response('已结束查询！')
             except Exception as e:
                 return HttpResponse(e)
@@ -342,14 +356,17 @@ class Query_order(baseview.BaseView):
         page = request.GET.get('page')
         page_size = request.GET.get('page_size', 10)
         if request.user.group == "admin":
-            pn = query_order.objects.filter(audit=request.user.username).count()
+            sql_str = Q(audit=request.user.username)
+            pn = query_order.objects.filter(sql_str).count()
         elif request.user.group == "manager":
-            pn = query_order.objects.filter(Q(audit=request.user.username) | Q(username=request.user.username)).count()
+            sql_str = Q(audit=request.user.username) | Q(username=request.user.username)
+            pn = query_order.objects.filter(sql_str).count()
         else:
-            pn = query_order.objects.filter(username=request.user.username).count()
+            sql_str = Q(username=request.user.username)
+            pn = query_order.objects.filter(sql_str).count()
         start = (int(page) -1) * page_size
         end = int(page) * page_size
-        user_list = query_order.objects.all().order_by('-id')[start:end]
+        user_list = query_order.objects.filter(sql_str).all().order_by('-id')[start:end]
         serializers = Query_review(user_list, many=True)
         return Response({'data': serializers.data, 'pn': pn})
 
