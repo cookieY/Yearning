@@ -8,8 +8,6 @@ services:
       - ./db_data/:/var/lib/mysql/
       - ./init-sql/:/docker-entrypoint-initdb.d/
     restart: always
-    ports:
-      - "3306:3306"
     environment:
       MYSQL_ROOT_PASSWORD: yearning
       MYSQL_DATABASE: Yearning
@@ -17,7 +15,7 @@ services:
       MYSQL_PASSWORD: yearning
   yearning:
     image: registry.cn-hangzhou.aliyuncs.com/cookie/yearning:v1.3.4
-    depends_on: 
+    links: 
       - db
     ports:
       - "8080:80"
