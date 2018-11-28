@@ -1,0 +1,21 @@
+FROM python:3.6.7-alpine3.8
+
+RUN apk add --no-cache git musl-dev libffi-dev openssl-dev gcc libxml2-dev libxslt-dev libgcrypt-dev
+
+COPY src/requirements.txt /opt/Yearning/src/requirements.txt  
+
+RUN  pip3 install -r /opt/Yearning/src/requirements.txt \
+	&& sed -i "s#\(.*\)int(self\.server_version\.split('\.', 1)\[0\]) >= 5\(.*\)#\1int(self\.server_version\.split('\.', 1)\[0\]) >= 5 or self\.server_version\.split('\.', 1)\[0\] == 'Inception2'\2#g" /usr/local/lib/python3.6/site-packages/pymysql/connections.py \
+	&& sed -i "#defer_warnings#{n;s/self\._show_warnings()#pass#g}" /usr/local/lib/python3.6/site-packages/pymysql/cursors.py
+COPY src /opt/Yearning/src
+
+WORKDIR /opt/Yearning/src 
+COPY install/start_yearning.sh ./start_yearning.sh
+RUN mv deploy.conf.template deploy.conf \
+		&& chmod 755 ./start_yearning.sh
+
+EXPOSE 8000
+
+STOPSIGNAL SIGTERM
+
+CMD ["./start_yearning.sh"]

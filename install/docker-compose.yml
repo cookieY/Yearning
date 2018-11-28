@@ -2,6 +2,7 @@ version: '2'
 
 services:
   db:
+    container_name: mysql
     image: mysql:5.7
     ports:
       - 3306:3306
@@ -16,21 +17,27 @@ services:
     restart: always
 
   inception:
+    container_name: inception
     image: registry.cn-hangzhou.aliyuncs.com/lihuanhuan/inception
     ports:
       - 6669:6669
     volumes:
-      - d://workspace/github/Yearning/install/yearning-docker-compose/docker/etc/inception/inc.cnf:/etc/inc.cnf
+      - d://workspace/github/Yearning/install/etc/inception/inc.cnf:/etc/inc.cnf
     network_mode: bridge
     restart: always
     container_name: inception
+    restart: always
 
   yearning:
-    image: registry.cn-hangzhou.aliyuncs.com/cookie/yearning:v1.3.3
+    container_name: yearning
+    image: registry.cn-beijing.aliyuncs.com/donobody/yearning
+    build: 
+      context: ..
+      dockerfile: ./Dockerfile-src
     depends_on: 
       - db
+      - inception
     ports:
-      - "8080:80"
       - "8000:8000"
     environment:
       HOST: localhost
@@ -39,6 +46,17 @@ services:
       MYSQL_ADDR: db
     network_mode: bridge
     restart: always
+  
+  yearningweb:
+    container_name: yearningweb
+    build:
+      context: ..
+      dockerfile: ./Dockerfile-webpage
+    image: registry.cn-beijing.aliyuncs.com/donobody/yearningweb
+    depends_on: 
+      - yearning
+    network_mode: bridge
+    restart: always
+    ports:
+      - 80:80
 
-# 默认账号：admin，默认密码：Yearning_admin
-# 感谢 eacdy 张功震 贡献

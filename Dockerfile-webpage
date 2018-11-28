@@ -1,0 +1,11 @@
+FROM node:8-alpine as builder
+
+COPY webpage/package.json /opt/Yearning/webpage/package.json
+WORKDIR /opt/Yearning/webpage
+RUN npm install --production  
+
+COPY webpage /opt/Yearning/webpage 
+RUN npm run build
+
+FROM nginx:1.15-alpine 
+COPY --from=builder /opt/Yearning/webpage/dist/ /usr/share/nginx/html/
