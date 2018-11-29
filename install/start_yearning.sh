@@ -1,6 +1,6 @@
 #!/bin/sh
-sed -i "s/ipaddress =.*/ipaddress=$HOST/" deploy.conf
-sed -i "s/address =.*/address=$MYSQL_ADDR/" deploy.conf
-sed -i "s/username =.*/username=$MYSQL_USER/" deploy.conf
-sed -i "s/password =.*/password=$MYSQL_PASSWORD/" deploy.conf
+sed -i -r "s/ipaddress =.*/ipaddress=$HOST/" /opt/Yearning/src/deploy.conf
+sed -i -r "s/address =.*/address=$MYSQL_ADDR/" /opt/Yearning/src/deploy.conf
+sed -i -r "s/username =.*/username=$MYSQL_USER/" /opt/Yearning/src/deploy.conf
+sed -i -r "s/password =.*/password=$MYSQL_PASSWORD/" /opt/Yearning/src/deploy.conf
 /usr/local/bin/gunicorn settingConf.wsgi:application -b 0.0.0.0:8000 -w 2
