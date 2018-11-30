@@ -7,7 +7,7 @@ services:
     ports:
       - 3306:3306
     volumes:
-      - d://workspace/docker_share/mysql:/var/lib/mysql
+      - /server/docker_share/mysql:/var/lib/mysql
     environment:
       - MYSQL_ROOT_PASSWORD=root
     container_name: mysql
@@ -22,11 +22,13 @@ services:
     ports:
       - 6669:6669
     volumes:
-      - d://workspace/github/Yearning/install/etc/inception/inc.cnf:/etc/inc.cnf
+      - ./etc/inception/inc.cnf:/etc/inc.cnf
     network_mode: bridge
     restart: always
     container_name: inception
     restart: always
+    links:
+      - db
 
   yearning:
     container_name: yearning
@@ -46,6 +48,9 @@ services:
       MYSQL_ADDR: db
     network_mode: bridge
     restart: always
+    links:
+      - db
+      - inception
   
   yearningweb:
     container_name: yearningweb
@@ -59,4 +64,8 @@ services:
     restart: always
     ports:
       - 80:80
+    links:
+      - yearning
+    volumes:
+      - ./etc/nginx/default.conf:/etc/nginx/conf.d/default.conf
 
