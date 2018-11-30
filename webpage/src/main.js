@@ -32,16 +32,16 @@ router.beforeEach((to, from, next) => {
   if (sessionStorage.getItem('locking') === '1' && to.name !== 'locking') { // 判断当前是否是锁定状态
     iView.LoadingBar.finish()
     next(false)
-    router.replace({name: 'login'})
+    router.replace({ name: 'login' })
   } else if (sessionStorage.getItem('locking') === '0' && to.name === 'locking') {
     iView.LoadingBar.finish()
     next(false)
   } else {
     if (!sessionStorage.getItem('user') && to.name !== 'login') { // 判断是否已经登录且前往的页面不是登录页
-      next({name: 'login'})
+      next({ name: 'login' })
       iView.LoadingBar.finish()
     } else if (sessionStorage.getItem('user') && to.name === 'login') { // 判断是否已经登录且前往的是登录页
-      next({name: 'login'})
+      next({ name: 'login' })
       iView.LoadingBar.finish()
     } else {
       next()
@@ -57,7 +57,7 @@ router.afterEach(() => {
 new Vue({
   el: '#Subnet',
   template: '<Subnet/>',
-  components: {Subnet},
+  components: { Subnet },
   store: store,
   router: router
 })

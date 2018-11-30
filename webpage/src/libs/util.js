@@ -53,15 +53,15 @@ util.auth = location.protocol + '//' + document.domain + ':8002/api-token-auth/'
 util.ajanxerrorcode = function (vm, error) {
   if (error.response) {
     if (error.response.status === 401) {
-      vm.$router.push({name: 'error_401'})
+      vm.$router.push({ name: 'error_401' })
     } else if (error.response.status === 400) {
-      Notice.error({title: '警告', desc: '账号密码错误,请重新输入!'})
+      Notice.error({ title: '警告', desc: '账号密码错误,请重新输入!' })
     } else if (error.response.status === 500) {
-      vm.$router.push({name: 'error_500'})
+      vm.$router.push({ name: 'error_500' })
     } else if (error.response.status === 404) {
-      vm.$router.push({name: 'error_404'})
+      vm.$router.push({ name: 'error_404' })
     } else {
-      Notice.error({title: '警告', desc: error.response})
+      Notice.error({ title: '警告', desc: error.response })
     }
   }
 }
@@ -79,7 +79,7 @@ util.showThisRoute = function (itAccess, currentAccess) {
 }
 
 util.openPage = function (vm, name) {
-  vm.$router.push({name: name})
+  vm.$router.push({ name: name })
   vm.$store.commit('Breadcrumbset', name)
   vm.$store.state.currentPageName = name
   util.taglist(vm, name)
@@ -97,7 +97,7 @@ util.taglist = function (vm, name) {
   appRouter.forEach((val) => {
     for (let i of val.children) {
       if (i.name === name && name !== 'home_index') {
-        vm.$store.state.pageOpenedList.push({'title': i.title, 'name': i.name})
+        vm.$store.state.pageOpenedList.push({ 'title': i.title, 'name': i.name })
       }
     }
   })

@@ -2,7 +2,7 @@ FROM node:8-alpine as builder
 
 COPY webpage/package.json /opt/Yearning/webpage/package.json
 WORKDIR /opt/Yearning/webpage
-RUN npm install --production  
+RUN npm install 
 
 COPY webpage /opt/Yearning/webpage 
 RUN npm run build

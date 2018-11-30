@@ -36,6 +36,10 @@ module.exports = {
         }
       },
       {
+        test: /iview.src.*?js$/,
+        loader: 'babel-loader'
+      },
+      {
         test: /\.vue$/,
         loader: 'vue-loader',
         options: vueLoaderConfig
@@ -43,7 +47,7 @@ module.exports = {
       {
         test: /\.js$/,
         loader: 'babel-loader',
-        include: [resolve('src'), resolve('test'),resolve('node_modules/iview')]
+        include: [resolve('src'), resolve('test'), resolve('node_modules/iview')]
       },
       {
         test: /\.(png|jpe?g|gif|svg)(\?.*)?$/,
