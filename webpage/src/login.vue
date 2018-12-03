@@ -261,7 +261,9 @@
               sessionStorage.setItem('auth', res.data['permissions'])
               let auth = res.data['permissions']
               if (auth === 'admin') {
-                sessionStorage.setItem('access', 0)
+                sessionStorage.setItem('access', 3)
+              } else if (auth === 'manager') {
+                sessionStorage.setItem('access', 2)
               } else {
                 sessionStorage.setItem('access', 1)
               }

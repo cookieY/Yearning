@@ -42,8 +42,8 @@ services:
     ports:
       - "8000:8000"
     environment:
-      HOST: localhost
-      MYSQL_PASSWORD: yearning
+      HOST: 0.0.0.0
+      MYSQL_PASSWORD: root
       MYSQL_USER: root
       MYSQL_ADDR: db
     network_mode: bridge

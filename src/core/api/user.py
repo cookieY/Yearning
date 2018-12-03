@@ -213,7 +213,7 @@ class ldapauth(baseview.AnyLogin):
             valite = util.auth(username=username, password=password)
             if valite:
                 user = Account.objects.filter(username=username).first()
-                if user is not None:
+                if user:
                     user.set_password(password)
                     user.save()
                     payload = jwt_payload_handler(user)
