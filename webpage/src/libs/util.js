@@ -31,7 +31,7 @@ util.mode = function typeok (obj) {
 util.err_notice = function (err) {
   Notice.error({
     title: '错误',
-    desc: err.response.data ? err.response.data : err,
+    desc: err.response && err.response.data ? err.response.data : err,
     duration: 3
   })
 }
