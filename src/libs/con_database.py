@@ -8,7 +8,8 @@ cookie
 '''
 
 import pymysql
-
+import logging
+CUSTOM_ERROR = logging.getLogger('Yearning.core.views')
 
 class SQLgo(object):
     def __init__(self, ip=None, user=None, password=None, db=None, port=None):
@@ -46,12 +47,10 @@ class SQLgo(object):
             result = cursor.fetchall()
             for field in cursor.description:
                 if id == 0:
-                    head_info = {'title': field[0], "key": field[0], "fixed": "left", "minWidth": 60}
+                    head_info = {'title': field[0], "key": field[0]}
                     id += 1
                 else:
-                    head_info = {'title': field[0], "key": field[0], "minWidth": 60}
-                if field[3] >= 253:
-                    head_info.update({"width" : 200})
+                    head_info = {'title': field[0], "key": field[0]}
                 data_dict.append(head_info)
             len = cursor.rowcount
         return {'data': result, 'title': data_dict, 'len': len}

@@ -266,8 +266,24 @@
               if (!res.data['data']) {
                 util.err_notice(res.data)
               } else {
-                this.columnsName = res.data['title']
                 this.allsearchdata = res.data['data']
+                let dataFirst = this.allsearchdata[0]
+                let dataWidth = {}
+                for (let item in dataFirst) {
+                  if ((dataFirst[item] + '').length > 30) {
+                    dataWidth[item] = 260
+                  }
+                }
+                this.columnsName = res.data['title'].map((item, index) => {
+                  if (index === 0) {
+                      item['fixed'] = 'left'
+                  }
+                  item['minWidth'] = 80
+                  if (dataWidth[item.key]) {
+                    item['width'] = dataWidth[item.key]
+                  }
+                  return item
+                })
                 this.Testresults = this.allsearchdata.slice(0, 10)
                 this.total = res.data['len']
               }
