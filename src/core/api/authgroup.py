@@ -16,7 +16,7 @@ class auth_group(baseview.BaseView):
     def get(self, request, args: str = None):
         if args == 'all':
             user = Account.objects.filter(username=request.user).first()
-            if user.id != 1:
+            if user.group != 'admin':
                 return HttpResponse(status=401)
             else:
                 try:

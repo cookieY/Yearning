@@ -25,14 +25,14 @@
                 </Select>
               </Form-item>
               <Form-item label="连接名称:" prop="connection_name">
-                <Select v-model="formItem.connection_name" placeholder="请选择" @on-change="DataBaseName" filterable>
+                <Select v-model="formItem.connection_name" placeholder="请选择" @on-change="DataBaseName" filterable :disabled="sql.length !== 0" >
                   <Option v-for="i in tableform.sqlname" :value="i.connection_name" :key="i.connection_name" >
                     {{ i.connection_name }}
                   </Option>
                 </Select>
               </Form-item>
               <Form-item label="数据库库名:" prop="basename">
-                <Select v-model="formItem.basename" placeholder="请选择" @on-change="GetTableName" filterable>
+                <Select v-model="formItem.basename" placeholder="请选择" @on-change="GetTableName" filterable :disabled="sql.length !== 0">
                   <Option v-for="item in tableform.basename" :value="item" :key="item">{{ item }}</Option>
                 </Select>
               </Form-item>
@@ -411,6 +411,13 @@
           this.ScreenConnection(index)
         }
       },
+      ScreenConnection (b) {
+        this.tableform.sqlname = this.item.filter(item => {
+          if (item.computer_room === b) {
+            return item
+          }
+        })
+      },
       test_sql () {
         let ddl = ['select', 'insert', 'update', 'delete']
         let createtable = this.formDynamic.split(';')
@@ -482,13 +489,6 @@
             })
         }
       },
-      ScreenConnection (b) {
-        this.tableform.sqlname = this.item.filter(item => {
-          if (item.computer_room === b) {
-            return item
-          }
-        })
-      },
       GetTableName () {
         if (this.formItem.basename) {
           let data = JSON.stringify(this.formItem)
@@ -502,12 +502,19 @@
             util.err_notice(error)
           })
         }
+        this.getdatabases([this.formItem.connection_name])
       },
-      getdatabases () {
-        axios.put(`${util.url}/workorder/connection`, {'permissions_type': 'ddl'})
+      getdatabases (ddlcon = []) {
+        console.log(ddlcon)
+        axios.put(`${util.url}/workorder/connection`, {
+          'permissions_type': 'ddl',
+           'ddlcon': ddlcon
+        })
           .then(res => {
+            console.log(res)
             this.item = res.data['connection']
             this.assigned = res.data['assigend']
+
             this.dataset = res.data['custom']
           })
           .catch(error => {
@@ -585,6 +592,7 @@
         })
       },
       canel () {
+        this.getdatabases()
         this.sql = []
         this.pass = false
         this.getinfo()

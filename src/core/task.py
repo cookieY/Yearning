@@ -18,7 +18,7 @@ from .models import (
 
 CUSTOM_ERROR = logging.getLogger('Yearning.core.views')
 
-def set_auth_group(user):
+def set_auth_group(user, ddlcon = [], dmlcon = [], querycon = [], **kwargs):
     perm = {
         'ddl': '0',
         'ddlcon': [],
@@ -38,13 +38,43 @@ def set_auth_group(user):
     group_list = str(group.auth_group).split(',')
     for group_name in group_list:
         auth = grained.objects.filter(username=group_name).first()
-        if auth is not None:
-            for k, v in perm.items():
-                if isinstance(v, list):
-                    v = list(set(v) | set(auth.permissions[k]))
-                elif v == '0':
-                    v = auth.permissions[k]
-                perm[k] = v
+        if auth:
+            if ddlcon:
+                tmp_ddlcon = set(auth.permissions['ddlcon'])& set(ddlcon)
+                if tmp_ddlcon:
+                    perm['ddlcon'] += list(set(perm['ddlcon'])| tmp_ddlcon)
+                else:
+                    continue
+            else:
+                perm['ddlcon'] += auth.permissions['ddlcon']
+
+            if dmlcon:
+                tmp_dmlcon = set(auth.permissions['dmlcon'])& set(dmlcon)
+                if tmp_dmlcon:
+                    perm['dmlcon'] += list(set(perm['dmlcon'])| tmp_dmlcon)
+                else:
+                    continue
+            else:
+                perm['dmlcon'] += auth.permissions['dmlcon']
+
+            if querycon:
+                tmp_querycon = set(auth.permissions['querycon'])& set(querycon)
+                if tmp_querycon:
+                    perm['querycon'] += list(set(perm['querycon'])| tmp_querycon)
+                else:
+                    continue
+            else:
+                perm['querycon'] += auth.permissions['querycon']
+            
+            perm['diccon'] += auth.permissions['diccon']
+            perm['person'] += auth.permissions['person']
+            for k, v in auth.permissions.items():
+                if isinstance(v, str):
+                    if int(perm[k]) or int(v):
+                        perm[k] = '1'
+                    else:
+                        perm[k] = '0'
+
     return perm
 
 

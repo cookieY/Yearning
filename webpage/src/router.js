@@ -292,7 +292,7 @@ export const appRouter = [
         name: 'management-user',
         title: '用户',
         'icon': 'md-people',
-        access: 3,
+        access: 2,
         component: resolve => {
           require(['./components/management/userInfo.vue'], resolve)
         }
