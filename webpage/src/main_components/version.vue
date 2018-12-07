@@ -1,6 +1,6 @@
 <template>
   <div style="margin-left: 2%">
-    <h1>Yearning v1.3.0</h1>
+    <h1>v2.3.0</h1>
     <h2>更新内容:</h2>
     <p></p>
     <p v-for="i in word">{{i}}</p>

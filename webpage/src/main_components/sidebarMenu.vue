@@ -16,7 +16,7 @@
     <MenuItem name="main">
       <Icon type="md-cube" size="50" class="MenuIcon"></Icon>
       <br>
-      <span>Yearning SQL审核平台</span>
+      <span>JLC SQL审核平台</span>
     </MenuItem>
     <MenuItem name="home_index">
       <Icon type="md-home" :size="iconSize"></Icon>

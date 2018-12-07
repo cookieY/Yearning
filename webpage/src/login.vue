@@ -18,11 +18,11 @@
     <div class="div-a">
       <div style='margin-left: 10%'>
         <Icon type="md-cube" size="60" style="margin-top:5%"></Icon>
-        <p style="margin-left: 20%;margin-top: -10%;font-size: 20px">Yearning SQL 审核平台</p>
+        <p style="margin-left: 20%;margin-top: -10%;font-size: 20px">JLC SQL 审核平台</p>
       </div>
       <br>
       <Card>
-        <Tabs value="custom" style="max-height: 300px;">
+        <Tabs value="ldap" style="max-height: 300px;">
           <TabPane label="普通登陆" name="custom">
             <Form ref="formInline" :model="formInline" :rules="ruleInline" inline>
               <Form-item prop="user" style="width: 100%">
@@ -35,7 +35,7 @@
                 <Button type="primary" @click="authdata()" style="width: 100%" size="large">登录</Button>
                 <Button type="success" @click="register = true" style="width: 100%;margin-top: 3%" size="large">用户注册
                 </Button>
-                <p style="margin-left: 5%;margin-top: 5%">2018 © Power By Cookie.Ye 使用chrome获得最佳体验</p>
+                <p style="margin-left: 5%;margin-top: 5%">使用chrome获得最佳体验</p>
               </Form-item>
             </Form>
           </TabPane>
@@ -51,7 +51,7 @@
               </Form-item>
               <Form-item style="width: 100%">
                 <Button type="primary" @click="ldap_login()" style="width: 100%" size="large">登录</Button>
-                <p style="margin-left: 5%;margin-top: 5%">2018 © Power By Cookie.Ye 使用chrome获得最佳体验</p>
+                <p style="margin-left: 5%;margin-top: 5%">使用chrome获得最佳体验</p>
               </Form-item>
             </Form>
           </TabPane>
