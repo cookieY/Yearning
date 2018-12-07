@@ -23,7 +23,7 @@
                 </FormItem>
 
                 <FormItem label="连接名:" prop="connection_name">
-                  <Select v-model="formItem.connection_name" @on-change="DataBaseName" filterable>
+                  <Select v-model="formItem.connection_name" @on-change="DataBaseName" filterable :disabled="formItem.textarea.length !== 0">
                     <Option v-for="i in datalist.connection_name_list" :value="i.connection_name"
                             :key="i.connection_name">{{ i.connection_name }}
                     </Option>
@@ -341,18 +341,26 @@
       },
       ClearForm () {
         this.formItem.textarea = ''
+      },
+      getdatabases (dmlcon = []) {
+        console.log(dmlcon)
+        axios.put(`${util.url}/workorder/connection`, {
+          'permissions_type': 'dml',
+           'dmlcon': dmlcon
+        })
+          .then(res => {
+            console.log(res)
+            this.item = res.data['connection']
+            this.assigned = res.data['assigend']
+            this.datalist.computer_roomlist = res.data['custom']
+          })
+          .catch(error => {
+            util.err_notice(error)
+          })
       }
     },
     mounted () {
-      axios.put(`${util.url}/workorder/connection`, {'permissions_type': 'dml'})
-        .then(res => {
-          this.item = res.data['connection']
-          this.assigned = res.data['assigend']
-          this.datalist.computer_roomlist = res.data['custom']
-        })
-        .catch(error => {
-          util.err_notice(error)
-        })
+      this.getdatabases()
       for (let i of util.highlight.split('|')) {
         this.wordList.push({'vl': i, 'meta': '关键字'})
       }

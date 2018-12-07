@@ -20,24 +20,24 @@
           <div class="edittable-test-con">
             <Form :model="formItem" :label-width="100" ref="formItem" :rules="ruleValidate">
               <Form-item label="机房:" prop="computer_room">
-                <Select v-model="formItem.computer_room" placeholder="请选择" @on-change="Connection_Name">
+                <Select v-model="formItem.computer_room" placeholder="请选择">
                   <Option v-for="i in dataset" :value="i" :key="i">{{ i }}</Option>
                 </Select>
               </Form-item>
               <Form-item label="连接名称:" prop="connection_name">
-                <Select v-model="formItem.connection_name" placeholder="请选择" @on-change="DataBaseName" filterable :disabled="sql.length !== 0" >
-                  <Option v-for="i in tableform.sqlname" :value="i.connection_name" :key="i.connection_name" >
+                <Select v-model="formItem.connection_name" placeholder="请选择" filterable :disabled="sql.length !== 0" ref="connection_name">
+                  <Option v-for="i in tableform.conname" :value="i.connection_name" :key="i.connection_name" >
                     {{ i.connection_name }}
                   </Option>
                 </Select>
               </Form-item>
               <Form-item label="数据库库名:" prop="basename">
-                <Select v-model="formItem.basename" placeholder="请选择" @on-change="GetTableName" filterable :disabled="sql.length !== 0">
+                <Select v-model="formItem.basename" placeholder="请选择" filterable :disabled="sql.length !== 0" ref="basename">
                   <Option v-for="item in tableform.basename" :value="item" :key="item">{{ item }}</Option>
                 </Select>
               </Form-item>
               <Form-item label="数据库表名:">
-                <Select v-model="formItem.tablename" placeholder="请选择" filterable>
+                <Select v-model="formItem.tablename" placeholder="请选择" filterable ref="tablename">
                   <Option v-for="item in tableform.info" :value="item" :key="item">{{ item }}</Option>
                 </Select>
               </Form-item>
@@ -182,13 +182,13 @@
     data () {
       return {
         dataset: [],
-        item: {},
+        item: [],
         basename: [],
         sqlname: [],
         TableDataNew: [],
         TableCreateSql: [],
         tableform: {
-          sqlname: [],
+          conname: [],
           basename: [],
           info: []
         },
@@ -406,18 +406,6 @@
         require('brace/mode/mysql')
         require('brace/theme/xcode')
       },
-      Connection_Name (index) {
-        if (index) {
-          this.ScreenConnection(index)
-        }
-      },
-      ScreenConnection (b) {
-        this.tableform.sqlname = this.item.filter(item => {
-          if (item.computer_room === b) {
-            return item
-          }
-        })
-      },
       test_sql () {
         let ddl = ['select', 'insert', 'update', 'delete']
         let createtable = this.formDynamic.split(';')
@@ -471,51 +459,15 @@
           this.sql.push(i)
         }
       },
-      DataBaseName (index) {
-        if (index) {
-          this.id = this.item.filter(item => {
-            if (item.connection_name === index) {
-              return item
-            }
-          })
-          axios.put(`${util.url}/workorder/basename`, {
-            'id': this.id[0].id
-          })
-            .then(res => {
-              this.tableform.basename = res.data
-            })
-            .catch(() => {
-              util.err_notice('无法连接数据库!请检查网络')
-            })
-        }
-      },
-      GetTableName () {
-        if (this.formItem.basename) {
-          let data = JSON.stringify(this.formItem)
-          axios.put(`${util.url}/workorder/tablename`, {
-            'data': data,
-            'id': this.id[0].id
-          })
-            .then(res => {
-              this.tableform.info = res.data
-            }).catch(error => {
-            util.err_notice(error)
-          })
-        }
-        this.getdatabases([this.formItem.connection_name])
-      },
       getdatabases (ddlcon = []) {
-        console.log(ddlcon)
         axios.put(`${util.url}/workorder/connection`, {
           'permissions_type': 'ddl',
            'ddlcon': ddlcon
         })
           .then(res => {
-            console.log(res)
-            this.item = res.data['connection']
+            this.item = this.item.length ? this.item : res.data['connection']
             this.assigned = res.data['assigend']
-
-            this.dataset = res.data['custom']
+            this.dataset = this.dataset.length ? this.dataset : res.data['custom']
           })
           .catch(error => {
             util.err_notice(error)
@@ -660,6 +612,80 @@
         this.wordList.push({'vl': i, 'meta': '关键字'})
       }
       this.getdatabases()
+    },
+    watch: {
+      'formItem.computer_room': function (val) {
+        this.tableform.conname = this.item.filter(item => {
+          if (item.computer_room === val) {
+            return item
+          }
+        })
+        // 清空备选项
+        this.tableform.basename = []
+        this.tableform.info = []
+        // 情况绑定值
+        this.formItem.connection_name = ''
+        this.formItem.basename = ''
+        this.formItem.tablename = ''
+        // 清空搜索内容
+        this.$refs.connection_name.setQuery('')
+        this.$refs.basename.setQuery('')
+        this.$refs.tablename.setQuery('')
+      },
+      'formItem.connection_name': function (val) {
+        console.log(val)
+        this.id = this.item.filter(item => {
+            if (item.connection_name === val) {
+              return item
+            }
+          })
+          axios.put(`${util.url}/workorder/basename`, {
+            'id': this.id[0].id
+          })
+            .then(res => {
+              // 清空备选项
+              this.tableform.basename = res.data
+              this.tableform.info = []
+              // 清空绑定值
+              this.formItem.basename = ''
+              this.formItem.tablename = ''
+              // 清空搜索内容
+              this.$refs.basename.setQuery('')
+              this.$refs.tablename.setQuery('')
+            })
+            .catch(() => {
+              util.err_notice('无法连接数据库!请检查网络')
+            })
+        this.getdatabases([this.formItem.connection_name])
+      },
+      'formItem.basename': function (val) {
+        console.log(this.formItem.computer_room + ':::: ' + this.formItem.connection_name + ':::' + val + ',,,,,')
+        console.log(this.formItem.computer_room && this.formItem.connection_name && val)
+        if (this.formItem.computer_room && this.formItem.connection_name && val) {
+          let data = JSON.stringify(this.formItem)
+          axios.put(`${util.url}/workorder/tablename`, {
+            'data': data,
+            'id': this.id[0].id
+          })
+            .then(res => {
+              // 清空备选项
+              this.tableform.info = res.data
+              // 清空绑定值
+              this.formItem.tablename = ''
+              // 清空搜索内容
+              this.$refs.tablename.setQuery(' ')
+            }).catch(error => {
+            util.err_notice(error)
+          })
+        } else {
+          // 清空备选项
+          this.tableform.info = []
+          // 清空绑定值
+          this.formItem.tablename = ''
+          // 清空搜索内容
+          this.$refs.tablename.setQuery(' ')
+        }
+      }
     }
   }
 </script>

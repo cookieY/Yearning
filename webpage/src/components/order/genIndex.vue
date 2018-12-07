@@ -267,6 +267,7 @@
               util.err_notice('无法连接数据库!请检查网络')
             })
         }
+        this.getdatabases([this.formItem.connection_name])
       },
       ScreenConnection (b) {
         this.tableform.sqlname = this.item.filter(item => {
@@ -289,9 +290,14 @@
           })
         }
       },
-      getdatabases () {
-        axios.put(`${util.url}/workorder/connection`, {'permissions_type': 'ddl'})
+      getdatabases (dmlcon = []) {
+        console.log(dmlcon)
+        axios.put(`${util.url}/workorder/connection`, {
+          'permissions_type': 'dml',
+           'dmlcon': dmlcon
+        })
           .then(res => {
+            console.log(res)
             this.item = res.data['connection']
             this.assigned = res.data['assigend']
             this.dataset = res.data['custom']
