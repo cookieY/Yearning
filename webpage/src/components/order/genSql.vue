@@ -105,6 +105,10 @@
                 <edittable refs="table2" v-model="TableDataNew" :columns-list="tabcolumns" @index="remove"
                            @on-change="cell_change"></edittable>
               </TabPane>
+              <TabPane label="添加&删除索引" name="order2" icon="md-add">
+                <editindex :tabledata="TableIndex" :table_name="formItem.tablename"
+                           @on-indexdata="getindexconfirm"></editindex>
+              </TabPane>
               <TabPane label="建表语句" name="order5" icon="md-crop">
                 <p v-html="TableCreateSql"></p>
               </TabPane>
@@ -171,12 +175,14 @@
   import axios from 'axios'
   import util from '../../libs/util'
   import edittable from './components/editTable'
+  import editindex from './components/modifyIndex.vue'
   import ICol from 'iview/src/components/grid/col'
 
   export default {
     components: {
       ICol,
       edittable,
+      editindex,
       editor: require('../../libs/editor')
     },
     data () {
@@ -187,6 +193,7 @@
         sqlname: [],
         TableDataNew: [],
         TableCreateSql: [],
+        TableIndex: [],
         tableform: {
           conname: [],
           basename: [],
@@ -500,6 +507,7 @@
               .then(res => {
                 this.TableDataNew = res.data.field
                 this.TableCreateSql = res.data.sql.replace(/\n/g, '<br>')
+                this.TableIndex = res.data.index
                 this.$Spin.hide()
               })
               .catch(() => {
@@ -563,7 +571,7 @@
           })
             .then(res => {
               for (let i of res.data) {
-                this.sql.push(i)
+                this.formDynamic += ';\n' + i.replace(/^\s+|\s+$/g, ' ')
               }
               this.putdata = []
               this.add_row = []
@@ -605,6 +613,11 @@
           'edit': data,
           'table_name': this.formItem.tablename
         })
+      },
+      getindexconfirm (val) {
+        for (let i of val) {
+          this.formDynamic += ';\n' + i.replace(/^\s+|\s+$/g, ' ')
+        }
       }
     },
     mounted () {

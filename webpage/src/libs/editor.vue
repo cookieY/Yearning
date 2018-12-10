@@ -19,7 +19,8 @@
     data () {
       return {
         editor: null,
-        contentBackup: ''
+        contentBackup: '',
+        selectContent: ''
       }
     },
     watch: {
@@ -61,6 +62,10 @@
         let content = editor.getValue()
         vm.$emit('input', content)
         vm.contentBackup = content
+      })
+      editor.on('changeSelection', function () {
+        let selectContent = editor.getSelectedText()
+        console.log(selectContent)
       })
     }
   }
