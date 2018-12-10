@@ -8,7 +8,7 @@ util.title = function (title) {
   window.document.title = title
 }
 
-util.mode = function typeok (obj) {
+util.mode = function (obj) {
   let oc = {}
   Object.keys(obj).forEach(function (key) {
     if (typeof obj[key] === 'string') {
@@ -104,6 +104,24 @@ util.taglist = function (vm, name) {
     }
   })
   localStorage.setItem('pageOpenedList', JSON.stringify(vm.$store.state.pageOpenedList))
+}
+
+util.clearObj = function (obj) {
+  for (let i in obj) {
+    if (typeof obj[i] === 'object') {
+      obj[i] = []
+    } else {
+      obj[i] = ''
+    }
+  }
+  return obj
+}
+
+util.sameMerge = function (obj, merge, el) {
+  for (let i of el) {
+    obj[i] = merge[i]
+  }
+  return obj
 }
 
 export default util

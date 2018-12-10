@@ -194,11 +194,11 @@
       LoginRegister () {
         this.$refs['userinfova'].validate((valid) => {
           if (valid) {
-            axios.post(`${util.url}/loginregister/`, {
+            axios.post(`${this.$config.url}/loginregister/`, {
               'userinfo': JSON.stringify(this.userinfo)
             })
               .then(res => {
-                util.notice(res.data)
+                this.$config.notice(res.data)
                 this.userinfo = {
                   username: '',
                   password: '',
@@ -209,15 +209,15 @@
                 }
               })
               .catch(error => {
-                util.err_notice(error)
+                this.$config.err_notice(error)
               })
           } else {
-            util.err_notice('请正确填写相关注册信息！')
+            this.$config.err_notice('请正确填写相关注册信息！')
           }
         })
       },
       authdata () {
-        axios.post(util.auth, {
+        axios.post(this.$config.auth, {
           'username': this.formInline.user,
           'password': this.formInline.password
         })
@@ -242,7 +242,7 @@
           })
       },
       ldap_login () {
-        axios.post(`${util.url}/ldapauth`, {
+        axios.post(`${this.$config.url}/ldapauth`, {
           'username': this.formInline.user,
           'password': this.formInline.password
         })

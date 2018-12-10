@@ -14,11 +14,12 @@ from core.models import DatabaseList, Account, querypermissions, query_order, gl
 
 CUSTOM_ERROR = logging.getLogger('Yearning.core.views')
 
+BLACKLIST = ['update', 'insert', 'alter', 'into', 'for', 'drop']
+
 
 def exclued_db_list():
     try:
         from core.models import globalpermissions
-
         setting = globalpermissions.objects.filter(authorization='global').first()
         exclued_database_name = setting.other.get('exclued_db_list', [])
     except Exception:
@@ -31,7 +32,8 @@ def exclued_db_list():
 class DateEncoder(simplejson.JSONEncoder):  # 感谢的凉夜贡献
 
     def default(self, o):
-        if isinstance(o, datetime.datetime) or isinstance(o, datetime.date) or isinstance(o, datetime.time):
+        if isinstance(o, datetime.datetime) or isinstance(o, datetime.date) \
+                or isinstance(o, datetime.time) or isinstance(o, datetime.timedelta):
             return o.__str__()
         return simplejson.JSONEncoder.default(self, o)
 
@@ -43,17 +45,48 @@ class search(baseview.BaseView):
 
     '''
 
+    @staticmethod
+    def sql_parse(sql):
+        for i in sql.split():
+            for c in BLACKLIST:
+                if i == c:
+                    return True
+
+    @staticmethod
+    def sql_as_ex(sql, sensitive_list):
+        count = 0
+        sql = sql.split()
+        for gen in sql:
+            if gen == 'as':
+                count += 1
+        if count != 0:
+            as_list = []
+            for i in range(len(sql)):
+                if sql[i] == 'as':
+                    as_list.append({sql[i - 1]: sql[i + 1].rstrip(',')})
+
+            if as_list is not None:
+                for sen_i in range(len(sensitive_list)):
+                    for as_i in as_list:
+                        for c in as_i:
+                            if sensitive_list[sen_i] == c:
+                                sensitive_list[sen_i] = as_i[c]
+            return sensitive_list
+        else:
+            return sensitive_list
+
     def post(self, request, args=None):
         un_init = util.init_conf()
         limit = ast.literal_eval(un_init['other'])
         sql = request.data['sql']
-        check = str(sql).strip().split(';\n')
+        check = str(sql).lower().strip().split(';\n')
         user = query_order.objects.filter(username=request.user).order_by('-id').first()
         un_init = util.init_conf()
         custom_com = ast.literal_eval(un_init['other'])
+        critical = len(custom_com['sensitive_list'])
         if user.query_per == 1:
-            if check[-1].strip().lower().startswith('s') != 1:
-                return Response('只支持查询功能或删除不必要的空白行！')
+            if check[-1].startswith('s') != 1:
+                return Response('请勿使用非查询语句,请删除不必要的空白行！')
             else:
                 address = json.loads(request.data['address'])
                 _c = DatabaseList.objects.filter(
@@ -68,25 +101,38 @@ class search(baseview.BaseView):
                         db=address['basename']
                 ) as f:
                     try:
-                        if limit.get('limit').strip() == '':
-                            CUSTOM_ERROR.error('未设置全局最大limit值，系统自动设置为1000')
-                            query_sql = replace_limit(check[-1].strip(), 1000)
+                        if search.sql_parse(check[-1]):
+                            return Response('语句中不得含有违禁关键字: update insert alter into for drop')
+
+                        if check[-1].startswith('show') != -1:
+                            query_sql = check[-1]
                         else:
-                            query_sql = replace_limit(check[-1].strip(), limit.get('limit'))
+                            if limit.get('limit').strip() == '':
+                                CUSTOM_ERROR.error('未设置全局最大limit值，系统自动设置为1000')
+                                query_sql = replace_limit(check[-1], 1000)
+                            else:
+                                query_sql = replace_limit(check[-1], limit.get('limit'))
                         data_set = f.search(sql=query_sql)
                     except Exception as e:
                         CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
                         return HttpResponse(e)
                     else:
-                        for l in data_set['data']:
-                            for k, v in l.items():
-                                if isinstance(v, bytes):
+                        if critical:
+                            as_list = search.sql_as_ex(query_sql, custom_com['sensitive_list'])
+                            for l in data_set['data']:
+                                for k, v in l.items():
                                     for n in range(data_set['len']):
-                                        data_set['data'][n].update({k: 'blob字段为不可呈现类型'})
-                                for i in custom_com['sensitive_list']:
-                                    if k == i:
-                                        for n in range(data_set['len']):
-                                            data_set['data'][n].update({k: '********'})
+                                        if isinstance(v, bytes):
+                                            data_set['data'][n].update({k: 'blob字段为不可呈现类型'})
+                                        for i in as_list:
+                                            if k == i:
+                                                data_set['data'][n].update({k: '********'})
+                        else:
+                            for l in data_set['data']:
+                                for k, v in l.items():
+                                    for n in range(data_set['len']):
+                                        if isinstance(v, bytes):
+                                            data_set['data'][n].update({k: 'blob字段为不可呈现类型'})
                         querypermissions.objects.create(
                             work_id=user.work_id,
                             username=request.user,

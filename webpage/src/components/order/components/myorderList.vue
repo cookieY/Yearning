@@ -18,9 +18,9 @@
           <Icon type="android-send"></Icon>
           工单{{ this.$route.query.workid }}详细信息
           <br>
-          <Button type="text" v-if="this.$route.query.status === 1" @click.native="_RollBack()">查看回滚语句</Button>
+          <Button type="text" v-if="this.$route.query.status === 1" @click.native="rollback()">查看回滚语句</Button>
           <Button type="text" v-else-if="this.$route.query.status === 0 || this.$route.query.status ===4"
-                  @click.native="PutData()">重新提交
+                  @click.native="repairOrder()">重新提交
           </Button>
           <Button type="text" v-if="this.$route.query.status === 2" @click.native="delorder()">工单撤销</Button>
           <Button type="text" @click.native="$router.go(-1)">返回</Button>
@@ -37,7 +37,7 @@
       <div class="top">返回顶端</div>
     </BackTop>
 
-    <Modal v-model="reloadsql" :ok-text="'提交工单'" width="800" @on-ok="_Putorder">
+    <Modal v-model="reloadsql" :ok-text="'提交工单'" width="800" @on-ok="comorder">
       <Row>
         <Card>
           <div class="step-header-con">
@@ -77,7 +77,6 @@
 </template>
 
 <script>
-  import util from '../../../libs/util'
   import axios from 'axios'
   //
   export default {
@@ -128,19 +127,18 @@
           username: '',
           bundle_id: null
         },
-        ddlsql: [],
         sqltype: null,
         dmlorddl: null
       }
     },
     methods: {
-      _RollBack () {
+      rollback () {
         this.sql = ''
         if (this.TableDataNew[1].state.length === 40) {
           this.openswitch = true
           let opid = this.TableDataNew.map(item => item.sequence)
           opid.splice(0, 1)
-          axios.post(`${util.url}/detail/`, {'opid': JSON.stringify(opid), 'id': this.$route.query.id})
+          axios.post(`${this.$config.url}/detail/`, {'opid': JSON.stringify(opid), 'id': this.$route.query.id})
             .then(res => {
               this.formItem = res.data.data
               this.formItem.backup = '0'
@@ -151,14 +149,14 @@
               this.reloadsql = true
             })
             .catch(() => {
-              util.err_notice('无法获得相关回滚数据,请确认备份库配置正确及备份规则')
+              this.$config.err_notice('无法获得相关回滚数据,请确认备份库配置正确及备份规则')
             })
         } else {
           this.$Message.error('此工单没有备份或语句执行失败!')
         }
       },
-      PutData () {
-        axios.put(`${util.url}/detail`, {'id': this.$route.query.id})
+      repairOrder () {
+        axios.put(`${this.$config.url}/detail`, {'id': this.$route.query.id})
           .then(res => {
             this.formItem = res.data.data
             this.sql = res.data.sql
@@ -166,13 +164,13 @@
             this.formItem.backup = '0'
           })
           .catch(error => {
-            util.err_notice(error)
+            this.$config.err_notice(error)
           })
         this.reloadsql = true
       },
-      _Putorder () {
+      comorder () {
         let sql = this.sql.replace(/(;|；)$/gi, '').replace(/\s/g, ' ').replace(/；/g, ';').split(';')
-        axios.post(`${util.url}/sqlsyntax/`, {
+        axios.post(`${this.$config.url}/sqlsyntax/`, {
           'data': JSON.stringify(this.formItem),
           'sql': JSON.stringify(sql),
           'real_name': sessionStorage.getItem('real_name'),
@@ -180,35 +178,35 @@
           'id': this.formItem.bundle_id
         })
           .then(() => {
-            util.notice('工单已提交成功')
+            this.$config.notice('工单已提交成功')
           })
           .catch(error => {
-            util.err_notice(error)
+            this.$config.err_notice(error)
           })
       },
       delorder () {
         let _list = []
         _list.push({'status': this.$route.query.status, 'id': this.$route.query.id})
-        axios.post(`${util.url}/undoOrder`, {
+        axios.post(`${this.$config.url}/undoOrder`, {
           'id': JSON.stringify(_list)
         })
           .then(res => {
-            util.notice(res.data)
+            this.$config.notice(res.data)
             this.$router.go(-1)
           })
           .catch(error => {
-            util.err_notice(error)
+            this.$config.err_notice(error)
           })
       }
     },
     mounted () {
-      axios.get(`${util.url}/detail?workid=${this.$route.query.workid}&status=${this.$route.query.status}&id=${this.$route.query.id}`)
+      axios.get(`${this.$config.url}/detail?workid=${this.$route.query.workid}&status=${this.$route.query.status}&id=${this.$route.query.id}`)
         .then(res => {
           this.TableDataNew = res.data.data
           this.dmlorddl = res.data.type
         })
         .catch(error => {
-          util.err_notice(error)
+          this.$config.err_notice(error)
         })
     }
   }

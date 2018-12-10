@@ -7,7 +7,7 @@
     <Col span="6">
       <Card>
         <p slot="title">
-          <Icon type="md-refresh" />
+          <Icon type="md-refresh"/>
           添加数据库
         </p>
         <div class="edittable-testauto-con">
@@ -34,7 +34,7 @@
             </Form-item>
             <Button type="info" @click="testlink()">测试连接</Button>
             <Button type="success" @click="add()" style="margin-left: 5%">确定</Button>
-            <Button type="warning" @click="del()" style="margin-left: 5%">取消</Button>
+            <Button type="warning" @click="reset()" style="margin-left: 5%">重置</Button>
           </Form>
         </div>
       </Card>
@@ -57,7 +57,7 @@
                     <Checkbox :label="c" :key="c" v-for="c in dictionary.databasesList"></Checkbox>
                   </CheckboxGroup>
                 </FormItem>
-                <Button @click.native="Commit" type="info">生成数据字典</Button>
+                <Button @click.native="genSqlDic" type="info">生成数据字典</Button>
               </Form>
             </div>
           </TabPane>
@@ -75,7 +75,7 @@
                   <Checkbox :label="c.BaseName" :key="c.BaseName" v-for="c in dictionary.getdellist"></Checkbox>
                 </CheckboxGroup>
               </FormItem>
-              <Button @click.native="Deletedic" type="warning">删除数据字典</Button>
+              <Button @click.native="deldic" type="warning">删除数据字典</Button>
             </Form>
           </TabPane>
         </Tabs>
@@ -84,7 +84,7 @@
     <Col span="18" class="padding-left-10">
       <Card>
         <p slot="title">
-          <Icon type="md-apps" />
+          <Icon type="md-apps"/>
           数据库详情表
         </p>
         <div class="edittable-con-1">
@@ -157,7 +157,7 @@
 <script>
   import '../../assets/tablesmargintop.css'
   import axios from 'axios'
-  import util from '../../libs/util'
+
   import ICol from '../../../node_modules/iview/src/components/grid/col'
 
   export default {
@@ -230,7 +230,6 @@
           }
         ],
         rowdata: [],
-        modal: false,
         // 添加数据库信息
         formItem: {
           name: '',
@@ -270,11 +269,6 @@
         },
         // 生成字典规则
         dataset: [],
-        Generate: {
-          textarea: '',
-          add: '',
-          name: ''
-        },
         dictionary: {
           name: '',
           add: '',
@@ -302,28 +296,27 @@
       }
     },
     methods: {
-      del () {
-        this.modal = false
-        this.formItem = {}
+      reset () {
+        this.formItem = this.$config.clearObj(this.formItem)
       },
       testlink () {
-        axios.put(util.url + '/management_db/test', {
+        axios.put(this.$config.url + '/management_db/test', {
           'ip': this.formItem.ip,
           'user': this.formItem.username,
           'password': this.formItem.password,
           'port': this.formItem.port
         })
           .then(res => {
-            util.notice(res.data)
+            this.$config.notice(res.data)
           })
           .catch(error => {
-            util.err_notice(error)
+            this.$config.err_notice(error)
           })
       },
       add () {
         for (let i of this.rowdata) {
           if (i.connection_name === this.formItem.name) {
-            util.err_notice('连接名称重复,请更改为其他!')
+            this.$config.err_notice('连接名称重复,请更改为其他!')
             return
           }
         }
@@ -337,18 +330,18 @@
               'password': this.formItem.password,
               'port': this.formItem.port
             }
-            axios.post(util.url + '/management_db/', {
+            axios.post(this.$config.url + '/management_db/', {
               'data': JSON.stringify(data)
             })
               .then(() => {
-                util.notice('数据库信息添加成功,请对相应用户赋予该数据库访问权限!')
+                this.$config.notice('数据库信息添加成功,请对相应用户赋予该数据库访问权限!')
                 this.$refs.totol.currentPage = 1
                 this.mountdata()
               })
               .catch(error => {
-                util.err_notice(error)
+                this.$config.err_notice(error)
               })
-            this.del()
+            this.reset()
           }
         })
       },
@@ -362,7 +355,7 @@
         this.delbasename = this.rowdata[index].connection_name
       },
       // 删除数据库字典
-      Deletedic () {
+      deldic () {
         if (this.dictionary.delname.length === 0) {
           this.$Message.error({
             content: '请选择相应的数据库再删除!',
@@ -376,24 +369,24 @@
             })
           } else {
             this.$Loading.start()
-            axios.put(`${util.url}/adminsql/deldic`, {
+            axios.put(`${this.$config.url}/adminsql/deldic`, {
               'name': this.dictionary.delname,
               'basename': this.dictionary.getdel
             })
               .then(res => {
-                util.notice(res.data)
+                this.$config.notice(res.data)
                 this.$Loading.finish()
                 this.cleardata()
               })
               .catch(error => {
-                util.err_notice(error)
+                this.$config.err_notice(error)
                 this.$Loading.error()
               })
           }
         }
       },
       // 生成数据库字典
-      Commit () {
+      genSqlDic () {
         if (this.dictionary.databases.length === 0) {
           this.$Message.error({
             content: '请选择相应的数据库再生成数据字典!',
@@ -416,16 +409,16 @@
               ])
             }
           })
-          axios.put(`${util.url}/adminsql/Generation`, {
+          axios.put(`${this.$config.url}/adminsql/Generation`, {
             'id': this.tmp_id,
             'basename': JSON.stringify(this.dictionary.databases)
           })
             .then(res => {
-              util.notice(res.data)
+              this.$config.notice(res.data)
               this.$Spin.hide()
               this.cleardata()
             }).catch(error => {
-            util.err_notice(error)
+            this.$config.err_notice(error)
             this.$Spin.hide()
           })
         }
@@ -436,14 +429,14 @@
           return
         }
         this.tmp_id = vl
-        axios.put(`${util.url}/workorder/basename`, {
+        axios.put(`${this.$config.url}/workorder/basename`, {
           'id': vl
         })
           .then(res => {
             this.dictionary.databasesList = res.data
           })
           .catch(() => {
-            util.err_notice('数据库信息获取失败,请检查网络状态.')
+            this.$config.err_notice('数据库信息获取失败,请检查网络状态.')
           })
       },
       // 全选
@@ -466,37 +459,32 @@
         if (val.length === 0) {
           return
         }
-        axios.put(`${util.url}/sqldic/getdiclist`, {
+        axios.put(`${this.$config.url}/sqldic/getdiclist`, {
           'name': val
         })
           .then(res => {
             this.dictionary.getdellist = res.data
           })
           .catch(error => {
-            util.err_notice(error)
+            this.$config.err_notice(error)
           })
       },
       // 重置
       cleardata () {
-        this.dictionary.name = ''
-        this.dictionary.databases = []
-        this.dictionary.databasesList = []
-        this.dictionary.getdellist = []
-        this.dictionary.getdel = []
-        this.dictionary.delname = ''
+        this.$config.clearObj(this.dictionary)
       },
       delbaselink () {
         if (this.delbasename === this.delconfirmbasename) {
-          axios.delete(`${util.url}/management_db/${this.delbasename}`)
+          axios.delete(`${this.$config.url}/management_db/${this.delbasename}`)
             .then(res => {
-              util.notice(res.data)
+              this.$config.notice(res.data)
               this.delbaseModal = false
               this.delconfirmbasename = ''
               this.$refs.totol.currentPage = 1
               this.mountdata()
             })
             .catch(error => {
-              util.err_notice(error)
+              this.$config.err_notice(error)
             })
         } else {
           this.$Message.error({
@@ -505,50 +493,45 @@
         }
       },
       mountdata (vl = 1) {
-        axios.get(`${util.url}/management_db/all/?page=${vl}&permissions_type=base`)
+        axios.get(`${this.$config.url}/management_db/all/?page=${vl}&permissions_type=base`)
           .then(res => {
-            this.rowdata = res.data.data
-            this.pagenumber = parseInt(res.data.page)
-            this.diclist = res.data.diclist
-            this.dataset = res.data['custom']
+            [this.rowdata, this.pagenumber, this.diclist, this.dataset] = [res.data.data, parseInt(res.data.page), res.data.diclist]
           })
           .catch(error => {
-            util.err_notice(error)
+            this.$config.err_notice(error)
           })
       },
       dingding (vl) {
         this.dingname = vl.connection_name
-        axios.get(`${util.url}/dingding?connection_name=${this.dingname}`)
+        axios.get(`${this.$config.url}/dingding?connection_name=${this.dingname}`)
           .then(res => {
-            this.dingdingid = res.data.id
-            this.dingdingbeforetext = res.data.before
-            this.dingdingaftertext = res.data.after
+            [this.dingdingid, this.dingdingbeforetext, this.dingdingaftertext] = [res.data.id, res.data.before, res.data.after]
           })
           .catch(error => {
-            util.err_notice(error)
+            this.$config.err_notice(error)
           })
         this.addDingding = true
       },
       savedingding () {
-        axios.post(`${util.url}/dingding/`, {
+        axios.post(`${this.$config.url}/dingding/`, {
           'before': this.dingdingbeforetext,
           'after': this.dingdingaftertext,
           'id': this.dingdingid
         })
           .then(() => {
-            util.notice('钉钉推送消息已设置成功!')
+            this.$config.notice('钉钉推送消息已设置成功!')
             this.addDingding = false
           })
           .catch(error => {
-            util.err_notice(error)
+            this.$config.err_notice(error)
           })
       },
       update_base () {
-        axios.put(`${util.url}/management_db/update`, {
+        axios.put(`${this.$config.url}/management_db/update`, {
           'data': JSON.stringify(this.editbaseinfo)
         })
-          .then(res => util.notice(res.data))
-          .catch(err => util.err_notice(err))
+          .then(res => this.$config.notice(res.data))
+          .catch(err => this.$config.err_notice(err))
       }
     },
     mounted () {

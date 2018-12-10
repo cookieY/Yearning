@@ -177,7 +177,7 @@
 </template>
 <script>
   import axios from 'axios'
-  import util from '../../libs/util'
+
   import ICircle from 'iview/src/components/circle/circle'
 
   export default {
@@ -452,7 +452,7 @@
       }
     },
     methods: {
-      edit_tab: function (index) {
+      edit_tab (index) {
         this.sql = []
         this.togoing = index
         this.dataId = []
@@ -468,36 +468,36 @@
         if (this.multi_name === '') {
           this.$Message.error('请选择执行人!')
         } else {
-          axios.put(`${util.url}/audit_sql`, {
+          axios.put(`${this.$config.url}/audit_sql`, {
             'type': 2,
             'perform': this.multi_name,
             'work_id': this.formitem.work_id,
             'username': this.formitem.username
           })
             .then(res => {
-              util.notice(res.data)
+              this.$config.notice(res.data)
               this.modal2 = false
             })
             .catch(error => {
-              util.err_notice(error)
+              this.$config.err_notice(error)
             })
         }
       },
       put_button () {
         this.modal2 = false
         this.tmp[this.togoing].status = 3
-        axios.put(`${util.url}/audit_sql`, {
+        axios.put(`${this.$config.url}/audit_sql`, {
           'type': 1,
           'from_user': sessionStorage.getItem('user'),
           'to_user': this.formitem.username,
           'id': this.formitem.id
         })
           .then(res => {
-            util.notice(res.data)
+            this.$config.notice(res.data)
             this.$refs.page.currentPage = 1
           })
           .catch(error => {
-            util.err_notice(error)
+            this.$config.err_notice(error)
           })
       },
       out_button () {
@@ -505,7 +505,7 @@
         this.reject.reje = true
       },
       rejecttext () {
-        axios.put(`${util.url}/audit_sql`, {
+        axios.put(`${this.$config.url}/audit_sql`, {
           'type': 0,
           'from_user': sessionStorage.getItem('user'),
           'text': this.reject.textarea,
@@ -513,17 +513,17 @@
           'id': this.formitem.id
         })
           .then(res => {
-            util.err_notice(res.data)
+            this.$config.err_notice(res.data)
             this.mou_data()
             this.$refs.page.currentPage = 1
           })
           .catch(error => {
-            util.err_notice(error)
+            this.$config.err_notice(error)
           })
       },
       test_button () {
         this.osclist = []
-        axios.put(`${util.url}/audit_sql`, {
+        axios.put(`${this.$config.url}/audit_sql`, {
           'type': 'test',
           'base': this.formitem.basename,
           'id': this.formitem.id
@@ -541,15 +541,15 @@
               this.summit = false
               sessionStorage.setItem('osc', JSON.stringify(osclist))
             } else {
-              util.err_notice(res.data.status)
+              this.$config.err_notice(res.data.status)
             }
           })
           .catch(error => {
-            util.err_notice(error)
+            this.$config.err_notice(error)
           })
       },
       mou_data (vl = 1) {
-        axios.get(`${util.url}/audit_sql?page=${vl}&username=${sessionStorage.getItem('user')}`)
+        axios.get(`${this.$config.url}/audit_sql?page=${vl}&username=${sessionStorage.getItem('user')}`)
           .then(res => {
             this.tmp = res.data.data
             this.tmp.forEach((item) => { (item.backup === 1) ? item.backup = '是' : item.backup = '否' })
@@ -558,28 +558,28 @@
             this.multi_list = res.data.multi_list
           })
           .catch(error => {
-            util.err_notice(error)
+            this.$config.err_notice(error)
           })
       },
       delrecordList (vl) {
         this.delrecord = vl
       },
       delrecordData () {
-        axios.post(`${util.url}/undoOrder`, {
+        axios.post(`${this.$config.url}/undoOrder`, {
           'id': JSON.stringify(this.delrecord)
         })
           .then(res => {
-            util.notice(res.data)
+            this.$config.notice(res.data)
             this.mou_data()
           })
           .catch(error => {
-            util.err_notice(error)
+            this.$config.err_notice(error)
           })
       },
       oscsetp (vl) {
         let vm = this
         this.callback_time = setInterval(function () {
-          axios.get(`${util.url}/osc/${vl}`)
+          axios.get(`${this.$config.url}/osc/${vl}`)
             .then(res => {
               if (res.data[0].PERCENT === 99) {
                 vm.percent = 100
@@ -596,11 +596,11 @@
         clearInterval(this.callback_time)
       },
       stop_osc () {
-        axios.delete(`${util.url}/osc/${this.oscsha1}`)
+        axios.delete(`${this.$config.url}/osc/${this.oscsha1}`)
           .then(res => {
-            util.notice(res.data)
+            this.$config.notice(res.data)
           })
-          .catch(error => util.err_notice(error))
+          .catch(error => this.$config.err_notice(error))
       }
     },
     mounted () {

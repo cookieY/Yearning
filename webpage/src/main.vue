@@ -8,7 +8,7 @@
       <div class="logo-con">
       </div>
       <sidebar-menu v-if="!hideMenuText" :menuList="menuList" :iconSize="18"/>
-      <sidebar-menu-shrink :icon-color="menuIconColor" v-else :menuList="menuList"/>
+      <sidebar-menu-shrink v-else :menuList="menuList"/>
     </div>
     <div class="main-header-con" :style="{paddingLeft: hideMenuText?'60px':'200px'}">
       <div class="main-header">
@@ -24,16 +24,16 @@
           </div>
         </div>
         <div class="header-avator-con">
-          <a @click="getc = true">捐助</a>
-          <Modal
-            v-model="getc"
-            title="捐助Yearning"
-            width="640">
-            <h3>让Yearning持续提供更好的功能与服务。</h3>
-            <br>
-            <img height="300" width="300" src="./assets/alipay.jpg"/>
-            <img height="300" width="300" src="./assets/wechat.jpg"/>
-          </Modal>
+          <!--<a @click="getc = true">捐助</a>-->
+          <!--<Modal-->
+          <!--v-model="getc"-->
+          <!--title="捐助Yearning"-->
+          <!--width="640">-->
+          <!--<h3>让Yearning持续提供更好的功能与服务。</h3>-->
+          <!--<br>-->
+          <!--<img height="300" width="300" src="./assets/alipay.jpg"/>-->
+          <!--<img height="300" width="300" src="./assets/wechat.jpg"/>-->
+          <!--</Modal>-->
           <a href="https://cookiey.github.io/Yearning-document/used/" target="_Blank">使用说明</a>
           <div @click="handleFullScreen" v-if="showFullScreenBtn" class="full-screen-btn-con">
             <Tooltip :content="isFullScreen ? '退出全屏' : '全屏'" placement="bottom">
@@ -50,7 +50,7 @@
               <Dropdown trigger="click" @on-click="handleClickUserDropdown">
                 <a href="javascript:void(0)">
                   <span class="main-user-name">{{ userName }}</span>
-                  <Icon type="md-arrow-dropdown" />
+                  <Icon type="md-arrow-dropdown"/>
                 </a>
                 <DropdownMenu slot="list">
                   <DropdownItem name="ownSpace">个人中心</DropdownItem>
@@ -63,7 +63,7 @@
         </div>
       </div>
       <div class="tags-con">
-        <tags-page-opened :pageTagsList="pageTagsList"></tags-page-opened>
+        <tags-page-opened :pageTagsList="pageOpenedList"></tags-page-opened>
       </div>
     </div>
     <div class="single-page-con" :style="{paddingLeft: hideMenuText?'60px':'200px'}">
@@ -123,7 +123,7 @@
   import breadcrumbNav from './main_components/breadcrumbNav.vue'
   import sidebarMenuShrink from './main_components/sidebarMenuShrink.vue'
   import axios from 'axios'
-  // ;
+  import { mapState } from 'vuex'
   import util from './libs/util.js'
 
   export default {
@@ -148,20 +148,11 @@
         statement: false
       }
     },
-    computed: {
-      menuList () {
-        return this.$store.state.menuList
-      },
-      pageTagsList () {
-        return this.$store.state.pageOpenedList // 打开的页面的页面对象
-      },
-      currentPath () {
-        return this.$store.state.currentPath // 当前面包屑数组
-      },
-      menuIconColor () {
-        return 'white'
-      }
-    },
+    computed: mapState([
+      'pageOpenedList',
+      'currentPath',
+      'menuList'
+    ]),
     methods: {
       // 导航栏收缩
       toggleClick () {
@@ -314,7 +305,7 @@
         }
       },
       statementput () {
-        axios.put(`${util.url}/homedata/statement`)
+        axios.put(`${this.$config.url}/homedata/statement`)
       }
     },
     mounted () {
@@ -330,7 +321,7 @@
         }]
       }
       this.init()
-      axios.get(`${util.url}/homedata/messages`)
+      axios.get(`${this.$config.url}/homedata/messages`)
         .then(res => {
           if (res.data.statement !== 'pass') {
             this.statement = true

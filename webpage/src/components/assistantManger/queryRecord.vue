@@ -23,7 +23,6 @@
 </template>
 <script>
   import axios from 'axios'
-  import util from '../../libs/util'
 
   export default {
     name: 'put',
@@ -77,19 +76,18 @@
           }
         ],
         page_number: 1,
-        computer_room: util.computer_room,
+        computer_room: this.$config.computer_room,
         table_data: []
       }
     },
     methods: {
       currentpage (vl = 1) {
-        axios.get(`${util.url}/query_worklf?page=${vl}`)
+        axios.get(`${this.$config.url}/query_worklf?page=${vl}`)
           .then(res => {
-            this.table_data = res.data.data
-            this.page_number = res.data.page
+            [this.table_data, this.page_number] = [res.data.data, res.data.page]
           })
           .catch(error => {
-            util.err_notice(error)
+            this.$config.err_notice(error)
           })
       }
     },

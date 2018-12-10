@@ -109,7 +109,6 @@
 <script>
   import ICol from '../../../node_modules/iview/src/components/grid/col.vue'
   import axios from 'axios'
-  import util from '../../libs/util'
 
   export default {
     components: {
@@ -218,14 +217,14 @@
         require('brace/theme/xcode')
       },
       beautify () {
-        axios.put(`${util.url}/sqlsyntax/beautify`, {
+        axios.put(`${this.$config.url}/sqlsyntax/beautify`, {
           'data': this.formItem.textarea
         })
           .then(res => {
             this.formItem.textarea = res.data
           })
           .catch(error => {
-            util.err_notice(error)
+            this.$config.err_notice(error)
           })
       },
       Connection_Name (val) {
@@ -251,14 +250,14 @@
               return item
             }
           })
-          axios.put(`${util.url}/workorder/basename`, {
+          axios.put(`${this.$config.url}/workorder/basename`, {
             'id': this.id[0].id
           })
             .then(res => {
               this.datalist.basenamelist = res.data
             })
             .catch(() => {
-              util.err_notice('无法连接数据库!请检查网络')
+              this.$config.err_notice('无法连接数据库!请检查网络')
             })
         }
       },
@@ -278,7 +277,7 @@
           if (valid) {
             if (this.formItem.textarea) {
               let tmp = this.formItem.textarea.replace(/(;|；)$/gi, '').replace(/；/g, ';')
-              axios.put(`${util.url}/sqlsyntax/test`, {
+              axios.put(`${this.$config.url}/sqlsyntax/test`, {
                 'id': this.id[0].id,
                 'base': this.formItem.basename,
                 'sql': tmp
@@ -300,7 +299,7 @@
                   }
                 })
                 .catch(() => {
-                  util.err_notice('无法连接到Inception!')
+                  this.$config.err_notice('无法连接到Inception!')
                 })
             } else {
               this.$Message.error('请填写sql语句后再测试!')
@@ -313,7 +312,7 @@
           if (valid) {
             if (this.formItem.textarea) {
               this.datalist.sqllist = this.formItem.textarea.replace(/(;|；)$/gi, '').replace(/\s/g, ' ').replace(/；/g, ';').split(';')
-              axios.post(`${util.url}/sqlsyntax/`, {
+              axios.post(`${this.$config.url}/sqlsyntax/`, {
                 'data': JSON.stringify(this.formItem),
                 'sql': JSON.stringify(this.datalist.sqllist),
                 'real_name': sessionStorage.getItem('real_name'),
@@ -328,7 +327,7 @@
                   this.ClearForm()
                 })
                 .catch(error => {
-                  util.err_notice(error)
+                  this.$config.err_notice(error)
                 })
             } else {
               this.$Message.error('请填写sql语句后再提交!')
@@ -344,16 +343,16 @@
       }
     },
     mounted () {
-      axios.put(`${util.url}/workorder/connection`, {'permissions_type': 'dml'})
+      axios.put(`${this.$config.url}/workorder/connection`, {'permissions_type': 'dml'})
         .then(res => {
           this.item = res.data['connection']
           this.assigned = res.data['assigend']
           this.datalist.computer_roomlist = res.data['custom']
         })
         .catch(error => {
-          util.err_notice(error)
+          this.$config.err_notice(error)
         })
-      for (let i of util.highlight.split('|')) {
+      for (let i of this.$config.highlight.split('|')) {
         this.wordList.push({'vl': i, 'meta': '关键字'})
       }
     }

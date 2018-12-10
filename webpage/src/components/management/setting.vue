@@ -226,7 +226,7 @@
 </template>
 
 <script>
-  import util from '../../libs/util'
+
   import axios from 'axios'
 
   export default {
@@ -324,55 +324,55 @@
         this.message.mail = status
       },
       ldap_test () {
-        axios.put(`${util.url}/setting/1`, {
+        axios.put(`${this.$config.url}/setting/1`, {
           'ldap': JSON.stringify(this.ldap)
         })
           .then(res => {
-            util.notice(res.data)
+            this.$config.notice(res.data)
           })
           .catch(error => {
-            util.err_notice(this, error)
+            this.$config.err_notice(this, error)
           })
       },
       dingding_test () {
-        axios.put(`${util.url}/setting/2`, {
+        axios.put(`${this.$config.url}/setting/2`, {
           'ding': this.message.webhook
         })
           .then(res => {
-            util.notice(res.data)
+            this.$config.notice(res.data)
           })
           .catch(error => {
-            util.err_notice(this, error)
+            this.$config.err_notice(this, error)
           })
       },
       mail_test () {
-        axios.put(`${util.url}/setting/3`, {
+        axios.put(`${this.$config.url}/setting/3`, {
           'mail': JSON.stringify(this.message)
         })
           .then(res => {
-            util.notice(res.data)
+            this.$config.notice(res.data)
           })
           .catch(error => {
-            util.err_notice(error)
+            this.$config.err_notice(error)
           })
       },
       save_upload () {
-        axios.post(`${util.url}/setting/save`, {
+        axios.post(`${this.$config.url}/setting/save`, {
           'inception': JSON.stringify(this.inception),
           'ldap': JSON.stringify(this.ldap),
           'message': JSON.stringify(this.message),
           'other': JSON.stringify(this.other)
         })
           .then(res => {
-            util.notice(res.data)
+            this.$config.notice(res.data)
           })
           .catch(error => {
-            util.err_notice(this, error)
+            this.$config.err_notice(this, error)
           })
       }
     },
     mounted () {
-      axios.get(`${util.url}/setting/get`)
+      axios.get(`${this.$config.url}/setting/get`)
         .then(res => {
           if (res.data.other === 'refused') {
             this.$router.push({
@@ -380,17 +380,13 @@
             })
           } else {
             this.message = res.data.message
-            this.message.mail ? this.message.mail = true : this.message.mail = false
-            this.message.ding ? this.message.ding = true : this.message.ding = false
             this.inception = res.data.inception
             this.other = res.data.other
-            this.other.multi ? this.other.multi = true : this.other.multi = false
-            this.other.query ? this.other.query = true : this.other.query = false
             this.ldap = res.data.ldap
           }
         })
         .catch(error => {
-          util.err_notice(error)
+          this.$config.err_notice(error)
         })
     }
   }

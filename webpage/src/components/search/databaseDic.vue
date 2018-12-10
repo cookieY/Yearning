@@ -190,7 +190,7 @@ a:active {
 <script>
 import ICol from '../../../node_modules/iview/src/components/grid/col.vue'
 import axios from 'axios'
-import util from '../../libs/util'
+
 export default {
   components: {
     ICol
@@ -292,13 +292,13 @@ export default {
                       'field': params.row.Field
                     }
                     let auth = ''
-                    axios.post(`${util.url}/auth_twice`, {
+                    axios.post(`${this.$config.url}/auth_twice`, {
                       'permissions_type': 'dic'
                     })
                       .then(res => {
                         auth = res.data
                         if (auth === '1') {
-                          axios.put(`${util.url}/adminsql/delfield`, {
+                          axios.put(`${this.$config.url}/adminsql/delfield`, {
                             'data': JSON.stringify(data)
                           })
                             .then(res => {
@@ -309,7 +309,7 @@ export default {
                               this.ResetData()
                             })
                             .catch(error => {
-                              util.err_notice(error)
+                              this.$config.err_notice(error)
                             })
                         } else {
                           this.$Notice.error({
@@ -350,14 +350,14 @@ export default {
   },
   methods: {
     AddtableInfo () {
-      axios.post(`${util.url}/auth_twice`, {
+      axios.post(`${this.$config.url}/auth_twice`, {
         'permissions_type': 'dic'
       })
         .then(res => {
           if (res.data === '1') {
             this.AddTable.open = true
           } else {
-            util.err_notice('账号权限不足，无法提供修改功能！')
+            this.$config.err_notice('账号权限不足，无法提供修改功能！')
           }
         })
     },
@@ -370,7 +370,7 @@ export default {
     handleSubmit (name) {
       this.$refs[name].validate((valid) => {
         if (valid) {
-          axios.put(`${util.url}/adminsql/addtable`, {
+          axios.put(`${this.$config.url}/adminsql/addtable`, {
             'tablename': this.formDynamic.tablename,
             'basename': this.formItem.select,
             'name': this.formItem.namedata,
@@ -378,10 +378,10 @@ export default {
             'tablecomment': this.formDynamic.tablecomment
           })
             .then(res => {
-              util.notice(res.data)
+              this.$config.notice(res.data)
             })
             .catch(error => {
-              util.err_notice(error)
+              this.$config.err_notice(error)
             })
         } else {
           this.$Message.error('请填下相关必填项之后再提交!');
@@ -412,7 +412,7 @@ export default {
           ])
         }
       });
-      axios.post(`${util.url}/exportdocx/`, {
+      axios.post(`${this.$config.url}/exportdocx/`, {
           'data': JSON.stringify(this.ExportData.checkbox),
           'connection_name': this.formItem.namedata,
           'basename': this.formItem.select,
@@ -420,16 +420,16 @@ export default {
         })
         .then(res => {
           this.ExportData.urloff = true
-          util.notice(res.data.status)
+          this.$config.notice(res.data.status)
           if (res.data.url === '') {
             this.ExportData.urloff = false
           } else {
-            this.ExportData.url = `${util.url}/download/?url=${res.data.url}`
+            this.ExportData.url = `${this.$config.url}/download/?url=${res.data.url}`
           }
           this.$Spin.hide();
         })
         .catch(error => {
-          util.err_notice(error)
+          this.$config.err_notice(error)
           this.$Spin.hide();
         })
     },
@@ -472,7 +472,7 @@ export default {
           ])
         }
       });
-      axios.put(`${util.url}/sqldic/info`, {
+      axios.put(`${this.$config.url}/sqldic/info`, {
           'basename': this.formItem.select,
           'name': this.formItem.namedata,
           'hello': '1',
@@ -488,13 +488,13 @@ export default {
           this.$Spin.hide()
         })
         .catch(error => {
-          util.err_notice(error)
+          this.$config.err_notice(error)
         })
     },
     // 表结构数据分页处理
     spliceArr (c) {
       this.EditTableinfo.id = c
-      axios.put(`${util.url}/sqldic/datalist`, {
+      axios.put(`${this.$config.url}/sqldic/datalist`, {
           'basename': this.formItem.select,
           'name': this.formItem.namedata,
           'hello': c
@@ -503,13 +503,13 @@ export default {
           this.formItem.data = res.data
         })
         .catch(() => {
-          util.err_notice('分页获取失败!')
+          this.$config.err_notice('分页获取失败!')
         })
       this.EditTableinfo.singleid = '0'
     },
     // 数据表列表分页处理
     spliceArrTwo (c) {
-      axios.put(`${util.url}/sqldic/tablelist`, {
+      axios.put(`${this.$config.url}/sqldic/tablelist`, {
           'basename': this.formItem.select,
           'name': this.formItem.namedata,
           'tablelist': c
@@ -518,14 +518,14 @@ export default {
           this.TmpData = res.data
         })
         .catch(() => {
-          util.err_notice('分页获取失败!')
+          this.$config.err_notice('分页获取失败!')
         })
     },
     // 获得点击表名后获得的单表数据
     OnlyTabkleInfo (c) {
       if (this.formItem.select.length === 0) {} else {
         this.$refs.totol.currentPage = 1
-        axios.put(`${util.url}/sqldic/single`, {
+        axios.put(`${this.$config.url}/sqldic/single`, {
             'basename': this.formItem.select,
             'name': this.formItem.namedata,
             'tablename': c
@@ -535,13 +535,13 @@ export default {
             this.EditTableinfo.singleid = '1'
           })
           .catch(() => {
-            util.err_notice('表单数据获取失败!')
+            this.$config.err_notice('表单数据获取失败!')
           })
       }
     },
     OnlyTabkleInfotwo (c) {
       this.$refs.totol.currentPage = 1
-      axios.put(`${util.url}/sqldic/single`, {
+      axios.put(`${this.$config.url}/sqldic/single`, {
           'basename': this.formItem.select,
           'name': this.formItem.namedata,
           'tablename': c
@@ -551,7 +551,7 @@ export default {
           this.EditTableinfo.singleid = '1'
         })
         .catch(() => {
-          util.err_notice('表单数据获取失败!')
+          this.$config.err_notice('表单数据获取失败!')
         })
     },
     // 重置按钮
@@ -564,7 +564,7 @@ export default {
     // 表备注model
     EdiTtableInfo (c) {
       let auth = ''
-      axios.post(`${util.url}/auth_twice`, {
+      axios.post(`${this.$config.url}/auth_twice`, {
           'permissions_type': 'dic'
         })
         .then(res => {
@@ -575,39 +575,39 @@ export default {
             this.EditTableinfo.basename = c[0].BaseName
             this.EditTableinfo.tablename = c[0].TableName
           } else {
-            util.err_notice('账号权限不足，无法提供修改功能！')
+            this.$config.err_notice('账号权限不足，无法提供修改功能！')
           }
         })
     },
     // 删除表
     Deltabledata (c) {
       let auth = ''
-      axios.post(`${util.url}/auth_twice`, {
+      axios.post(`${this.$config.url}/auth_twice`, {
           'permissions_type': 'dic'
         })
         .then(res => {
           auth = res.data
           if (auth === '1') {
-            axios.put(`${util.url}/adminsql/deltable`, {
+            axios.put(`${this.$config.url}/adminsql/deltable`, {
                 'basename': c[0].BaseName,
                 'tablename': c[0].TableName,
                 'ConnectionName': this.formItem.namedata
               })
               .then(() => {
-                util.notice(`${c[0].TableName}表删除成功!`)
+                this.$config.notice(`${c[0].TableName}表删除成功!`)
                 this.ShowTableInfo()
               })
               .catch(error => {
-                util.err_notice(error)
+                this.$config.err_notice(error)
               })
           } else {
-            util.err_notice('账号权限不足，无法提供删除功能！')
+            this.$config.err_notice('账号权限不足，无法提供删除功能！')
           }
         })
     },
     // 表备注model提交
     EditCoreTable () {
-      axios.put(`${util.url}/adminsql/edittableinfo`, {
+      axios.put(`${this.$config.url}/adminsql/edittableinfo`, {
           'tablename': this.EditTableinfo.tablename,
           'basename': this.EditTableinfo.basename,
           'comment': this.EditTableinfo.comment,
@@ -616,18 +616,18 @@ export default {
           'singleid': this.EditTableinfo.singleid
         })
         .then(res => {
-          util.notice(`${this.EditTableinfo.tablename}表备注修改成功`)
+          this.$config.notice(`${this.EditTableinfo.tablename}表备注修改成功`)
           this.formItem.data = res.data
         })
         .catch(error => {
-          util.err_notice(error)
+          this.$config.err_notice(error)
         })
       this.EditTableinfo.Onoff = false
     },
     // 字段备注model
     EditField (row) {
       let auth = ''
-      axios.post(`${util.url}/auth_twice`, {
+      axios.post(`${this.$config.url}/auth_twice`, {
           'permissions_type': 'dic'
         })
         .then(res => {
@@ -639,13 +639,13 @@ export default {
             this.EditTableinfo.tableName = row.TableName
             this.EditTableinfo.baseName = row.BaseName
           } else {
-            util.err_notice('账号权限不足，无法提供修改功能！')
+            this.$config.err_notice('账号权限不足，无法提供修改功能！')
           }
         })
     },
     // 字段备注model提交
     EditFieldCore () {
-      axios.put(`${util.url}/adminsql/editfelid`, {
+      axios.put(`${this.$config.url}/adminsql/editfelid`, {
           'tablename': this.EditTableinfo.tableName,
           'basename': this.EditTableinfo.baseName,
           'comment': this.EditTableinfo.felidcomment,
@@ -655,7 +655,7 @@ export default {
           'singleid': this.EditTableinfo.singleid
         })
         .then(res => {
-          util.notice(`${this.EditTableinfo.tableName}字段更新成功`)
+          this.$config.notice(`${this.EditTableinfo.tableName}字段更新成功`)
           this.formItem.data = res.data
         })
         .catch(error => {
@@ -670,24 +670,24 @@ export default {
       if (this.formItem.namedata.length === 0) {
         return
       }
-      axios.post(`${util.url}/sqldic/`, {
+      axios.post(`${this.$config.url}/sqldic/`, {
           'name': val
         })
         .then(res => {
           this.formItem.info = res.data.map(item => item.BaseName)
         })
         .catch(error => {
-          util.err_notice(error)
+          this.$config.err_notice(error)
         })
     }
   },
   mounted () {
-    axios.get(`${util.url}/sqldic/all?permissions_type=dic`)
+    axios.get(`${this.$config.url}/sqldic/all?permissions_type=dic`)
       .then(res => {
         this.TableList = res.data
       })
       .catch(error => {
-       util.err_notice(error)
+       this.$config.err_notice(error)
       })
   }
 }

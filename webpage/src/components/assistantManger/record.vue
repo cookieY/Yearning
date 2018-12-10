@@ -24,7 +24,6 @@
 </template>
 <script>
   import axios from 'axios'
-  import util from '../../libs/util'
   //
   export default {
     name: 'Record',
@@ -98,13 +97,12 @@
     },
     methods: {
       getrecordinfo (vl = 1) {
-        axios.get(`${util.url}/record/all?page=${vl}&username=${sessionStorage.getItem('user')}`)
+        axios.get(`${this.$config.url}/record/all?page=${vl}&username=${sessionStorage.getItem('user')}`)
           .then(res => {
-            this.TableDataNew = res.data.data
-            this.pagenumber = res.data.page
+            [this.TableDataNew, this.pagenumber] = [res.data.data, res.data.page]
           })
           .catch(error => {
-            util.err_notice(error)
+            this.$config.err_notice(error)
           })
       },
       splicpage (page) {

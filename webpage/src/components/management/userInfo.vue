@@ -196,7 +196,6 @@
 <script>
   import axios from 'axios'
   import '../../assets/tablesmargintop.css'
-  import util from '../../libs/util'
 
   export default {
     data () {
@@ -217,6 +216,7 @@
       return {
         loading: false,
         percent: 0,
+        currentPage: 1,
         permission: {
           ddl: '0',
           ddlcon: [],
@@ -556,13 +556,13 @@
     },
     methods: {
       getgrouplist () {
-        axios.put(`${util.url}/authgroup/group_list`, {'group_list': JSON.stringify(this.editAuthForm.authgroup)})
+        axios.put(`${this.$config.url}/authgroup/group_list`, {'group_list': JSON.stringify(this.editAuthForm.authgroup)})
           .then(res => {
             this.permission_list = res.data.permissions
-            this.formItem = util.mode(res.data.permissions)
+            this.formItem = this.$config.mode(res.data.permissions)
           })
           .catch(error => {
-            util.err_notice(error)
+            this.$config.err_notice(error)
           })
       },
       cancelAuthModal () {
@@ -570,12 +570,12 @@
         this.editAuthForm.authgroup = []
       },
       getauthgroup () {
-        axios.get(`${util.url}/authgroup/group_name`)
+        axios.get(`${this.$config.url}/authgroup/group_name`)
           .then(res => {
             this.groupset = res.data.authgroup
           })
           .catch(error => {
-            util.err_notice(error)
+            this.$config.err_notice(error)
           })
       },
       edituser (index) {
@@ -602,27 +602,27 @@
         this.real_name = this.data5[index].real_name
       },
       putemail () {
-        axios.put(`${util.url}/userinfo/changemail`, {
+        axios.put(`${this.$config.url}/userinfo/changemail`, {
           'username': this.username,
           'mail': this.email,
           'real': this.real_name
         })
           .then(res => {
-            util.notice(res.data)
+            this.$config.notice(res.data)
             this.editemail = false
             this.pagenumber = 1
             this.refreshuser()
             sessionStorage.setItem('real_name', this.real_name)
           })
           .catch(error => {
-            util.err_notice(error)
+            this.$config.err_notice(error)
           })
       },
       Registered () {
         this.$refs['userinfova'].validate((valid) => {
           if (valid) {
             this.loading = true
-            axios.post(util.url + '/userinfo/', {
+            axios.post(this.$config.url + '/userinfo/', {
               'username': this.userinfo.username,
               'password': this.userinfo.password,
               'group': this.userinfo.group,
@@ -633,34 +633,26 @@
             })
               .then(res => {
                 this.loading = false
-                util.notice(res.data)
+                this.$config.notice(res.data)
                 this.refreshuser()
-                this.userinfo = {
-                  username: '',
-                  password: '',
-                  confirmpassword: '',
-                  group: '',
-                  checkbox: '',
-                  department: '',
-                  email: '',
-                  auth_group: ''
-                }
+                this.pagenumber = 1
+                this.userinfo = this.$config.clearObj(this.userinfo)
               })
               .catch(error => {
                 this.loading = false
-                util.err_notice(error)
+                this.$config.err_notice(error)
               })
           }
         })
       },
       refreshuser (vl = 1) {
-        axios.get(`${util.url}/userinfo/all?page=${vl}`)
+        axios.get(`${this.$config.url}/userinfo/all?page=${vl}`)
           .then(res => {
             this.data5 = res.data.data
             this.pagenumber = parseInt(res.data.page)
           })
           .catch(error => {
-            util.err_notice(error)
+            this.$config.err_notice(error)
           })
       },
       splicpage (page) {
@@ -678,16 +670,16 @@
         this.$refs['editPasswordForm'].validate((valid) => {
           if (valid) {
             this.savePassLoading = true
-            axios.put(util.url + '/userinfo/changepwd', {
+            axios.put(this.$config.url + '/userinfo/changepwd', {
               'username': this.username,
               'new': this.editPasswordForm.newPass
             })
               .then(res => {
-                util.notice(res.data)
+                this.$config.notice(res.data)
                 this.editPasswordModal = false
               })
               .catch(error => {
-                util.err_notice(error)
+                this.$config.err_notice(error)
               })
             this.savePassLoading = false
           }
@@ -695,7 +687,7 @@
       },
       saveAuthInfo () {
         this.savePassLoading = true
-        axios.put(`${util.url}/authgroup/save_info`, {
+        axios.put(`${this.$config.url}/authgroup/save_info`, {
           'username': this.editAuthForm.username,
           'group': this.editAuthForm.group,
           'department': this.editAuthForm.department,
@@ -703,29 +695,29 @@
           'permission_list': JSON.stringify(this.permission_list)
         })
           .then(res => {
-            util.notice(res.data)
+            this.$config.notice(res.data)
             this.editAuthModal = false
             this.editAuthForm.authgroup = []
             this.refreshuser()
             this.pagenumber = 1
           })
           .catch(error => {
-            util.err_notice(error)
+            this.$config.err_notice(error)
           })
         this.savePassLoading = false
       },
       delUser () {
         if (this.username === this.confirmuser) {
-          axios.delete(util.url + '/userinfo/' + this.username)
+          axios.delete(this.$config.url + '/userinfo/' + this.username)
             .then(res => {
-              util.notice(res.data)
+              this.$config.notice(res.data)
               this.deluserModal = false
               this.confirmuser = ''
               this.pagenumber = 1
               this.refreshuser()
             })
             .catch(error => {
-              util.err_notice(error)
+              this.$config.err_notice(error)
             })
         } else {
           this.$Message.error('用户名不一致!请重新操作!')
@@ -753,7 +745,7 @@
     },
     mounted () {
       this.getauthgroup()
-      axios.put(`${util.url}/workorder/connection`, {'permissions_type': 'user'})
+      axios.put(`${this.$config.url}/workorder/connection`, {'permissions_type': 'user'})
         .then(res => {
           this.connectionList.connection = res.data['connection']
           this.connectionList.dic = res.data['dic']
@@ -761,7 +753,7 @@
           this.connectionList.multi = res.data['multi']
         })
         .catch(error => {
-          util.err_notice(error)
+          this.$config.err_notice(error)
         })
       this.refreshuser()
     }

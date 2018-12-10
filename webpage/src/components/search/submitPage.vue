@@ -24,7 +24,6 @@
 <script>
   //
   import axios from 'axios'
-  import util from '../../libs/util'
 
   export default {
     name: 'put_ready',
@@ -63,7 +62,7 @@
         })
       },
       del () {
-        axios.delete(`${util.url}/query_worklf`)
+        axios.delete(`${this.$config.url}/query_worklf`)
           .then(() => {
             this.$router.push({
               name: 'serach-sql'
@@ -72,7 +71,7 @@
       }
     },
     mounted () {
-      axios.put(`${util.url}/query_worklf`, {'mode': 'status'})
+      axios.put(`${this.$config.url}/query_worklf`, {'mode': 'status'})
         .then(res => {
           if (res.data === 1) {
             this.$router.push({

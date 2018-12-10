@@ -9,10 +9,11 @@ import axios from 'axios'
 import { MainRoute } from './router'
 import store from './aspsm'
 import 'iview/dist/styles/iview.css'
-import util from './libs/util'
+import config from './libs/util'
 import particles from 'particles.js/particles'
 
 Vue.config.productionTip = false
+Vue.prototype.$config = config
 Vue.use(particles)
 Vue.use(Vuex)
 Vue.use(iView)
@@ -27,21 +28,15 @@ const router = new VueRouter(RouterConfig)
 
 router.beforeEach((to, from, next) => {
   iView.LoadingBar.start()
-  util.title(to.meta.title)
+  config.title(to.meta.title)
   if (sessionStorage.getItem('locking') === '1' && to.name !== 'locking') { // 判断当前是否是锁定状态
-    iView.LoadingBar.finish()
     next(false)
     router.replace({name: 'login'})
-  } else if (sessionStorage.getItem('locking') === '0' && to.name === 'locking') {
-    iView.LoadingBar.finish()
-    next(false)
   } else {
     if (!sessionStorage.getItem('user') && to.name !== 'login') { // 判断是否已经登录且前往的页面不是登录页
       next({name: 'login'})
-      iView.LoadingBar.finish()
     } else if (sessionStorage.getItem('user') && to.name === 'login') { // 判断是否已经登录且前往的是登录页
       next({name: 'login'})
-      iView.LoadingBar.finish()
     } else {
       next()
     }

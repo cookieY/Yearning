@@ -125,8 +125,6 @@
 
 <script>
   import axios from 'axios'
-  //
-  import util from '../../libs/util'
   import dataSourcePie from './components/dataSourcePie.vue'
   import inforCard from './components/inforCard.vue'
   import toDoListItem from './components/toDoListItem.vue'
@@ -163,17 +161,12 @@
       },
       formatDate () {
         let date = new Date()
-        let year = date.getFullYear()
         let month = date.getMonth() + 1
-        let day = date.getDate()
-        let hour = date.getHours()
-        let minute = date.getMinutes()
-        let second = date.getSeconds()
-        this.time = year + '/' + month + '/' + day + '  ' + hour + ':' + minute + ':' + second
+        this.time = date.getFullYear() + '/' + month + '/' + date.getDate() + '  ' + date.getHours() + ':' + date.getMinutes() + ':' + date.getSeconds()
       },
       addNew () {
         if (this.newToDoItemValue.length !== 0) {
-          axios.post(`${util.url}/homedata/todolist/`, {
+          axios.post(`${this.$config.url}/homedata/todolist/`, {
             'todo': this.newToDoItemValue
           })
             .then(() => {
@@ -187,7 +180,7 @@
               this.showAddNewTodo = false
             })
             .catch(error => {
-              util.err_notice(error)
+              this.$config.err_notice(error)
             })
         } else {
           this.$Message.error('请输入待办事项内容')
@@ -198,28 +191,28 @@
         this.newToDoItemValue = ''
       },
       deltodo (val) {
-        axios.put(`${util.url}/homedata/deltodo`, {
+        axios.put(`${this.$config.url}/homedata/deltodo`, {
           'todo': val
         })
           .then(() => {
             this.gettodo()
           })
           .catch(error => {
-            util.err_notice(error)
+            this.$config.err_notice(error)
           })
       },
       gettodo () {
-        axios.put(`${util.url}/homedata/todolist`)
+        axios.put(`${this.$config.url}/homedata/todolist`)
           .then(res => {
             this.toDoList = res.data
           })
           .catch(error => {
-            util.err_notice(error)
+            this.$config.err_notice(error)
           })
       }
     },
     mounted () {
-      axios.get(`${util.url}/homedata/infocard`)
+      axios.get(`${this.$config.url}/homedata/infocard`)
         .then(res => {
           this.count.dic = res.data[0]
           this.count.createUser = res.data[1]
@@ -227,7 +220,7 @@
           this.count.link = res.data[3]
         })
         .catch(error => {
-          util.err_notice(error)
+          this.$config.err_notice(error)
         })
       this.gettodo()
       this.formatDate()

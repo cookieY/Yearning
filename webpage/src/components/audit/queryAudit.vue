@@ -61,7 +61,6 @@
 
 <script>
   import axios from 'axios'
-  import util from '../../libs/util'
 
   export default {
     name: 'Query_audit',
@@ -206,24 +205,24 @@
     },
     methods: {
       permisson_list (vl = 1) {
-        axios.get(`${util.url}/query_order?page=${vl}`)
+        axios.get(`${this.$config.url}/query_order?page=${vl}`)
           .then(res => {
             this.query_info = res.data['data']
             this.per_pn = res.data['pn']
           })
           .catch(error => {
-            util.err_notice(error)
+            this.$config.err_notice(error)
           })
       },
       delrecordData () {
-        axios.post(`${util.url}/query_order/`, {'work_id': JSON.stringify(this.delrecord)})
+        axios.post(`${this.$config.url}/query_order/`, {'work_id': JSON.stringify(this.delrecord)})
           .then(res => {
-            util.notice(res.data)
+            this.$config.notice(res.data)
             this.$refs.perpage.currentPage = 1
             this.permisson_list()
           })
           .catch(error => {
-            util.err_notice(error)
+            this.$config.err_notice(error)
           })
       },
       delrecordList (vl) {
@@ -234,44 +233,44 @@
         this.query = vl
       },
       savedata () {
-        axios.put(`${util.url}/query_worklf/`,
+        axios.put(`${this.$config.url}/query_worklf/`,
           {
             'mode': 'agree',
             'work_id': this.query.work_id
           })
           .then(res => {
-            util.notice(res.data)
+            this.$config.notice(res.data)
             this.editInfodModal = false
             this.$refs.perpage.currentPage = 1
             this.permisson_list()
           })
           .catch(error => {
-            util.err_notice(error)
+            this.$config.err_notice(error)
           })
       },
       reject () {
-        axios.put(`${util.url}/query_worklf/`,
+        axios.put(`${this.$config.url}/query_worklf/`,
           {
             'mode': 'disagree',
             'work_id': this.query.work_id
           })
           .then(res => {
-            util.notice(res.data)
+            this.$config.notice(res.data)
             this.editInfodModal = false
             this.$refs.perpage.currentPage = 1
             this.permisson_list()
           })
           .catch(error => {
-            util.err_notice(error)
+            this.$config.err_notice(error)
           })
       },
       stop_query (vl) {
-        axios.put(`${util.url}/query_worklf`, {'mode': 'end', 'username': vl.username})
+        axios.put(`${this.$config.url}/query_worklf`, {'mode': 'end', 'username': vl.username})
           .then(res => {
-            util.notice(res.data)
+            this.$config.notice(res.data)
             this.permisson_list()
           })
-          .catch(err => util.err_notice(err))
+          .catch(err => this.$config.err_notice(err))
       }
     },
     mounted () {

@@ -61,7 +61,7 @@
   import flow from './workFlow'
   import ICol from '../../../node_modules/iview/src/components/grid/col.vue'
   import axios from 'axios'
-  import util from '../../libs/util'
+
   import Csv from '../../../node_modules/iview/src/utils/csv'
   import ExportCsv from '../../../node_modules/iview/src/components/table/export-csv'
 
@@ -150,10 +150,10 @@
             }
           }
         }
-        axios.put(`${util.url}/search`, {'base': this.put_info.base, 'table': vl[0].title})
+        axios.put(`${this.$config.url}/search`, {'base': this.put_info.base, 'table': vl[0].title})
           .then(res => {
             if (res.data['error']) {
-              util.err_notice(res.data['error'])
+              this.$config.err_notice(res.data['error'])
             } else {
               this.columnsName = res.data['title']
               this.allsearchdata = res.data['data']
@@ -167,14 +167,14 @@
         require('brace/theme/xcode')
       },
       beautify () {
-        axios.put(`${util.url}/sqlsyntax/beautify`, {
+        axios.put(`${this.$config.url}/sqlsyntax/beautify`, {
           'data': this.formItem.textarea
         })
           .then(res => {
             this.formItem.textarea = res.data
           })
           .catch(error => {
-            util.err_notice(error)
+            this.$config.err_notice(error)
           })
       },
       splice_arr (page) {
@@ -207,13 +207,13 @@
         let address = {
           'basename': this.put_info.base
         }
-        axios.post(`${util.url}/search`, {
+        axios.post(`${this.$config.url}/search`, {
           'sql': this.formItem.textarea,
           'address': JSON.stringify(address)
         })
           .then(res => {
             if (!res.data['data']) {
-              util.err_notice(res.data)
+              this.$config.err_notice(res.data)
             } else {
               this.columnsName = res.data['title']
               this.allsearchdata = res.data['data']
@@ -232,26 +232,26 @@
         })
       },
       End_sql () {
-        axios.put(`${util.url}/query_worklf`, {'mode': 'end', 'username': sessionStorage.getItem('user')})
-          .then(res => util.notice(res.data))
-          .catch(err => util.err_notice(err))
+        axios.put(`${this.$config.url}/query_worklf`, {'mode': 'end', 'username': sessionStorage.getItem('user')})
+          .then(res => this.$config.notice(res.data))
+          .catch(err => this.$config.err_notice(err))
         this.$router.push({
           name: 'serach-sql'
         })
       }
     },
     mounted () {
-      axios.put(`${util.url}/query_worklf`, {'mode': 'status'})
+      axios.put(`${this.$config.url}/query_worklf`, {'mode': 'status'})
         .then(res => {
           if (res.data !== 1) {
             this.$router.push({
               name: 'serach-sql'
             })
           } else {
-            axios.put(`${util.url}/query_worklf`, {'mode': 'info'})
+            axios.put(`${this.$config.url}/query_worklf`, {'mode': 'info'})
               .then(res => {
                 this.data1 = JSON.parse(res.data['info'])
-                let tWord = util.highlight.split('|')
+                let tWord = this.$config.highlight.split('|')
                 for (let i of tWord) {
                   this.wordList.push({'vl': i, 'meta': '关键字'})
                 }

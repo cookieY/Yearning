@@ -186,7 +186,6 @@
 <script>
   import axios from 'axios'
   import '../../assets/tablesmargintop.css'
-  import util from '../../libs/util'
 
   const structure = {
     ddl: '0',
@@ -292,62 +291,58 @@
     },
     methods: {
       editAuthGroup (vl) {
-        this.addAuthGroupModal = true
-        this.isAdd = false
-        this.isReadOnly = true
+        [this.isReadOnly, this.addAuthGroupModal, this.isAdd] = [true, true, false]
         this.id = vl.id
         this.addAuthGroupForm.groupname = vl.username
         this.permission = vl.permissions
       },
       createModel () {
-        this.addAuthGroupModal = true
-        this.isReadOnly = false
-        this.isAdd = true
+        [this.addAuthGroupModal, this.isReadOnly, this.isAdd] = [true, false, true]
         this.permission = structure
       },
       createAuthGroup () {
         for (let i of this.data6) {
           if (this.addAuthGroupForm.groupname === i.username) {
-            return util.err_notice('不可创建相同名的权限组！')
+            return this.$config.err_notice('不可创建相同名的权限组！')
           }
         }
-        axios.post(`${util.url}/authgroup/`, {
+        axios.post(`${this.$config.url}/authgroup/`, {
           'groupname': this.addAuthGroupForm.groupname,
           'permission': JSON.stringify(this.permission)
         })
           .then(res => {
-            util.notice(res.data)
+            this.$config.notice(res.data)
             this.$refs.total.currentPage = 1
             this.refreshgroup()
           })
           .catch(error => {
-            util.err_notice(error)
+            this.$config.err_notice(error)
           })
         this.addAuthGroupModal = false
       },
       saveAddGroup () {
-        axios.put(`${util.url}/authgroup/update`, {
+        axios.put(`${this.$config.url}/authgroup/update`, {
           'groupname': this.addAuthGroupForm.groupname,
           'permission': JSON.stringify(this.permission)
         })
           .then(res => {
-            util.notice(res.data)
+            this.$config.notice(res.data)
             this.$refs.total.currentPage = 1
             this.refreshgroup()
           })
           .catch(error => {
-            util.err_notice(error)
+            this.$config.err_notice(error)
           })
         this.addAuthGroupModal = false
       },
       refreshgroup (vl = 1) {
-        axios.get(`${util.url}/authgroup/all?page=${vl}`)
+        axios.get(`${this.$config.url}/authgroup/all?page=${vl}`)
           .then(res => {
             this.data6 = res.data.data
             this.pagenumber = parseInt(res.data.page)
           })
           .catch(error => {
-            util.ajanxerrorcode(this, error)
+            this.$config.ajanxerrorcode(this, error)
           })
       },
       splicpage (page) {
@@ -374,12 +369,12 @@
       },
       deleteAuthGroup () {
         if (this.authgroup === this.confirmgroup) {
-          axios.delete(`${util.url}/authgroup/${this.confirmgroup}`)
+          axios.delete(`${this.$config.url}/authgroup/${this.confirmgroup}`)
             .then(res => {
-              util.notice(res.data)
+              this.$config.notice(res.data)
               this.refreshgroup()
             })
-            .catch(err => util.err_notice(err))
+            .catch(err => this.$config.err_notice(err))
         } else {
           this.$Message.error({
             content: '请填写正确的权限组名称！',
@@ -393,14 +388,14 @@
       }
     },
     mounted () {
-      axios.put(`${util.url}/workorder/connection`, {'permissions_type': 'user'})
+      axios.put(`${this.$config.url}/workorder/connection`, {'permissions_type': 'user'})
         .then(res => {
           this.connectionList.connection = res.data['connection']
           this.connectionList.dic = res.data['dic']
           this.connectionList.person = res.data['person']
         })
         .catch(error => {
-          util.err_notice(error)
+          this.$config.err_notice(error)
         })
       this.refreshgroup()
     }

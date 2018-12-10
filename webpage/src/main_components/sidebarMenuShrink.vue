@@ -3,7 +3,7 @@
   .btn_hover {
     width: 60px;
     margin-left: 30%;
-    padding:10px 0;
+    padding: 10px 0;
   }
 
 </style>
@@ -60,8 +60,6 @@
 </template>
 
 <script>
-  //
-  import util from '../libs/util'
   import axios from 'axios'
 
   export default {
@@ -106,12 +104,12 @@
             name: active
           })
         } else {
-          util.openPage(this, active)
+          this.$config.openPage(this, active)
         }
       }
     },
     created () {
-      axios.get(`${util.url}/homedata/menu`)
+      axios.get(`${this.$config.url}/homedata/menu`)
         .then(res => {
           let c = JSON.parse(res.data)
           this.filtermenulist.ddledit = c.ddl

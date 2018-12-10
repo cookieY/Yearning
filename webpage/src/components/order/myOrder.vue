@@ -24,7 +24,6 @@
 <script>
   //
   import axios from 'axios'
-  import util from '../../libs/util'
 
   export default {
     name: 'put',
@@ -190,20 +189,20 @@
           }
         ],
         page_number: 1,
-        computer_room: util.computer_room,
+        computer_room: this.$config.computer_room,
         table_data: []
       }
     },
     methods: {
       currentpage (vl = 1) {
-        axios.get(`${util.url}/myorder/?user=${sessionStorage.getItem('user')}&page=${vl}`)
+        axios.get(`${this.$config.url}/myorder/?user=${sessionStorage.getItem('user')}&page=${vl}`)
           .then(res => {
             this.table_data = res.data.data
             this.table_data.forEach((item) => { (item.backup === 1) ? item.backup = '是' : item.backup = '否' })
             this.page_number = parseInt(res.data.page)
           })
           .catch(error => {
-            util.err_notice(error)
+            this.$config.err_notice(error)
           })
       }
     },

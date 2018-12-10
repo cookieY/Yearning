@@ -15,7 +15,6 @@
 
 <script>
   import axios from 'axios'
-  import util from '../../libs/util'
 
   export default {
     name: 'expend',
@@ -37,12 +36,15 @@
       }
     },
     mounted () {
-      axios.post(`${util.url}/query_worklf/`, {'workid': this.$route.query.workid, 'user': this.$route.query.user})
+      axios.post(`${this.$config.url}/query_worklf/`, {
+        'workid': this.$route.query.workid,
+        'user': this.$route.query.user
+      })
         .then(res => {
           this.TableDataNew = res.data
         })
         .catch(error => {
-          util.err_notice(error)
+          this.$config.err_notice(error)
         })
     }
   }

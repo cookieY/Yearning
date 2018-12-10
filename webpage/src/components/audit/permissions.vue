@@ -28,82 +28,82 @@
       <h3 slot="header" style="color:#2D8CF0">权限申请单</h3>
       <Form :label-width="120" label-position="right">
         <FormItem label="权限组:">
-          <p>{{auth_group}}</p>
+          <p>{{perList.auth_group}}</p>
         </FormItem>
         <template>
           <FormItem label="DDL及索引权限:">
-            <p v-if="permission.ddl === '0'">否</p>
+            <p v-if="perList.permissions.ddl === '0'">否</p>
             <p v-else>是</p>
           </FormItem>
-          <template v-if="permission.ddl !== '0'">
+          <template v-if="perList.permissions.ddl !== '0'">
             <FormItem label="连接名:">
-              <span v-for="i in permission.ddlcon" style="margin-left: 1%">{{i}}</span>
+              <Tag color="blue" v-for="i in perList.permissions.ddlcon" :key="i">{{i}}</Tag>
             </FormItem>
           </template>
           <hr style="height:1px;border:none;border-top:1px dashed #dddee1;"/>
           <br>
           <FormItem label="DML权限:">
-            <p v-if="permission.dml === '0'">否</p>
+            <p v-if="perList.permissions.dml === '0'">否</p>
             <p v-else>是</p>
           </FormItem>
-          <template v-if="permission.dml === '1'">
+          <template v-if="perList.permissions.dml === '1'">
             <FormItem label="连接名:">
-              <span v-for="i in permission.dmlcon" style="margin-left: 1%">{{i}}</span>
+              <Tag color="blue" v-for="i in perList.permissions.dmlcon" :key="i">{{i}}</Tag>
             </FormItem>
           </template>
           <hr style="height:1px;border:none;border-top:1px dashed #dddee1;"/>
           <br>
           <FormItem label="上级审核人范围:">
-            <span v-for="i in permission.person" style="margin-left: 1%">{{i}}</span>
+            <Tag color="blue" v-for="i in perList.permissions.person" :key="i">{{i}}</Tag>
           </FormItem>
           <hr style="height:1px;border:none;border-top:1px dashed #dddee1;"/>
           <br>
           <FormItem label="数据查询权限:">
-            <p v-if="permission.query === '0'">否</p>
+            <p v-if="perList.permissions.query === '0'">否</p>
             <p v-else>是</p>
           </FormItem>
-          <template v-if="permission.query === '1'">
+          <template v-if="perList.permissions.query === '1'">
             <FormItem label="连接名:">
-              <span v-for="i in permission.querycon" style="margin-left: 1%">{{i}}</span>
+              <Tag color="blue" v-for="i in perList.permissions.querycon" :key="i">{{i}}</Tag>
             </FormItem>
           </template>
           <hr style="height:1px;border:none;border-top:1px dashed #dddee1;"/>
           <br>
           <FormItem label="数据字典权限:">
-            <p v-if="permission.dic === '0'">否</p>
+            <p v-if="perList.permissions.dic === '0'">否</p>
             <p v-else>是</p>
           </FormItem>
-          <template v-if="permission.dic === '1'">
+          <template v-if="perList.permissions.dic === '1'">
             <FormItem label="数据字典修改权限:">
-              <p v-if="permission.dicedit === '0'">否</p>
+              <p v-if="perList.permissions.dicedit === '0'">否</p>
               <p v-else>是</p>
             </FormItem>
             <FormItem label="数据字典导出权限:">
-              <p v-if="permission.dicexport === '0'">否</p>
+              <p v-if="perList.permissions.dicexport === '0'">否</p>
               <p v-else>是</p>
             </FormItem>
             <FormItem label="连接名:">
-              <span v-for="i in permission.diccon" style="margin-left: 1%">{{i}}</span>
+              <Tag color="blue" v-for="i in perList.permissions.diccon" :key="i">{{i}}</Tag>
             </FormItem>
           </template>
         </template>
         <hr style="height:1px;border:none;border-top:1px dashed #dddee1;"/>
         <br>
         <FormItem label="用户管理权限:">
-          <p v-if="permission.user === '0'">否</p>
+          <p v-if="perList.permissions.user === '0'">否</p>
           <p v-else>是</p>
         </FormItem>
         <hr style="height:1px;border:none;border-top:1px dashed #dddee1;"/>
         <br>
         <FormItem label="数据库管理权限:">
-          <p v-if="permission.base === '0'">否</p>
+          <p v-if="perList.permissions.base === '0'">否</p>
           <p v-else>是</p>
         </FormItem>
       </Form>
       <div slot="footer">
         <Button type="primary" @click="editInfodModal=false">取消</Button>
-        <Button type="error" @click="reject" v-if="status === 2">驳回</Button>
-        <Button type="success" @click="savedata" v-if="status === 2">同意</Button>
+        <Button type="error" @click="reject" v-if="perList.status === 2">驳回</Button>
+        <Button type="success" @click="savedata" v-if="perList.status === 2">同意</Button>
       </div>
     </Modal>
 
@@ -112,9 +112,9 @@
 
 <script>
   import axios from 'axios'
-  import util from '../../libs/util'
+
   export default {
-    name: 'permission',
+    name: 'permissions',
     data () {
       return {
         permissondata: [],
@@ -218,34 +218,36 @@
           }
         ],
         per_pn: 1,
-        delrecord: [],
+        delrecord: Object,
         editInfodModal: false,
-        permission: {},
-        user: '',
-        work_id: '',
-        auth_group: '',
-        status: 9
+        perList: {
+          permissions: Object,
+          username: String,
+          work_id: String,
+          auth_group: String,
+          status: Number
+        }
       }
     },
     methods: {
       permisson_list (vl = 1) {
-        axios.get(`${util.url}/audit_grained/all/?page=${vl}`)
+        axios.get(`${this.$config.url}/audit_grained/all/?page=${vl}`)
           .then(res => {
             this.permissondata = res.data['data']
             this.per_pn = res.data['pn']
           })
           .catch(error => {
-            util.err_notice(error)
+            this.$config.err_notice(error)
           })
       },
       delrecordData () {
-        axios.put(`${util.url}/audit_grained/`, {'work_id': JSON.stringify(this.delrecord)})
+        axios.put(`${this.$config.url}/audit_grained/`, {'work_id': JSON.stringify(this.delrecord)})
           .then(res => {
-            util.notice(res.data)
+            this.$config.notice(res.data)
             this.permisson_list()
           })
           .catch(error => {
-            util.err_notice(error)
+            this.$config.err_notice(error)
           })
       },
       delrecordList (vl) {
@@ -253,44 +255,39 @@
       },
       modalinfo (vl) {
         this.editInfodModal = true
-        this.permission = vl.permissions
-        this.user = vl.username
-        this.work_id = vl.work_id
-        this.auth_group = vl.auth_group
-        this.status = vl.status
+        this.perList = vl
       },
       savedata () {
-        axios.post(`${util.url}/audit_grained/`,
+        axios.post(`${this.$config.url}/audit_grained/`,
           {
             'status': 0,
-            'user': this.user,
-            'work_id': this.work_id,
-            'auth_group': this.auth_group,
-            'grained_list': JSON.stringify(this.permission)
+            'user': this.perList.username,
+            'work_id': this.perList.work_id,
+            'auth_group': this.perList.auth_group
           })
           .then(res => {
-            util.notice(res.data)
+            this.$config.notice(res.data)
             this.editInfodModal = false
             this.permisson_list()
           })
           .catch(error => {
-            util.err_notice(error)
+            this.$config.err_notice(error)
           })
       },
       reject () {
-        axios.post(`${util.url}/audit_grained/`,
+        axios.post(`${this.$config.url}/audit_grained/`,
           {
             'status': 1,
-            'user': this.user,
-            'work_id': this.work_id
+            'user': this.perList.username,
+            'work_id': this.perList.work_id
           })
           .then(res => {
-            util.notice(res.data)
+            this.$config.notice(res.data)
             this.editInfodModal = false
             this.permisson_list()
           })
           .catch(error => {
-            util.err_notice(error)
+            this.$config.err_notice(error)
           })
       }
     },

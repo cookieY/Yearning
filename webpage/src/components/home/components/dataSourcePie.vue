@@ -4,14 +4,13 @@
 
 <script>
 import axios from 'axios'
-import util from '../../../libs/util'
 const echarts = require('echarts');
 export default {
   name: 'dataSourcePie',
   mounted () {
     this.$nextTick(() => {
       var dataSourcePie = echarts.init(document.getElementById('data_source_con'));
-      axios.get(`${util.url}/homedata/pie`)
+      axios.get(`${this.$config.url}/homedata/pie`)
         .then(res => {
           let piedata = [{
               value: parseInt(res.data[0]),
@@ -63,7 +62,7 @@ export default {
           });
         })
         .catch(error => {
-          util.err_notice(error)
+          this.$config.err_notice(error)
         })
     });
   }

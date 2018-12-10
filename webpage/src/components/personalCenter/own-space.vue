@@ -10,7 +10,7 @@
         个人信息
       </p>
       <div>
-        <Form ref="userForm" :model="userForm" :label-width="100" label-position="right">
+        <Form ref="userForm" :label-width="100" label-position="right">
           <FormItem label="用户名：" prop="name">
             <div style="display:inline-block;width:300px;">
               <span>{{ userForm.username }}</span>
@@ -28,7 +28,7 @@
             <span>{{ userForm.group }}</span>
           </FormItem>
           <FormItem label="权限组：">
-            <span>{{ userForm.auth_group }}</span>
+            <Tag color="blue" v-for="i in authgroup" :key="i">{{i}}</Tag>
           </FormItem>
           <FormItem label="邮箱：">
             <span>{{ userForm.email }}</span>
@@ -55,12 +55,13 @@
             <FormItem label="可访问的连接名:" v-if="formItem.query === '是'">
               <Tag color="blue" v-for="i in formItem.querycon" :key="i">{{i}}</Tag>
             </FormItem>
+            <Divider orientation="left">上级审核人</Divider>
+            <FormItem label="上级审核人:">
+              <Tag color="blue" v-for="i in formItem.person" :key="i">{{i}}</Tag>
+            </FormItem>
             <Divider orientation="left">字典权限</Divider>
             <FormItem label="字典是否可见:">
               <p>{{formItem.dic}}</p>
-            </FormItem>
-            <FormItem label="上级审核人:">
-              <Tag color="blue" v-for="i in formItem.person" :key="i">{{i}}</Tag>
             </FormItem>
             <FormItem label="可访问的连接名:" v-if="formItem.dic === '是'">
               <Tag color="blue" v-for="i in formItem.diccon" :key="i">{{i}}</Tag>
@@ -82,7 +83,7 @@
           <FormItem label="编辑：">
             <Button type="warning" size="small" @click="editPasswordModal=true">修改密码</Button>
             <Button type="primary" size="small" @click="openMailChange">修改邮箱/真实姓名</Button>
-            <Button type="success" size="small" @click="ApplyForPermission">权限申请</Button>
+            <Button type="success" size="small" @click="editInfoModal = true">权限申请</Button>
           </FormItem>
         </Form>
       </div>
@@ -111,7 +112,7 @@
       <h3 slot="header" style="color:#2D8CF0">邮箱/真实姓名修改</h3>
       <Form :label-width="100" label-position="right">
         <FormItem label="邮箱地址">
-          <Input v-model="editEmailForm.mail"></Input>
+          <Input v-model="editEmailForm.email"></Input>
         </FormItem>
         <FormItem label="真实姓名">
           <Input v-model="editEmailForm.real_name"></Input>
@@ -125,9 +126,9 @@
 
     <Modal v-model="editInfoModal" :width="1000">
       <h3 slot="header" style="color:#2D8CF0">权限申请单</h3>
-      <Form :model="editAuthForm" :label-width="120" label-position="right">
+      <Form :label-width="120" label-position="right">
         <FormItem label="权限组" prop="authgroup">
-          <Select v-model="editAuthForm.authgroup" multiple @on-change="getgrouplist" placeholder="请选择">
+          <Select v-model="authgroup" multiple @on-change="getgrouplist" placeholder="请选择">
             <Option v-for="list in groupset" :value="list" :key="list">{{ list }}</Option>
           </Select>
           <template>
@@ -182,7 +183,7 @@
       </Form>
       <div slot="footer">
         <Button type="text" @click="editInfoModal=false">取消</Button>
-        <Button type="primary" :loading="savePassLoading" @click="PutPermissionData">提交</Button>
+        <Button type="primary" :loading="savePassLoading" @click="putPermissionData">提交</Button>
       </div>
     </Modal>
   </div>
@@ -190,7 +191,7 @@
 
 <script>
   //
-  import util from '../../libs/util'
+
   import axios from 'axios'
 
   export default {
@@ -204,16 +205,13 @@
         }
       }
       return {
-        editAuthForm: {
-          authgroup: []
-        },
-        groupset: [],
+        groupset: Array,
         editEmailModal: false,
         editEmailForm: {
           mail: '',
           real_name: ''
         },
-        userForm: {},
+        userForm: Object,
         formItem: {
           ddl: '',
           ddlcon: ''
@@ -230,16 +228,19 @@
           rePass: ''
         },
         passwordValidate: {
-          oldPass: [{
-            required: true,
-            message: '请输入原密码',
-            trigger: 'blur'
-          }],
-          newPass: [{
-            required: true,
-            message: '请输入新密码',
-            trigger: 'blur'
-          },
+          oldPass: [
+            {
+              required: true,
+              message: '请输入原密码',
+              trigger: 'blur'
+            }
+          ],
+          newPass: [
+            {
+              required: true,
+              message: '请输入新密码',
+              trigger: 'blur'
+            },
             {
               min: 6,
               message: '请至少输入6个字符',
@@ -265,81 +266,62 @@
         editInfoModal: false,
         permission: {
           ddl: '0',
-          ddlcon: [],
+          ddlcon: Array,
           dml: '0',
-          dmlcon: [],
+          dmlcon: Array,
           query: '0',
-          querycon: [],
+          querycon: Array,
           dic: '0',
-          diccon: [],
+          diccon: Array,
           dicedit: '0',
           dicexport: '0',
           index: '0',
-          indexcon: [],
+          indexcon: Array,
           user: '0',
           base: '0'
         },
-        indeterminate: {
-          ddl: true,
-          dml: true,
-          query: true,
-          dic: true,
-          person: true
-        },
-        checkAll: {
-          ddl: false,
-          dml: false,
-          query: false,
-          dic: false,
-          person: false
-        },
-        connectionList: {
-          connection: [],
-          dic: [],
-          person: []
-        },
-        permission_list: {}
+        permission_list: Object,
+        authgroup: []
       }
     },
     methods: {
       openMailChange () {
         this.editEmailModal = true
-        this.editEmailForm.mail = this.userForm.email
-        this.editEmailForm.real_name = this.userForm.real_name
+        this.editEmailForm = this.userForm
       },
       getgrouplist () {
-        axios.put(`${util.url}/authgroup/group_list`, {'group_list': JSON.stringify(this.editAuthForm.authgroup)})
+        axios.put(`${this.$config.url}/authgroup/group_list`, {'group_list': JSON.stringify(this.authgroup)})
           .then(res => {
             this.permission_list = res.data.permissions
-            this.permission = util.mode(res.data.permissions)
+            this.permission = this.$config.mode(res.data.permissions)
           })
           .catch(error => {
-            util.err_notice(error)
+            this.$config.err_notice(error)
           })
       },
       getauthgroup () {
-        axios.get(`${util.url}/authgroup/group_name`)
+        axios.get(`${this.$config.url}/authgroup/group_name`)
           .then(res => {
             this.groupset = res.data.authgroup
           })
           .catch(error => {
-            util.err_notice(error)
+            this.$config.err_notice(error)
           })
       },
       saveEditPass () {
         this.$refs['editPasswordForm'].validate((valid) => {
           if (valid) {
             this.savePassLoading = true
-            axios.put(`${util.url}/userinfo/changepwd`, {
+            axios.put(`${this.$config.url}/userinfo/changepwd`, {
               'username': sessionStorage.getItem('user'),
               'new': this.editPasswordForm.newPass
             })
               .then(res => {
-                util.notice(res.data)
+                this.$config.notice(res.data)
                 this.editPasswordModal = false
               })
               .catch(error => {
-                util.err_notice(error)
+                this.$config.err_notice(error)
               })
             this.savePassLoading = false
           }
@@ -350,64 +332,42 @@
       },
       saveEmail () {
         this.savePassLoading = true
-        axios.put(`${util.url}/userinfo/changemail`, {
-          'mail': this.editEmailForm.mail,
+        axios.put(`${this.$config.url}/userinfo/changemail`, {
+          'mail': this.editEmailForm.email,
           'username': sessionStorage.getItem('user'),
           'real': this.editEmailForm.real_name
         })
           .then(res => {
-            util.notice(res.data)
+            this.$config.notice(res.data)
             this.editEmailModal = false
             sessionStorage.setItem('real_name', this.editEmailForm.real_name)
           })
           .catch(error => {
-            util.err_notice(error)
+            this.$config.err_notice(error)
           })
         this.savePassLoading = false
       },
       init () {
-        axios.put(`${util.url}/homedata/ownspace`)
+        axios.put(`${this.$config.url}/homedata/ownspace`)
           .then(res => {
             this.userForm = res.data.userinfo
-            this.formItem = util.mode(res.data.permissons)
+            this.authgroup = res.data.userinfo.auth_group.split(',')
+            this.formItem = this.$config.mode(res.data.permissons)
           })
       },
-      ApplyForPermission () {
-        this.editInfoModal = true
-        this.editAuthForm.authgroup = this.userForm.auth_group.split(',')
-      },
-      ddlCheckAll (name, indeterminate, ty) {
-        if (this.indeterminate[indeterminate]) {
-          this.checkAll[indeterminate] = false
-        } else {
-          this.checkAll[indeterminate] = !this.checkAll[indeterminate]
-        }
-        this.indeterminate[indeterminate] = false
-        if (this.checkAll[indeterminate]) {
-          if (ty === 'dic') {
-            this.permission[name] = this.connectionList[ty].map(vl => vl.Name)
-          } else if (ty === 'person') {
-            this.permission[name] = this.connectionList[ty].map(vl => vl.username)
-          } else {
-            this.permission[name] = this.connectionList[ty].map(vl => vl.connection_name)
-          }
-        } else {
-          this.permission[name] = []
-        }
-      },
-      PutPermissionData () {
+      putPermissionData () {
         this.savePassLoading = true
-        axios.post(`${util.url}/apply_grained/`, {
-          'auth_group': this.editAuthForm.authgroup,
+        axios.post(`${this.$config.url}/apply_grained/`, {
+          'auth_group': this.authgroup,
           'grained_list': JSON.stringify(this.permission_list),
           'real_name': sessionStorage.getItem('real_name')
         })
           .then(res => {
-            util.notice(res.data)
+            this.$config.notice(res.data)
             this.editInfoModal = false
           })
           .catch(error => {
-            util.err_notice(error)
+            this.$config.err_notice(error)
           })
         this.savePassLoading = false
       }
@@ -415,15 +375,6 @@
     mounted () {
       this.init()
       this.getauthgroup()
-      axios.put(`${util.url}/workorder/connection`, {'permissions_type': 'own_space'})
-        .then(res => {
-          this.connectionList.connection = res.data['connection']
-          this.connectionList.dic = res.data['dic']
-          this.connectionList.person = res.data['person']
-        })
-        .catch(error => {
-          util.err_notice(error)
-        })
     }
   }
 </script>

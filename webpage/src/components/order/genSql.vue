@@ -26,7 +26,7 @@
               </Form-item>
               <Form-item label="连接名称:" prop="connection_name">
                 <Select v-model="formItem.connection_name" placeholder="请选择" @on-change="DataBaseName" filterable>
-                  <Option v-for="i in tableform.sqlname" :value="i.connection_name" :key="i.connection_name" >
+                  <Option v-for="i in tableform.sqlname" :value="i.connection_name" :key="i.connection_name">
                     {{ i.connection_name }}
                   </Option>
                 </Select>
@@ -166,7 +166,7 @@
 <script>
   //
   import axios from 'axios'
-  import util from '../../libs/util'
+
   import edittable from './components/editTable'
   import ICol from 'iview/src/components/grid/col'
 
@@ -422,7 +422,7 @@
         this.$refs['formItem'].validate((valid) => {
           if (valid) {
             let tmp = this.formDynamic.replace(/(;|；)$/gi, '').replace(/；/g, ';')
-            axios.put(`${util.url}/sqlsyntax/test`, {
+            axios.put(`${this.$config.url}/sqlsyntax/test`, {
               'id': this.id[0].id,
               'base': this.formItem.basename,
               'sql': tmp
@@ -442,11 +442,11 @@
                     this.validate_gen = true
                   }
                 } else {
-                  util.err_notice('无法连接到Inception!')
+                  this.$config.err_notice('无法连接到Inception!')
                 }
               })
               .catch(error => {
-                util.err_notice(error)
+                this.$config.err_notice(error)
               })
           } else {
             this.$Message.error('请填写具体地址或sql语句后再测试!')
@@ -467,14 +467,14 @@
               return item
             }
           })
-          axios.put(`${util.url}/workorder/basename`, {
+          axios.put(`${this.$config.url}/workorder/basename`, {
             'id': this.id[0].id
           })
             .then(res => {
               this.tableform.basename = res.data
             })
             .catch(() => {
-              util.err_notice('无法连接数据库!请检查网络')
+              this.$config.err_notice('无法连接数据库!请检查网络')
             })
         }
       },
@@ -488,26 +488,26 @@
       GetTableName () {
         if (this.formItem.basename) {
           let data = JSON.stringify(this.formItem)
-          axios.put(`${util.url}/workorder/tablename`, {
+          axios.put(`${this.$config.url}/workorder/tablename`, {
             'data': data,
             'id': this.id[0].id
           })
             .then(res => {
               this.tableform.info = res.data
             }).catch(error => {
-            util.err_notice(error)
+            this.$config.err_notice(error)
           })
         }
       },
       getdatabases () {
-        axios.put(`${util.url}/workorder/connection`, {'permissions_type': 'ddl'})
+        axios.put(`${this.$config.url}/workorder/connection`, {'permissions_type': 'ddl'})
           .then(res => {
             this.item = res.data['connection']
             this.assigned = res.data['assigend']
             this.dataset = res.data['custom']
           })
           .catch(error => {
-            util.err_notice(error)
+            this.$config.err_notice(error)
           })
       },
       getinfo () {
@@ -530,7 +530,7 @@
               }
             })
             this.formItem.table_name = this.formItem.tablename
-            axios.put(`${util.url}/workorder/field`, {
+            axios.put(`${this.$config.url}/workorder/field`, {
               'connection_info': JSON.stringify(this.formItem),
               'id': this.id[0].id
             })
@@ -539,7 +539,7 @@
                 this.$Spin.hide()
               })
               .catch(() => {
-                util.err_notice('连接失败！详细信息请查看日志')
+                this.$config.err_notice('连接失败！详细信息请查看日志')
                 this.$Spin.hide()
               })
             this.getindex()
@@ -586,13 +586,13 @@
       },
       confirmsql () {
         if (this.Add_tmp.Field !== '') {
-          util.notice('请将需要添加的字段添加进入临时表或者删除!')
+          this.$config.notice('请将需要添加的字段添加进入临时表或者删除!')
         } else {
           this.putdata.push({
             'add': this.add_row,
             'table_name': this.formItem.tablename
           })
-          axios.put(`${util.url}/gensql/sql`, {
+          axios.put(`${this.$config.url}/gensql/sql`, {
             'data': JSON.stringify(this.putdata),
             'basename': this.formItem.basename
           })
@@ -603,7 +603,7 @@
               this.putdata = []
               this.add_row = []
             }).catch(error => {
-            util.err_notice(error)
+            this.$config.err_notice(error)
           })
         }
       },
@@ -612,10 +612,10 @@
       },
       commitorder () {
         if (this.sql === [] || this.formItem.basename === '' || this.assigned === '' || this.formItem.text === '' || this.formItem.assigned === '') {
-          util.err_notice('工单数据缺失,请检查工单信息是否缺失!')
+          this.$config.err_notice('工单数据缺失,请检查工单信息是否缺失!')
         } else {
           if (this.pass === true) {
-            axios.post(`${util.url}/sqlsyntax/`, {
+            axios.post(`${this.$config.url}/sqlsyntax/`, {
               'data': JSON.stringify(this.formItem),
               'sql': JSON.stringify(this.sql),
               'real_name': sessionStorage.getItem('real_name'),
@@ -623,15 +623,15 @@
               'id': this.id[0].id
             })
               .then(res => {
-                util.notice(res.data)
+                this.$config.notice(res.data)
                 this.$router.push({
                   name: 'myorder'
                 })
               }).catch(error => {
-              util.err_notice(error)
+              this.$config.err_notice(error)
             })
           } else {
-            util.err_notice('提交工单需点击确认按钮')
+            this.$config.err_notice('提交工单需点击确认按钮')
           }
         }
       },
@@ -643,7 +643,7 @@
       }
     },
     mounted () {
-      for (let i of util.highlight.split('|')) {
+      for (let i of this.$config.highlight.split('|')) {
         this.wordList.push({'vl': i, 'meta': '关键字'})
       }
       this.getdatabases()

@@ -18,13 +18,12 @@
         <Option value="NO" >不设置为全文索引</Option>
       </Select>
     <Button type="primary" @click.native="addcolumns">  添加</Button>
-    <Button type="success" @click.native="confirm2()">生成索引语句</Button>
+    <Button type="success" @click.native="genindex()">生成索引语句</Button>
   </div>
 </div>
 </template>
 <script>
 import axios from 'axios'
-import util from '../../../libs/util'
 export default {
   name: 'editindex',
   props: {
@@ -74,7 +73,8 @@ export default {
           }
         }
       ], // index现有表字段
-      addcolums: [{
+      addcolums: [
+        {
           title: '索引名称',
           key: 'key_name'
         },
@@ -125,12 +125,12 @@ export default {
       this.add_tmp = {}
       this.add_tmp.extra = 'NO'
     },
-    confirm2 () {
+    genindex () {
       this.putdata.push({
         'addindex': this.add_row,
         'table_name': this.table_name
       })
-      axios.put(`${util.url}/gensql/index`, {
+      axios.put(`${this.$config.url}/gensql/index`, {
           'data': JSON.stringify(this.putdata)
         })
         .then(mm => {

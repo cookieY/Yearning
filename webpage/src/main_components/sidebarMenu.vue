@@ -99,7 +99,7 @@
       }
     },
     created () {
-      axios.get(`${util.url}/homedata/menu`)
+      axios.get(`${this.$config.url}/homedata/menu`)
         .then(res => {
           let c = JSON.parse(res.data)
           this.filtermenulist.ddledit = c.ddl
