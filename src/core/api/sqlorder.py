@@ -73,8 +73,8 @@ class sqlorder(baseview.BaseView):
             type = request.data['type']
             real_name = request.data['real_name']
             id = request.data['id']
-            username = request.user
-            if username == data['assigned']:
+            user = request.user
+            if str(user.username) == str(data['assigned']):
                 return HttpResponse("审核人不能是自己",status=401)
         except KeyError as e:
             CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
