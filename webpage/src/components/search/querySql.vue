@@ -36,7 +36,9 @@
               <div slot="title">
                 <Button type="error" icon="md-trash" @click.native="ClearForm()">清除</Button>
                 <Button type="info" icon="md-brush" @click.native="beautify()">美化</Button>
-                <Button type="success" icon="ios-redo" @click.native="Search_sql()">查询</Button>
+                <Button v-if="formItem.selectContent" type="success" icon="ios-redo" @click.native="Search_sql()">
+                  查询已选择</Button>
+                <Button v-else type="success" icon="ios-redo" @click.native="Search_sql()">查询</Button>
                 <Button type="primary" icon="ios-cloud-download" @click.native="exportdata()" v-if="put_info.export_data">导出查询数据</Button>
                 <span>
                   <b>当前选择的库:</b>
@@ -44,7 +46,7 @@
                 </span>
               </div>
               <Button type="primary" icon="md-add" @click.native="search_perm()" slot="extra">查询权限</Button>
-              <editor v-model="formItem.textarea" @init="editorInit" @setCompletions="setCompletions" value="请输入SQL"></editor>
+              <editor v-model="formItem.textarea" @init="editorInit" @setCompletions="setCompletions" @on-select="getSelect"  value="请输入SQL"></editor>
             </Card>
           </Row>
           <Row>
@@ -109,8 +111,10 @@
         data1: [],
         validate_gen: true,
         formItem: {
-          textarea: ''
+          textarea: '',
+          selectContent: ''
         },
+        tmpGetselect: '',
         columnsName: [],
         Testresults: [],
         ruleValidate: {
@@ -218,6 +222,7 @@
         })
           .then(res => {
             this.formItem.textarea = res.data
+            this.formItem.selectContent = ''
           })
           .catch(error => {
             util.err_notice(error)
@@ -232,6 +237,7 @@
       },
       ClearForm () {
         this.formItem.textarea = ''
+        this.formItem.selectContent = ''
         this.Testresults = []
         this.columnsName = []
         this.$refs.totol.currentPage = 1
@@ -260,7 +266,7 @@
             }
           })
           axios.post(`${util.url}/search`, {
-            'sql': this.formItem.textarea,
+            'sql': this.formItem.selectContent.length > 2 ? this.formItem.selectContent : this.formItem.textarea,
             'address': JSON.stringify(address)
           }).then(res => {
               if (!res.data['data']) {
@@ -321,6 +327,18 @@
         } else {
           this.data1 = JSON.parse(JSON.stringify(this.data2))
         }
+      },
+      getSelect (val) {
+        this.tmpGetselect = val
+      },
+      setSelect () {
+        let tmp = this.tmpGetselect.replace(/\s+/g, ' ')
+        if (tmp !== ' ' && tmp.length > 2) {
+          this.formItem.selectContent = tmp
+        } else {
+          this.formItem.selectContent = ''
+        }
+        console.log(this.formItem.selectContent)
       }
     },
     mounted () {
@@ -351,10 +369,14 @@
     watch: {
       searchkey: function (newkey, oldkey) {
         this.debouncedFilter()
+      },
+      tmpGetselect: function (newselect, oldselect) {
+        this.debouncedSelect()
       }
     },
     created: function () {
       this.debouncedFilter = _.debounce(this.keyfilter, 500)
+      this.debouncedSelect = _.debounce(this.setSelect, 500)
     }
   }
 </script>

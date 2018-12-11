@@ -9,70 +9,70 @@ def create_sql(select_name=None, base_name=None, column_name=None, column_type=N
         if default is None:
             if null == 'YES':
                 if comment is None:
-                    return f"ALTER TABLE `{base_name}`.`{table_name}` \
-                             ADD COLUMN `{column_name}` {column_type}"
+                    return f"ALTER TABLE `{base_name}`.`{table_name}` " +\
+                           f"ADD COLUMN `{column_name}` {column_type}"
                 else:
-                    return f"ALTER TABLE `{base_name}`.`{table_name}`  ADD COLUMN `{column_name}` \
-                            {column_type} COMMENT '{comment}'"
+                    return f"ALTER TABLE `{base_name}`.`{table_name}` ADD COLUMN `{column_name}` " +\
+                           f"{column_type} COMMENT '{comment}'"
             else:
                 if comment is None:
-                    return f"ALTER TABLE `{base_name}`.`{table_name}` ADD COLUMN `{column_name}` \
-                            {column_type} NOT NULL"
+                    return f"ALTER TABLE `{base_name}`.`{table_name}` ADD COLUMN `{column_name}` " +\
+                           f"{column_type} NOT NULL"
                 else:
-                    return f"ALTER TABLE `{base_name}`.`{table_name}` ADD COLUMN `{column_name}` " \
+                    return f"ALTER TABLE `{base_name}`.`{table_name}` ADD COLUMN `{column_name}` " +\
                            f"{column_type} NOT NULL COMMENT '{comment}'"
         else:
             if null == 'NO':
                 if comment is None:
-                    return f"ALTER TABLE `{base_name}`.`{table_name}` ADD COLUMN `{column_name}` " \
+                    return f"ALTER TABLE `{base_name}`.`{table_name}` ADD COLUMN `{column_name}` " +\
                            f"{column_type} NOT NULL DEFAULT {default}"
                 else:
-                    return f"ALTER TABLE `{base_name}`.`{table_name}` ADD COLUMN `{column_name}` " \
+                    return f"ALTER TABLE `{base_name}`.`{table_name}` ADD COLUMN `{column_name}` " +\
                            f"{column_type} NOT NULL DEFAULT {default} COMMENT '{comment}'"
             else:
                 if comment is None:
-                    return f"ALTER TABLE `{base_name}`.`{table_name}` ADD COLUMN  `{column_name}` \
-                           {column_type}  DEFAULT {default}"
+                    return f"ALTER TABLE `{base_name}`.`{table_name}` ADD COLUMN  `{column_name}` " +\
+                           f"{column_type}  DEFAULT {default}"
                 else:
-                    return f"ALTER TABLE `{base_name}`.`{table_name}` ADD COLUMN `{column_name}` " \
+                    return f"ALTER TABLE `{base_name}`.`{table_name}` ADD COLUMN `{column_name}` " +\
                            f"{column_type}  DEFAULT {default} COMMENT '{comment}'"
     if select_name == 'edit':
         if default is None:
             if null == 'YES':
                 if comment is None:
-                    return f"ALTER TABLE `{base_name}`.`{table_name}` " \
+                    return f"ALTER TABLE `{base_name}`.`{table_name}` " +\
                            f"CHANGE COLUMN `{column_name}` `{column_name}` {column_type}"
                 else:
-                    return f"ALTER TABLE `{base_name}`.`{table_name}` \
-                           CHANGE COLUMN `{column_name}` `{column_name}` \
-                           {column_type} COMMENT '{comment}'"
+                    return f"ALTER TABLE `{base_name}`.`{table_name}` " +\
+                           f"CHANGE COLUMN `{column_name}` `{column_name}` " +\
+                           f"{column_type} COMMENT '{comment}'"
             else:
                 if comment == '':
-                    return f"ALTER TABLE `{base_name}`.`{table_name}` " \
+                    return f"ALTER TABLE `{base_name}`.`{table_name}` " +\
                            f"CHANGE COLUMN `{column_name}` `{column_name}` {column_type} NOT NULL"
                 else:
-                    return f"ALTER TABLE `{base_name}`.`{table_name}` \
-                           CHANGE COLUMN `{column_name}` `{column_name}` \
-                           {column_type} NOT NULL COMMENT '{comment}'"
+                    return f"ALTER TABLE `{base_name}`.`{table_name}` " +\
+                           f"CHANGE COLUMN `{column_name}` `{column_name}` " +\
+                           f"{column_type} NOT NULL COMMENT '{comment}'"
         else:
             if null == 'NO':
                 if comment is None:
-                    return f"ALTER TABLE `{base_name}`.`{table_name}` \
-                           CHANGE COLUMN `{column_name}` `{column_name}` \
-                           {column_type} NOT NULL DEFAULT {default}"
+                    return f"ALTER TABLE `{base_name}`.`{table_name}` " +\
+                           f"CHANGE COLUMN `{column_name}` `{column_name}` " +\
+                           f"{column_type} NOT NULL DEFAULT {default}"
                 else:
-                    return f"ALTER TABLE `{base_name}`.`{table_name}` \
-                           CHANGE COLUMN `{column_name}` `{column_name}` \
-                           {column_type} NOT NULL DEFAULT {default} COMMENT '{comment}'"
+                    return f"ALTER TABLE `{base_name}`.`{table_name}` " +\
+                           f"CHANGE COLUMN `{column_name}` `{column_name}` " +\
+                           f"{column_type} NOT NULL DEFAULT {default} COMMENT '{comment}'"
             else:
                 if comment is None:
-                    return f"ALTER TABLE `{base_name}`.`{table_name}` \
-                           CHANGE COLUMN `{column_name}` `{column_name}` \
-                           {column_type} DEFAULT {default}"
+                    return f"ALTER TABLE `{base_name}`.`{table_name}` " +\
+                           f"CHANGE COLUMN `{column_name}` `{column_name}` " +\
+                           f"{column_type} DEFAULT {default}"
                 else:
-                    return f"ALTER TABLE `{base_name}`.`{table_name}` \
-                           CHANGE COLUMN `{column_name}` `{column_name}` \
-                           {column_type} DEFAULT {default} COMMENT '{comment}'"
+                    return f"ALTER TABLE `{base_name}`.`{table_name}` " +\
+                           f"CHANGE COLUMN `{column_name}` `{column_name}` " +\
+                           f"{column_type} DEFAULT {default} COMMENT '{comment}'"
 
     if select_name == 'del':
         return f"ALTER TABLE `{base_name}`.`{table_name}` DROP COLUMN {column_name}"

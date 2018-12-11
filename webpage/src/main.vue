@@ -61,7 +61,7 @@
           v-if="$route.name === 'ddledit'
         || $route.name === 'dmledit'
         || $route.name === 'view-dml'
-        || $route.name === 'serach-sql'
+        || $route.name === 'querypage'
         ">
           <keep-alive>
             <router-view></router-view>
