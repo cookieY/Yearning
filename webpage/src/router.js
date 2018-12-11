@@ -166,15 +166,6 @@ export const appRouter = [
         component: resolve => {
           require(['./components/order/sqlSyntax.vue'], resolve)
         }
-      },
-      {
-        path: 'indexedit',
-        name: 'indexedit',
-        title: '索引',
-        'icon': 'md-share-alt',
-        component: resolve => {
-          require(['./components/order/genIndex.vue'], resolve)
-        }
       }
     ]
   },

@@ -73,6 +73,9 @@ class sqlorder(baseview.BaseView):
             type = request.data['type']
             real_name = request.data['real_name']
             id = request.data['id']
+            username = request.user
+            if username == data['assigned']:
+                return HttpResponse("审核人不能是自己",status=401)
         except KeyError as e:
             CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
             return HttpResponse(status=500)
@@ -107,7 +110,7 @@ class sqlorder(baseview.BaseView):
                     assigned=data['assigned'],
                     id=id
                 ).start()
-                return Response('已提交，请等待管理员审核!')
+                return HttpResponse('已提交，请等待管理员审核!')
             except Exception as e:
                 CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
                 return HttpResponse(status=500)

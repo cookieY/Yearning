@@ -66,7 +66,7 @@
             表结构详情
           </p>
           <div class="edittable-table-height-con">
-            <Tabs :value="tabs">
+            <Tabs v-model="tabs">
               <TabPane label="手动模式" name="order1" icon="md-code">
                 <Form>
                   <FormItem>
@@ -117,7 +117,6 @@
         </Card>
       </Col>
     </Row>
-
     <Modal v-model="openswitch" @on-ok="commitorder" :ok-text="'提交工单'" width="800">
       <Row>
         <Card>
@@ -571,10 +570,15 @@
           })
             .then(res => {
               for (let i of res.data) {
-                this.formDynamic += ';\n' + i.replace(/^\s+|\s+$/g, ' ')
+                if (this.formDynamic.length) {
+                  this.formDynamic += ';\n' + i.replace(/\s+/g, ' ')
+                } else {
+                  this.formDynamic = i.replace(/\s+/g, ' ')
+                }
               }
               this.putdata = []
               this.add_row = []
+              this.tabs = 'order1'
             }).catch(error => {
             util.err_notice(error)
           })
@@ -616,8 +620,13 @@
       },
       getindexconfirm (val) {
         for (let i of val) {
-          this.formDynamic += ';\n' + i.replace(/^\s+|\s+$/g, ' ')
+          if (this.formDynamic.length) {
+            this.formDynamic += ';\n' + i.replace(/\s+/g, ' ')
+          } else {
+            this.formDynamic = i.replace(/\s+/g, ' ')
+          }
         }
+        this.tabs = 'order1'
       }
     },
     mounted () {
