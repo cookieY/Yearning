@@ -50,21 +50,31 @@ class audit(baseview.BaseView):
             try:
                 un_init = util.init_conf()
                 custom_com = ast.literal_eval(un_init['other'])
-                page_number = SqlOrder.objects.filter(Q(assigned=username)|Q(username=username)|Q(exceuser=username)).count()
+                if request.user.group == 'admin':
+                    page_sql = Q()
+                    raw_sql = '''
+                        select core_sqlorder.*,core_databaselist.connection_name, \
+                        core_databaselist.computer_room from core_sqlorder,core_databaselist
+                        where core_sqlorder.bundle_id = core_databaselist.id and \
+                        core_sqlorder.delete_yn = 1 
+                        ORDER BY core_sqlorder.id desc
+                        '''
+                else:
+                    page_sql = Q(assigned=username)|Q(username=username)|Q(exceuser=username)
+                    raw_sql = '''
+                            select core_sqlorder.*,core_databaselist.connection_name, \
+                            core_databaselist.computer_room from core_sqlorder,core_databaselist
+                            where core_sqlorder.bundle_id = core_databaselist.id and \
+                            core_sqlorder.delete_yn = 1 and \
+                            (core_sqlorder.assigned = '%s' or \
+                            core_sqlorder.username = '%s' or \
+                            core_sqlorder.exceuser = '%s') \
+                            ORDER BY core_sqlorder.id desc
+                            ''' % (username, username, username)
+                page_number = SqlOrder.objects.filter(page_sql).count()
                 start = (int(page) - 1) * 20
                 end = int(page) * 20
-                info = SqlOrder.objects.raw(
-                    '''
-                    select core_sqlorder.*,core_databaselist.connection_name, \
-                    core_databaselist.computer_room from core_sqlorder,core_databaselist
-                    where core_sqlorder.bundle_id = core_databaselist.id and \
-                    core_sqlorder.delete_yn = 1 and \
-                    (core_sqlorder.assigned = '%s' or \
-                    core_sqlorder.username = '%s' or \
-                    core_sqlorder.exceuser = '%s') \
-                    ORDER BY core_sqlorder.id desc
-                    ''' % (username, username, username)
-                )[start:end]
+                info = SqlOrder.objects.raw(raw_sql)[start:end]
                 data = util.ser(info)
                 users = Account.objects.filter(Q(group = 'perform') | Q(group = 'manager')).all()
                 ser = serializers.UserINFO(users, many=True)

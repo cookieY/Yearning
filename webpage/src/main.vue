@@ -57,10 +57,18 @@
     </div>
     <div class="single-page-con" :style="{paddingLeft: hideMenuText?'60px':'200px'}">
       <div class="single-page">
-        <template>
+        <template
+          v-if="$route.name === 'ddledit'
+        || $route.name === 'dmledit'
+        || $route.name === 'view-dml'
+        || $route.name === 'querypage'
+        ">
           <keep-alive>
             <router-view></router-view>
           </keep-alive>
+        </template>
+        <template v-else>
+          <router-view></router-view>
         </template>
       </div>
     </div>

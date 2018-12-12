@@ -8,6 +8,8 @@ services:
       - 3306:3306
     volumes:
       - /server/docker_share/mysql:/var/lib/mysql
+      - /etc/timezone:/etc/timezone
+      - /etc/localtime:/etc/localtime
     environment:
       - MYSQL_ROOT_PASSWORD=root
     container_name: mysql
@@ -23,6 +25,8 @@ services:
       - 6669:6669
     volumes:
       - ./etc/inception/inc.cnf:/etc/inc.cnf
+      - /etc/timezone:/etc/timezone
+      - /etc/localtime:/etc/localtime
     network_mode: bridge
     restart: always
     container_name: inception
@@ -51,6 +55,9 @@ services:
     links:
       - db
       - inception
+    volumes:
+      - /etc/timezone:/etc/timezone
+      - /etc/localtime:/etc/localtime
   
   yearningweb:
     container_name: yearningweb
@@ -68,4 +75,6 @@ services:
       - yearning
     volumes:
       - ./etc/nginx/default.conf:/etc/nginx/conf.d/default.conf
+      - /etc/timezone:/etc/timezone
+      - /etc/localtime:/etc/localtime
 

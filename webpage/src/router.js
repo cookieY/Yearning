@@ -246,14 +246,14 @@ export const appRouter = [
     name: 'record',
     title: '记录',
     component: Index,
-    access: 2,
+    access: 3,
     children: [
       {
         path: 'query-review',
         name: 'query-review',
         title: '查询审计',
         'icon': 'md-pulse',
-        access: 2,
+        access: 3,
         component: resolve => {
           require(['./components/assistantManger/queryRecord.vue'], resolve)
         }
@@ -263,7 +263,7 @@ export const appRouter = [
         name: 'audit-record',
         title: '工单记录',
         'icon': 'md-list',
-        access: 2,
+        access: 3,
         component: resolve => {
           require(['./components/assistantManger/record.vue'], resolve)
         }

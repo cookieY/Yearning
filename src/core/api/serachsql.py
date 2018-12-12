@@ -356,7 +356,7 @@ class Query_order(baseview.BaseView):
         page = request.GET.get('page')
         page_size = request.GET.get('page_size', 10)
         if request.user.group == "admin":
-            sql_str = Q(audit=request.user.username)
+            sql_str = Q()
             pn = query_order.objects.filter(sql_str).count()
         elif request.user.group == "manager":
             sql_str = Q(audit=request.user.username) | Q(username=request.user.username)
@@ -372,7 +372,6 @@ class Query_order(baseview.BaseView):
 
     def post(self, request, args: str = None):
         work_id_list = json.loads(request.data['work_id'])
-        CUSTOM_ERROR.error(type(request.user.username))
         if request.user.group == "admin":
             for i in work_id_list:
                 query_order.objects.filter(work_id=i).delete()
