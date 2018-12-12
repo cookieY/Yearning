@@ -103,7 +103,7 @@
         </FormItem>
         <FormItem label="选择执行人:" v-if="multi ">
           <Select v-model="multi_name" style="width: 20%" clearable v-if="formitem.status !== 1">
-            <Option v-for="i in multi_list" :value="i.username" :key="i.username">{{i.auth_group+':'+i.username}}</Option>
+            <Option v-for="i in multi_list" :value="i.username" :key="i.username">{{ i.auth_group? i.auth_group+'->'+i.username: i.username }}</Option>
           </Select>
           <span v-if="formitem.status === 1">{{ formitem.exceuser }}</span>
         </FormItem>

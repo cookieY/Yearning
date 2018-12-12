@@ -23,7 +23,7 @@
                 </FormItem>
 
                 <FormItem label="连接名:" prop="connection_name">
-                  <Select v-model="formItem.connection_name" @on-change="DataBaseName" filterable>
+                  <Select v-model="formItem.connection_name" @on-change="DataBaseName" filterable :disabled="formItem.textarea.length !== 0" ref="connection_name">
                     <Option v-for="i in datalist.connection_name_list" :value="i.connection_name"
                             :key="i.connection_name">{{ i.connection_name }}
                     </Option>
@@ -31,19 +31,19 @@
                 </FormItem>
 
                 <FormItem label="库名:" prop="basename">
-                  <Select v-model="formItem.basename" filterable>
+                  <Select v-model="formItem.basename" filterable :disabled="formItem.textarea.length !== 0" ref="basename">
                     <Option v-for="item in datalist.basenamelist" :value="item" :key="item">{{ item }}</Option>
+                  </Select>
+                </FormItem>
+
+                <FormItem label="指定审核人:" prop="assigned">
+                  <Select v-model="formItem.assigned" filterable ref="assigned">
+                    <Option v-for="i in datalist.assigend" :value="i" :key="i">{{i}}</Option>
                   </Select>
                 </FormItem>
 
                 <FormItem label="工单说明:" prop="text">
                   <Input v-model="formItem.text" placeholder="请输入"></Input>
-                </FormItem>
-
-                <FormItem label="指定审核人:" prop="assigned">
-                  <Select v-model="formItem.assigned" filterable>
-                    <Option v-for="i in this.assigned" :value="i" :key="i">{{i}}</Option>
-                  </Select>
                 </FormItem>
 
                 <FormItem label="是否备份">
@@ -70,9 +70,9 @@
                 </FormItem>
 
                 <FormItem>
-                  <Button type="warning" icon="md-search" @click.native="test_sql()">检测</Button>
+                  <Button type="warning" icon="md-search" @click.native="test_sql()" :disabled="formItem.textarea.length === 0">检测</Button>
                   <Button type="success" icon="ios-redo" @click.native="SubmitSQL()" style="margin-left: 10%"
-                          :disabled="this.validate_gen">提交
+                          :disabled="this.validate_sub">提交
                   </Button>
                 </FormItem>
               </Form>
@@ -122,6 +122,7 @@
         validate_gen: true,
         formItem: {
           textarea: '',
+          checkedsql: '',
           computer_room: '',
           connection_name: '',
           basename: '',
@@ -168,7 +169,8 @@
           connection_name_list: [],
           basenamelist: [],
           sqllist: [],
-          computer_roomlist: []
+          computer_roomlist: [],
+          assigend: []
         },
         ruleValidate: {
           computer_room: [{
@@ -229,15 +231,17 @@
           })
       },
       Connection_Name (val) {
-        this.datalist.connection_name_list = []
+        // 初始化备选项
         this.datalist.basenamelist = []
+        this.datalist.assigend = []
+        // 初始化选择值
         this.formItem.connection_name = ''
         this.formItem.basename = ''
-        if (val) {
-          this.ScreenConnection(val)
-        }
-      },
-      ScreenConnection (val) {
+        this.formItem.assigned = ''
+        // 清空被选中项目
+        this.$refs.connection_name.setQuery(' ')
+        this.$refs.basename.setQuery(' ')
+        this.$refs.assigned.setQuery(' ')
         this.datalist.connection_name_list = this.item.filter(item => {
           if (item.computer_room === val) {
             return item
@@ -255,17 +259,35 @@
             'id': this.id[0].id
           })
             .then(res => {
+              // 初始化备选项
               this.datalist.basenamelist = res.data
+              this.datalist.assigned = []
+              // 初始化选择值
+              this.formItem.basename = ''
+              this.formItem.assigned = ''
+              // 清空被选中项目
+              this.$refs.basename.setQuery(' ')
+              this.$refs.assigned.setQuery(' ')
             })
             .catch(() => {
               util.err_notice('无法连接数据库!请检查网络')
             })
         }
+        axios.put(`${util.url}/workorder/connection`, {
+          'permissions_type': 'dml',
+           'dmlcon': [index]
+        })
+          .then(res => {
+            this.datalist.assigend = res.data['assigend']
+          })
+          .catch(error => {
+            util.err_notice(error)
+          })
       },
       test_sql () {
         let ddl = ['select', 'alter', 'drop', 'create']
-        let createtable = this.formItem.textarea.replace(/(;|；)$/gi, '').replace(/\s/g, ' ').replace(/；/g, ';').split(';')
-        for (let i of createtable) {
+        let dmlsql = this.formItem.textarea.replace(/(;|；)$/gi, '').replace(/\s/g, ' ').replace(/；/g, ';').split(';')
+        for (let i of dmlsql) {
           for (let c of ddl) {
             i = i.replace(/(^\s*)|(\s*$)/g, '')
             if (i.toLowerCase().indexOf(c) === 0) {
@@ -294,6 +316,7 @@
                     })
                     if (gen === 0) {
                       this.validate_gen = false
+                      this.formItem.checkedsql = this.formItem.textarea
                     } else {
                       this.validate_gen = true
                     }
@@ -312,24 +335,29 @@
         this.$refs['formItem'].validate((valid) => {
           if (valid) {
             if (this.formItem.textarea) {
-              this.datalist.sqllist = this.formItem.textarea.replace(/(;|；)$/gi, '').replace(/\s/g, ' ').replace(/；/g, ';').split(';')
-              axios.post(`${util.url}/sqlsyntax/`, {
-                'data': JSON.stringify(this.formItem),
-                'sql': JSON.stringify(this.datalist.sqllist),
-                'real_name': sessionStorage.getItem('real_name'),
-                'type': 1,
-                'id': this.id[0].id
-              })
-                .then(res => {
-                  this.$Notice.success({
-                    title: '成功',
-                    desc: res.data
+              if (this.formItem.textarea === this.formItem.checkedsql) {
+                this.datalist.sqllist = this.formItem.textarea.replace(/(;|；)$/gi, '').replace(/\s/g, ' ').replace(/；/g, ';').split(';')
+                axios.post(`${util.url}/sqlsyntax/`, {
+                  'data': JSON.stringify(this.formItem),
+                  'sql': JSON.stringify(this.datalist.sqllist),
+                  'real_name': sessionStorage.getItem('real_name'),
+                  'type': 1,
+                  'id': this.id[0].id
+                })
+                  .then(res => {
+                    this.$Notice.success({
+                      title: '成功',
+                      desc: res.data
+                    })
+                    this.ClearForm()
                   })
-                  this.ClearForm()
-                })
-                .catch(error => {
-                  util.err_notice(error)
-                })
+                  .catch(error => {
+                    util.err_notice(error)
+                  })
+              } else {
+                this.$Message.error('sql语句有变动,请重新检测')
+                this.validate_gen = true
+              }
             } else {
               this.$Message.error('请填写sql语句后再提交!')
             }
@@ -341,18 +369,34 @@
       },
       ClearForm () {
         this.formItem.textarea = ''
+      },
+      getdatabases (dmlcon = []) {
+        axios.put(`${util.url}/workorder/connection`, {
+          'permissions_type': 'dml',
+           'dmlcon': dmlcon
+        })
+          .then(res => {
+            console.log(res)
+            this.item = res.data['connection']
+            this.assigned = res.data['assigend']
+            this.datalist.computer_roomlist = res.data['custom']
+          })
+          .catch(error => {
+            util.err_notice(error)
+          })
+      }
+    },
+    computed: {
+      validate_sub: function () {
+        if (this.validate_gen | (this.formItem.checkedsql.length === 0) | (this.formItem.textarea !== this.formItem.checkedsql)) {
+          return true
+        } else {
+          return false
+        }
       }
     },
     mounted () {
-      axios.put(`${util.url}/workorder/connection`, {'permissions_type': 'dml'})
-        .then(res => {
-          this.item = res.data['connection']
-          this.assigned = res.data['assigend']
-          this.datalist.computer_roomlist = res.data['custom']
-        })
-        .catch(error => {
-          util.err_notice(error)
-        })
+      this.getdatabases()
       for (let i of util.highlight.split('|')) {
         this.wordList.push({'vl': i, 'meta': '关键字'})
       }

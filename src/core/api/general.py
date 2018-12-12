@@ -33,10 +33,9 @@ class addressing(baseview.BaseView):
 
         if args == 'connection':
             try:
-                assigned = set_auth_group(request.user)
                 un_init = util.init_conf()
                 custom_com = ast.literal_eval(un_init['other'])
-                
+                permission_spec = set_auth_group(request.user, **request.data)
                 if request.data['permissions_type'] == 'user' or request.data['permissions_type'] == 'own_space':
                     info = DatabaseList.objects.all()
                     con_name = Area(info, many=True).data
@@ -45,7 +44,6 @@ class addressing(baseview.BaseView):
 
                 elif request.data['permissions_type'] == 'query':
                     con_name = []
-                    permission_spec = set_auth_group(request.user)
                     if permission_spec['query'] == '1':
                         # 过滤
                         for i in permission_spec['querycon']:
@@ -58,13 +56,11 @@ class addressing(baseview.BaseView):
                                         'ip': con_instance.ip ,
                                         'computer_room': con_instance.computer_room
                                     })
-                    assigned = set_auth_group(request.user)
-                    return Response({'assigend': assigned['person'], 'connection': con_name,
+                    return Response({'assigend': permission_spec['person'], 'connection': con_name,
                                      'custom': custom_com['con_room']})
                 else:
                     con_name = []
                     _type = request.data['permissions_type'] + 'con'
-                    permission_spec = set_auth_group(request.user)
                     for i in permission_spec[_type]:
                         con_instance = DatabaseList.objects.filter(connection_name=i).first()
                         if con_instance:
@@ -83,7 +79,7 @@ class addressing(baseview.BaseView):
                         'connection': con_name,
                         'person': serializers.data,
                         'dic': dic,
-                        'assigend': assigned['person'],
+                        'assigend': permission_spec['person'],
                         'custom': custom_com['con_room'],
                         'multi': custom_com['multi']
                     }
@@ -160,31 +156,9 @@ class addressing(baseview.BaseView):
                     ) as f:
                         field = f.gen_alter(table_name=table)
                         sql = f.get_create_sql(table_name=table)
-                        return Response({"field":field,"sql":sql})
+                        index = f.index(table_name=table)
+                        return Response({"field":field,"sql":sql, 'index':index})
                 except Exception as e:
                     CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
                     return HttpResponse(status=500)
 
-        elif args == 'indexdata':
-            try:
-                login = json.loads(request.data['login'])
-                table = request.data['table']
-                basename = login['basename']
-                con_id = request.data['id']
-            except KeyError as e:
-                CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
-            else:
-                try:
-                    _connection = DatabaseList.objects.filter(id=con_id).first()
-                    with con_database.SQLgo(
-                            ip=_connection.ip,
-                            user=_connection.username,
-                            password=_connection.password,
-                            port=_connection.port,
-                            db=basename
-                    ) as f:
-                        res = f.index(table_name=table)
-                        return Response(res)
-                except Exception as e:
-                    CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
-                    return HttpResponse(e)

@@ -33,7 +33,7 @@
               </FormItem>
 
               <FormItem label="连接名:" prop="connection_name">
-                <Select v-model="step.connection_name" filterable>
+                <Select v-model="step.connection_name"  @on-change="DB_Name" filterable>
                   <Option v-for="i in datalist.connection_name_list" :value="i.connection_name"
                           :key="i.connection_name">{{ i.connection_name }}
                   </Option>
@@ -154,6 +154,16 @@
           if (item.computer_room === val) {
             return item
           }
+        })
+      },
+      DB_Name (val) {
+        this.step.person = ''
+        axios.put(`${util.url}/workorder/connection`, {'permissions_type': 'query', 'querycon': [val]})
+        .then(res => {
+          this.personlist = res.data['assigend']
+        })
+        .catch(error => {
+          util.err_notice(error)
         })
       },
       handleSubmit () {
