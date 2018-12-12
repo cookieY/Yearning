@@ -37,7 +37,7 @@ class Account(AbstractUser):
     department = models.CharField(max_length=40)  # 部门
     auth_group = models.CharField(max_length=100, null=True)  # 细粒化权限组
     real_name = models.CharField(max_length=100, null=True, default='请添加真实姓名')  # 真实姓名
-
+    updatetime = models.DateTimeField('修改时间', auto_now_add = True)
 
 class SqlDictionary(models.Model):
     '''
@@ -50,6 +50,7 @@ class SqlDictionary(models.Model):
     Extra = models.TextField()  # 备注
     TableComment = models.CharField(max_length=100)  # 表备注
     Name = models.CharField(max_length=100, null=True)  # 连接名
+    updatetime = models.DateTimeField('修改时间', auto_now_add = True)
 
     def __str__(self):
         return self.TableName
@@ -75,7 +76,7 @@ class SqlOrder(models.Model):
     real_name = models.CharField(max_length=100, null=True)  # 姓名
     exceuser = models.CharField(max_length=50, blank=True)  # 工单执行人
     delete_yn = models.IntegerField(null=False, default=1)  # 1:显示, 0:不显示
-
+    updatetime = models.DateTimeField('修改时间', auto_now_add = True)
 
 class DatabaseList(models.Model):
     '''
@@ -89,7 +90,7 @@ class DatabaseList(models.Model):
     password = models.CharField(max_length=50)  # 数据库密码
     before = models.TextField(null=True)  # 提交工单 钉钉webhook发送内容
     after = models.TextField(null=True)  # 工单执行成功后 钉钉webhook发送内容
-
+    updatetime = models.DateTimeField('修改时间', auto_now_add = True)
 
 class SqlRecord(models.Model):
     '''
@@ -104,7 +105,7 @@ class SqlRecord(models.Model):
     execute_time = models.CharField(max_length=150, null=True)
     backup_dbname = models.CharField(max_length=100, null=True)
     SQLSHA1 = models.TextField(null=True)
-
+    updatetime = models.DateTimeField('修改时间', auto_now_add = True)
 
 class Todolist(models.Model):
     '''
@@ -112,7 +113,7 @@ class Todolist(models.Model):
     '''
     username = models.CharField(max_length=50)  # 账户
     content = models.CharField(max_length=200)  # 内容
-
+    updatetime = models.DateTimeField('修改时间', auto_now_add = True)
 
 class globalpermissions(models.Model):
     '''
@@ -125,12 +126,12 @@ class globalpermissions(models.Model):
     ldap = JSONField(null=True)
     message = JSONField(null=True)
     other = JSONField(null=True)
-
+    updatetime = models.DateTimeField('修改时间', auto_now_add = True)
 
 class grained(models.Model):
     username = models.CharField(max_length=50, db_index=True)
     permissions = JSONField()
-
+    updatetime = models.DateTimeField('修改时间', auto_now_add = True)
 
 class applygrained(models.Model):
     username = models.CharField(max_length=50, db_index=True)
@@ -139,12 +140,13 @@ class applygrained(models.Model):
     permissions = JSONField()
     auth_group = models.CharField(max_length=50, null=True)
     real_name = models.CharField(max_length=100, null=True)  # 真实姓名
-
+    updatetime = models.DateTimeField('修改时间', auto_now_add = True)
 
 class querypermissions(models.Model):
     work_id = models.CharField(max_length=50, null=True, db_index=True)
     username = models.CharField(max_length=100, null=True)
     statements = models.TextField()
+    updatetime = models.DateTimeField('修改时间', auto_now_add = True)
 
 
 class query_order(models.Model):
@@ -159,3 +161,4 @@ class query_order(models.Model):
     audit = models.CharField(max_length=100, null=True)
     time = models.CharField(max_length=100, null=True)
     real_name = models.CharField(max_length=100, null=True)  # 真实姓名
+    updatetime = models.DateTimeField('修改时间', auto_now_add = True)
