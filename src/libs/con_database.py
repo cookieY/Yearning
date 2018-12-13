@@ -90,7 +90,7 @@ class SQLgo(object):
                     'Default': i[4]
                 } for i in result
             ]
-            sqllist = 'show table status where NAME="%s";' % (table_name)
+            sqllist = "show table status like '%s';" % (table_name)
             cursor.execute(sqllist)
             result = cursor.fetchall()
             tablecomment = result[0][-1]
