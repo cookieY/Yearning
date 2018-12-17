@@ -146,7 +146,7 @@
       cancel-text="关闭窗口">
       <Form>
         <FormItem label="SQL语句SHA1值">
-          <Select v-model="oscsha1" style="width:70%" @on-change="oscsetp" transfer>
+          <Select v-model="oscsha1" style="width:70%" @on-change="oscsetp" transfer >
             <Option v-for="item in osclist" :value="item.SQLSHA1" :key="item.SQLSHA1">{{ item.SQLSHA1 }}</Option>
           </Select>
         </FormItem>
@@ -439,7 +439,7 @@
         togoing: null,
         osc: false,
         oscsha1: '',
-        osclist: JSON.parse(sessionStorage.getItem('osc')),
+        osclist: [],
         percent: 0,
         consuming: '00:00',
         callback_time: null,
@@ -530,16 +530,13 @@
         })
           .then(res => {
             if (res.data.status === 200) {
-              let osclist
               this.dataId = res.data.result
-              osclist = this.dataId.filter(vl => {
+              this.osclist = this.dataId.filter(vl => {
                 if (vl.SQLSHA1 !== '') {
                   return vl
                 }
               })
-              this.osclist = osclist
               this.summit = false
-              sessionStorage.setItem('osc', JSON.stringify(osclist))
             } else {
               this.$config.err_notice(res.data.status)
             }
@@ -579,18 +576,18 @@
       oscsetp (vl) {
         let vm = this
         this.callback_time = setInterval(function () {
-          axios.get(`${this.$config.url}/osc/${vl}`)
+          axios.get(`${vm.$config.url}/osc/${vl}`)
             .then(res => {
-              if (res.data[0].PERCENT === 99) {
+              if (res.data[0] !== undefined) {
+                vm.percent = res.data[0].PERCENT
+                vm.consuming = res.data[0].REMAINTIME
+              } else {
                 vm.percent = 100
                 clearInterval(vm.callback_time)
-              } else {
-                vm.percent = res.data[0].PERCENT
               }
-              vm.consuming = res.data[0].REMAINTIME
             })
             .catch(error => console.log(error))
-        }, 2000)
+        }, 1000)
       },
       callback_method () {
         clearInterval(this.callback_time)
