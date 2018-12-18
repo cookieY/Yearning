@@ -5,7 +5,7 @@
 # Yearning SQL审核平台
 
 ![](https://img.shields.io/badge/build-release-brightgreen.svg)  
-![](https://img.shields.io/badge/version-v1.3.4-brightgreen.svg)  
+![](https://img.shields.io/badge/version-v1.3.5-brightgreen.svg)  
 ![](https://img.shields.io/badge/vue.js-2.5.13-brightgreen.svg) 
 ![](https://img.shields.io/badge/iview-3.1.0-brightgreen.svg?style=flat-square) 
 ![](https://img.shields.io/badge/python-3.6-brightgreen.svg)
