@@ -495,7 +495,7 @@
       mountdata (vl = 1) {
         axios.get(`${this.$config.url}/management_db/all/?page=${vl}&permissions_type=base`)
           .then(res => {
-            [this.rowdata, this.pagenumber, this.diclist, this.dataset] = [res.data.data, parseInt(res.data.page), res.data.diclist]
+            [this.rowdata, this.pagenumber, this.diclist, this.dataset] = [res.data.data, parseInt(res.data.page), res.data.diclist, res.data.custom]
           })
           .catch(error => {
             this.$config.err_notice(error)

@@ -96,7 +96,6 @@
 </template>
 <script>
   import axios from 'axios'
-  import util from './libs/util'
   import ICol from '../node_modules/iview/src/components/grid/col.vue'
   //
   export default {
@@ -237,8 +236,8 @@
               name: 'home_index'
             })
           })
-          .catch(error => {
-            util.ajanxerrorcode(this, error)
+          .catch(() => {
+            this.$config.err_notice(this, '账号密码错误,请重新输入!')
           })
       },
       ldap_login () {
@@ -258,7 +257,7 @@
               sessionStorage.setItem('jwt', `JWT ${res.data['token']}`)
               sessionStorage.setItem('auth', res.data['permissions'])
               let auth = res.data['permissions']
-              if (auth === 'admin') {
+              if (auth === 'admin' || auth === 'perform') {
                 sessionStorage.setItem('access', 0)
               } else {
                 sessionStorage.setItem('access', 1)
@@ -268,8 +267,8 @@
               })
             }
           })
-          .catch(error => {
-            util.ajanxerrorcode(this, error)
+          .catch(() => {
+            this.$config.err_notice(this, '账号密码错误,请重新输入!')
           })
       }
     },
