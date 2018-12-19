@@ -55,22 +55,25 @@ class search(baseview.BaseView):
     @staticmethod
     def sql_as_ex(sql, sensitive_list):
         count = 0
-        sql = sql.split()
-        for gen in sql:
+        sql = sql.split(',')
+        complete = []
+        for comma in sql:
+            _a = comma.split(' ')
+            for _i in _a:
+                if _i is not '':
+                    complete.append(_i)
+        for gen in complete:
             if gen == 'as':
                 count += 1
         if count != 0:
             as_list = []
-            for i in range(len(sql)):
-                if sql[i] == 'as':
-                    as_list.append({sql[i - 1]: sql[i + 1].rstrip(',')})
+            for i in range(len(complete)):
+                if complete[i] == 'as':
+                    as_list.append(complete[i + 1].rstrip(','))
 
             if as_list is not None:
-                for sen_i in range(len(sensitive_list)):
-                    for as_i in as_list:
-                        for c in as_i:
-                            if sensitive_list[sen_i] == c:
-                                sensitive_list[sen_i] = as_i[c]
+                for sen_i in as_list:
+                    sensitive_list.append(sen_i)
             return sensitive_list
         else:
             return sensitive_list
@@ -118,7 +121,7 @@ class search(baseview.BaseView):
                         return HttpResponse(e)
                     else:
                         if critical:
-                            as_list = search.sql_as_ex(query_sql, custom_com['sensitive_list'])
+                            as_list = search.sql_as_ex(sql, custom_com['sensitive_list'])
                             for l in data_set['data']:
                                 for k, v in l.items():
                                     for n in range(data_set['len']):
