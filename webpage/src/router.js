@@ -114,7 +114,7 @@ export const appRouter = [
     ]
   },
   {
-    path: 'order',
+    path: '/order',
     icon: 'md-folder',
     name: 'order',
     title: '工单提交',
