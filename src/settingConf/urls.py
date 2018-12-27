@@ -25,7 +25,8 @@ from core.api.managerdb import (
 )
 from core.api.auditorder import (
     audit,
-    del_order
+    del_order,
+    getsql
 )
 from core.api.record import (
     record_order,
@@ -46,6 +47,7 @@ from core.api.authgroup import *
 
 urlpatterns = [
     url(r'^api/v1/authgroup/(.*)', auth_group.as_view()),
+    url(r'^api/v1/getsql', getsql.as_view()),
     url(r'^api/v1/setting/(.*)', setting_view.as_view()),
     url(r'^api/v1/query_order', Query_order.as_view()),
     url(r'^api/v1/query_worklf', query_worklf.as_view()),

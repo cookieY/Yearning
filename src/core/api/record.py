@@ -32,11 +32,12 @@ class record_order(baseview.SuperUserpermissions):
                 end = int(page) * 10
                 sql = SqlOrder.objects.raw(
                     '''
-                    select core_sqlorder.*,core_databaselist.connection_name, \
-                    core_databaselist.computer_room from core_sqlorder \
+                    select o.id,o.work_id,o.text,o.backup,o.date,o.assigned,
+                    o.username,o.real_name,o.basename,core_databaselist.connection_name, \
+                    core_databaselist.computer_room from core_sqlorder as o \
                     INNER JOIN core_databaselist on \
-                    core_sqlorder.bundle_id = core_databaselist.id where core_sqlorder.status = 1 and core_sqlorder.assigned = '%s'\
-                    ORDER BY core_sqlorder.id desc
+                    o.bundle_id = core_databaselist.id where o.status = 1 and o.assigned = '%s'\
+                    ORDER BY o.id desc
                     ''' % username
                 )[start:end]
                 data = util.ser(sql)

@@ -69,7 +69,6 @@
         </Row>
       </Card>
     </Row>
-
     <Modal v-model="modal2" width="1000">
       <p slot="header" style="color:#f60;font-size: 16px">
         <Icon type="information-circled"></Icon>
@@ -109,7 +108,9 @@
       </template>
 
       <div slot="footer">
-        <Button type="warning" @click.native="test_button()" v-if="auth === 'admin'">检测sql</Button>
+        <Button type="warning" @click.native="test_button()" v-if="auth === 'admin'" :loading="loading">
+          <span v-if="!loading">检测sql</span>
+          <span v-else>检测中</span></Button>
         <Button @click="modal2 = false">取消</Button>
         <template v-if="switch_show">
           <template v-if="multi">
@@ -146,7 +147,7 @@
       cancel-text="关闭窗口">
       <Form>
         <FormItem label="SQL语句SHA1值">
-          <Select v-model="oscsha1" style="width:70%" @on-change="oscsetp" transfer >
+          <Select v-model="oscsha1" style="width:70%" @on-change="oscsetp" transfer>
             <Option v-for="item in osclist" :value="item.SQLSHA1" :key="item.SQLSHA1">{{ item.SQLSHA1 }}</Option>
           </Select>
         </FormItem>
@@ -185,6 +186,7 @@
     name: 'Sqltable',
     data () {
       return {
+        loading: false,
         sql_columns: [
           {
             title: 'sql语句',
@@ -459,10 +461,16 @@
         this.modal2 = true
         this.formitem = this.tmp[index]
         this.tmp[index].status === 2 ? this.switch_show = true : this.switch_show = false
-        let tmpSql = this.tmp[index].sql.split(';')
-        for (let i of tmpSql) {
-          this.sql.push({'sql': i})
-        }
+        axios.get(`${this.$config.url}/getsql?id=${this.formitem.id}`)
+          .then(res => {
+            let tmpSql = res.data.split(';')
+            for (let i of tmpSql) {
+              this.sql.push({'sql': i})
+            }
+          })
+          .catch(err => {
+            this.$config.err_notice(err)
+          })
       },
       agreed_button () {
         if (this.multi_name === '') {
@@ -522,6 +530,7 @@
           })
       },
       test_button () {
+        this.loading = true
         this.osclist = []
         axios.put(`${this.$config.url}/audit_sql`, {
           'type': 'test',
@@ -537,6 +546,7 @@
                 }
               })
               this.summit = false
+              this.loading = false
             } else {
               this.$config.err_notice(res.data.status)
             }

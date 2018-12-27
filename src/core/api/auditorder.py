@@ -54,11 +54,12 @@ class audit(baseview.SuperUserpermissions):
                 end = int(page) * 20
                 info = SqlOrder.objects.raw(
                     '''
-                    select core_sqlorder.*,core_databaselist.connection_name, \
-                    core_databaselist.computer_room from core_sqlorder \
+                    select o.id,o.work_id,o.text,o.backup,o.date,o.assigned,
+                    o.username,o.real_name,o.status,o.basename,o.delay,core_databaselist.connection_name, \
+                    core_databaselist.computer_room from core_sqlorder as o \
                     INNER JOIN core_databaselist on \
-                    core_sqlorder.bundle_id = core_databaselist.id where core_sqlorder.assigned = '%s'\
-                    ORDER BY core_sqlorder.id desc
+                    o.bundle_id = core_databaselist.id where o.assigned = '%s'\
+                    ORDER BY o.id desc
                     ''' % username
                 )[start:end]
                 data = util.ser(info)
@@ -97,7 +98,7 @@ class audit(baseview.SuperUserpermissions):
                     return HttpResponse(status=500)
                 else:
                     try:
-                        SqlOrder.objects.filter(id=order_id).update(status=0,rejected=text)
+                        SqlOrder.objects.filter(id=order_id).update(status=0, rejected=text)
                         _tmpData = SqlOrder.objects.filter(id=order_id).values(
                             'work_id',
                             'bundle_id'
@@ -203,6 +204,14 @@ class del_order(baseview.BaseView):
             except Exception as e:
                 CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
                 return HttpResponse(status=500)
+
+
+class getsql(baseview.BaseView):
+
+    def get(self, request, args: str = None):
+        id = request.GET.get('id')
+        sql = SqlOrder.objects.filter(id=id).first()
+        return Response(sql.sql)
 
 
 def push_message(message=None, type=None, user=None, to_addr=None, work_id=None, status=None):
