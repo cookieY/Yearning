@@ -17,13 +17,13 @@
 
               <Form ref="formItem" :model="formItem" :rules="ruleValidate" :label-width="80">
                 <FormItem label="机房:" prop="computer_room">
-                  <Select v-model="formItem.computer_room" @on-change="Connection_Name">
+                  <Select v-model="formItem.computer_room" @on-change="ScreenConnection">
                     <Option v-for="i in datalist.computer_roomlist" :key="i" :value="i">{{i}}</Option>
                   </Select>
                 </FormItem>
 
                 <FormItem label="连接名:" prop="connection_name">
-                  <Select v-model="formItem.connection_name" @on-change="DataBaseName" filterable>
+                  <Select v-model="formItem.connection_name" @on-change="DataBaseName">
                     <Option v-for="i in datalist.connection_name_list" :value="i.connection_name"
                             :key="i.connection_name">{{ i.connection_name }}
                     </Option>
@@ -31,7 +31,7 @@
                 </FormItem>
 
                 <FormItem label="库名:" prop="basename">
-                  <Select v-model="formItem.basename" filterable>
+                  <Select v-model="formItem.basename">
                     <Option v-for="item in datalist.basenamelist" :value="item" :key="item">{{ item }}</Option>
                   </Select>
                 </FormItem>
@@ -227,18 +227,12 @@
             this.$config.err_notice(error)
           })
       },
-      Connection_Name (val) {
-        this.datalist.connection_name_list = []
-        this.datalist.basenamelist = []
+      ScreenConnection (val) {
         this.formItem.connection_name = ''
         this.formItem.basename = ''
-        if (val) {
-          this.ScreenConnection(val)
-        }
-      },
-      ScreenConnection (val) {
         this.datalist.connection_name_list = this.item.filter(item => {
           if (item.computer_room === val) {
+            console.log(item)
             return item
           }
         })

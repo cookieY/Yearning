@@ -23,44 +23,44 @@
             <breadcrumb-nav :currentPath="currentPath"></breadcrumb-nav>
           </div>
         </div>
-        <div class="header-avator-con">
-          <a @click="getc = true">捐助</a>
-          <Modal
-          v-model="getc"
-          title="捐助Yearning"
-          width="640">
-          <h3>让Yearning持续提供更好的功能与服务。</h3>
-          <br>
-          <img height="300" width="300" src="./assets/alipay.jpg"/>
-          <img height="300" width="300" src="./assets/wechat.jpg"/>
-          </Modal>
-          <a href="https://cookiey.github.io/Yearning-document/used/" target="_Blank">使用说明</a>
-          <div @click="handleFullScreen" v-if="showFullScreenBtn" class="full-screen-btn-con">
-            <Tooltip :content="isFullScreen ? '退出全屏' : '全屏'" placement="bottom">
-              <Icon :type="isFullScreen ? 'md-contract' : 'md-expand'" :size="23"></Icon>
-            </Tooltip>
-          </div>
-          <div @click="lockScreen" class="lock-screen-btn-con">
-            <Tooltip content="锁屏" placement="bottom">
-              <Icon type="md-lock" :size="20"></Icon>
-            </Tooltip>
-          </div>
-          <div class="user-dropdown-menu-con">
-            <Row type="flex" justify="end" align="middle" class="user-dropdown-innercon">
-              <Dropdown trigger="click" @on-click="handleClickUserDropdown">
-                <a href="javascript:void(0)">
-                  <span class="main-user-name">{{ userName }}</span>
-                  <Icon type="md-arrow-dropdown"/>
-                </a>
-                <DropdownMenu slot="list">
-                  <DropdownItem name="ownSpace">个人中心</DropdownItem>
-                  <DropdownItem name="loginout" divided>退出登录</DropdownItem>
-                </DropdownMenu>
-              </Dropdown>
-              <Avatar :src="avatorPath" style="background: #ffffff;margin-left: 10px;"></Avatar>
-            </Row>
-          </div>
-        </div>
+        <!--<div class="header-avator-con">-->
+          <!--<a @click="getc = true">捐助</a>-->
+          <!--<Modal-->
+          <!--v-model="getc"-->
+          <!--title="捐助Yearning"-->
+          <!--width="640">-->
+          <!--<h3>让Yearning持续提供更好的功能与服务。</h3>-->
+          <!--<br>-->
+          <!--<img height="300" width="300" src="./assets/alipay.jpg"/>-->
+          <!--<img height="300" width="300" src="./assets/wechat.jpg"/>-->
+          <!--</Modal>-->
+          <!--<a href="https://cookiey.github.io/Yearning-document/used/" target="_Blank">使用说明</a>-->
+          <!--<div @click="handleFullScreen" v-if="showFullScreenBtn" class="full-screen-btn-con">-->
+            <!--<Tooltip :content="isFullScreen ? '退出全屏' : '全屏'" placement="bottom">-->
+              <!--<Icon :type="isFullScreen ? 'md-contract' : 'md-expand'" :size="23"></Icon>-->
+            <!--</Tooltip>-->
+          <!--</div>-->
+          <!--<div @click="lockScreen" class="lock-screen-btn-con">-->
+            <!--<Tooltip content="锁屏" placement="bottom">-->
+              <!--<Icon type="md-lock" :size="20"></Icon>-->
+            <!--</Tooltip>-->
+          <!--</div>-->
+          <!--<div class="user-dropdown-menu-con">-->
+            <!--<Row type="flex" justify="end" align="middle" class="user-dropdown-innercon">-->
+              <!--<Dropdown trigger="click" @on-click="handleClickUserDropdown">-->
+                <!--<a href="javascript:void(0)">-->
+                  <!--<span class="main-user-name">{{ userName }}</span>-->
+                  <!--<Icon type="md-arrow-dropdown"/>-->
+                <!--</a>-->
+                <!--<DropdownMenu slot="list">-->
+                  <!--<DropdownItem name="ownSpace">个人中心</DropdownItem>-->
+                  <!--<DropdownItem name="loginout" divided>退出登录</DropdownItem>-->
+                <!--</DropdownMenu>-->
+              <!--</Dropdown>-->
+              <!--<Avatar :src="avatorPath" style="background: #ffffff;margin-left: 10px;"></Avatar>-->
+            <!--</Row>-->
+          <!--</div>-->
+        <!--</div>-->
       </div>
       <div class="tags-con">
         <tags-page-opened :pageTagsList="pageOpenedList"></tags-page-opened>

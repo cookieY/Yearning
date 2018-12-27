@@ -86,8 +86,8 @@ def index(key_name=None, table_name=None, non_unique=None,
         else:
             if non_unique is not None:
                 return f'''ALTER TABLE `{table_name}` ADD \
-                            UNIQUE {key_name}(`{column_name}`)'''
+                            UNIQUE {key_name}({column_name})'''
             else:
-                return f'''ALTER TABLE `{table_name}` ADD INDEX {key_name}(`{column_name}`)'''
+                return f'''ALTER TABLE `{table_name}` ADD INDEX {key_name}({column_name})'''
     if select_name == "delindex":
         return f'''ALTER TABLE `{table_name}` DROP INDEX {key_name}'''

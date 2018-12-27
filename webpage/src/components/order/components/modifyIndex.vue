@@ -149,7 +149,8 @@ export default {
     remove (index) {
       if (this.tabledata[index].key_name !== 'PRIMARY') {
         this.$Notice.success({
-          title: `${this.tabledata[index].key_name}-索引删除成功!`
+          title: `${this.tabledata[index].key_name}-索引删除成功!`,
+          desc: '请点击生成索引语句按钮生成语句!'
         })
         this.putdata.push({
           'delindex': this.tabledata[index],
