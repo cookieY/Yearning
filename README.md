@@ -58,7 +58,7 @@
 
 详细安装步骤请访问[www.yearning.io](http://yearning.io)获得帮助
 
-[使用及安装文档](http://supermancookie.com/Yearning-document/)
+[使用及安装文档](http://guide.yearning.io)
 
 ## Support 支持Yearning
 
