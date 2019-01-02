@@ -133,7 +133,8 @@ class order_detail(baseview.BaseView):
 
         try:
             order_id = request.data['id']
-            info = list(set(json.loads(request.data['opid'])))
+            tmp = list(set(json.loads(request.data['opid'])))
+            info = [x for x in tmp if x.find("0_0_") == -1]
         except KeyError as e:
             CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
             return HttpResponse(status=500)
@@ -141,14 +142,14 @@ class order_detail(baseview.BaseView):
             try:
                 sql = []
                 rollback_sql = []
+                dataset = SqlOrder.objects.raw(
+                    "select core_sqlorder.*,core_databaselist.connection_name,\
+                    core_databaselist.computer_room from core_sqlorder INNER JOIN \
+                    core_databaselist on core_sqlorder.bundle_id = core_databaselist.id \
+                    WHERE core_sqlorder.id = %s"
+                    % order_id)
+                data = util.ser(dataset)
                 for i in info:
-                    info = SqlOrder.objects.raw(
-                        "select core_sqlorder.*,core_databaselist.connection_name,\
-                        core_databaselist.computer_room from core_sqlorder INNER JOIN \
-                        core_databaselist on core_sqlorder.bundle_id = core_databaselist.id \
-                        WHERE core_sqlorder.id = %s"
-                        % order_id)
-                    data = util.ser(info)
                     _data = SqlRecord.objects.filter(sequence=i).first()
                     roll = rollback.rollbackSQL(db=_data.backup_dbname, opid=i)
                     link = _data.backup_dbname + '.' + roll['tablename']
@@ -159,7 +160,7 @@ class order_detail(baseview.BaseView):
                 rollback_sql = sorted(rollback_sql)
                 if rollback_sql == []: return HttpResponse(status=500)
                 rollback_sql = [{'sql': x} for x in rollback_sql]
-                return Response({'data': data[0], 'sql': rollback_sql, 'type': 1})
+                return Response({'data': data, 'sql': rollback_sql, 'type': 1})
             except Exception as e:
                 CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
                 return HttpResponse(status=500)
