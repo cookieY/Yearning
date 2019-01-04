@@ -160,7 +160,7 @@ class order_detail(baseview.BaseView):
                 rollback_sql = sorted(rollback_sql)
                 if rollback_sql == []: return HttpResponse(status=500)
                 rollback_sql = [{'sql': x} for x in rollback_sql]
-                return Response({'data': data, 'sql': rollback_sql, 'type': 1})
+                return Response({'data': data[0], 'sql': rollback_sql, 'type': 1})
             except Exception as e:
                 CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
                 return HttpResponse(status=500)
