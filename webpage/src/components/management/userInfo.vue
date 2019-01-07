@@ -140,21 +140,9 @@
               <FormItem label="可访问的连接名:" v-if="formItem.query === '是'">
                 <Tag color="blue" v-for="i in formItem.querycon" :key="i">{{i}}</Tag>
               </FormItem>
-              <Divider orientation="left">字典权限</Divider>
-              <FormItem label="字典是否可见:">
-                <p>{{formItem.dic}}</p>
-              </FormItem>
-              <FormItem label="上级审核人:">
+              <Divider orientation="left">上级审核人</Divider>
+              <FormItem>
                 <Tag color="blue" v-for="i in formItem.person" :key="i">{{i}}</Tag>
-              </FormItem>
-              <FormItem label="可访问的连接名:" v-if="formItem.dic === '是'">
-                <Tag color="blue" v-for="i in formItem.diccon" :key="i">{{i}}</Tag>
-              </FormItem>
-              <FormItem label="字典修改权限:">
-                <p>{{formItem.dicedit}}</p>
-              </FormItem>
-              <FormItem label="字典导出权限:">
-                <p>{{formItem.dicexport}}</p>
               </FormItem>
               <Divider orientation="left">管理权限</Divider>
               <FormItem label="用户管理权限:">
@@ -427,8 +415,6 @@
           ddlcon: [],
           dml: '',
           dmlcon: [],
-          dic: '',
-          diccon: [],
           query: '',
           querycon: [],
           user: '',

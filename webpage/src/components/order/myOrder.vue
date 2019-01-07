@@ -195,7 +195,7 @@
     },
     methods: {
       currentpage (vl = 1) {
-        axios.get(`${this.$config.url}/myorder/?user=${sessionStorage.getItem('user')}&page=${vl}`)
+        axios.get(`${this.$config.url}/myorder/?page=${vl}`)
           .then(res => {
             this.table_data = res.data.data
             this.table_data.forEach((item) => { (item.backup === 1) ? item.backup = '是' : item.backup = '否' })

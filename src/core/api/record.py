@@ -21,13 +21,12 @@ class record_order(baseview.SuperUserpermissions):
     def get(self, request, args=None):
         try:
             page = request.GET.get('page')
-            username = request.GET.get('username')
         except KeyError as e:
             CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
             return HttpResponse(status=500)
         else:
             try:
-                pagenumber = SqlOrder.objects.filter(status=1, assigned=username).count()
+                pagenumber = SqlOrder.objects.filter(status=1, assigned=request.user).count()
                 start = int(page) * 10 - 10
                 end = int(page) * 10
                 sql = SqlOrder.objects.raw(
@@ -38,7 +37,7 @@ class record_order(baseview.SuperUserpermissions):
                     INNER JOIN core_databaselist on \
                     o.bundle_id = core_databaselist.id where o.status = 1 and o.assigned = '%s'\
                     ORDER BY o.id desc
-                    ''' % username
+                    ''' % request.user
                 )[start:end]
                 data = util.ser(sql)
                 return Response({'data': data, 'page': pagenumber})

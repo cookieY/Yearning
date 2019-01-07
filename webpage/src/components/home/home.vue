@@ -81,10 +81,6 @@
                         intro-text="数据库连接地址"></infor-card>
           </Col>
           <Col span="6" class-name="padding-left-5">
-            <infor-card id-name="collection_count" :end-val="count.dic" iconType="md-cloud-upload" color="#ffd572"
-                        intro-text="数据字典采集字段"></infor-card>
-          </Col>
-          <Col span="6" class-name="padding-left-5">
             <infor-card id-name="transfer_count" :end-val="count.order" iconType="md-shuffle" color="#f25e43"
                         intro-text="我提交的工单"></infor-card>
           </Col>
@@ -143,8 +139,7 @@
         count: {
           createUser: 0,
           order: 0,
-          link: 0,
-          dic: 0
+          link: 0
         },
         showAddNewTodo: false,
         newToDoItemValue: '',
@@ -214,10 +209,9 @@
     mounted () {
       axios.get(`${this.$config.url}/homedata/infocard`)
         .then(res => {
-          this.count.dic = res.data[0]
-          this.count.createUser = res.data[1]
-          this.count.order = res.data[2]
-          this.count.link = res.data[3]
+          this.count.createUser = res.data[0]
+          this.count.order = res.data[1]
+          this.count.link = res.data[2]
         })
         .catch(error => {
           this.$config.err_notice(error)

@@ -25,7 +25,7 @@
                 </Select>
               </Form-item>
               <Form-item label="连接名称:" prop="connection_name">
-                <Select v-model="formItem.connection_name" placeholder="请选择" @on-change="DataBaseName" filterable>
+                <Select v-model="formItem.connection_name" placeholder="请选择" @on-change="DataBaseName">
                   <Option v-for="i in tableform.sqlname" :value="i.connection_name" :key="i.connection_name">
                     {{ i.connection_name }}
                   </Option>
@@ -41,21 +41,36 @@
                   <Option v-for="item in tableform.info" :value="item" :key="item">{{ item }}</Option>
                 </Select>
               </Form-item>
-              <Button type="warning" @click="canel()" style="margin-left: 15%">重置</Button>
-              <Button type="primary" @click="getinfo()" style="margin-left: 3%">连接</Button>
-              <Button type="success" @click="confirmsql()" style="margin-left: 3%">生成</Button>
+              <Form-item>
+                <Button type="primary" @click="getinfo()" style="margin-left: 3%">获取表结构信息</Button>
+              </Form-item>
+              <FormItem label="工单提交说明:" required>
+                <Input v-model="formItem.text" placeholder="请输入工单说明"></Input>
+              </FormItem>
+              <FormItem label="指定审核人:" required>
+                <Select v-model="formItem.assigned" filterable transfer>
+                  <Option v-for="i in assigned" :value="i" :key="i">{{i}}</Option>
+                </Select>
+              </FormItem>
+              <FormItem label="延迟执行">
+                <InputNumber
+                  v-model="formItem.delay"
+                  :formatter="value => `${value}分钟`"
+                  :parser="value => value.replace('分钟', '')"
+                  :min="0">
+                </InputNumber>
+              </FormItem>
+              <FormItem label="是否备份" prop="backup">
+                <RadioGroup v-model="formItem.backup">
+                  <Radio label="1">是</Radio>
+                  <Radio label="0">否</Radio>
+                </RadioGroup>
+              </FormItem>
+              <FormItem>
+                <Button type="warning" @click="canel()">重置</Button>
+                <Button type="success" style="margin-left: 3%" @click="commitorder" :disabled="validate_gen">提交</Button>
+              </FormItem>
             </Form>
-            <br>
-            <Tabs value="order1" style="height: 300px;overflow-y: scroll;">
-              <TabPane label="DDL语句" name="order1">
-                <p v-for="list in sql" style="font-size: 12px;color:#2b85e4"> {{ list }}<br><br></p>
-              </TabPane>
-              <TabPane label="提交工单" name="order2">
-                <Button type="primary" style="margin-left: 25%;margin-top: 20%;" @click.native="orderswitch"
-                        size="large">获取工单详情
-                </Button>
-              </TabPane>
-            </Tabs>
           </div>
         </Card>
       </Col>
@@ -63,11 +78,11 @@
         <Card>
           <p slot="title">
             <Icon type="md-remove"></Icon>
-            表结构详情
+            填写SQL语句
           </p>
           <div class="edittable-table-height-con">
             <Tabs :value="tabs">
-              <TabPane label="手动模式" name="order1" icon="md-code">
+              <TabPane label="填写SQL语句" name="order1" icon="md-code">
                 <Form>
                   <FormItem>
                     <editor v-model="formDynamic" @init="editorInit" @setCompletions="setCompletions"></editor>
@@ -77,89 +92,17 @@
                   </FormItem>
                   <FormItem>
                     <Button type="warning" @click="test_sql">检测</Button>
-                    <Button type="primary" @click="handleSubmit(formDynamic)" style="margin-left: 3%"
-                            :disabled="this.validate_gen">提交到DDL语句
-                    </Button>
                   </FormItem>
                 </Form>
               </TabPane>
-              <TabPane label="生成添加字段" name="order3" icon="md-add">
-                <Table stripe :columns="addcolums" :data="add_row" height="385" border></Table>
-                <div style="margin-top: 5%">
-                  <Input v-model="Add_tmp.Field" placeholder="字段名" style="width: 10%"></Input>
-                  <Select v-model="Add_tmp.Species" style="width: 15%" transfer placeholder="字段类型">
-                    <Option v-for="i in optionData" :key="i" :value="i">{{i}}</Option>
-                  </Select>
-                  <Input v-model="Add_tmp.Len" placeholder="字段长度" style="width: 10%"></Input>
-                  <Select v-model="Add_tmp.Null" style="width: 15%" placeholder="字段可以为空" transfer>
-                    <Option value="YES">YES</Option>
-                    <Option value="NO">NO</Option>
-                  </Select>
-                  <Input v-model="Add_tmp.Default" placeholder="默认值" style="width: 15%"></Input>
-                  <Input v-model="Add_tmp.Extra" placeholder="字段备注" style="width: 15%"></Input>
-                  <Button type="warning" @click.native="ClearColumns">清空</Button>
-                  <Button type="info" @click.native="AddColumns()">添加</Button>
-                </div>
-              </TabPane>
-              <TabPane label="生成修改&删除字段" name="order4" icon="md-crop">
-                <edittable refs="table2" v-model="TableDataNew" :columns-list="tabcolumns" @index="remove"
-                           @on-change="cell_change"></edittable>
+              <TabPane label="表结构详情" name="order3" icon="md-add">
+                <Table :columns="tabcolumns" :data="TableDataNew"></Table>
               </TabPane>
             </Tabs>
           </div>
         </Card>
       </Col>
     </Row>
-
-    <Modal v-model="openswitch" @on-ok="commitorder" :ok-text="'提交工单'" width="800">
-      <Row>
-        <Card>
-          <div class="step-header-con">
-            <h3>Yearning SQL平台审核工单</h3>
-          </div>
-          <p class="step-content"></p>
-          <Form class="step-form" :label-width="100">
-            <FormItem label="用户名:">
-              <p>{{username}}</p>
-            </FormItem>
-            <FormItem label="数据库库名:">
-              <p>{{formItem.basename}}</p>
-            </FormItem>
-            <FormItem label="数据库表名:">
-              <p>{{formItem.tablename}}</p>
-            </FormItem>
-            <FormItem label="执行SQL:">
-              <p v-for="i in sql">{{i}}</p>
-            </FormItem>
-            <FormItem label="工单提交说明:" required>
-              <Input v-model="formItem.text" placeholder="请输入工单说明"></Input>
-            </FormItem>
-            <FormItem label="指定审核人:" required>
-              <Select v-model="formItem.assigned" filterable transfer>
-                <Option v-for="i in assigned" :value="i" :key="i">{{i}}</Option>
-              </Select>
-            </FormItem>
-            <FormItem label="延迟执行">
-              <InputNumber
-                v-model="formItem.delay"
-                :formatter="value => `${value}分钟`"
-                :parser="value => value.replace('分钟', '')"
-                :min="0">
-              </InputNumber>
-            </FormItem>
-            <FormItem label="是否备份">
-              <RadioGroup v-model="formItem.backup">
-                <Radio label="1">是</Radio>
-                <Radio label="0">否</Radio>
-              </RadioGroup>
-            </FormItem>
-            <FormItem label="确认提交：" required>
-              <Checkbox v-model="pass">确认</Checkbox>
-            </FormItem>
-          </Form>
-        </Card>
-      </Row>
-    </Modal>
   </div>
 </template>
 
@@ -261,62 +204,7 @@
             handle: ['edit', 'delete']
           }
         ],
-        putdata: [],
-        Add_tmp: {
-          Field: '',
-          Type: '',
-          Null: null,
-          Default: null,
-          Extra: null,
-          Len: '',
-          Species: null
-        },
-        add_row: [],
         username: sessionStorage.getItem('user'),
-        addcolums: [
-          {
-            title: '字段名',
-            key: 'Field'
-          },
-          {
-            title: '字段类型',
-            key: 'Type'
-          },
-          {
-            title: '是否为空',
-            key: 'Null'
-          },
-          {
-            title: '默认值',
-            key: 'Default'
-          },
-          {
-            title: '备注',
-            key: 'Extra'
-          },
-          {
-            title: 'action',
-            width: 80,
-            render: (h, params) => {
-              return h('Button', {
-                props: {
-                  type: 'text'
-                },
-                on: {
-                  click: () => {
-                    this.$Notice.error({
-                      title: `${this.add_row[params.index].Field}-临时字段删除成功!`
-                    })
-                    this.add_row.splice(params.index, 1)
-                  }
-                }
-              }, '删除')
-            }
-          }
-        ],
-        sql: [],
-        openswitch: false,
-        pass: false,
         ruleValidate: {
           computer_room: [{
             required: true,
@@ -343,7 +231,8 @@
             message: '提交说明不得为空',
             trigger: 'change'
           }
-          ]
+          ],
+          backup: {required: true, message: '备份不得为空', trigger: 'change'}
         },
         formItem: {
           text: '',
@@ -404,7 +293,11 @@
       },
       Connection_Name (index) {
         if (index) {
-          this.ScreenConnection(index)
+          this.tableform.sqlname = this.item.filter(item => {
+            if (item.computer_room === index) {
+              return item
+            }
+          })
         }
       },
       test_sql () {
@@ -428,37 +321,26 @@
               'sql': tmp
             })
               .then(res => {
-                if (res.data.status === 200) {
-                  this.Testresults = res.data.result
-                  let gen = 0
-                  this.Testresults.forEach(vl => {
-                    if (vl.errlevel !== 0) {
-                      gen += 1
-                    }
-                  })
-                  if (gen === 0) {
-                    this.validate_gen = false
-                  } else {
-                    this.validate_gen = true
+                this.Testresults = res.data.result
+                let gen = 0
+                this.Testresults.forEach(vl => {
+                  if (vl.errlevel !== 0) {
+                    gen += 1
                   }
+                })
+                if (gen === 0) {
+                  this.validate_gen = false
                 } else {
-                  this.$config.err_notice('无法连接到Inception!')
+                  this.validate_gen = true
                 }
               })
-              .catch(error => {
-                this.$config.err_notice(error)
+              .catch(() => {
+                this.$config.err_notice('无法连接到Inception!')
               })
           } else {
             this.$Message.error('请填写具体地址或sql语句后再测试!')
           }
         })
-      },
-      handleSubmit () {
-        let createtable = this.formDynamic.replace(/(;|；)$/gi, '').replace(/\s/g, ' ').replace(/；/g, ';').split(';')
-        this.validate_gen = true
-        for (let i of createtable) {
-          this.sql.push(i)
-        }
       },
       DataBaseName (index) {
         if (index) {
@@ -477,13 +359,6 @@
               this.$config.err_notice('无法连接数据库!请检查网络')
             })
         }
-      },
-      ScreenConnection (b) {
-        this.tableform.sqlname = this.item.filter(item => {
-          if (item.computer_room === b) {
-            return item
-          }
-        })
       },
       GetTableName () {
         if (this.formItem.basename) {
@@ -548,76 +423,16 @@
           }
         })
       },
-      AddColumns () {
-        if (this.Add_tmp.Field === '' || this.Add_tmp.Null === null || this.Add_tmp.Species === '') {
-          this.$Notice.warning({
-            title: '字段名,是否为空，类型为必填项'
-          })
-        } else {
-          if (this.Add_tmp.Extra) {
-            this.Add_tmp.Extra = this.Add_tmp.Extra.replace(/\s+/g, '')
-          }
-          if (this.Add_tmp.Len !== '') {
-            this.Add_tmp.Type = `${this.Add_tmp.Species}(${this.Add_tmp.Len})`
-          } else {
-            this.Add_tmp.Type = `${this.Add_tmp.Species}`
-          }
-          this.add_row.push(JSON.parse(JSON.stringify(this.Add_tmp)))
-          for (let c of Object.keys(this.Add_tmp)) {
-            this.Add_tmp[c] = ''
-            this.Add_tmp.Default = null
-            this.Add_tmp.Extra = null
-          }
-        }
-      },
-      ClearColumns () {
-        this.Add_tmp = {}
-      },
-      remove (index) {
-        this.putdata.push({
-          'del': index,
-          'table_name': this.formItem.tablename
-        })
-      },
       canel () {
-        this.sql = []
-        this.pass = false
-        this.getinfo()
-      },
-      confirmsql () {
-        if (this.Add_tmp.Field !== '') {
-          this.$config.notice('请将需要添加的字段添加进入临时表或者删除!')
-        } else {
-          this.putdata.push({
-            'add': this.add_row,
-            'table_name': this.formItem.tablename
-          })
-          axios.put(`${this.$config.url}/gensql/sql`, {
-            'data': JSON.stringify(this.putdata),
-            'basename': this.formItem.basename
-          })
-            .then(res => {
-              for (let i of res.data) {
-                this.sql.push(i)
-              }
-              this.putdata = []
-              this.add_row = []
-            }).catch(error => {
-            this.$config.err_notice(error)
-          })
-        }
-      },
-      orderswitch () {
-        this.openswitch = !this.openswitch
+        this.$refs['formItem'].resetFields()
       },
       commitorder () {
-        if (this.sql === [] || this.formItem.basename === '' || this.assigned === '' || this.formItem.text === '' || this.formItem.assigned === '') {
-          this.$config.err_notice('工单数据缺失,请检查工单信息是否缺失!')
-        } else {
-          if (this.pass === true) {
+        this.$refs['formItem'].validate((valid) => {
+          if (valid) {
+            let sql = this.formDynamic.replace(/(;|；)$/gi, '').replace(/\s/g, ' ').replace(/；/g, ';').split(';')
             axios.post(`${this.$config.url}/sqlsyntax/`, {
               'data': JSON.stringify(this.formItem),
-              'sql': JSON.stringify(this.sql),
+              'sql': JSON.stringify(sql),
               'real_name': sessionStorage.getItem('real_name'),
               'type': 0,
               'id': this.id[0].id
@@ -627,18 +442,11 @@
                 this.$router.push({
                   name: 'myorder'
                 })
-              }).catch(error => {
-              this.$config.err_notice(error)
-            })
-          } else {
-            this.$config.err_notice('提交工单需点击确认按钮')
+              })
+              .catch(error => {
+                this.$config.err_notice(error)
+              })
           }
-        }
-      },
-      cell_change (data) {
-        this.putdata.push({
-          'edit': data,
-          'table_name': this.formItem.tablename
         })
       }
     },

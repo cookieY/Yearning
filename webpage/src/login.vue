@@ -237,7 +237,7 @@
             })
           })
           .catch(() => {
-            this.$config.err_notice(this, '账号密码错误,请重新输入!')
+            this.$config.err_notice('账号密码错误,请重新输入!')
           })
       },
       ldap_login () {
@@ -246,12 +246,6 @@
           'password': this.formInline.password
         })
           .then(res => {
-            if (res.data['token'] === 'null') {
-              this.$Notice.error({
-                title: '警告',
-                desc: res.data['res']
-              })
-            } else {
               axios.defaults.headers.common['Authorization'] = 'JWT ' + res.data['token']
               sessionStorage.setItem('user', this.formInline.user)
               sessionStorage.setItem('jwt', `JWT ${res.data['token']}`)
@@ -265,10 +259,9 @@
               this.$router.push({
                 name: 'home_index'
               })
-            }
           })
           .catch(() => {
-            this.$config.err_notice(this, '账号密码错误,请重新输入!')
+            this.$config.err_notice('账号密码错误,请重新输入!')
           })
       }
     },

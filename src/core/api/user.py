@@ -90,14 +90,14 @@ class userinfo(baseview.BaseView):
         if args == 'changepwd':
             try:
                 username = request.data['username']
-                new_password = request.data['new']
+                password = request.data['new']
             except KeyError as e:
                 CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
                 return HttpResponse(status=500)
             else:
                 try:
                     user = Account.objects.get(username__exact=username)
-                    user.set_password(new_password)
+                    user.set_password(password)
                     user.save()
                     return Response('%s--密码修改成功!' % username)
                 except Exception as e:
@@ -244,7 +244,7 @@ class ldapauth(baseview.AnyLogin):
                     token = jwt_encode_handler(jwt_payload_handler(_user))
                     return Response({'token': token, 'res': '', 'permissions': 'guest'})
             else:
-                return Response({'token': 'null', 'res': 'ldap账号认证失败,请检查ldap账号或ldap配置!'})
+                return HttpResponse(status=401)
 
 
 class login_register(baseview.AnyLogin):

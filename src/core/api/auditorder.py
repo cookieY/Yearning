@@ -41,7 +41,6 @@ class audit(baseview.SuperUserpermissions):
 
         try:
             page = request.GET.get('page')
-            username = request.GET.get('username')
         except KeyError as e:
             CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
             return HttpResponse(status=500)
@@ -49,7 +48,7 @@ class audit(baseview.SuperUserpermissions):
             try:
                 un_init = util.init_conf()
                 custom_com = ast.literal_eval(un_init['other'])
-                page_number = SqlOrder.objects.filter(assigned=username).count()
+                page_number = SqlOrder.objects.filter(assigned=request.user).count()
                 start = (int(page) - 1) * 20
                 end = int(page) * 20
                 info = SqlOrder.objects.raw(
@@ -60,7 +59,7 @@ class audit(baseview.SuperUserpermissions):
                     INNER JOIN core_databaselist on \
                     o.bundle_id = core_databaselist.id where o.assigned = '%s'\
                     ORDER BY o.id desc
-                    ''' % username
+                    ''' % request.user
                 )[start:end]
                 data = util.ser(info)
                 info = Account.objects.filter(group='perform').all()
@@ -111,7 +110,7 @@ class audit(baseview.SuperUserpermissions):
 
             elif category == 1:
                 try:
-                    from_user = request.data['from_user']
+                    from_user = request.user
                     to_user = request.data['to_user']
                     order_id = request.data['id']
                 except KeyError as e:

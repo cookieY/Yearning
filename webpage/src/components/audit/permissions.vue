@@ -68,24 +68,6 @@
             </FormItem>
           </template>
           <hr style="height:1px;border:none;border-top:1px dashed #dddee1;"/>
-          <br>
-          <FormItem label="数据字典权限:">
-            <p v-if="perList.permissions.dic === '0'">否</p>
-            <p v-else>是</p>
-          </FormItem>
-          <template v-if="perList.permissions.dic === '1'">
-            <FormItem label="数据字典修改权限:">
-              <p v-if="perList.permissions.dicedit === '0'">否</p>
-              <p v-else>是</p>
-            </FormItem>
-            <FormItem label="数据字典导出权限:">
-              <p v-if="perList.permissions.dicexport === '0'">否</p>
-              <p v-else>是</p>
-            </FormItem>
-            <FormItem label="连接名:">
-              <Tag color="blue" v-for="i in perList.permissions.diccon" :key="i">{{i}}</Tag>
-            </FormItem>
-          </template>
         </template>
         <hr style="height:1px;border:none;border-top:1px dashed #dddee1;"/>
         <br>

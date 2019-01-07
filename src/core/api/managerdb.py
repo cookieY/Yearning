@@ -38,7 +38,6 @@ class management_db(baseview.SuperUserpermissions):
                 {
                         'page': page_number,
                         'data': serializers.data,
-                        'diclist': data,
                         'ding_switch': switch_dingding,
                         'mail_switch': switch_email
                 }
@@ -172,7 +171,7 @@ class management_db(baseview.SuperUserpermissions):
                 per = grained.objects.all().values('username', 'permissions')
                 for i in per:
                     for c in i['permissions']:
-                        if isinstance(i['permissions'][c], list) and c != 'diccon':
+                        if isinstance(i['permissions'][c], list):
                             i['permissions'][c] = list(filter(lambda x: x != args, i['permissions'][c]))
                     grained.objects.filter(username=i['username']).update(permissions=i['permissions'])
             return Response('数据库信息已删除!')

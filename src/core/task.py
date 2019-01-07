@@ -24,12 +24,8 @@ def set_auth_group(user):
         'ddlcon': [],
         'dml': '0',
         'dmlcon': [],
-        'dic': '0',
-        'diccon': [],
-        'dicedit': '0',
         'user': '0',
         'base': '0',
-        'dicexport': '0',
         'person': [],
         'query': '0',
         'querycon': []

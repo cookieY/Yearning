@@ -3,7 +3,6 @@ serializers
 '''
 from rest_framework import serializers
 from core.models import DatabaseList
-from core.models import SqlDictionary
 from core.models import SqlRecord
 from core.models import Account
 from core.models import SqlOrder, query_order, querypermissions, globalpermissions, grained
@@ -27,18 +26,6 @@ class UserINFO(serializers.HyperlinkedModelSerializer):
     class Meta:
         model = Account
         fields = ('id', 'username', 'group', 'department', 'email', 'auth_group', 'real_name')
-
-
-class SQLGeneratDic(serializers.HyperlinkedModelSerializer):
-    '''
-    数据库字典信息serializers
-    '''
-
-    class Meta:
-        model = SqlDictionary
-        fields = (
-            'BaseName', 'TableName', 'Field', 'Type', 'Extra', 'TableComment'
-        )
 
 
 class Sqllist(serializers.HyperlinkedModelSerializer):

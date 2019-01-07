@@ -97,7 +97,7 @@
     },
     methods: {
       getrecordinfo (vl = 1) {
-        axios.get(`${this.$config.url}/record/all?page=${vl}&username=${sessionStorage.getItem('user')}`)
+        axios.get(`${this.$config.url}/record?page=${vl}`)
           .then(res => {
             [this.TableDataNew, this.pagenumber] = [res.data.data, res.data.page]
           })

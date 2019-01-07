@@ -3,9 +3,7 @@ import json
 from libs import baseview
 from rest_framework.response import Response
 from django.http import HttpResponse
-from django.db.models import Count
 from core.models import (
-    SqlDictionary,
     SqlOrder,
     Account,
     DatabaseList,
@@ -44,11 +42,10 @@ class dashboard(baseview.BaseView):
 
         elif args == 'infocard':
             try:
-                dic = SqlDictionary.objects.count()
                 user = Account.objects.count()
                 order = SqlOrder.objects.filter(username=request.user).count()
                 link = DatabaseList.objects.count()
-                return Response([dic, user, order, link])
+                return Response([user, order, link])
             except Exception as e:
                 CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
                 return HttpResponse(status=500)

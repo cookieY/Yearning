@@ -157,15 +157,6 @@ export const appRouter = [
     component: Index,
     children: [
       {
-        path: 'view-dml',
-        name: 'view-dml',
-        title: '数据库字典',
-        'icon': 'ios-book',
-        component: resolve => {
-          require(['./components/search/databaseDic.vue'], resolve)
-        }
-      },
-      {
         path: 'serach-sql',
         name: 'serach-sql',
         title: 'SQL查询',

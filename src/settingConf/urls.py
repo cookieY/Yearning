@@ -3,12 +3,7 @@ url table
 '''
 from django.conf.urls import url
 from rest_framework.urlpatterns import format_suffix_patterns
-from core.api.sqldic import (
-    adminpremisson,
-    exportdoc,
-    dictionary,
-    downloadFile
-)
+
 from core.api.user import (
     userinfo,
     authgroup,
@@ -60,20 +55,16 @@ urlpatterns = [
     url(r'^api/v1/gensql/(.*)', gen_sql.as_view()),
     url(r'^api/v1/management_db/(.*)', management_db.as_view()),
     url(r'^api/v1/audit_sql', audit.as_view()),
-    url(r'^api/v1/sqldic/(.*)', dictionary.as_view()),
     url(r'^api/v1/auth_twice', authgroup.as_view()),
     url(r'^api/v1/sqlsyntax/(.*)', sqlorder.as_view()),
-    url(r'^api/v1/adminsql/(.*)', adminpremisson.as_view()),
     url(r'^api/v1/record/(.*)', record_order.as_view()),
     url(r'^api/v1/homedata/(.*)', dashboard.as_view()),
-    url(r'^api/v1/exportdocx/', exportdoc.as_view()),
     url(r'^api/v1/dingding', dingding.as_view()),
     url(r'^api/v1/detail', order_detail.as_view()),
     url(r'^api/v1/search', search.as_view()),
     url(r'^api/v1/ldapauth', ldapauth.as_view()),
     url(r'^api/v1/undoOrder', del_order.as_view()),
     url(r'^api/v1/osc/(.*)', osc_step.as_view()),
-    url(r'^api/v1/download', downloadFile),
     url(r'^api-token-auth/', login_auth.as_view()),
 ]
 urlpatterns = format_suffix_patterns(urlpatterns)

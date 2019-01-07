@@ -8,8 +8,7 @@ from core.task import grained_permissions, set_auth_group
 from core.api import serachsql
 from core.models import (
     DatabaseList,
-    Account,
-    SqlDictionary
+    Account
 )
 from libs.serializers import (
     Area,
@@ -38,8 +37,6 @@ class addressing(baseview.BaseView):
                 if request.data['permissions_type'] == 'user' or request.data['permissions_type'] == 'own_space':
                     info = DatabaseList.objects.all()
                     con_name = Area(info, many=True).data
-                    dic = SqlDictionary.objects.all().values('Name')
-                    dic.query.distinct = ['Name']
 
                 elif request.data['permissions_type'] == 'query':
                     con_name = []
@@ -52,7 +49,7 @@ class addressing(baseview.BaseView):
                                     {
                                         'id': con_instance.id,
                                         'connection_name': con_instance.connection_name,
-                                        'ip': con_instance.ip ,
+                                        'ip': con_instance.ip,
                                         'computer_room': con_instance.computer_room
                                     })
                     assigned = set_auth_group(request.user)
@@ -72,14 +69,12 @@ class addressing(baseview.BaseView):
                                     'ip': con_instance.ip,
                                     'computer_room': con_instance.computer_room
                                 })
-                    dic = ''
                 info = Account.objects.filter(group='admin').all()
                 serializers = UserINFO(info, many=True)
                 return Response(
                     {
                         'connection': con_name,
                         'person': serializers.data,
-                        'dic': dic,
                         'assigend': assigned['person'],
                         'custom': custom_com['con_room'],
                         'multi': custom_com['multi']

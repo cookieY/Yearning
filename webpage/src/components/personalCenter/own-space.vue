@@ -56,21 +56,8 @@
               <Tag color="blue" v-for="i in formItem.querycon" :key="i">{{i}}</Tag>
             </FormItem>
             <Divider orientation="left">上级审核人</Divider>
-            <FormItem label="上级审核人:">
+            <FormItem>
               <Tag color="blue" v-for="i in formItem.person" :key="i">{{i}}</Tag>
-            </FormItem>
-            <Divider orientation="left">字典权限</Divider>
-            <FormItem label="字典是否可见:">
-              <p>{{formItem.dic}}</p>
-            </FormItem>
-            <FormItem label="可访问的连接名:" v-if="formItem.dic === '是'">
-              <Tag color="blue" v-for="i in formItem.diccon" :key="i">{{i}}</Tag>
-            </FormItem>
-            <FormItem label="字典修改权限:">
-              <p>{{formItem.dicedit}}</p>
-            </FormItem>
-            <FormItem label="字典导出权限:">
-              <p>{{formItem.dicexport}}</p>
             </FormItem>
             <Divider orientation="left">管理权限</Divider>
             <FormItem label="用户管理权限:">
@@ -92,9 +79,6 @@
       <h3 slot="header" style="color:#2D8CF0">修改密码</h3>
       <Form ref="editPasswordForm" :model="editPasswordForm" :label-width="100" label-position="right"
             :rules="passwordValidate">
-        <FormItem label="原密码" prop="oldPass" :error="oldPassError">
-          <Input v-model="editPasswordForm.oldPass" placeholder="请输入现在使用的密码" type="password"></Input>
-        </FormItem>
         <FormItem label="新密码" prop="newPass">
           <Input v-model="editPasswordForm.newPass" placeholder="请输入新密码，至少6位字符" type="password"></Input>
         </FormItem>
@@ -154,21 +138,9 @@
               <FormItem label="可访问的连接名:" v-if="permission.query === '是'">
                 <Tag color="blue" v-for="i in permission.querycon" :key="i">{{i}}</Tag>
               </FormItem>
-              <Divider orientation="left">字典权限</Divider>
-              <FormItem label="字典是否可见:">
-                <p>{{permission.dic}}</p>
-              </FormItem>
-              <FormItem label="上级审核人:">
+              <Divider orientation="left">上级审核人</Divider>
+              <FormItem>
                 <Tag color="blue" v-for="i in permission.person" :key="i">{{i}}</Tag>
-              </FormItem>
-              <FormItem label="可访问的连接名:" v-if="permission.dic === '是'">
-                <Tag color="blue" v-for="i in permission.diccon" :key="i">{{i}}</Tag>
-              </FormItem>
-              <FormItem label="字典修改权限:">
-                <p>{{permission.dicedit}}</p>
-              </FormItem>
-              <FormItem label="字典导出权限:">
-                <p>{{permission.dicexport}}</p>
               </FormItem>
               <Divider orientation="left">管理权限</Divider>
               <FormItem label="用户管理权限:">
@@ -223,7 +195,6 @@
         oldPassError: '',
         checkIdentifyCodeLoading: false,
         editPasswordForm: {
-          oldPass: '',
           newPass: '',
           rePass: ''
         },
@@ -271,10 +242,6 @@
           dmlcon: Array,
           query: '0',
           querycon: Array,
-          dic: '0',
-          diccon: Array,
-          dicedit: '0',
-          dicexport: '0',
           index: '0',
           indexcon: Array,
           user: '0',
@@ -313,7 +280,7 @@
           if (valid) {
             this.savePassLoading = true
             axios.put(`${this.$config.url}/userinfo/changepwd`, {
-              'username': sessionStorage.getItem('user'),
+              'username': this.userForm.username,
               'new': this.editPasswordForm.newPass
             })
               .then(res => {
@@ -334,7 +301,7 @@
         this.savePassLoading = true
         axios.put(`${this.$config.url}/userinfo/changemail`, {
           'mail': this.editEmailForm.email,
-          'username': sessionStorage.getItem('user'),
+          'username': this.userForm.username,
           'real': this.editEmailForm.real_name
         })
           .then(res => {

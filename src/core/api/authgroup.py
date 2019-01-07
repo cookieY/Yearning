@@ -81,12 +81,8 @@ class auth_group(baseview.BaseView):
                     'ddlcon': [],
                     'dml': '0',
                     'dmlcon': [],
-                    'dic': '0',
-                    'diccon': [],
-                    'dicedit': '0',
                     'user': '0',
                     'base': '0',
-                    'dicexport': '0',
                     'person': [],
                     'query': '0',
                     'querycon': []
@@ -134,7 +130,7 @@ class auth_group(baseview.BaseView):
             try:
                 group_name = request.data['groupname']
                 permissions = json.loads(request.data['permission'])
-                select = ['query', 'ddl', 'dml', 'dic']
+                select = ['query', 'ddl', 'dml']
                 for i in select:
                     if permissions[i] == '0':
                         index = f'{i}con'

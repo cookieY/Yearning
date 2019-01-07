@@ -496,7 +496,6 @@
         this.tmp[this.togoing].status = 3
         axios.put(`${this.$config.url}/audit_sql`, {
           'type': 1,
-          'from_user': sessionStorage.getItem('user'),
           'to_user': this.formitem.username,
           'id': this.formitem.id
         })
@@ -515,7 +514,6 @@
       rejecttext () {
         axios.put(`${this.$config.url}/audit_sql`, {
           'type': 0,
-          'from_user': sessionStorage.getItem('user'),
           'text': this.reject.textarea,
           'to_user': this.formitem.username,
           'id': this.formitem.id
@@ -556,7 +554,7 @@
           })
       },
       mou_data (vl = 1) {
-        axios.get(`${this.$config.url}/audit_sql?page=${vl}&username=${sessionStorage.getItem('user')}`)
+        axios.get(`${this.$config.url}/audit_sql?page=${vl}`)
           .then(res => {
             this.tmp = res.data.data
             this.tmp.forEach((item) => { (item.backup === 1) ? item.backup = '是' : item.backup = '否' })
