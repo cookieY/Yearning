@@ -60,7 +60,7 @@
           </Table>
         </div>
         <br>
-        <Page :total="pagenumber" show-elevator @on-change="getPageInfo" :page-size="10" ref="totol"></Page>
+        <Page :total="pagenumber" show-elevator @on-change="stepPageNumber" :page-size="10" ref="totol"></Page>
       </Card>
     </Col>
 
@@ -190,7 +190,8 @@
           id: null
         },
         baseinfo: false,
-        editbaseinfo: {}
+        editbaseinfo: {},
+        stepPage: Number
       }
     },
     methods: {
@@ -233,8 +234,7 @@
             })
               .then(() => {
                 this.$config.notice('数据库信息添加成功,请对相应用户赋予该数据库访问权限!')
-                this.$refs.totol.currentPage = 1
-                this.getPageInfo()
+                this.stepPageNumber(this.stepPage)
               })
               .catch(error => {
                 this.$config.err_notice(error)
@@ -252,11 +252,14 @@
         this.ding.modal = true
       },
       delConnection (vl) {
+        let step = this.stepPage
+        if (this.tableData.length === 1) {
+          step = step - 1
+        }
         axios.delete(`${this.$config.url}/management_db/${vl.connection_name}`)
           .then(res => {
             this.$config.notice(res.data)
-            this.$refs.totol.currentPage = 1
-            this.getPageInfo()
+            this.getPageInfo(step)
           })
           .catch(error => {
             this.$config.err_notice(error)
@@ -266,7 +269,6 @@
         axios.get(`${this.$config.url}/management_db/all/?page=${vl}&permissions_type=base`)
           .then(res => {
             [this.tableData, this.pagenumber, this.comList] = [res.data.data, parseInt(res.data.page), res.data.custom]
-            console.log(res.data.data)
           })
           .catch(error => {
             this.$config.err_notice(error)
@@ -280,6 +282,7 @@
         })
           .then(() => {
             this.$config.notice('钉钉推送消息已设置成功!')
+            this.getPageInfo(this.stepPage)
             this.ding.modal = false
           })
           .catch(error => {
@@ -292,6 +295,10 @@
         })
           .then(res => this.$config.notice(res.data))
           .catch(err => this.$config.err_notice(err))
+      },
+      stepPageNumber (vl) {
+        this.stepPage = vl
+        this.getPageInfo(vl)
       }
     },
     mounted () {
