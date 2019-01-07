@@ -65,10 +65,14 @@ class userinfo(baseview.BaseView):
                     start = int(page) * 10 - 10
                     end = int(page) * 10
                     if valve == 'true':
-                        page_number = Account.objects.filter(username__contains=user,
-                                                             department__contains=department).count()
-                        user = Account.objects.filter(username__contains=user, department__contains=department)[
-                               start:end]
+                        if department != '':
+                            page_number = Account.objects.filter(username__contains=user,
+                                                                 department__contains=department).count()
+                            user = Account.objects.filter(username__contains=user, department__contains=department)[
+                                   start:end]
+                        else:
+                            page_number = Account.objects.filter(username__contains=user).count()
+                            user = Account.objects.filter(username__contains=user)[start:end]
                     else:
                         page_number = Account.objects.count()
                         user = Account.objects.all()[start:end]
