@@ -53,16 +53,26 @@ class userinfo(baseview.BaseView):
         if args == 'all':
             try:
                 page = request.GET.get('page')
+                user = request.GET.get('user').strip()
+                department = request.GET.get('department').strip()
+                valve = request.GET.get('valve')
+                print(type(valve))
             except KeyError as e:
                 CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
                 return HttpResponse(status=500)
             else:
                 try:
-                    page_number = Account.objects.count()
                     start = int(page) * 10 - 10
                     end = int(page) * 10
-                    info = Account.objects.all()[start:end]
-                    serializers = UserINFO(info, many=True)
+                    if valve == 'true':
+                        page_number = Account.objects.filter(username__contains=user,
+                                                             department__contains=department).count()
+                        user = Account.objects.filter(username__contains=user, department__contains=department)[
+                               start:end]
+                    else:
+                        page_number = Account.objects.count()
+                        user = Account.objects.all()[start:end]
+                    serializers = UserINFO(user, many=True)
                     return Response({'page': page_number, 'data': serializers.data})
                 except Exception as e:
                     CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')

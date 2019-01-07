@@ -8,10 +8,9 @@ from libs import util
 from rest_framework.response import Response
 from django.http import HttpResponse
 from django.db import transaction
-from libs.serializers import Sqllist, Getdingding
+from libs.serializers import Sqllist
 from core.models import (
     DatabaseList,
-    SqlDictionary,
     SqlRecord,
     SqlOrder,
     grained
@@ -60,14 +59,11 @@ class management_db(baseview.SuperUserpermissions):
                 end = int(page) * 10
                 info = DatabaseList.objects.all().order_by('connection_name')[start:end]
                 serializers = Sqllist(info, many=True)
-                data = SqlDictionary.objects.all().values('Name')
-                data.query.group_by = ['Name']  # 不重复表名
 
                 return Response(
                     {
                         'page': page_number,
                         'data': serializers.data,
-                        'diclist': data,
                         'custom': custom_com['con_room']
                     }
                 )
@@ -191,21 +187,6 @@ class dingding(baseview.SuperUserpermissions):
     dingding 相关
 
     '''
-
-    def get(self, request, args=None):
-        try:
-            connection_name = request.GET.get('connection_name')
-        except KeyError as e:
-            CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
-            return HttpResponse(status=500)
-        else:
-            try:
-                data = DatabaseList.objects.filter(connection_name=connection_name).first()
-                serializers = Getdingding(data)
-                return Response(serializers.data)
-            except Exception as e:
-                CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
-                return HttpResponse(status=500)
 
     def post(self, request, args=None):
         try:

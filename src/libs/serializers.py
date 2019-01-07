@@ -48,7 +48,7 @@ class Sqllist(serializers.HyperlinkedModelSerializer):
 
     class Meta:
         model = DatabaseList
-        fields = ('id', 'connection_name', 'ip', 'computer_room', 'password', 'port', 'username')
+        fields = ('id', 'connection_name', 'ip', 'computer_room', 'password', 'port', 'username', 'before', 'after')
 
 
 class query_con(serializers.HyperlinkedModelSerializer):
@@ -79,16 +79,6 @@ class Record(serializers.HyperlinkedModelSerializer):
     class Meta:
         model = SqlRecord
         fields = ('sql', 'state', 'error', 'affectrow', 'sequence', 'execute_time')
-
-
-class Getdingding(serializers.HyperlinkedModelSerializer):
-    '''
-    dingding webhook serializers
-    '''
-
-    class Meta:
-        model = DatabaseList
-        fields = ('id', 'before', 'after')
 
 
 class Recordinfo(serializers.HyperlinkedModelSerializer):

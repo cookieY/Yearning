@@ -42,7 +42,7 @@
                 <Option v-for="list in groupset" :value="list" :key="list">{{ list }}</Option>
               </Select>
             </FormItem>
-            <Button type="primary" @click.native="Registered" style="margin-left: 35%" :loading="loading">注册</Button>
+            <Button type="primary" @click.native="registered" style="margin-left: 35%" :loading="loading">注册</Button>
           </Form>
         </div>
       </Card>
@@ -53,15 +53,28 @@
           <Icon type="md-people"></Icon>
           系统用户表
         </p>
+        <Input v-model="query.user" placeholder="请填写用户名" style="width: 20%" clearable></Input>
+        <Input v-model="query.department" placeholder="请填写部门" style="width: 20%" clearable></Input>
+        <Button @click="queryData" type="primary">查询</Button>
+        <Button @click="queryCancel" type="warning">重置</Button>
         <div class="edittable-con-1">
-          <Table border :columns="columns6" :data="data5" stripe height="550"></Table>
+          <Table border :columns="columns" :data="tableData" stripe height="520">
+            <template slot-scope="{ row, index }" slot="action">
+              <Button type="primary" size="small" style="margin-right: 5px" @click="editPassModal(row)"
+                      v-if="row.id !== 1">更改密码
+              </Button>
+              <Button type="info" size="small" @click="editAuthModal(row)" style="margin-right: 5px">权限组</Button>
+              <Button type="success" size="small" @click="editEmailModal(row)" style="margin-right: 5px">邮箱</Button>
+              <Button type="warning" size="small" @click="deleteUserModal(row)" v-if="row.id !== 1">删除</Button>
+            </template>
+          </Table>
         </div>
         <br>
-        <Page :total="pagenumber" show-elevator @on-change="splicpage" :page-size="10" ref="total"></Page>
+        <Page :total="pagenumber" show-elevator @on-change="refreshUser" :page-size="10" ref="total"></Page>
       </Card>
     </Col>
 
-    <Modal v-model="editPasswordModal" :closable='false' :mask-closable=false :width="500">
+    <Modal v-model="editPasswordForm.modal" :closable='false' :mask-closable=false :width="500">
       <h3 slot="header" style="color:#2D8CF0">修改用户密码</h3>
       <Form ref="editPasswordForm" :model="editPasswordForm" :label-width="100" label-position="right"
             :rules="passwordValidate">
@@ -76,12 +89,12 @@
         </FormItem>
       </Form>
       <div slot="footer">
-        <Button type="text" @click="cancelEditPass">取消</Button>
+        <Button type="text" @click="cancelModal(editPasswordForm)">取消</Button>
         <Button type="primary" @click="saveEditPass" :loading="savePassLoading">保存</Button>
       </div>
     </Modal>
 
-    <Modal v-model="editAuthModal" :width="900">
+    <Modal v-model="editAuthForm.modal" :width="900">
       <h3 slot="header" style="color:#2D8CF0">权限组设置</h3>
       <Form :model="editAuthForm" :label-width="100" label-position="right">
         <FormItem label="用户名">
@@ -101,7 +114,7 @@
           <Input v-model="editAuthForm.department" placeholder="请输入新部门"></Input>
         </FormItem>
         <FormItem label="权限组" prop="authgroup">
-          <Select v-model="editAuthForm.authgroup" multiple @on-change="getgrouplist" placeholder="请选择">
+          <Select v-model="editAuthForm.authgroup" multiple @on-change="getGroupList" placeholder="请选择">
             <Option v-for="list in groupset" :value="list" :key="list">{{ list }}</Option>
           </Select>
           <template>
@@ -155,40 +168,40 @@
         </FormItem>
       </Form>
       <div slot="footer">
-        <Button type="text" @click="cancelAuthModal">取消</Button>
+        <Button type="text" @click="editAuthForm.modal = false">取消</Button>
         <Button type="primary" :loading="savePassLoading" @click="saveAuthInfo">保存</Button>
       </div>
     </Modal>
 
-    <Modal v-model="deluserModal" :closable='false' :mask-closable=false :width="500">
+    <Modal v-model="deluser.modal" :closable='false' :mask-closable=false :width="500">
       <h3 slot="header" style="color:#2D8CF0">删除用户</h3>
       <Form :label-width="100" label-position="right">
         <FormItem label="用户名">
           <Input v-model="username" readonly="readonly"></Input>
         </FormItem>
         <FormItem label="请输入用户名">
-          <Input v-model="confirmuser" placeholder="请确认用户名"></Input>
+          <Input v-model="deluser.confirmUser" placeholder="请确认用户名"></Input>
         </FormItem>
       </Form>
       <div slot="footer">
-        <Button type="text" @click="cancelDelInfo">取消</Button>
+        <Button type="text" @click="cancelModal(deluser)">取消</Button>
         <Button type="warning" @click="delUser">删除</Button>
       </div>
     </Modal>
 
-    <Modal v-model="editemail" :closable='false' :mask-closable=false :width="500">
+    <Modal v-model="email.modal" :closable='false' :mask-closable=false :width="500">
       <h3 slot="header" style="color:#2D8CF0">email邮箱</h3>
       <Form :label-width="100" label-position="right">
         <FormItem label="E-mail">
-          <Input v-model="email"></Input>
+          <Input v-model="email.addr"></Input>
         </FormItem>
         <FormItem label="真实姓名">
           <Input v-model="real_name"></Input>
         </FormItem>
       </Form>
       <div slot="footer">
-        <Button type="text" @click="editemail=false">取消</Button>
-        <Button type="warning" @click="putemail">更改</Button>
+        <Button type="text" @click="email.modal=false">取消</Button>
+        <Button type="warning" @click="modifyEmail">更改</Button>
       </div>
     </Modal>
   </div>
@@ -214,26 +227,13 @@
         }
       }
       return {
-        loading: false,
-        percent: 0,
-        currentPage: 1,
-        permission: {
-          ddl: '0',
-          ddlcon: [],
-          dml: '0',
-          dmlcon: [],
-          query: '0',
-          dic: '0',
-          diccon: [],
-          dicedit: '0',
-          dicexport: '0',
-          index: '0',
-          indexcon: [],
-          user: '0',
-          base: '0'
+        query: {
+          user: '',
+          department: '',
+          valve: false
         },
-        con: [],
-        columns6: [
+        loading: false,
+        columns: [
           {
             title: '用户名',
             key: 'username',
@@ -264,99 +264,10 @@
             key: 'action',
             width: 400,
             align: 'center',
-            render: (h, params) => {
-              if (params.row.id !== 1) {
-                return h('div', [
-                  h('Button', {
-                    props: {
-                      type: 'primary',
-                      size: 'small'
-                    },
-                    style: {
-                      marginRight: '5px'
-                    },
-                    on: {
-                      click: () => {
-                        this.edituser(params.index)
-                      }
-                    }
-                  }, '更改密码'),
-                  h('Button', {
-                    props: {
-                      type: 'info',
-                      size: 'small'
-                    },
-                    style: {
-                      marginRight: '5px'
-                    },
-                    on: {
-                      click: () => {
-                        this.editauth(params.index)
-                      }
-                    }
-                  }, '权限组'),
-                  h('Button', {
-                    props: {
-                      type: 'success',
-                      size: 'small'
-                    },
-                    style: {
-                      marginRight: '5px'
-                    },
-                    on: {
-                      click: () => {
-                        this.editEmail(params.index)
-                      }
-                    }
-                  }, 'email更改'),
-                  h('Button', {
-                    props: {
-                      type: 'warning',
-                      size: 'small'
-                    },
-                    on: {
-                      click: () => {
-                        this.deleteUser(params.index)
-                      }
-                    }
-                  }, '删除')
-                ])
-              } else {
-                return h('div', [
-                  h('Button', {
-                    props: {
-                      type: 'info',
-                      size: 'small'
-                    },
-                    style: {
-                      marginRight: '5px'
-                    },
-                    on: {
-                      click: () => {
-                        this.editauth(params.index)
-                      }
-                    }
-                  }, '权限组'),
-                  h('Button', {
-                    props: {
-                      type: 'success',
-                      size: 'small'
-                    },
-                    style: {
-                      marginRight: '5px'
-                    },
-                    on: {
-                      click: () => {
-                        this.editEmail(params.index)
-                      }
-                    }
-                  }, 'email更改')
-                ])
-              }
-            }
+            slot: 'action'
           }
         ],
-        data5: [],
+        tableData: [],
         pagenumber: 1,
         // 新建用户
         userinfo: {
@@ -467,7 +378,8 @@
         // 更改密码
         editPasswordForm: {
           newPass: '',
-          rePass: ''
+          rePass: '',
+          modal: false
         },
         // 保存更改密码loding按钮状态
         savePassLoading: false,
@@ -501,12 +413,14 @@
           ]
         },
         // 更改部门及权限
+        GroupModal: false,
         editAuthForm: {
           username: '',
           group: '',
           department: '',
           authgroup: [],
-          real: []
+          real_name: '',
+          modal: false
         },
         formItem: {
           ddl: '',
@@ -522,40 +436,25 @@
           person: ''
         },
         // 更改部门及权限遮罩层状态
-        editAuthModal: false,
-        editemail: false,
-        email: '',
+        email: {
+          modal: false,
+          addr: ''
+        },
         real_name: '',
         // 用户名
         username: '',
-        confirmuser: '',
-        deluserModal: false,
-        dicadd: [],
-        checkAll: {
-          ddl: false,
-          dml: false,
-          query: false,
-          dic: false,
-          person: false
-        },
-        indeterminate: {
-          ddl: true,
-          dml: true,
-          query: true,
-          dic: true,
-          person: true
+        deluser: {
+          modal: false,
+          confirmUser: ''
         },
         connectionList: {
-          connection: [],
-          dic: [],
-          person: [],
           multi: Boolean
         },
         permission_list: {}
       }
     },
     methods: {
-      getgrouplist () {
+      getGroupList () {
         axios.put(`${this.$config.url}/authgroup/group_list`, {'group_list': JSON.stringify(this.editAuthForm.authgroup)})
           .then(res => {
             this.permission_list = res.data.permissions
@@ -565,11 +464,7 @@
             this.$config.err_notice(error)
           })
       },
-      cancelAuthModal () {
-        this.editAuthModal = false
-        this.editAuthForm.authgroup = []
-      },
-      getauthgroup () {
+      getAuthGroup () {
         axios.get(`${this.$config.url}/authgroup/group_name`)
           .then(res => {
             this.groupset = res.data.authgroup
@@ -578,93 +473,31 @@
             this.$config.err_notice(error)
           })
       },
-      edituser (index) {
-        this.editPasswordModal = true
-        this.username = this.data5[index].username
+      editPassModal (row) {
+        this.editPasswordForm.modal = true
+        this.username = row.username
       },
-      editauth (index) {
-        this.editAuthModal = true
-        this.editAuthForm = this.data5[index]
-        if (this.data5[index].auth_group !== null) {
-          this.editAuthForm.authgroup = this.data5[index].auth_group.split(',')
+      editAuthModal (row) {
+        this.editAuthForm = this.$config.sameMerge(this.editAuthForm, row, this.editAuthForm)
+        this.editAuthForm.modal = true
+        if (row.auth_group !== null) {
+          this.editAuthForm.authgroup = row.auth_group.split(',')
         } else {
           this.editAuthForm.authgroup = []
         }
       },
-      deleteUser (index) {
-        this.deluserModal = true
-        this.username = this.data5[index].username
+      editEmailModal (row) {
+        this.email.modal = true
+        this.username = row.username
+        this.email.addr = row.email
+        this.real_name = row.real_name
       },
-      editEmail (index) {
-        this.editemail = true
-        this.username = this.data5[index].username
-        this.email = this.data5[index].email
-        this.real_name = this.data5[index].real_name
+      deleteUserModal (row) {
+        this.deluser.modal = true
+        this.username = row.username
       },
-      putemail () {
-        axios.put(`${this.$config.url}/userinfo/changemail`, {
-          'username': this.username,
-          'mail': this.email,
-          'real': this.real_name
-        })
-          .then(res => {
-            this.$config.notice(res.data)
-            this.editemail = false
-            this.pagenumber = 1
-            this.refreshuser()
-            sessionStorage.setItem('real_name', this.real_name)
-          })
-          .catch(error => {
-            this.$config.err_notice(error)
-          })
-      },
-      Registered () {
-        this.$refs['userinfova'].validate((valid) => {
-          if (valid) {
-            this.loading = true
-            axios.post(this.$config.url + '/userinfo/', {
-              'username': this.userinfo.username,
-              'password': this.userinfo.password,
-              'group': this.userinfo.group,
-              'department': this.userinfo.department,
-              'email': this.userinfo.email,
-              'auth_group': JSON.stringify(this.userinfo.authgroup),
-              'realname': this.userinfo.realname
-            })
-              .then(res => {
-                this.loading = false
-                this.$config.notice(res.data)
-                this.refreshuser()
-                this.pagenumber = 1
-                this.userinfo = this.$config.clearObj(this.userinfo)
-              })
-              .catch(error => {
-                this.loading = false
-                this.$config.err_notice(error)
-              })
-          }
-        })
-      },
-      refreshuser (vl = 1) {
-        axios.get(`${this.$config.url}/userinfo/all?page=${vl}`)
-          .then(res => {
-            this.data5 = res.data.data
-            this.pagenumber = parseInt(res.data.page)
-          })
-          .catch(error => {
-            this.$config.err_notice(error)
-          })
-      },
-      splicpage (page) {
-        this.refreshuser(page)
-      },
-      cancelEditPass () {
-        this.editPasswordForm = {}
-        this.editPasswordModal = false
-      },
-      cancelDelInfo () {
-        this.deluserModal = false
-        this.confirmuser = ''
+      cancelModal (vl) {
+        this.$config.clearObj(vl)
       },
       saveEditPass () {
         this.$refs['editPasswordForm'].validate((valid) => {
@@ -676,7 +509,7 @@
             })
               .then(res => {
                 this.$config.notice(res.data)
-                this.editPasswordModal = false
+                this.editPasswordForm.modal = false
               })
               .catch(error => {
                 this.$config.err_notice(error)
@@ -696,9 +529,8 @@
         })
           .then(res => {
             this.$config.notice(res.data)
-            this.editAuthModal = false
-            this.editAuthForm.authgroup = []
-            this.refreshuser()
+            this.$config.clearObj(this.editAuthForm)
+            this.refreshUser()
             this.pagenumber = 1
           })
           .catch(error => {
@@ -706,15 +538,68 @@
           })
         this.savePassLoading = false
       },
+      modifyEmail () {
+        axios.put(`${this.$config.url}/userinfo/changemail`, {
+          'username': this.username,
+          'mail': this.email.addr,
+          'real': this.real_name
+        })
+          .then(res => {
+            this.$config.notice(res.data)
+            this.email.modal = false
+            this.pagenumber = 1
+            this.refreshUser()
+            sessionStorage.setItem('real_name', this.real_name)
+          })
+          .catch(error => {
+            this.$config.err_notice(error)
+          })
+      },
+      registered () {
+        this.$refs['userinfova'].validate((valid) => {
+          if (valid) {
+            this.loading = true
+            axios.post(this.$config.url + '/userinfo/', {
+              'username': this.userinfo.username,
+              'password': this.userinfo.password,
+              'group': this.userinfo.group,
+              'department': this.userinfo.department,
+              'email': this.userinfo.email,
+              'auth_group': JSON.stringify(this.userinfo.authgroup),
+              'realname': this.userinfo.realname
+            })
+              .then(res => {
+                this.loading = false
+                this.$config.notice(res.data)
+                this.refreshUser()
+                this.pagenumber = 1
+                this.userinfo = this.$config.clearObj(this.userinfo)
+              })
+              .catch(error => {
+                this.loading = false
+                this.$config.err_notice(error)
+              })
+          }
+        })
+      },
+      refreshUser (vl = 1) {
+        axios.get(`${this.$config.url}/userinfo/all?page=${vl}&user=${this.query.user}&department=${this.query.department}&valve=${this.query.valve}`)
+          .then(res => {
+            this.tableData = res.data.data
+            this.pagenumber = parseInt(res.data.page)
+          })
+          .catch(error => {
+            this.$config.err_notice(error)
+          })
+      },
       delUser () {
-        if (this.username === this.confirmuser) {
+        if (this.username === this.deluser.confirmUser) {
           axios.delete(this.$config.url + '/userinfo/' + this.username)
             .then(res => {
               this.$config.notice(res.data)
-              this.deluserModal = false
-              this.confirmuser = ''
+              this.$config.clearObj(this.deluser)
               this.pagenumber = 1
-              this.refreshuser()
+              this.refreshUser()
             })
             .catch(error => {
               this.$config.err_notice(error)
@@ -723,39 +608,25 @@
           this.$Message.error('用户名不一致!请重新操作!')
         }
       },
-      ddlCheckAll (name, indeterminate, ty) {
-        if (this.indeterminate[indeterminate]) {
-          this.checkAll[indeterminate] = false
-        } else {
-          this.checkAll[indeterminate] = !this.checkAll[indeterminate]
-        }
-        this.indeterminate[indeterminate] = false
-        if (this.checkAll[indeterminate]) {
-          if (ty === 'dic') {
-            this.permission[name] = this.connectionList[ty].map(vl => vl.Name)
-          } else if (ty === 'person') {
-            this.permission[name] = this.connectionList[ty].map(vl => vl.username)
-          } else {
-            this.permission[name] = this.connectionList[ty].map(vl => vl.connection_name)
-          }
-        } else {
-          this.permission[name] = []
-        }
+      queryData () {
+        this.query.valve = true
+        this.refreshUser()
+      },
+      queryCancel () {
+        this.$config.clearObj(this.query)
+        this.refreshUser()
       }
     },
     mounted () {
-      this.getauthgroup()
+      this.refreshUser()
+      this.getAuthGroup()
       axios.put(`${this.$config.url}/workorder/connection`, {'permissions_type': 'user'})
         .then(res => {
-          this.connectionList.connection = res.data['connection']
-          this.connectionList.dic = res.data['dic']
-          this.connectionList.person = res.data['person']
           this.connectionList.multi = res.data['multi']
         })
         .catch(error => {
           this.$config.err_notice(error)
         })
-      this.refreshuser()
     }
   }
 </script>
