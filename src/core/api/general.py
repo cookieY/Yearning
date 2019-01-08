@@ -150,32 +150,9 @@ class addressing(baseview.BaseView):
                             port=_connection.port,
                             db=basename
                     ) as f:
-                        res = f.gen_alter(table_name=table)
-                        return Response(res)
+                        field = f.gen_alter(table_name=table)
+                        idx = f.index(table_name=table)
+                        return Response({'idx': idx, 'field': field})
                 except Exception as e:
                     CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
                     return HttpResponse(status=500)
-
-        elif args == 'indexdata':
-            try:
-                login = json.loads(request.data['login'])
-                table = request.data['table']
-                basename = login['basename']
-                con_id = request.data['id']
-            except KeyError as e:
-                CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
-            else:
-                try:
-                    _connection = DatabaseList.objects.filter(id=con_id).first()
-                    with con_database.SQLgo(
-                            ip=_connection.ip,
-                            user=_connection.username,
-                            password=_connection.password,
-                            port=_connection.port,
-                            db=basename
-                    ) as f:
-                        res = f.index(table_name=table)
-                        return Response(res)
-                except Exception as e:
-                    CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
-                    return HttpResponse(e)

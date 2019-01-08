@@ -68,7 +68,9 @@
     </div>
     <div class="single-page-con" :style="{paddingLeft: hideMenuText?'60px':'200px'}">
       <div class="single-page">
+        <keep-alive>
           <router-view></router-view>
+        </keep-alive>
       </div>
     </div>
     <Modal

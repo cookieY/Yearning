@@ -18,6 +18,7 @@ from .models import (
 
 CUSTOM_ERROR = logging.getLogger('Yearning.core.views')
 
+
 def set_auth_group(user):
     perm = {
         'ddl': '0',
@@ -68,6 +69,20 @@ def grained_permissions(func):
                     return func(self, request, args)
                 else:
                     return HttpResponse(status=401)
+
+    return wrapper
+
+
+def ThinkTooMuch(func):
+    def wrapper(self, request, args=None):
+        if request.method == "DELETE":
+            user = args
+        else:
+            user = request.data['username']
+        if user != str(request.user):
+            if request.user.is_staff is not True:
+                return HttpResponse('请不要想太多!')
+        return func(self, request, args)
 
     return wrapper
 

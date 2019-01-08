@@ -236,8 +236,8 @@
               name: 'home_index'
             })
           })
-          .catch(() => {
-            this.$config.err_notice('账号密码错误,请重新输入!')
+          .catch(err => {
+            this.$config.auth_notice(err)
           })
       },
       ldap_login () {
@@ -260,8 +260,8 @@
                 name: 'home_index'
               })
           })
-          .catch(() => {
-            this.$config.err_notice('账号密码错误,请重新输入!')
+          .catch(err => {
+            this.$config.auth_notice(err)
           })
       }
     },

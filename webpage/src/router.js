@@ -22,7 +22,7 @@ const mainchild = [
     title: '查询申请进度',
     name: 'queryready',
     component: resolve => {
-      require(['./components/search/submitPage.vue'], resolve)
+      require(['./components/query/submitPage.vue'], resolve)
     }
   },
   {
@@ -30,7 +30,7 @@ const mainchild = [
     title: '查询',
     name: 'querypage',
     component: resolve => {
-      require(['./components/search/querySql.vue'], resolve)
+      require(['./components/query/querySql.vue'], resolve)
     }
   },
   {
@@ -126,7 +126,7 @@ export const appRouter = [
         title: 'DDL',
         'icon': 'md-git-merge',
         component: resolve => {
-          require(['./components/order/genSql.vue'], resolve)
+          require(['./components/order/ddlOrder.vue'], resolve)
         }
       },
       {
@@ -135,16 +135,7 @@ export const appRouter = [
         title: 'DML',
         'icon': 'md-code',
         component: resolve => {
-          require(['./components/order/sqlSyntax.vue'], resolve)
-        }
-      },
-      {
-        path: 'indexedit',
-        name: 'indexedit',
-        title: '索引',
-        'icon': 'md-share-alt',
-        component: resolve => {
-          require(['./components/order/genIndex.vue'], resolve)
+          require(['./components/order/dmlOrder.vue'], resolve)
         }
       }
     ]
@@ -162,7 +153,7 @@ export const appRouter = [
         title: 'SQL查询',
         'icon': 'ios-podium',
         component: resolve => {
-          require(['./components/search/workFlow.vue'], resolve)
+          require(['./components/query/workFlow.vue'], resolve)
         }
       }
     ]

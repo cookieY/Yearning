@@ -35,6 +35,19 @@ util.err_notice = function (err) {
   })
 }
 
+util.auth_notice = function (err) {
+  let text = err
+  if (err.response !== undefined) {
+    if (err.response.status === 400) {
+      text = '账号密码错误,请重新输入!'
+    }
+  }
+  Notice.error({
+    title: '错误',
+    desc: text
+  })
+}
+
 util.notice = function (vl) {
   Notice.info({
     title: '通知',

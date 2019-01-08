@@ -1,7 +1,7 @@
 import logging
 import json
 from libs import baseview, util
-from core.task import grained_permissions, set_auth_group
+from core.task import grained_permissions, set_auth_group,ThinkTooMuch
 from libs.serializers import UserINFO
 from libs.send_email import send_email
 from rest_framework.response import Response
@@ -13,8 +13,7 @@ from core.models import (
     Account,
     Todolist,
     grained,
-    query_order,
-    globalpermissions
+    query_order
 )
 
 CUSTOM_ERROR = logging.getLogger('Yearning.core.views')
@@ -56,7 +55,6 @@ class userinfo(baseview.BaseView):
                 user = request.GET.get('user').strip()
                 department = request.GET.get('department').strip()
                 valve = request.GET.get('valve')
-                print(type(valve))
             except KeyError as e:
                 CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
                 return HttpResponse(status=500)
@@ -86,6 +84,7 @@ class userinfo(baseview.BaseView):
             user = set_auth_group(request.GET.get('user'))
             return Response(user)
 
+    @ThinkTooMuch
     def put(self, request, args=None):
         if args == 'changepwd':
             try:
@@ -170,6 +169,7 @@ class userinfo(baseview.BaseView):
                 CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
                 return HttpResponse(e)
 
+    @ThinkTooMuch
     def delete(self, request, args=None):
         try:
             pr = Account.objects.filter(username=args).first()
