@@ -109,9 +109,9 @@ def auth(username, password):
     LDAP_TYPE = ldap['type']
     LDAP_SCBASE = ldap['sc']
 
-    if LDAP_TYPE == 1:
+    if LDAP_TYPE == '1':
         search_filter = '(mail={})'.format(username)
-    elif  LDAP_TYPE == 2:
+    elif  LDAP_TYPE == '2':
         search_filter = '(uid={})'.format(username)
     else:
         search_filter = '(cn={})'.format(username)
