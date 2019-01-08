@@ -238,13 +238,11 @@
           back_password: ''
         },
         ldap: {
-          type: '',
-          host: '',
-          sc: '',
-          domain: '',
+          url: '',
           user: '',
           password: '',
-          ou: null
+          type: 1,
+          sc: ''
         },
         message: {
           webhook: '',
