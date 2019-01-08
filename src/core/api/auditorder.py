@@ -42,7 +42,10 @@ class audit(baseview.SuperUserpermissions):
         try:
             page = request.GET.get('page')
             qurey = json.loads(request.GET.get('query'))
-            print(qurey)
+            picker = []
+            for i in qurey['picker']:
+                picker.append(str(i).split('T')[0])
+            print(qurey['picker'])
         except KeyError as e:
             CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
             return HttpResponse(status=500)
@@ -53,16 +56,17 @@ class audit(baseview.SuperUserpermissions):
                 page_number = SqlOrder.objects.filter(assigned=request.user).count()
                 start = (int(page) - 1) * 20
                 end = int(page) * 20
-                info = SqlOrder.objects.raw(
-                    '''
-                    select o.id,o.work_id,o.text,o.backup,o.date,o.assigned,
-                    o.username,o.real_name,o.status,o.basename,o.delay,core_databaselist.connection_name, \
-                    core_databaselist.computer_room from core_sqlorder as o \
-                    INNER JOIN core_databaselist on \
-                    o.bundle_id = core_databaselist.id where o.assigned = '%s'\
-                    ORDER BY o.id desc
-                    ''' % request.user
-                )[start:end]
+                if qurey['picker'][0] == '':
+                    info = SqlOrder.objects.raw(
+                        '''
+                        select o.id,o.work_id,o.text,o.backup,o.date,o.assigned,
+                        o.username,o.real_name,o.status,o.basename,o.delay,core_databaselist.connection_name, \
+                        core_databaselist.computer_room from core_sqlorder as o \
+                        INNER JOIN core_databaselist on \
+                        o.bundle_id = core_databaselist.id where o.assigned = '%s' and work_id like \
+                        ORDER BY o.id desc
+                        ''' % request.user
+                    )[start:end]
                 data = util.ser(info)
                 info = Account.objects.filter(group='perform').all()
                 ser = serializers.UserINFO(info, many=True)
