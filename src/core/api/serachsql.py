@@ -179,8 +179,6 @@ def replace_limit(sql, limit):
 
     if sql[-1] != ';':
         sql += ';'
-    if sql.startswith('show') == -1:
-        return sql
     sql_re = re.search(r'limit\s.*\d.*;', sql.lower())
     length = ''
     if sql_re is not None:
