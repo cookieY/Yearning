@@ -49,11 +49,8 @@
               <Card style="margin-left: 5%">
                 <p slot="title">LDAP设置</p>
                 <Form :label-width="120">
-                  <FormItem label="服务地址:">
-                    <Input placeholder="服务ip地址" v-model="ldap.host"></Input>
-                  </FormItem>
-                  <FormItem label="端口:">
-                    <Input placeholder="端口" v-model="ldap.port"></Input>
+                  <FormItem label="服务地址url">
+                    <Input placeholder="[协议名称]://[ip地址或者域名]:[端口号]" v-model="ldap.url"></Input>
                   </FormItem>
                   <FormItem label="LDAP管理员DN:">
                     <Input placeholder="请填写管理员DN" v-model="ldap.user"></Input>
@@ -82,7 +79,7 @@
                   <br>
                   2.请正确填写Inception备份库相关信息，否则将无法获得回滚语句。(无法获得回滚语句的原因有多种这只是其中之一)
                   <br>
-                  3.LDAP登录用户名，必须使用全局唯一。
+                  3.LDAP登录用户名，必须全局唯一。
                 </template>
               </Alert>
             </Col>

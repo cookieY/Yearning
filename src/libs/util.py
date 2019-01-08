@@ -16,7 +16,7 @@ import random
 import ssl
 import time
 import ldap3
-from ldap3 import Connection, SUBTREE
+from ldap3 import Server, Connection, SUBTREE
 import configparser
 import ast
 
@@ -84,9 +84,9 @@ def conf_path() -> object:
                     _conf.get('mysql', 'password'), _conf.get('host', 'ipaddress'))
 
 class LDAPConnection(object):
-    def __init__(self, host, port, user, password):
-        server = Server(host, port=port, get_info=ldap3.ALL)
-        self.conn = Connection(server, user=user, password=password, authentication=SIMPLE, raise_exceptions=True)
+    def __init__(self, url, user, password):
+        server = Server(url, get_info=ldap3.ALL)
+        self.conn = Connection(server, user=user, password=password, check_names=True, lazy=False, raise_exceptions=False)
 
     def __enter__(self):
         self.conn.bind()
@@ -95,9 +95,10 @@ class LDAPConnection(object):
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.conn.unbind()
 
-def test_auth(host, port, user, password):
-    with LDAPConnection(host, port, user, password) as conn:
-        return True
+def test_auth(url, user, password):
+    with LDAPConnection(url, user, password) as conn:
+        if conn.bind():
+            return True
     return False
 
 
@@ -115,7 +116,7 @@ def auth(username, password):
     else:
         search_filter = '(cn={})'.format(username)
 
-    with LDAPConnection(ldap['host'], ldap['port'], ldap['user'], ldap['password']) as conn:
+    with LDAPConnection(ldap['url'], ldap['user'], ldap['password']) as conn:
 
         res = conn.search(
             search_base=LDAP_SCBASE,
@@ -127,12 +128,12 @@ def auth(username, password):
             entry = conn.response[0]
             # check password by dn
             try:
-                if conn.rebind(user=entry.entry_dn, password=password):
+                if conn.rebind(user=entry['dn'], password=password):
                     attr_dict = entry['attributes']
                     print((True, attr_dict["mail"], attr_dict["cn"], attr_dict["uid"]))
                     return True
-            except:
-                print("auth fail")
+            except Exception as e:
+                print(str(e))
 
     return False
 

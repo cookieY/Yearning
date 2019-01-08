@@ -32,9 +32,8 @@ class setting_view(baseview.SuperUserpermissions):
             if args == '1':  # ldap测试
                 ldap = json.loads(request.data['ldap'])
                 ldap_test = util.test_auth(
-                    host=ldap['host'],
-                    port=ldap['port'],
-                    username=ldap['user'],
+                    url=ldap['url'],
+                    user=ldap['user'],
                     password=ldap['password'])
                 if ldap_test:
                     return Response('ldap连接成功!')
