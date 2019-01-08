@@ -1,7 +1,7 @@
 import logging
 import json
 from libs import baseview, util
-from core.task import grained_permissions, set_auth_group,ThinkTooMuch
+from core.task import set_auth_group, ThinkTooMuch
 from libs.serializers import UserINFO
 from libs.send_email import send_email
 from rest_framework.response import Response
@@ -48,11 +48,12 @@ class userinfo(baseview.BaseView):
       
     '''
 
+    @ThinkTooMuch
     def get(self, request, args=None):
         if args == 'all':
             try:
                 page = request.GET.get('page')
-                user = request.GET.get('user').strip()
+                user = request.GET.get('username').strip()
                 department = request.GET.get('department').strip()
                 valve = request.GET.get('valve')
             except KeyError as e:
@@ -185,24 +186,6 @@ class userinfo(baseview.BaseView):
                 Account.objects.filter(username=args).delete()
                 Todolist.objects.filter(username=args).delete()
             return Response('%s--用户已删除!' % args)
-        except Exception as e:
-            CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
-            return HttpResponse(status=500)
-
-
-class authgroup(baseview.BaseView):
-    '''
-
-    认证组权限
-
-    '''
-
-    @grained_permissions
-    def post(self, request, args=None):
-        try:
-            _type = request.data['permissions_type'] + 'edit'
-            permission = set_auth_group(request.user)
-            return Response(permission[_type])
         except Exception as e:
             CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
             return HttpResponse(status=500)

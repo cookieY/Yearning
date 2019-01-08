@@ -209,13 +209,13 @@
             this.$config.notice(res.data)
           })
           .catch(error => {
-            this.$config.err_notice(error)
+            this.$config.err_notice(this, error)
           })
       },
       addConnection () {
         for (let i of this.tableData) {
           if (i.connection_name === this.formItem.name) {
-            this.$config.err_notice('连接名称重复,请更改为其他!')
+            this.$config.err_notice(this, '连接名称重复,请更改为其他!')
             return
           }
         }
@@ -237,7 +237,7 @@
                 this.stepPageNumber(this.stepPage)
               })
               .catch(error => {
-                this.$config.err_notice(error)
+                this.$config.err_notice(this, error)
               })
             this.reset()
           }
@@ -262,7 +262,7 @@
             this.getPageInfo(step)
           })
           .catch(error => {
-            this.$config.err_notice(error)
+            this.$config.err_notice(this, error)
           })
       },
       getPageInfo (vl = 1) {
@@ -271,7 +271,7 @@
             [this.tableData, this.pagenumber, this.comList] = [res.data.data, parseInt(res.data.page), res.data.custom]
           })
           .catch(error => {
-            this.$config.err_notice(error)
+            this.$config.err_notice(this, error)
           })
       },
       saveDingding () {
@@ -286,7 +286,7 @@
             this.ding.modal = false
           })
           .catch(error => {
-            this.$config.err_notice(error)
+            this.$config.err_notice(this, error)
           })
       },
       modifyBase () {
@@ -294,7 +294,7 @@
           'data': JSON.stringify(this.editbaseinfo)
         })
           .then(res => this.$config.notice(res.data))
-          .catch(err => this.$config.err_notice(err))
+          .catch(err => this.$config.err_notice(this, err))
       },
       stepPageNumber (vl) {
         this.stepPage = vl

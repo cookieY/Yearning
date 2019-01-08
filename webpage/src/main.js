@@ -34,9 +34,9 @@ router.beforeEach((to, from, next) => {
     router.replace({name: 'login'})
   } else {
     if (!sessionStorage.getItem('user') && to.name !== 'login') { // 判断是否已经登录且前往的页面不是登录页
-      next({name: 'login'})
-    } else if (sessionStorage.getItem('user') && to.name === 'login') { // 判断是否已经登录且前往的是登录页
-      next({name: 'login'})
+      next(false)
+      router.replace({name: 'login'})
+      console.log(2)
     } else {
       next()
     }

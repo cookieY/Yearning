@@ -87,7 +87,7 @@
             [this.table_data, this.page_number] = [res.data.data, res.data.page]
           })
           .catch(error => {
-            this.$config.err_notice(error)
+            this.$config.err_notice(this, error)
           })
       }
     },

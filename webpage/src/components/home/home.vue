@@ -175,7 +175,7 @@
               this.showAddNewTodo = false
             })
             .catch(error => {
-              this.$config.err_notice(error)
+              this.$config.err_notice(this, error)
             })
         } else {
           this.$Message.error('请输入待办事项内容')
@@ -193,7 +193,7 @@
             this.gettodo()
           })
           .catch(error => {
-            this.$config.err_notice(error)
+            this.$config.err_notice(this, error)
           })
       },
       gettodo () {
@@ -202,7 +202,7 @@
             this.toDoList = res.data
           })
           .catch(error => {
-            this.$config.err_notice(error)
+            this.$config.err_notice(this, error)
           })
       }
     },
@@ -214,7 +214,7 @@
           this.count.link = res.data[2]
         })
         .catch(error => {
-          this.$config.err_notice(error)
+          this.$config.err_notice(this, error)
         })
       this.gettodo()
       this.formatDate()

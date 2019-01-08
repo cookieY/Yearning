@@ -263,7 +263,7 @@
             this.permission = this.$config.mode(res.data.permissions)
           })
           .catch(error => {
-            this.$config.err_notice(error)
+            this.$config.err_notice(this, error)
           })
       },
       getauthgroup () {
@@ -272,7 +272,7 @@
             this.groupset = res.data.authgroup
           })
           .catch(error => {
-            this.$config.err_notice(error)
+            this.$config.err_notice(this, error)
           })
       },
       saveEditPass () {
@@ -288,7 +288,7 @@
                 this.editPasswordModal = false
               })
               .catch(error => {
-                this.$config.err_notice(error)
+                this.$config.err_notice(this, error)
               })
             this.savePassLoading = false
           }
@@ -310,7 +310,7 @@
             sessionStorage.setItem('real_name', this.editEmailForm.real_name)
           })
           .catch(error => {
-            this.$config.err_notice(error)
+            this.$config.err_notice(this, error)
           })
         this.savePassLoading = false
       },
@@ -334,7 +334,7 @@
             this.editInfoModal = false
           })
           .catch(error => {
-            this.$config.err_notice(error)
+            this.$config.err_notice(this, error)
           })
         this.savePassLoading = false
       }

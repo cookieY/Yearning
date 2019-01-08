@@ -102,7 +102,7 @@
             [this.TableDataNew, this.pagenumber] = [res.data.data, res.data.page]
           })
           .catch(error => {
-            this.$config.err_notice(error)
+            this.$config.err_notice(this, error)
           })
       },
       splicpage (page) {

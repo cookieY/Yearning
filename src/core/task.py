@@ -77,6 +77,8 @@ def ThinkTooMuch(func):
     def wrapper(self, request, args=None):
         if request.method == "DELETE":
             user = args
+        elif request.method == "GET":
+            user = request.GET.get('username')
         else:
             user = request.data['username']
         if user != str(request.user):
@@ -86,6 +88,20 @@ def ThinkTooMuch(func):
 
     return wrapper
 
+
+def isAdmin(func):
+    def wrapper(self, request, args=None):
+        if request.user.is_staff != 1:
+            if request.method == "PUT":
+                if args == 'group_list':
+                    return func(self, request, args)
+            elif request.method == "GET":
+                if args == 'group_name':
+                    return func(self, request, args)
+            return HttpResponse('请不要想太多!')
+        return func(self, request, args)
+
+    return wrapper
 
 class order_push_message(threading.Thread):
     '''

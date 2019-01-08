@@ -28,10 +28,19 @@ util.mode = function (obj) {
   return oc
 }
 
-util.err_notice = function (err) {
+util.err_notice = function (vm, err) {
+  let text = err
+  if (err.response !== undefined) {
+    if (err.response.status === 401) {
+      text = 'Token过期！请重新登录!'
+      vm.$router.replace({
+        name: 'login'
+      })
+    }
+  }
   Notice.error({
     title: '错误',
-    desc: err
+    desc: text
   })
 }
 

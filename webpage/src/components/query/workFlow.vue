@@ -183,7 +183,7 @@
           this.datalist.computer_roomlist = res.data['custom']
         })
         .catch(error => {
-          this.$config.err_notice(error)
+          this.$config.err_notice(this, error)
         })
       axios.put(`${this.$config.url}/query_worklf`, {'mode': 'status'})
         .then(res => {

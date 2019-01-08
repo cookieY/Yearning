@@ -44,7 +44,7 @@
           this.TableDataNew = res.data
         })
         .catch(error => {
-          this.$config.err_notice(error)
+          this.$config.err_notice(this, error)
         })
     }
   }

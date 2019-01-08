@@ -340,7 +340,7 @@
             .then(res => {
               this.tableform.info = res.data
             }).catch(error => {
-            this.$config.err_notice(error)
+            this.$config.err_notice(this, error)
           })
         }
       },
@@ -352,7 +352,7 @@
             this.dataset = res.data['custom']
           })
           .catch(error => {
-            this.$config.err_notice(error)
+            this.$config.err_notice(this, error)
           })
       },
       acquireStruct () {
@@ -384,7 +384,7 @@
                 this.$Spin.hide()
               })
               .catch(() => {
-                this.$config.err_notice('连接失败！详细信息请查看日志')
+                this.$config.err_notice(this, '连接失败！详细信息请查看日志')
                 this.$Spin.hide()
               })
           } else {
@@ -427,7 +427,7 @@
                 }
               })
               .catch(() => {
-                this.$config.err_notice('无法连接到Inception!')
+                this.$config.err_notice(this, '无法连接到Inception!')
               })
           } else {
             this.$Message.error('请填写具体地址或sql语句后再测试!')
@@ -449,7 +449,7 @@
                 this.$config.notice(res.data)
               })
               .catch(error => {
-                this.$config.err_notice(error)
+                this.$config.err_notice(this, error)
               })
           }
         })

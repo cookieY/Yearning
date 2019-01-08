@@ -41,6 +41,8 @@ class audit(baseview.SuperUserpermissions):
 
         try:
             page = request.GET.get('page')
+            qurey = json.loads(request.GET.get('query'))
+            print(qurey)
         except KeyError as e:
             CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
             return HttpResponse(status=500)

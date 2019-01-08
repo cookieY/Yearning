@@ -208,10 +208,10 @@
                 }
               })
               .catch(error => {
-                this.$config.err_notice(error)
+                this.$config.err_notice(this, error)
               })
           } else {
-            this.$config.err_notice('请正确填写相关注册信息！')
+            this.$config.err_notice(this, '请正确填写相关注册信息！')
           }
         })
       },

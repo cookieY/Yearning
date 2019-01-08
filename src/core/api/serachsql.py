@@ -88,7 +88,7 @@ class search(baseview.BaseView):
         custom_com = ast.literal_eval(un_init['other'])
         critical = len(custom_com['sensitive_list'])
         if user.query_per == 1:
-            if check[-1].startswith('s') != 1:
+            if check[-1].startswith('s') is not True:
                 return Response('请勿使用非查询语句,请删除不必要的空白行！')
             else:
                 address = json.loads(request.data['address'])
@@ -107,7 +107,7 @@ class search(baseview.BaseView):
                         if search.sql_parse(check[-1]):
                             return Response('语句中不得含有违禁关键字: update insert alter into for drop')
 
-                        if check[-1].startswith('show') != -1:
+                        if check[-1].startswith('show'):
                             query_sql = check[-1]
                         else:
                             if limit.get('limit').strip() == '':
@@ -351,7 +351,6 @@ class query_worklf(baseview.BaseView):
             return Response({'info': json.dumps(data), 'status': database.export, 'highlight': highlist})
 
     def delete(self, request, args: str = None):
-
         data = query_order.objects.filter(username=request.user).order_by('-id').first()
         query_order.objects.filter(work_id=data.work_id).delete()
         return Response('')

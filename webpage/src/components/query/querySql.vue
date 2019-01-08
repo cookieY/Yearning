@@ -153,7 +153,7 @@
         axios.put(`${this.$config.url}/search`, {'base': this.put_info.base, 'table': vl[0].title})
           .then(res => {
             if (res.data['error']) {
-              this.$config.err_notice(res.data['error'])
+              this.$config.err_notice(this, res.data['error'])
             } else {
               this.columnsName = res.data['title']
               this.allsearchdata = res.data['data']
@@ -174,7 +174,7 @@
             this.formItem.textarea = res.data
           })
           .catch(error => {
-            this.$config.err_notice(error)
+            this.$config.err_notice(this, error)
           })
       },
       splice_arr (page) {
@@ -213,7 +213,7 @@
         })
           .then(res => {
             if (!res.data['data']) {
-              this.$config.err_notice(res.data)
+              this.$config.err_notice(this, res.data)
             } else {
               this.columnsName = res.data['title']
               this.allsearchdata = res.data['data']
@@ -234,7 +234,7 @@
       End_sql () {
         axios.put(`${this.$config.url}/query_worklf`, {'mode': 'end', 'username': sessionStorage.getItem('user')})
           .then(res => this.$config.notice(res.data))
-          .catch(err => this.$config.err_notice(err))
+          .catch(err => this.$config.err_notice(this, err))
         this.$router.push({
           name: 'serach-sql'
         })

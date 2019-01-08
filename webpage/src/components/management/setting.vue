@@ -353,7 +353,7 @@
             this.$config.notice(res.data)
           })
           .catch(error => {
-            this.$config.err_notice(error)
+            this.$config.err_notice(this, error)
           })
       },
       save_upload () {
@@ -386,7 +386,7 @@
           }
         })
         .catch(error => {
-          this.$config.err_notice(error)
+          this.$config.err_notice(this, error)
         })
     }
   }

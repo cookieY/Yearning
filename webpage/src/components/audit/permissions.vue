@@ -219,7 +219,7 @@
             this.per_pn = res.data['pn']
           })
           .catch(error => {
-            this.$config.err_notice(error)
+            this.$config.err_notice(this, error)
           })
       },
       delrecordData () {
@@ -229,7 +229,7 @@
             this.permisson_list()
           })
           .catch(error => {
-            this.$config.err_notice(error)
+            this.$config.err_notice(this, error)
           })
       },
       delrecordList (vl) {
@@ -253,7 +253,7 @@
             this.permisson_list()
           })
           .catch(error => {
-            this.$config.err_notice(error)
+            this.$config.err_notice(this, error)
           })
       },
       reject () {
@@ -269,7 +269,7 @@
             this.permisson_list()
           })
           .catch(error => {
-            this.$config.err_notice(error)
+            this.$config.err_notice(this, error)
           })
       }
     },

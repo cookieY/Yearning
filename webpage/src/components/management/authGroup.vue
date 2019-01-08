@@ -262,7 +262,7 @@
       createAuthGroup () {
         for (let i of this.data6) {
           if (this.addAuthGroupForm.groupname === i.username) {
-            return this.$config.err_notice('不可创建相同名的权限组！')
+            return this.$config.err_notice(this, '不可创建相同名的权限组！')
           }
         }
         axios.post(`${this.$config.url}/authgroup/`, {
@@ -275,7 +275,7 @@
             this.refreshgroup()
           })
           .catch(error => {
-            this.$config.err_notice(error)
+            this.$config.err_notice(this, error)
           })
         this.addAuthGroupModal = false
       },
@@ -290,7 +290,7 @@
             this.refreshgroup()
           })
           .catch(error => {
-            this.$config.err_notice(error)
+            this.$config.err_notice(this, error)
           })
         this.addAuthGroupModal = false
       },
@@ -331,7 +331,7 @@
               this.$config.notice(res.data)
               this.refreshgroup()
             })
-            .catch(err => this.$config.err_notice(err))
+            .catch(err => this.$config.err_notice(this, err))
         } else {
           this.$Message.error({
             content: '请填写正确的权限组名称！',
@@ -351,7 +351,7 @@
           this.connectionList.person = res.data['person']
         })
         .catch(error => {
-          this.$config.err_notice(error)
+          this.$config.err_notice(this, error)
         })
       this.refreshgroup()
     }

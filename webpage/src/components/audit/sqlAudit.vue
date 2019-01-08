@@ -52,19 +52,41 @@
         </p>
         <Row>
           <Col span="24">
-            <Poptip
-              confirm
-              title="您确认删除这些工单信息吗?"
-              @on-ok="delrecordData"
-            >
-              <Button type="text" style="margin-left: -1%">删除记录</Button>
-            </Poptip>
-            <Button type="text" style="margin-left: -1%" @click.native="mou_data()">刷新</Button>
-
+            <Form inline>
+              <FormItem>
+                <Poptip
+                  confirm
+                  title="您确认删除这些工单信息吗?"
+                  @on-ok="delrecordData"
+                >
+                  <Button type="warning">删除记录</Button>
+                </Poptip>
+              </FormItem>
+              <FormItem>
+                <Poptip trigger="hover" title="提示" content="此开关用于打开实时表格数据更新功能">
+                  <i-switch v-model="valve" @on-change="refreshForm" size="large">
+                    <span slot="open">打开</span>
+                    <span slot="close">关闭</span>
+                  </i-switch>
+                </Poptip>
+              </FormItem>
+              <FormItem>
+                <Input placeholder="账号名" v-model="find.user"></Input>
+              </FormItem>
+              <FormItem>
+                <DatePicker format="yyyy/MM/dd" type="daterange" placeholder="请选择查询的时间范围"
+                            v-model="find.picker"></DatePicker>
+              </FormItem>
+              <FormItem>
+                <Button type="success" @click="queryData">查询</Button>
+                <Button type="primary">重置</Button>
+              </FormItem>
+            </Form>
             <Table border :columns="columns6" :data="tmp" stripe ref="selection"
-                   @on-selection-change="delrecordList"></Table>
+                   @on-selection-change="delrecordList">
+            </Table>
             <br>
-            <Page :total="pagenumber" show-elevator @on-change="mou_data" :page-size="20" ref="page"></Page>
+            <Page :total="pagenumber" show-elevator @on-change="refreshData" :page-size="20" ref="page"></Page>
           </Col>
         </Row>
       </Card>
@@ -450,7 +472,13 @@
         auth: sessionStorage.getItem('auth'),
         multi_list: {},
         multi_name: '',
-        reboot: null
+        reboot: null,
+        valve: false,
+        find: {
+          picker: [],
+          user: '',
+          valve: false
+        }
       }
     },
     methods: {
@@ -469,7 +497,7 @@
             }
           })
           .catch(err => {
-            this.$config.err_notice(err)
+            this.$config.err_notice(this, err)
           })
       },
       agreed_button () {
@@ -487,7 +515,7 @@
               this.modal2 = false
             })
             .catch(error => {
-              this.$config.err_notice(error)
+              this.$config.err_notice(this, error)
             })
         }
       },
@@ -504,7 +532,7 @@
             this.$refs.page.currentPage = 1
           })
           .catch(error => {
-            this.$config.err_notice(error)
+            this.$config.err_notice(this, error)
           })
       },
       out_button () {
@@ -519,12 +547,12 @@
           'id': this.formitem.id
         })
           .then(res => {
-            this.$config.err_notice(res.data)
-            this.mou_data()
+            this.$config.notice(res.data)
+            this.refreshData()
             this.$refs.page.currentPage = 1
           })
           .catch(error => {
-            this.$config.err_notice(error)
+            this.$config.err_notice(this, error)
           })
       },
       test_button () {
@@ -546,15 +574,15 @@
               this.summit = false
               this.loading = false
             } else {
-              this.$config.err_notice(res.data.status)
+              this.$config.err_notice(this, res.data.status)
             }
           })
           .catch(error => {
-            this.$config.err_notice(error)
+            this.$config.err_notice(this, error)
           })
       },
-      mou_data (vl = 1) {
-        axios.get(`${this.$config.url}/audit_sql?page=${vl}`)
+      refreshData (vl = 1) {
+        axios.get(`${this.$config.url}/audit_sql?page=${vl}&query=${JSON.stringify(this.find)}`)
           .then(res => {
             this.tmp = res.data.data
             this.tmp.forEach((item) => { (item.backup === 1) ? item.backup = '是' : item.backup = '否' })
@@ -563,7 +591,7 @@
             this.multi_list = res.data.multi_list
           })
           .catch(error => {
-            this.$config.err_notice(error)
+            this.$config.err_notice(this, error)
           })
       },
       delrecordList (vl) {
@@ -575,10 +603,10 @@
         })
           .then(res => {
             this.$config.notice(res.data)
-            this.mou_data()
+            this.refreshData()
           })
           .catch(error => {
-            this.$config.err_notice(error)
+            this.$config.err_notice(this, error)
           })
       },
       oscsetp (vl) {
@@ -605,15 +633,25 @@
           .then(res => {
             this.$config.notice(res.data)
           })
-          .catch(error => this.$config.err_notice(error))
+          .catch(error => this.$config.err_notice(this, error))
+      },
+      refreshForm (vl) {
+        if (vl) {
+          let vm = this
+          this.reboot = setInterval(function () {
+            vm.refreshData(vm.$refs.page.currentPage)
+          }, 5000)
+        } else {
+          clearInterval(this.reboot)
+        }
+      },
+      queryData () {
+        this.refreshData()
       }
     },
     mounted () {
-      let vm = this
-      this.mou_data()
-      this.reboot = setInterval(function () {
-        vm.mou_data(vm.$refs.page.currentPage)
-      }, 5000)
+      this.find.valve = true
+      this.refreshData()
     },
     destroyed () {
       clearInterval(this.reboot)

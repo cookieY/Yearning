@@ -224,7 +224,7 @@
             this.formItem.textarea = res.data
           })
           .catch(error => {
-            this.$config.err_notice(error)
+            this.$config.err_notice(this, error)
           })
       },
       ScreenConnection (val) {
@@ -251,7 +251,7 @@
               this.datalist.basenamelist = res.data
             })
             .catch(() => {
-              this.$config.err_notice('无法连接数据库!请检查网络')
+              this.$config.err_notice(this, '无法连接数据库!请检查网络')
             })
         }
       },
@@ -293,7 +293,7 @@
                   }
                 })
                 .catch(() => {
-                  this.$config.err_notice('无法连接到Inception!')
+                  this.$config.err_notice(this, '无法连接到Inception!')
                 })
             } else {
               this.$Message.error('请填写sql语句后再测试!')
@@ -321,7 +321,7 @@
                   this.ClearForm()
                 })
                 .catch(error => {
-                  this.$config.err_notice(error)
+                  this.$config.err_notice(this, error)
                 })
             } else {
               this.$Message.error('请填写sql语句后再提交!')
@@ -344,7 +344,7 @@
           this.datalist.computer_roomlist = res.data['custom']
         })
         .catch(error => {
-          this.$config.err_notice(error)
+          this.$config.err_notice(this, error)
         })
       for (let i of this.$config.highlight.split('|')) {
         this.wordList.push({'vl': i, 'meta': '关键字'})

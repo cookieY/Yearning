@@ -7,46 +7,35 @@ from django.http import HttpResponse
 from libs import baseview
 from rest_framework.response import Response
 from core.models import Account, grained
+from core.task import isAdmin
 
 CUSTOM_ERROR = logging.getLogger('Yearning.core.views')
 
 
 class auth_group(baseview.BaseView):
 
+    @isAdmin
     def get(self, request, args: str = None):
         if args == 'all':
-            user = Account.objects.filter(username=request.user).first()
-            if user.id != 1:
-                return HttpResponse(status=401)
+            try:
+                page = request.GET.get('page')
+            except KeyError as e:
+                CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
+                return HttpResponse(status=500)
             else:
                 try:
-                    page = request.GET.get('page')
-                except KeyError as e:
+                    page_number = grained.objects.count()
+                    start = int(page) * 10 - 10
+                    end = int(page) * 10
+                    queryset = grained.objects.order_by('-id').all()[start:end]
+                    ser = []
+                    for i in queryset:
+                        ser.append(
+                            {'id': i.id, 'username': i.username, 'permissions': i.permissions})
+                    return Response({'page': page_number, 'data': ser})
+                except Exception as e:
                     CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
-                    return HttpResponse(status=500)
-                else:
-                    try:
-                        page_number = grained.objects.count()
-                        start = int(page) * 10 - 10
-                        end = int(page) * 10
-                        queryset = grained.objects.order_by('-id').all()[start:end]
-                        ser = []
-                        for i in queryset:
-                            ser.append(
-                                {'id': i.id, 'username': i.username, 'permissions': i.permissions})
-                        return Response({'page': page_number, 'data': ser})
-                    except Exception as e:
-                        CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
-                        return HttpResponse(e)
-
-        elif args == 'permissions':
-            try:
-                group_name = request.GET.get('group_name')
-                group = grained.objects.filter(username=group_name).first()
-                return Response(group.permissions)
-            except Exception as e:
-                CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
-                return HttpResponse(e)
+                    return HttpResponse(e)
 
         elif args == 'group_name':
             try:
@@ -57,6 +46,7 @@ class auth_group(baseview.BaseView):
                 CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
                 return HttpResponse(e)
 
+    @isAdmin
     def post(self, request, args: str = None):
         try:
             group_name = request.data['groupname']
@@ -67,6 +57,7 @@ class auth_group(baseview.BaseView):
             CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
             return HttpResponse(e)
 
+    @isAdmin
     def put(self, request, args: str = None):
         if args == 'group_list':
             try:
@@ -141,6 +132,7 @@ class auth_group(baseview.BaseView):
                 CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
                 return HttpResponse(e)
 
+    @isAdmin
     def delete(self, request, args: str = None):
         user = Account.objects.all().values('username', 'auth_group')
         for i in user:

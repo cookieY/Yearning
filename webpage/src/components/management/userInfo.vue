@@ -447,7 +447,7 @@
             this.formItem = this.$config.mode(res.data.permissions)
           })
           .catch(error => {
-            this.$config.err_notice(error)
+            this.$config.err_notice(this, error)
           })
       },
       getAuthGroup () {
@@ -456,7 +456,7 @@
             this.groupset = res.data.authgroup
           })
           .catch(error => {
-            this.$config.err_notice(error)
+            this.$config.err_notice(this, error)
           })
       },
       editPassModal (row) {
@@ -498,7 +498,7 @@
                 this.editPasswordForm.modal = false
               })
               .catch(error => {
-                this.$config.err_notice(error)
+                this.$config.err_notice(this, error)
               })
             this.savePassLoading = false
           }
@@ -520,7 +520,7 @@
             this.pagenumber = 1
           })
           .catch(error => {
-            this.$config.err_notice(error)
+            this.$config.err_notice(this, error)
           })
         this.savePassLoading = false
       },
@@ -538,7 +538,7 @@
             sessionStorage.setItem('real_name', this.real_name)
           })
           .catch(error => {
-            this.$config.err_notice(error)
+            this.$config.err_notice(this, error)
           })
       },
       registered () {
@@ -563,19 +563,19 @@
               })
               .catch(error => {
                 this.loading = false
-                this.$config.err_notice(error)
+                this.$config.err_notice(this, error)
               })
           }
         })
       },
       refreshUser (vl = 1) {
-        axios.get(`${this.$config.url}/userinfo/all?page=${vl}&user=${this.query.user}&department=${this.query.department}&valve=${this.query.valve}`)
+        axios.get(`${this.$config.url}/userinfo/all?page=${vl}&username=${this.query.user}&department=${this.query.department}&valve=${this.query.valve}`)
           .then(res => {
             this.tableData = res.data.data
             this.pagenumber = parseInt(res.data.page)
           })
           .catch(error => {
-            this.$config.err_notice(error)
+            this.$config.err_notice(this, error)
           })
       },
       delUser () {
@@ -588,7 +588,7 @@
               this.refreshUser()
             })
             .catch(error => {
-              this.$config.err_notice(error)
+              this.$config.err_notice(this, error)
             })
         } else {
           this.$Message.error('用户名不一致!请重新操作!')
@@ -611,7 +611,7 @@
           this.connectionList.multi = res.data['multi']
         })
         .catch(error => {
-          this.$config.err_notice(error)
+          this.$config.err_notice(this, error)
         })
     }
   }

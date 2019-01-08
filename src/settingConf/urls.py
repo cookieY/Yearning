@@ -6,7 +6,6 @@ from rest_framework.urlpatterns import format_suffix_patterns
 
 from core.api.user import (
     userinfo,
-    authgroup,
     ldapauth,
     login_auth,
     login_register
@@ -55,7 +54,6 @@ urlpatterns = [
     url(r'^api/v1/gensql/(.*)', gen_sql.as_view()),
     url(r'^api/v1/management_db/(.*)', management_db.as_view()),
     url(r'^api/v1/audit_sql', audit.as_view()),
-    url(r'^api/v1/auth_twice', authgroup.as_view()),
     url(r'^api/v1/sqlsyntax/(.*)', sqlorder.as_view()),
     url(r'^api/v1/record/(.*)', record_order.as_view()),
     url(r'^api/v1/homedata/(.*)', dashboard.as_view()),
