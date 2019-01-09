@@ -42,10 +42,6 @@ class audit(baseview.SuperUserpermissions):
         try:
             page = request.GET.get('page')
             qurey = json.loads(request.GET.get('query'))
-            picker = []
-            for i in qurey['picker']:
-                picker.append(str(i).split('T')[0])
-            print(qurey['picker'])
         except KeyError as e:
             CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
             return HttpResponse(status=500)
@@ -53,20 +49,29 @@ class audit(baseview.SuperUserpermissions):
             try:
                 un_init = util.init_conf()
                 custom_com = ast.literal_eval(un_init['other'])
-                page_number = SqlOrder.objects.filter(assigned=request.user).count()
                 start = (int(page) - 1) * 20
                 end = int(page) * 20
-                if qurey['picker'][0] == '':
-                    info = SqlOrder.objects.raw(
-                        '''
-                        select o.id,o.work_id,o.text,o.backup,o.date,o.assigned,
-                        o.username,o.real_name,o.status,o.basename,o.delay,core_databaselist.connection_name, \
-                        core_databaselist.computer_room from core_sqlorder as o \
-                        INNER JOIN core_databaselist on \
-                        o.bundle_id = core_databaselist.id where o.assigned = '%s' and work_id like \
-                        ORDER BY o.id desc
-                        ''' % request.user
-                    )[start:end]
+                if qurey['valve']:
+                    if qurey['picker'][0] == '':
+                        info = SqlOrder.objects.filter(assigned=request.user,
+                                                       username__contains=qurey['user']).order_by('-id')[
+                               start:end]
+                        page_number = SqlOrder.objects.filter(assigned=request.user,
+                                                              username__contains=qurey['user']).count()
+                    else:
+                        picker = []
+                        for i in qurey['picker']:
+                            picker.append(str(i).split('T')[0])
+                        info = SqlOrder.objects.filter(assigned=request.user, username__contains=qurey['user'],
+                                                       date__gte=picker[0], date__lte=picker[1]).order_by('-id')[
+                               start:end]
+                        page_number = SqlOrder.objects.filter(assigned=request.user,
+                                                              username__contains=qurey['user'], date__gte=picker[0],
+                                                              date__lte=picker[1]).count()
+
+                else:
+                    page_number = SqlOrder.objects.filter(assigned=request.user).count()
+                    info = SqlOrder.objects.filter(assigned=request.user).order_by('-id')[start:end]
                 data = util.ser(info)
                 info = Account.objects.filter(group='perform').all()
                 ser = serializers.UserINFO(info, many=True)
@@ -215,8 +220,10 @@ class getsql(baseview.BaseView):
 
     def get(self, request, args: str = None):
         id = request.GET.get('id')
+        bundle = request.GET.get('bundle_id')
+        baseCon = DatabaseList.objects.filter(id=bundle).first()
         sql = SqlOrder.objects.filter(id=id).first()
-        return Response(sql.sql)
+        return Response({'sql': sql.sql, 'comRoom': baseCon.computer_room, 'conn': baseCon.connection_name})
 
 
 def push_message(message=None, type=None, user=None, to_addr=None, work_id=None, status=None):

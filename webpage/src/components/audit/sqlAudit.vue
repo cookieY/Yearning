@@ -79,7 +79,7 @@
               </FormItem>
               <FormItem>
                 <Button type="success" @click="queryData">查询</Button>
-                <Button type="primary">重置</Button>
+                <Button type="primary" @click="queryCancel">重置</Button>
               </FormItem>
             </Form>
             <Table border :columns="columns6" :data="tmp" stripe ref="selection"
@@ -478,7 +478,8 @@
           picker: [],
           user: '',
           valve: false
-        }
+        },
+        stepPage: 1
       }
     },
     methods: {
@@ -488,13 +489,16 @@
         this.dataId = []
         this.modal2 = true
         this.formitem = this.tmp[index]
+        console.log(this.formitem)
         this.tmp[index].status === 2 ? this.switch_show = true : this.switch_show = false
-        axios.get(`${this.$config.url}/getsql?id=${this.formitem.id}`)
+        axios.get(`${this.$config.url}/getsql?id=${this.formitem.id}&bundle_id=${this.formitem.bundle_id}`)
           .then(res => {
-            let tmpSql = res.data.split(';')
+            let tmpSql = res.data.sql.split(';')
             for (let i of tmpSql) {
               this.sql.push({'sql': i})
             }
+            this.formitem.computer_room = res.data.comRoom
+            this.formitem.connection_name = res.data.conn
           })
           .catch(err => {
             this.$config.err_notice(this, err)
@@ -513,6 +517,7 @@
             .then(res => {
               this.$config.notice(res.data)
               this.modal2 = false
+              this.stepPageNumber(this.stepPage)
             })
             .catch(error => {
               this.$config.err_notice(this, error)
@@ -529,7 +534,7 @@
         })
           .then(res => {
             this.$config.notice(res.data)
-            this.$refs.page.currentPage = 1
+            this.stepPageNumber(this.stepPage)
           })
           .catch(error => {
             this.$config.err_notice(this, error)
@@ -548,8 +553,7 @@
         })
           .then(res => {
             this.$config.notice(res.data)
-            this.refreshData()
-            this.$refs.page.currentPage = 1
+            this.stepPageNumber(this.stepPage)
           })
           .catch(error => {
             this.$config.err_notice(this, error)
@@ -646,11 +650,19 @@
         }
       },
       queryData () {
+        this.find.valve = true
         this.refreshData()
+      },
+      queryCancel () {
+        this.find = this.$config.clearObj(this.find)
+        this.refreshData()
+      },
+      stepPageNumber (vl) {
+        this.stepPage = vl
+        this.refreshData(vl)
       }
     },
     mounted () {
-      this.find.valve = true
       this.refreshData()
     },
     destroyed () {
