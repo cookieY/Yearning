@@ -25,12 +25,7 @@ class order(baseview.BaseView):
                     username=request.user).count()
                 start = (int(page) - 1) * 20
                 end = int(page) * 20
-                info = SqlOrder.objects.raw(
-                    "select core_sqlorder.*,core_databaselist.connection_name,\
-                    core_databaselist.computer_room from core_sqlorder INNER JOIN \
-                    core_databaselist on core_sqlorder.bundle_id = core_databaselist.id \
-                    WHERE core_sqlorder.username = '%s'ORDER BY core_sqlorder.id DESC "
-                    % request.user)[start:end]
+                info = SqlOrder.objects.filter(username=request.user).order_by('-id')[start:end]
                 data = util.ser(info)
                 return Response({'page': page_number, 'data': data})
             except Exception as e:

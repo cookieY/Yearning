@@ -45,8 +45,12 @@
           <Icon type="md-apps"/>
           数据库详情表
         </p>
+        <Input v-model="query.connection_name" placeholder="请填写连接名" style="width: 20%" clearable></Input>
+        <Input v-model="query.computer_room" placeholder="请填写机房" style="width: 20%" clearable></Input>
+        <Button @click="queryData" type="primary">查询</Button>
+        <Button @click="queryCancel" type="warning">重置</Button>
         <div class="edittable-con-1">
-          <Table :columns="columns" :data="tableData" height="550">
+          <Table :columns="columns" :data="tableData">
             <template slot-scope="{ row, index }" slot="action">
               <Button type="info" size="small" @click="viewConnectionModal(row)" style="margin-right: 5px">查看</Button>
               <Button type="success" size="small" @click="dingInfoModal(row)" style="margin-right: 5px">钉钉消息</Button>
@@ -60,7 +64,7 @@
           </Table>
         </div>
         <br>
-        <Page :total="pagenumber" show-elevator @on-change="stepPageNumber" :page-size="10" ref="totol"></Page>
+        <Page :total="pagenumber" show-elevator @on-change="getPageInfo" :page-size="10" ref="page"></Page>
       </Card>
     </Col>
 
@@ -191,7 +195,11 @@
         },
         baseinfo: false,
         editbaseinfo: {},
-        stepPage: Number
+        query: {
+          computer_room: '',
+          connection_name: '',
+          valve: false
+        }
       }
     },
     methods: {
@@ -234,7 +242,7 @@
             })
               .then(() => {
                 this.$config.notice('数据库信息添加成功,请对相应用户赋予该数据库访问权限!')
-                this.stepPageNumber(this.stepPage)
+                this.getPageInfo(this.$refs.page.currentPage)
               })
               .catch(error => {
                 this.$config.err_notice(this, error)
@@ -252,7 +260,7 @@
         this.ding.modal = true
       },
       delConnection (vl) {
-        let step = this.stepPage
+        let step = this.$refs.page.currentPage
         if (this.tableData.length === 1) {
           step = step - 1
         }
@@ -266,7 +274,7 @@
           })
       },
       getPageInfo (vl = 1) {
-        axios.get(`${this.$config.url}/management_db/all/?page=${vl}&permissions_type=base`)
+        axios.get(`${this.$config.url}/management_db/all/?page=${vl}&permissions_type=base&con=${JSON.stringify(this.query)}`)
           .then(res => {
             [this.tableData, this.pagenumber, this.comList] = [res.data.data, parseInt(res.data.page), res.data.custom]
           })
@@ -282,7 +290,7 @@
         })
           .then(() => {
             this.$config.notice('钉钉推送消息已设置成功!')
-            this.getPageInfo(this.stepPage)
+            this.getPageInfo(this.$refs.page.currentPage)
             this.ding.modal = false
           })
           .catch(error => {
@@ -296,9 +304,13 @@
           .then(res => this.$config.notice(res.data))
           .catch(err => this.$config.err_notice(this, err))
       },
-      stepPageNumber (vl) {
-        this.stepPage = vl
-        this.getPageInfo(vl)
+      queryData () {
+        this.query.valve = true
+        this.getPageInfo()
+      },
+      queryCancel () {
+        this.$config.clearObj(this.query)
+        this.getPageInfo()
       }
     },
     mounted () {

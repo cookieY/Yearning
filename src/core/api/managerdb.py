@@ -46,6 +46,7 @@ class management_db(baseview.SuperUserpermissions):
 
         try:
             page = request.GET.get('page')
+            con = json.loads(request.GET.get('con'))
         except KeyError as e:
             CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
             return HttpResponse(status=500)
@@ -53,10 +54,16 @@ class management_db(baseview.SuperUserpermissions):
             try:
                 un_init = util.init_conf()
                 custom_com = ast.literal_eval(un_init['other'])
-                page_number = DatabaseList.objects.count()
                 start = int(page) * 10 - 10
                 end = int(page) * 10
-                info = DatabaseList.objects.all().order_by('connection_name')[start:end]
+                if con['valve']:
+                    page_number = DatabaseList.objects.filter(connection_name__contains=con['connection_name'],
+                                                              computer_room__contains=con['computer_room']).count()
+                    info = DatabaseList.objects.filter(connection_name__contains=con['connection_name'],
+                                                             computer_room__contains=con['computer_room'])[start:end]
+                else:
+                    page_number = DatabaseList.objects.count()
+                    info = DatabaseList.objects.all().order_by('connection_name')[start:end]
                 serializers = Sqllist(info, many=True)
 
                 return Response(

@@ -65,12 +65,18 @@
               </Button>
               <Button type="info" size="small" @click="editAuthModal(row)" style="margin-right: 5px">权限组</Button>
               <Button type="success" size="small" @click="editEmailModal(row)" style="margin-right: 5px">邮箱</Button>
-              <Button type="warning" size="small" @click="deleteUserModal(row)" v-if="row.id !== 1">删除</Button>
+              <Poptip
+                confirm
+                title="确定删除改用户吗？"
+                transfer
+                @on-ok="delUser(row)">
+                <Button type="warning" size="small" v-if="row.id !== 1">删除</Button>
+              </Poptip>
             </template>
           </Table>
         </div>
         <br>
-        <Page :total="pagenumber" show-elevator @on-change="refreshUser" :page-size="10" ref="total"></Page>
+        <Page :total="pagenumber" show-elevator @on-change="refreshUser" :page-size="10" ref="page"></Page>
       </Card>
     </Col>
 
@@ -158,22 +164,6 @@
       <div slot="footer">
         <Button type="text" @click="editAuthForm.modal = false">取消</Button>
         <Button type="primary" :loading="savePassLoading" @click="saveAuthInfo">保存</Button>
-      </div>
-    </Modal>
-
-    <Modal v-model="deluser.modal" :closable='false' :mask-closable=false :width="500">
-      <h3 slot="header" style="color:#2D8CF0">删除用户</h3>
-      <Form :label-width="100" label-position="right">
-        <FormItem label="用户名">
-          <Input v-model="username" readonly="readonly"></Input>
-        </FormItem>
-        <FormItem label="请输入用户名">
-          <Input v-model="deluser.confirmUser" placeholder="请确认用户名"></Input>
-        </FormItem>
-      </Form>
-      <div slot="footer">
-        <Button type="text" @click="cancelModal(deluser)">取消</Button>
-        <Button type="warning" @click="delUser">删除</Button>
       </div>
     </Modal>
 
@@ -429,10 +419,6 @@
         real_name: '',
         // 用户名
         username: '',
-        deluser: {
-          modal: false,
-          confirmUser: ''
-        },
         connectionList: {
           multi: Boolean
         },
@@ -478,10 +464,6 @@
         this.email.addr = row.email
         this.real_name = row.real_name
       },
-      deleteUserModal (row) {
-        this.deluser.modal = true
-        this.username = row.username
-      },
       cancelModal (vl) {
         this.$config.clearObj(vl)
       },
@@ -516,8 +498,7 @@
           .then(res => {
             this.$config.notice(res.data)
             this.$config.clearObj(this.editAuthForm)
-            this.refreshUser()
-            this.pagenumber = 1
+            this.refreshUser(this.$refs.page.currentPage)
           })
           .catch(error => {
             this.$config.err_notice(this, error)
@@ -533,8 +514,7 @@
           .then(res => {
             this.$config.notice(res.data)
             this.email.modal = false
-            this.pagenumber = 1
-            this.refreshUser()
+            this.refreshUser(this.$refs.page.currentPage)
             sessionStorage.setItem('real_name', this.real_name)
           })
           .catch(error => {
@@ -557,8 +537,7 @@
               .then(res => {
                 this.loading = false
                 this.$config.notice(res.data)
-                this.refreshUser()
-                this.pagenumber = 1
+                this.refreshUser(this.$refs.page.currentPage)
                 this.userinfo = this.$config.clearObj(this.userinfo)
               })
               .catch(error => {
@@ -578,21 +557,19 @@
             this.$config.err_notice(this, error)
           })
       },
-      delUser () {
-        if (this.username === this.deluser.confirmUser) {
-          axios.delete(this.$config.url + '/userinfo/' + this.username)
-            .then(res => {
-              this.$config.notice(res.data)
-              this.$config.clearObj(this.deluser)
-              this.pagenumber = 1
-              this.refreshUser()
-            })
-            .catch(error => {
-              this.$config.err_notice(this, error)
-            })
-        } else {
-          this.$Message.error('用户名不一致!请重新操作!')
+      delUser (row) {
+        let step = this.$refs.page.currentPage
+        if (this.tableData.length === 1) {
+          step = step - 1
         }
+        axios.delete(`${this.$config.url}/userinfo/${row.username}`)
+          .then(res => {
+            this.$config.notice(res.data)
+            this.refreshUser(step)
+          })
+          .catch(error => {
+            this.$config.err_notice(this, error)
+          })
       },
       queryData () {
         this.query.valve = true
