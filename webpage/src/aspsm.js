@@ -7,7 +7,7 @@ import util from './libs/util'
 Vue.use(Vuex)
 const store = new Vuex.Store({
   state: {
-    // 数据库登陆信息
+    // 数据库登录信息
     formItem: {
       input: '',
       sqladdress: '',
