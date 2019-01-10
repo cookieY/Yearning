@@ -39,7 +39,7 @@
     - 支持限制邮箱后缀名的有限注册功能
 - 其他
     - todoList
-    - LDAP登陆  
+    - LDAP登录  
     - 动态配置 
 
 ## Environment 环境

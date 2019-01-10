@@ -260,7 +260,7 @@ class login_auth(baseview.AnyLogin):
     def post(self, request, args: str = None):
 
         '''
-        普通登陆类型认证
+        普通登录类型认证
         :return: jwt token
         '''
 
