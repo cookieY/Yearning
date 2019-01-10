@@ -51,7 +51,8 @@ class auth_group(baseview.BaseView):
         try:
             group_name = request.data['groupname']
             permissions = json.loads(request.data['permission'])
-            grained.objects.get_or_create(username=group_name, permissions=permissions)
+            grained.objects.get_or_create(
+                username=group_name, permissions=permissions)
             return Response('权限组已创建!')
         except Exception as e:
             CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
@@ -104,14 +105,13 @@ class auth_group(baseview.BaseView):
                     if group == "guest":
                         pr = 0
                     if not authgroup:
-                        Account.objects.filter(username=username).update(group=group,
-                                                                         department=department, auth_group=None,
-                                                                         is_staff=pr)
+                        Account.objects.filter(username=username).update(
+                            group=group, department=department, auth_group=None, is_staff=pr
+                        )
                     else:
                         auth_group_str = (",".join(authgroup))
-                        Account.objects.filter(username=username).update(group=group,
-                                                                         department=department,
-                                                                         auth_group=auth_group_str, is_staff=pr)
+                        Account.objects.filter(username=username).update(
+                            group=group, department=department, auth_group=auth_group_str, is_staff=pr)
                     return Response('权限保存成功!')
                 except Exception as e:
                     CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
@@ -126,7 +126,8 @@ class auth_group(baseview.BaseView):
                     if permissions[i] == '0':
                         index = f'{i}con'
                         permissions[index] = []
-                grained.objects.filter(username=group_name).update(permissions=permissions)
+                grained.objects.filter(username=group_name).update(
+                    permissions=permissions)
                 return Response('权限组更新成功!')
             except Exception as e:
                 CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
@@ -141,6 +142,7 @@ class auth_group(baseview.BaseView):
                 for c in auth_list:
                     if c == args:
                         auth_list.remove(c)
-                Account.objects.filter(username=i['username']).update(auth_group=','.join(auth_list))
+                Account.objects.filter(username=i['username']).update(
+                    auth_group=','.join(auth_list))
         grained.objects.filter(username=args).delete()
         return Response('权限组删除成功！')

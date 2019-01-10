@@ -7,18 +7,16 @@ Some tool sets
 cookie
 
 '''
-
-from urllib import request
-from collections import namedtuple
-from libs import con_database
 import json
 import random
 import ssl
 import time
-import ldap3
-from ldap3 import Connection, SUBTREE
 import configparser
 import ast
+from urllib import request
+from collections import namedtuple
+import ldap3
+from libs import con_database
 
 _conf = configparser.ConfigParser()
 _conf.read('deploy.conf')
@@ -77,7 +75,8 @@ def conf_path() -> object:
     '''
     读取配置文件属性
     '''
-    conf_set = namedtuple("name", ["db", "address", "port", "username", "password", "ipaddress"])
+    conf_set = namedtuple(
+        "name", ["db", "address", "port", "username", "password", "ipaddress"])
 
     return conf_set(_conf.get('mysql', 'db'), _conf.get('mysql', 'address'),
                     _conf.get('mysql', 'port'), _conf.get('mysql', 'username'),
@@ -101,7 +100,7 @@ def test_auth(username, password, host, type, sc, domain, ou):
             res = c.search(
                 search_base=sc,
                 search_filter='(cn={})'.format(username),
-                search_scope=SUBTREE,
+                search_scope=ldap3.SUBTREE,
                 attributes=['cn', 'uid', 'mail'],
             )
             if res:
@@ -111,19 +110,20 @@ def test_auth(username, password, host, type, sc, domain, ou):
 
                 # check password by dn
                 try:
-                    conn2 = Connection(ldap3.Server(host, get_info=ldap3.ALL), user=dn, password=password,
-                                       check_names=True, lazy=False, raise_exceptions=False)
+                    conn2 = ldap3.Connection(ldap3.Server(host, get_info=ldap3.ALL), user=dn, password=password,
+                                             check_names=True, lazy=False, raise_exceptions=False)
                     conn2.bind()
                     if conn2.result["description"] == "success":
-                        print((True, attr_dict["mail"], attr_dict["cn"], attr_dict["uid"]))
+                        print(
+                            (True, attr_dict["mail"], attr_dict["cn"], attr_dict["uid"]))
                         c.unbind()
                         conn2.unbind()
                         return True
                     else:
                         print("auth fail")
                         return False
-                except:
-                    print("auth fail")
+                except Exception as e:
+                    print(e)
                     return False
         else:
             return True
@@ -157,7 +157,7 @@ def auth(username, password):
             res = c.search(
                 search_base=LDAP_SCBASE,
                 search_filter='(cn={})'.format(username),
-                search_scope=SUBTREE,
+                search_scope=ldap3.SUBTREE,
                 attributes=['cn', 'uid', 'mail'],
             )
             if res:
@@ -167,19 +167,20 @@ def auth(username, password):
 
                 # check password by dn
                 try:
-                    conn2 = Connection(ldap3.Server(LDAP_SERVER, get_info=ldap3.ALL), user=dn, password=password,
-                                       check_names=True, lazy=False, raise_exceptions=False)
+                    conn2 = ldap3.Connection(ldap3.Server(LDAP_SERVER, get_info=ldap3.ALL), user=dn, password=password,
+                                             check_names=True, lazy=False, raise_exceptions=False)
                     conn2.bind()
                     if conn2.result["description"] == "success":
-                        print((True, attr_dict["mail"], attr_dict["cn"], attr_dict["uid"]))
+                        print(
+                            (True, attr_dict["mail"], attr_dict["cn"], attr_dict["uid"]))
                         c.unbind()
                         conn2.unbind()
                         return True
                     else:
                         print("auth fail")
                         return False
-                except:
-                    print("auth fail")
+                except Exception as e:
+                    print(e)
                     return False
         else:
             return True
@@ -189,11 +190,12 @@ def auth(username, password):
 
 def init_conf():
     with con_database.SQLgo(
-            ip=_conf.get('mysql', 'address'),
-            user=_conf.get('mysql', 'username'),
-            password=_conf.get('mysql', 'password'),
-            db=_conf.get('mysql', 'db'),
-            port=_conf.get('mysql', 'port')) as f:
-        res = f.query_info("select * from core_globalpermissions where authorization = 'global'")
+        ip=_conf.get('mysql', 'address'),
+        user=_conf.get('mysql', 'username'),
+        password=_conf.get('mysql', 'password'),
+        db=_conf.get('mysql', 'db'),
+        port=_conf.get('mysql', 'port')) as f:
+        res = f.query_info(
+            "select * from core_globalpermissions where authorization = 'global'")
 
     return res[0]

@@ -13,7 +13,8 @@ from core.models import (
     DatabaseList,
     SqlRecord,
     SqlOrder,
-    grained
+    grained,
+    query_order
 )
 
 CUSTOM_ERROR = logging.getLogger('Yearning.core.views')
@@ -175,6 +176,7 @@ class management_db(baseview.SuperUserpermissions):
                     SqlRecord.objects.filter(workid=work_id).delete()
                     SqlOrder.objects.filter(bundle_id=con_id.id).delete()
                     DatabaseList.objects.filter(connection_name=args).delete()
+                    query_order.objects.filter(connection_name=args).update(query_per=3)
                 per = grained.objects.all().values('username', 'permissions')
                 for i in per:
                     for c in i['permissions']:

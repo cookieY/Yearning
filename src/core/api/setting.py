@@ -2,7 +2,6 @@ import logging
 import json
 from libs import baseview, util
 from rest_framework.response import Response
-from core.task import set_auth_group
 from core.models import globalpermissions, Account
 from django.http import HttpResponse
 

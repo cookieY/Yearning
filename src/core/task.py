@@ -141,13 +141,13 @@ class order_push_message(threading.Thread):
             detail = DatabaseList.objects.filter(id=self.order.bundle_id).first()
 
             with call_inception.Inception(
-                    LoginDic={
-                        'host': detail.ip,
-                        'user': detail.username,
-                        'password': detail.password,
-                        'db': self.order.basename,
-                        'port': detail.port
-                    }
+                LoginDic={
+                    'host': detail.ip,
+                    'user': detail.username,
+                    'password': detail.password,
+                    'db': self.order.basename,
+                    'port': detail.port
+                }
             ) as f:
                 res = f.Execute(sql=self.order.sql, backup=self.order.backup)
                 for i in res:
@@ -200,9 +200,9 @@ class order_push_message(threading.Thread):
             try:
                 util.dingding(
                     content='工单执行通知\n工单编号:%s\n发起人:%s\n地址:%s\n工单备注:%s\n状态:已执行\n备注:%s'
-                            % (
-                                self.order.work_id, self.order.username, self.addr_ip, self.order.text,
-                                content.after),
+                    % (
+                        self.order.work_id, self.order.username, self.addr_ip, self.order.text,
+                        content.after),
                     url=ding_url())
             except Exception as e:
                 CUSTOM_ERROR.error(f'{e.__class__.__name__}--钉钉推送失败: {e}')
@@ -260,7 +260,8 @@ class rejected_push_messages(threading.Thread):
             try:
                 util.dingding(
                     content='工单驳回通知\n工单编号:%s\n发起人:%s\n地址:%s\n驳回说明:%s\n状态:驳回'
-                            % (self._tmpData['work_id'], self.to_user, self.addr_ip, self.text), url=ding_url())
+                    % (self._tmpData['work_id'], self.to_user, self.addr_ip, self.text),
+                    url=ding_url())
             except Exception as e:
                 CUSTOM_ERROR.error(f'{e.__class__.__name__}--钉钉推送失败: {e}')
         if tag.message['mail']:
@@ -318,7 +319,8 @@ class submit_push_messages(threading.Thread):
             try:
                 util.dingding(
                     content='工单提交通知\n工单编号:%s\n发起人:%s\n地址:%s\n工单说明:%s\n状态:已提交\n备注:%s'
-                            % (self.workId, self.user, self.addr_ip, self.text, content.before), url=ding_url())
+                    % (self.workId, self.user, self.addr_ip, self.text, content.before),
+                    url=ding_url())
             except Exception as e:
                 CUSTOM_ERROR.error(f'{e.__class__.__name__}--钉钉推送失败: {e}')
         if tag.message['mail']:

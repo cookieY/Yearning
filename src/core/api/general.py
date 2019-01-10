@@ -43,7 +43,8 @@ class addressing(baseview.BaseView):
                     permission_spec = set_auth_group(request.user)
                     if permission_spec['query'] == '1':
                         for i in permission_spec['querycon']:
-                            con_instance = DatabaseList.objects.filter(connection_name=i).first()
+                            con_instance = DatabaseList.objects.filter(
+                                connection_name=i).first()
                             if con_instance:
                                 con_name.append(
                                     {
@@ -60,7 +61,8 @@ class addressing(baseview.BaseView):
                     _type = request.data['permissions_type'] + 'con'
                     permission_spec = set_auth_group(request.user)
                     for i in permission_spec[_type]:
-                        con_instance = DatabaseList.objects.filter(connection_name=i).first()
+                        con_instance = DatabaseList.objects.filter(
+                            connection_name=i).first()
                         if con_instance:
                             con_name.append(
                                 {
@@ -94,10 +96,10 @@ class addressing(baseview.BaseView):
                 _connection = DatabaseList.objects.filter(id=con_id).first()
                 try:
                     with con_database.SQLgo(
-                            ip=_connection.ip,
-                            user=_connection.username,
-                            password=_connection.password,
-                            port=_connection.port
+                        ip=_connection.ip,
+                        user=_connection.username,
+                        password=_connection.password,
+                        port=_connection.port
                     ) as f:
                         res = f.baseItems(sql='show databases')
                         exclude_db = serachsql.exclued_db_list()
@@ -120,11 +122,11 @@ class addressing(baseview.BaseView):
                 _connection = DatabaseList.objects.filter(id=con_id).first()
                 try:
                     with con_database.SQLgo(
-                            ip=_connection.ip,
-                            user=_connection.username,
-                            password=_connection.password,
-                            port=_connection.port,
-                            db=basename
+                        ip=_connection.ip,
+                        user=_connection.username,
+                        password=_connection.password,
+                        port=_connection.port,
+                        db=basename
                     ) as f:
                         res = f.baseItems(sql='show tables')
                         return Response(res)
@@ -142,17 +144,19 @@ class addressing(baseview.BaseView):
                 CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
             else:
                 try:
-                    _connection = DatabaseList.objects.filter(id=con_id).first()
+                    _connection = DatabaseList.objects.filter(
+                        id=con_id).first()
                     with con_database.SQLgo(
-                            ip=_connection.ip,
-                            user=_connection.username,
-                            password=_connection.password,
-                            port=_connection.port,
-                            db=basename
+                        ip=_connection.ip,
+                        user=_connection.username,
+                        password=_connection.password,
+                        port=_connection.port,
+                        db=basename
                     ) as f:
                         field = f.gen_alter(table_name=table)
                         idx = f.index(table_name=table)
                         return Response({'idx': idx, 'field': field})
+                        
                 except Exception as e:
                     CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
                     return HttpResponse(status=500)

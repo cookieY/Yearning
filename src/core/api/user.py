@@ -67,8 +67,7 @@ class userinfo(baseview.BaseView):
                         if department != '':
                             page_number = Account.objects.filter(username__contains=user,
                                                                  department__contains=department).count()
-                            user = Account.objects.filter(username__contains=user, department__contains=department)[
-                                   start:end]
+                            user = Account.objects.filter(username__contains=user, department__contains=department)[start:end]
                         else:
                             page_number = Account.objects.filter(username__contains=user).count()
                             user = Account.objects.filter(username__contains=user)[start:end]
@@ -205,8 +204,6 @@ class ldapauth(baseview.AnyLogin):
         except KeyError as e:
             CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
         else:
-            jwt_payload_handler = api_settings.JWT_PAYLOAD_HANDLER
-            jwt_encode_handler = api_settings.JWT_ENCODE_HANDLER
             valite = util.auth(username=username, password=password)
             if valite:
                 user = Account.objects.filter(username=username).first()
@@ -234,8 +231,8 @@ class login_register(baseview.AnyLogin):
 
     def post(self, request, args=None):
         try:
-            userinfo = json.loads(request.data['userinfo'])
-            _send_mail = send_email(to_addr=userinfo['email'])
+            userdata = json.loads(request.data['userinfo'])
+            _send_mail = send_email(to_addr=userdata['email'])
             _status, _message = _send_mail.email_check()
             if _status != 200:
                 return Response(data=_message)
@@ -245,14 +242,14 @@ class login_register(baseview.AnyLogin):
         else:
             try:
                 user = Account.objects.create_user(
-                    username=userinfo['username'],
-                    password=userinfo['password'],
-                    department=userinfo['department'],
+                    username=userdata['username'],
+                    password=userdata['password'],
+                    department=userdata['department'],
                     group='guest',
-                    email=userinfo['email'],
-                    real_name=userinfo['realname'])
+                    email=userdata['email'],
+                    real_name=userdata['realname'])
                 user.save()
-                return Response('%s 用户注册成功!' % userinfo['username'])
+                return Response('%s 用户注册成功!' % userdata['username'])
             except Exception as e:
                 CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
                 return HttpResponse('用户名已存在，请使用其他用户名注册！')

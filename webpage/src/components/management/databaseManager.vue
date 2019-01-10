@@ -243,6 +243,7 @@
               .then(() => {
                 this.$config.notice('数据库信息添加成功,请对相应用户赋予该数据库访问权限!')
                 this.getPageInfo(this.$refs.page.currentPage)
+                this.$refs['formValidate'].resetFields()
               })
               .catch(error => {
                 this.$config.err_notice(this, error)

@@ -46,10 +46,12 @@ class SQLgo(object):
             result = cursor.fetchall()
             for field in cursor.description:
                 if id == 0:
-                    data_dict.append({'title': field[0], "key": field[0], "fixed": "left", "width": 150})
+                    data_dict.append(
+                        {'title': field[0], "key": field[0], "fixed": "left", "width": 150})
                     id += 1
                 else:
-                    data_dict.append({'title': field[0], "key": field[0], "width": 200})
+                    data_dict.append(
+                        {'title': field[0], "key": field[0], "width": 200})
             len = cursor.rowcount
         return {'data': result, 'title': data_dict, 'len': len}
 
@@ -132,11 +134,6 @@ class SQLgo(object):
             for i in di:
                 self.addDic(dic, i['key_name'], i['column_name'])
             for t in dic:
-                """
-                初始化第一个value
-                将value 数据变为字符串
-                转为字典对象数组
-                """
                 str1 = dic[t][0]
 
                 for i in range(1, len(dic[t])):
