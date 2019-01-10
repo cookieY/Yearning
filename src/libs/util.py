@@ -16,7 +16,7 @@ import random
 import ssl
 import time
 import ldap3
-from ldap3 import Connection, SUBTREE
+from ldap3 import Server, Connection, SUBTREE
 import configparser
 import ast
 
@@ -83,108 +83,59 @@ def conf_path() -> object:
                     _conf.get('mysql', 'port'), _conf.get('mysql', 'username'),
                     _conf.get('mysql', 'password'), _conf.get('host', 'ipaddress'))
 
+class LDAPConnection(object):
+    def __init__(self, url, user, password):
+        server = Server(url, get_info=ldap3.ALL)
+        self.conn = Connection(server, user=user, password=password, check_names=True, lazy=False, raise_exceptions=False)
 
-def test_auth(username, password, host, type, sc, domain, ou):
-    if type == '1':
-        user = username + '@' + domain
-    elif type == '2':
-        user = "uid=%s,%s" % (username, sc)
-    else:
-        user = "cn=%s,%s" % (username, sc)
-    c = ldap3.Connection(
-        ldap3.Server(host, get_info=ldap3.ALL),
-        user=user,
-        password=password)
-    ret = c.bind()
-    if ret:
-        if ou:
-            res = c.search(
-                search_base=sc,
-                search_filter='(cn={})'.format(username),
-                search_scope=SUBTREE,
-                attributes=['cn', 'uid', 'mail'],
-            )
-            if res:
-                entry = c.response[0]
-                dn = entry['dn']
-                attr_dict = entry['attributes']
+    def __enter__(self):
+        self.conn.bind()
+        return self.conn
 
-                # check password by dn
-                try:
-                    conn2 = Connection(ldap3.Server(host, get_info=ldap3.ALL), user=dn, password=password,
-                                       check_names=True, lazy=False, raise_exceptions=False)
-                    conn2.bind()
-                    if conn2.result["description"] == "success":
-                        print((True, attr_dict["mail"], attr_dict["cn"], attr_dict["uid"]))
-                        c.unbind()
-                        conn2.unbind()
-                        return True
-                    else:
-                        print("auth fail")
-                        return False
-                except:
-                    print("auth fail")
-                    return False
-        else:
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.conn.unbind()
+
+def test_auth(url, user, password):
+    with LDAPConnection(url, user, password) as conn:
+        if conn.bind():
             return True
-    else:
-        return False
+    return False
 
 
 def auth(username, password):
     un_init = init_conf()
     ldap = ast.literal_eval(un_init['ldap'])
-    # 后台录入的验证用户信息，连接到ldap后通过查询登陆的用户名所在的OU，DN信息，然后进一步去ldap服务器进行账户和密码验证。
 
-    LDAP_SERVER = ldap['host']
-    LDAP_DOMAIN = ldap['domain']
     LDAP_TYPE = ldap['type']
     LDAP_SCBASE = ldap['sc']
 
     if LDAP_TYPE == '1':
-        user = username + '@' + LDAP_DOMAIN
-    elif LDAP_TYPE == '2':
-        user = "uid=%s,%s" % (username, LDAP_SCBASE)
+        search_filter = '(mail={})'.format(username)
+    elif  LDAP_TYPE == '2':
+        search_filter = '(uid={})'.format(username)
     else:
-        user = "cn=%s,%s" % (username, LDAP_SCBASE)
-    c = ldap3.Connection(
-        ldap3.Server(LDAP_SERVER, get_info=ldap3.ALL),
-        user=user,
-        password=password)
-    ret = c.bind()
-    if ret:
-        if ldap['ou']:
-            res = c.search(
-                search_base=LDAP_SCBASE,
-                search_filter='(cn={})'.format(username),
-                search_scope=SUBTREE,
-                attributes=['cn', 'uid', 'mail'],
-            )
-            if res:
-                entry = c.response[0]
-                dn = entry['dn']
-                attr_dict = entry['attributes']
+        search_filter = '(cn={})'.format(username)
 
-                # check password by dn
-                try:
-                    conn2 = Connection(ldap3.Server(LDAP_SERVER, get_info=ldap3.ALL), user=dn, password=password,
-                                       check_names=True, lazy=False, raise_exceptions=False)
-                    conn2.bind()
-                    if conn2.result["description"] == "success":
-                        print((True, attr_dict["mail"], attr_dict["cn"], attr_dict["uid"]))
-                        c.unbind()
-                        conn2.unbind()
-                        return True
-                    else:
-                        print("auth fail")
-                        return False
-                except:
-                    print("auth fail")
-                    return False
-        else:
-            return True
-    else:
-        return False
+    with LDAPConnection(ldap['url'], ldap['user'], ldap['password']) as conn:
+
+        res = conn.search(
+            search_base=LDAP_SCBASE,
+            search_filter=search_filter,
+            search_scope=SUBTREE,
+            attributes=['cn', 'uid', 'mail'],
+        )
+        if res:
+            entry = conn.response[0]
+            # check password by dn
+            try:
+                if conn.rebind(user=entry['dn'], password=password):
+                    attr_dict = entry['attributes']
+                    print((True, attr_dict["mail"], attr_dict["cn"], attr_dict["uid"]))
+                    return True
+            except Exception as e:
+                print(str(e))
+登录
+    return False
 
 
 def init_conf():

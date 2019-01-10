@@ -42,7 +42,7 @@
             <div class="line-gray"></div>
             <Row class="margin-top-8">
               <Col span="8">
-                <p class="notwrap">登陆时间:</p>
+                <p class="notwrap">登录时间:</p>
               </Col>
               <Col span="16" class="padding-left-8">{{time}}</Col>
             </Row>

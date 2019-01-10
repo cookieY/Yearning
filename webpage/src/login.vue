@@ -23,7 +23,7 @@
       <br>
       <Card>
         <Tabs value="custom" style="max-height: 300px;">
-          <TabPane label="普通登陆" name="custom">
+          <TabPane label="普通登录" name="custom">
             <Form ref="formInline" :model="formInline" :rules="ruleInline" inline>
               <Form-item prop="user" style="width: 100%">
                 <Input v-model="formInline.user" placeholder="Username"></Input>
@@ -40,7 +40,7 @@
             </Form>
           </TabPane>
           <!--自己添加-->
-          <TabPane label="LDAP登陆" name="ldap">
+          <TabPane label="LDAP登录" name="ldap">
             <Form ref="formInline" :model="formInline" :rules="ruleInline" inline>
               <Form-item prop="user" style="width: 100%">
                 <Input v-model="formInline.user" placeholder="ldap_Username"></Input>

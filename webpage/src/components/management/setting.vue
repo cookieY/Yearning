@@ -49,30 +49,24 @@
               <Card style="margin-left: 5%">
                 <p slot="title">LDAP设置</p>
                 <Form :label-width="120">
-                  <FormItem label="LDAP认证类型:">
+                  <FormItem label="服务地址url">
+                    <Input placeholder="[协议名称]://[ip地址或者域名]:[端口号]" v-model="ldap.url"></Input>
+                  </FormItem>
+                  <FormItem label="LDAP管理员DN:">
+                    <Input placeholder="请填写管理员DN" v-model="ldap.user"></Input>
+                  </FormItem>
+                  <FormItem label="LDAP管理员密码:">
+                    <Input placeholder="请填写管理员密码" v-model="ldap.password" type="password"></Input>
+                  </FormItem>
+                  <FormItem label="LDAP登录用户名:">
                     <Select v-model="ldap.type">
-                      <Option value="1">域名认证</Option>
-                      <Option value="2">uid认证</Option>
-                      <Option value="3">cn认证</Option>
+                      <Option value="1">mail</Option>
+                      <Option value="2">uid</Option>
+                      <Option value="3">cn</Option>
                     </Select>
                   </FormItem>
-                  <FormItem label="服务地址:">
-                    <Input placeholder="服务ip地址" v-model="ldap.host"></Input>
-                  </FormItem>
                   <FormItem label="LDAP_SCBASE:">
-                    <Input placeholder="LDAP dc 相关设置,采用域名认证可不填写" v-model="ldap.sc"></Input>
-                  </FormItem>
-                  <FormItem >
-                    <Checkbox v-model="ldap.ou">启用多ou</Checkbox>
-                  </FormItem>
-                  <FormItem label="LDAP_域名:">
-                    <Input placeholder="LDAP Domain" v-model="ldap.domain"></Input>
-                  </FormItem>
-                  <FormItem label="LDAP_测试用户:">
-                    <Input placeholder="请填写测试用户" v-model="ldap.user"></Input>
-                  </FormItem>
-                  <FormItem label="LDAP_测试密码:">
-                    <Input placeholder="请填写测试密码" v-model="ldap.password" type="password"></Input>
+                    <Input placeholder="LDAP Search Base" v-model="ldap.sc"></Input>
                   </FormItem>
                   <Button type="primary" @click="ldap_test()">ldap测试</Button>
                 </Form>
@@ -85,7 +79,7 @@
                   <br>
                   2.请正确填写Inception备份库相关信息，否则将无法获得回滚语句。(无法获得回滚语句的原因有多种这只是其中之一)
                   <br>
-                  3.LDAP登陆建议使用域名方式登陆，如使用其他的方式配置较为繁琐。比如使用uid方式需在LDAP_SCBASE中填写相关dc，cn等相关信息
+                  3.LDAP登录用户名，必须全局唯一。
                 </template>
               </Alert>
             </Col>
@@ -244,13 +238,11 @@
           back_password: ''
         },
         ldap: {
-          type: '',
-          host: '',
-          sc: '',
-          domain: '',
+          url: '',
           user: '',
           password: '',
-          ou: null
+          type: 1,
+          sc: ''
         },
         message: {
           webhook: '',
