@@ -237,7 +237,7 @@
             })
           })
           .catch(() => {
-            this.$config.err_notice(this, '账号密码错误,请重新输入!')
+            this.$config.err_notice('账号密码错误,请重新输入!')
           })
       },
       ldap_login () {
@@ -268,7 +268,7 @@
             }
           })
           .catch(() => {
-            this.$config.err_notice(this, '账号密码错误,请重新输入!')
+            this.$config.err_notice('账号密码错误,请重新输入!')
           })
       }
     },

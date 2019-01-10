@@ -331,7 +331,7 @@
             this.$config.notice(res.data)
           })
           .catch(error => {
-            this.$config.err_notice(this, error)
+            this.$config.err_notice(error)
           })
       },
       dingding_test () {
@@ -342,7 +342,7 @@
             this.$config.notice(res.data)
           })
           .catch(error => {
-            this.$config.err_notice(this, error)
+            this.$config.err_notice(error)
           })
       },
       mail_test () {
@@ -367,7 +367,7 @@
             this.$config.notice(res.data)
           })
           .catch(error => {
-            this.$config.err_notice(this, error)
+            this.$config.err_notice(error)
           })
       }
     },

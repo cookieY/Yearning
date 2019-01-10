@@ -342,7 +342,7 @@
             this.pagenumber = parseInt(res.data.page)
           })
           .catch(error => {
-            this.$config.err_notice(this, error)
+            this.$config.err_notice(error)
           })
       },
       splicpage (page) {
