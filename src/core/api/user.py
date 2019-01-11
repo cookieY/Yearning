@@ -208,7 +208,7 @@ class ldapauth(baseview.AnyLogin):
             if valite:
                 user = Account.objects.filter(username=username).first()
                 if user is not None:
-                    user.set_password(password)
+                    user.set_password(util.workId())
                     user.save()
                     payload = jwt_payload_handler(user)
                     token = jwt_encode_handler(payload)
@@ -216,12 +216,11 @@ class ldapauth(baseview.AnyLogin):
                 else:
                     permissions = Account.objects.create_user(
                         username=username,
-                        password=password,
+                        password=util.workId(),
                         is_staff=0,
                         group='guest')
                     permissions.save()
-                    _user = authenticate(username=username, password=password)
-                    token = jwt_encode_handler(jwt_payload_handler(_user))
+                    token = jwt_encode_handler(jwt_payload_handler(permissions))
                     return Response({'token': token, 'res': '', 'permissions': 'guest'})
             else:
                 return HttpResponse(status=401)
