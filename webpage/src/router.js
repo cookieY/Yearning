@@ -1,7 +1,6 @@
 import Index from './main.vue'
 
-const mainchild = [
-  {
+const mainchild = [{
     path: 'home',
     title: '首页',
     name: 'home_index',
@@ -53,7 +52,7 @@ const mainchild = [
     path: 'myorder',
     name: 'myorder',
     title: '我的工单',
-    'icon': 'person',
+    icon: 'person',
     component: resolve => {
       require(['./components/order/myOrder.vue'], resolve)
     }
@@ -101,8 +100,7 @@ export const page401 = {
   }
 }
 
-export const appRouter = [
-  {
+export const appRouter = [{
     path: '/',
     icon: 'md-home',
     name: 'main',
@@ -119,12 +117,14 @@ export const appRouter = [
     name: 'order',
     title: '工单提交',
     component: Index,
-    children: [
-      {
+    children: [{
         path: 'ddledit',
         name: 'ddledit',
         title: 'DDL',
-        'icon': 'md-git-merge',
+        icon: 'md-git-merge',
+        meta: {
+          keepAlive: true
+        },
         component: resolve => {
           require(['./components/order/ddlOrder.vue'], resolve)
         }
@@ -133,7 +133,10 @@ export const appRouter = [
         path: 'dmledit',
         name: 'dmledit',
         title: 'DML',
-        'icon': 'md-code',
+        icon: 'md-code',
+        meta: {
+          keepAlive: true
+        },
         component: resolve => {
           require(['./components/order/dmlOrder.vue'], resolve)
         }
@@ -146,17 +149,15 @@ export const appRouter = [
     name: 'view',
     title: '查询',
     component: Index,
-    children: [
-      {
-        path: 'serach-sql',
-        name: 'serach-sql',
-        title: 'SQL查询',
-        'icon': 'ios-podium',
-        component: resolve => {
-          require(['./components/query/workFlow.vue'], resolve)
-        }
+    children: [{
+      path: 'serach-sql',
+      name: 'serach-sql',
+      title: 'SQL查询',
+      icon: 'ios-podium',
+      component: resolve => {
+        require(['./components/query/workFlow.vue'], resolve)
       }
-    ]
+    }]
   },
   {
     path: '/audit',
@@ -165,12 +166,11 @@ export const appRouter = [
     title: '审核',
     component: Index,
     access: 0,
-    children: [
-      {
+    children: [{
         path: 'audit-order',
         name: 'audit-audit',
         title: '工单',
-        'icon': 'md-create',
+        icon: 'md-create',
         component: resolve => {
           require(['./components/audit/sqlAudit.vue'], resolve)
         }
@@ -179,7 +179,7 @@ export const appRouter = [
         path: 'audit-permissions',
         name: 'audit-permissions',
         title: '权限',
-        'icon': 'md-share',
+        icon: 'md-share',
         component: resolve => {
           require(['./components/audit/permissions.vue'], resolve)
         }
@@ -188,7 +188,7 @@ export const appRouter = [
         path: 'query-audit',
         name: 'query-audit',
         title: '查询',
-        'icon': 'logo-rss',
+        icon: 'logo-rss',
         component: resolve => {
           require(['./components/audit/queryAudit.vue'], resolve)
         }
@@ -202,12 +202,11 @@ export const appRouter = [
     title: '记录',
     component: Index,
     access: 0,
-    children: [
-      {
+    children: [{
         path: 'query-review',
         name: 'query-review',
         title: '查询审计',
-        'icon': 'md-pulse',
+        icon: 'md-pulse',
         component: resolve => {
           require(['./components/assistantManger/queryRecord.vue'], resolve)
         }
@@ -216,7 +215,7 @@ export const appRouter = [
         path: 'audit-record',
         name: 'audit-record',
         title: '工单记录',
-        'icon': 'md-list',
+        icon: 'md-list',
         component: resolve => {
           require(['./components/assistantManger/record.vue'], resolve)
         }
@@ -230,12 +229,11 @@ export const appRouter = [
     title: '管理',
     access: 0,
     component: Index,
-    children: [
-      {
+    children: [{
         path: 'management-user',
         name: 'management-user',
         title: '用户',
-        'icon': 'md-people',
+        icon: 'md-people',
         component: resolve => {
           require(['./components/management/userInfo.vue'], resolve)
         }
@@ -244,7 +242,7 @@ export const appRouter = [
         path: 'management-database',
         name: 'management-database',
         title: '数据库',
-        'icon': 'md-medal',
+        icon: 'md-medal',
         component: resolve => {
           require(['./components/management/databaseManager.vue'], resolve)
         }
@@ -253,7 +251,7 @@ export const appRouter = [
         path: 'setting',
         name: 'setting',
         title: '设置',
-        'icon': 'md-settings',
+        icon: 'md-settings',
         component: resolve => {
           require(['./components/management/setting.vue'], resolve)
         }
@@ -262,7 +260,7 @@ export const appRouter = [
         path: 'auth-group',
         name: 'auth-group',
         title: '权限组',
-        'icon': 'ios-switch',
+        icon: 'ios-switch',
         component: resolve => {
           require(['./components/management/authGroup.vue'], resolve)
         }

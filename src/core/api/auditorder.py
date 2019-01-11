@@ -51,7 +51,7 @@ class audit(baseview.SuperUserpermissions):
                 start = (int(page) - 1) * 20
                 end = int(page) * 20
                 if qurey['valve']:
-                    if qurey['picker'][0] == '':
+                    if len(qurey['picker']) == 0:
                         info = SqlOrder.objects.filter(assigned=request.user,
                                                        username__contains=qurey['user']).order_by('-id')[start:end]
                         page_number = SqlOrder.objects.filter(assigned=request.user,
@@ -59,7 +59,7 @@ class audit(baseview.SuperUserpermissions):
                     else:
                         picker = []
                         for i in qurey['picker']:
-                            picker.append(str(i).split('T')[0])
+                            picker.append(i)
                         info = SqlOrder.objects.filter(assigned=request.user, username__contains=qurey['user'],
                                                        date__gte=picker[0], date__lte=picker[1]).order_by('-id')[start:end]
                         page_number = SqlOrder.objects.filter(assigned=request.user,

@@ -29,7 +29,8 @@
                 <Input v-model="formInline.user" placeholder="Username"></Input>
               </Form-item>
               <Form-item prop="password" style="width: 100%">
-                <Input type="password" v-model="formInline.password" placeholder="Password" @on-keyup.enter="authdata"></Input>
+                <Input type="password" v-model="formInline.password" placeholder="Password"
+                       @on-keyup.enter="authdata"></Input>
               </Form-item>
               <Form-item style="width: 100%">
                 <Button type="primary" @click="authdata()" style="width: 100%" size="large">登录</Button>
@@ -246,19 +247,19 @@
           'password': this.formInline.password
         })
           .then(res => {
-              axios.defaults.headers.common['Authorization'] = 'JWT ' + res.data['token']
-              sessionStorage.setItem('user', this.formInline.user)
-              sessionStorage.setItem('jwt', `JWT ${res.data['token']}`)
-              sessionStorage.setItem('auth', res.data['permissions'])
-              let auth = res.data['permissions']
-              if (auth === 'admin' || auth === 'perform') {
-                sessionStorage.setItem('access', 0)
-              } else {
-                sessionStorage.setItem('access', 1)
-              }
-              this.$router.push({
-                name: 'home_index'
-              })
+            axios.defaults.headers.common['Authorization'] = 'JWT ' + res.data['token']
+            sessionStorage.setItem('user', this.formInline.user)
+            sessionStorage.setItem('jwt', `JWT ${res.data['token']}`)
+            sessionStorage.setItem('auth', res.data['permissions'])
+            let auth = res.data['permissions']
+            if (auth === 'admin' || auth === 'perform') {
+              sessionStorage.setItem('access', 0)
+            } else {
+              sessionStorage.setItem('access', 1)
+            }
+            this.$router.push({
+              name: 'home_index'
+            })
           })
           .catch(err => {
             this.$config.auth_notice(err)

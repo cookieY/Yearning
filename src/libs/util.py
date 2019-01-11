@@ -11,11 +11,11 @@ import json
 import random
 import ssl
 import time
-from ldap3 import Server, Connection, SUBTREE, ALL
 import configparser
 import ast
 from urllib import request
 from collections import namedtuple
+from ldap3 import Server, Connection, SUBTREE, ALL
 from libs import con_database
 
 _conf = configparser.ConfigParser()
@@ -109,7 +109,7 @@ def auth(username, password):
     LDAP_SCBASE = ldap['sc']
 
     if LDAP_TYPE == '1':
-        search_filter = '(mail={})'.format(username)
+        search_filter = '(sAMAccountName={})'.format(username)
     elif  LDAP_TYPE == '2':
         search_filter = '(uid={})'.format(username)
     else:

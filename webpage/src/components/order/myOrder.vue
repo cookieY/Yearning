@@ -10,6 +10,19 @@
           <Icon type="md-person"></Icon>
           我的工单
         </p>
+        <Form inline ref="queryForm">
+          <FormItem>
+            <Input placeholder="工单说明" v-model="find.text" @on-keyup.enter="queryData"></Input>
+          </FormItem>
+          <FormItem>
+            <DatePicker format="yyyy-MM-dd HH:mm" type="datetimerange" placeholder="请选择查询的时间范围"
+                        v-model="find.picker" @on-change="find.picker=$event" style="width: 250px"></DatePicker>
+          </FormItem>
+          <FormItem>
+            <Button type="success" @click="queryData">查询</Button>
+            <Button type="primary" @click="queryCancel">重置</Button>
+          </FormItem>
+        </Form>
         <Row>
           <Col span="24">
             <Table border :columns="columns" :data="table_data" stripe size="small"></Table>
@@ -84,42 +97,7 @@
                 }
               }, text)
             },
-            sortable: true,
-            filters: [{
-              label: '已执行',
-              value: 1
-            },
-              {
-                label: '驳回',
-                value: 0
-              },
-              {
-                label: '待审核',
-                value: 2
-              },
-              {
-                label: '执行中',
-                value: 3
-              },
-              {
-                label: '执行失败',
-                value: 4
-              }
-            ],
-            //            filterMultiple: false 禁止多选,
-            filterMethod (value, row) {
-              if (value === 1) {
-                return row.status === 1
-              } else if (value === 2) {
-                return row.status === 2
-              } else if (value === 0) {
-                return row.status === 0
-              } else if (value === 3) {
-                return row.status === 3
-              } else {
-                return row.status === 4
-              }
-            }
+            sortable: true
           },
           {
             title: '操作',
@@ -190,12 +168,17 @@
         ],
         page_number: 1,
         computer_room: this.$config.computer_room,
-        table_data: []
+        table_data: [],
+        find: {
+          picker: [],
+          valve: false,
+          text: ''
+        }
       }
     },
     methods: {
       currentpage (vl = 1) {
-        axios.get(`${this.$config.url}/myorder/?page=${vl}`)
+        axios.get(`${this.$config.url}/myorder/?page=${vl}&query=${JSON.stringify(this.find)}`)
           .then(res => {
             this.table_data = res.data.data
             this.table_data.forEach((item) => { (item.backup === 1) ? item.backup = '是' : item.backup = '否' })
@@ -204,6 +187,14 @@
           .catch(error => {
             this.$config.err_notice(this, error)
           })
+      },
+      queryData () {
+        this.find.valve = true
+        this.currentpage()
+      },
+      queryCancel () {
+        this.find = this.$config.clearObj(this.find)
+        this.currentpage()
       }
     },
     mounted () {

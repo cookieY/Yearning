@@ -74,8 +74,8 @@
                 <Input placeholder="账号名" v-model="find.user"></Input>
               </FormItem>
               <FormItem>
-                <DatePicker format="yyyy/MM/dd" type="daterange" placeholder="请选择查询的时间范围"
-                            v-model="find.picker"></DatePicker>
+                <DatePicker format="yyyy-MM-dd HH:mm" type="datetimerange" placeholder="请选择查询的时间范围"
+                            v-model="find.picker" @on-change="find.picker=$event" style="width: 250px"></DatePicker>
               </FormItem>
               <FormItem>
                 <Button type="success" @click="queryData">查询</Button>
