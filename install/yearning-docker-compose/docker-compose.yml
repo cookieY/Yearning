@@ -3,10 +3,11 @@ version: '2'
 services:
   db:
     image: mysql:5.7
+    container_name: yearning_db
     volumes:
-      - ./docker/etc/mysql/:/etc/mysql/conf.d/
-      - ./db_data/:/var/lib/mysql/
-      - ./init-sql/:/docker-entrypoint-initdb.d/
+      - $PWD/yearning/docker/etc/mysql/:/etc/mysql/conf.d/
+      - $PWD/yearning/db_data/:/var/lib/mysql/
+      - $PWD/yearning/init-sql/:/docker-entrypoint-initdb.d/
     restart: always
     ports:
       - "3306:3306"
@@ -15,8 +16,10 @@ services:
       MYSQL_DATABASE: Yearning
       MYSQL_USER: yearning
       MYSQL_PASSWORD: yearning
+
   yearning:
     image: registry.cn-hangzhou.aliyuncs.com/cookie/yearning:v1.3.5
+    container_name: yearning_app
     depends_on: 
       - db
     ports:
@@ -28,5 +31,11 @@ services:
       MYSQL_USER: root
       MYSQL_ADDR: db
 
+  inception:
+    build: inception
+    container_name: yearning_inception
+    ports:
+      - 6669:6669
+    
 # 默认账号：admin，默认密码：Yearning_admin
 # 感谢 eacdy 张功震 贡献
