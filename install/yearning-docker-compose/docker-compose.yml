@@ -16,12 +16,11 @@ services:
       MYSQL_USER: yearning
       MYSQL_PASSWORD: yearning
   yearning:
-    image: registry.cn-hangzhou.aliyuncs.com/cookie/yearning:v1.3.5
+    image: registry.cn-hangzhou.aliyuncs.com/cookie/yearning:latest
     depends_on: 
       - db
     ports:
-      - "8080:80"
-      - "8000:8000"
+      - "8080:8000"
     environment:
       HOST: localhost
       MYSQL_PASSWORD: yearning
