@@ -9,14 +9,6 @@ const mainchild = [{
     }
   },
   {
-    path: 'ownspace',
-    title: '个人中心',
-    name: 'ownspace_index',
-    component: resolve => {
-      require(['./components/personalCenter/own-space.vue'], resolve)
-    }
-  },
-  {
     path: 'queryready',
     title: '查询申请进度',
     name: 'queryready',

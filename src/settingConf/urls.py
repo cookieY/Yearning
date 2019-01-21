@@ -1,7 +1,9 @@
 '''
 url table
 '''
+
 from django.conf.urls import url
+from django.views.generic import TemplateView
 from rest_framework.urlpatterns import format_suffix_patterns
 
 from core.api.user import (
@@ -62,5 +64,6 @@ urlpatterns = [
     url(r'^api/v1/undoOrder', del_order.as_view()),
     url(r'^api/v1/osc/(.*)', osc_step.as_view()),
     url(r'^api-token-auth/', login_auth.as_view()),
+    url(r'^$', TemplateView.as_view(template_name="index.html")),
 ]
 urlpatterns = format_suffix_patterns(urlpatterns)

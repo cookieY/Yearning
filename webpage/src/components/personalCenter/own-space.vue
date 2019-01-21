@@ -4,77 +4,36 @@
 
 <template>
   <div>
-    <Card>
-      <p slot="title">
-        <Icon type="md-person"></Icon>
-        个人信息
-      </p>
-      <div>
-        <Form ref="userForm" :label-width="100" label-position="right">
-          <FormItem label="用户名：" prop="name">
-            <div style="display:inline-block;width:300px;">
-              <span>{{ userForm.username }}</span>
-            </div>
-          </FormItem>
-          <FormItem label="姓名：" prop="name">
-            <div style="display:inline-block;width:300px;">
-              <span>{{ userForm.real_name }}</span>
-            </div>
-          </FormItem>
-          <FormItem label="部门：">
-            <span>{{ userForm.department }}</span>
-          </FormItem>
-          <FormItem label="角色：">
-            <span>{{ userForm.group }}</span>
-          </FormItem>
-          <FormItem label="权限组：">
-            <Tag color="blue" v-for="i in authgroup" :key="i">{{i}}</Tag>
-          </FormItem>
-          <FormItem label="邮箱：">
-            <span>{{ userForm.email }}</span>
-          </FormItem>
-          <FormItem>
-            <Divider orientation="left">DDL权限</Divider>
-            <FormItem label="DDL是否可见:">
-              <p>{{formItem.ddl}}</p>
-            </FormItem>
-            <FormItem label="可访问的连接名:" v-if="formItem.ddl === '是'">
-              <Tag color="blue" v-for="i in formItem.ddlcon" :key="i">{{i}}</Tag>
-            </FormItem>
-            <Divider orientation="left">DML权限</Divider>
-            <FormItem label="DML是否可见:">
-              <p>{{formItem.dml}}</p>
-            </FormItem>
-            <FormItem label="可访问的连接名:" v-if="formItem.dml === '是'">
-              <Tag color="blue" v-for="i in formItem.dmlcon" :key="i">{{i}}</Tag>
-            </FormItem>
-            <Divider orientation="left">查询权限</Divider>
-            <FormItem label="查询是否可见:">
-              <p>{{formItem.query}}</p>
-            </FormItem>
-            <FormItem label="可访问的连接名:" v-if="formItem.query === '是'">
-              <Tag color="blue" v-for="i in formItem.querycon" :key="i">{{i}}</Tag>
-            </FormItem>
-            <Divider orientation="left">上级审核人</Divider>
-            <FormItem>
-              <Tag color="blue" v-for="i in formItem.person" :key="i">{{i}}</Tag>
-            </FormItem>
-            <Divider orientation="left">管理权限</Divider>
-            <FormItem label="用户管理权限:">
-              <p>{{formItem.user}}</p>
-            </FormItem>
-            <FormItem label="数据库管理权限:">
-              <p>{{formItem.base}}</p>
-            </FormItem>
-          </FormItem>
-          <FormItem label="编辑：">
-            <Button type="warning" size="small" @click="editPasswordModal=true">修改密码</Button>
-            <Button type="primary" size="small" @click="openMailChange">修改邮箱/真实姓名</Button>
-            <Button type="success" size="small" @click="editInfoModal = true">权限申请</Button>
-          </FormItem>
-        </Form>
-      </div>
-    </Card>
+    <div>
+      <Form ref="userForm" :label-width="100" label-position="right">
+        <FormItem label="用户名：" prop="name">
+          <div style="display:inline-block;width:300px;">
+            <span>{{ userForm.username }}</span>
+          </div>
+        </FormItem>
+        <FormItem label="姓名：" prop="name">
+          <div style="display:inline-block;width:300px;">
+            <span>{{ userForm.real_name }}</span>
+          </div>
+        </FormItem>
+        <FormItem label="部门：">
+          <span>{{ userForm.department }}</span>
+        </FormItem>
+        <FormItem label="角色：">
+          <span>{{ userForm.group }}</span>
+        </FormItem>
+        <FormItem label="权限组：">
+          <Tag color="blue" v-for="i in authgroup" :key="i">{{i}}</Tag>
+        </FormItem>
+        <FormItem label="邮箱：">
+          <span>{{ userForm.email }}</span>
+        </FormItem>
+          <Button type="warning" size="small" @click="editPasswordModal=true">修改密码</Button>
+          <Button type="primary" size="small" @click="openMailChange">修改邮箱/真实姓名</Button>
+          <Button type="success" size="small" @click="openPerChange">查看/申请权限</Button>
+      </Form>
+    </div>
+
     <Modal v-model="editPasswordModal" :closable='false' :mask-closable=false :width="500">
       <h3 slot="header" style="color:#2D8CF0">修改密码</h3>
       <Form ref="editPasswordForm" :model="editPasswordForm" :label-width="100" label-position="right"
@@ -112,7 +71,7 @@
       <h3 slot="header" style="color:#2D8CF0">权限申请单</h3>
       <Form :label-width="120" label-position="right">
         <FormItem label="权限组" prop="authgroup">
-          <Select v-model="authgroup" multiple @on-change="getgrouplist" placeholder="请选择">
+          <Select v-model="applygroup" multiple @on-change="getgrouplist" placeholder="请选择">
             <Option v-for="list in groupset" :value="list" :key="list">{{ list }}</Option>
           </Select>
           <template>
@@ -248,7 +207,8 @@
           base: '0'
         },
         permission_list: Object,
-        authgroup: []
+        authgroup: [],
+        applygroup: []
       }
     },
     methods: {
@@ -256,8 +216,12 @@
         this.editEmailModal = true
         this.editEmailForm = this.userForm
       },
+      openPerChange () {
+        this.editInfoModal = true
+        this.applygroup = this.authgroup
+      },
       getgrouplist () {
-        axios.put(`${this.$config.url}/authgroup/group_list`, {'group_list': JSON.stringify(this.authgroup)})
+        axios.put(`${this.$config.url}/authgroup/group_list`, {'group_list': JSON.stringify(this.applygroup)})
           .then(res => {
             this.permission_list = res.data.permissions
             this.permission = this.$config.mode(res.data.permissions)
@@ -319,13 +283,14 @@
           .then(res => {
             this.userForm = res.data.userinfo
             this.authgroup = res.data.userinfo.auth_group.split(',')
+            this.applygroup = res.data.userinfo.auth_group.split(',')
             this.formItem = this.$config.mode(res.data.permissons)
           })
       },
       putPermissionData () {
         this.savePassLoading = true
         axios.post(`${this.$config.url}/apply_grained/`, {
-          'auth_group': this.authgroup,
+          'auth_group': this.applygroup,
           'grained_list': JSON.stringify(this.permission_list),
           'real_name': sessionStorage.getItem('real_name')
         })

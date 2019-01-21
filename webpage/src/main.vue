@@ -54,8 +54,7 @@
                   <Icon type="md-arrow-dropdown"/>
                 </a>
                 <DropdownMenu slot="list">
-                  <DropdownItem name="ownSpace">个人中心</DropdownItem>
-                  <DropdownItem name="loginout" divided>退出登录</DropdownItem>
+                  <DropdownItem name="loginout">退出登录</DropdownItem>
                 </DropdownMenu>
               </Dropdown>
               <Avatar :src="avatorPath" style="background: #ffffff;margin-left: 10px;"></Avatar>
@@ -120,7 +119,6 @@ import breadcrumbNav from './main_components/breadcrumbNav.vue'
 import sidebarMenuShrink from './main_components/sidebarMenuShrink.vue'
 import axios from 'axios'
 import { mapState } from 'vuex'
-import util from './libs/util.js'
 
 export default {
   components: {
@@ -157,17 +155,12 @@ export default {
       this.hideMenuText = !this.hideMenuText
     },
     // 个人中心
-    handleClickUserDropdown (name) {
-      if (name === 'ownSpace') {
-        util.openPage(this, 'ownspace_index', '个人中心')
-      } else if (name === 'loginout') {
-        // 退出登录
-        localStorage.clear()
-        sessionStorage.clear()
-        this.$router.push({
-          name: 'login'
-        })
-      }
+    handleClickUserDropdown () {
+      localStorage.clear()
+      sessionStorage.clear()
+      this.$router.push({
+        name: 'login'
+      })
     },
     // 全屏
     handleFullScreen () {

@@ -83,6 +83,7 @@ class search(baseview.BaseView):
         limit = ast.literal_eval(un_init['other'])
         sql = request.data['sql']
         check = str(sql).lower().strip().split(';\n')
+        raw_sql = str(sql).strip().split(';\n')[-1]
         user = query_order.objects.filter(
             username=request.user).order_by('-id').first()
         un_init = util.init_conf()
@@ -109,14 +110,14 @@ class search(baseview.BaseView):
                             return Response('语句中不得含有违禁关键字: update insert alter into for drop')
 
                         if check[-1].startswith('show'):
-                            query_sql = check[-1]
+                            query_sql = raw_sql
                         else:
                             if limit.get('limit').strip() == '':
                                 CUSTOM_ERROR.error('未设置全局最大limit值，系统自动设置为1000')
-                                query_sql = replace_limit(check[-1], 1000)
+                                query_sql = replace_limit(raw_sql, 1000)
                             else:
                                 query_sql = replace_limit(
-                                    check[-1], limit.get('limit'))
+                                    raw_sql, limit.get('limit'))
                         data_set = f.search(sql=query_sql)
                     except Exception as e:
                         CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')

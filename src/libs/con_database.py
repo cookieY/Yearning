@@ -7,17 +7,23 @@ About connection Database
 cookie
 '''
 
+from libs.cryptoAES import cryptoAES
+from settingConf import settings
 import pymysql
 
 
 class SQLgo(object):
     def __init__(self, ip=None, user=None, password=None, db=None, port=None):
+        self.AES = cryptoAES(settings.SECRET_KEY)
         self.ip = ip
         self.user = user
-        self.password = password
         self.db = db
         self.port = int(port)
         self.con = object
+        try:
+            self.password = self.AES.decrypt(password)
+        except ValueError:
+            self.password = password
 
     @staticmethod
     def addDic(theIndex, word, value):

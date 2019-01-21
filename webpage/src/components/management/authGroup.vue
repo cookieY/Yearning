@@ -37,7 +37,7 @@
               </div>
               <CheckboxGroup v-model="permission.ddlcon">
                 <Checkbox v-for="i in connectionList.connection" :label="i.connection_name" :key="i.connection_name">
-                  {{i.connection_name}}
+                  <Tag color="purple" :key="i"> {{i.connection_name}}</Tag>
                 </Checkbox>
               </CheckboxGroup>
             </FormItem>
@@ -61,7 +61,7 @@
               </div>
               <CheckboxGroup v-model="permission.dmlcon">
                 <Checkbox v-for="i in connectionList.connection" :label="i.connection_name" :key="i.connection_name">
-                  {{i.connection_name}}
+                  <Tag color="geekblue" :key="i"> {{i.connection_name}}</Tag>
                 </Checkbox>
               </CheckboxGroup>
             </FormItem>
@@ -85,7 +85,7 @@
               </div>
               <CheckboxGroup v-model="permission.querycon">
                 <Checkbox v-for="i in connectionList.connection" :label="i.connection_name" :key="i.connection_name">
-                  {{i.connection_name}}
+                  <Tag color="blue" :key="i"> {{i.connection_name}}</Tag>
                 </Checkbox>
               </CheckboxGroup>
             </FormItem>
@@ -101,7 +101,8 @@
               </Checkbox>
             </div>
             <CheckboxGroup v-model="permission.person">
-              <Checkbox v-for="i in connectionList.person" :label="i.username" :key="i.username">{{i.username}}
+              <Checkbox v-for="i in connectionList.person" :label="i.username" :key="i.username">
+                <Tag color="cyan" :key="i"> {{i.username}}</Tag>
               </Checkbox>
             </CheckboxGroup>
           </FormItem>

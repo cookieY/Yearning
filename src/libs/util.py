@@ -82,10 +82,12 @@ def conf_path() -> object:
                     _conf.get('mysql', 'port'), _conf.get('mysql', 'username'),
                     _conf.get('mysql', 'password'), _conf.get('host', 'ipaddress'))
 
+
 class LDAPConnection(object):
     def __init__(self, url, user, password):
         server = Server(url, get_info=ALL)
-        self.conn = Connection(server, user=user, password=password, check_names=True, lazy=False, raise_exceptions=False)
+        self.conn = Connection(server, user=user, password=password, check_names=True, lazy=False,
+                               raise_exceptions=False)
 
     def __enter__(self):
         self.conn.bind()
@@ -93,6 +95,7 @@ class LDAPConnection(object):
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.conn.unbind()
+
 
 def test_auth(url, user, password):
     with LDAPConnection(url, user, password) as conn:
@@ -110,7 +113,7 @@ def auth(username, password):
 
     if LDAP_TYPE == '1':
         search_filter = '(sAMAccountName={})'.format(username)
-    elif  LDAP_TYPE == '2':
+    elif LDAP_TYPE == '2':
         search_filter = '(uid={})'.format(username)
     else:
         search_filter = '(cn={})'.format(username)
@@ -138,11 +141,11 @@ def auth(username, password):
 
 def init_conf():
     with con_database.SQLgo(
-        ip=_conf.get('mysql', 'address'),
-        user=_conf.get('mysql', 'username'),
-        password=_conf.get('mysql', 'password'),
-        db=_conf.get('mysql', 'db'),
-        port=_conf.get('mysql', 'port')) as f:
+            ip=_conf.get('mysql', 'address'),
+            user=_conf.get('mysql', 'username'),
+            password=_conf.get('mysql', 'password'),
+            db=_conf.get('mysql', 'db'),
+            port=_conf.get('mysql', 'port')) as f:
         res = f.query_info(
             "select * from core_globalpermissions where authorization = 'global'")
 
