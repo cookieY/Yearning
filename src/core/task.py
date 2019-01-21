@@ -18,18 +18,15 @@ from .models import (
 
 CUSTOM_ERROR = logging.getLogger('Yearning.core.views')
 
+
 def set_auth_group(user):
     perm = {
         'ddl': '0',
         'ddlcon': [],
         'dml': '0',
         'dmlcon': [],
-        'dic': '0',
-        'diccon': [],
-        'dicedit': '0',
         'user': '0',
         'base': '0',
-        'dicexport': '0',
         'person': [],
         'query': '0',
         'querycon': []
@@ -76,6 +73,36 @@ def grained_permissions(func):
     return wrapper
 
 
+def ThinkTooMuch(func):
+    def wrapper(self, request, args=None):
+        if request.method == "DELETE":
+            user = args
+        elif request.method == "GET":
+            user = request.GET.get('username')
+        else:
+            user = request.data['username']
+        if user != str(request.user):
+            if request.user.is_staff is not True:
+                return HttpResponse('请不要想太多!')
+        return func(self, request, args)
+
+    return wrapper
+
+
+def isAdmin(func):
+    def wrapper(self, request, args=None):
+        if request.user.is_staff != 1:
+            if request.method == "PUT":
+                if args == 'group_list':
+                    return func(self, request, args)
+            elif request.method == "GET":
+                if args == 'group_name':
+                    return func(self, request, args)
+            return HttpResponse('请不要想太多!')
+        return func(self, request, args)
+
+    return wrapper
+
 class order_push_message(threading.Thread):
     '''
 
@@ -114,13 +141,13 @@ class order_push_message(threading.Thread):
             detail = DatabaseList.objects.filter(id=self.order.bundle_id).first()
 
             with call_inception.Inception(
-                    LoginDic={
-                        'host': detail.ip,
-                        'user': detail.username,
-                        'password': detail.password,
-                        'db': self.order.basename,
-                        'port': detail.port
-                    }
+                LoginDic={
+                    'host': detail.ip,
+                    'user': detail.username,
+                    'password': detail.password,
+                    'db': self.order.basename,
+                    'port': detail.port
+                }
             ) as f:
                 res = f.Execute(sql=self.order.sql, backup=self.order.backup)
                 for i in res:
@@ -173,9 +200,9 @@ class order_push_message(threading.Thread):
             try:
                 util.dingding(
                     content='工单执行通知\n工单编号:%s\n发起人:%s\n地址:%s\n工单备注:%s\n状态:已执行\n备注:%s'
-                            % (
-                                self.order.work_id, self.order.username, self.addr_ip, self.order.text,
-                                content.after),
+                    % (
+                        self.order.work_id, self.order.username, self.addr_ip, self.order.text,
+                        content.after),
                     url=ding_url())
             except Exception as e:
                 CUSTOM_ERROR.error(f'{e.__class__.__name__}--钉钉推送失败: {e}')
@@ -233,7 +260,8 @@ class rejected_push_messages(threading.Thread):
             try:
                 util.dingding(
                     content='工单驳回通知\n工单编号:%s\n发起人:%s\n地址:%s\n驳回说明:%s\n状态:驳回'
-                            % (self._tmpData['work_id'], self.to_user, self.addr_ip, self.text), url=ding_url())
+                    % (self._tmpData['work_id'], self.to_user, self.addr_ip, self.text),
+                    url=ding_url())
             except Exception as e:
                 CUSTOM_ERROR.error(f'{e.__class__.__name__}--钉钉推送失败: {e}')
         if tag.message['mail']:
@@ -291,7 +319,8 @@ class submit_push_messages(threading.Thread):
             try:
                 util.dingding(
                     content='工单提交通知\n工单编号:%s\n发起人:%s\n地址:%s\n工单说明:%s\n状态:已提交\n备注:%s'
-                            % (self.workId, self.user, self.addr_ip, self.text, content.before), url=ding_url())
+                    % (self.workId, self.user, self.addr_ip, self.text, content.before),
+                    url=ding_url())
             except Exception as e:
                 CUSTOM_ERROR.error(f'{e.__class__.__name__}--钉钉推送失败: {e}')
         if tag.message['mail']:

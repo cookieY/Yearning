@@ -28,7 +28,6 @@ class audit(baseview.SuperUserpermissions):
     '''
 
     def get(self, request, args: str = None):
-
         '''
 
         :argument 审核页面数据展示请求接口
@@ -41,7 +40,7 @@ class audit(baseview.SuperUserpermissions):
 
         try:
             page = request.GET.get('page')
-            username = request.GET.get('username')
+            qurey = json.loads(request.GET.get('query'))
         except KeyError as e:
             CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
             return HttpResponse(status=500)
@@ -49,19 +48,29 @@ class audit(baseview.SuperUserpermissions):
             try:
                 un_init = util.init_conf()
                 custom_com = ast.literal_eval(un_init['other'])
-                page_number = SqlOrder.objects.filter(assigned=username).count()
                 start = (int(page) - 1) * 20
                 end = int(page) * 20
-                info = SqlOrder.objects.raw(
-                    '''
-                    select o.id,o.work_id,o.text,o.backup,o.date,o.assigned,
-                    o.username,o.real_name,o.status,o.basename,o.delay,core_databaselist.connection_name, \
-                    core_databaselist.computer_room from core_sqlorder as o \
-                    INNER JOIN core_databaselist on \
-                    o.bundle_id = core_databaselist.id where o.assigned = '%s'\
-                    ORDER BY o.id desc
-                    ''' % username
-                )[start:end]
+                if qurey['valve']:
+                    if len(qurey['picker']) == 0:
+                        info = SqlOrder.objects.filter(assigned=request.user,
+                                                       username__contains=qurey['user']).order_by('-id')[start:end]
+                        page_number = SqlOrder.objects.filter(assigned=request.user,
+                                                              username__contains=qurey['user']).count()
+                    else:
+                        picker = []
+                        for i in qurey['picker']:
+                            picker.append(i)
+                        info = SqlOrder.objects.filter(assigned=request.user, username__contains=qurey['user'],
+                                                       date__gte=picker[0], date__lte=picker[1]).order_by('-id')[start:end]
+                        page_number = SqlOrder.objects.filter(assigned=request.user,
+                                                              username__contains=qurey['user'], date__gte=picker[0],
+                                                              date__lte=picker[1]).count()
+
+                else:
+                    page_number = SqlOrder.objects.filter(
+                        assigned=request.user).count()
+                    info = SqlOrder.objects.filter(
+                        assigned=request.user).order_by('-id')[start:end]
                 data = util.ser(info)
                 info = Account.objects.filter(group='perform').all()
                 ser = serializers.UserINFO(info, many=True)
@@ -72,7 +81,6 @@ class audit(baseview.SuperUserpermissions):
                 return HttpResponse(status=500)
 
     def put(self, request, args: str = None):
-
         '''
 
         :argument 工单确认执行,驳回,二次检测接口。
@@ -98,12 +106,14 @@ class audit(baseview.SuperUserpermissions):
                     return HttpResponse(status=500)
                 else:
                     try:
-                        SqlOrder.objects.filter(id=order_id).update(status=0, rejected=text)
+                        SqlOrder.objects.filter(id=order_id).update(
+                            status=0, rejected=text)
                         _tmpData = SqlOrder.objects.filter(id=order_id).values(
                             'work_id',
                             'bundle_id'
                         ).first()
-                        rejected_push_messages(_tmpData, to_user, addr_ip, text).start()
+                        rejected_push_messages(
+                            _tmpData, to_user, addr_ip, text).start()
                         return Response('操作成功，该请求已驳回！')
                     except Exception as e:
                         CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
@@ -111,7 +121,7 @@ class audit(baseview.SuperUserpermissions):
 
             elif category == 1:
                 try:
-                    from_user = request.data['from_user']
+                    from_user = request.user
                     to_user = request.data['to_user']
                     order_id = request.data['id']
                 except KeyError as e:
@@ -119,12 +129,15 @@ class audit(baseview.SuperUserpermissions):
                     return HttpResponse(status=500)
                 else:
                     try:
-                        idempotent = SqlOrder.objects.filter(id=order_id).first()
+                        idempotent = SqlOrder.objects.filter(
+                            id=order_id).first()
                         if idempotent.status != 2:
                             return Response('非法传参，触发幂等操作')
                         else:
-                            SqlOrder.objects.filter(id=order_id).update(status=3)
-                            order_push_message(addr_ip, order_id, from_user, to_user).start()
+                            SqlOrder.objects.filter(
+                                id=order_id).update(status=3)
+                            order_push_message(
+                                addr_ip, order_id, from_user, to_user).start()
                             return Response('工单执行成功!请通过记录页面查看具体执行结果')
                     except Exception as e:
                         CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
@@ -139,11 +152,10 @@ class audit(baseview.SuperUserpermissions):
                     return HttpResponse(status=500)
                 else:
                     mail = Account.objects.filter(username=perform).first()
-                    SqlOrder.objects.filter(work_id=work_id).update(assigned=perform)
+                    SqlOrder.objects.filter(
+                        work_id=work_id).update(assigned=perform)
                     threading.Thread(target=push_message, args=(
-                        {'to_user': username, 'workid': work_id, 'addr': addr_ip}, 9, request.user, mail.email,
-                        work_id,
-                        '已提交执行人')).start()
+                        {'to_user': username, 'workid': work_id, 'addr': addr_ip}, 9, request.user, mail.email, work_id, '已提交执行人')).start()
                     return Response('工单已提交执行人！')
 
             elif category == 'test':
@@ -157,7 +169,8 @@ class audit(baseview.SuperUserpermissions):
                     sql = SqlOrder.objects.filter(id=order_id).first()
                     if not sql.sql:
                         return Response({'status': '工单内无sql语句!'})
-                    data = DatabaseList.objects.filter(id=sql.bundle_id).first()
+                    data = DatabaseList.objects.filter(
+                        id=sql.bundle_id).first()
                     info = {
                         'host': data.ip,
                         'user': data.username,
@@ -196,7 +209,8 @@ class del_order(baseview.BaseView):
                 for i in data_id:
                     if i['status'] == 1:
                         work_id = SqlOrder.objects.filter(id=i['id']).first()
-                        SqlRecord.objects.filter(workid=work_id.work_id).delete()
+                        SqlRecord.objects.filter(
+                            workid=work_id.work_id).delete()
                         SqlOrder.objects.filter(id=i['id']).delete()
                     else:
                         SqlOrder.objects.filter(id=i['id']).delete()
@@ -210,8 +224,10 @@ class getsql(baseview.BaseView):
 
     def get(self, request, args: str = None):
         id = request.GET.get('id')
+        bundle = request.GET.get('bundle_id')
+        baseCon = DatabaseList.objects.filter(id=bundle).first()
         sql = SqlOrder.objects.filter(id=id).first()
-        return Response(sql.sql)
+        return Response({'sql': sql.sql, 'comRoom': baseCon.computer_room, 'conn': baseCon.connection_name})
 
 
 def push_message(message=None, type=None, user=None, to_addr=None, work_id=None, status=None):
@@ -221,8 +237,8 @@ def push_message(message=None, type=None, user=None, to_addr=None, work_id=None,
             try:
                 put_mess = send_email.send_email(to_addr=to_addr)
                 put_mess.send_mail(mail_data=message, type=type)
-            except:
-                pass
+            except Exception as e:
+                CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
 
         if tag.message['ding']:
             un_init = util.init_conf()

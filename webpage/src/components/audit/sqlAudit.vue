@@ -52,19 +52,48 @@
         </p>
         <Row>
           <Col span="24">
-            <Poptip
-              confirm
-              title="您确认删除这些工单信息吗?"
-              @on-ok="delrecordData"
-            >
-              <Button type="text" style="margin-left: -1%">删除记录</Button>
-            </Poptip>
-            <Button type="text" style="margin-left: -1%" @click.native="mou_data()">刷新</Button>
-
-            <Table border :columns="columns6" :data="tmp" stripe ref="selection"
-                   @on-selection-change="delrecordList"></Table>
+            <Form inline>
+              <FormItem>
+                <Poptip
+                  confirm
+                  title="您确认删除这些工单信息吗?"
+                  @on-ok="delrecordData"
+                >
+                  <Button type="warning">删除记录</Button>
+                </Poptip>
+              </FormItem>
+              <FormItem>
+                <Poptip trigger="hover" title="提示" content="此开关用于打开实时表格数据更新功能">
+                  <i-switch v-model="valve" @on-change="refreshForm" size="large">
+                    <span slot="open">打开</span>
+                    <span slot="close">关闭</span>
+                  </i-switch>
+                </Poptip>
+              </FormItem>
+              <FormItem>
+                <Input placeholder="账号名" v-model="find.user"></Input>
+              </FormItem>
+              <FormItem>
+                <DatePicker format="yyyy-MM-dd HH:mm" type="datetimerange" placeholder="请选择查询的时间范围"
+                            v-model="find.picker" @on-change="find.picker=$event" style="width: 250px"></DatePicker>
+              </FormItem>
+              <FormItem>
+                <Button type="success" @click="queryData">查询</Button>
+                <Button type="primary" @click="queryCancel">重置</Button>
+              </FormItem>
+            </Form>
+            <Table border :columns="columns" :data="tableData" stripe ref="selection"
+                   @on-selection-change="delrecordList">
+              <template slot-scope="{ row, index }" slot="action">
+                <div>
+                  <Button type="text" @click="openOrder(index)">查看</Button>
+                  <Button type="text" @click="orderDetail(row)" v-if="row.status !== 2 && row.status !==3">执行结果</Button>
+                  <Button type="text" @click="openOSC" v-if="row.status === 3 && row.type === 0">osc进度</Button>
+                </div>
+              </template>
+            </Table>
             <br>
-            <Page :total="pagenumber" show-elevator @on-change="mou_data" :page-size="20" ref="page"></Page>
+            <Page :total="pagenumber" show-elevator @on-change="refreshData" :page-size="20" ref="page"></Page>
           </Col>
         </Row>
       </Card>
@@ -108,26 +137,26 @@
       </template>
 
       <div slot="footer">
-        <Button type="warning" @click.native="test_button()" v-if="auth === 'admin'" :loading="loading">
+        <Button type="warning" @click.native="testTo()" :loading="loading">
           <span v-if="!loading">检测sql</span>
           <span v-else>检测中</span></Button>
         <Button @click="modal2 = false">取消</Button>
         <template v-if="switch_show">
           <template v-if="multi">
-            <Button type="error" @click="out_button()" :disabled="summit" v-if="auth === 'admin'">驳回</Button>
-            <Button type="error" @click="out_button()" v-else>驳回</Button>
-            <Button type="success" @click="agreed_button()" :disabled="summit" v-if="auth === 'admin'">同意</Button>
-            <Button type="success" @click="put_button()" v-else-if="auth === 'perform'">执行</Button>
+            <Button type="error" @click="rejectTo()" :disabled="summit" v-if="auth === 'admin'">驳回</Button>
+            <Button type="error" @click="rejectTo()" v-else>驳回</Button>
+            <Button type="success" @click="agreedTo()" :disabled="summit" v-if="auth === 'admin'">同意</Button>
+            <Button type="success" @click="performTo()" v-else-if="auth === 'perform'">执行</Button>
           </template>
           <template v-else>
-            <Button type="error" @click="out_button()" :disabled="summit">驳回</Button>
-            <Button type="success" @click="put_button()" :disabled="summit">执行</Button>
+            <Button type="error" @click="rejectTo()" :disabled="summit">驳回</Button>
+            <Button type="success" @click="performTo()" :disabled="summit">执行</Button>
           </template>
         </template>
       </div>
     </Modal>
 
-    <Modal v-model="reject.reje" @on-ok="rejecttext">
+    <Modal v-model="reject.reje" @on-ok="rejectText">
       <p slot="header" style="color:#f60;font-size: 16px">
         <Icon type="information-circled"></Icon>
         <span>SQL工单驳回理由说明</span>
@@ -142,12 +171,12 @@
       :closable="false"
       :mask-closable="false"
       @on-cancel="callback_method"
-      @on-ok="stop_osc"
+      @on-ok="stopOSC"
       ok-text="终止osc"
       cancel-text="关闭窗口">
       <Form>
         <FormItem label="SQL语句SHA1值">
-          <Select v-model="oscsha1" style="width:70%" @on-change="oscsetp" transfer>
+          <Select v-model="oscsha1" style="width:70%" @on-change="setpOSC" transfer>
             <Option v-for="item in osclist" :value="item.SQLSHA1" :key="item.SQLSHA1">{{ item.SQLSHA1 }}</Option>
           </Select>
         </FormItem>
@@ -193,7 +222,7 @@
             key: 'sql'
           }
         ],
-        columns6: [
+        columns: [
           {
             type: 'selection',
             width: 60,
@@ -231,7 +260,6 @@
             key: 'real_name',
             sortable: true
           },
-
           {
             title: '状态',
             key: 'status',
@@ -263,125 +291,14 @@
                 }
               }, text)
             },
-            sortable: true,
-            filters: [
-              {
-                label: '已执行',
-                value: 1
-              },
-              {
-                label: '驳回',
-                value: 0
-              },
-              {
-                label: '待审核',
-                value: 2
-              },
-              {
-                label: '执行中',
-                value: 3
-              },
-              {
-                label: '执行失败',
-                value: 4
-              }
-            ],
-            //            filterMultiple: false 禁止多选,
-            filterMethod (value, row) {
-              if (value === 1) {
-                return row.status === 1
-              } else if (value === 2) {
-                return row.status === 2
-              } else if (value === 0) {
-                return row.status === 0
-              } else if (value === 3) {
-                return row.status === 3
-              } else {
-                return row.status === 4
-              }
-            }
+            sortable: true
           },
           {
             title: '操作',
             key: 'action',
             width: 150,
             align: 'center',
-            render: (h, params) => {
-              if (params.row.status !== 1 && params.row.status !== 4) {
-                if (params.row.status === 3 && params.row.type === 0) {
-                  return h('div', [
-                    h('Button', {
-                      props: {
-                        size: 'small',
-                        type: 'text'
-                      },
-                      on: {
-                        click: () => {
-                          this.summit = true
-                          this.edit_tab(params.index)
-                        }
-                      }
-                    }, '查看'),
-                    h('Button', {
-                      props: {
-                        size: 'small',
-                        type: 'text'
-                      },
-                      on: {
-                        click: () => {
-                          this.oscsha1 = ''
-                          this.osc = true
-                        }
-                      }
-                    }, 'osc进度')
-                  ])
-                } else {
-                  return h('div', [
-                    h('Button', {
-                      props: {
-                        size: 'small',
-                        type: 'text'
-                      },
-                      on: {
-                        click: () => {
-                          this.summit = true
-                          this.edit_tab(params.index)
-                        }
-                      }
-                    }, '查看')
-                  ])
-                }
-              } else {
-                return h('div', [
-                  h('Button', {
-                    props: {
-                      size: 'small',
-                      type: 'text'
-                    },
-                    on: {
-                      click: () => {
-                        this.summit = true
-                        this.edit_tab(params.index)
-                      }
-                    }
-                  }, '查看'),
-                  h('Button', {
-                    props: {
-                      size: 'small',
-                      type: 'text'
-                    },
-                    on: {
-                      click: () => {
-                        this.$router.push({
-                          name: 'orderlist',
-                          query: {workid: params.row.work_id, id: params.row.id, status: 1, type: params.row.type}
-                        })
-                      }
-                    }
-                  }, '执行结果')
-                ])
-              }
-            }
+            slot: 'action'
           }
         ],
         modal2: false,
@@ -435,7 +352,7 @@
           reje: false,
           textarea: ''
         },
-        tmp: [],
+        tableData: [],
         pagenumber: 1,
         delrecord: [],
         togoing: null,
@@ -450,29 +367,38 @@
         auth: sessionStorage.getItem('auth'),
         multi_list: {},
         multi_name: '',
-        reboot: null
+        reboot: null,
+        valve: false,
+        find: {
+          picker: [],
+          user: '',
+          valve: false
+        }
       }
     },
     methods: {
-      edit_tab (index) {
+      openOrder (index) {
+        this.summit = true
         this.sql = []
         this.togoing = index
         this.dataId = []
         this.modal2 = true
-        this.formitem = this.tmp[index]
-        this.tmp[index].status === 2 ? this.switch_show = true : this.switch_show = false
-        axios.get(`${this.$config.url}/getsql?id=${this.formitem.id}`)
+        this.formitem = this.tableData[index]
+        this.tableData[index].status === 2 ? this.switch_show = true : this.switch_show = false
+        axios.get(`${this.$config.url}/getsql?id=${this.formitem.id}&bundle_id=${this.formitem.bundle_id}`)
           .then(res => {
-            let tmpSql = res.data.split(';')
+            let tmpSql = res.data.sql.split(';')
             for (let i of tmpSql) {
               this.sql.push({'sql': i})
             }
+            this.formitem.computer_room = res.data.comRoom
+            this.formitem.connection_name = res.data.conn
           })
           .catch(err => {
-            this.$config.err_notice(err)
+            this.$config.err_notice(this, err)
           })
       },
-      agreed_button () {
+      agreedTo () {
         if (this.multi_name === '') {
           this.$Message.error('请选择执行人!')
         } else {
@@ -485,51 +411,34 @@
             .then(res => {
               this.$config.notice(res.data)
               this.modal2 = false
+              this.refreshData(this.$refs.page.currentPage)
             })
             .catch(error => {
-              this.$config.err_notice(error)
+              this.$config.err_notice(this, error)
             })
         }
       },
-      put_button () {
+      performTo () {
         this.modal2 = false
-        this.tmp[this.togoing].status = 3
+        this.tableData[this.togoing].status = 3
         axios.put(`${this.$config.url}/audit_sql`, {
           'type': 1,
-          'from_user': sessionStorage.getItem('user'),
           'to_user': this.formitem.username,
           'id': this.formitem.id
         })
           .then(res => {
             this.$config.notice(res.data)
-            this.$refs.page.currentPage = 1
+            this.refreshData(this.$refs.page.currentPage)
           })
           .catch(error => {
-            this.$config.err_notice(error)
+            this.$config.err_notice(this, error)
           })
       },
-      out_button () {
+      rejectTo () {
         this.modal2 = false
         this.reject.reje = true
       },
-      rejecttext () {
-        axios.put(`${this.$config.url}/audit_sql`, {
-          'type': 0,
-          'from_user': sessionStorage.getItem('user'),
-          'text': this.reject.textarea,
-          'to_user': this.formitem.username,
-          'id': this.formitem.id
-        })
-          .then(res => {
-            this.$config.err_notice(res.data)
-            this.mou_data()
-            this.$refs.page.currentPage = 1
-          })
-          .catch(error => {
-            this.$config.err_notice(error)
-          })
-      },
-      test_button () {
+      testTo () {
         this.loading = true
         this.osclist = []
         axios.put(`${this.$config.url}/audit_sql`, {
@@ -548,42 +457,67 @@
               this.summit = false
               this.loading = false
             } else {
-              this.$config.err_notice(res.data.status)
+              this.$config.err_notice(this, res.data.status)
             }
           })
           .catch(error => {
-            this.$config.err_notice(error)
+            this.$config.err_notice(this, error)
           })
       },
-      mou_data (vl = 1) {
-        axios.get(`${this.$config.url}/audit_sql?page=${vl}&username=${sessionStorage.getItem('user')}`)
+      rejectText () {
+        axios.put(`${this.$config.url}/audit_sql`, {
+          'type': 0,
+          'text': this.reject.textarea,
+          'to_user': this.formitem.username,
+          'id': this.formitem.id
+        })
           .then(res => {
-            this.tmp = res.data.data
-            this.tmp.forEach((item) => { (item.backup === 1) ? item.backup = '是' : item.backup = '否' })
+            this.$config.notice(res.data)
+            this.refreshData(this.$refs.page.currentPage)
+          })
+          .catch(error => {
+            this.$config.err_notice(this, error)
+          })
+      },
+      orderDetail (row) {
+        this.$router.push({
+          name: 'orderlist',
+          query: {workid: row.work_id, id: row.id, status: 1, type: row.type}
+        })
+      },
+      refreshData (vl = 1) {
+        axios.get(`${this.$config.url}/audit_sql?page=${vl}&query=${JSON.stringify(this.find)}`)
+          .then(res => {
+            this.tableData = res.data.data
+            this.tableData.forEach((item) => { (item.backup === 1) ? item.backup = '是' : item.backup = '否' })
             this.pagenumber = res.data.page
             this.multi = res.data.multi
             this.multi_list = res.data.multi_list
           })
           .catch(error => {
-            this.$config.err_notice(error)
+            this.$config.err_notice(this, error)
           })
       },
       delrecordList (vl) {
         this.delrecord = vl
       },
       delrecordData () {
+        let step = this.$refs.page.currentPage
+        if (this.tableData.length === this.delrecord.length) {
+          step = step - 1
+        }
         axios.post(`${this.$config.url}/undoOrder`, {
           'id': JSON.stringify(this.delrecord)
         })
           .then(res => {
             this.$config.notice(res.data)
-            this.mou_data()
+            this.refreshData(step)
           })
           .catch(error => {
-            this.$config.err_notice(error)
+            this.$config.err_notice(this, error)
           })
       },
-      oscsetp (vl) {
+      setpOSC (vl) {
         let vm = this
         this.callback_time = setInterval(function () {
           axios.get(`${vm.$config.url}/osc/${vl}`)
@@ -599,23 +533,41 @@
             .catch(error => console.log(error))
         }, 1000)
       },
-      callback_method () {
-        clearInterval(this.callback_time)
+      openOSC () {
+        this.oscsha1 = ''
+        this.osc = true
       },
-      stop_osc () {
+      stopOSC () {
         axios.delete(`${this.$config.url}/osc/${this.oscsha1}`)
           .then(res => {
             this.$config.notice(res.data)
           })
-          .catch(error => this.$config.err_notice(error))
+          .catch(error => this.$config.err_notice(this, error))
+      },
+      callback_method () {
+        clearInterval(this.callback_time)
+      },
+      refreshForm (vl) {
+        if (vl) {
+          let vm = this
+          this.reboot = setInterval(function () {
+            vm.refreshData(vm.$refs.page.currentPage)
+          }, 5000)
+        } else {
+          clearInterval(this.reboot)
+        }
+      },
+      queryData () {
+        this.find.valve = true
+        this.refreshData()
+      },
+      queryCancel () {
+        this.find = this.$config.clearObj(this.find)
+        this.refreshData()
       }
     },
     mounted () {
-      let vm = this
-      this.mou_data()
-      this.reboot = setInterval(function () {
-        vm.mou_data(vm.$refs.page.currentPage)
-      }, 5000)
+      this.refreshData()
     },
     destroyed () {
       clearInterval(this.reboot)

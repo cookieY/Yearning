@@ -3,9 +3,7 @@ import json
 from libs import baseview
 from rest_framework.response import Response
 from django.http import HttpResponse
-from django.db.models import Count
 from core.models import (
-    SqlDictionary,
     SqlOrder,
     Account,
     DatabaseList,
@@ -35,8 +33,10 @@ class dashboard(baseview.BaseView):
     def get(self, request, args=None):
         if args == 'pie':
             try:
-                alter = SqlOrder.objects.filter(type=0, username=request.user).count()
-                sql = SqlOrder.objects.filter(type=1, username=request.user).count()
+                alter = SqlOrder.objects.filter(
+                    type=0, username=request.user).count()
+                sql = SqlOrder.objects.filter(
+                    type=1, username=request.user).count()
                 return Response([alter, sql])
             except Exception as e:
                 CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
@@ -44,18 +44,18 @@ class dashboard(baseview.BaseView):
 
         elif args == 'infocard':
             try:
-                dic = SqlDictionary.objects.count()
                 user = Account.objects.count()
                 order = SqlOrder.objects.filter(username=request.user).count()
                 link = DatabaseList.objects.count()
-                return Response([dic, user, order, link])
+                return Response([user, order, link])
             except Exception as e:
                 CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
                 return HttpResponse(status=500)
 
         elif args == 'messages':
             try:
-                statement = Account.objects.filter(username=request.user).first()
+                statement = Account.objects.filter(
+                    username=request.user).first()
                 if statement.id == 1:
                     return Response({'statement': statement.last_name})
                 else:
@@ -87,7 +87,8 @@ class dashboard(baseview.BaseView):
                 return HttpResponse(status=500)
             else:
                 try:
-                    Todolist.objects.filter(username=request.user, content=todo).delete()
+                    Todolist.objects.filter(
+                        username=request.user, content=todo).delete()
                     return Response('')
                 except Exception as e:
                     CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
@@ -100,7 +101,8 @@ class dashboard(baseview.BaseView):
             return Response({'userinfo': _serializers.data, 'permissons': permissions})
 
         elif args == 'statement':
-            Account.objects.filter(username=request.user).update(last_name='pass')
+            Account.objects.filter(
+                username=request.user).update(last_name='pass')
             return Response('')
 
     def post(self, request, args=None):
@@ -110,7 +112,8 @@ class dashboard(baseview.BaseView):
             CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
         else:
             try:
-                Todolist.objects.get_or_create(username=request.user, content=todo)
+                Todolist.objects.get_or_create(
+                    username=request.user, content=todo)
                 return Response('')
             except Exception as e:
                 CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')

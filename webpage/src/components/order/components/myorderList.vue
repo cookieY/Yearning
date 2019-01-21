@@ -149,7 +149,7 @@
               this.reloadsql = true
             })
             .catch(() => {
-              this.$config.err_notice('无法获得相关回滚数据,请确认备份库配置正确及备份规则')
+              this.$config.err_notice(this, '无法获得相关回滚数据,请确认备份库配置正确及备份规则')
             })
         } else {
           this.$Message.error('此工单没有备份或语句执行失败!')
@@ -164,7 +164,7 @@
             this.formItem.backup = '0'
           })
           .catch(error => {
-            this.$config.err_notice(error)
+            this.$config.err_notice(this, error)
           })
         this.reloadsql = true
       },
@@ -181,7 +181,7 @@
             this.$config.notice('工单已提交成功')
           })
           .catch(error => {
-            this.$config.err_notice(error)
+            this.$config.err_notice(this, error)
           })
       },
       delorder () {
@@ -195,7 +195,7 @@
             this.$router.go(-1)
           })
           .catch(error => {
-            this.$config.err_notice(error)
+            this.$config.err_notice(this, error)
           })
       }
     },
@@ -206,7 +206,7 @@
           this.dmlorddl = res.data.type
         })
         .catch(error => {
-          this.$config.err_notice(error)
+          this.$config.err_notice(this, error)
         })
     }
   }

@@ -7,18 +7,16 @@ Some tool sets
 cookie
 
 '''
-
-from urllib import request
-from collections import namedtuple
-from libs import con_database
 import json
 import random
 import ssl
 import time
-import ldap3
-from ldap3 import Server, Connection, SUBTREE
 import configparser
 import ast
+from urllib import request
+from collections import namedtuple
+from ldap3 import Server, Connection, SUBTREE, ALL
+from libs import con_database
 
 _conf = configparser.ConfigParser()
 _conf.read('deploy.conf')
@@ -77,16 +75,19 @@ def conf_path() -> object:
     '''
     读取配置文件属性
     '''
-    conf_set = namedtuple("name", ["db", "address", "port", "username", "password", "ipaddress"])
+    conf_set = namedtuple(
+        "name", ["db", "address", "port", "username", "password", "ipaddress"])
 
     return conf_set(_conf.get('mysql', 'db'), _conf.get('mysql', 'address'),
                     _conf.get('mysql', 'port'), _conf.get('mysql', 'username'),
                     _conf.get('mysql', 'password'), _conf.get('host', 'ipaddress'))
 
+
 class LDAPConnection(object):
     def __init__(self, url, user, password):
-        server = Server(url, get_info=ldap3.ALL)
-        self.conn = Connection(server, user=user, password=password, check_names=True, lazy=False, raise_exceptions=False)
+        server = Server(url, get_info=ALL)
+        self.conn = Connection(server, user=user, password=password, check_names=True, lazy=False,
+                               raise_exceptions=False)
 
     def __enter__(self):
         self.conn.bind()
@@ -94,6 +95,7 @@ class LDAPConnection(object):
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.conn.unbind()
+
 
 def test_auth(url, user, password):
     with LDAPConnection(url, user, password) as conn:
@@ -110,8 +112,8 @@ def auth(username, password):
     LDAP_SCBASE = ldap['sc']
 
     if LDAP_TYPE == '1':
-        search_filter = '(mail={})'.format(username)
-    elif  LDAP_TYPE == '2':
+        search_filter = '(sAMAccountName={})'.format(username)
+    elif LDAP_TYPE == '2':
         search_filter = '(uid={})'.format(username)
     else:
         search_filter = '(cn={})'.format(username)
@@ -134,7 +136,6 @@ def auth(username, password):
                     return True
             except Exception as e:
                 print(str(e))
-登录
     return False
 
 
@@ -145,6 +146,7 @@ def init_conf():
             password=_conf.get('mysql', 'password'),
             db=_conf.get('mysql', 'db'),
             port=_conf.get('mysql', 'port')) as f:
-        res = f.query_info("select * from core_globalpermissions where authorization = 'global'")
+        res = f.query_info(
+            "select * from core_globalpermissions where authorization = 'global'")
 
     return res[0]

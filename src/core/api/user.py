@@ -1,7 +1,7 @@
 import logging
 import json
 from libs import baseview, util
-from core.task import grained_permissions, set_auth_group
+from core.task import set_auth_group, ThinkTooMuch
 from libs.serializers import UserINFO
 from libs.send_email import send_email
 from rest_framework.response import Response
@@ -13,8 +13,7 @@ from core.models import (
     Account,
     Todolist,
     grained,
-    query_order,
-    globalpermissions
+    query_order
 )
 
 CUSTOM_ERROR = logging.getLogger('Yearning.core.views')
@@ -49,20 +48,33 @@ class userinfo(baseview.BaseView):
       
     '''
 
+    @ThinkTooMuch
     def get(self, request, args=None):
         if args == 'all':
             try:
                 page = request.GET.get('page')
+                user = request.GET.get('username').strip()
+                department = request.GET.get('department').strip()
+                valve = request.GET.get('valve')
             except KeyError as e:
                 CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
                 return HttpResponse(status=500)
             else:
                 try:
-                    page_number = Account.objects.count()
                     start = int(page) * 10 - 10
                     end = int(page) * 10
-                    info = Account.objects.all()[start:end]
-                    serializers = UserINFO(info, many=True)
+                    if valve == 'true':
+                        if department != '':
+                            page_number = Account.objects.filter(username__contains=user,
+                                                                 department__contains=department).count()
+                            user = Account.objects.filter(username__contains=user, department__contains=department)[start:end]
+                        else:
+                            page_number = Account.objects.filter(username__contains=user).count()
+                            user = Account.objects.filter(username__contains=user)[start:end]
+                    else:
+                        page_number = Account.objects.count()
+                        user = Account.objects.all()[start:end]
+                    serializers = UserINFO(user, many=True)
                     return Response({'page': page_number, 'data': serializers.data})
                 except Exception as e:
                     CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
@@ -72,18 +84,19 @@ class userinfo(baseview.BaseView):
             user = set_auth_group(request.GET.get('user'))
             return Response(user)
 
+    @ThinkTooMuch
     def put(self, request, args=None):
         if args == 'changepwd':
             try:
                 username = request.data['username']
-                new_password = request.data['new']
+                password = request.data['new']
             except KeyError as e:
                 CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
                 return HttpResponse(status=500)
             else:
                 try:
                     user = Account.objects.get(username__exact=username)
-                    user.set_password(new_password)
+                    user.set_password(password)
                     user.save()
                     return Response('%s--密码修改成功!' % username)
                 except Exception as e:
@@ -156,6 +169,7 @@ class userinfo(baseview.BaseView):
                 CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
                 return HttpResponse(e)
 
+    @ThinkTooMuch
     def delete(self, request, args=None):
         try:
             pr = Account.objects.filter(username=args).first()
@@ -176,24 +190,6 @@ class userinfo(baseview.BaseView):
             return HttpResponse(status=500)
 
 
-class authgroup(baseview.BaseView):
-    '''
-
-    认证组权限
-
-    '''
-
-    @grained_permissions
-    def post(self, request, args=None):
-        try:
-            _type = request.data['permissions_type'] + 'edit'
-            permission = set_auth_group(request.user)
-            return Response(permission[_type])
-        except Exception as e:
-            CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
-            return HttpResponse(status=500)
-
-
 class ldapauth(baseview.AnyLogin):
     '''
 
@@ -208,13 +204,11 @@ class ldapauth(baseview.AnyLogin):
         except KeyError as e:
             CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
         else:
-            jwt_payload_handler = api_settings.JWT_PAYLOAD_HANDLER
-            jwt_encode_handler = api_settings.JWT_ENCODE_HANDLER
             valite = util.auth(username=username, password=password)
             if valite:
                 user = Account.objects.filter(username=username).first()
                 if user is not None:
-                    user.set_password(password)
+                    user.set_password(util.workId())
                     user.save()
                     payload = jwt_payload_handler(user)
                     token = jwt_encode_handler(payload)
@@ -222,23 +216,22 @@ class ldapauth(baseview.AnyLogin):
                 else:
                     permissions = Account.objects.create_user(
                         username=username,
-                        password=password,
+                        password=util.workId(),
                         is_staff=0,
                         group='guest')
                     permissions.save()
-                    _user = authenticate(username=username, password=password)
-                    token = jwt_encode_handler(jwt_payload_handler(_user))
+                    token = jwt_encode_handler(jwt_payload_handler(permissions))
                     return Response({'token': token, 'res': '', 'permissions': 'guest'})
             else:
-                return Response({'token': 'null', 'res': 'ldap账号认证失败,请检查ldap账号或ldap配置!'})
+                return HttpResponse(status=401)
 
 
 class login_register(baseview.AnyLogin):
 
     def post(self, request, args=None):
         try:
-            userinfo = json.loads(request.data['userinfo'])
-            _send_mail = send_email(to_addr=userinfo['email'])
+            userdata = json.loads(request.data['userinfo'])
+            _send_mail = send_email(to_addr=userdata['email'])
             _status, _message = _send_mail.email_check()
             if _status != 200:
                 return Response(data=_message)
@@ -248,14 +241,14 @@ class login_register(baseview.AnyLogin):
         else:
             try:
                 user = Account.objects.create_user(
-                    username=userinfo['username'],
-                    password=userinfo['password'],
-                    department=userinfo['department'],
+                    username=userdata['username'],
+                    password=userdata['password'],
+                    department=userdata['department'],
                     group='guest',
-                    email=userinfo['email'],
-                    real_name=userinfo['realname'])
+                    email=userdata['email'],
+                    real_name=userdata['realname'])
                 user.save()
-                return Response('%s 用户注册成功!' % userinfo['username'])
+                return Response('%s 用户注册成功!' % userdata['username'])
             except Exception as e:
                 CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
                 return HttpResponse('用户名已存在，请使用其他用户名注册！')

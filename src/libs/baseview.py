@@ -1,9 +1,7 @@
 from rest_framework.permissions import (
     IsAdminUser,
-    IsAuthenticated,
-    BasePermission
+    IsAuthenticated
 )
-from core.models import globalpermissions
 from rest_framework.views import APIView
 
 

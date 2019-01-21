@@ -3,7 +3,6 @@ serializers
 '''
 from rest_framework import serializers
 from core.models import DatabaseList
-from core.models import SqlDictionary
 from core.models import SqlRecord
 from core.models import Account
 from core.models import SqlOrder, query_order, querypermissions, globalpermissions, grained
@@ -29,18 +28,6 @@ class UserINFO(serializers.HyperlinkedModelSerializer):
         fields = ('id', 'username', 'group', 'department', 'email', 'auth_group', 'real_name')
 
 
-class SQLGeneratDic(serializers.HyperlinkedModelSerializer):
-    '''
-    数据库字典信息serializers
-    '''
-
-    class Meta:
-        model = SqlDictionary
-        fields = (
-            'BaseName', 'TableName', 'Field', 'Type', 'Extra', 'TableComment'
-        )
-
-
 class Sqllist(serializers.HyperlinkedModelSerializer):
     '''
     数据库连接信息serializers
@@ -48,7 +35,7 @@ class Sqllist(serializers.HyperlinkedModelSerializer):
 
     class Meta:
         model = DatabaseList
-        fields = ('id', 'connection_name', 'ip', 'computer_room', 'password', 'port', 'username')
+        fields = ('id', 'connection_name', 'ip', 'computer_room', 'password', 'port', 'username', 'before', 'after')
 
 
 class query_con(serializers.HyperlinkedModelSerializer):
@@ -79,16 +66,6 @@ class Record(serializers.HyperlinkedModelSerializer):
     class Meta:
         model = SqlRecord
         fields = ('sql', 'state', 'error', 'affectrow', 'sequence', 'execute_time')
-
-
-class Getdingding(serializers.HyperlinkedModelSerializer):
-    '''
-    dingding webhook serializers
-    '''
-
-    class Meta:
-        model = DatabaseList
-        fields = ('id', 'before', 'after')
 
 
 class Recordinfo(serializers.HyperlinkedModelSerializer):

@@ -37,7 +37,7 @@
               </div>
               <CheckboxGroup v-model="permission.ddlcon">
                 <Checkbox v-for="i in connectionList.connection" :label="i.connection_name" :key="i.connection_name">
-                  {{i.connection_name}}
+                  <Tag color="purple" :key="i"> {{i.connection_name}}</Tag>
                 </Checkbox>
               </CheckboxGroup>
             </FormItem>
@@ -61,7 +61,7 @@
               </div>
               <CheckboxGroup v-model="permission.dmlcon">
                 <Checkbox v-for="i in connectionList.connection" :label="i.connection_name" :key="i.connection_name">
-                  {{i.connection_name}}
+                  <Tag color="geekblue" :key="i"> {{i.connection_name}}</Tag>
                 </Checkbox>
               </CheckboxGroup>
             </FormItem>
@@ -85,7 +85,7 @@
               </div>
               <CheckboxGroup v-model="permission.querycon">
                 <Checkbox v-for="i in connectionList.connection" :label="i.connection_name" :key="i.connection_name">
-                  {{i.connection_name}}
+                  <Tag color="blue" :key="i"> {{i.connection_name}}</Tag>
                 </Checkbox>
               </CheckboxGroup>
             </FormItem>
@@ -101,44 +101,11 @@
               </Checkbox>
             </div>
             <CheckboxGroup v-model="permission.person">
-              <Checkbox v-for="i in connectionList.person" :label="i.username" :key="i.username">{{i.username}}
+              <Checkbox v-for="i in connectionList.person" :label="i.username" :key="i.username">
+                <Tag color="cyan" :key="i"> {{i.username}}</Tag>
               </Checkbox>
             </CheckboxGroup>
           </FormItem>
-          <hr style="height:1px;border:none;border-top:1px dashed #dddee1;"/>
-          <br>
-          <FormItem label="数据字典权限:">
-            <RadioGroup v-model="permission.dic">
-              <Radio label="1">是</Radio>
-              <Radio label="0">否</Radio>
-            </RadioGroup>
-          </FormItem>
-          <template v-if="permission.dic === '1'">
-            <FormItem label="数据字典修改权限:">
-              <RadioGroup v-model="permission.dicedit">
-                <Radio label="1">是</Radio>
-                <Radio label="0">否</Radio>
-              </RadioGroup>
-            </FormItem>
-            <FormItem label="数据字典导出权限:">
-              <RadioGroup v-model="permission.dicexport">
-                <Radio label="1">是</Radio>
-                <Radio label="0">否</Radio>
-              </RadioGroup>
-            </FormItem>
-            <FormItem label="连接名:">
-              <div style="border-bottom: 1px solid #e9e9e9;padding-bottom:6px;margin-bottom:6px;">
-                <Checkbox
-                  :indeterminate="indeterminate.dic"
-                  :value="checkAll.dic"
-                  @click.prevent.native="ddlCheckAll('diccon', 'dic', 'dic')">全选
-                </Checkbox>
-              </div>
-              <CheckboxGroup v-model="permission.diccon">
-                <Checkbox v-for="i in connectionList.dic" :label="i.Name" :key="i.Name">{{i.Name}}</Checkbox>
-              </CheckboxGroup>
-            </FormItem>
-          </template>
         </template>
         <template>
           <hr style="height:1px;border:none;border-top:1px dashed #dddee1;"/>
@@ -194,10 +161,6 @@
     dmlcon: [],
     query: '0',
     querycon: [],
-    dic: '0',
-    diccon: [],
-    dicedit: '0',
-    dicexport: '0',
     user: '0',
     base: '0',
     person: []
@@ -268,19 +231,16 @@
           ddl: true,
           dml: true,
           query: true,
-          dic: true,
           person: true
         },
         checkAll: {
           ddl: false,
           dml: false,
           query: false,
-          dic: false,
           person: false
         },
         connectionList: {
           connection: [],
-          dic: [],
           person: []
         },
         addAuthGroupForm: {
@@ -303,7 +263,7 @@
       createAuthGroup () {
         for (let i of this.data6) {
           if (this.addAuthGroupForm.groupname === i.username) {
-            return this.$config.err_notice('不可创建相同名的权限组！')
+            return this.$config.err_notice(this, '不可创建相同名的权限组！')
           }
         }
         axios.post(`${this.$config.url}/authgroup/`, {
@@ -316,7 +276,7 @@
             this.refreshgroup()
           })
           .catch(error => {
-            this.$config.err_notice(error)
+            this.$config.err_notice(this, error)
           })
         this.addAuthGroupModal = false
       },
@@ -331,7 +291,7 @@
             this.refreshgroup()
           })
           .catch(error => {
-            this.$config.err_notice(error)
+            this.$config.err_notice(this, error)
           })
         this.addAuthGroupModal = false
       },
@@ -356,9 +316,7 @@
         }
         this.indeterminate[indeterminate] = false
         if (this.checkAll[indeterminate]) {
-          if (ty === 'dic') {
-            this.permission[name] = this.connectionList[ty].map(vl => vl.Name)
-          } else if (ty === 'person') {
+          if (ty === 'person') {
             this.permission[name] = this.connectionList[ty].map(vl => vl.username)
           } else {
             this.permission[name] = this.connectionList[ty].map(vl => vl.connection_name)
@@ -374,7 +332,7 @@
               this.$config.notice(res.data)
               this.refreshgroup()
             })
-            .catch(err => this.$config.err_notice(err))
+            .catch(err => this.$config.err_notice(this, err))
         } else {
           this.$Message.error({
             content: '请填写正确的权限组名称！',
@@ -391,11 +349,10 @@
       axios.put(`${this.$config.url}/workorder/connection`, {'permissions_type': 'user'})
         .then(res => {
           this.connectionList.connection = res.data['connection']
-          this.connectionList.dic = res.data['dic']
           this.connectionList.person = res.data['person']
         })
         .catch(error => {
-          this.$config.err_notice(error)
+          this.$config.err_notice(this, error)
         })
       this.refreshgroup()
     }

@@ -38,22 +38,6 @@ class Account(AbstractUser):
     real_name = models.CharField(max_length=100, null=True, default='请添加真实姓名')  # 真实姓名
 
 
-class SqlDictionary(models.Model):
-    '''
-    数据库字典表
-    '''
-    BaseName = models.CharField(max_length=100)  # 库名
-    TableName = models.CharField(max_length=100)  # 表名
-    Field = models.CharField(max_length=100)  # 字段名
-    Type = models.CharField(max_length=100)  # 类型
-    Extra = models.TextField()  # 备注
-    TableComment = models.CharField(max_length=100)  # 表备注
-    Name = models.CharField(max_length=100, null=True)  # 连接名
-
-    def __str__(self):
-        return self.TableName
-
-
 class SqlOrder(models.Model):
     '''
     工单提交表

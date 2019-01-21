@@ -3,8 +3,8 @@ import logging
 import datetime
 import re
 import threading
-import simplejson
 import ast
+import simplejson
 from django.http import HttpResponse
 from rest_framework.response import Response
 from libs.serializers import Query_review, Query_list
@@ -19,11 +19,11 @@ BLACKLIST = ['update', 'insert', 'alter', 'into', 'for', 'drop']
 
 def exclued_db_list():
     try:
-        from core.models import globalpermissions
-        setting = globalpermissions.objects.filter(authorization='global').first()
+        setting = globalpermissions.objects.filter(
+            authorization='global').first()
         exclued_database_name = setting.other.get('exclued_db_list', [])
-    except Exception:
-        logging.error("exclued_database_name配置错误.")
+    except Exception as e:
+        CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
         exclued_database_name = []
     finally:
         return exclued_database_name
@@ -83,12 +83,14 @@ class search(baseview.BaseView):
         limit = ast.literal_eval(un_init['other'])
         sql = request.data['sql']
         check = str(sql).lower().strip().split(';\n')
-        user = query_order.objects.filter(username=request.user).order_by('-id').first()
+        raw_sql = str(sql).strip().split(';\n')[-1]
+        user = query_order.objects.filter(
+            username=request.user).order_by('-id').first()
         un_init = util.init_conf()
         custom_com = ast.literal_eval(un_init['other'])
         critical = len(custom_com['sensitive_list'])
         if user.query_per == 1:
-            if check[-1].startswith('s') != 1:
+            if check[-1].startswith('s') is not True:
                 return Response('请勿使用非查询语句,请删除不必要的空白行！')
             else:
                 address = json.loads(request.data['address'])
@@ -97,45 +99,50 @@ class search(baseview.BaseView):
                     computer_room=user.computer_room
                 ).first()
                 with con_database.SQLgo(
-                        ip=_c.ip,
-                        password=_c.password,
-                        user=_c.username,
-                        port=_c.port,
-                        db=address['basename']
+                    ip=_c.ip,
+                    password=_c.password,
+                    user=_c.username,
+                    port=_c.port,
+                    db=address['basename']
                 ) as f:
                     try:
                         if search.sql_parse(check[-1]):
                             return Response('语句中不得含有违禁关键字: update insert alter into for drop')
 
-                        if check[-1].startswith('show') != -1:
-                            query_sql = check[-1]
+                        if check[-1].startswith('show'):
+                            query_sql = raw_sql
                         else:
                             if limit.get('limit').strip() == '':
                                 CUSTOM_ERROR.error('未设置全局最大limit值，系统自动设置为1000')
-                                query_sql = replace_limit(check[-1], 1000)
+                                query_sql = replace_limit(raw_sql, 1000)
                             else:
-                                query_sql = replace_limit(check[-1], limit.get('limit'))
+                                query_sql = replace_limit(
+                                    raw_sql, limit.get('limit'))
                         data_set = f.search(sql=query_sql)
                     except Exception as e:
                         CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
                         return HttpResponse(e)
                     else:
                         if critical:
-                            as_list = search.sql_as_ex(sql, custom_com['sensitive_list'])
+                            as_list = search.sql_as_ex(
+                                sql, custom_com['sensitive_list'])
                             for l in data_set['data']:
                                 for k, v in l.items():
                                     for n in range(data_set['len']):
                                         if isinstance(v, bytes):
-                                            data_set['data'][n].update({k: 'blob字段为不可呈现类型'})
+                                            data_set['data'][n].update(
+                                                {k: 'blob字段为不可呈现类型'})
                                         for i in as_list:
                                             if k == i:
-                                                data_set['data'][n].update({k: '********'})
+                                                data_set['data'][n].update(
+                                                    {k: '********'})
                         else:
                             for l in data_set['data']:
                                 for k, v in l.items():
                                     for n in range(data_set['len']):
                                         if isinstance(v, bytes):
-                                            data_set['data'][n].update({k: 'blob字段为不可呈现类型'})
+                                            data_set['data'][n].update(
+                                                {k: 'blob字段为不可呈现类型'})
                         querypermissions.objects.create(
                             work_id=user.work_id,
                             username=request.user,
@@ -148,7 +155,8 @@ class search(baseview.BaseView):
     def put(self, request, args: str = None):
         base = request.data['base']
         table = request.data['table']
-        query_per = query_order.objects.filter(username=request.user).order_by('-id').first()
+        query_per = query_order.objects.filter(
+            username=request.user).order_by('-id').first()
         if query_per.query_per == 1:
             _c = DatabaseList.objects.filter(
                 connection_name=query_per.connection_name,
@@ -156,15 +164,16 @@ class search(baseview.BaseView):
             ).first()
             try:
                 with con_database.SQLgo(
-                        ip=_c.ip,
-                        password=_c.password,
-                        user=_c.username,
-                        port=_c.port,
-                        db=base
+                    ip=_c.ip,
+                    password=_c.password,
+                    user=_c.username,
+                    port=_c.port,
+                    db=base
                 ) as f:
                     data_set = f.search(sql='desc %s' % table)
                 return Response(data_set)
-            except:
+            except Exception as e:
+                CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
                 return Response('')
         else:
             return Response({'error': '非法请求,账号无查询权限！'})
@@ -179,8 +188,6 @@ def replace_limit(sql, limit):
 
     if sql[-1] != ';':
         sql += ';'
-    if sql.startswith('show') == -1:
-        return sql
     sql_re = re.search(r'limit\s.*\d.*;', sql.lower())
     length = ''
     if sql_re is not None:
@@ -215,7 +222,8 @@ class query_worklf(baseview.BaseView):
 
         work_id = request.data['workid']
         user = request.data['user']
-        data = querypermissions.objects.filter(work_id=work_id, username=user).all().order_by('-id')
+        data = querypermissions.objects.filter(
+            work_id=work_id, username=user).all().order_by('-id')
         serializers = Query_list(data, many=True)
         return Response(serializers.data)
 
@@ -235,14 +243,12 @@ class query_worklf(baseview.BaseView):
             if not query_switch['query']:
                 query_per = 2
             else:
-                userinfo = Account.objects.filter(username=audit, group='admin').first()
+                userinfo = Account.objects.filter(
+                    username=audit, group='admin').first()
                 try:
                     thread = threading.Thread(
                         target=push_message,
-                        args=(
-                            {'to_user': request.user, 'workid': work_id}, 5, request.user, userinfo.email, work_id,
-                            '提交')
-                    )
+                        args=({'to_user': request.user, 'workid': work_id}, 5, request.user, userinfo.email, work_id, '提交'))
                     thread.start()
                 except Exception as e:
                     CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
@@ -261,17 +267,20 @@ class query_worklf(baseview.BaseView):
             )
             if not query_switch['query']:
                 query_order.objects.filter(work_id=work_id).update(query_per=1)
-            ## 钉钉及email站内信推送
+            # 钉钉及email站内信推送
             return Response('查询工单已提交，等待管理员审核！')
 
         elif request.data['mode'] == 'agree':
             work_id = request.data['work_id']
-            query_info = query_order.objects.filter(work_id=work_id).order_by('-id').first()
+            query_info = query_order.objects.filter(
+                work_id=work_id).order_by('-id').first()
             query_order.objects.filter(work_id=work_id).update(query_per=1)
-            userinfo = Account.objects.filter(username=query_info.username).first()
+            userinfo = Account.objects.filter(
+                username=query_info.username).first()
             try:
                 thread = threading.Thread(target=push_message, args=(
-                    {'to_user': query_info.username, 'workid': query_info.work_id}, 6, query_info.username,
+                    {'to_user': query_info.username,
+                     'workid': query_info.work_id}, 6, query_info.username,
                     userinfo.email,
                     work_id, '同意'))
                 thread.start()
@@ -282,11 +291,14 @@ class query_worklf(baseview.BaseView):
         elif request.data['mode'] == 'disagree':
             work_id = request.data['work_id']
             query_order.objects.filter(work_id=work_id).update(query_per=0)
-            query_info = query_order.objects.filter(work_id=work_id).order_by('-id').first()
-            userinfo = Account.objects.filter(username=query_info.username).first()
+            query_info = query_order.objects.filter(
+                work_id=work_id).order_by('-id').first()
+            userinfo = Account.objects.filter(
+                username=query_info.username).first()
             try:
                 thread = threading.Thread(target=push_message, args=(
-                    {'to_user': query_info.username, 'workid': query_info.work_id}, 7, query_info.username,
+                    {'to_user': query_info.username,
+                     'workid': query_info.work_id}, 7, query_info.username,
                     userinfo.email,
                     work_id, '驳回'))
                 thread.start()
@@ -296,14 +308,17 @@ class query_worklf(baseview.BaseView):
 
         elif request.data['mode'] == 'status':
             try:
-                status = query_order.objects.filter(username=request.user).order_by('-id').first()
+                status = query_order.objects.filter(
+                    username=request.user).order_by('-id').first()
                 return Response(status.query_per)
-            except:
+            except Exception as e:
+                CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
                 return Response(0)
 
         elif request.data['mode'] == 'end':
             try:
-                query_order.objects.filter(username=request.data['username']).order_by('-id').update(query_per=3)
+                query_order.objects.filter(username=request.data['username']).order_by(
+                    '-id').update(query_per=3)
                 return Response('已结束查询！')
             except Exception as e:
                 return HttpResponse(e)
@@ -311,8 +326,10 @@ class query_worklf(baseview.BaseView):
         elif request.data['mode'] == 'info':
             tablelist = []
             highlist = []
-            database = query_order.objects.filter(username=request.user).order_by('-id').first()
-            _connection = DatabaseList.objects.filter(connection_name=database.connection_name).first()
+            database = query_order.objects.filter(
+                username=request.user).order_by('-id').first()
+            _connection = DatabaseList.objects.filter(
+                connection_name=database.connection_name).first()
             with con_database.SQLgo(ip=_connection.ip,
                                     user=_connection.username,
                                     password=_connection.password,
@@ -325,24 +342,11 @@ class query_worklf(baseview.BaseView):
                     if uc['Database'] == cc:
                         del dataname[index]
             for i in dataname:
-                with con_database.SQLgo(ip=_connection.ip,
-                                        user=_connection.username,
-                                        password=_connection.password,
-                                        port=_connection.port,
-                                        db=i['Database']) as f:
-                    tablename = f.query_info(sql='show tables')
                 highlist.append({'vl': i['Database'], 'meta': '库名'})
-                for c in tablename:
-                    key = 'Tables_in_%s' % i['Database']
-                    highlist.append({'vl': c[key], 'meta': '表名'})
-                    children.append({
-                        'title': c[key]
-                    })
                 tablelist.append({
                     'title': i['Database'],
-                    'children': children
+                    'children': [{}]
                 })
-                children = []
             data = [{
                 'title': database.connection_name,
                 'expand': 'true',
@@ -350,8 +354,32 @@ class query_worklf(baseview.BaseView):
             }]
             return Response({'info': json.dumps(data), 'status': database.export, 'highlight': highlist})
 
-    def delete(self, request, args: str = None):
+        elif request.data['mode'] == 'table':
+            basename = request.data['base']
+            highlist = []
+            children = []
+            database = query_order.objects.filter(username=request.user).order_by('-id').first()
+            _connection = DatabaseList.objects.filter(connection_name=database.connection_name).first()
+            with con_database.SQLgo(ip=_connection.ip,
+                                    user=_connection.username,
+                                    password=_connection.password,
+                                    port=_connection.port,
+                                    db=basename) as f:
+                tablename = f.query_info(sql='show tables')
+                for c in tablename:
+                    key = 'Tables_in_%s' % basename
+                    field = f.query_info(sql='select COLUMN_NAME from information_schema.COLUMNS where table_name = "%s"'%c[key])
+                    for z in field:
+                        highlist.append({'vl':z['COLUMN_NAME'], 'meta': '字段名'})
+                    highlist.append({'vl': c[key], 'meta': '表名'})
+                    children.append({
+                        'title': c[key]
+                    })
+            return Response({'table': children, 'highlight': highlist})
 
+
+
+    def delete(self, request, args: str = None):
         data = query_order.objects.filter(username=request.user).order_by('-id').first()
         query_order.objects.filter(work_id=data.work_id).delete()
         return Response('')
@@ -364,8 +392,8 @@ def push_message(message=None, type=None, user=None, to_addr=None, work_id=None,
             try:
                 put_mess = send_email.send_email(to_addr=to_addr)
                 put_mess.send_mail(mail_data=message, type=type)
-            except:
-                pass
+            except Exception as e:
+                CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
 
         if tag.message['ding']:
             un_init = util.init_conf()

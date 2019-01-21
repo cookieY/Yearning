@@ -51,22 +51,10 @@
         <Row class="margin-top-10">
           <Card>
             <p slot="title" class="card-title">
-              <Icon type="md-checkbox-outline"></Icon>
-              待办事项
+              <Icon type="md-person" size="24"/>
+              个人信息
             </p>
-            <a type="text" slot="extra" @click.prevent="addNewToDoItem">
-              <Icon type="md-add"></Icon>
-            </a>
-            <Modal v-model="showAddNewTodo" title="添加新的待办事项" @on-ok="addNew" @on-cancel="cancelAdd">
-              <Row type="flex" justify="center">
-                <Input v-model="newToDoItemValue" icon="compose" placeholder="请输入..." style="width: 300px"/>
-              </Row>
-            </Modal>
-            <div class="to-do-list-con">
-              <div v-for="(item, index) in toDoList" :key="index" class="to-do-item">
-                <to-do-list-item :content="item.title" :todoitem="false" @deltodo="deltodo"></to-do-list-item>
-              </div>
-            </div>
+            <userinfomation></userinfomation>
           </Card>
         </Row>
       </Col>
@@ -79,10 +67,6 @@
           <Col span="6" class-name="padding-left-5">
             <infor-card id-name="visit_count" :end-val="count.link" iconType="ios-eye" color="#64d572" :iconSize="50"
                         intro-text="数据库连接地址"></infor-card>
-          </Col>
-          <Col span="6" class-name="padding-left-5">
-            <infor-card id-name="collection_count" :end-val="count.dic" iconType="md-cloud-upload" color="#ffd572"
-                        intro-text="数据字典采集字段"></infor-card>
           </Col>
           <Col span="6" class-name="padding-left-5">
             <infor-card id-name="transfer_count" :end-val="count.order" iconType="md-shuffle" color="#f25e43"
@@ -128,12 +112,15 @@
   import dataSourcePie from './components/dataSourcePie.vue'
   import inforCard from './components/inforCard.vue'
   import toDoListItem from './components/toDoListItem.vue'
+  import userinfomation from '../personalCenter/own-space'
 
   export default {
     components: {
       dataSourcePie,
       inforCard,
-      toDoListItem
+      toDoListItem,
+      userinfomation
+
     },
     data () {
       return {
@@ -143,86 +130,33 @@
         count: {
           createUser: 0,
           order: 0,
-          link: 0,
-          dic: 0
+          link: 0
         },
-        showAddNewTodo: false,
         newToDoItemValue: '',
         time: '',
         username: sessionStorage.getItem('user'),
         board: {
-          'title': ['1.DDL语句生成', '2.数据库字典生成及查看', '3.SQL语句审核及回滚', '4.工单流程化', '5.可视化数据查询', '6.细粒度的权限划分']
+          'title': ['1.DDL语句生成', '2.SQL语句审核及回滚', '3.工单流程化', '4.可视化数据查询', '5.细粒度的权限划分']
         }
       }
     },
     methods: {
-      addNewToDoItem () {
-        this.showAddNewTodo = true
-      },
       formatDate () {
         let date = new Date()
         let month = date.getMonth() + 1
         this.time = date.getFullYear() + '/' + month + '/' + date.getDate() + '  ' + date.getHours() + ':' + date.getMinutes() + ':' + date.getSeconds()
-      },
-      addNew () {
-        if (this.newToDoItemValue.length !== 0) {
-          axios.post(`${this.$config.url}/homedata/todolist/`, {
-            'todo': this.newToDoItemValue
-          })
-            .then(() => {
-              let vm = this
-              this.toDoList.unshift({
-                title: this.newToDoItemValue
-              })
-              setTimeout(function () {
-                vm.newToDoItemValue = ''
-              }, 200)
-              this.showAddNewTodo = false
-            })
-            .catch(error => {
-              this.$config.err_notice(error)
-            })
-        } else {
-          this.$Message.error('请输入待办事项内容')
-        }
-      },
-      cancelAdd () {
-        this.showAddNewTodo = false
-        this.newToDoItemValue = ''
-      },
-      deltodo (val) {
-        axios.put(`${this.$config.url}/homedata/deltodo`, {
-          'todo': val
-        })
-          .then(() => {
-            this.gettodo()
-          })
-          .catch(error => {
-            this.$config.err_notice(error)
-          })
-      },
-      gettodo () {
-        axios.put(`${this.$config.url}/homedata/todolist`)
-          .then(res => {
-            this.toDoList = res.data
-          })
-          .catch(error => {
-            this.$config.err_notice(error)
-          })
       }
     },
     mounted () {
       axios.get(`${this.$config.url}/homedata/infocard`)
         .then(res => {
-          this.count.dic = res.data[0]
-          this.count.createUser = res.data[1]
-          this.count.order = res.data[2]
-          this.count.link = res.data[3]
+          this.count.createUser = res.data[0]
+          this.count.order = res.data[1]
+          this.count.link = res.data[2]
         })
         .catch(error => {
-          this.$config.err_notice(error)
+          this.$config.err_notice(this, error)
         })
-      this.gettodo()
       this.formatDate()
     }
   }

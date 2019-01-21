@@ -58,9 +58,9 @@
                   <FormItem label="LDAP管理员密码:">
                     <Input placeholder="请填写管理员密码" v-model="ldap.password" type="password"></Input>
                   </FormItem>
-                  <FormItem label="LDAP登录用户名:">
+                  <FormItem label="LDAP搜索规则:">
                     <Select v-model="ldap.type">
-                      <Option value="1">mail</Option>
+                      <Option value="1">sAMAccountName</Option>
                       <Option value="2">uid</Option>
                       <Option value="3">cn</Option>
                     </Select>
@@ -345,7 +345,7 @@
             this.$config.notice(res.data)
           })
           .catch(error => {
-            this.$config.err_notice(error)
+            this.$config.err_notice(this, error)
           })
       },
       save_upload () {
@@ -378,7 +378,7 @@
           }
         })
         .catch(error => {
-          this.$config.err_notice(error)
+          this.$config.err_notice(this, error)
         })
     }
   }

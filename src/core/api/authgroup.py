@@ -7,46 +7,35 @@ from django.http import HttpResponse
 from libs import baseview
 from rest_framework.response import Response
 from core.models import Account, grained
+from core.task import isAdmin
 
 CUSTOM_ERROR = logging.getLogger('Yearning.core.views')
 
 
 class auth_group(baseview.BaseView):
 
+    @isAdmin
     def get(self, request, args: str = None):
         if args == 'all':
-            user = Account.objects.filter(username=request.user).first()
-            if user.id != 1:
-                return HttpResponse(status=401)
+            try:
+                page = request.GET.get('page')
+            except KeyError as e:
+                CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
+                return HttpResponse(status=500)
             else:
                 try:
-                    page = request.GET.get('page')
-                except KeyError as e:
+                    page_number = grained.objects.count()
+                    start = int(page) * 10 - 10
+                    end = int(page) * 10
+                    queryset = grained.objects.order_by('-id').all()[start:end]
+                    ser = []
+                    for i in queryset:
+                        ser.append(
+                            {'id': i.id, 'username': i.username, 'permissions': i.permissions})
+                    return Response({'page': page_number, 'data': ser})
+                except Exception as e:
                     CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
-                    return HttpResponse(status=500)
-                else:
-                    try:
-                        page_number = grained.objects.count()
-                        start = int(page) * 10 - 10
-                        end = int(page) * 10
-                        queryset = grained.objects.order_by('-id').all()[start:end]
-                        ser = []
-                        for i in queryset:
-                            ser.append(
-                                {'id': i.id, 'username': i.username, 'permissions': i.permissions})
-                        return Response({'page': page_number, 'data': ser})
-                    except Exception as e:
-                        CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
-                        return HttpResponse(e)
-
-        elif args == 'permissions':
-            try:
-                group_name = request.GET.get('group_name')
-                group = grained.objects.filter(username=group_name).first()
-                return Response(group.permissions)
-            except Exception as e:
-                CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
-                return HttpResponse(e)
+                    return HttpResponse(e)
 
         elif args == 'group_name':
             try:
@@ -57,16 +46,19 @@ class auth_group(baseview.BaseView):
                 CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
                 return HttpResponse(e)
 
+    @isAdmin
     def post(self, request, args: str = None):
         try:
             group_name = request.data['groupname']
             permissions = json.loads(request.data['permission'])
-            grained.objects.get_or_create(username=group_name, permissions=permissions)
+            grained.objects.get_or_create(
+                username=group_name, permissions=permissions)
             return Response('权限组已创建!')
         except Exception as e:
             CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
             return HttpResponse(e)
 
+    @isAdmin
     def put(self, request, args: str = None):
         if args == 'group_list':
             try:
@@ -81,12 +73,8 @@ class auth_group(baseview.BaseView):
                     'ddlcon': [],
                     'dml': '0',
                     'dmlcon': [],
-                    'dic': '0',
-                    'diccon': [],
-                    'dicedit': '0',
                     'user': '0',
                     'base': '0',
-                    'dicexport': '0',
                     'person': [],
                     'query': '0',
                     'querycon': []
@@ -117,14 +105,13 @@ class auth_group(baseview.BaseView):
                     if group == "guest":
                         pr = 0
                     if not authgroup:
-                        Account.objects.filter(username=username).update(group=group,
-                                                                         department=department, auth_group=None,
-                                                                         is_staff=pr)
+                        Account.objects.filter(username=username).update(
+                            group=group, department=department, auth_group=None, is_staff=pr
+                        )
                     else:
                         auth_group_str = (",".join(authgroup))
-                        Account.objects.filter(username=username).update(group=group,
-                                                                         department=department,
-                                                                         auth_group=auth_group_str, is_staff=pr)
+                        Account.objects.filter(username=username).update(
+                            group=group, department=department, auth_group=auth_group_str, is_staff=pr)
                     return Response('权限保存成功!')
                 except Exception as e:
                     CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
@@ -134,17 +121,19 @@ class auth_group(baseview.BaseView):
             try:
                 group_name = request.data['groupname']
                 permissions = json.loads(request.data['permission'])
-                select = ['query', 'ddl', 'dml', 'dic']
+                select = ['query', 'ddl', 'dml']
                 for i in select:
                     if permissions[i] == '0':
                         index = f'{i}con'
                         permissions[index] = []
-                grained.objects.filter(username=group_name).update(permissions=permissions)
+                grained.objects.filter(username=group_name).update(
+                    permissions=permissions)
                 return Response('权限组更新成功!')
             except Exception as e:
                 CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
                 return HttpResponse(e)
 
+    @isAdmin
     def delete(self, request, args: str = None):
         user = Account.objects.all().values('username', 'auth_group')
         for i in user:
@@ -153,6 +142,7 @@ class auth_group(baseview.BaseView):
                 for c in auth_list:
                     if c == args:
                         auth_list.remove(c)
-                Account.objects.filter(username=i['username']).update(auth_group=','.join(auth_list))
+                Account.objects.filter(username=i['username']).update(
+                    auth_group=','.join(auth_list))
         grained.objects.filter(username=args).delete()
         return Response('权限组删除成功！')

@@ -2,22 +2,26 @@ import logging
 import json
 import ast
 from libs import baseview
+from libs.cryptoAES import cryptoAES
 from libs import con_database
 from core.task import grained_permissions
 from libs import util
 from rest_framework.response import Response
 from django.http import HttpResponse
 from django.db import transaction
-from libs.serializers import Sqllist, Getdingding
+from libs.serializers import Sqllist
+from settingConf import settings
 from core.models import (
     DatabaseList,
-    SqlDictionary,
     SqlRecord,
     SqlOrder,
-    grained
+    grained,
+    query_order
 )
 
 CUSTOM_ERROR = logging.getLogger('Yearning.core.views')
+
+AES = cryptoAES(settings.SECRET_KEY)
 
 
 class management_db(baseview.SuperUserpermissions):
@@ -39,7 +43,6 @@ class management_db(baseview.SuperUserpermissions):
                 {
                         'page': page_number,
                         'data': serializers.data,
-                        'diclist': data,
                         'ding_switch': switch_dingding,
                         'mail_switch': switch_email
                 }
@@ -48,6 +51,7 @@ class management_db(baseview.SuperUserpermissions):
 
         try:
             page = request.GET.get('page')
+            con = json.loads(request.GET.get('con'))
         except KeyError as e:
             CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
             return HttpResponse(status=500)
@@ -55,19 +59,22 @@ class management_db(baseview.SuperUserpermissions):
             try:
                 un_init = util.init_conf()
                 custom_com = ast.literal_eval(un_init['other'])
-                page_number = DatabaseList.objects.count()
                 start = int(page) * 10 - 10
                 end = int(page) * 10
-                info = DatabaseList.objects.all().order_by('connection_name')[start:end]
+                if con['valve']:
+                    page_number = DatabaseList.objects.filter(connection_name__contains=con['connection_name'],
+                                                              computer_room__contains=con['computer_room']).count()
+                    info = DatabaseList.objects.filter(connection_name__contains=con['connection_name'],
+                                                       computer_room__contains=con['computer_room'])[start:end]
+                else:
+                    page_number = DatabaseList.objects.count()
+                    info = DatabaseList.objects.all().order_by('connection_name')[start:end]
                 serializers = Sqllist(info, many=True)
-                data = SqlDictionary.objects.all().values('Name')
-                data.query.group_by = ['Name']  # 不重复表名
 
                 return Response(
                     {
                         'page': page_number,
                         'data': serializers.data,
-                        'diclist': data,
                         'custom': custom_com['con_room']
                     }
                 )
@@ -87,6 +94,7 @@ class management_db(baseview.SuperUserpermissions):
 
         try:
             data = json.loads(request.data['data'])
+            password = AES.encrypt(data['password'])
         except KeyError as e:
             CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
             return HttpResponse(status=500)
@@ -97,7 +105,7 @@ class management_db(baseview.SuperUserpermissions):
                     ip=data['ip'],
                     computer_room=data['computer_room'],
                     username=data['username'],
-                    password=data['password'],
+                    password=password,
                     port=data['port']
                 )
                 return Response('ok')
@@ -137,6 +145,7 @@ class management_db(baseview.SuperUserpermissions):
 
             try:
                 update_data = json.loads(request.data['data'])
+                password = AES.encrypt(update_data['password'])
             except KeyError as e:
                 CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
                 return HttpResponse(status=500)
@@ -147,7 +156,7 @@ class management_db(baseview.SuperUserpermissions):
                         computer_room=update_data['computer_room']).update(
                         ip=update_data['ip'],
                         username=update_data['username'],
-                        password=update_data['password'],
+                        password=password,
                         port=update_data['port']
                     )
                     return Response('数据信息更新成功！')
@@ -173,10 +182,11 @@ class management_db(baseview.SuperUserpermissions):
                     SqlRecord.objects.filter(workid=work_id).delete()
                     SqlOrder.objects.filter(bundle_id=con_id.id).delete()
                     DatabaseList.objects.filter(connection_name=args).delete()
+                    query_order.objects.filter(connection_name=args).update(query_per=3)
                 per = grained.objects.all().values('username', 'permissions')
                 for i in per:
                     for c in i['permissions']:
-                        if isinstance(i['permissions'][c], list) and c != 'diccon':
+                        if isinstance(i['permissions'][c], list):
                             i['permissions'][c] = list(filter(lambda x: x != args, i['permissions'][c]))
                     grained.objects.filter(username=i['username']).update(permissions=i['permissions'])
             return Response('数据库信息已删除!')
@@ -191,21 +201,6 @@ class dingding(baseview.SuperUserpermissions):
     dingding 相关
 
     '''
-
-    def get(self, request, args=None):
-        try:
-            connection_name = request.GET.get('connection_name')
-        except KeyError as e:
-            CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
-            return HttpResponse(status=500)
-        else:
-            try:
-                data = DatabaseList.objects.filter(connection_name=connection_name).first()
-                serializers = Getdingding(data)
-                return Response(serializers.data)
-            except Exception as e:
-                CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
-                return HttpResponse(status=500)
 
     def post(self, request, args=None):
         try:

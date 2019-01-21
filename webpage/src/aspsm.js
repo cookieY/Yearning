@@ -1,7 +1,9 @@
 import Vue from 'vue'
 import Vuex from 'vuex'
-//
-import { MainRoute, appRouter } from './router'
+import {
+  MainRoute,
+  appRouter
+} from './router'
 import util from './libs/util'
 
 Vue.use(Vuex)
@@ -23,20 +25,16 @@ const store = new Vuex.Store({
       MainRoute, ...appRouter
     ],
     currentPageName: 'home_index',
-    currentPath: [
-      {
-        title: '首页',
-        path: '/',
-        name: 'home_index'
-      }
-    ],
-    pageOpenedList: [
-      {
-        title: '首页',
-        path: '',
-        name: 'home_index'
-      }
-    ],
+    currentPath: [{
+      title: '首页',
+      path: '/',
+      name: 'home_index'
+    }],
+    pageOpenedList: [{
+      title: '首页',
+      path: '',
+      name: 'home_index'
+    }],
     tagsList: [...appRouter],
     cachePage: []
   },
@@ -119,12 +117,20 @@ const store = new Vuex.Store({
     Breadcrumbset (state, name) {
       if (name === 'ownspace_index') {
         state.currentPath.splice(1, state.currentPath.length - 1)
-        state.currentPath.push({'title': '个人中心', 'path': 'ownspace', 'name': name})
+        state.currentPath.push({
+          'title': '个人中心',
+          'path': 'ownspace',
+          'name': name
+        })
       } else if (name === 'home_index') {
         state.currentPath.splice(1, state.currentPath.length - 1)
       } else if (name === 'myorder') {
         state.currentPath.splice(1, state.currentPath.length - 1)
-        state.currentPath.push({'title': '我的工单', 'path': 'message', 'name': name})
+        state.currentPath.push({
+          'title': '我的工单',
+          'path': 'message',
+          'name': name
+        })
       } else {
         state.currentPath.splice(1, state.currentPath.length - 1)
         appRouter.forEach((val) => {
