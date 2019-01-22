@@ -153,6 +153,20 @@ export default {
     },
     choseName (vl) {
       if (vl.expand === true) {
+        this.$Spin.show({
+          render: (h) => {
+            return h('div', [
+              h('Icon', {
+                'class': 'demo-spin-icon-load',
+                props: {
+                  type: 'ios-loading',
+                  size: 18
+                }
+              }),
+              h('div', 'Loading')
+            ])
+          }
+        })
         axios.put(`${this.$config.url}/query_worklf`, { 'mode': 'table', 'base': vl.title })
           .then(res => {
             this.wordList = concat_(this.wordList, res.data.highlight)
@@ -161,7 +175,9 @@ export default {
                 this.data1[0].children[i].children = res.data.table
               }
             }
+            this.$Spin.hide()
           })
+          .catch(() => this.$Spin.hide())
       }
     },
     Getbasename (vl) {

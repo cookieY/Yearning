@@ -338,7 +338,6 @@ class query_worklf(baseview.BaseView):
                                     password=_connection.password,
                                     port=_connection.port) as f:
                 dataname = f.query_info(sql='show databases')
-            children = []
             ignore = exclued_db_list()
             for index, uc in sorted(enumerate(dataname), reverse=True):
                 for cc in ignore:

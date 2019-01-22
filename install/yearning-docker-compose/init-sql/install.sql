@@ -137,7 +137,7 @@ CREATE TABLE `core_databaselist` (
   `ip` varchar(100) COLLATE utf8_bin NOT NULL,
   `username` varchar(150) COLLATE utf8_bin NOT NULL,
   `port` int(11) NOT NULL,
-  `password` varchar(50) COLLATE utf8_bin NOT NULL,
+  `password` varchar(500) COLLATE utf8_bin NOT NULL,
   `before` longtext COLLATE utf8_bin,
   `after` longtext COLLATE utf8_bin,
   PRIMARY KEY (`id`)

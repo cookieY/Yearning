@@ -9,6 +9,8 @@ cookie
 '''
 
 from libs import util
+from settingConf import settings
+from libs.cryptoAES import cryptoAES
 import pymysql
 import sqlparse
 import ast
@@ -19,7 +21,12 @@ pymysql.install_as_MySQLdb()
 class Inception(object):
     def __init__(self, LoginDic=None):
         self.__dict__.update(LoginDic)
+        self.AES = cryptoAES(settings.SECRET_KEY)
         self.con = object
+        try:
+            self.password = self.AES.decrypt(self.__dict__.get('password'))
+        except ValueError:
+            self.password = self.__dict__.get('password')
 
     def __enter__(self):
         un_init = util.init_conf()
@@ -45,7 +52,7 @@ class Inception(object):
              %s; \
              inception_magic_commit;
             ''' % (self.__dict__.get('user'),
-                   self.__dict__.get('password'),
+                   self.password,
                    self.__dict__.get('host'),
                    self.__dict__.get('port'),
                    Type,
@@ -61,7 +68,7 @@ class Inception(object):
                         %s; \
                         inception_magic_commit;
                        ''' % (self.__dict__.get('user'),
-                              self.__dict__.get('password'),
+                              self.password,
                               self.__dict__.get('host'),
                               self.__dict__.get('port'),
                               Type,
