@@ -69,7 +69,9 @@ class search(baseview.BaseView):
             as_list = []
             for i in range(len(complete)):
                 if complete[i] == 'as':
-                    as_list.append(complete[i + 1].rstrip(','))
+                    for s in sensitive_list:
+                        if complete[i - 1] == s:
+                            as_list.append(complete[i + 1].rstrip(','))
 
             if as_list is not None:
                 for sen_i in as_list:
@@ -99,11 +101,11 @@ class search(baseview.BaseView):
                     computer_room=user.computer_room
                 ).first()
                 with con_database.SQLgo(
-                    ip=_c.ip,
-                    password=_c.password,
-                    user=_c.username,
-                    port=_c.port,
-                    db=address['basename']
+                        ip=_c.ip,
+                        password=_c.password,
+                        user=_c.username,
+                        port=_c.port,
+                        db=address['basename']
                 ) as f:
                     try:
                         if search.sql_parse(check[-1]):
@@ -164,11 +166,11 @@ class search(baseview.BaseView):
             ).first()
             try:
                 with con_database.SQLgo(
-                    ip=_c.ip,
-                    password=_c.password,
-                    user=_c.username,
-                    port=_c.port,
-                    db=base
+                        ip=_c.ip,
+                        password=_c.password,
+                        user=_c.username,
+                        port=_c.port,
+                        db=base
                 ) as f:
                     data_set = f.search(sql='desc %s' % table)
                 return Response(data_set)
@@ -248,7 +250,8 @@ class query_worklf(baseview.BaseView):
                 try:
                     thread = threading.Thread(
                         target=push_message,
-                        args=({'to_user': request.user, 'workid': work_id}, 5, request.user, userinfo.email, work_id, '提交'))
+                        args=(
+                        {'to_user': request.user, 'workid': work_id}, 5, request.user, userinfo.email, work_id, '提交'))
                     thread.start()
                 except Exception as e:
                     CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
@@ -368,16 +371,15 @@ class query_worklf(baseview.BaseView):
                 tablename = f.query_info(sql='show tables')
                 for c in tablename:
                     key = 'Tables_in_%s' % basename
-                    field = f.query_info(sql='select COLUMN_NAME from information_schema.COLUMNS where table_name = "%s"'%c[key])
+                    field = f.query_info(
+                        sql='select COLUMN_NAME from information_schema.COLUMNS where table_name = "%s"' % c[key])
                     for z in field:
-                        highlist.append({'vl':z['COLUMN_NAME'], 'meta': '字段名'})
+                        highlist.append({'vl': z['COLUMN_NAME'], 'meta': '字段名'})
                     highlist.append({'vl': c[key], 'meta': '表名'})
                     children.append({
                         'title': c[key]
                     })
             return Response({'table': children, 'highlight': highlist})
-
-
 
     def delete(self, request, args: str = None):
         data = query_order.objects.filter(username=request.user).order_by('-id').first()

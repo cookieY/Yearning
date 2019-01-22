@@ -28,7 +28,7 @@ SECRET_KEY = 'u)zall!ag&mci+ja5u&-6*1e^ufyu)l4i8+^=mw$845@k!ie+3.txt'
 DEBUG = False
 
 # ALLOWED_HOSTS = [str(CONF_DATA.ipaddress).split(':')[0]]
-ALLOWED_HOSTS = ['*']
+ALLOWED_HOSTS = ['127.0.0.1']
 
 # Application definition
 AUTH_USER_MODEL = 'core.Account'

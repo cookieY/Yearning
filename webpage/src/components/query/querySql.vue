@@ -165,6 +165,10 @@ export default {
       }
     },
     Getbasename (vl) {
+      if (vl[0].children) {
+        this.put_info.base = vl[0].title
+        return
+      }
       for (let i of this.data1[0].children) {
         for (let c of i.children) {
           if (c.title === vl[0].title && c.nodeKey === vl[0].nodeKey) {
