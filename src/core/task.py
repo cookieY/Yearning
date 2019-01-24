@@ -103,6 +103,7 @@ def isAdmin(func):
 
     return wrapper
 
+
 class order_push_message(threading.Thread):
     '''
 
@@ -141,13 +142,13 @@ class order_push_message(threading.Thread):
             detail = DatabaseList.objects.filter(id=self.order.bundle_id).first()
 
             with call_inception.Inception(
-                LoginDic={
-                    'host': detail.ip,
-                    'user': detail.username,
-                    'password': detail.password,
-                    'db': self.order.basename,
-                    'port': detail.port
-                }
+                    LoginDic={
+                        'host': detail.ip,
+                        'user': detail.username,
+                        'password': detail.password,
+                        'db': self.order.basename,
+                        'port': detail.port
+                    }
             ) as f:
                 res = f.Execute(sql=self.order.sql, backup=self.order.backup)
                 for i in res:
@@ -199,10 +200,10 @@ class order_push_message(threading.Thread):
         if tag.message['ding']:
             try:
                 util.dingding(
-                    content='工单执行通知\n工单编号:%s\n发起人:%s\n地址:%s\n工单备注:%s\n状态:已执行\n备注:%s'
-                    % (
-                        self.order.work_id, self.order.username, self.addr_ip, self.order.text,
-                        content.after),
+                    content='# <font face=\"微软雅黑\">工单执行通知</font> \n #  \n <br>  \n  **工单编号:**  %s \n  \n  **发起人员:**  <font color=\"#000080\">%s</font><br /> \n \n  **审核人员:**  <font color=\"#000080\">%s</font><br /> \n \n **平台地址:**  http://%s \n  \n **工单备注:**  %s \n \n **执行状态:**  <font color=\"#38C759\">已执行</font><br /> \n \n **连接名备注:**  %s \n '
+                            % (
+                                self.order.work_id, self.order.username, self.from_user, self.addr_ip, self.order.text,
+                                content.after),
                     url=ding_url())
             except Exception as e:
                 CUSTOM_ERROR.error(f'{e.__class__.__name__}--钉钉推送失败: {e}')
@@ -229,12 +230,13 @@ class rejected_push_messages(threading.Thread):
 
     '''
 
-    def __init__(self, _tmpData, to_user, addr_ip, text):
+    def __init__(self, _tmpData, to_user, addr_ip, text, from_user):
         super().__init__()
         self.to_user = to_user
         self._tmpData = _tmpData
         self.addr_ip = addr_ip
         self.text = text
+        self.from_user = from_user
 
     def run(self):
         self.execute()
@@ -259,8 +261,8 @@ class rejected_push_messages(threading.Thread):
         if tag.message['ding']:
             try:
                 util.dingding(
-                    content='工单驳回通知\n工单编号:%s\n发起人:%s\n地址:%s\n驳回说明:%s\n状态:驳回'
-                    % (self._tmpData['work_id'], self.to_user, self.addr_ip, self.text),
+                    '# <font face=\"微软雅黑\">工单驳回通知</font> \n #  \n <br>  \n  **工单编号:**  %s \n  \n  **发起人员:**  <font color=\"#000080\">%s</font><br /> \n \n **审核人员:**  <font color=\"#000080\">%s</font><br /> \n \n **平台地址:**  http://%s \n \n **状态:**  <font color=\"#FF0000\">驳回</font>\n \n **驳回说明:**  %s'
+                    % (self._tmpData['work_id'], self.to_user, self.from_user, self.addr_ip, self.text),
                     url=ding_url())
             except Exception as e:
                 CUSTOM_ERROR.error(f'{e.__class__.__name__}--钉钉推送失败: {e}')
@@ -318,8 +320,8 @@ class submit_push_messages(threading.Thread):
         if tag.message['ding']:
             try:
                 util.dingding(
-                    content='工单提交通知\n工单编号:%s\n发起人:%s\n地址:%s\n工单说明:%s\n状态:已提交\n备注:%s'
-                    % (self.workId, self.user, self.addr_ip, self.text, content.before),
+                    '# <font face=\"微软雅黑\">工单提交通知</font> #  \n <br>  \n  **工单编号:**  %s \n  \n  **提交人员:**  <font color=\"#000080\">%s</font><br /> \n \n **审核人员:**  <font color=\"#000080\">%s</font><br /> \n \n**平台地址:**  http://%s \n  \n **工单说明:**  %s \n \n **状态:**  <font color=\"#FF9900\">已提交</font><br /> \n \n **业务备注:**  %s \n '
+                    % (self.workId, self.user, self.assigned, self.addr_ip, self.text, content.before),
                     url=ding_url())
             except Exception as e:
                 CUSTOM_ERROR.error(f'{e.__class__.__name__}--钉钉推送失败: {e}')

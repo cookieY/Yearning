@@ -399,7 +399,7 @@ def push_message(message=None, type=None, user=None, to_addr=None, work_id=None,
         if tag.message['ding']:
             un_init = util.init_conf()
             webhook = ast.literal_eval(un_init['message'])
-            util.dingding(content='查询申请通知\n工单编号:%s\n发起人:%s\n状态:%s' % (work_id, user, status),
+            util.dingding(content='# <font face=\"微软雅黑\">工单提交通知</font> #  \n <br>  \n  **工单编号:**  %s \n  \n  **提交人员:**  <font color=\"#000080\">%s</font><br /> \n  \n **状态:**  <font color=\"#FF9900\">%s</font><br /> \n' % (work_id, user, status),
                           url=webhook['webhook'])
     except Exception as e:
         CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')

@@ -44,7 +44,7 @@
           <br>
           <Button type="error" icon="md-trash" @click.native="ClearForm()">清除</Button>
           <Button type="info" icon="md-brush" @click.native="beautify()">美化</Button>
-          <Button type="success" icon="ios-redo" @click.native="Search_sql()">查询</Button>
+          <Button type="success" icon="ios-redo" @click.native="Search_sql()" >查询</Button>
           <Button
             type="primary"
             icon="ios-cloud-download"
@@ -262,8 +262,9 @@ export default {
             this.Testresults = this.allsearchdata.slice(0, 10)
             this.total = res.data['len']
           }
+          this.$Spin.hide()
         })
-      this.$Spin.hide()
+        .catch(err => this.$config.err_notice(this, err))
     },
     exportdata () {
       exportcsv({

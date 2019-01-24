@@ -101,7 +101,7 @@ p {
                     <Table :columns="testColumns" :data="testResults" highlight-row></Table>
                   </FormItem>
                   <FormItem>
-                    <Button type="warning" @click="testSql">检测语句</Button>
+                    <Button type="warning" @click="testSql" :loading="loading">检测语句</Button>
                     <Button
                       type="success"
                       style="margin-left: 3%"
@@ -303,7 +303,8 @@ export default {
           key: 'column_name'
         }
       ],
-      idxData: []
+      idxData: [],
+      loading: false
     }
   },
   methods: {
@@ -423,6 +424,7 @@ export default {
       }
       this.$refs['formItem'].validate((valid) => {
         if (valid) {
+          this.loading = true
           let tmp = this.formDynamic.replace(/(;|；)$/gi, '').replace(/；/g, ';')
           axios.put(`${this.$config.url}/sqlsyntax/test`, {
             'id': this.id[0].id,
@@ -442,8 +444,10 @@ export default {
               } else {
                 this.validate_gen = true
               }
+              this.loading = false
             })
             .catch(() => {
+              this.loading = false
               this.$config.err_notice(this, '无法连接到Inception!')
             })
         } else {

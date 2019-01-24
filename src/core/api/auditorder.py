@@ -113,7 +113,7 @@ class audit(baseview.SuperUserpermissions):
                             'bundle_id'
                         ).first()
                         rejected_push_messages(
-                            _tmpData, to_user, addr_ip, text).start()
+                            _tmpData, to_user, addr_ip, text, request.user).start()
                         return Response('操作成功，该请求已驳回！')
                     except Exception as e:
                         CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')

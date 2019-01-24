@@ -29,7 +29,7 @@ def dingding(content: str = None, url: str = None):
 
     '''
 
-    pdata = {"msgtype": "text", "text": {"content": content}}
+    pdata = {"msgtype": "markdown", "markdown": {"title": "Yearning sql审计平台", "text": content}}
     binary_data = json.dumps(pdata).encode(encoding='UTF8')
     headers = {"Content-Type": "application/json"}
     req = request.Request(url, headers=headers)
