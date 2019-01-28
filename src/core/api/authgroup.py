@@ -3,6 +3,7 @@
 # Date: 2018/7/10
 import logging
 import json
+import ast
 from django.http import HttpResponse
 from libs import baseview
 from rest_framework.response import Response
@@ -102,6 +103,16 @@ class auth_group(baseview.BaseView):
                 return HttpResponse(e)
             else:
                 try:
+                    # 当用户从admin/perform 角色组改变为guest时，需要删除所有权限组下，上级审核人与之匹配的值
+                    u = Account.objects.filter(username=username).first()
+                    if u.group != 'guest' and group == 'guest':
+                        per = grained.objects.all().values('username', 'permissions')
+                        for i in per:
+                            for c in i['permissions']:
+                                if isinstance(i['permissions'][c], list) and c == 'person':
+                                    i['permissions'][c] = list(filter(lambda x: x != username, i['permissions'][c]))
+                            grained.objects.filter(username=i['username']).update(permissions=i['permissions'])
+
                     if group == "guest":
                         pr = 0
                     if not authgroup:

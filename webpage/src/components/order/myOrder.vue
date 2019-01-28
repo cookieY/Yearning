@@ -85,6 +85,9 @@
               } else if (row.status === 4) {
                 color = 'error'
                 text = '执行失败'
+              } else if (row.status === 5) {
+                color = 'primary'
+                text = '待执行'
               } else {
                 color = 'warning'
                 text = '执行中'
