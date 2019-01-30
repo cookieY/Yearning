@@ -269,7 +269,7 @@ export default {
     exportdata () {
       exportcsv({
         filename: 'Yearning_Data',
-        original: false,
+        original: true,
         data: this.allsearchdata,
         columns: this.columnsName
       })

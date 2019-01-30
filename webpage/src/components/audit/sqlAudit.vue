@@ -8,16 +8,19 @@
       font-size: 28px;
       font-weight: normal;
     }
+
     & p {
       color: #657180;
       font-size: 14px;
       margin: 10px 0 15px;
     }
+
     & span {
       display: block;
       padding-top: 15px;
       color: #657180;
       font-size: 14px;
+
       &:before {
         content: '';
         display: block;
@@ -30,6 +33,7 @@
       }
     ;
     }
+
     & span i {
       font-style: normal;
       color: #3f414d;
@@ -86,9 +90,12 @@
                    @on-selection-change="delrecordList">
               <template slot-scope="{ row, index }" slot="action">
                 <div>
-                  <Button type="text" @click="openOrder(index)">查看</Button>
-                  <Button type="text" @click="orderDetail(row)" v-if="row.status !== 2 && row.status !==3">执行结果</Button>
-                  <Button type="text" @click="openOSC" v-if="row.status === 3 && row.type === 0">osc进度</Button>
+                  <Button type="text" @click="openOrder(index)" size="small">查看</Button>
+                  <Button type="text" @click="orderDetail(row)" v-if="row.status !== 2 && row.status !==3" size="small">
+                    执行结果
+                  </Button>
+                  <Button type="text" @click="openOSC" v-if="row.status === 3 && row.type === 0" size="small">osc进度
+                  </Button>
                 </div>
               </template>
             </Table>
@@ -104,9 +111,6 @@
         <span>SQL工单详细信息</span>
       </p>
       <Form label-position="right">
-        <FormItem label="工单编号:">
-          <span>{{ formitem.work_id }}</span>
-        </FormItem>
         <FormItem label="机房:">
           <span>{{ formitem.computer_room }}</span>
         </FormItem>
@@ -131,7 +135,7 @@
           </Select>
         </FormItem>
       </Form>
-      <template v-if="auth === 'admin'">
+      <template>
         <p class="pa">SQL检查结果:</p>
         <Table :columns="columnsName" :data="dataId" stripe border height="200"></Table>
       </template>
@@ -258,6 +262,11 @@
           {
             title: '真实姓名',
             key: 'real_name',
+            sortable: true
+          },
+          {
+            title: '执行人',
+            key: 'executor',
             sortable: true
           },
           {
@@ -491,10 +500,17 @@
       refreshData (vl = 1) {
         axios.get(`${this.$config.url}/audit_sql?page=${vl}&query=${JSON.stringify(this.find)}`)
           .then(res => {
+            this.multi = res.data.multi
+            if (!this.multi) {
+              for (let i = 0; i < this.columns.length; i++) {
+                if (this.columns[i].key === 'executor') {
+                  this.columns.splice(i, 1)
+                }
+              }
+            }
             this.tableData = res.data.data
             this.tableData.forEach((item) => { (item.backup === 1) ? item.backup = '是' : item.backup = '否' })
             this.pagenumber = res.data.page
-            this.multi = res.data.multi
             this.multi_list = res.data.multi_list
           })
           .catch(error => {
@@ -571,9 +587,6 @@
     },
     mounted () {
       this.refreshData()
-    },
-    destroyed () {
-      clearInterval(this.reboot)
     }
   }
 </script>

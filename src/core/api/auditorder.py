@@ -50,27 +50,57 @@ class audit(baseview.SuperUserpermissions):
                 custom_com = ast.literal_eval(un_init['other'])
                 start = (int(page) - 1) * 20
                 end = int(page) * 20
-                if qurey['valve']:
-                    if len(qurey['picker']) == 0:
-                        info = SqlOrder.objects.filter(assigned=request.user,
-                                                       username__contains=qurey['user']).order_by('-id')[start:end]
-                        page_number = SqlOrder.objects.filter(assigned=request.user,
-                                                              username__contains=qurey['user']).count()
-                    else:
-                        picker = []
-                        for i in qurey['picker']:
-                            picker.append(i)
-                        info = SqlOrder.objects.filter(assigned=request.user, username__contains=qurey['user'],
-                                                       date__gte=picker[0], date__lte=picker[1]).order_by('-id')[start:end]
-                        page_number = SqlOrder.objects.filter(assigned=request.user,
-                                                              username__contains=qurey['user'], date__gte=picker[0],
-                                                              date__lte=picker[1]).count()
+                u_mulit = Account.objects.filter(username=request.user).first()
+                if u_mulit.group == 'perform':
+                    if qurey['valve']:
+                        if len(qurey['picker']) == 0:
+                            info = SqlOrder.objects.filter(executor=request.user,
+                                                           username__contains=qurey['user']).defer('sql').order_by(
+                                '-id')[
+                                   start:end]
+                            page_number = SqlOrder.objects.filter(executor=request.user,
+                                                                  username__contains=qurey['user']).only('id').count()
+                        else:
+                            picker = []
+                            for i in qurey['picker']:
+                                picker.append(i)
+                            info = SqlOrder.objects.filter(executor=request.user, username__contains=qurey['user'],
+                                                           date__gte=picker[0], date__lte=picker[1]).defer(
+                                'sql').order_by(
+                                '-id')[start:end]
+                            page_number = SqlOrder.objects.filter(executor=request.user,
+                                                                  username__contains=qurey['user'], date__gte=picker[0],
+                                                                  date__lte=picker[1]).only('id').count()
 
+                    else:
+                        page_number = SqlOrder.objects.filter(
+                            executor=request.user).only('id').count()
+                        info = SqlOrder.objects.filter(
+                            executor=request.user).defer('sql').order_by('-id')[start:end]
                 else:
-                    page_number = SqlOrder.objects.filter(
-                        assigned=request.user).count()
-                    info = SqlOrder.objects.filter(
-                        assigned=request.user).order_by('-id')[start:end]
+                    if qurey['valve']:
+                        if len(qurey['picker']) == 0:
+                            info = SqlOrder.objects.filter(assigned=request.user,
+                                                           username__contains=qurey['user']).defer('sql').order_by('-id')[
+                                   start:end]
+                            page_number = SqlOrder.objects.filter(assigned=request.user,
+                                                                  username__contains=qurey['user']).only('id').count()
+                        else:
+                            picker = []
+                            for i in qurey['picker']:
+                                picker.append(i)
+                            info = SqlOrder.objects.filter(assigned=request.user, username__contains=qurey['user'],
+                                                           date__gte=picker[0], date__lte=picker[1]).defer('sql').order_by(
+                                '-id')[start:end]
+                            page_number = SqlOrder.objects.filter(assigned=request.user,
+                                                                  username__contains=qurey['user'], date__gte=picker[0],
+                                                                  date__lte=picker[1]).only('id').count()
+
+                    else:
+                        page_number = SqlOrder.objects.filter(
+                            assigned=request.user).only('id').count()
+                        info = SqlOrder.objects.filter(
+                            assigned=request.user).defer('sql').order_by('-id')[start:end]
                 data = util.ser(info)
                 info = Account.objects.filter(group='perform').all()
                 ser = serializers.UserINFO(info, many=True)
@@ -155,7 +185,8 @@ class audit(baseview.SuperUserpermissions):
                     SqlOrder.objects.filter(
                         work_id=work_id).update(executor=perform)
                     threading.Thread(target=push_message, args=(
-                        {'to_user': username, 'workid': work_id, 'addr': addr_ip}, 9, request.user, mail.email, work_id, '已提交执行人')).start()
+                        {'to_user': username, 'workid': work_id, 'addr': addr_ip}, 9, request.user, mail.email, work_id,
+                        '已提交执行人')).start()
                     return Response('工单已提交执行人！')
 
             elif category == 'test':

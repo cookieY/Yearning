@@ -25,7 +25,14 @@
         </Form>
         <Row>
           <Col span="24">
-            <Table border :columns="columns" :data="table_data" stripe size="small"></Table>
+            <Table border :columns="columnsName" :data="table_data" stripe size="small">
+              <template slot-scope="{ row, index }" slot="action">
+                <div>
+                  <Button type="text" @click="openOrder(row)" size="small">详细信息</Button>
+                  <Button type="text" @click="orderReject(row)" v-if="row.status === 0" size="small">驳回理由</Button>
+                </div>
+              </template>
+            </Table>
           </Col>
         </Row>
         <br>
@@ -42,7 +49,7 @@
     name: 'put',
     data () {
       return {
-        columns: [
+        columnsName: [
           {
             title: '工单编号:',
             key: 'work_id',
@@ -62,8 +69,13 @@
             sortable: true
           },
           {
-            title: '提交人',
-            key: 'username',
+            title: '审核/执行人',
+            key: 'assigned',
+            sortable: true
+          },
+          {
+            title: '多级审核执行人',
+            key: 'executor',
             sortable: true
           },
           {
@@ -106,67 +118,7 @@
             title: '操作',
             key: 'action',
             align: 'center',
-            render: (h, params) => {
-              if (params.row.status === 0) {
-                return h('div', [
-                  h('Button', {
-                    props: {
-                      size: 'small',
-                      type: 'text'
-                    },
-                    on: {
-                      click: () => {
-                        this.$router.push({
-                          name: 'orderlist',
-                          query: {
-                            workid: params.row.work_id,
-                            id: params.row.id,
-                            status: params.row.status,
-                            type: params.row.type
-                          }
-                        })
-                      }
-                    }
-                  }, '详细信息'),
-                  h('Button', {
-                    props: {
-                      size: 'small',
-                      type: 'text'
-                    },
-                    on: {
-                      click: () => {
-                        this.$Modal.error({
-                          title: '驳回理由',
-                          content: params.row.rejected
-                        })
-                      }
-                    }
-                  }, '驳回理由')
-                ])
-              } else {
-                return h('div', [
-                  h('Button', {
-                    props: {
-                      size: 'small',
-                      type: 'text'
-                    },
-                    on: {
-                      click: () => {
-                        this.$router.push({
-                          name: 'orderlist',
-                          query: {
-                            workid: params.row.work_id,
-                            id: params.row.id,
-                            status: params.row.status,
-                            type: params.row.type
-                          }
-                        })
-                      }
-                    }
-                  }, '详细信息')
-                ])
-              }
-            }
+            slot: 'action'
           }
         ],
         page_number: 1,
@@ -176,13 +128,21 @@
           picker: [],
           valve: false,
           text: ''
-        }
+        },
+        multi: false
       }
     },
     methods: {
       currentpage (vl = 1) {
         axios.get(`${this.$config.url}/myorder/?page=${vl}&query=${JSON.stringify(this.find)}`)
           .then(res => {
+            if (!res.data.multi) {
+              for (let i = 0; i < this.columnsName.length; i++) {
+                if (this.columnsName[i].key === 'executor') {
+                  this.columnsName.splice(i, 1)
+                }
+              }
+            }
             this.table_data = res.data.data
             this.table_data.forEach((item) => { (item.backup === 1) ? item.backup = '是' : item.backup = '否' })
             this.page_number = parseInt(res.data.page)
@@ -198,6 +158,23 @@
       queryCancel () {
         this.find = this.$config.clearObj(this.find)
         this.currentpage()
+      },
+      openOrder (row) {
+        this.$router.push({
+          name: 'orderlist',
+          query: {
+            workid: row.work_id,
+            id: row.id,
+            status: row.status,
+            type: row.type
+          }
+        })
+      },
+      orderReject (row) {
+        this.$Modal.error({
+          title: '驳回理由',
+          content: row.rejected
+        })
       }
     },
     mounted () {
