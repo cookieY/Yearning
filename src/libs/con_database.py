@@ -168,3 +168,4 @@ class SQLgo(object):
             cursor.execute(sql)
             result = cursor.fetchall()
         return result
+

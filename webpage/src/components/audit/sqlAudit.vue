@@ -586,8 +586,8 @@
       }
     },
     mounted () {
-      this.refreshForm(this.valve)
       this.refreshData()
+      this.refreshForm(this.valve)
     }
   }
 </script>
