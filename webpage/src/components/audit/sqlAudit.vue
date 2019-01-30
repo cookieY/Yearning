@@ -380,7 +380,7 @@
         multi_list: {},
         multi_name: '',
         reboot: null,
-        valve: false,
+        valve: true,
         find: {
           picker: [],
           user: '',
@@ -586,6 +586,7 @@
       }
     },
     mounted () {
+      this.refreshForm(this.valve)
       this.refreshData()
     }
   }
