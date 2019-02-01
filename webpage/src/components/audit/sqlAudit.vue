@@ -588,6 +588,9 @@
     mounted () {
       this.refreshData()
       this.refreshForm(this.valve)
+    },
+    destroyed () {
+      clearInterval(this.reboot)
     }
   }
 </script>

@@ -205,22 +205,6 @@ CREATE TABLE `core_querypermissions` (
 ) ENGINE=InnoDB AUTO_INCREMENT=85 DEFAULT CHARSET=utf8 COLLATE=utf8_bin;
 
 -- ----------------------------
--- Table structure for core_sqldictionary
--- ----------------------------
-DROP TABLE IF EXISTS `core_sqldictionary`;
-CREATE TABLE `core_sqldictionary` (
-  `id` int(11) NOT NULL AUTO_INCREMENT,
-  `BaseName` varchar(100) COLLATE utf8_bin NOT NULL,
-  `TableName` varchar(100) COLLATE utf8_bin NOT NULL,
-  `Field` varchar(100) COLLATE utf8_bin NOT NULL,
-  `Type` varchar(100) COLLATE utf8_bin NOT NULL,
-  `Extra` longtext COLLATE utf8_bin NOT NULL,
-  `TableComment` varchar(100) COLLATE utf8_bin NOT NULL,
-  `Name` varchar(100) COLLATE utf8_bin DEFAULT NULL,
-  PRIMARY KEY (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=15750 DEFAULT CHARSET=utf8 COLLATE=utf8_bin;
-
--- ----------------------------
 -- Table structure for core_sqlorder
 -- ----------------------------
 DROP TABLE IF EXISTS `core_sqlorder`;
@@ -240,6 +224,7 @@ CREATE TABLE `core_sqlorder` (
   `delay` int(11) DEFAULT NULL,
   `rejected` longtext COLLATE utf8_bin NOT NULL,
   `real_name` varchar(100) COLLATE utf8_bin DEFAULT NULL,
+  `executor` varchar(50) COLLATE utf8_bin DEFAULT NULL,
   PRIMARY KEY (`id`),
   KEY `core_sqlorder_bundle_id_3d5581f1` (`bundle_id`)
 ) ENGINE=InnoDB AUTO_INCREMENT=78 DEFAULT CHARSET=utf8 COLLATE=utf8_bin;
