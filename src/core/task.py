@@ -200,7 +200,7 @@ class order_push_message(threading.Thread):
         if tag.message['ding']:
             try:
                 util.dingding(
-                    content='# <font face=\"微软雅黑\">工单执行通知</font> \n #  \n <br>  \n  **工单编号:**  %s \n  \n  **发起人员:**  <font color=\"#000080\">%s</font><br /> \n \n  **审核人员:**  <font color=\"#000080\">%s</font><br /> \n \n **平台地址:**  http://%s \n  \n **工单备注:**  %s \n \n **执行状态:**  <font color=\"#38C759\">已执行</font><br /> \n \n **连接名备注:**  %s \n '
+                    content='# <font face=\"微软雅黑\">工单执行通知</font> \n #  \n <br>  \n  **工单编号:**  %s \n  \n  **发起人员:**  <font color=\"#000080\">%s</font><br /> \n \n  **审核人员:**  <font color=\"#000080\">%s</font><br /> \n \n **平台地址:**  http://%s \n  \n **工单备注:**  %s \n \n **执行状态:**  <font color=\"#38C759\">已执行</font><br /> \n \n **备注:**  %s \n '
                             % (
                                 self.order.work_id, self.order.username, self.from_user, self.addr_ip, self.order.text,
                                 content.after),
@@ -320,7 +320,7 @@ class submit_push_messages(threading.Thread):
         if tag.message['ding']:
             try:
                 util.dingding(
-                    '# <font face=\"微软雅黑\">工单提交通知</font> #  \n <br>  \n  **工单编号:**  %s \n  \n  **提交人员:**  <font color=\"#000080\">%s</font><br /> \n \n **审核人员:**  <font color=\"#000080\">%s</font><br /> \n \n**平台地址:**  http://%s \n  \n **工单说明:**  %s \n \n **状态:**  <font color=\"#FF9900\">已提交</font><br /> \n \n **业务备注:**  %s \n '
+                    '# <font face=\"微软雅黑\">工单提交通知</font> #  \n <br>  \n  **工单编号:**  %s \n  \n  **提交人员:**  <font color=\"#000080\">%s</font><br /> \n \n **审核人员:**  <font color=\"#000080\">%s</font><br /> \n \n**平台地址:**  http://%s \n  \n **工单说明:**  %s \n \n **状态:**  <font color=\"#FF9900\">已提交</font><br /> \n \n **备注:**  %s \n '
                     % (self.workId, self.user, self.assigned, self.addr_ip, self.text, content.before),
                     url=ding_url())
             except Exception as e:
