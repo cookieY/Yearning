@@ -169,3 +169,22 @@ class SQLgo(object):
             result = cursor.fetchall()
         return result
 
+    def update(self, sql):
+
+        with self.con.cursor(cursor=pymysql.cursors.DictCursor) as cursor:
+            sta = cursor.execute(sql)
+            if sta == 1:
+                print('Done')
+            else:
+                print('Failed')
+            self.con.commit()
+
+
+if __name__ == "__main__":
+    AES = cryptoAES(settings.SECRET_KEY)
+    with SQLgo(ip='127.0.0.1', user='root', password='xxxxx', db='Yearning', port=3306) as f:
+        a = f.query_info(sql='select id,password from core_databaselist;')
+
+        for i in a:
+            c = f.update(
+                sql="update core_databaselist set password='%s' where id='%s'" % (AES.encrypt(i['password']), i['id']))
