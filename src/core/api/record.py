@@ -27,8 +27,8 @@ class record_order(baseview.SuperUserpermissions):
         else:
             try:
                 pagenumber = SqlOrder.objects.filter(status=1, assigned=request.user).count()
-                start = int(page) * 10 - 10
-                end = int(page) * 10
+                start = (int(page) - 1) * 20
+                end = int(page) * 20
                 sql = SqlOrder.objects.raw(
                     '''
                     select o.id,o.work_id,o.text,o.backup,o.date,o.assigned,

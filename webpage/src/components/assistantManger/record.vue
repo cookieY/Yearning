@@ -23,7 +23,7 @@
               :total="this.pagenumber"
               show-elevator
               @on-change="splicpage"
-              :page-size="10"
+              :page-size="20"
               ref="page"
             ></Page>
           </Col>

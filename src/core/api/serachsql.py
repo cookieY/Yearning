@@ -410,8 +410,8 @@ class Query_order(baseview.SuperUserpermissions):
     def get(self, request, args: str = None):
         page = request.GET.get('page')
         pn = query_order.objects.filter(audit=request.user).count()
-        start = int(page) * 10 - 10
-        end = int(page) * 10
+        start = (int(page) - 1) * 20
+        end = int(page) * 20
         user_list = query_order.objects.all().order_by('-id')[start:end]
         serializers = Query_review(user_list, many=True)
         return Response({'data': serializers.data, 'pn': pn})
