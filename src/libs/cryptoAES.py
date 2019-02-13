@@ -24,3 +24,6 @@ class cryptoAES(object):
         cryptor = AES.new(self.key, self.mode, self.key)
         plain_text = cryptor.decrypt(a2b_hex(text))
         return bytes.decode(plain_text.rstrip(b'\0'))
+
+
+

@@ -36,11 +36,12 @@ from core.api.sqlorder import sqlorder
 from core.api.serachsql import search, query_worklf, Query_order
 from core.api.osc import osc_step
 from core.api.myorder import order
-from core.api.general import addressing
+from core.api.general import addressing, exAES
 from core.api.setting import setting_view
 from core.api.authgroup import auth_group
 
 urlpatterns = [
+    url(r'^api/v1/exaes', exAES.as_view()),
     url(r'^api/v1/authgroup/(.*)', auth_group.as_view()),
     url(r'^api/v1/getsql', getsql.as_view()),
     url(r'^api/v1/setting/(.*)', setting_view.as_view()),
