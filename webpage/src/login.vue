@@ -26,7 +26,7 @@
           <TabPane label="普通登录" name="custom">
             <Form ref="formInline" :model="formInline" :rules="ruleInline" inline>
               <Form-item prop="user" style="width: 100%">
-                <Input v-model="formInline.user" placeholder="Username"></Input>
+                <Input v-model="formInline.user" placeholder="Username" autofocus></Input>
               </Form-item>
               <Form-item prop="password" style="width: 100%">
                 <Input type="password" v-model="formInline.password" placeholder="Password"
