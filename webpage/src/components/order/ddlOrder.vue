@@ -64,12 +64,8 @@ p {
                 </Select>
               </FormItem>
               <FormItem label="延迟执行" required>
-                <InputNumber
-                  v-model="formItem.delay"
-                  :formatter="value => `${value}分钟`"
-                  :parser="value => value.replace('分钟', '')"
-                  :min="0"
-                ></InputNumber>
+                <DatePicker format="yyyy-MM-dd HH:mm" type="datetime" placeholder="选择时间点" :options="invalidDate"
+                            v-model="formItem.picker" @on-change="formItem.picker=$event"></DatePicker>
               </FormItem>
               <FormItem label="是否备份" prop="backup">
                 <RadioGroup v-model="formItem.backup">
@@ -137,6 +133,11 @@ export default {
   },
   data () {
     return {
+      invalidDate: {
+        disabledDate (date) {
+          return date && date.valueOf() < Date.now() - 86400000
+        }
+      },
       dataset: [],
       item: {},
       basename: [],
@@ -193,7 +194,7 @@ export default {
         tablename: '',
         backup: '0',
         assigned: '',
-        delay: 0
+        picker: null
       },
       id: null,
       tabs: 'order1',
@@ -467,9 +468,11 @@ export default {
             'id': this.id[0].id
           })
             .then(res => {
+              this.validate_gen = true
               this.$config.notice(res.data)
             })
             .catch(error => {
+              this.validate_gen = true
               this.$config.err_notice(this, error)
             })
         }

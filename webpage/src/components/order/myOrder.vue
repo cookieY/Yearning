@@ -64,6 +64,11 @@
             key: 'backup'
           },
           {
+            title: '数据库名:',
+            key: 'basename',
+            sortable: true
+          },
+          {
             title: '提交时间:',
             key: 'date',
             sortable: true

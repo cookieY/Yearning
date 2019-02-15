@@ -53,10 +53,10 @@ class SqlOrder(models.Model):
     sql = models.TextField(blank=True)  # sql语句
     text = models.TextField(blank=True)  # 工单备注
     assigned = models.CharField(max_length=50, blank=True)  # 工单审核人
-    delay = models.IntegerField(null=True, default=0)  # 延迟时间
+    delay = models.CharField(max_length=100, null=True, default='None')  # 延迟时间
     rejected = models.TextField(blank=True)  # 驳回说明
     real_name = models.CharField(max_length=100, null=True)  # 姓名
-    executor = models.CharField(max_length=50,null=True) #多级审核下的执行人
+    executor = models.CharField(max_length=50, null=True)  # 多级审核下的执行人
 
 
 class DatabaseList(models.Model):

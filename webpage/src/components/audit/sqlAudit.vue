@@ -120,8 +120,8 @@
         <FormItem label="数据库库名:">
           <span>{{ formitem.basename }}</span>
         </FormItem>
-        <FormItem label="延迟执行:">
-          <span>{{ formitem.delay }}分钟</span>
+        <FormItem label="定时执行:">
+          <span>{{ formitem.delay }}</span>
         </FormItem>
         <FormItem label="工单说明:">
           <span>{{ formitem.text }}</span>
@@ -129,7 +129,7 @@
         <FormItem>
           <Table :columns="sql_columns" :data="sql" height="200"></Table>
         </FormItem>
-        <FormItem label="选择执行人:" v-if="multi && auth === 'admin'">
+        <FormItem label="选择执行人:" v-if="multi && auth === 'admin'" required>
           <Select v-model="multi_name" style="width: 20%">
             <Option v-for="i in multi_list" :value="i.username" :key="i.username">{{i.username}}</Option>
           </Select>

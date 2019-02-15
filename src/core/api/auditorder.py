@@ -2,6 +2,7 @@ import logging
 import json
 import ast
 import threading
+import datetime
 from libs import baseview, call_inception, util, serializers, send_email
 from rest_framework.response import Response
 from django.http import HttpResponse
@@ -81,7 +82,8 @@ class audit(baseview.SuperUserpermissions):
                     if qurey['valve']:
                         if len(qurey['picker']) == 0:
                             info = SqlOrder.objects.filter(assigned=request.user,
-                                                           username__contains=qurey['user']).defer('sql').order_by('-id')[
+                                                           username__contains=qurey['user']).defer('sql').order_by(
+                                '-id')[
                                    start:end]
                             page_number = SqlOrder.objects.filter(assigned=request.user,
                                                                   username__contains=qurey['user']).only('id').count()
@@ -90,7 +92,8 @@ class audit(baseview.SuperUserpermissions):
                             for i in qurey['picker']:
                                 picker.append(i)
                             info = SqlOrder.objects.filter(assigned=request.user, username__contains=qurey['user'],
-                                                           date__gte=picker[0], date__lte=picker[1]).defer('sql').order_by(
+                                                           date__gte=picker[0], date__lte=picker[1]).defer(
+                                'sql').order_by(
                                 '-id')[start:end]
                             page_number = SqlOrder.objects.filter(assigned=request.user,
                                                                   username__contains=qurey['user'], date__gte=picker[0],
@@ -142,8 +145,8 @@ class audit(baseview.SuperUserpermissions):
                             'work_id',
                             'bundle_id'
                         ).first()
-                        rejected_push_messages(
-                            _tmpData, to_user, addr_ip, text, request.user).start()
+                        reject = rejected_push_messages(_tmpData, to_user, addr_ip, text, request.user)
+                        threading.Timer(0, reject.execute).start()
                         return Response('操作成功，该请求已驳回！')
                     except Exception as e:
                         CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
@@ -164,10 +167,15 @@ class audit(baseview.SuperUserpermissions):
                         if idempotent.status != 2:
                             return Response('非法传参，触发幂等操作')
                         else:
+                            delay = 0
+                            if str(idempotent.delay).rstrip() != '':
+                                now_time = datetime.datetime.now()
+                                next_time = datetime.datetime.strptime(idempotent.delay, "%Y-%m-%d %H:%M")
+                                delay = int((next_time - now_time).total_seconds())
                             SqlOrder.objects.filter(
                                 id=order_id).update(status=3)
-                            order_push_message(
-                                addr_ip, order_id, from_user, to_user).start()
+                            arr = order_push_message(addr_ip, order_id, from_user, to_user)
+                            threading.Timer(delay, arr.run).start()
                             return Response('工单执行成功!请通过记录页面查看具体执行结果')
                     except Exception as e:
                         CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')

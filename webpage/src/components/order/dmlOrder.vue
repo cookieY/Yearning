@@ -60,13 +60,9 @@
                   </RadioGroup>
                 </FormItem>
 
-                <FormItem label="延迟执行" required>
-                  <InputNumber
-                    v-model="formItem.delay"
-                    :formatter="value => `${value}分钟`"
-                    :parser="value => value.replace('分钟', '')"
-                    :min="0"
-                  ></InputNumber>
+                <FormItem label="定时执行">
+                  <DatePicker format="yyyy-MM-dd HH:mm" type="datetime" placeholder="选择时间点" :options="invalidDate"
+                              v-model="formItem.picker" @on-change="formItem.picker=$event"></DatePicker>
                 </FormItem>
               </Form>
               <Form :label-width="30">
@@ -134,6 +130,11 @@
     name: 'SQLsyntax',
     data () {
       return {
+        invalidDate: {
+          disabledDate (date) {
+            return date && date.valueOf() < Date.now() - 86400000
+          }
+        },
         validate_gen: true,
         formItem: {
           textarea: '',
@@ -143,7 +144,7 @@
           text: '',
           backup: '0',
           assigned: '',
-          delay: 0
+          picker: null
         },
         columnsName: [
           {

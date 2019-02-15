@@ -104,7 +104,7 @@ def isAdmin(func):
     return wrapper
 
 
-class order_push_message(threading.Thread):
+class order_push_message(object):
     '''
 
     :argument 同意执行工单调用该方法异步处理数据
@@ -137,7 +137,7 @@ class order_push_message(threading.Thread):
         :return: none
 
         '''
-        time.sleep(self.order.delay * 60)
+
         try:
             detail = DatabaseList.objects.filter(id=self.order.bundle_id).first()
 
@@ -223,7 +223,7 @@ class order_push_message(threading.Thread):
                 CUSTOM_ERROR.error(f'{e.__class__.__name__}--邮箱推送失败: {e}')
 
 
-class rejected_push_messages(threading.Thread):
+class rejected_push_messages(object):
     '''
 
     :argument 驳回工单调用该方法异步处理数据
@@ -237,9 +237,6 @@ class rejected_push_messages(threading.Thread):
         self.addr_ip = addr_ip
         self.text = text
         self.from_user = from_user
-
-    def run(self):
-        self.execute()
 
     def execute(self):
 
