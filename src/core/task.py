@@ -166,7 +166,7 @@ class order_push_message(object):
                         backup_dbname=i['backup_dbname']
                     )
         except Exception as e:
-            CUSTOM_ERROR.error(f'{e.__class__.__name__}--邮箱推送失败: {e}')
+            CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
         finally:
             status = SqlOrder.objects.filter(work_id=self.order.work_id).first()
             if status.status != 4:
