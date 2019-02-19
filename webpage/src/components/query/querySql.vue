@@ -152,6 +152,7 @@ export default {
       }))
     },
     choseName (vl) {
+      this.put_info.base = vl.title
       if (vl.expand === true) {
         this.$Spin.show({
           render: (h) => {

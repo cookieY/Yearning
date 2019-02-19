@@ -62,7 +62,7 @@
 
                 <FormItem label="定时执行">
                   <DatePicker format="yyyy-MM-dd HH:mm" type="datetime" placeholder="选择时间点" :options="invalidDate"
-                              v-model="formItem.picker" @on-change="formItem.picker=$event"></DatePicker>
+                              v-model="formItem.picker" @on-change="formItem.picker=$event" :editable="false"></DatePicker>
                 </FormItem>
               </Form>
               <Form :label-width="30">

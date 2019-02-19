@@ -171,6 +171,8 @@ class audit(baseview.SuperUserpermissions):
                             if str(idempotent.delay).rstrip() != '':
                                 now_time = datetime.datetime.now()
                                 next_time = datetime.datetime.strptime(idempotent.delay, "%Y-%m-%d %H:%M")
+                                if now_time > next_time:
+                                    return Response('工单定时执行时间不得小于当前时间！！！')
                                 delay = int((next_time - now_time).total_seconds())
                             SqlOrder.objects.filter(
                                 id=order_id).update(status=3)

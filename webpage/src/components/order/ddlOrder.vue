@@ -63,8 +63,8 @@ p {
                   <Option v-for="i in assigned" :value="i" :key="i">{{i}}</Option>
                 </Select>
               </FormItem>
-              <FormItem label="延迟执行" required>
-                <DatePicker format="yyyy-MM-dd HH:mm" type="datetime" placeholder="选择时间点" :options="invalidDate"
+              <FormItem label="定时执行">
+                <DatePicker format="yyyy-MM-dd HH:mm" type="datetime" placeholder="选择时间点" :options="invalidDate" :editable="false"
                             v-model="formItem.picker" @on-change="formItem.picker=$event"></DatePicker>
               </FormItem>
               <FormItem label="是否备份" prop="backup">
