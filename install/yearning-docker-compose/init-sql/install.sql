@@ -221,7 +221,7 @@ CREATE TABLE `core_sqlorder` (
   `sql` longtext COLLATE utf8_bin NOT NULL,
   `text` longtext COLLATE utf8_bin NOT NULL,
   `assigned` varchar(50) COLLATE utf8_bin NOT NULL,
-  `delay` varchar(100) COLLATE utf8_bin DEFAULT NULL,
+  `delay` int(11) DEFAULT NULL,
   `rejected` longtext COLLATE utf8_bin NOT NULL,
   `real_name` varchar(100) COLLATE utf8_bin DEFAULT NULL,
   `executor` varchar(50) COLLATE utf8_bin DEFAULT NULL,
