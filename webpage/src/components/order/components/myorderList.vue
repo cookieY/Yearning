@@ -57,6 +57,9 @@
             <FormItem label="数据库库名:">
               <p>{{formItem.basename}}</p>
             </FormItem>
+            <FormItem label="定时执行:">
+              <p>{{formItem.delay}}</p>
+            </FormItem>
             <FormItem>
                 <Input v-model="sql" type="textarea" :rows="8"></Input>
             </FormItem>

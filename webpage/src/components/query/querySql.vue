@@ -265,7 +265,10 @@ export default {
           }
           this.$Spin.hide()
         })
-        .catch(err => this.$config.err_notice(this, err))
+        .catch(err => {
+          this.$config.err_notice(this, err)
+          this.$Spin.hide()
+        })
     },
     exportdata () {
       exportcsv({

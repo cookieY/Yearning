@@ -4,7 +4,7 @@ import datetime
 import re
 import threading
 import ast
-import simplejson
+import simplejson,time
 from django.http import HttpResponse
 from rest_framework.response import Response
 from libs.serializers import Query_review, Query_list
@@ -128,23 +128,26 @@ class search(baseview.BaseView):
                         if critical:
                             as_list = search.sql_as_ex(
                                 sql, custom_com['sensitive_list'])
+                            fe = []
+                            for k, v in data_set['data'][0].items():
+                                if isinstance(v, bytes):
+                                    fe.append(k)
                             for l in data_set['data']:
-                                for k, v in l.items():
-                                    for n in range(data_set['len']):
-                                        if isinstance(v, bytes):
-                                            data_set['data'][n].update(
-                                                {k: 'blob字段为不可呈现类型'})
-                                        for i in as_list:
-                                            if k == i:
-                                                data_set['data'][n].update(
-                                                    {k: '********'})
+                                if len(fe) != 0:
+                                    for i in fe:
+                                        l[i] = 'blob字段为不可呈现类型'
+                                for s in as_list:
+                                    l[s] = '********'
                         else:
-                            for l in data_set['data']:
-                                for k, v in l.items():
-                                    for n in range(data_set['len']):
-                                        if isinstance(v, bytes):
-                                            data_set['data'][n].update(
-                                                {k: 'blob字段为不可呈现类型'})
+                            fe = []
+                            for k, v in data_set['data'][0].items():
+                                if isinstance(v, bytes):
+                                    fe.append(k)
+                            if len(fe) != 0:
+                                for l in data_set['data']:
+                                    for i in fe:
+                                        l[i] = 'blob字段为不可呈现类型'
+
                         querypermissions.objects.create(
                             work_id=user.work_id,
                             username=request.user,
@@ -213,10 +216,26 @@ class query_worklf(baseview.BaseView):
 
     def get(self, request, args: str = None):
         page = request.GET.get('page')
-        page_number = query_order.objects.count()
+        qurey = json.loads(request.GET.get('query'))
         start = int(page) * 20 - 20
         end = int(page) * 20
-        info = query_order.objects.all().order_by('-id')[start:end]
+        if qurey['valve']:
+            if len(qurey['picker']) == 0:
+                info = query_order.objects.filter(username__contains=qurey['user']).order_by(
+                    '-id')[
+                       start:end]
+                page_number = query_order.objects.filter(username__contains=qurey['user']).only('id').count()
+            else:
+                picker = []
+                for i in qurey['picker']:
+                    picker.append(i)
+                info = query_order.objects.filter(username__contains=qurey['user'], date__gte=picker[0],
+                                                  date__lte=picker[1]).order_by('-id')[start:end]
+                page_number = query_order.objects.filter(username__contains=qurey['user'], date__gte=picker[0],
+                                                         date__lte=picker[1]).only('id').count()
+        else:
+            info = query_order.objects.all().order_by('-id')[start:end]
+            page_number = query_order.objects.only('id').count()
         serializers = Query_review(info, many=True)
         return Response({'page': page_number, 'data': serializers.data})
 
@@ -251,7 +270,8 @@ class query_worklf(baseview.BaseView):
                     thread = threading.Thread(
                         target=push_message,
                         args=(
-                        {'to_user': request.user, 'workid': work_id}, 5, request.user, userinfo.email, work_id, '提交'))
+                            {'to_user': request.user, 'workid': work_id}, 5, request.user, userinfo.email, work_id,
+                            '提交'))
                     thread.start()
                 except Exception as e:
                     CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
@@ -399,8 +419,10 @@ def push_message(message=None, type=None, user=None, to_addr=None, work_id=None,
         if tag.message['ding']:
             un_init = util.init_conf()
             webhook = ast.literal_eval(un_init['message'])
-            util.dingding(content='# <font face=\"微软雅黑\">工单提交通知</font> #  \n <br>  \n  **工单编号:**  %s \n  \n  **提交人员:**  <font color=\"#000080\">%s</font><br /> \n  \n **状态:**  <font color=\"#FF9900\">%s</font><br /> \n' % (work_id, user, status),
-                          url=webhook['webhook'])
+            util.dingding(
+                content='# <font face=\"微软雅黑\">工单提交通知</font> #  \n <br>  \n  **工单编号:**  %s \n  \n  **提交人员:**  <font color=\"#000080\">%s</font><br /> \n  \n **状态:**  <font color=\"#FF9900\">%s</font><br /> \n' % (
+                    work_id, user, status),
+                url=webhook['webhook'])
     except Exception as e:
         CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
 
@@ -409,12 +431,29 @@ class Query_order(baseview.SuperUserpermissions):
 
     def get(self, request, args: str = None):
         page = request.GET.get('page')
-        pn = query_order.objects.filter(audit=request.user).count()
+        qurey = json.loads(request.GET.get('query'))
         start = (int(page) - 1) * 20
         end = int(page) * 20
-        user_list = query_order.objects.all().order_by('-id')[start:end]
-        serializers = Query_review(user_list, many=True)
-        return Response({'data': serializers.data, 'pn': pn})
+        if qurey['valve']:
+            if len(qurey['picker']) == 0:
+                info = query_order.objects.filter(username__contains=qurey['user']).order_by(
+                    '-id')[
+                       start:end]
+                page_number = query_order.objects.filter(username__contains=qurey['user']).only('id').count()
+            else:
+                picker = []
+                for i in qurey['picker']:
+                    picker.append(i)
+                info = query_order.objects.filter(username__contains=qurey['user'], date__gte=picker[0],
+                                                  date__lte=picker[1]).order_by('-id')[start:end]
+                page_number = query_order.objects.filter(username__contains=qurey['user'], date__gte=picker[0],
+                                                         date__lte=picker[1]).only('id').count()
+        else:
+            info = query_order.objects.all().order_by('-id')[start:end]
+            page_number = query_order.objects.only('id').count()
+
+        serializers = Query_review(info, many=True)
+        return Response({'data': serializers.data, 'pn': page_number})
 
     def post(self, request, args: str = None):
         work_id_list = json.loads(request.data['work_id'])

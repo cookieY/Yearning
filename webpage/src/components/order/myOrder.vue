@@ -57,7 +57,8 @@
           },
           {
             title: '工单说明',
-            key: 'text'
+            key: 'text',
+            tooltip: true
           },
           {
             title: '是否备份',

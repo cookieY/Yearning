@@ -8,13 +8,28 @@
         </p>
         <Row>
           <Col span="24">
-            <Poptip
-              confirm
-              title="您确认删除这些工单信息吗?"
-              @on-ok="delrecordData"
-            >
-              <Button type="text" style="margin-left: -1%">删除记录</Button>
-            </Poptip>
+            <Form inline>
+              <FormItem>
+                <Poptip
+                  confirm
+                  title="您确认删除这些工单信息吗?"
+                  @on-ok="delrecordData"
+                >
+                  <Button type="warning">删除记录</Button>
+                </Poptip>
+              </FormItem>
+              <FormItem>
+                <Input placeholder="账号名" v-model="find.user"></Input>
+              </FormItem>
+              <FormItem>
+                <DatePicker format="yyyy-MM-dd HH:mm" type="datetimerange" placeholder="请选择查询的时间范围"
+                            v-model="find.picker" @on-change="find.picker=$event" style="width: 250px"></DatePicker>
+              </FormItem>
+              <FormItem>
+                <Button type="success" @click="queryData">查询</Button>
+                <Button type="primary" @click="queryCancel">重置</Button>
+              </FormItem>
+            </Form>
             <Table border :columns="permissoncolums" :data="query_info" stripe ref="selection"
                    @on-selection-change="delrecordList"></Table>
             <br>
@@ -42,11 +57,6 @@
         <FormItem label="导出数据:">
           <p v-if="query.export === 1">是</p>
           <p v-else>否</p>
-        </FormItem>
-        <hr style="height:1px;border:none;border-top:1px dashed #dddee1;"/>
-        <br>
-        <FormItem label="查询说明:">
-          <Input v-model="query.instructions" type="textarea" :autosize="{minRows: 5,maxRows: 8}" readonly></Input>
         </FormItem>
       </Form>
       <div slot="footer">
@@ -80,6 +90,11 @@
           {
             title: '时间',
             key: 'time'
+          },
+          {
+            title: '查询说明',
+            key: 'instructions',
+            tooltip: true
           },
           {
             title: '申请人',
@@ -200,12 +215,17 @@
         per_pn: 1,
         delrecord: [],
         editInfodModal: false,
-        query: {}
+        query: {},
+        find: {
+          picker: [],
+          user: '',
+          valve: false
+        }
       }
     },
     methods: {
       permisson_list (vl = 1) {
-        axios.get(`${this.$config.url}/query_order?page=${vl}`)
+        axios.get(`${this.$config.url}/query_order?page=${vl}&query=${JSON.stringify(this.find)}`)
           .then(res => {
             this.query_info = res.data['data']
             this.per_pn = res.data['pn']
@@ -271,6 +291,14 @@
             this.permisson_list()
           })
           .catch(err => this.$config.err_notice(this, err))
+      },
+      queryData () {
+        this.find.valve = true
+        this.permisson_list()
+      },
+      queryCancel () {
+        this.find = this.$config.clearObj(this.find)
+        this.permisson_list()
       }
     },
     mounted () {

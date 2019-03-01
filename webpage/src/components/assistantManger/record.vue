@@ -46,7 +46,8 @@ export default {
         },
         {
           title: '工单说明',
-          key: 'text'
+          key: 'text',
+          tooltip: true
         },
         {
           title: '执行时间',

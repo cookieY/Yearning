@@ -62,7 +62,7 @@
 
                 <FormItem label="定时执行">
                   <DatePicker format="yyyy-MM-dd HH:mm" type="datetime" placeholder="选择时间点" :options="invalidDate"
-                              v-model="formItem.picker" @on-change="formItem.picker=$event" :editable="false"></DatePicker>
+                              v-model="formItem.delay" @on-change="formItem.delay=$event" :editable="false"></DatePicker>
                 </FormItem>
               </Form>
               <Form :label-width="30">
@@ -144,7 +144,7 @@
           text: '',
           backup: '0',
           assigned: '',
-          picker: null
+          delay: null
         },
         columnsName: [
           {

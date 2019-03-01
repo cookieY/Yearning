@@ -53,11 +53,11 @@ class SQLgo(object):
             for field in cursor.description:
                 if id == 0:
                     data_dict.append(
-                        {'title': field[0], "key": field[0], "fixed": "left", "width": 150})
+                        {'title': field[0], "key": field[0], "fixed": "left", "width": 150, "tooltip": True})
                     id += 1
                 else:
                     data_dict.append(
-                        {'title': field[0], "key": field[0], "width": 200})
+                        {'title': field[0], "key": field[0], "width": 200, "tooltip": True})
             len = cursor.rowcount
         return {'data': result, 'title': data_dict, 'len': len}
 

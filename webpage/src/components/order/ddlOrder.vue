@@ -65,7 +65,7 @@ p {
               </FormItem>
               <FormItem label="定时执行">
                 <DatePicker format="yyyy-MM-dd HH:mm" type="datetime" placeholder="选择时间点" :options="invalidDate" :editable="false"
-                            v-model="formItem.picker" @on-change="formItem.picker=$event"></DatePicker>
+                            v-model="formItem.delay" @on-change="formItem.delay=$event"></DatePicker>
               </FormItem>
               <FormItem label="是否备份" prop="backup">
                 <RadioGroup v-model="formItem.backup">
@@ -194,7 +194,7 @@ export default {
         tablename: '',
         backup: '0',
         assigned: '',
-        picker: null
+        delay: null
       },
       id: null,
       tabs: 'order1',
@@ -469,7 +469,10 @@ export default {
           })
             .then(res => {
               this.validate_gen = true
-              this.$config.notice(res.data)
+              this.$Notice.success({
+                title: '成功',
+                desc: res.data
+              })
             })
             .catch(error => {
               this.validate_gen = true
