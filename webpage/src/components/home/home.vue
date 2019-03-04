@@ -46,6 +46,12 @@
               </Col>
               <Col span="16" class="padding-left-8">{{time}}</Col>
             </Row>
+            <Row>
+              <Col span="8">
+                <p class="notwrap">当前版本:</p>
+              </Col>
+              <Col span="16" class="padding-left-8"> <a target="_Blank"  href="https://cookiey.github.io/Yearning-document/update/">v1.4.2</a></Col>
+            </Row>
           </Card>
         </Row>
         <Row class="margin-top-10">

@@ -62,17 +62,6 @@ export const loginRouter = {
   }
 }
 
-export const version = {
-  path: '/version',
-  name: 'version',
-  meta: {
-    title: 'version - 版本号'
-  },
-  component: resolve => {
-    require(['./main_components/version.vue'], resolve)
-  }
-}
-
 export const locking = {
   path: '/locking',
   name: 'locking',
@@ -265,6 +254,5 @@ export const MainRoute = [
   loginRouter,
   locking,
   ...appRouter,
-  version,
   page401
 ]
