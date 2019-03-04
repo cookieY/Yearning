@@ -128,25 +128,27 @@ class search(baseview.BaseView):
                         if critical:
                             as_list = search.sql_as_ex(
                                 sql, custom_com['sensitive_list'])
-                            fe = []
-                            for k, v in data_set['data'][0].items():
-                                if isinstance(v, bytes):
-                                    fe.append(k)
-                            for l in data_set['data']:
-                                if len(fe) != 0:
-                                    for i in fe:
-                                        l[i] = 'blob字段为不可呈现类型'
-                                for s in as_list:
-                                    l[s] = '********'
-                        else:
-                            fe = []
-                            for k, v in data_set['data'][0].items():
-                                if isinstance(v, bytes):
-                                    fe.append(k)
-                            if len(fe) != 0:
+                            if data_set['data']:
+                                fe = []
+                                for k, v in data_set['data'][0].items():
+                                    if isinstance(v, bytes):
+                                        fe.append(k)
                                 for l in data_set['data']:
-                                    for i in fe:
-                                        l[i] = 'blob字段为不可呈现类型'
+                                    if len(fe) != 0:
+                                        for i in fe:
+                                            l[i] = 'blob字段为不可呈现类型'
+                                    for s in as_list:
+                                        l[s] = '********'
+                        else:
+                            if data_set['data']:
+                                fe = []
+                                for k, v in data_set['data'][0].items():
+                                    if isinstance(v, bytes):
+                                        fe.append(k)
+                                if len(fe) != 0:
+                                    for l in data_set['data']:
+                                        for i in fe:
+                                            l[i] = 'blob字段为不可呈现类型'
 
                         querypermissions.objects.create(
                             work_id=user.work_id,
