@@ -126,6 +126,19 @@ util.clearObj = function (obj) {
   return obj
 }
 
+util.clearPicker = function (obj) {
+  for (let i in obj) {
+    if (typeof obj[i] === 'object') {
+      obj[i] = ['', '']
+    } else if (typeof obj[i] === 'string') {
+      obj[i] = ''
+    } else {
+      obj[i] = false
+    }
+  }
+  return obj
+}
+
 util.sameMerge = function (obj, merge, el) {
   for (let i of Object.keys(el)) {
     obj[i] = merge[i]

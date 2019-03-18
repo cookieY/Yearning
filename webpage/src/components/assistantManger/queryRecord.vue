@@ -17,7 +17,7 @@
               </FormItem>
               <FormItem>
                 <DatePicker format="yyyy-MM-dd HH:mm" type="datetimerange" placeholder="请选择查询的时间范围"
-                            v-model="find.picker" @on-change="find.picker=$event" style="width: 250px"></DatePicker>
+                            v-model="find.picker" @on-change="find.picker=$event" style="width: 250px" :editable="false"></DatePicker>
               </FormItem>
               <FormItem>
                 <Button type="success" @click="queryData">查询</Button>
@@ -120,7 +120,7 @@ export default {
       this.currentpage()
     },
     queryCancel () {
-      this.find = this.$config.clearObj(this.find)
+      this.find = this.$config.clearPicker(this.find)
       this.currentpage()
     }
   },

@@ -27,7 +27,7 @@ class order(baseview.BaseView):
                 start = (int(page) - 1) * 20
                 end = int(page) * 20
                 if qurey['valve']:
-                    if len(qurey['picker']) == 0:
+                    if qurey['picker'][0] is '':
                         info = SqlOrder.objects.filter(username=request.user, text__contains=qurey['text']).order_by(
                             '-id').defer('sql')[start:end]
 
