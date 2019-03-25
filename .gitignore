@@ -9,7 +9,7 @@ __pycache__/
 webpage/dist
 # Distribution / packaging
 .Python
-src/deploy.conf
+#src/deploy.conf
 src/dist
 src/exportData/*.docx
 src/core/migrations/*.py

@@ -11,7 +11,7 @@ BASEPATH = os.path.dirname(os.path.abspath(__file__))
 
 def startdjango():
     os.chdir(os.path.join(BASEPATH, 'src'))
-    subprocess.call('python3 manage.py runserver 0.0.0.0:8000', shell=True)
+    subprocess.call('python manage.py runserver 0.0.0.0:8000', shell=True)
 
 def startnode():
     os.chdir(os.path.join(BASEPATH, 'webpage'))

@@ -1,0 +1,1 @@
+ALTER TABLE core_databaselist ADD COLUMN dbtype VARCHAR(20) DEFAULT '' NOT NULL 

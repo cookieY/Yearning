@@ -12,9 +12,14 @@
         </p>
         <div class="edittable-testauto-con">
           <Form ref="formValidate" :model="formItem" :label-width="100" :rules="ruleInline">
-            <Form-item label="机房:">
+            <Form-item label="机房:" prop='add'>
               <Select v-model="formItem.add" placeholder="请选择">
                 <Option v-for="list in comList" :value="list" :key="list">{{ list }}</Option>
+              </Select>
+            </Form-item>
+            <Form-item label="数据库类型:" prop='dbtype'>
+              <Select v-model="formItem.dbtype" placeholder="请选择">
+                <Option v-for="list in dbTypeList" :value="list" :key="list">{{ list }}</Option>
               </Select>
             </Form-item>
             <Form-item label="连接名称:" prop="name">
@@ -45,8 +50,15 @@
           <Icon type="md-apps"/>
           数据库详情表
         </p>
+        <Select v-model="query.computer_room" placeholder="请选择机房" style="width: 20%" clearable>
+                <Option v-for="list in comList" :value="list" :key="list">{{ list }}</Option>
+        </Select>
+        <Select v-model="query.dbtype" placeholder="数据库类型" style="width: 20%" clearable>
+                <Option v-for="list in dbTypeList" :value="list" :key="list">{{ list }}</Option>
+        </Select>
         <Input v-model="query.connection_name" placeholder="请填写连接名" style="width: 20%" clearable></Input>
-        <Input v-model="query.computer_room" placeholder="请填写机房" style="width: 20%" clearable></Input>
+
+        <!-- <Input v-model="query.computer_room" placeholder="请填写机房" style="width: 20%" clearable></Input> -->
         <Button @click="queryData" type="primary">查询</Button>
         <Button @click="queryCancel" type="warning">重置</Button>
         <div class="edittable-con-1">
@@ -93,6 +105,9 @@
         <FormItem label="机房">
           <Input v-model="editbaseinfo.computer_room" readonly></Input>
         </FormItem>
+        <FormItem label="数据库类型">
+          <Input v-model="editbaseinfo.dbtype" readonly></Input>
+        </FormItem>
         <FormItem label="连接名称:">
           <Input v-model="editbaseinfo.connection_name" readonly></Input>
         </FormItem>
@@ -133,6 +148,10 @@
             key: 'connection_name'
           },
           {
+            title: '数据库类型',
+            key: 'dbtype'
+          },
+          {
             title: '数据库地址',
             key: 'ip'
           },
@@ -149,6 +168,7 @@
         ],
         // 添加数据库信息
         formItem: {
+          dbtype: '',
           name: '',
           ip: '',
           add: '',
@@ -158,6 +178,11 @@
         },
         // 添加表单验证规则
         ruleInline: {
+          dbtype: [{
+            required: true,
+            message: '请选择数据库类型',
+            trigger: 'blur'
+          }],
           name: [{
             required: true,
             message: '请填写连接名称',
@@ -185,6 +210,7 @@
           }]
         },
         comList: [],
+        dbTypeList: ['Mysql', 'SqlServer'],
         pagenumber: 1,
         ding: {
           modal: false,
@@ -208,10 +234,12 @@
       },
       testConnection () {
         axios.put(`${this.$config.url}/management_db/test`, {
+          'dbtype': this.formItem.dbtype,
           'ip': this.formItem.ip,
           'user': this.formItem.username,
           'password': this.formItem.password,
-          'port': this.formItem.port
+          'port': this.formItem.port,
+          'name': this.formItem.name
         })
           .then(res => {
             this.$config.notice(res.data)
@@ -235,7 +263,9 @@
               'computer_room': this.formItem.add,
               'username': this.formItem.username,
               'password': this.formItem.password,
-              'port': this.formItem.port
+              'port': this.formItem.port,
+              'add': this.formItem.add,
+              'dbtype': this.formItem.dbtype
             }
             axios.post(this.$config.url + '/management_db/', {
               'data': JSON.stringify(data)
