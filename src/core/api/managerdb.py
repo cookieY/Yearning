@@ -135,17 +135,16 @@ class management_db(baseview.SuperUserpermissions):
                 password = request.data['password']
                 port = request.data['port']
                 dbtype =request.data['dbtype']
-                name = request.data['name']
             except KeyError as e:
                 CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
                 return HttpResponse(status=500)
             else:
                 try:
                     if dbtype=='SqlServer':
-                        with con_mssql_database.MSSQL(ip=ip, user=user, password=password, port=port, db=name):
+                        with con_mssql_database.MSSQL(ip=ip, user=user, password=password, port=port):
                             return Response('连接成功!')
                     else:
-                        with con_database.SQLgo(ip=ip, user=user, password=password, db=name, port=port):
+                        with con_database.SQLgo(ip=ip, user=user, password=password, port=port):
                              return Response('连接成功!')
                 except Exception as e:
                     CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')

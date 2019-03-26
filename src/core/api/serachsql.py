@@ -10,6 +10,7 @@ from rest_framework.response import Response
 from libs.serializers import Query_review, Query_list
 from libs import baseview, send_email, util
 from libs import con_database
+from libs import con_mssql_database
 from core.models import DatabaseList, Account, querypermissions, query_order, globalpermissions
 
 CUSTOM_ERROR = logging.getLogger('Yearning.core.views')
@@ -100,62 +101,118 @@ class search(baseview.BaseView):
                     connection_name=user.connection_name,
                     computer_room=user.computer_room
                 ).first()
-                with con_database.SQLgo(
-                        ip=_c.ip,
-                        password=_c.password,
-                        user=_c.username,
-                        port=_c.port,
-                        db=address['basename']
-                ) as f:
-                    try:
-                        if search.sql_parse(check[-1]):
-                            return Response('语句中不得含有违禁关键字: update insert alter into for drop')
 
-                        if check[-1].startswith('show'):
-                            query_sql = raw_sql
-                        else:
-                            if limit.get('limit').strip() == '':
-                                CUSTOM_ERROR.error('未设置全局最大limit值，系统自动设置为1000')
-                                query_sql = replace_limit(raw_sql, 1000)
+                if _c.dbtype.lower()=='MySql'.lower():
+
+                    with con_database.SQLgo(
+                            ip=_c.ip,
+                            password=_c.password,
+                            user=_c.username,
+                            port=_c.port,
+                            db=address['basename']
+                    ) as f:
+                        try:
+                            if search.sql_parse(check[-1]):
+                                return Response('语句中不得含有违禁关键字: update insert alter into for drop')
+
+                            if check[-1].startswith('show'):
+                                query_sql = raw_sql
                             else:
-                                query_sql = replace_limit(
-                                    raw_sql, limit.get('limit'))
-                        data_set = f.search(sql=query_sql)
-                    except Exception as e:
-                        CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
-                        return HttpResponse(e)
-                    else:
-                        if critical:
-                            as_list = search.sql_as_ex(
-                                sql, custom_com['sensitive_list'])
-                            if data_set['data']:
-                                fe = []
-                                for k, v in data_set['data'][0].items():
-                                    if isinstance(v, bytes):
-                                        fe.append(k)
-                                for l in data_set['data']:  # O(N^n+m)
-                                    if len(fe) != 0:
-                                        for i in fe:
-                                            l[i] = 'blob字段为不可呈现类型'
-                                    for s in as_list:
-                                        l[s] = '********'
+                                if limit.get('limit').strip() == '':
+                                    CUSTOM_ERROR.error('未设置全局最大limit值，系统自动设置为1000')
+                                    query_sql = replace_limit(raw_sql, 1000)
+                                else:
+                                    query_sql = replace_limit(
+                                        raw_sql, limit.get('limit'))
+                            data_set = f.search(sql=query_sql)
+                        except Exception as e:
+                            CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
+                            return HttpResponse(e)
                         else:
-                            if data_set['data']:
-                                fe = []
-                                for k, v in data_set['data'][0].items():
-                                    if isinstance(v, bytes):
-                                        fe.append(k)
-                                if len(fe) != 0:
-                                    for l in data_set['data']:   # O(N^n)
-                                        for i in fe:
-                                            l[i] = 'blob字段为不可呈现类型'
+                            if critical:
+                                as_list = search.sql_as_ex(
+                                    sql, custom_com['sensitive_list'])
+                                if data_set['data']:
+                                    fe = []
+                                    for k, v in data_set['data'][0].items():
+                                        if isinstance(v, bytes):
+                                            fe.append(k)
+                                    for l in data_set['data']:  # O(N^n+m)
+                                        if len(fe) != 0:
+                                            for i in fe:
+                                                l[i] = 'blob字段为不可呈现类型'
+                                        for s in as_list:
+                                            l[s] = '********'
+                            else:
+                                if data_set['data']:
+                                    fe = []
+                                    for k, v in data_set['data'][0].items():
+                                        if isinstance(v, bytes):
+                                            fe.append(k)
+                                    if len(fe) != 0:
+                                        for l in data_set['data']:   # O(N^n)
+                                            for i in fe:
+                                                l[i] = 'blob字段为不可呈现类型'
 
-                        querypermissions.objects.create(
-                            work_id=user.work_id,
-                            username=request.user,
-                            statements=query_sql
-                        )
-                    return HttpResponse(simplejson.dumps(data_set, cls=DateEncoder, bigint_as_string=True))
+                            querypermissions.objects.create(
+                                work_id=user.work_id,
+                                username=request.user,
+                                statements=query_sql
+                            )
+                        return HttpResponse(simplejson.dumps(data_set, cls=DateEncoder, bigint_as_string=True))
+
+                elif _c.dbtype.lower()=='Sqlserver'.lower():
+                    with con_mssql_database.MSSQL(
+                            ip=_c.ip,
+                            password=_c.password,
+                            user=_c.username,
+                            port=_c.port,
+                            db=address['basename']
+                    ) as f:
+                        try:
+                            if search.sql_parse(check[-1]):
+                                return Response('语句中不得含有违禁关键字: update insert alter into for drop')
+                            query_sql = raw_sql
+                            ##todo Top限制处理
+                            data_set = f.search(sql=query_sql)
+                        except Exception as e:
+                            CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
+                            return HttpResponse(e)
+                        else:
+                            if critical:
+                                as_list = search.sql_as_ex(
+                                    sql, custom_com['sensitive_list'])
+                                if data_set['data']:
+                                    fe = []
+                                    for k, v in data_set['data'][0].items():
+                                        if isinstance(v, bytes):
+                                            fe.append(k)
+                                    for l in data_set['data']:  # O(N^n+m)
+                                        if len(fe) != 0:
+                                            for i in fe:
+                                                l[i] = 'blob字段为不可呈现类型'
+                                        for s in as_list:
+                                            l[s] = '********'
+                            else:
+                                if data_set['data']:
+                                    fe = []
+                                    for k, v in data_set['data'][0].items():
+                                        if isinstance(v, bytes):
+                                            fe.append(k)
+                                    if len(fe) != 0:
+                                        for l in data_set['data']:  # O(N^n)
+                                            for i in fe:
+                                                l[i] = 'blob字段为不可呈现类型'
+
+                            querypermissions.objects.create(
+                                work_id=user.work_id,
+                                username=request.user,
+                                statements=query_sql
+                            )
+                        return HttpResponse(simplejson.dumps(data_set, cls=DateEncoder, bigint_as_string=True))
+
+
+
         else:
             return Response('非法请求,账号无查询权限！')
 
@@ -351,15 +408,26 @@ class query_worklf(baseview.BaseView):
         elif request.data['mode'] == 'info':
             tablelist = []
             highlist = []
+            dataname=[]
             database = query_order.objects.filter(
                 username=request.user).order_by('-id').first()
             _connection = DatabaseList.objects.filter(
                 connection_name=database.connection_name).first()
-            with con_database.SQLgo(ip=_connection.ip,
-                                    user=_connection.username,
-                                    password=_connection.password,
-                                    port=_connection.port) as f:
-                dataname = f.query_info(sql='show databases')
+            try:
+                if _connection.dbtype.lower()=='MySql'.lower():
+                    with con_database.SQLgo(ip=_connection.ip,
+                                            user=_connection.username,
+                                            password=_connection.password,
+                                            port=_connection.port) as f:
+                        dataname = f.query_info(sql='show databases')
+                elif _connection.dbtype.lower() == 'Sqlserver'.lower():
+                    with con_mssql_database.MSSQL(ip=_connection.ip,
+                                                  user=_connection.username,
+                                                  password=_connection.password,
+                                                  port=_connection.port) as f:
+                        dataname = f.query_info(sql='select name as [Database] from sysdatabases')
+            except Exception as e:
+                return HttpResponse(e)
             ignore = exclued_db_list()
             for index, uc in sorted(enumerate(dataname), reverse=True):
                 for cc in ignore:
@@ -384,22 +452,42 @@ class query_worklf(baseview.BaseView):
             children = []
             database = query_order.objects.filter(username=request.user).order_by('-id').first()
             _connection = DatabaseList.objects.filter(connection_name=database.connection_name).first()
-            with con_database.SQLgo(ip=_connection.ip,
-                                    user=_connection.username,
-                                    password=_connection.password,
-                                    port=_connection.port,
-                                    db=basename) as f:
-                tablename = f.query_info(sql='show tables')
-                for c in tablename:
-                    key = 'Tables_in_%s' % basename
-                    field = f.query_info(
-                        sql='select COLUMN_NAME from information_schema.COLUMNS where table_name = "%s"' % c[key])
-                    for z in field:
-                        highlist.append({'vl': z['COLUMN_NAME'], 'meta': '字段名'})
-                    highlist.append({'vl': c[key], 'meta': '表名'})
-                    children.append({
-                        'title': c[key]
-                    })
+            if _connection.dbtype.lower() == 'MySql'.lower():
+
+                with con_database.SQLgo(ip=_connection.ip,
+                                        user=_connection.username,
+                                        password=_connection.password,
+                                        port=_connection.port,
+                                        db=basename) as f:
+                    tablename = f.query_info(sql='show tables')
+                    for c in tablename:
+                        key = 'Tables_in_%s' % basename
+                        field = f.query_info(
+                            sql='select COLUMN_NAME from information_schema.COLUMNS where table_name = "%s"' % c[key])
+                        for z in field:
+                            highlist.append({'vl': z['COLUMN_NAME'], 'meta': '字段名'})
+                        highlist.append({'vl': c[key], 'meta': '表名'})
+                        children.append({
+                            'title': c[key]
+                        })
+            elif _connection.dbtype.lower() == 'Sqlserver'.lower():
+                with con_mssql_database.MSSQL(ip=_connection.ip,
+                                        user=_connection.username,
+                                        password=_connection.password,
+                                        port=_connection.port,
+                                        db=basename) as f:
+                    tableSql='''SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES 
+                                WHERE TABLE_CATALOG='%s' AND TABLE_TYPE='BASE TABLE' ORDER BY TABLE_NAME''' % basename
+                    tablename = f.query_info(sql=tableSql)
+                    for c in tablename:
+                        key = 'TABLE_NAME'
+                        field = f.query_info(sql='''select name as COLUMN_NAME from syscolumns where id=(select max(id) from sysobjects where xtype='u' and name='%s') ORDER BY colorder''' % c[key])
+                        for z in field:
+                            highlist.append({'vl': z['COLUMN_NAME'], 'meta': '字段名'})
+                        highlist.append({'vl': c[key], 'meta': '表名'})
+                        children.append({
+                            'title': c[key]
+                        })
             return Response({'table': children, 'highlight': highlist})
 
     def delete(self, request, args: str = None):

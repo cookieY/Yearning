@@ -3,7 +3,7 @@ import logging
 import ast
 from django.http import HttpResponse
 from rest_framework.response import Response
-from libs import baseview, con_database, util
+from libs import baseview, con_database, util,con_mssql_database
 from core.task import grained_permissions, set_auth_group
 from core.api import serachsql
 from django.contrib.auth import authenticate
@@ -98,18 +98,27 @@ class addressing(baseview.BaseView):
             else:
                 _connection = DatabaseList.objects.filter(id=con_id).first()
                 try:
-                    with con_database.SQLgo(
-                            ip=_connection.ip,
-                            user=_connection.username,
-                            password=_connection.password,
-                            port=_connection.port
-                    ) as f:
-                        res = f.baseItems(sql='show databases')
-                        exclude_db = serachsql.exclued_db_list()
-                        for db in exclude_db:
-                            if db in res:
-                                res.remove(db)
-                        return Response(res)
+                    if _connection.dbtype.lower() == 'MySql'.lower():
+                        with con_database.SQLgo(
+                                ip=_connection.ip,
+                                user=_connection.username,
+                                password=_connection.password,
+                                port=_connection.port
+                        ) as f:
+                            res = f.baseItems(sql='show databases')
+                    elif _connection.dbtype.lower() == 'SqlServer'.lower():
+                        with con_mssql_database.MSSQL(
+                                ip=_connection.ip,
+                                user=_connection.username,
+                                password=_connection.password,
+                                port=_connection.port
+                        ) as f:
+                            res = f.baseItems(sql='select name as [Database] from sysdatabases')
+                    exclude_db = serachsql.exclued_db_list()
+                    for db in exclude_db:
+                        if db in res:
+                            res.remove(db)
+                    return Response(res)
                 except Exception as e:
                     CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
                     return HttpResponse(status=500)
@@ -124,15 +133,25 @@ class addressing(baseview.BaseView):
             else:
                 _connection = DatabaseList.objects.filter(id=con_id).first()
                 try:
-                    with con_database.SQLgo(
-                            ip=_connection.ip,
-                            user=_connection.username,
-                            password=_connection.password,
-                            port=_connection.port,
-                            db=basename
-                    ) as f:
-                        res = f.baseItems(sql='show tables')
-                        return Response(res)
+                    if _connection.dbtype.lower() == 'MySql'.lower():
+                        with con_database.SQLgo(
+                                ip=_connection.ip,
+                                user=_connection.username,
+                                password=_connection.password,
+                                port=_connection.port,
+                                db=basename
+                        ) as f:
+                            res = f.baseItems(sql='show tables')
+                    elif _connection.dbtype.lower() == 'SqlServer'.lower():
+                        with con_mssql_database.MSSQL(ip=_connection.ip,
+                                                      user=_connection.username,
+                                                      password=_connection.password,
+                                                      port=_connection.port,
+                                                      db=basename) as f:
+                            tableSql = '''SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES 
+                                                       WHERE TABLE_CATALOG='%s' AND TABLE_TYPE='BASE TABLE' ORDER BY TABLE_NAME''' % basename
+                            res = f.baseItems(sql=tableSql)
+                    return Response(res)
                 except Exception as e:
                     CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
                     return HttpResponse(status=500)
@@ -149,16 +168,27 @@ class addressing(baseview.BaseView):
                 try:
                     _connection = DatabaseList.objects.filter(
                         id=con_id).first()
-                    with con_database.SQLgo(
-                            ip=_connection.ip,
-                            user=_connection.username,
-                            password=_connection.password,
-                            port=_connection.port,
-                            db=basename
-                    ) as f:
-                        field = f.gen_alter(table_name=table)
-                        idx = f.index(table_name=table)
-                        return Response({'idx': idx, 'field': field})
+                    if _connection.dbtype.lower() == 'MySql'.lower():
+                        with con_database.SQLgo(
+                                ip=_connection.ip,
+                                user=_connection.username,
+                                password=_connection.password,
+                                port=_connection.port,
+                                db=basename
+                        ) as f:
+                            field = f.gen_alter(table_name=table)
+                            idx = f.index(table_name=table)
+                    elif _connection.dbtype.lower()== 'SqlServer'.lower():
+                        with con_mssql_database.MSSQL(
+                                ip=_connection.ip,
+                                user=_connection.username,
+                                password=_connection.password,
+                                port=_connection.port,
+                                db=basename
+                        ) as f:
+                            field = f.gen_alter(table_name=table)
+                            idx = f.index(table_name=table)
+                    return Response({'idx': idx, 'field': field})
 
                 except Exception as e:
                     CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')

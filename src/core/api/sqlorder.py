@@ -59,9 +59,13 @@ class sqlorder(baseview.BaseView):
                 CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
             else:
                 try:
-                    with call_inception.Inception(LoginDic=info) as test:
-                        res = test.Check(sql=sql)
-                        return Response({'result': res, 'status': 200})
+                    if data.dbtype.lower() == 'MySql'.lower():
+                        with call_inception.Inception(LoginDic=info) as test:
+                            res = test.Check(sql=sql)
+                            return Response({'result': res, 'status': 200})
+                    ##todo SQLServer目前没有类似Inception的服务 默认返回成功
+                    elif data.dbtype.lower() == 'SqlServer'.lower():
+                        return Response({'result': [], 'status': 200})
                 except Exception as e:
                     CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
                     return HttpResponse(e)

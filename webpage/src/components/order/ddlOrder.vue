@@ -302,6 +302,10 @@ export default {
         {
           title: '字段名',
           key: 'column_name'
+        },
+        {
+          title: '索引类型',
+          key: 'index_type'
         }
       ],
       idxData: [],
@@ -412,10 +416,10 @@ export default {
       })
     },
     testSql () {
-      let ddl = ['select', 'insert', 'update', 'delete']
+      let notddl = ['select', 'insert', 'update', 'delete']
       let createtable = this.formDynamic.split(';')
       for (let i of createtable) {
-        for (let c of ddl) {
+        for (let c of notddl) {
           i = i.replace(/(^\s*)|(\s*$)/g, '')
           if (i.toLowerCase().indexOf(c) === 0) {
             this.$Message.error('不可提交非DDL语句!')
