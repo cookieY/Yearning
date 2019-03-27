@@ -6,7 +6,7 @@ import ast
 import time
 from django.http import HttpResponse
 from libs import send_email, util
-from libs import call_inception
+from libs import call_inception,con_mssql_database
 from .models import (
     DatabaseList,
     Account,
@@ -140,33 +140,53 @@ class order_push_message(object):
 
         try:
             detail = DatabaseList.objects.filter(id=self.order.bundle_id).first()
-
-            with call_inception.Inception(
-                    LoginDic={
-                        'host': detail.ip,
-                        'user': detail.username,
-                        'password': detail.password,
-                        'db': self.order.basename,
-                        'port': detail.port
-                    }
-            ) as f:
-                res = f.Execute(sql=self.order.sql, backup=self.order.backup)
-                for i in res:
-                    if i['errlevel'] != 0:
-                        SqlOrder.objects.filter(work_id=self.order.work_id).update(status=4)
+            if detail.dbtype.lower() == 'MySql'.lower():
+                with call_inception.Inception(
+                        LoginDic={
+                            'host': detail.ip,
+                            'user': detail.username,
+                            'password': detail.password,
+                            'db': self.order.basename,
+                            'port': detail.port
+                        }
+                ) as f:
+                    res = f.Execute(sql=self.order.sql, backup=self.order.backup)
+                    for i in res:
+                        if i['errlevel'] != 0:
+                            SqlOrder.objects.filter(work_id=self.order.work_id).update(status=4)
+                        SqlRecord.objects.get_or_create(
+                            state=i['stagestatus'],
+                            sql=i['sql'],
+                            error=i['errormessage'],
+                            workid=self.order.work_id,
+                            affectrow=i['affected_rows'],
+                            sequence=i['sequence'],
+                            execute_time=i['execute_time'],
+                            SQLSHA1=i['SQLSHA1'],
+                            backup_dbname=i['backup_dbname']
+                        )
+            elif detail.dbtype.lower() == 'SqlServer'.lower():
+                with con_mssql_database.MSSQL(ip=detail.ip,
+                                              user=detail.username,
+                                              password=detail.password,
+                                              port=detail.port,
+                                              db=self.order.basename) as f:
+                    f.execute_non_query(self.order.sql)
                     SqlRecord.objects.get_or_create(
-                        state=i['stagestatus'],
-                        sql=i['sql'],
-                        error=i['errormessage'],
-                        workid=self.order.work_id,
-                        affectrow=i['affected_rows'],
-                        sequence=i['sequence'],
-                        execute_time=i['execute_time'],
-                        SQLSHA1=i['SQLSHA1'],
-                        backup_dbname=i['backup_dbname']
+                        state=0,
+                        sql=self.order.sql,
+                        error='',
+                        workid=self.order.work_id
                     )
         except Exception as e:
             CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
+            SqlOrder.objects.filter(work_id=self.order.work_id).update(status=4)
+            SqlRecord.objects.get_or_create(
+                state=1,
+                sql=self.order.sql,
+                error='%s' % str(e),
+                workid=self.order.work_id
+            )
         finally:
             status = SqlOrder.objects.filter(work_id=self.order.work_id).first()
             if status.status != 4:

@@ -177,6 +177,7 @@ class audit(baseview.SuperUserpermissions):
                             SqlOrder.objects.filter(
                                 id=order_id).update(status=3)
                             arr = order_push_message(addr_ip, order_id, from_user, to_user)
+                            #arr.run()
                             threading.Timer(delay, arr.run).start()
                             return Response('工单执行成功!请通过记录页面查看具体执行结果')
                     except Exception as e:
@@ -220,9 +221,12 @@ class audit(baseview.SuperUserpermissions):
                         'port': data.port
                     }
                     try:
-                        with call_inception.Inception(LoginDic=info) as test:
-                            res = test.Check(sql=sql.sql)
-                            return Response({'result': res, 'status': 200})
+                        if data.dbtype.lower() == 'MySql'.lower():
+                            with call_inception.Inception(LoginDic=info) as test:
+                                res = test.Check(sql=sql.sql)
+                                return Response({'result': res, 'status': 200})
+                        elif data.dbtype.lower() == 'SqlServer'.lower():
+                            return Response({'result': [], 'status': 200})
                     except Exception as e:
                         CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
                         return Response({'status': '请检查inception信息是否正确!'})

@@ -134,6 +134,7 @@ CREATE TABLE `core_databaselist` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
   `connection_name` varchar(50) COLLATE utf8_bin NOT NULL,
   `computer_room` varchar(50) COLLATE utf8_bin NOT NULL,
+  'dbtype' VARCHAR(20) COLLATE utf8_bin DEFAULT '' NOT NULL,
   `ip` varchar(100) COLLATE utf8_bin NOT NULL,
   `username` varchar(150) COLLATE utf8_bin NOT NULL,
   `port` int(11) NOT NULL,

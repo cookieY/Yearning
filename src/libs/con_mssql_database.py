@@ -209,3 +209,9 @@ class MSSQL(object):
             cursor.execute(sql)
             result = cursor.fetchall()
         return result
+
+    def execute_non_query(self, sql=None):
+
+        with self.con.cursor() as cursor:
+            cursor.execute(sql)
+            self.con.commit()
