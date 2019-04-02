@@ -3,13 +3,10 @@
 </p>
 
 # Yearning SQL审核平台
-[![996.icu](https://img.shields.io/badge/link-996.icu-red.svg)](https://996.icu)
+[![LICENSE](https://img.shields.io/badge/license-Anti%20996-blue.svg)](https://github.com/996icu/996.ICU/blob/master/LICENSE)
+[![LICENSE](https://img.shields.io/badge/license-AGPL%20-blue.svg)]
 ![](https://img.shields.io/badge/build-release-brightgreen.svg)  
 ![](https://img.shields.io/badge/version-v1.4.2-brightgreen.svg)  
-![](https://img.shields.io/badge/vue.js-2.5.13-brightgreen.svg) 
-![](https://img.shields.io/badge/iview-3.2.1-brightgreen.svg?style=flat-square) 
-![](https://img.shields.io/badge/python-3.6-brightgreen.svg)
-![](https://img.shields.io/badge/Django-2.1.5-brightgreen.svg)
 
 ##### MYSQL web端 SQL审核平台。
 
