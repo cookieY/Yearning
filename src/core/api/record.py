@@ -39,8 +39,7 @@ class record_order(baseview.SuperUserpermissions):
                     ORDER BY o.id desc
                     ''' % request.user
                 )[start:end]
-                data = util.ser(sql)
-                return Response({'data': data, 'page': pagenumber})
+                return Response({'data': util.ser(sql), 'page': pagenumber})
             except Exception as e:
                 CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
                 return HttpResponse(status=500)

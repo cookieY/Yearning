@@ -87,7 +87,7 @@
     methods: {
       currentPageTab (val) {
         if (val === 'login') {
-          localStorage.clear()
+          localStorage.removeItem('pageOpenedList')
           sessionStorage.clear()
           this.$router.push({
             name: 'login'

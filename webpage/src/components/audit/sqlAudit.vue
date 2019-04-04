@@ -79,7 +79,8 @@
               </FormItem>
               <FormItem>
                 <DatePicker format="yyyy-MM-dd HH:mm" type="datetimerange" placeholder="请选择查询的时间范围"
-                            v-model="find.picker" @on-change="find.picker=$event" style="width: 250px" :editable="false"></DatePicker>
+                            v-model="find.picker" @on-change="find.picker=$event" style="width: 250px"
+                            :editable="false"></DatePicker>
               </FormItem>
               <FormItem>
                 <Button type="success" @click="queryData">查询</Button>
@@ -371,7 +372,7 @@
         togoing: null,
         osc: false,
         oscsha1: '',
-        osclist: [],
+        osclist: JSON.parse(localStorage.getItem('osc')),
         percent: 0,
         consuming: '00:00',
         callback_time: null,
@@ -453,7 +454,6 @@
       },
       testTo () {
         this.loading = true
-        this.osclist = []
         axios.put(`${this.$config.url}/audit_sql`, {
           'type': 'test',
           'base': this.formitem.basename,
@@ -467,6 +467,7 @@
                   return vl
                 }
               })
+              localStorage.setItem('osc', JSON.stringify(this.osclist))
               this.summit = false
               this.loading = false
             } else {

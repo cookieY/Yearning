@@ -267,7 +267,7 @@ class getsql(baseview.BaseView):
         id = request.GET.get('id')
         bundle = request.GET.get('bundle_id')
         baseCon = DatabaseList.objects.filter(id=bundle).first()
-        sql = SqlOrder.objects.filter(id=id).first()
+        sql = SqlOrder.objects.filter(id=id).only('sql').first()
         return Response({'sql': sql.sql, 'comRoom': baseCon.computer_room, 'conn': baseCon.connection_name})
 
 
