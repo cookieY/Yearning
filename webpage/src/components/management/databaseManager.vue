@@ -56,7 +56,7 @@
               <Button type="success" size="small" @click="dingInfoModal(row)" style="margin-right: 5px">钉钉消息</Button>
               <Poptip
                 confirm
-                title="确定要删除此连接名吗？"
+                title="删除数据源将会删除对应的所有工单信息,确定要删除吗？"
                 @on-ok="delConnection(row)">
                 <Button type="warning" size="small">删除</Button>
               </Poptip>

@@ -68,6 +68,14 @@ class management_db(baseview.SuperUserpermissions):
                                                        computer_room__contains=con['computer_room'])[start:end]
                 else:
                     page_number = DatabaseList.objects.count()
+                    if page_number == 0:
+                        return Response(
+                            {
+                                'page': page_number,
+                                'data': [],
+                                'custom': custom_com['con_room']
+                            }
+                        )
                     info = DatabaseList.objects.all().order_by('connection_name')[start:end]
                 serializers = Sqllist(info, many=True)
 

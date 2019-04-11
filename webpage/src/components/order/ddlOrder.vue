@@ -56,7 +56,7 @@ p {
                 <Button type="error" @click="canel()">重置</Button>
               </Form-item>
               <FormItem label="工单提交说明:" prop="text">
-                <Input v-model="formItem.text" placeholder="请输入工单说明"></Input>
+                <Input v-model="formItem.text" placeholder="请输入工单说明" type="textarea" rows="4"></Input>
               </FormItem>
               <FormItem label="指定审核人:" prop="assigned">
                 <Select v-model="formItem.assigned" filterable transfer>
@@ -459,7 +459,7 @@ export default {
     commitOrder () {
       this.$refs['formItem'].validate((valid) => {
         if (valid) {
-          let sql = this.formDynamic.replace(/(;|；)$/gi, '').replace(/\s/g, ' ').replace(/；/g, ';').split(';')
+          let sql = this.formDynamic.replace(/(;|；)$/gi, '').replace(/\s/g, ' ').replace(/；/g, ';')
           axios.post(`${this.$config.url}/sqlsyntax/`, {
             'data': JSON.stringify(this.formItem),
             'sql': JSON.stringify(sql),

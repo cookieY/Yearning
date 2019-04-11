@@ -3,6 +3,7 @@ import json
 import ast
 import threading
 import datetime
+import sqlparse
 from libs import baseview, call_inception, util, serializers, send_email
 from rest_framework.response import Response
 from django.http import HttpResponse
@@ -268,7 +269,8 @@ class getsql(baseview.BaseView):
         bundle = request.GET.get('bundle_id')
         baseCon = DatabaseList.objects.filter(id=bundle).first()
         sql = SqlOrder.objects.filter(id=id).only('sql').first()
-        return Response({'sql': sql.sql, 'comRoom': baseCon.computer_room, 'conn': baseCon.connection_name})
+        ser_sql = sqlparse.split(sql.sql)
+        return Response({'sql': json.dumps(ser_sql), 'comRoom': baseCon.computer_room, 'conn': baseCon.connection_name})
 
 
 def push_message(message=None, type=None, user=None, to_addr=None, work_id=None, status=None):

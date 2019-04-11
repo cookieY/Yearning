@@ -1,5 +1,6 @@
 import logging
 import json
+import sqlparse
 from libs import baseview, util
 from libs import call_inception
 from core.task import submit_push_messages
@@ -46,7 +47,6 @@ class sqlorder(baseview.BaseView):
                 id = request.data['id']
                 base = request.data['base']
                 sql = request.data['sql']
-                sql = str(sql).strip('\n').strip().rstrip(';')
                 data = DatabaseList.objects.filter(id=id).first()
                 info = {
                     'host': data.ip,
@@ -78,10 +78,10 @@ class sqlorder(baseview.BaseView):
             return HttpResponse(status=500)
         else:
             try:
-                x = [x.rstrip(';') for x in tmp]
+                x = [x for x in sqlparse.split(tmp)]
                 if str(x[0]).lstrip().startswith('use'):
                     del x[0]
-                sql = ';'.join(x)
+                sql = ''.join(x)
                 sql = sql.strip(' ').rstrip(';')
                 workId = util.workId()
                 SqlOrder.objects.get_or_create(
