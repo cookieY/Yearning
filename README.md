@@ -6,7 +6,7 @@
 [![LICENSE](https://img.shields.io/badge/license-Anti%20996-blue.svg)](https://github.com/996icu/996.ICU/blob/master/LICENSE)
 ![LICENSE](https://img.shields.io/badge/license-AGPL%20-blue.svg)
 ![](https://img.shields.io/badge/build-release-brightgreen.svg)  
-![](https://img.shields.io/badge/version-v1.4.2-brightgreen.svg)  
+![](https://img.shields.io/badge/version-v1.4.6-brightgreen.svg)  
 
 ##### MYSQL web端 SQL审核平台。
 
@@ -38,14 +38,6 @@
     - todoList
     - LDAP登录  
     - 动态配置 
-
-## Environment 环境
-
-- Python 3.6
-
-- Vue.js 2.5
-
-- Django 2.1.5
 
 ## Install 安装及使用日志
 
