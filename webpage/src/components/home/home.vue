@@ -50,7 +50,7 @@
               <Col span="8">
                 <p class="notwrap">当前版本:</p>
               </Col>
-              <Col span="16" class="padding-left-8"> <a target="_Blank"  href="https://cookiey.github.io/Yearning-document/update/">v1.4.4</a></Col>
+              <Col span="16" class="padding-left-8"> <a target="_Blank"  href="https://cookiey.github.io/Yearning-document/update/">v1.4.6</a></Col>
             </Row>
           </Card>
         </Row>
