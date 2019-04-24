@@ -470,6 +470,8 @@
               this.summit = false
               this.loading = false
             } else {
+              this.loading = false
+              this.modal2 = false
               this.$config.err_notice(this, res.data.status)
             }
           })

@@ -1,7 +1,7 @@
 import logging
 import json
 from libs import baseview, util
-from core.task import set_auth_group, ThinkTooMuch
+from core.task import set_auth_group, ThinkTooMuch, DefenseMid
 from libs.serializers import UserINFO
 from libs.send_email import send_email
 from rest_framework.response import Response
@@ -123,6 +123,7 @@ class userinfo(baseview.BaseView):
                     CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
                     return HttpResponse(status=500)
 
+    @DefenseMid
     def post(self, request, args=None):
         try:
             username = request.data['username']

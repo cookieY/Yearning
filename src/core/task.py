@@ -89,6 +89,18 @@ def ThinkTooMuch(func):
     return wrapper
 
 
+def DefenseMid(func):
+    def wrapper(self, request, args=None):
+        if request.method == "POST":
+            user = str(request.user)
+            ac = Account.objects.filter(username=user).first()
+            if ac.is_staff != 1:
+                return HttpResponse('请不要想太多!')
+        return func(self, request, args)
+
+    return wrapper
+
+
 def isAdmin(func):
     def wrapper(self, request, args=None):
         if request.user.is_staff != 1:

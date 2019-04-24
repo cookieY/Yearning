@@ -172,7 +172,7 @@
         this.reloadsql = true
       },
       comorder () {
-        let sql = this.sql.replace(/(;|；)$/gi, '').replace(/\s/g, ' ').replace(/；/g, ';').split(';')
+        let sql = this.sql.replace(/(;|；)$/gi, '').replace(/\s/g, ' ').replace(/；/g, ';')
         axios.post(`${this.$config.url}/sqlsyntax/`, {
           'data': JSON.stringify(this.formItem),
           'sql': JSON.stringify(sql),
