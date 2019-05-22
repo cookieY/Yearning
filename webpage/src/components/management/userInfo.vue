@@ -120,9 +120,15 @@
           <Input v-model="editAuthForm.department" placeholder="请输入新部门"></Input>
         </FormItem>
         <FormItem label="权限组" prop="authgroup">
-          <Select v-model="editAuthForm.authgroup" multiple @on-change="getGroupList" placeholder="请选择">
-            <Option v-for="list in groupset" :value="list" :key="list">{{ list }}</Option>
-          </Select>
+          <multiselect
+            v-model="editAuthForm.authgroup" :options="groupset" :multiple="true"
+            :close-on-select="false" :clear-on-select="false" :preserve-search="true"
+            placeholder="输入搜索" @close="getGroupList"
+          >
+            <template slot="singleLabel" slot-scope="option">
+              {{ option }}
+            </template>
+          </multiselect>
           <template>
             <FormItem>
               <Divider orientation="left">DDL权限</Divider>
@@ -186,9 +192,13 @@
 </template>
 <script>
   import axios from 'axios'
+  import Multiselect from 'vue-multiselect'
   import '../../assets/tablesmargintop.css'
 
   export default {
+    components: {
+      Multiselect
+    },
     data () {
       const valideRePassword = (rule, value, callback) => { // eslint-disable-line no-unused-vars
         if (value !== this.editPasswordForm.newPass) {
@@ -593,3 +603,4 @@
     }
   }
 </script>
+<style src="vue-multiselect/dist/vue-multiselect.min.css"></style>

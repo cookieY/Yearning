@@ -71,9 +71,15 @@
       <h3 slot="header" style="color:#2D8CF0">权限申请单</h3>
       <Form :label-width="120" label-position="right">
         <FormItem label="权限组" prop="authgroup">
-          <Select v-model="applygroup" multiple @on-change="getgrouplist" placeholder="请选择">
-            <Option v-for="list in groupset" :value="list" :key="list">{{ list }}</Option>
-          </Select>
+          <multiselect
+            v-model="authgroup" :options="groupset" :multiple="true"
+            :close-on-select="false" :clear-on-select="false" :preserve-search="true"
+            placeholder="输入搜索" @close="getgrouplist"
+          >
+            <template slot="singleLabel" slot-scope="option">
+              {{ option }}
+            </template>
+          </multiselect>
           <template>
             <FormItem>
               <Divider orientation="left">DDL权限</Divider>
@@ -124,9 +130,13 @@
   //
 
   import axios from 'axios'
+  import Multiselect from 'vue-multiselect'
 
   export default {
     name: 'own-space',
+    components: {
+      Multiselect
+    },
     data () {
       const valideRePassword = (rule, value, callback) => {
         if (value !== this.editPasswordForm.newPass) {
@@ -310,3 +320,4 @@
     }
   }
 </script>
+<style src="vue-multiselect/dist/vue-multiselect.min.css"></style>
