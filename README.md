@@ -42,13 +42,6 @@
 ## Install 安装及使用日志
 
 [使用及安装文档](http://guide.yearning.io)
-
-## Support 支持Yearning
-
-如果Yearning能够帮助到你，请支持下Yearning吧，让Yearning能够持续改善并更新
-
-![](img/alipay.jpg)
-![](img/wechat.jpg)
   
 ## About 联系方式
    
