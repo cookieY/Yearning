@@ -177,7 +177,7 @@ class search(baseview.BaseView):
                         port=_c.port,
                         db=base
                 ) as f:
-                    data_set = f.search(sql='desc %s' % table)
+                    data_set = f.search(sql='desc `%s`' % table)
                 return Response(data_set)
             except Exception as e:
                 CUSTOM_ERROR.error(f'{e.__class__.__name__}: {e}')
