@@ -103,3 +103,6 @@ ENV/
 .mypy_cache/
 .idea/*.xml
 .vscode/
+go.sum
+.idea/Yearning.iml
+.idea/inspectionProfiles/Project_Default.xml

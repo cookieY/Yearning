@@ -76,6 +76,8 @@ func Paging(page interface{}, total int) (start int, end int) {
 
 func LdapConnenct(c echo.Context, l *model.Ldap, user string, pass string, isTest bool) bool {
 
+	var s string
+
 	ld, err := ldap.Dial("tcp", l.Url)
 	if err != nil {
 		c.Logger().Error(err.Error())
@@ -93,10 +95,18 @@ func LdapConnenct(c echo.Context, l *model.Ldap, user string, pass string, isTes
 
 	}
 
+	if l.Type == 1 {
+		s = fmt.Sprintf("(sAMAccountName=%s)", user)
+	} else if l.Type == 2 {
+		s = fmt.Sprintf("(uid=%s)", user)
+	} else {
+		s = fmt.Sprintf("(cn=%s)", user)
+	}
+
 	searchRequest := ldap.NewSearchRequest(
 		l.Sc,
 		ldap.ScopeWholeSubtree, ldap.NeverDerefAliases, 0, 0, false,
-		l.Type,
+		fmt.Sprintf("(&(objectClass=organizationalPerson)%s)", s),
 		[]string{"dn"},
 		nil,
 	)

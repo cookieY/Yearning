@@ -121,7 +121,7 @@ func Migrate() {
 			Url:      "",
 			User:     "",
 			Password: "",
-			Type:     "(&(objectClass=organizationalPerson)sAMAccountName)",
+			Type:     1,
 			Sc:       "",
 		}
 
