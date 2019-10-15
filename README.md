@@ -5,7 +5,7 @@
 # Yearning SQL审核平台
 ![LICENSE](https://img.shields.io/badge/license-AGPL%20-blue.svg)
 ![](https://img.shields.io/badge/build-release-brightgreen.svg)  
-![](https://img.shields.io/badge/version-v2.1.2-brightgreen.svg)  
+![](https://img.shields.io/badge/version-v2.1.4-brightgreen.svg)  
 
 ##### MYSQL web端 SQL审核平台。
 
@@ -43,6 +43,7 @@
     - todoList
     - LDAP登录  
     - 动态审核规则配置 
+- AutoTask自动执行
 
 ## Install 安装及使用日志
 
