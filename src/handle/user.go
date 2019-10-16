@@ -256,6 +256,10 @@ func SuperFetchUser(c echo.Context) (err error) {
 func SuperDeleteUser(c echo.Context) (err error) {
 	user := c.Param("user")
 
+	if user == "admin" {
+		return c.JSON(http.StatusOK,"admin用户无法被删除!")
+	}
+
 	var g []model.CoreGrained
 
 	model.DB().Find(&g)
