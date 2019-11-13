@@ -209,7 +209,7 @@ func ExecuteOrder(c echo.Context) (err error) {
 		SQL:      order.SQL,
 		Backup:   backup,
 		Execute:  true,
-		Source:   &pb.Source{Addr: sor.IP, Port: sor.Port, User: sor.Username, Password: ps},
+		Source:   &pb.Source{Addr: sor.IP, Port: int32(sor.Port), User: sor.Username, Password: ps},
 		WorkId:   order.WorkId,
 		IsDML:    false,
 		DataBase: order.DataBase,

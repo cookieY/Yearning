@@ -15,6 +15,7 @@ package lib
 
 import (
 	"Yearning-go/src/model"
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	_ "github.com/go-sql-driver/mysql"
@@ -79,10 +80,18 @@ func LdapConnenct(c echo.Context, l *model.Ldap, user string, pass string, isTes
 	var s string
 
 	ld, err := ldap.Dial("tcp", l.Url)
+
+	if l.Ldaps {
+		if err := ld.StartTLS(&tls.Config{InsecureSkipVerify: true});err != nil {
+			log.Println(err.Error())
+		}
+	}
+
 	if err != nil {
 		c.Logger().Error(err.Error())
 		return false
 	}
+
 	defer ld.Close()
 
 	if ld != nil {

@@ -152,7 +152,8 @@ func AddRouter(e *echo.Echo) {
 	autoTask := r.Group("/auto", SuperManageGroup)
 	autoTask.GET("", handle.SuperFetchAutoTaskSource)
 	autoTask.POST("", handle.SuperReferAutoTask)
-	autoTask.GET("/fetch", handle.SuperFetchAutoTaskList)
+	autoTask.PUT("/fetch", handle.SuperFetchAutoTaskList)
 	autoTask.POST("/edit", handle.SuperEditAutoTask)
 	autoTask.DELETE("/:id", handle.SuperDeleteAutoTask)
+	autoTask.POST("/active", handle.SuperAutoTaskActivation)
 }

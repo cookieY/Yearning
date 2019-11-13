@@ -105,7 +105,7 @@ func SuperAddDB(c echo.Context) (err error) {
 			model.DB().Create(&model.CoreDataSource{
 				IDC:      u.IDC,
 				Source:   u.Source,
-				Port:     int32(u.Port),
+				Port:     u.Port,
 				IP:       u.IP,
 				Password: x,
 				Username: u.User,
@@ -183,6 +183,6 @@ func SuperModifyDb(c echo.Context) (err error) {
 		return c.JSON(http.StatusInternalServerError, "")
 	}
 	x := lib.Encrypt(u.Data.Password)
-	model.DB().Model(&model.CoreDataSource{}).Where("source =?", u.Data.Source).Update(&model.CoreDataSource{IP: u.Data.IP, Port: int32(u.Data.Port), Username: u.Data.Username, Password: x})
+	model.DB().Model(&model.CoreDataSource{}).Where("source =?", u.Data.Source).Update(&model.CoreDataSource{IP: u.Data.IP, Port: u.Data.Port, Username: u.Data.Username, Password: x})
 	return c.JSON(http.StatusOK, "数据源信息已更新!")
 }

@@ -28,6 +28,7 @@ type autoTask struct {
 	Tp       int    `json:"tp"`
 	Row      uint   `json:"row"`
 	Id       int    `json:"id"`
+	Status   int    `json:"status"`
 }
 
 type fetchAutoTask struct {
@@ -49,6 +50,7 @@ func SuperReferAutoTask(c echo.Context) (err error) {
 			Tp:        u.Tp.Tp,
 			Name:      u.Tp.Name,
 			Affectrow: u.Tp.Row,
+			Status:    0,
 		})
 		return c.JSON(http.StatusOK, "已添加autoTask任务!")
 	} else {
@@ -62,11 +64,21 @@ func SuperFetchAutoTaskSource(c echo.Context) (err error) {
 	return c.JSON(http.StatusOK, source)
 }
 func SuperFetchAutoTaskList(c echo.Context) (err error) {
+	u := new(f)
+	if err = c.Bind(u); err != nil {
+		c.Logger().Error(err.Error())
+		return
+	}
 	var task []model.CoreAutoTask
 	var pg int
-	start, end := lib.Paging(c.QueryParam("page"), 15)
-	model.DB().Order("id desc").Offset(start).Limit(end).Find(&task)
-	model.DB().Model(&model.CoreAutoTask{}).Count(&pg)
+	start, end := lib.Paging(u.Page, 15)
+	if u.Find.Valve {
+		model.DB().Where("name like ?", "%"+u.Find.Text+"%").Order("id desc").Offset(start).Limit(end).Find(&task)
+		model.DB().Where("name like ?", "%"+u.Find.Text+"%").Model(&model.CoreAutoTask{}).Count(&pg)
+	} else {
+		model.DB().Order("id desc").Offset(start).Limit(end).Find(&task)
+		model.DB().Model(&model.CoreAutoTask{}).Count(&pg)
+	}
 	return c.JSON(http.StatusOK, map[string]interface{}{"data": task, "pg": pg})
 }
 
@@ -76,7 +88,7 @@ func SuperEditAutoTask(c echo.Context) (err error) {
 		c.Logger().Error(err.Error())
 		return c.JSON(http.StatusInternalServerError, err.Error())
 	}
-	model.DB().Model(model.CoreAutoTask{}).Where("id =?",u.Tp.Id).Update(&model.CoreAutoTask{
+	model.DB().Model(model.CoreAutoTask{}).Where("id =?", u.Tp.Id).Update(&model.CoreAutoTask{
 		Source:    u.Tp.Source,
 		Base:      u.Tp.Database,
 		Table:     u.Tp.Table,
@@ -91,4 +103,14 @@ func SuperDeleteAutoTask(c echo.Context) (err error) {
 	id := c.Param("id")
 	model.DB().Where("id =?", id).Delete(&model.CoreAutoTask{})
 	return c.JSON(http.StatusOK, "AutoTask工单已删除！")
+}
+
+func SuperAutoTaskActivation(c echo.Context) (err error) {
+	u := new(fetchAutoTask)
+	if err = c.Bind(u); err != nil {
+		c.Logger().Error(err.Error())
+		return c.JSON(http.StatusInternalServerError, err.Error())
+	}
+	model.DB().Model(model.CoreAutoTask{}).Where("id =?", u.Tp.Id).Update("status",u.Tp.Status)
+	return c.JSON(http.StatusOK,"AutoTask工单状态已变更！")
 }

@@ -89,14 +89,11 @@ func FetchQueryStatus(c echo.Context) (err error) {
 
 	model.DB().Where("username =?", user).Last(&d)
 
-	export := d.Export
-
 	if lib.TimeDifference(d.ExDate) {
 		model.DB().Model(model.CoreQueryOrder{}).Where("username =?", user).Update(&model.CoreQueryOrder{QueryPer: 3})
-		export = 2
 	}
 
-	return c.JSON(http.StatusOK, map[string]interface{}{"status": d.QueryPer, "export": export, "idc": d.IDC})
+	return c.JSON(http.StatusOK, map[string]interface{}{"status": d.QueryPer, "export": model.GloOther.Export, "idc": d.IDC})
 }
 
 func FetchQueryDatabaseInfo(c echo.Context) (err error) {

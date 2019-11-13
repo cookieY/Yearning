@@ -13,8 +13,6 @@
 
 package model
 
-import "github.com/BurntSushi/toml"
-
 type mysql struct {
 	Host     string
 	User     string
@@ -56,23 +54,11 @@ var InitPer = PermissionList{
 
 var C Config
 
-var _, E = toml.DecodeFile("conf.toml", &C)
+var JWT = ""
 
-//var _, E = toml.DecodeFile("../../conf.toml", &C)
-
-var JWT = C.General.SecretKey
-
-var Grpc = C.General.GrpcAddr
+var Grpc = ""
 
 var Host = ""
-
-var D = DbInfo{
-	Host:     C.Mysql.Host,
-	User:     C.Mysql.User,
-	Password: C.Mysql.Password,
-	Db:       C.Mysql.Db,
-	Port:     C.Mysql.Port,
-}
 
 var GloPer CoreGlobalConfiguration
 

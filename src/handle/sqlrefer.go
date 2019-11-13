@@ -84,7 +84,7 @@ func SQLReferToOrder(c echo.Context) (err error) {
 			Addr:     sor.IP,
 			User:     sor.Username,
 			Password: ps,
-			Port:     sor.Port,
+			Port:     int32(sor.Port),
 		},
 		SQL: u.SQL,
 	}

@@ -25,17 +25,17 @@ var _ = math.Inf
 const _ = proto.ProtoPackageIsVersion3 // please upgrade the proto package
 
 type LibraAuditOrder struct {
-	SQL                  string   `protobuf:"bytes,1,opt,name=SQL,proto3" json:"SQL,omitempty"`
-	DataBase             string   `protobuf:"bytes,2,opt,name=DataBase,proto3" json:"DataBase,omitempty"`
-	Table                string   `protobuf:"bytes,3,opt,name=Table,proto3" json:"Table,omitempty"`
-	Execute              bool     `protobuf:"varint,4,opt,name=Execute,proto3" json:"Execute,omitempty"`
-	Check                bool     `protobuf:"varint,5,opt,name=Check,proto3" json:"Check,omitempty"`
-	IsDML                bool     `protobuf:"varint,6,opt,name=IsDML,proto3" json:"IsDML,omitempty"`
-	Backup               bool     `protobuf:"varint,7,opt,name=Backup,proto3" json:"Backup,omitempty"`
-	Source               *Source  `protobuf:"bytes,8,opt,name=source,proto3" json:"source,omitempty"`
-	WorkId               string   `protobuf:"bytes,9,opt,name=WorkId,proto3" json:"WorkId,omitempty"`
-	IsAutoTask           bool     `protobuf:"varint,10,opt,name=IsAutoTask,proto3" json:"IsAutoTask,omitempty"`
-	Name                 string   `protobuf:"bytes,11,opt,name=Name,proto3" json:"Name,omitempty"`
+	SQL                  string   `protobuf:"bytes,1,opt,name=SQL,proto3" json:"SQL"`
+	DataBase             string   `protobuf:"bytes,2,opt,name=DataBase,proto3" json:"DataBase"`
+	Table                string   `protobuf:"bytes,3,opt,name=Table,proto3" json:"Table"`
+	Execute              bool     `protobuf:"varint,4,opt,name=Execute,proto3" json:"Execute"`
+	Check                bool     `protobuf:"varint,5,opt,name=Check,proto3" json:"Check"`
+	IsDML                bool     `protobuf:"varint,6,opt,name=IsDML,proto3" json:"IsDML"`
+	Backup               bool     `protobuf:"varint,7,opt,name=Backup,proto3" json:"Backup"`
+	Source               *Source  `protobuf:"bytes,8,opt,name=source,proto3" json:"source"`
+	WorkId               string   `protobuf:"bytes,9,opt,name=WorkId,proto3" json:"WorkId"`
+	IsAutoTask           bool     `protobuf:"varint,10,opt,name=IsAutoTask,proto3" json:"IsAutoTask"`
+	Name                 string   `protobuf:"bytes,11,opt,name=Name,proto3" json:"Name"`
 	XXX_NoUnkeyedLiteral struct{} `json:"-"`
 	XXX_unrecognized     []byte   `json:"-"`
 	XXX_sizecache        int32    `json:"-"`
@@ -144,10 +144,10 @@ func (m *LibraAuditOrder) GetName() string {
 }
 
 type Source struct {
-	Addr                 string   `protobuf:"bytes,1,opt,name=Addr,proto3" json:"Addr,omitempty"`
-	User                 string   `protobuf:"bytes,2,opt,name=User,proto3" json:"User,omitempty"`
-	Password             string   `protobuf:"bytes,3,opt,name=Password,proto3" json:"Password,omitempty"`
-	Port                 int32    `protobuf:"varint,4,opt,name=Port,proto3" json:"Port,omitempty"`
+	Addr                 string   `protobuf:"bytes,1,opt,name=Addr,proto3" json:"Addr"`
+	User                 string   `protobuf:"bytes,2,opt,name=User,proto3" json:"User"`
+	Password             string   `protobuf:"bytes,3,opt,name=Password,proto3" json:"Password"`
+	Port                 int32    `protobuf:"varint,4,opt,name=Port,proto3" json:"Port"`
 	XXX_NoUnkeyedLiteral struct{} `json:"-"`
 	XXX_unrecognized     []byte   `json:"-"`
 	XXX_sizecache        int32    `json:"-"`
@@ -207,11 +207,11 @@ func (m *Source) GetPort() int32 {
 }
 
 type Record struct {
-	SQL                  string   `protobuf:"bytes,1,opt,name=SQL,proto3" json:"SQL,omitempty"`
-	AffectRows           int32    `protobuf:"varint,2,opt,name=AffectRows,proto3" json:"AffectRows,omitempty"`
-	Status               string   `protobuf:"bytes,3,opt,name=Status,proto3" json:"Status,omitempty"`
-	Error                string   `protobuf:"bytes,4,opt,name=Error,proto3" json:"Error,omitempty"`
-	Level                int32    `protobuf:"varint,6,opt,name=Level,proto3" json:"Level,omitempty"`
+	SQL                  string   `protobuf:"bytes,1,opt,name=SQL,proto3" json:"SQL"`
+	AffectRows           int32    `protobuf:"varint,2,opt,name=AffectRows,proto3" json:"AffectRows"`
+	Status               string   `protobuf:"bytes,3,opt,name=Status,proto3" json:"Status"`
+	Error                string   `protobuf:"bytes,4,opt,name=Error,proto3" json:"Error"`
+	Level                int32    `protobuf:"varint,6,opt,name=Level,proto3" json:"Level"`
 	XXX_NoUnkeyedLiteral struct{} `json:"-"`
 	XXX_unrecognized     []byte   `json:"-"`
 	XXX_sizecache        int32    `json:"-"`
@@ -278,7 +278,7 @@ func (m *Record) GetLevel() int32 {
 }
 
 type RecordSet struct {
-	Record               []*Record `protobuf:"bytes,1,rep,name=record,proto3" json:"record,omitempty"`
+	Record               []*Record `protobuf:"bytes,1,rep,name=record,proto3" json:"record"`
 	XXX_NoUnkeyedLiteral struct{}  `json:"-"`
 	XXX_unrecognized     []byte    `json:"-"`
 	XXX_sizecache        int32     `json:"-"`
@@ -317,7 +317,7 @@ func (m *RecordSet) GetRecord() []*Record {
 }
 
 type ExecOrder struct {
-	Message              string   `protobuf:"bytes,1,opt,name=Message,proto3" json:"Message,omitempty"`
+	Message              string   `protobuf:"bytes,1,opt,name=Message,proto3" json:"Message"`
 	XXX_NoUnkeyedLiteral struct{} `json:"-"`
 	XXX_unrecognized     []byte   `json:"-"`
 	XXX_sizecache        int32    `json:"-"`
@@ -356,7 +356,7 @@ func (m *ExecOrder) GetMessage() string {
 }
 
 type Isok struct {
-	Ok                   bool     `protobuf:"varint,1,opt,name=Ok,proto3" json:"Ok,omitempty"`
+	Ok                   bool     `protobuf:"varint,1,opt,name=Ok,proto3" json:"Ok"`
 	XXX_NoUnkeyedLiteral struct{} `json:"-"`
 	XXX_unrecognized     []byte   `json:"-"`
 	XXX_sizecache        int32    `json:"-"`
@@ -395,8 +395,8 @@ func (m *Isok) GetOk() bool {
 }
 
 type InsulateWordList struct {
-	InsulateWordList     []string `protobuf:"bytes,1,rep,name=InsulateWordList,proto3" json:"InsulateWordList,omitempty"`
-	SQL                  string   `protobuf:"bytes,2,opt,name=SQL,proto3" json:"SQL,omitempty"`
+	InsulateWordList     []string `protobuf:"bytes,1,rep,name=InsulateWordList,proto3" json:"InsulateWordList"`
+	SQL                  string   `protobuf:"bytes,2,opt,name=SQL,proto3" json:"SQL"`
 	XXX_NoUnkeyedLiteral struct{} `json:"-"`
 	XXX_unrecognized     []byte   `json:"-"`
 	XXX_sizecache        int32    `json:"-"`
