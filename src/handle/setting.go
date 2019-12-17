@@ -55,8 +55,6 @@ func SuperSaveSetting(c echo.Context) (err error) {
 		return c.JSON(http.StatusInternalServerError, err.Error())
 	}
 
-	ser.FetchAuditRole = u.Juno
-
 	other, _ := json.Marshal(u.Other)
 	message, _ := json.Marshal(u.Message)
 	ldap, _ := json.Marshal(u.Ldap)

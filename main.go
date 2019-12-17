@@ -31,10 +31,12 @@ var (
 	b   string
 	x   bool
 	c   string
+	k bool
+
 )
 
 func usage() {
-	_, err := fmt.Fprintf(os.Stderr, `version: Yearning/2.1.6 author: HenryYee
+	_, err := fmt.Fprintf(os.Stderr, `version: Yearning/2.1.7 author: HenryYee
 Usage: Yearning [-m migrate] [-p port] [-s start] [-b web-bind] [-h help] [-c config file]
 
 Options:
@@ -45,6 +47,7 @@ Options:
  -x  表结构修复,升级时可以操作。如出现错误可直接忽略。
  -h  帮助
  -c  配置文件路径
+ -k  用户权限变更为权限组(2.1.7以下升级至2.1.7及以上使用)
 `)
 	if err != nil {
 		panic(err.Error())
@@ -59,12 +62,11 @@ func init() {
 	flag.BoolVar(&x, "x", false, "表结构修复")
 	flag.StringVar(&b, "b", "127.0.0.1", "钉钉/邮件推送时显示的平台地址")
 	flag.StringVar(&c, "c", "conf.toml", "配置文件路径")
+	flag.BoolVar(&k, "k", false, "用户权限变更为权限组(2.1.7以下升级至2.1.7及以上使用)")
 	flag.Usage = usage
 	log.SetPrefix("Yearning_error: ")
 	log.SetFlags(log.Ldate | log.Lmicroseconds | log.Llongfile)
 }
-
-//var Version = "v2.0.2"
 
 func main() {
 	defer pool.P.Close()
@@ -76,6 +78,11 @@ func main() {
 	if m {
 		model.DbInit(c)
 		service.Migrate()
+	}
+
+	if k {
+		model.DbInit(c)
+		service.MargeRuleGroup()
 	}
 
 	if s {

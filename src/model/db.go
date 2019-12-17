@@ -56,7 +56,7 @@ type Ldap struct {
 	Password string `json:"password"`
 	Type     int    `json:"type"`
 	Sc       string `json:"sc"`
-	Ldaps    bool `json:"ldaps"`
+	Ldaps    bool   `json:"ldaps"`
 }
 
 type PermissionList struct {
@@ -68,6 +68,18 @@ type PermissionList struct {
 	Base        string   `json:"base"`
 	Auditor     []string `json:"auditor"`
 	Query       string   `json:"query"`
+	QuerySource []string `json:"query_source"`
+}
+
+type MargeList struct {
+	DDL         int      `json:"ddl"`
+	DDLSource   []string `json:"ddl_source"`
+	DML         int      `json:"dml"`
+	DMLSource   []string `json:"dml_source"`
+	User        int      `json:"user"`
+	Base        int      `json:"base"`
+	Auditor     []string `json:"auditor"`
+	Query       int      `json:"query"`
 	QuerySource []string `json:"query_source"`
 }
 

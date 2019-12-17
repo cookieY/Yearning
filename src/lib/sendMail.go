@@ -72,7 +72,7 @@ var TmplTestDing = `
 `
 
 var TmplReferDing = `# Yearning工单提交通知 #  \n <br>  \n  **工单编号:**  %s \n  \n **提交人员:**  <font color=\"#78beea\">%s</font><br /> \n \n **审核人员:** <font color=\"#fe8696\">%s</font><br /> \n \n**平台地址:** http://%s \n  \n **工单说明:**  %s \n \n **状态:** <font color=\"#1abefa\">已提交</font><br /> \n `
-
+var TmplBackDing = `# Yearning工单执行通知 #  \n <br>  \n  **工单编号:**  %s \n  \n **提交人员:**  <font color=\"#78beea\">%s</font><br /> \n \n **审核人员:** <font color=\"#fe8696\">%s</font><br /> \n \n**平台地址:** http://%s \n  \n **工单说明:**  %s \n \n **状态:** <font color=\"#ea2426\">已撤回</font>`
 var TmplRejectDing = `# Yearning工单提交通知 #  \n <br>  \n  **工单编号:**  %s \n  \n **提交人员:**  <font color=\"#78beea\">%s</font><br /> \n \n **审核人员:** <font color=\"#fe8696\">%s</font><br /> \n \n**平台地址:** http://%s \n  \n **工单说明:**  %s \n \n **状态:** <font color=\"#df117e\">驳回</font> \n <br /> \n \n **驳回说明:**  %s `
 var TmplSuccessDing = `# Yearning工单执行通知 #  \n <br>  \n  **工单编号:**  %s \n  \n **提交人员:**  <font color=\"#78beea\">%s</font><br /> \n \n **审核人员:** <font color=\"#fe8696\">%s</font><br /> \n \n**平台地址:** http://%s \n  \n **工单说明:**  %s \n \n **状态:** <font color=\"#3fd2bd\">执行成功</font>`
 var TmplFailedDing = `# Yearning工单执行通知 #  \n <br>  \n  **工单编号:**  %s \n  \n **提交人员:**  <font color=\"#78beea\">%s</font><br /> \n \n **审核人员:** <font color=\"#fe8696\">%s</font><br /> \n \n**平台地址:** http://%s \n  \n **工单说明:**  %s \n \n **状态:** <font color=\"#ea2426\">执行失败</font>`
@@ -171,6 +171,11 @@ func MessagePush(c echo.Context, workid string, t uint, reject string) {
 		s.ToUser = user.Email
 		ding = fmt.Sprintf(TmplPerformDing, o.WorkId, o.Username, o.Assigned, model.Host, o.Text)
 		mail = fmt.Sprintf(TmplMail, "转交", o.WorkId, o.Username, model.Host, model.Host, "等待执行人执行")
+	}
+
+	if t == 6 {
+		ding = fmt.Sprintf(TmplBackDing, o.WorkId, o.Username, o.Assigned, model.Host, o.Text)
+		mail = fmt.Sprintf(TmplMail, "提交", o.WorkId, o.Username, model.Host, model.Host, "已撤销")
 	}
 
 	if model.GloOther.Query {

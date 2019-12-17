@@ -151,7 +151,15 @@ type CoreGrained struct {
 	Username    string `gorm:"type:varchar(50);not null"`
 	Rule        string `gorm:"type:varchar(10);not null";json:"rule"`
 	Permissions JSON   `gorm:"type:json"`
+	Group       JSON   `gorm:"type:json"`
 }
+
+type CoreRoleGroup struct {
+	ID          uint   `gorm:"primary_key;AUTO_INCREMENT"`
+	Name        string `gorm:"type:varchar(50);not null"`
+	Permissions JSON   `gorm:"type:json"`
+}
+
 
 type CoreQueryOrder struct {
 	ID       uint   `gorm:"primary_key;AUTO_INCREMENT"`

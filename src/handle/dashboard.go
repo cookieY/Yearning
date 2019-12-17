@@ -41,9 +41,9 @@ func DashInit(c echo.Context) (err error) {
 	user, _ := lib.JwtParse(c)
 	model.DB().Select("permissions").Where("username =?", user).First(&permissionList)
 	if user == "admin" {
-		super = map[string]string{"group": "1", "setting": "1", "perOrder": "1", "roles": "1","task": "1"}
+		super = map[string]string{"group": "1", "setting": "1", "perOrder": "1", "roles": "1", "task": "1", "roleGroup": "1"}
 	} else {
-		super = map[string]string{"group": "0", "setting": "0", "perOrder": "0","roles": "0"}
+		super = map[string]string{"group": "0", "setting": "0", "perOrder": "0", "roles": "0"}
 	}
 	return c.JSON(http.StatusOK, map[string]interface{}{"c": permissionList.Permissions, "s": super})
 }
@@ -126,7 +126,7 @@ func ReferGroupOrder(c echo.Context) (err error) {
 		return c.JSON(http.StatusOK, fmt.Sprintf("权限申请已达每日最大上限%d/次,请联系管理员！", model.GloOther.PerOrder))
 	}
 
-	model.DB().Model(model.CoreGroupOrder{}).Where("username =?",user).Last(&tv)
+	model.DB().Model(model.CoreGroupOrder{}).Where("username =?", user).Last(&tv)
 	if tv.Status == 2 {
 		return c.JSON(http.StatusOK, "在上一次申请没有审核前,请勿重复提交！")
 	}
