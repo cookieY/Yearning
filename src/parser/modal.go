@@ -82,6 +82,9 @@ type AuditRole struct {
 	OscPrintSql                    bool
 	OscChunkTime                   float32
 	OscSize                        uint
+	AllowCreatePartition           bool
+	AllowCreateView                bool
+	AllowSpecialType               bool
 }
 
 type IndexInfo struct {

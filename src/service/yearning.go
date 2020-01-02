@@ -33,9 +33,9 @@ func StartYearning(port string, host string) {
 	json.Unmarshal(model.GloPer.AuditRole, &parser.FetchAuditRole)
 	e := echo.New()
 	e.Static("/", "dist")
-	e.Use(middleware.CORSWithConfig(middleware.CORSConfig{
-		AllowOrigins: []string{"*"},
-	}))
+	//e.Use(middleware.CORSWithConfig(middleware.CORSConfig{
+	//	AllowOrigins: []string{"*"},
+	//}))
 	e.Use(middleware.Secure())
 	e.Use(middleware.Recover())
 	e.Use(middleware.GzipWithConfig(middleware.GzipConfig{

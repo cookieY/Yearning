@@ -102,6 +102,9 @@ func Migrate() {
 			OscCriticalThreadRunning:       20,
 			OscRecursionMethod:             "processlist",
 			OscCheckInterval:               1,
+			AllowCreatePartition:           false,
+			AllowCreateView:                false,
+			AllowSpecialType: false,
 		}
 
 		other := model.Other{

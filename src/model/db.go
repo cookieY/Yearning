@@ -36,6 +36,7 @@ type Other struct {
 	Export           bool     `json:"export"`
 	PerOrder         int      `json:"per_order"`
 	ExQueryTime      int      `json:"ex_query_time"`
+	QueryTimeout     int      `json:"query_timeout"`
 }
 
 type Message struct {
