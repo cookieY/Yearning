@@ -140,6 +140,7 @@ func UserRegister(c echo.Context) (err error) {
 		}
 		var unique model.CoreAccount
 		g, _ := json.Marshal(model.InitPer)
+		ix, _ := json.Marshal([]string{})
 		model.DB().Where("username = ?", u.UserInfo["username"]).Select("username").First(&unique)
 		if unique.Username != "" {
 			return c.JSON(http.StatusOK, "用户已存在请重新注册！")
@@ -152,7 +153,7 @@ func UserRegister(c echo.Context) (err error) {
 			Department: u.UserInfo["department"],
 			Email:      u.UserInfo["email"],
 		})
-		model.DB().Create(&model.CoreGrained{Username: u.UserInfo["username"], Permissions: g, Rule: "guest"})
+        model.DB().Create(&model.CoreGrained{Username: u.UserInfo["username"], Permissions: g, Rule: "guest", Group: ix})
 		return c.JSON(http.StatusOK, "注册成功！")
 	}
 	return c.JSON(http.StatusForbidden, "没有开启注册通道！")
