@@ -117,5 +117,5 @@ func FetchQueryRecordDetail(c echo.Context) (err error) {
 	var count int
 	model.DB().Where("work_id =?", u.WorkId).Offset(start).Limit(end).Find(&detail)
 	model.DB().Model(&model.CoreQueryRecord{}).Where("work_id =?", u.WorkId).Count(&count)
-	return c.JSON(http.StatusOK, detail)
+	return c.JSON(http.StatusOK, map[string]interface{}{"data":detail,"count":count})
 }

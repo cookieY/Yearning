@@ -315,8 +315,8 @@ func GeneralFetchUndo(c echo.Context) (err error) {
 	if model.DB().Where("username =? AND work_id =? AND `status` =? ", user, u, 2).First(&undo).RecordNotFound() {
 		return c.JSON(http.StatusOK, "工单状态已更改！无法撤销")
 	}
-	model.DB().Where("username =? AND work_id =? AND `status` =? ", user, u, 2).Delete(&model.CoreSqlOrder{})
 	go lib.MessagePush(c, undo.WorkId, 6, "")
+	model.DB().Where("username =? AND work_id =? AND `status` =? ", user, u, 2).Delete(&model.CoreSqlOrder{})
 	return c.JSON(http.StatusOK, "工单已撤销！")
 }
 
