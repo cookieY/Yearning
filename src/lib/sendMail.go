@@ -108,7 +108,7 @@ func SendDingMsg(c echo.Context, msg model.Message, sv string) {
 
 	//创建一个请求
 
-	mx := fmt.Sprintf(`{"msgtype": "markdown", "markdown": {"title": "Yearning sql审计平台", "text": "%s"}}`, sv)
+	mx := fmt.Sprintf(`{"msgtype": "markdown", "markdown": {"content":"%s"}}`, sv)
 
 	req, err := http.NewRequest("POST", msg.WebHook, strings.NewReader(mx))
 	if err != nil {
