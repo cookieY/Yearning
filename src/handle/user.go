@@ -79,7 +79,8 @@ func UserLdapLogin(c echo.Context) (err error) {
 				Department: "all",
 				Email:      "",
 			})
-			model.DB().Create(&model.CoreGrained{Username: u.Username, Permissions: g, Rule: "guest"})
+			ix, _ := json.Marshal([]string{})
+			model.DB().Create(&model.CoreGrained{Username: u.Username, Permissions: g, Rule: "guest",Group:ix})
 		}
 		token, tokenErr := lib.JwtAuth(u.Username, account.Rule)
 		if tokenErr != nil {
@@ -181,7 +182,8 @@ func SuperUserRegister(c echo.Context) (err error) {
 		Department: u.UserInfo["department"],
 		Email:      u.UserInfo["email"],
 	})
-	model.DB().Create(&model.CoreGrained{Username: u.UserInfo["username"], Permissions: g, Rule: u.UserInfo["group"]})
+	ix, _ := json.Marshal([]string{})
+	model.DB().Create(&model.CoreGrained{Username: u.UserInfo["username"], Permissions: g, Rule: u.UserInfo["group"],Group:ix})
 	return c.JSON(http.StatusOK, "注册成功！")
 }
 

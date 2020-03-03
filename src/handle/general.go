@@ -33,6 +33,7 @@ type fetch struct {
 	Source string
 	Base   string
 	Table  string
+	Board  string
 }
 
 type cdx struct {
@@ -355,4 +356,20 @@ func GeneralFetchSQLInfo(c echo.Context) (err error) {
 		s = append(s, map[string]string{"SQL": i.Text()})
 	}
 	return c.JSON(http.StatusOK, s)
+}
+
+func GeneralPostBoard(c echo.Context) (err error) {
+	req := new(fetch)
+	if err = c.Bind(req); err != nil {
+		c.Logger().Error(err.Error())
+		return c.JSON(http.StatusOK, err.Error())
+	}
+	model.DB().Model(model.CoreGlobalConfiguration{}).Where("id =?", 1).Update(&model.CoreGlobalConfiguration{Board: req.Board})
+	return c.JSON(http.StatusOK, "公告已保存")
+}
+
+func GeneralFetchBoard(c echo.Context) (err error) {
+	var k model.CoreGlobalConfiguration
+	model.DB().Where("id =?", 1).First(&k)
+	return c.JSON(http.StatusOK, k.Board)
 }

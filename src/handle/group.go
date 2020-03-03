@@ -26,7 +26,7 @@ import (
 
 type s struct {
 	Data   []model.CoreGrained    `json:"data"`
-	Data2  []model.CoreRoleGroup  `json:"data2"`
+	GroupList  []model.CoreRoleGroup `json:"group_list"`
 	Page   int                    `json:"page"`
 	Source []model.CoreDataSource `json:"source"`
 	Audit  []model.CoreAccount    `json:"audit"`
@@ -40,15 +40,12 @@ type k struct {
 	Group      []string
 }
 
-type m struct {
-	Username   []string
-	Permission model.PermissionList
+type marge struct {
+	User   string
+	Group  []string
+	IsShow bool
 }
 
-type marge struct {
-	User  string
-	Group []string
-}
 
 func SuperGroup(c echo.Context) (err error) {
 	user, _ := lib.JwtParse(c)
@@ -80,7 +77,7 @@ func SuperGroup(c echo.Context) (err error) {
 				model.DB().Offset(start).Limit(end).Find(&r)
 				model.DB().Model(model.CoreRoleGroup{}).Count(&pg)
 			}
-			return c.JSON(http.StatusOK, s{Data2: r, Page: pg, Source: source, Audit: u, Query: query,})
+			return c.JSON(http.StatusOK, s{GroupList: r, Page: pg, Source: source, Audit: u, Query: query,})
 		} else {
 			if f.Valve {
 				model.DB().Select("id,username,rule,`group`").Where("username LIKE ?", "%"+fmt.Sprintf("%s", f.Username)+"%").Offset(start).Limit(end).Find(&g)
@@ -90,7 +87,7 @@ func SuperGroup(c echo.Context) (err error) {
 				model.DB().Model(model.CoreGrained{}).Count(&pg)
 			}
 			model.DB().Select("name").Find(&r)
-			return c.JSON(http.StatusOK, s{Data: g, Page: pg, Data2: r})
+			return c.JSON(http.StatusOK, s{Data: g, Page: pg, GroupList: r})
 		}
 	}
 	return c.JSON(http.StatusForbidden, "非法越权操作！")

@@ -127,5 +127,5 @@ func (D *DbInfo) CreateTable() {
 
 	//DB().AutoMigrate(&CoreGlobalConfiguration{})
 	//DB().AutoMigrate(&CoreSqlOrder{})
-	DB().CreateTable(&CoreGroupOrder{})
+	//DB().CreateTable(&CoreGroupOrder{})
 }

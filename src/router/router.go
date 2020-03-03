@@ -73,7 +73,6 @@ func AddRouter(e *echo.Echo) {
 	r.GET("/dash/count", handle.DashCount)
 	r.PUT("/dash/userinfo", handle.DashUserInfo)
 	r.PUT("/dash/stmt", handle.DashStmt)
-	r.POST("/dash/refer", handle.ReferGroupOrder)
 
 	r.POST("/user/password_reset", handle.ChangePassword)
 	r.POST("/user/mail_reset", handle.ChangeMail)
@@ -99,6 +98,7 @@ func AddRouter(e *echo.Echo) {
 	r.PUT("/query/beauty", handle.GeneralQueryBeauty)
 	r.PUT("/query/merge", handle.GeneralMergeDDL)
 	r.POST("/sql/refer", handle.SQLReferToOrder)
+	r.GET("/board",handle.GeneralFetchBoard)
 
 	audit := r.Group("/audit", AuditGroup)
 	audit.POST("/refer/perform", handle.MulitAuditOrder)
@@ -130,6 +130,7 @@ func AddRouter(e *echo.Echo) {
 	group.POST("/setting/add", handle.SuperSaveSetting)
 	group.POST("/setting/roles", handle.SuperSaveRoles)
 	group.PUT("/setting/test/:el", handle.SuperTestSetting)
+	group.POST("/board/post",handle.GeneralPostBoard)
 
 	user := r.Group("/management_user", SuperManageUser)
 	user.POST("/modify", handle.SuperModifyUser)
@@ -144,11 +145,6 @@ func AddRouter(e *echo.Echo) {
 	db.PUT("/test", handle.SuperTestDBConnect)
 	db.DELETE("/del/:source", handle.SuperDeleteDb)
 	db.PUT("/edit", handle.SuperModifyDb)
-
-	rules := r.Group("/rules", SuperManageGroup)
-	rules.GET("", handle.FetchGroupOrder)
-	rules.PUT("/reject", handle.RejectGroupOrder)
-	rules.PUT("/allow", handle.AllowGroupOrder)
 
 	autoTask := r.Group("/auto", SuperManageGroup)
 	autoTask.GET("", handle.SuperFetchAutoTaskSource)

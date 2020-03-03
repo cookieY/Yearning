@@ -199,29 +199,6 @@ func MessagePush(c echo.Context, workid string, t uint, reject string) {
 		}
 	}
 
-	if t == 9 || t == 10 || t == 11 {
-		var op model.CoreGroupOrder
-		model.DB().Select("work_id,username").Where("work_id =?", workid).First(&op)
-		model.DB().Select("email").Where("username =?", op.Username).First(&user)
-		s.ToUser = user.Email
-		if t == 9 {
-			model.DB().Select("email").Where("username =?", "admin").First(&user)
-			s.ToUser = user.Email
-			ding = fmt.Sprintf(TmplGroupRefer, op.WorkId, op.Username, "admin", model.Host)
-			mail = fmt.Sprintf(TmplMail, "权限申请", op.WorkId, op.Username, model.Host, model.Host, "已提交")
-		}
-
-		if t == 10 {
-			ding = fmt.Sprintf(TmplSuccessGroup, op.WorkId, op.Username, "admin", model.Host)
-			mail = fmt.Sprintf(TmplMail, "权限申请", op.WorkId, op.Username, model.Host, model.Host, "已同意")
-		}
-
-		if t == 11 {
-			ding = fmt.Sprintf(TmplRejectGroup, op.WorkId, op.Username, "admin", model.Host)
-			mail = fmt.Sprintf(TmplMail, "权限申请", op.WorkId, op.Username, model.Host, model.Host, "已驳回")
-		}
-	}
-
 	if model.GloMessage.Mail {
 		if user.Email != "" {
 			go SendMail(c, s, mail)

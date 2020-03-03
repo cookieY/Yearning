@@ -60,7 +60,8 @@ func Migrate() {
 		model.DB().CreateTable(&model.CoreRollback{})
 		model.DB().CreateTable(&model.CoreQueryRecord{})
 		model.DB().CreateTable(&model.CoreQueryOrder{})
-		model.DB().CreateTable(&model.CoreGroupOrder{})
+		model.DB().CreateTable(&model.CoreAutoTask{})
+		model.DB().CreateTable(&model.CoreRoleGroup{})
 
 		o := parser.AuditRole{
 			DMLInsertColumns:               false,
@@ -171,7 +172,6 @@ func UpdateSoft() {
 	model.DB().AutoMigrate(&model.CoreRollback{})
 	model.DB().AutoMigrate(&model.CoreQueryRecord{})
 	model.DB().AutoMigrate(&model.CoreQueryOrder{})
-	model.DB().AutoMigrate(&model.CoreGroupOrder{})
 	model.DB().AutoMigrate(&model.CoreAutoTask{})
 	model.DB().AutoMigrate(&model.CoreRoleGroup{})
 	fmt.Println("数据已更新!")

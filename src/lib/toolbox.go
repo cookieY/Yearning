@@ -16,6 +16,7 @@ package lib
 import (
 	"Yearning-go/src/model"
 	"crypto/tls"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	_ "github.com/go-sql-driver/mysql"
@@ -221,7 +222,8 @@ func QueryMethod(source *model.CoreDataSource, req *model.Queryresults, wordList
 
 	ps := Decrypt(source.Password)
 
-	db, err := sqlx.Connect("mysql", fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?charset=utf8&readTimeout=%ds", source.Username, ps, source.IP, source.Port, req.Basename,model.GloOther.QueryTimeout))
+	db, err := sqlx.Connect("mysql", fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?charset=utf8mb4&readTimeout=%ds", source.Username, ps, source.IP, source.Port, req.Basename,model.GloOther.QueryTimeout))
+
 	if err != nil {
 		return qd, err
 	}
@@ -252,7 +254,13 @@ func QueryMethod(source *model.CoreDataSource, req *model.Queryresults, wordList
 				if len(r) > 10000 {
 					results[idx] = "blob字段无法显示"
 				} else {
-					results[idx] = string(r)
+					if hex.EncodeToString(r) == "01" {
+						results[idx] = "true"
+					} else if hex.EncodeToString(r) == "00" {
+						results[idx] = "false"
+					} else {
+						results[idx] = string(r)
+					}
 				}
 			}
 		}
