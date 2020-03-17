@@ -59,7 +59,7 @@ func DashCount(c echo.Context) (err error) {
 	model.DB().Model(&model.CoreSqlOrder{}).Select("id").Count(&orderCount)
 	model.DB().Model(&model.CoreDataSource{}).Select("id").Count(&sourceCount)
 
-	return c.JSON(http.StatusOK, map[string]interface{}{"createUser": userCount, "order": orderCount, "source": queryCount, "query": sourceCount, "dataTop5": s})
+	return c.JSON(http.StatusOK, map[string]interface{}{"createUser": userCount, "order": orderCount, "source": sourceCount, "query":queryCount , "dataTop5": s})
 }
 
 func DashUserInfo(c echo.Context) (err error) {
