@@ -36,10 +36,6 @@ type queryOrder struct {
 	WorkId   string
 }
 
-type clearQueryOrder struct {
-	WorkId []string
-}
-
 func ReferQueryOrder(c echo.Context) (err error) {
 	var u model.CoreAccount
 	var t model.CoreQueryOrder
@@ -334,24 +330,6 @@ func DisAgreedQueryOrder(c echo.Context) (err error) {
 	model.DB().Model(model.CoreQueryOrder{}).Where("work_id =?", u.WorkId).Update(map[string]interface{}{"query_per": 0})
 	lib.MessagePush(c, u.WorkId, 8, "")
 	return c.JSON(http.StatusOK, "该次工单查询已驳回！")
-}
-
-func DelQueryOrder(c echo.Context) (err error) {
-	req := new(clearQueryOrder)
-	if err := c.Bind(req); err != nil {
-		c.Logger().Error(err.Error())
-		return c.JSON(http.StatusOK, err.Error())
-	}
-	var d model.CoreQueryOrder
-
-	tx := model.DB().Begin()
-	for _, i := range req.WorkId {
-		model.DB().Where("work_id =?", i).Delete(&model.CoreQueryOrder{})
-		model.DB().Where("work_id =?", d.WorkId).Delete(&model.CoreQueryRecord{})
-	}
-	tx.Commit()
-
-	return c.JSON(http.StatusOK, "查询工单删除!")
 }
 
 func UndoQueryOrder(c echo.Context) (err error) {

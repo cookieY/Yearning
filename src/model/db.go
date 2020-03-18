@@ -49,6 +49,7 @@ type Message struct {
 	Mail     bool   `json:"mail"`
 	Ding     bool   `json:"ding"`
 	Ssl      bool   `json:"ssl"`
+	PushType bool   `json:"push_type"`
 }
 
 type Ldap struct {

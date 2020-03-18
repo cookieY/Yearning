@@ -298,26 +298,6 @@ func RollBackSQLOrder(c echo.Context) (err error) {
 	return c.JSON(http.StatusOK, "工单已提交,请等待审核人审核！")
 }
 
-type ber struct {
-	U []string
-}
-
-func UndoAuditOrder(c echo.Context) (err error) {
-	u := new(ber)
-	if err = c.Bind(u); err != nil {
-		c.Logger().Error(err.Error())
-		return
-	}
-	tx := model.DB().Begin()
-	for _, i := range u.U {
-		tx.Where("work_id =?", i).Delete(&model.CoreSqlOrder{})
-		tx.Where("work_id =?", i).Delete(&model.CoreRollback{})
-		tx.Where("work_id =?", i).Delete(&model.CoreSqlRecord{})
-	}
-	tx.Commit()
-	return c.JSON(http.StatusOK, "工单已删除！")
-}
-
 func MulitAuditOrder(c echo.Context) (err error) {
 	req := new(executeStr)
 	if err = c.Bind(req); err != nil {

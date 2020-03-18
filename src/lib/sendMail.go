@@ -71,19 +71,17 @@ var TmplTestDing = `
 # Yearning 测试！
 `
 
-var TmplReferDing = `# Yearning工单提交通知 #  \n <br>  \n  **工单编号:**  %s \n  \n **提交人员:**  <font color=\"#78beea\">%s</font><br /> \n \n **审核人员:** <font color=\"#fe8696\">%s</font><br /> \n \n**平台地址:** http://%s \n  \n **工单说明:**  %s \n \n **状态:** <font color=\"#1abefa\">已提交</font><br /> \n `
-var TmplBackDing = `# Yearning工单执行通知 #  \n <br>  \n  **工单编号:**  %s \n  \n **提交人员:**  <font color=\"#78beea\">%s</font><br /> \n \n **审核人员:** <font color=\"#fe8696\">%s</font><br /> \n \n**平台地址:** http://%s \n  \n **工单说明:**  %s \n \n **状态:** <font color=\"#ea2426\">已撤回</font>`
-var TmplRejectDing = `# Yearning工单提交通知 #  \n <br>  \n  **工单编号:**  %s \n  \n **提交人员:**  <font color=\"#78beea\">%s</font><br /> \n \n **审核人员:** <font color=\"#fe8696\">%s</font><br /> \n \n**平台地址:** http://%s \n  \n **工单说明:**  %s \n \n **状态:** <font color=\"#df117e\">驳回</font> \n <br /> \n \n **驳回说明:**  %s `
-var TmplSuccessDing = `# Yearning工单执行通知 #  \n <br>  \n  **工单编号:**  %s \n  \n **提交人员:**  <font color=\"#78beea\">%s</font><br /> \n \n **审核人员:** <font color=\"#fe8696\">%s</font><br /> \n \n**平台地址:** http://%s \n  \n **工单说明:**  %s \n \n **状态:** <font color=\"#3fd2bd\">执行成功</font>`
-var TmplFailedDing = `# Yearning工单执行通知 #  \n <br>  \n  **工单编号:**  %s \n  \n **提交人员:**  <font color=\"#78beea\">%s</font><br /> \n \n **审核人员:** <font color=\"#fe8696\">%s</font><br /> \n \n**平台地址:** http://%s \n  \n **工单说明:**  %s \n \n **状态:** <font color=\"#ea2426\">执行失败</font>`
-var TmplPerformDing = `# Yearning工单转交通知 #  \n <br>  \n  **工单编号:**  %s \n  \n **提交人员:**  <font color=\"#78beea\">%s</font><br /> \n \n **审核人员:** <font color=\"#fe8696\">%s</font><br /> \n \n**平台地址:** http://%s \n  \n **工单说明:**  %s \n \n **状态:** <font color=\"#de4943\">等待执行人执行</font>`
-var TmplQueryRefer = `# Yearning查询申请通知 #  \n <br>  \n  **工单编号:**  %s \n  \n **提交人员:**  <font color=\"#78beea\">%s</font><br /> \n \n **审核人员:** <font color=\"#fe8696\">%s</font><br /> \n \n**平台地址:** http://%s \n  \n **工单说明:**  %s \n \n **状态:** <font color=\"#1abefa\">已提交</font>`
-var TmplSuccessQuery = `# Yearning查询申请通知 #  \n <br>  \n  **工单编号:**  %s \n  \n **提交人员:**  <font color=\"#78beea\">%s</font><br /> \n \n **审核人员:** <font color=\"#fe8696\">%s</font><br /> \n \n**平台地址:** http://%s \n  \n **状态:** <font color=\"#3fd2bd\">同意</font>`
-var TmplRejectQuery = `# Yearning查询申请通知 #  \n <br>  \n  **工单编号:**  %s \n  \n **提交人员:**  <font color=\"#78beea\">%s</font><br /> \n \n **审核人员:** <font color=\"#fe8696\">%s</font><br /> \n \n**平台地址:** http://%s \n  \n **状态:** <font color=\"#df117e\">已驳回</font>`
+var TmplReferDing = `# Yearning工单提交通知 #  \n \n  **工单编号:**  %s \n \n **提交人员:**  <font color=\"#78beea\">%s</font> \n \n **审核人员:** <font color=\"#fe8696\">%s</font> \n \n **平台地址:** http://%s \n \n **工单说明:**  %s \n \n **状态:** <font color=\"#1abefa\">已提交</font> \n \n `
 
-var TmplGroupRefer = `# Yearning权限申请通知 #  \n <br>  \n  **工单编号:**  %s \n  \n **提交人员:**  <font color=\"#78beea\">%s</font><br /> \n \n **审核人员:** <font color=\"#fe8696\">%s</font><br /> \n \n**平台地址:** http://%s \n  \n **状态:** <font color=\"#1abefa\">已提交</font>`
-var TmplSuccessGroup = `# Yearning权限申请通知 #  \n <br>  \n  **工单编号:**  %s \n  \n **提交人员:**  <font color=\"#78beea\">%s</font><br /> \n \n **审核人员:** <font color=\"#fe8696\">%s</font><br /> \n \n**平台地址:** http://%s \n  \n **状态:** <font color=\"#3fd2bd\">同意</font>`
-var TmplRejectGroup = `# Yearning权限申请通知 #  \n <br>  \n  **工单编号:**  %s \n  \n **提交人员:**  <font color=\"#78beea\">%s</font><br /> \n \n **审核人员:** <font color=\"#fe8696\">%s</font><br /> \n \n**平台地址:** http://%s \n  \n **状态:** <font color=\"#df117e\">已驳回</font>`
+var TmplRejectDing = `# Yearning工单驳回通知 #  \n \n  **工单编号:**  %s \n \n **提交人员:**  <font color=\"#78beea\">%s</font> \n \n **审核人员:** <font color=\"#fe8696\">%s</font> \n \n **平台地址:** http://%s \n \n **工单说明:**  %s \n \n **状态:** <font color=\"#df117e\">驳回</font>  \n \n **驳回说明:**  %s `
+var TmplSuccessDing = `# Yearning工单执行通知 #  \n \n  **工单编号:**  %s \n \n **提交人员:**  <font color=\"#78beea\">%s</font> \n \n **审核人员:** <font color=\"#fe8696\">%s</font> \n \n **平台地址:** http://%s \n \n **工单说明:**  %s \n \n **状态:** <font color=\"#3fd2bd\">执行成功</font>`
+var TmplFailedDing = `# Yearning工单执行通知 #  \n \n  **工单编号:**  %s \n \n **提交人员:**  <font color=\"#78beea\">%s</font> \n \n **审核人员:** <font color=\"#fe8696\">%s</font> \n \n **平台地址:** http://%s \n \n **工单说明:**  %s \n \n **状态:** <font color=\"#ea2426\">执行失败</font>`
+var TmplPerformDing = `# Yearning工单转交通知 #  \n \n  **工单编号:**  %s \n \n **提交人员:**  <font color=\"#78beea\">%s</font> \n \n **审核人员:** <font color=\"#fe8696\">%s</font> \n \n **平台地址:** http://%s \n \n **工单说明:**  %s \n \n **状态:** <font color=\"#de4943\">等待执行人执行</font>`
+var TmplBackDing = `# Yearning工单执行通知 #  \n \n  **工单编号:**  %s \n \n **提交人员:**  <font color=\"#78beea\">%s</font> \n \n **审核人员:** <font color=\"#fe8696\">%s</font> \n \n **平台地址:** http://%s \n \n **工单说明:**  %s \n \n **状态:** <font color=\"#ea2426\">已撤回</font>`
+
+var TmplQueryRefer = `# Yearning查询申请通知 #  \n \n  **工单编号:**  %s \n \n **提交人员:**  <font color=\"#78beea\">%s</font> \n \n **审核人员:** <font color=\"#fe8696\">%s</font> \n \n **平台地址:** http://%s \n \n **工单说明:**  %s \n \n **状态:** <font color=\"#1abefa\">已提交</font>`
+var TmplSuccessQuery = `# Yearning查询申请通知 #  \n \n  **工单编号:**  %s \n \n **提交人员:**  <font color=\"#78beea\">%s</font> \n \n **审核人员:** <font color=\"#fe8696\">%s</font> \n \n **平台地址:** http://%s \n \n **状态:** <font color=\"#3fd2bd\">同意</font>`
+var TmplRejectQuery = `# Yearning查询申请通知 #  \n \n  **工单编号:**  %s \n \n **提交人员:**  <font color=\"#78beea\">%s</font> \n \n **审核人员:** <font color=\"#fe8696\">%s</font> \n \n **平台地址:** http://%s \n \n **状态:** <font color=\"#df117e\">已驳回</font>`
 
 func SendMail(c echo.Context, mail model.Message, tmpl string) {
 	m := gomail.NewMessage()
@@ -107,8 +105,13 @@ func SendDingMsg(c echo.Context, msg model.Message, sv string) {
 	//请求地址模板
 
 	//创建一个请求
+	var mx string
 
-	mx := fmt.Sprintf(`{"msgtype": "markdown", "markdown": {"title": "Yearning sql审计平台", "text": "%s"}}`, sv)
+	if msg.PushType {
+		mx = fmt.Sprintf(`{"msgtype": "markdown", "markdown": {"content": "%s"}}`, sv)
+	} else {
+		mx = fmt.Sprintf(`{"msgtype": "markdown", "markdown": {"title": "Yearning sql审计平台", "text": "%s"}}`, sv)
+	}
 
 	req, err := http.NewRequest("POST", msg.WebHook, strings.NewReader(mx))
 	if err != nil {

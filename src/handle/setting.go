@@ -37,6 +37,10 @@ type lt struct {
 	Ldap model.Ldap
 }
 
+type ber struct {
+	Date string `json:"date"`
+}
+
 func SuperFetchSetting(c echo.Context) (err error) {
 
 	var k model.CoreGlobalConfiguration
@@ -108,7 +112,7 @@ func SuperTestSetting(c echo.Context) (err error) {
 	return c.JSON(http.StatusInternalServerError, "未知传参！")
 }
 
-func SuperSaveRoles(c echo.Context) (err error)  {
+func SuperSaveRoles(c echo.Context) (err error) {
 
 	u := new(set)
 
@@ -122,4 +126,42 @@ func SuperSaveRoles(c echo.Context) (err error)  {
 	model.DB().Model(model.CoreGlobalConfiguration{}).Where("authorization =?", "global").Updates(&model.CoreGlobalConfiguration{AuditRole: audit})
 
 	return c.JSON(http.StatusOK, "配置信息已保存！")
+}
+
+func DelQueryOrder(c echo.Context) (err error) {
+	u := new(ber)
+	if err := c.Bind(u); err != nil {
+		c.Logger().Error(err.Error())
+		return c.JSON(http.StatusOK, err.Error())
+	}
+	var order []model.CoreQueryOrder
+	model.DB().Where("`date` < ?", u.Date).Find(&order)
+
+	tx := model.DB().Begin()
+	for _, i := range order {
+		model.DB().Where("work_id =?", i.WorkId).Delete(&model.CoreQueryOrder{})
+		model.DB().Where("work_id =?", i.WorkId).Delete(&model.CoreQueryRecord{})
+	}
+	tx.Commit()
+
+	return c.JSON(http.StatusOK, "查询工单删除!")
+}
+
+// UndoAuditOrder delete Order
+func UndoAuditOrder(c echo.Context) (err error) {
+	u := new(ber)
+	if err = c.Bind(u); err != nil {
+		c.Logger().Error(err.Error())
+		return
+	}
+	var order []model.CoreSqlOrder
+	model.DB().Where("`date` < ?", u.Date).Find(&order)
+	tx := model.DB().Begin()
+	for _, i := range order {
+		tx.Where("work_id =?", i.WorkId).Delete(&model.CoreSqlOrder{})
+		tx.Where("work_id =?", i.WorkId).Delete(&model.CoreRollback{})
+		tx.Where("work_id =?", i.WorkId).Delete(&model.CoreSqlRecord{})
+	}
+	tx.Commit()
+	return c.JSON(http.StatusOK, "工单已删除！")
 }
