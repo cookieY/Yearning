@@ -55,7 +55,7 @@
   
 ## About 联系方式
    
-   E-mail: im@supermancookie.com
+   E-mail: henry@yearning.io
 
 ## Snapshot 效果展示
 
