@@ -83,7 +83,7 @@
 ![](img/query.png)
 
 - 细粒度的权限分配
-![](img/per.png)
+![](img/PER.png)
 
 - 我的工单
 ![](img/myorder.png)
