@@ -11,7 +11,7 @@
 
 ## Yearning2.0 前端项目 
 
-[Gemini](https://github.com/cookieY/Gemini)
+[Gemini](https://github.com/cookieY/Yearning-gemini)
 
 ## Website 官网
 
