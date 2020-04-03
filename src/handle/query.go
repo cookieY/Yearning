@@ -70,7 +70,9 @@ func ReferQueryOrder(c echo.Context) (err error) {
 			ExDate:   time.Now().Format("2006-01-02 15:04"),
 		})
 
-		lib.MessagePush(c, work, 7, "")
+		if state == 2 {
+			lib.MessagePush(c, work, 6, "")
+		}
 
 		return c.JSON(http.StatusOK, "查询工单已提交!")
 	}

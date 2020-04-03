@@ -241,7 +241,7 @@ func QueryMethod(source *model.CoreDataSource, req *model.Queryresults, wordList
 	if err != nil {
 		return qd, err
 	}
-
+	defer rows.Close()
 	for rows.Next() {
 
 		results := make(map[string]interface{})

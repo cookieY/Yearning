@@ -106,7 +106,7 @@ func DbInit(c string) {
 	if err != nil {
 		newDb, err = gorm.Open("mysql", fmt.Sprintf("%s:%s@(%s)/%s?charset=utf8mb4&parseTime=True&loc=Local", os.Getenv("MYSQL_USER"), os.Getenv("MYSQL_PASSWORD"), os.Getenv("MYSQL_ADDR"), os.Getenv("MYSQL_DB")))
 		if err != nil {
-			fmt.Println("无法连接数据库!")
+			fmt.Println(err.Error())
 			os.Exit(1)
 		}
 	}

@@ -263,10 +263,10 @@ func InitGrpcpool() (err error) {
 		InitTargets:  []string{model.Grpc},
 		InitCap:      5,
 		MaxCap:       30,
-		DialTimeout:  time.Second * 5,
+		DialTimeout:  time.Second * 30,
 		IdleTimeout:  time.Second * 60,
-		ReadTimeout:  time.Second * 5,
-		WriteTimeout: time.Second * 5,
+		ReadTimeout:  time.Second * 30,
+		WriteTimeout: time.Second * 30,
 	}
 
 	P, err = NewGRPCPool(options, grpc.WithInsecure())

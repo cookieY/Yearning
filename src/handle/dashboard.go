@@ -72,7 +72,7 @@ func DashUserInfo(c echo.Context) (err error) {
 	)
 	model.DB().Select("username,rule,department,real_name,email").Where("username =?", user).Find(&u)
 	model.DB().Select("`group`").Where("username =?", user).First(&p)
-	model.DB().Select("`name`").First(&groupList)
+	model.DB().Select("`name`").Find(&groupList)
 	model.DB().Select("stmt").First(&s)
 	return c.JSON(http.StatusOK, map[string]interface{}{"u": u, "p": p.Group, "s": s,"g":groupList})
 }

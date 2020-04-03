@@ -123,6 +123,8 @@ func SuperAddDB(c echo.Context) (err error) {
 func SuperDeleteDb(c echo.Context) (err error) {
 
 	var g []model.CoreGrained
+	var k []model.CoreRoleGroup
+
 
 	tx := model.DB().Begin()
 
@@ -131,6 +133,7 @@ func SuperDeleteDb(c echo.Context) (err error) {
 	unescape, _ := url.QueryUnescape(source)
 
 	model.DB().Find(&g)
+	model.DB().Find(&k)
 
 	if er := tx.Where("source =?", unescape).Delete(&model.CoreDataSource{}).Error; er != nil {
 		tx.Rollback()
@@ -147,6 +150,21 @@ func SuperDeleteDb(c echo.Context) (err error) {
 		p.QuerySource = lib.ResearchDel(p.QuerySource, source)
 		r, _ := json.Marshal(p)
 		if e := tx.Model(&model.CoreGrained{}).Where("id =?", i.ID).Update(model.CoreGrained{Permissions: r}).Error; e != nil {
+			tx.Rollback()
+			c.Logger().Error(e.Error())
+		}
+	}
+
+	for _, i := range k {
+		var p model.PermissionList
+		if err := json.Unmarshal(i.Permissions, &p); err != nil {
+			c.Logger().Error(err.Error())
+		}
+		p.DDLSource = lib.ResearchDel(p.DDLSource, source)
+		p.DMLSource = lib.ResearchDel(p.DMLSource, source)
+		p.QuerySource = lib.ResearchDel(p.QuerySource, source)
+		r, _ := json.Marshal(p)
+		if e := tx.Model(&model.CoreRoleGroup{}).Where("id =?", i.ID).Update(model.CoreRoleGroup{Permissions: r}).Error; e != nil {
 			tx.Rollback()
 			c.Logger().Error(e.Error())
 		}

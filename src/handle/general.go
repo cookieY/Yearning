@@ -340,7 +340,7 @@ func GeneralMergeDDL(c echo.Context) (err error) {
 	}
 	m, err := soar.MergeAlterTables(req.Sql)
 	if err != nil {
-		return c.JSON(http.StatusOK, map[string]interface{}{"err": err.Error(), "e": true})
+		return c.JSON(http.StatusOK, map[string]interface{}{"err_code": err.Error(), "e": true})
 	}
 	return c.JSON(http.StatusOK, map[string]interface{}{"sols": m, "e": false})
 }
