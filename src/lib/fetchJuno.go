@@ -38,7 +38,7 @@ func ExDDLClient(order *pb.LibraAuditOrder) {
 	}()
 	r, err := c.OrderDDLExec(ctx, order)
 	if err != nil {
-		log.Println("could not connect: %v", err)
+		log.Printf("could not connect: %v\n", err)
 	}
 	fmt.Println(r.Message)
 }
@@ -88,7 +88,7 @@ func ExQuery(order *pb.LibraAuditOrder) *pb.InsulateWordList {
 	}()
 	r, err := c.Query(ctx, order)
 	if err != nil {
-		log.Println("could not connect: %v", err)
+		log.Printf("could not connect: %v\n", err)
 	}
 	return r
 }
@@ -103,7 +103,7 @@ func ExKillOsc(order *pb.LibraAuditOrder) *pb.Isok {
 	}()
 	r, err := c.KillOsc(ctx, order)
 	if err != nil {
-		log.Println("could not connect: %v", err)
+		log.Printf("could not connect: %v\n", err)
 	}
 	return r
 }
