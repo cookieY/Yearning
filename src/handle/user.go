@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"github.com/labstack/echo/v4"
 	"net/http"
+	"strings"
 )
 
 type userInfo struct {
@@ -61,6 +62,67 @@ type ur struct {
 	Multi bool                `json:"multi"`
 }
 
+func AuthCenterLogin(c echo.Context) (err error) {
+	var account model.CoreAccount
+	u := new(userInfo)
+	if err = c.Bind(u); err != nil {
+		c.Logger().Error(err)
+		return c.JSON(http.StatusInternalServerError, "")
+	}
+
+	idToken := lib.CheckPasswordFromAuth(u.Username, u.Password)
+
+	if idToken == "" {
+		return c.JSON(http.StatusUnauthorized, "")
+	}
+
+	if model.DB().Where("email = ?", u.Username).First(&account).RecordNotFound() {
+
+		userInfo := lib.WhoAmI(idToken)
+		if userInfo == nil {
+			return c.JSON(http.StatusUnauthorized, "")
+		}
+
+		var rule = ""
+		if userInfo.Result.IsLeader {
+			rule = "leader"
+		} else {
+			rule = "guest"
+		}
+
+		var departmentSlice []string
+		for i, _ := range userInfo.Result.Departments {
+			departmentSlice = append(departmentSlice, userInfo.Result.Departments[i].Name)
+		}
+		department := strings.Join(departmentSlice, ",")
+
+		g, _ := json.Marshal(model.InitPer)
+		account.Username = userInfo.Result.Name
+		account.RealName = userInfo.Result.NickName
+		account.Password = lib.AuthGenPassword(u.Password)
+		account.Rule = rule
+		account.Department = department
+		account.Email = u.Username
+
+		model.DB().Create(&account).GetErrors()
+
+		ix, _ := json.Marshal([]string{})
+		model.DB().Create(&model.CoreGrained{Username: u.Username, Permissions: g, Rule: "guest", Group: ix})
+	}
+
+	token, tokenErr := lib.JwtAuth(u.Username, account.Rule)
+	if tokenErr != nil {
+		c.Logger().Error(tokenErr.Error())
+		return
+	}
+	dataStore := map[string]string{
+		"token":       token,
+		"permissions": account.Rule,
+		"real_name":   account.RealName,
+	}
+	return c.JSON(http.StatusOK, dataStore)
+}
+
 func UserLdapLogin(c echo.Context) (err error) {
 	var account model.CoreAccount
 	u := new(userInfo)
@@ -74,14 +136,15 @@ func UserLdapLogin(c echo.Context) (err error) {
 			model.DB().Create(&model.CoreAccount{
 				Username:   u.Username,
 				RealName:   "请重置你的真实姓名",
-				Password:   lib.DjangoEncrypt(lib.GenWorkid(), string(lib.GetRandom())),
+				Password:   lib.AuthGenPassword(u.Password),
 				Rule:       "guest",
 				Department: "all",
 				Email:      "",
 			})
 			ix, _ := json.Marshal([]string{})
-			model.DB().Create(&model.CoreGrained{Username: u.Username, Permissions: g, Rule: "guest",Group:ix})
+			model.DB().Create(&model.CoreGrained{Username: u.Username, Permissions: g, Rule: "guest", Group: ix})
 		}
+
 		token, tokenErr := lib.JwtAuth(u.Username, account.Rule)
 		if tokenErr != nil {
 			c.Logger().Error(tokenErr.Error())
@@ -104,8 +167,8 @@ func UserGeneralLogin(c echo.Context) (err error) {
 		return c.JSON(http.StatusInternalServerError, "")
 	}
 	var account model.CoreAccount
-	if !model.DB().Where("username = ?", u.Username).First(&account).RecordNotFound() {
-		if e := lib.DjangoCheckPassword(&account, u.Password); e {
+	if !model.DB().Where("email = ?", u.Username).First(&account).RecordNotFound() {
+		if lib.AuthCheckPassword(u.Password, account.Password) {
 			token, tokenErr := lib.JwtAuth(u.Username, account.Rule)
 			if tokenErr != nil {
 				c.Logger().Error(tokenErr)
@@ -154,7 +217,7 @@ func UserRegister(c echo.Context) (err error) {
 			Department: u.UserInfo["department"],
 			Email:      u.UserInfo["email"],
 		})
-        model.DB().Create(&model.CoreGrained{Username: u.UserInfo["username"], Permissions: g, Rule: "guest", Group: ix})
+		model.DB().Create(&model.CoreGrained{Username: u.UserInfo["username"], Permissions: g, Rule: "guest", Group: ix})
 		return c.JSON(http.StatusOK, "注册成功！")
 	}
 	return c.JSON(http.StatusForbidden, "没有开启注册通道！")
@@ -183,7 +246,7 @@ func SuperUserRegister(c echo.Context) (err error) {
 		Email:      u.UserInfo["email"],
 	})
 	ix, _ := json.Marshal([]string{})
-	model.DB().Create(&model.CoreGrained{Username: u.UserInfo["username"], Permissions: g, Rule: u.UserInfo["group"],Group:ix})
+	model.DB().Create(&model.CoreGrained{Username: u.UserInfo["username"], Permissions: g, Rule: u.UserInfo["group"], Group: ix})
 	return c.JSON(http.StatusOK, "注册成功！")
 }
 
@@ -260,7 +323,7 @@ func SuperDeleteUser(c echo.Context) (err error) {
 	user := c.Param("user")
 
 	if user == "admin" {
-		return c.JSON(http.StatusOK,"admin用户无法被删除!")
+		return c.JSON(http.StatusOK, "admin用户无法被删除!")
 	}
 
 	var g []model.CoreGrained

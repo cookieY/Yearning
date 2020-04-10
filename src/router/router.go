@@ -65,6 +65,7 @@ func AddRouter(e *echo.Echo) {
 	e.POST("/register", handle.UserRegister)
 	e.GET("/fetch", handle.UserReqSwitch)
 	e.POST("/ldap", handle.UserLdapLogin)
+	e.POST("/auth", handle.AuthCenterLogin)
 
 	r := e.Group("/api/v2", middleware.JWT([]byte(model.JWT)))
 	r.POST("/dash/initMenu", handle.DashInit)
@@ -98,7 +99,7 @@ func AddRouter(e *echo.Echo) {
 	r.PUT("/query/beauty", handle.GeneralQueryBeauty)
 	r.PUT("/query/merge", handle.GeneralMergeDDL)
 	r.POST("/sql/refer", handle.SQLReferToOrder)
-	r.GET("/board",handle.GeneralFetchBoard)
+	r.GET("/board", handle.GeneralFetchBoard)
 
 	audit := r.Group("/audit", AuditGroup)
 	audit.POST("/refer/perform", handle.MulitAuditOrder)
@@ -130,7 +131,7 @@ func AddRouter(e *echo.Echo) {
 	group.PUT("/setting/test/:el", handle.SuperTestSetting)
 	group.POST("/setting/del/order", handle.UndoAuditOrder)
 	group.POST("/setting/del/query", handle.DelQueryOrder)
-	group.POST("/board/post",handle.GeneralPostBoard)
+	group.POST("/board/post", handle.GeneralPostBoard)
 
 	user := r.Group("/management_user", SuperManageUser)
 	user.POST("/modify", handle.SuperModifyUser)
