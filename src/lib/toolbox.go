@@ -278,10 +278,29 @@ func QueryMethod(source *model.CoreDataSource, req *model.Queryresults, wordList
 		qd.Data = append(qd.Data, results)
 	}
 
-	for _, cv := range cols {
+	ele := removeDuplicateElement(cols)
+
+	for _, cv := range ele {
 		qd.Field = append(qd.Field, map[string]string{"title": cv, "key": cv, "width": "200"})
 	}
 	qd.Field[0]["fixed"] = "left"
 
 	return qd, nil
+}
+
+func removeDuplicateElement(slice []string) []string {
+	result := make([]string, 0, len(slice))
+	temp := map[string]struct{}{}
+	idx := 0
+	for _, item := range slice {
+		if _, ok := temp[item]; !ok {
+			temp[item] = struct{}{}
+			result = append(result, item)
+		} else {
+			idx++
+			item += fmt.Sprintf("(%v)", idx)
+			result = append(result, item)
+		}
+	}
+	return result
 }
