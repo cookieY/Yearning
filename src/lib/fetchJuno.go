@@ -1,7 +1,7 @@
 package lib
 
 import (
-	"Yearning-go/src/pool"
+	"Yearning-go/src/model"
 	pb "Yearning-go/src/proto"
 	"context"
 	"fmt"
@@ -11,8 +11,7 @@ import (
 
 func TsClient(order *pb.LibraAuditOrder) ([]*pb.Record, error) {
 
-	conn, _ := pool.P.Get()
-	c := pb.NewJunoClient(conn)
+	c := pb.NewJunoClient(model.Conn)
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	r, err := c.OrderDeal(ctx, order)
 	if err != nil {
@@ -21,7 +20,6 @@ func TsClient(order *pb.LibraAuditOrder) ([]*pb.Record, error) {
 	}
 	defer func() {
 		cancel()
-		_ = pool.P.Put(conn)
 	}()
 
 	return r.Record, nil
@@ -29,30 +27,26 @@ func TsClient(order *pb.LibraAuditOrder) ([]*pb.Record, error) {
 
 func ExDDLClient(order *pb.LibraAuditOrder) {
 	// Set up a connection to the server.
-	conn, _ := pool.P.Get()
-	c := pb.NewJunoClient(conn)
+	c := pb.NewJunoClient(model.Conn)
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer func() {
 		cancel()
-		_ = pool.P.Put(conn)
 	}()
 	r, err := c.OrderDDLExec(ctx, order)
 	if err != nil {
-		log.Println("could not connect: %v", err)
+		log.Printf("could not connect: %v", err)
 	}
-	fmt.Println(r.Message)
+	log.Println(r.Message)
 }
 
 func ExDMLClient(order *pb.LibraAuditOrder) {
 
 	// Set up a connection to the server.
-	conn, _ := pool.P.Get()
-	c := pb.NewJunoClient(conn)
+	c := pb.NewJunoClient(model.Conn)
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer func() {
 		cancel()
-		_ = pool.P.Put(conn)
 	}()
 	r, err := c.OrderDMLExec(ctx, order)
 	if err != nil {
@@ -63,13 +57,10 @@ func ExDMLClient(order *pb.LibraAuditOrder) {
 
 func ExAutoTask(order *pb.LibraAuditOrder) bool {
 
-	// Set up a connection to the server.
-	conn, _ := pool.P.Get()
-	c := pb.NewJunoClient(conn)
+	c := pb.NewJunoClient(model.Conn)
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer func() {
 		cancel()
-		_ = pool.P.Put(conn)
 	}()
 	r, err := c.AutoTask(ctx, order)
 	if err != nil {
@@ -79,31 +70,29 @@ func ExAutoTask(order *pb.LibraAuditOrder) bool {
 }
 
 func ExQuery(order *pb.LibraAuditOrder) *pb.InsulateWordList {
-	conn, _ := pool.P.Get()
-	c := pb.NewJunoClient(conn)
+
+	c := pb.NewJunoClient(model.Conn)
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer func() {
 		cancel()
-		_ = pool.P.Put(conn)
 	}()
 	r, err := c.Query(ctx, order)
 	if err != nil {
-		log.Println("could not connect: %v", err)
+		log.Printf("could not connect: %v", err)
 	}
 	return r
 }
 
 func ExKillOsc(order *pb.LibraAuditOrder) *pb.Isok {
-	conn, _ := pool.P.Get()
-	c := pb.NewJunoClient(conn)
+
+	c := pb.NewJunoClient(model.Conn)
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer func() {
 		cancel()
-		_ = pool.P.Put(conn)
 	}()
 	r, err := c.KillOsc(ctx, order)
 	if err != nil {
-		log.Println("could not connect: %v", err)
+		log.Printf("could not connect: %v", err)
 	}
 	return r
 }

@@ -222,7 +222,7 @@ func QueryMethod(source *model.CoreDataSource, req *model.Queryresults, wordList
 
 	ps := Decrypt(source.Password)
 
-	db, err := sqlx.Connect("mysql", fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?charset=utf8mb4&readTimeout=%ds", source.Username, ps, source.IP, source.Port, req.Basename,model.GloOther.QueryTimeout))
+	db, err := sqlx.Connect("mysql", fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?charset=utf8mb4", source.Username, ps, source.IP, source.Port, req.Basename))
 
 	if err != nil {
 		return qd, err

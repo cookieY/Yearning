@@ -27,10 +27,10 @@ import (
 func StartYearning(port string, host string) {
 	model.DB().First(&model.GloPer)
 	model.Host = host
-	json.Unmarshal(model.GloPer.Message, &model.GloMessage)
-	json.Unmarshal(model.GloPer.Ldap, &model.GloLdap)
-	json.Unmarshal(model.GloPer.Other, &model.GloOther)
-	json.Unmarshal(model.GloPer.AuditRole, &parser.FetchAuditRole)
+	_ = json.Unmarshal(model.GloPer.Message, &model.GloMessage)
+	_ = json.Unmarshal(model.GloPer.Ldap, &model.GloLdap)
+	_ = json.Unmarshal(model.GloPer.Other, &model.GloOther)
+	_ = json.Unmarshal(model.GloPer.AuditRole, &parser.FetchAuditRole)
 	e := echo.New()
 	e.Static("/", "dist")
 	//e.Use(middleware.CORSWithConfig(middleware.CORSConfig{

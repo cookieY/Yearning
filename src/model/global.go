@@ -13,6 +13,8 @@
 
 package model
 
+import "google.golang.org/grpc"
+
 type mysql struct {
 	Host     string
 	User     string
@@ -67,3 +69,5 @@ var GloLdap Ldap
 var GloOther Other
 
 var GloMessage Message
+
+var Conn *grpc.ClientConn

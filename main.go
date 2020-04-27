@@ -16,10 +16,10 @@ package main
 import (
 	"Yearning-go/src/lib"
 	"Yearning-go/src/model"
-	"Yearning-go/src/pool"
 	"Yearning-go/src/service"
 	"flag"
 	"fmt"
+	"google.golang.org/grpc"
 	"log"
 	"os"
 )
@@ -72,7 +72,6 @@ func init() {
 }
 
 func main() {
-	defer pool.P.Close()
 	flag.Parse()
 	if h {
 		flag.Usage()
@@ -82,11 +81,10 @@ func main() {
 			service.MargeRuleGroup()
 		}
 		if s {
-			err := pool.InitGrpcpool()
-			if err != nil {
-				fmt.Println(err.Error())
-				os.Exit(1)
-			}
+			model.Conn, _ = grpc.Dial(model.Grpc, grpc.WithInsecure())
+			defer func() {
+				model.Conn.Close()
+			}()
 			service.UpdateSoft()
 			service.StartYearning(p, b)
 		}
