@@ -36,7 +36,7 @@ func ExDDLClient(order *pb.LibraAuditOrder) {
 	if err != nil {
 		log.Printf("could not connect: %v", err)
 	}
-	log.Println(r.Message)
+	fmt.Println(r.Message)
 }
 
 func ExDMLClient(order *pb.LibraAuditOrder) {

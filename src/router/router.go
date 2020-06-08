@@ -17,56 +17,72 @@ import (
 	"Yearning-go/src/handle"
 	"Yearning-go/src/lib"
 	"Yearning-go/src/model"
-	"github.com/labstack/echo/v4"
-	"github.com/labstack/echo/v4/middleware"
+	"github.com/cookieY/yee"
+	"github.com/cookieY/yee/middleware"
 	"net/http"
 )
 
-func SuperManageDB(next echo.HandlerFunc) echo.HandlerFunc {
-	return func(c echo.Context) error {
-		if lib.SuperAuth(c, "db") {
-			return next(c)
-		}
-		return c.JSON(http.StatusForbidden, "非法越权操作！")
+func SuperManageDB() yee.HandlerFunc {
+	return yee.HandlerFunc{
+		Func: func(c yee.Context) (err error) {
+			if lib.SuperAuth(c, "db") {
+				c.Next()
+				return nil
+			}
+			return c.JSON(http.StatusForbidden, "非法越权操作！")
+		},
+		IsMiddleware: true,
 	}
 }
 
-func SuperManageUser(next echo.HandlerFunc) echo.HandlerFunc {
-	return func(c echo.Context) error {
-		if lib.SuperAuth(c, "user") {
-			return next(c)
-		}
-		return c.JSON(http.StatusForbidden, "非法越权操作！")
+func SuperManageUser() yee.HandlerFunc {
+	return yee.HandlerFunc{
+		Func: func(c yee.Context) (err error) {
+			if lib.SuperAuth(c, "user") {
+				c.Next()
+				return
+			}
+			return c.JSON(http.StatusForbidden, "非法越权操作！")
+		},
+		IsMiddleware: true,
 	}
 }
 
-func SuperManageGroup(next echo.HandlerFunc) echo.HandlerFunc {
-	return func(c echo.Context) error {
-		user, _ := lib.JwtParse(c)
-		if user == "admin" {
-			return next(c)
-		}
-		return c.JSON(http.StatusForbidden, "非法越权操作！")
+func SuperManageGroup() yee.HandlerFunc {
+	return yee.HandlerFunc{
+		Func: func(c yee.Context) (err error) {
+			user, _ := lib.JwtParse(c)
+			if user == "admin" {
+				c.Next()
+				return
+			}
+			return c.JSON(http.StatusForbidden, "非法越权操作！")
+		},
+		IsMiddleware: true,
 	}
 }
 
-func AuditGroup(next echo.HandlerFunc) echo.HandlerFunc {
-	return func(c echo.Context) error {
-		_, rule := lib.JwtParse(c)
-		if rule == "admin" || rule == "perform" {
-			return next(c)
-		}
-		return c.JSON(http.StatusForbidden, "非法越权操作！")
+func AuditGroup() yee.HandlerFunc {
+	return yee.HandlerFunc{
+		Func: func(c yee.Context) (err error) {
+			_, rule := lib.JwtParse(c)
+			if rule == "admin" || rule == "perform" {
+				c.Next()
+				return
+			}
+			return c.JSON(http.StatusForbidden, "非法越权操作！")
+		},
+		IsMiddleware: true,
 	}
 }
 
-func AddRouter(e *echo.Echo) {
+func AddRouter(e *yee.Core) {
 	e.POST("/login", handle.UserGeneralLogin)
 	e.POST("/register", handle.UserRegister)
 	e.GET("/fetch", handle.UserReqSwitch)
 	e.POST("/ldap", handle.UserLdapLogin)
 
-	r := e.Group("/api/v2", middleware.JWT([]byte(model.JWT)))
+	r := e.Group("/api/v2", middleware.JWTWithConfig(middleware.JwtConfig{SigningKey: []byte(model.JWT)}))
 	r.POST("/dash/initMenu", handle.DashInit)
 	r.GET("/dash/pie", handle.DashPie)
 	r.GET("/dash/axis", handle.DashAxis)
@@ -96,12 +112,11 @@ func AddRouter(e *echo.Echo) {
 	r.GET("/query/tableinfo/:base/:table/:source", handle.FetchQueryTableStruct)
 	r.POST("/query", handle.FetchQueryResults)
 	r.DELETE("/query/undo", handle.UndoQueryOrder)
-	r.PUT("/query/beauty", handle.GeneralQueryBeauty)
 	r.PUT("/query/merge", handle.GeneralMergeDDL)
 	r.POST("/sql/refer", handle.SQLReferToOrder)
-	r.GET("/board",handle.GeneralFetchBoard)
+	r.GET("/board", handle.GeneralFetchBoard)
 
-	audit := r.Group("/audit", AuditGroup)
+	audit := r.Group("/audit", AuditGroup())
 	audit.POST("/refer/perform", handle.MulitAuditOrder)
 	audit.PUT("", handle.FetchAuditOrder)
 	audit.GET("/sql", handle.FetchOrderSQL)
@@ -120,7 +135,7 @@ func AddRouter(e *echo.Echo) {
 	audit.GET("/fetch_osc/:work_id", handle.OscPercent)
 	audit.DELETE("/fetch_osc/:work_id", handle.OscKill)
 
-	group := r.Group("/group", SuperManageGroup)
+	group := r.Group("/group", SuperManageGroup())
 	group.GET("", handle.SuperGroup)
 	group.POST("/update", handle.SuperGroupUpdate)
 	group.DELETE("/del/:clear", handle.SuperClearUserRule)
@@ -130,23 +145,23 @@ func AddRouter(e *echo.Echo) {
 	group.PUT("/setting/test/:el", handle.SuperTestSetting)
 	group.POST("/setting/del/order", handle.UndoAuditOrder)
 	group.POST("/setting/del/query", handle.DelQueryOrder)
-	group.POST("/board/post",handle.GeneralPostBoard)
+	group.POST("/board/post", handle.GeneralPostBoard)
 
-	user := r.Group("/management_user", SuperManageUser)
+	user := r.Group("/management_user", SuperManageUser())
 	user.POST("/modify", handle.SuperModifyUser)
 	user.POST("/password_reset", handle.SuperChangePassword)
 	user.GET("/fetch", handle.SuperFetchUser)
 	user.DELETE("/del/:user", handle.SuperDeleteUser)
 	user.POST("/register", handle.SuperUserRegister)
 
-	db := r.Group("/management_db", SuperManageDB)
+	db := r.Group("/management_db", SuperManageDB())
 	db.GET("/fetch/", handle.SuperFetchDB)
 	db.POST("/add", handle.SuperAddDB)
 	db.PUT("/test", handle.SuperTestDBConnect)
 	db.DELETE("/del/:source", handle.SuperDeleteDb)
 	db.PUT("/edit", handle.SuperModifyDb)
 
-	autoTask := r.Group("/auto", SuperManageGroup)
+	autoTask := r.Group("/auto", SuperManageGroup())
 	autoTask.GET("", handle.SuperFetchAutoTaskSource)
 	autoTask.POST("", handle.SuperReferAutoTask)
 	autoTask.PUT("/fetch", handle.SuperFetchAutoTaskList)

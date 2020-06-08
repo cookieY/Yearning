@@ -63,7 +63,6 @@ type AuditRole struct {
 	DDLPrimaryKeyMust              bool   //是否强制主键名为id
 	DDLAllowColumnType             bool   // ddl语句允许更改字段类型
 	DDLImplicitTypeConversion      bool
-	DMLMinimalRollback             bool
 	DDLAllowPRINotInt              bool
 	IsOSC                          bool
 	OscBinDir                      string // pt-osc path

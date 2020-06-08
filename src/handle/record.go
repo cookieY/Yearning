@@ -17,11 +17,11 @@ import (
 	"Yearning-go/src/lib"
 	"Yearning-go/src/model"
 	"fmt"
-	"github.com/labstack/echo/v4"
+	"github.com/cookieY/yee"
 	"net/http"
 )
 
-func FetchRecord(c echo.Context) (err error) {
+func FetchRecord(c yee.Context) (err error) {
 	u := new(f)
 	if err = c.Bind(u); err != nil {
 		c.Logger().Error(err.Error())
@@ -68,7 +68,7 @@ func FetchRecord(c echo.Context) (err error) {
 	})
 }
 
-func FetchQueryRecord(c echo.Context) (err error) {
+func FetchQueryRecord(c yee.Context) (err error) {
 	u := new(f)
 	if err = c.Bind(u); err != nil {
 		c.Logger().Error(err.Error())
@@ -105,7 +105,7 @@ func FetchQueryRecord(c echo.Context) (err error) {
 	})
 }
 
-func FetchQueryRecordDetail(c echo.Context) (err error) {
+func FetchQueryRecordDetail(c yee.Context) (err error) {
 	u := new(executeStr)
 
 	if err = c.Bind(u); err != nil {
@@ -117,5 +117,5 @@ func FetchQueryRecordDetail(c echo.Context) (err error) {
 	var count int
 	model.DB().Where("work_id =?", u.WorkId).Offset(start).Limit(end).Find(&detail)
 	model.DB().Model(&model.CoreQueryRecord{}).Where("work_id =?", u.WorkId).Count(&count)
-	return c.JSON(http.StatusOK, map[string]interface{}{"data":detail,"count":count})
+	return c.JSON(http.StatusOK, map[string]interface{}{"data": detail, "count": count})
 }

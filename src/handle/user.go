@@ -18,7 +18,7 @@ import (
 	"Yearning-go/src/model"
 	"encoding/json"
 	"fmt"
-	"github.com/labstack/echo/v4"
+	"github.com/cookieY/yee"
 	"net/http"
 )
 
@@ -61,11 +61,11 @@ type ur struct {
 	Multi bool                `json:"multi"`
 }
 
-func UserLdapLogin(c echo.Context) (err error) {
+func UserLdapLogin(c yee.Context) (err error) {
 	var account model.CoreAccount
 	u := new(userInfo)
 	if err = c.Bind(u); err != nil {
-		c.Logger().Error(err)
+		c.Logger().Error(err.Error())
 		return c.JSON(http.StatusInternalServerError, "")
 	}
 	if lib.LdapConnenct(c, &model.GloLdap, u.Username, u.Password, false) {
@@ -97,10 +97,10 @@ func UserLdapLogin(c echo.Context) (err error) {
 	return c.JSON(http.StatusUnauthorized, "")
 }
 
-func UserGeneralLogin(c echo.Context) (err error) {
+func UserGeneralLogin(c yee.Context) (err error) {
 	u := new(userInfo)
 	if err = c.Bind(u); err != nil {
-		c.Logger().Error(err)
+		c.Logger().Error(err.Error())
 		return c.JSON(http.StatusInternalServerError, "")
 	}
 	var account model.CoreAccount
@@ -108,7 +108,7 @@ func UserGeneralLogin(c echo.Context) (err error) {
 		if e := lib.DjangoCheckPassword(&account, u.Password); e {
 			token, tokenErr := lib.JwtAuth(u.Username, account.Rule)
 			if tokenErr != nil {
-				c.Logger().Error(tokenErr)
+				c.Logger().Error(tokenErr.Error())
 				return
 			}
 			dataStore := map[string]string{
@@ -124,19 +124,19 @@ func UserGeneralLogin(c echo.Context) (err error) {
 
 }
 
-func UserReqSwitch(c echo.Context) (err error) {
+func UserReqSwitch(c yee.Context) (err error) {
 	if model.GloOther.Register {
 		return c.JSON(http.StatusOK, 1)
 	}
 	return c.JSON(http.StatusOK, 0)
 }
 
-func UserRegister(c echo.Context) (err error) {
+func UserRegister(c yee.Context) (err error) {
 
 	if model.GloOther.Register {
 		u := new(register)
 		if err = c.Bind(u); err != nil {
-			c.Logger().Error(err)
+			c.Logger().Error(err.Error())
 			return c.JSON(http.StatusInternalServerError, "")
 		}
 		var unique model.CoreAccount
@@ -161,11 +161,11 @@ func UserRegister(c echo.Context) (err error) {
 
 }
 
-func SuperUserRegister(c echo.Context) (err error) {
+func SuperUserRegister(c yee.Context) (err error) {
 
 	u := new(register)
 	if err = c.Bind(u); err != nil {
-		c.Logger().Error(err)
+		c.Logger().Error(err.Error())
 		return c.JSON(http.StatusInternalServerError, "")
 	}
 	var unique model.CoreAccount
@@ -187,7 +187,7 @@ func SuperUserRegister(c echo.Context) (err error) {
 	return c.JSON(http.StatusOK, "注册成功！")
 }
 
-func ChangePassword(c echo.Context) (err error) {
+func ChangePassword(c yee.Context) (err error) {
 	u := new(changePassword)
 	if err = c.Bind(u); err != nil {
 		c.Logger().Error(err.Error())
@@ -198,10 +198,10 @@ func ChangePassword(c echo.Context) (err error) {
 	return c.JSON(http.StatusOK, "密码修改成功！")
 }
 
-func ChangeMail(c echo.Context) (err error) {
+func ChangeMail(c yee.Context) (err error) {
 	u := new(changeMail)
 	if err = c.Bind(u); err != nil {
-		c.Logger().Error(err)
+		c.Logger().Error(err.Error())
 		return c.JSON(http.StatusInternalServerError, "")
 	}
 	user, _ := lib.JwtParse(c)
@@ -209,7 +209,7 @@ func ChangeMail(c echo.Context) (err error) {
 	return c.JSON(http.StatusOK, "邮箱/真实姓名修改成功！刷新后显示最新信息!")
 }
 
-func SuperModifyUser(c echo.Context) (err error) {
+func SuperModifyUser(c yee.Context) (err error) {
 	u := new(modifyUser)
 	if err = c.Bind(u); err != nil {
 		c.Logger().Error(err.Error())
@@ -224,7 +224,7 @@ func SuperModifyUser(c echo.Context) (err error) {
 	return c.JSON(http.StatusOK, "邮箱/真实姓名修改成功！刷新后显示最新信息!")
 }
 
-func SuperChangePassword(c echo.Context) (err error) {
+func SuperChangePassword(c yee.Context) (err error) {
 
 	u := new(changePassword)
 	if err = c.Bind(u); err != nil {
@@ -235,7 +235,7 @@ func SuperChangePassword(c echo.Context) (err error) {
 	return c.JSON(http.StatusOK, "密码修改成功！")
 }
 
-func SuperFetchUser(c echo.Context) (err error) {
+func SuperFetchUser(c yee.Context) (err error) {
 	var f fetchuser
 	var u []model.CoreAccount
 	var pg int
@@ -256,8 +256,8 @@ func SuperFetchUser(c echo.Context) (err error) {
 	return c.JSON(http.StatusOK, ur{Page: pg, Data: u, Multi: model.GloOther.Multi})
 }
 
-func SuperDeleteUser(c echo.Context) (err error) {
-	user := c.Param("user")
+func SuperDeleteUser(c yee.Context) (err error) {
+	user := c.Params("user")
 
 	if user == "admin" {
 		return c.JSON(http.StatusOK,"admin用户无法被删除!")
@@ -291,7 +291,7 @@ func SuperDeleteUser(c echo.Context) (err error) {
 		r, _ := json.Marshal(p)
 		if err := tx.Model(&model.CoreGrained{}).Where("id =?", i.ID).Update(model.CoreGrained{Permissions: r}).Error; err != nil {
 			tx.Rollback()
-			c.Logger().Error(err.Error)
+			c.Logger().Error(err.Error())
 			return c.JSON(http.StatusInternalServerError, nil)
 		}
 	}

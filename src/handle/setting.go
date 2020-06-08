@@ -18,7 +18,7 @@ import (
 	"Yearning-go/src/model"
 	ser "Yearning-go/src/parser"
 	"encoding/json"
-	"github.com/labstack/echo/v4"
+	"github.com/cookieY/yee"
 	"net/http"
 )
 
@@ -41,7 +41,7 @@ type ber struct {
 	Date string `json:"date"`
 }
 
-func SuperFetchSetting(c echo.Context) (err error) {
+func SuperFetchSetting(c yee.Context) (err error) {
 
 	var k model.CoreGlobalConfiguration
 
@@ -50,7 +50,7 @@ func SuperFetchSetting(c echo.Context) (err error) {
 	return c.JSON(http.StatusOK, k)
 }
 
-func SuperSaveSetting(c echo.Context) (err error) {
+func SuperSaveSetting(c yee.Context) (err error) {
 
 	u := new(set)
 
@@ -70,9 +70,9 @@ func SuperSaveSetting(c echo.Context) (err error) {
 	return c.JSON(http.StatusOK, "配置信息已保存！")
 }
 
-func SuperTestSetting(c echo.Context) (err error) {
+func SuperTestSetting(c yee.Context) (err error) {
 
-	el := c.Param("el")
+	el := c.Params("el")
 
 	if el == "mail" {
 		u := new(mt)
@@ -80,7 +80,7 @@ func SuperTestSetting(c echo.Context) (err error) {
 			c.Logger().Error(err.Error())
 			return c.JSON(http.StatusInternalServerError, err.Error())
 		}
-		go lib.SendMail(c, u.Mail, lib.TemoplateTestMail)
+		go lib.SendMail(u.Mail, lib.TemoplateTestMail)
 		return c.JSON(http.StatusOK, "测试邮件已发送！请注意查收！")
 	}
 
@@ -90,7 +90,7 @@ func SuperTestSetting(c echo.Context) (err error) {
 			c.Logger().Error(err.Error())
 			return c.JSON(http.StatusInternalServerError, err.Error())
 		}
-		go lib.SendDingMsg(c, u.Mail, lib.TmplTestDing)
+		go lib.SendDingMsg(u.Mail, lib.TmplTestDing)
 		return c.JSON(http.StatusOK, "测试消息已发送！请注意查收！")
 	}
 
@@ -112,7 +112,7 @@ func SuperTestSetting(c echo.Context) (err error) {
 	return c.JSON(http.StatusInternalServerError, "未知传参！")
 }
 
-func SuperSaveRoles(c echo.Context) (err error) {
+func SuperSaveRoles(c yee.Context) (err error) {
 
 	u := new(set)
 
@@ -128,7 +128,7 @@ func SuperSaveRoles(c echo.Context) (err error) {
 	return c.JSON(http.StatusOK, "配置信息已保存！")
 }
 
-func DelQueryOrder(c echo.Context) (err error) {
+func DelQueryOrder(c yee.Context) (err error) {
 	u := new(ber)
 	if err := c.Bind(u); err != nil {
 		c.Logger().Error(err.Error())
@@ -148,7 +148,7 @@ func DelQueryOrder(c echo.Context) (err error) {
 }
 
 // UndoAuditOrder delete Order
-func UndoAuditOrder(c echo.Context) (err error) {
+func UndoAuditOrder(c yee.Context) (err error) {
 	u := new(ber)
 	if err = c.Bind(u); err != nil {
 		c.Logger().Error(err.Error())

@@ -18,8 +18,8 @@ import (
 	"Yearning-go/src/model"
 	"encoding/json"
 	"fmt"
+	"github.com/cookieY/yee"
 	"github.com/jinzhu/gorm"
-	"github.com/labstack/echo/v4"
 	"log"
 	"net/http"
 	"net/url"
@@ -60,7 +60,7 @@ type editDb struct {
 	Data adddb
 }
 
-func SuperFetchDB(c echo.Context) (err error) {
+func SuperFetchDB(c yee.Context) (err error) {
 
 	var f fetchdb
 	var u []model.CoreDataSource
@@ -86,7 +86,7 @@ func SuperFetchDB(c echo.Context) (err error) {
 
 }
 
-func SuperAddDB(c echo.Context) (err error) {
+func SuperAddDB(c yee.Context) (err error) {
 
 	var refer model.CoreDataSource
 
@@ -120,15 +120,14 @@ func SuperAddDB(c echo.Context) (err error) {
 	}
 }
 
-func SuperDeleteDb(c echo.Context) (err error) {
+func SuperDeleteDb(c yee.Context) (err error) {
 
 	var g []model.CoreGrained
 	var k []model.CoreRoleGroup
 
-
 	tx := model.DB().Begin()
 
-	source := c.Param("source")
+	source := c.Params("source")
 
 	unescape, _ := url.QueryUnescape(source)
 
@@ -137,7 +136,7 @@ func SuperDeleteDb(c echo.Context) (err error) {
 
 	if er := tx.Where("source =?", unescape).Delete(&model.CoreDataSource{}).Error; er != nil {
 		tx.Rollback()
-		c.Logger().Error(er.Error)
+		c.Logger().Error(er.Error())
 		return c.JSON(http.StatusInternalServerError, "")
 	}
 	for _, i := range g {
@@ -173,7 +172,7 @@ func SuperDeleteDb(c echo.Context) (err error) {
 	return c.JSON(http.StatusOK, "数据库信息已删除")
 }
 
-func SuperTestDBConnect(c echo.Context) (err error) {
+func SuperTestDBConnect(c yee.Context) (err error) {
 
 	u := new(testconn)
 	if err = c.Bind(u); err != nil {
@@ -194,7 +193,7 @@ func SuperTestDBConnect(c echo.Context) (err error) {
 	return c.JSON(http.StatusOK, "数据库实例连接成功！")
 }
 
-func SuperModifyDb(c echo.Context) (err error) {
+func SuperModifyDb(c yee.Context) (err error) {
 	u := new(editDb)
 	if err = c.Bind(u); err != nil {
 		c.Logger().Error(err.Error())

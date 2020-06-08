@@ -28,6 +28,7 @@ func DataInit(o *parser.AuditRole, other *model.Other, ldap *model.Ldap, message
 	l, _ := json.Marshal(ldap)
 	m, _ := json.Marshal(message)
 	ak, _ := json.Marshal(a)
+	group, _ := json.Marshal([]string{"admin"})
 	model.DB().Debug().Create(&model.CoreAccount{
 		Username:   "admin",
 		RealName:   "超级管理员",
@@ -45,6 +46,11 @@ func DataInit(o *parser.AuditRole, other *model.Other, ldap *model.Ldap, message
 	})
 	model.DB().Debug().Create(&model.CoreGrained{
 		Username:    "admin",
+		Permissions: ak,
+		Group:       group,
+	})
+	model.DB().Debug().Create(&model.CoreRoleGroup{
+		Name:        "admin",
 		Permissions: ak,
 	})
 }
@@ -87,8 +93,6 @@ func Migrate() {
 			DDLPrimaryKeyMust:              false,
 			MaxTableNameLen:                10,
 			MaxAffectRows:                  1000,
-			EnableSetCollation:             false,
-			EnableSetCharset:               false,
 			SupportCharset:                 "",
 			SupportCollation:               "",
 			CheckIdentifier:                false,
@@ -105,7 +109,7 @@ func Migrate() {
 			OscCheckInterval:               1,
 			AllowCreatePartition:           false,
 			AllowCreateView:                false,
-			AllowSpecialType: false,
+			AllowSpecialType:               false,
 		}
 
 		other := model.Other{
@@ -192,7 +196,7 @@ func MargeRuleGroup() {
 		})
 		k := []string{i.Username}
 		k1, _ := json.Marshal(k)
-		model.DB().Model(model.CoreGrained{}).Where("username =?",i.Username).Update(&model.CoreGrained{Group: k1})
+		model.DB().Model(model.CoreGrained{}).Where("username =?", i.Username).Update(&model.CoreGrained{Group: k1})
 	}
 	fmt.Println("权限迁移成功!")
 }

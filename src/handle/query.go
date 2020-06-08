@@ -20,8 +20,8 @@ import (
 	pb "Yearning-go/src/proto"
 	"encoding/json"
 	"fmt"
+	"github.com/cookieY/yee"
 	"github.com/jinzhu/gorm"
-	"github.com/labstack/echo/v4"
 	"net/http"
 	"net/url"
 	"time"
@@ -36,7 +36,7 @@ type queryOrder struct {
 	WorkId   string
 }
 
-func ReferQueryOrder(c echo.Context) (err error) {
+func ReferQueryOrder(c yee.Context) (err error) {
 	var u model.CoreAccount
 	var t model.CoreQueryOrder
 	user, _ := lib.JwtParse(c)
@@ -71,7 +71,7 @@ func ReferQueryOrder(c echo.Context) (err error) {
 		})
 
 		if state == 2 {
-			lib.MessagePush(c, work, 6, "")
+			lib.MessagePush(work, 6, "")
 		}
 
 		return c.JSON(http.StatusOK, "查询工单已提交!")
@@ -79,7 +79,7 @@ func ReferQueryOrder(c echo.Context) (err error) {
 	return c.JSON(http.StatusOK, "重复提交!")
 }
 
-func FetchQueryStatus(c echo.Context) (err error) {
+func FetchQueryStatus(c yee.Context) (err error) {
 
 	user, _ := lib.JwtParse(c)
 
@@ -94,7 +94,7 @@ func FetchQueryStatus(c echo.Context) (err error) {
 	return c.JSON(http.StatusOK, map[string]interface{}{"status": d.QueryPer, "export": model.GloOther.Export, "idc": d.IDC})
 }
 
-func FetchQueryDatabaseInfo(c echo.Context) (err error) {
+func FetchQueryDatabaseInfo(c yee.Context) (err error) {
 	user, _ := lib.JwtParse(c)
 	var d model.CoreQueryOrder
 	var u model.CoreDataSource
@@ -113,9 +113,9 @@ func FetchQueryDatabaseInfo(c echo.Context) (err error) {
 
 		var dataBase string
 
-		var dc [] string
+		var dc []string
 
-		var mid [] string
+		var mid []string
 
 		var highlist []map[string]string
 
@@ -162,7 +162,7 @@ func FetchQueryDatabaseInfo(c echo.Context) (err error) {
 			baselist = append(baselist, map[string]interface{}{"title": z, "children": []map[string]string{{}}})
 		}
 
-		var info [] map[string]interface{}
+		var info []map[string]interface{}
 
 		info = append(info, map[string]interface{}{
 			"title":    source.Source,
@@ -177,11 +177,11 @@ func FetchQueryDatabaseInfo(c echo.Context) (err error) {
 	}
 }
 
-func FetchQueryTableInfo(c echo.Context) (err error) {
+func FetchQueryTableInfo(c yee.Context) (err error) {
 	user, _ := lib.JwtParse(c)
-	t := c.Param("t")
+	t := c.Params("t")
 	// todo source改方法 不然中文无法识别
-	source := c.Param("source")
+	source := c.Params("source")
 	unescape, _ := url.QueryUnescape(source)
 	var d model.CoreQueryOrder
 	var u model.CoreDataSource
@@ -227,10 +227,10 @@ func FetchQueryTableInfo(c echo.Context) (err error) {
 	}
 }
 
-func FetchQueryTableStruct(c echo.Context) (err error) {
-	t := c.Param("table")
-	b := c.Param("base")
-	source := c.Param("source")
+func FetchQueryTableStruct(c yee.Context) (err error) {
+	t := c.Params("table")
+	b := c.Params("base")
+	source := c.Params("source")
 	unescape, _ := url.QueryUnescape(source)
 	user, _ := lib.JwtParse(c)
 	var d model.CoreQueryOrder
@@ -254,7 +254,7 @@ func FetchQueryTableStruct(c echo.Context) (err error) {
 	return c.JSON(http.StatusOK, f)
 }
 
-func FetchQueryResults(c echo.Context) (err error) {
+func FetchQueryResults(c yee.Context) (err error) {
 
 	req := new(model.Queryresults)
 
@@ -300,7 +300,7 @@ func FetchQueryResults(c echo.Context) (err error) {
 	return c.JSON(http.StatusOK, map[string]interface{}{"title": data.Field, "data": data.Data, "status": false, "time": queryTime})
 }
 
-func AgreedQueryOrder(c echo.Context) (err error) {
+func AgreedQueryOrder(c yee.Context) (err error) {
 	u := new(queryOrder)
 	var s model.CoreQueryOrder
 	if err = c.Bind(u); err != nil {
@@ -313,11 +313,11 @@ func AgreedQueryOrder(c echo.Context) (err error) {
 	}
 
 	model.DB().Model(model.CoreQueryOrder{}).Where("work_id =?", u.WorkId).Update(map[string]interface{}{"query_per": 1, "ex_date": time.Now().Format("2006-01-02 15:04")})
-	lib.MessagePush(c, u.WorkId, 7, "")
+	lib.MessagePush(u.WorkId, 7, "")
 	return c.JSON(http.StatusOK, "该次工单查询已同意！")
 }
 
-func DisAgreedQueryOrder(c echo.Context) (err error) {
+func DisAgreedQueryOrder(c yee.Context) (err error) {
 	u := new(queryOrder)
 	var s model.CoreQueryOrder
 	if err = c.Bind(u); err != nil {
@@ -330,17 +330,17 @@ func DisAgreedQueryOrder(c echo.Context) (err error) {
 	}
 
 	model.DB().Model(model.CoreQueryOrder{}).Where("work_id =?", u.WorkId).Update(map[string]interface{}{"query_per": 0})
-	lib.MessagePush(c, u.WorkId, 8, "")
+	lib.MessagePush(u.WorkId, 8, "")
 	return c.JSON(http.StatusOK, "该次工单查询已驳回！")
 }
 
-func UndoQueryOrder(c echo.Context) (err error) {
+func UndoQueryOrder(c yee.Context) (err error) {
 	user, _ := lib.JwtParse(c)
 	model.DB().Model(model.CoreQueryOrder{}).Where("username =?", user).Update(map[string]interface{}{"query_per": 3})
 	return c.JSON(http.StatusOK, "查询已终止！")
 }
 
-func SuperUndoQueryOrder(c echo.Context) (err error) {
+func SuperUndoQueryOrder(c yee.Context) (err error) {
 	s := new(queryOrder)
 	var u model.CoreQueryOrder
 	if err = c.Bind(s); err != nil {
@@ -356,7 +356,7 @@ func SuperUndoQueryOrder(c echo.Context) (err error) {
 	return c.JSON(http.StatusOK, "查询已终止！")
 }
 
-func FetchQueryOrder(c echo.Context) (err error) {
+func FetchQueryOrder(c yee.Context) (err error) {
 	u := new(f)
 	if err = c.Bind(u); err != nil {
 		c.Logger().Error(err.Error())
@@ -369,7 +369,7 @@ func FetchQueryOrder(c echo.Context) (err error) {
 	var order []model.CoreQueryOrder
 
 	user, _ := lib.JwtParse(c)
-	whereField := fmt.Sprintf("username LIKE ?  AND assigned = '%s'",user)
+	whereField := fmt.Sprintf("username LIKE ?  AND assigned = '%s'", user)
 	dateField := " AND date >= ? AND date <= ?"
 
 	if u.Find.Valve {
@@ -381,8 +381,8 @@ func FetchQueryOrder(c echo.Context) (err error) {
 			model.DB().Model(&model.CoreQueryOrder{}).Where(whereField+dateField, "%"+fmt.Sprintf("%s", u.Find.User)+"%", u.Find.Picker[0], u.Find.Picker[1]).Count(&pg)
 		}
 	} else {
-		model.DB().Where("assigned =?",user).Order("id desc").Offset(start).Limit(end).Find(&order)
-		model.DB().Model(&model.CoreQueryOrder{}).Where("assigned =?",user).Count(&pg)
+		model.DB().Where("assigned =?", user).Order("id desc").Offset(start).Limit(end).Find(&order)
+		model.DB().Model(&model.CoreQueryOrder{}).Where("assigned =?", user).Count(&pg)
 
 	}
 	return c.JSON(http.StatusOK, struct {
@@ -394,19 +394,19 @@ func FetchQueryOrder(c echo.Context) (err error) {
 	})
 }
 
-func QueryQuickCancel(c echo.Context) (err error) {
+func QueryQuickCancel(c yee.Context) (err error) {
 	model.DB().Model(model.CoreQueryOrder{}).Updates(&model.CoreQueryOrder{QueryPer: 3})
 	return c.JSON(http.StatusOK, "所有查询已取消！")
 }
 
-func QueryDeleteEmptyRecord(c echo.Context) (err error)  {
+func QueryDeleteEmptyRecord(c yee.Context) (err error) {
 	var j []model.CoreQueryOrder
-	model.DB().Select("work_id").Where(`query_per =?`,3).Find(&j)
-	for _,i := range j {
+	model.DB().Select("work_id").Where(`query_per =?`, 3).Find(&j)
+	for _, i := range j {
 		var k model.CoreQueryRecord
-		if model.DB().Where("work_id =?",i.WorkId).First(&k).RecordNotFound() {
-			model.DB().Where("work_id =?",i.WorkId).Delete(&model.CoreQueryOrder{})
+		if model.DB().Where("work_id =?", i.WorkId).First(&k).RecordNotFound() {
+			model.DB().Where("work_id =?", i.WorkId).Delete(&model.CoreQueryOrder{})
 		}
 	}
-	return c.JSON(http.StatusOK,"空查询工单已全部清除！")
+	return c.JSON(http.StatusOK, "空查询工单已全部清除！")
 }

@@ -17,7 +17,7 @@ import (
 	"Yearning-go/src/lib"
 	"Yearning-go/src/model"
 	pb "Yearning-go/src/proto"
-	"github.com/labstack/echo/v4"
+	"github.com/cookieY/yee"
 	"net/http"
 	"time"
 )
@@ -41,7 +41,7 @@ type ddlrefer struct {
 	Ty  uint
 }
 
-func SQLReferToOrder(c echo.Context) (err error) {
+func SQLReferToOrder(c yee.Context) (err error) {
 	u := new(ddlrefer)
 	user, _ := lib.JwtParse(c)
 	if err = c.Bind(u); err != nil {
@@ -70,7 +70,7 @@ func SQLReferToOrder(c echo.Context) (err error) {
 		RealName: account.RealName,
 		Time:     time.Now().Format("2006-01-02"),
 	})
-	lib.MessagePush(c, w, 2, "")
+	lib.MessagePush(w, 2, "")
 
 	// todo 以下代码为autoTask代码
 	var sor model.CoreDataSource
@@ -92,19 +92,15 @@ func SQLReferToOrder(c echo.Context) (err error) {
 	if r {
 		var order model.CoreSqlOrder
 		model.DB().Where("work_id =?", w).First(&order)
-		backup := false
-		if u.DDL.Backup == 1 {
-			backup = true
-		}
+
 		// todo 调整参数
 		s.IsDML = true
+		s.Backup = u.DDL.Backup == 1
 		s.WorkId = w
-		s.Backup = backup
 		s.Execute = true
 		s.SQL = u.SQL
 
 		// todo 开始执行
-
 		go func() {
 			t1 := lib.TimerEx(&order)
 			if t1 > 0 {

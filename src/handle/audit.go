@@ -14,11 +14,11 @@
 package handle
 
 import (
+	"Yearning-go/src/apis"
 	"Yearning-go/src/lib"
 	"Yearning-go/src/model"
-	pb "Yearning-go/src/proto"
 	"fmt"
-	"github.com/labstack/echo/v4"
+	"github.com/cookieY/yee"
 	"github.com/pingcap/parser"
 	"net/http"
 	"time"
@@ -29,6 +29,11 @@ type fetchorder struct {
 	User   string
 	Valve  bool
 	Text   string
+}
+
+type singleOrder struct {
+	model.CoreSqlOrder
+	SQLS []map[string]string `json:"sqls"`
 }
 
 type f struct {
@@ -51,7 +56,7 @@ type referorder struct {
 	Data model.CoreSqlOrder
 }
 
-func FetchAuditOrder(c echo.Context) (err error) {
+func FetchAuditOrder(c yee.Context) (err error) {
 	u := new(f)
 	if err = c.Bind(u); err != nil {
 		c.Logger().Error(err.Error())
@@ -76,31 +81,25 @@ func FetchAuditOrder(c echo.Context) (err error) {
 		if u.Find.Valve {
 			whereField = fmt.Sprintf(whereField, "executor")
 			if u.Find.Picker[0] == "" {
-				model.DB().Select(queryField).Where(whereField, user, "%"+fmt.Sprintf("%s", u.Find.User)+"%").Order("id desc").Offset(start).Limit(end).Find(&order)
-				model.DB().Model(&model.CoreSqlOrder{}).Where(whereField, user, "%"+fmt.Sprintf("%s", u.Find.User)+"%").Count(&pg)
+				model.DB().Model(&model.CoreSqlOrder{}).Select(queryField).Where(whereField, user, "%"+fmt.Sprintf("%s", u.Find.User)+"%").Count(&pg).Order("id desc").Offset(start).Limit(end).Find(&order)
 			} else {
-				model.DB().Select(queryField).Where(whereField+dateField, user, "%"+fmt.Sprintf("%s", u.Find.User)+"%", u.Find.Picker[0], u.Find.Picker[1]).Order("id desc").Offset(start).Limit(end).Find(&order)
-				model.DB().Model(&model.CoreSqlOrder{}).Where(whereField+dateField, user, "%"+fmt.Sprintf("%s", u.Find.User)+"%", u.Find.Picker[0], u.Find.Picker[1]).Count(&pg)
+				model.DB().Model(&model.CoreSqlOrder{}).Select(queryField).Where(whereField+dateField, user, "%"+fmt.Sprintf("%s", u.Find.User)+"%", u.Find.Picker[0], u.Find.Picker[1]).Count(&pg).Order("id desc").Offset(start).Limit(end).Find(&order)
 			}
 		} else {
-			model.DB().Select(queryField).Where("executor = ?", user).Order("id desc").Offset(start).Limit(end).Find(&order)
-			model.DB().Model(&model.CoreSqlOrder{}).Where("executor = ?", user).Count(&pg)
+			model.DB().Model(&model.CoreSqlOrder{}).Select(queryField).Where("executor = ?", user).Count(&pg).Order("id desc").Offset(start).Limit(end).Find(&order)
 		}
 	} else {
 		if u.Find.Valve {
 			whereField = fmt.Sprintf(whereField, "assigned")
 			if u.Find.Picker[0] == "" {
-				model.DB().Select(queryField).
-					Where(whereField, user, "%"+fmt.Sprintf("%s", u.Find.User)+"%").Order("id desc").Offset(start).Limit(end).Find(&order)
-				model.DB().Model(&model.CoreSqlOrder{}).Where(whereField, user, "%"+fmt.Sprintf("%s", u.Find.User)+"%").Count(&pg)
+				model.DB().Model(&model.CoreSqlOrder{}).Select(queryField).
+					Where(whereField, user, "%"+fmt.Sprintf("%s", u.Find.User)+"%").Count(&pg).Order("id desc").Offset(start).Limit(end).Find(&order)
 			} else {
-				model.DB().Select(queryField).
-					Where(whereField+dateField, user, "%"+fmt.Sprintf("%s", u.Find.User)+"%", u.Find.Picker[0], u.Find.Picker[1]).Order("id desc").Offset(start).Limit(end).Find(&order)
-				model.DB().Model(&model.CoreSqlOrder{}).Where(whereField+dateField, user, "%"+fmt.Sprintf("%s", u.Find.User)+"%", u.Find.Picker[0], u.Find.Picker[1]).Count(&pg)
+				model.DB().Model(&model.CoreSqlOrder{}).Select(queryField).
+					Where(whereField+dateField, user, "%"+fmt.Sprintf("%s", u.Find.User)+"%", u.Find.Picker[0], u.Find.Picker[1]).Count(&pg).Order("id desc").Offset(start).Limit(end).Find(&order)
 			}
 		} else {
-			model.DB().Select(queryField).Where("assigned = ?", user).Order("id desc").Offset(start).Limit(end).Find(&order)
-			model.DB().Model(&model.CoreSqlOrder{}).Where("assigned = ?", user).Count(&pg)
+			model.DB().Model(&model.CoreSqlOrder{}).Select(queryField).Where("assigned = ?", user).Count(&pg).Order("id desc").Offset(start).Limit(end).Find(&order)
 		}
 	}
 
@@ -108,74 +107,30 @@ func FetchAuditOrder(c echo.Context) (err error) {
 
 	model.DB().Where("rule ='perform'").Find(&ex)
 
-	call := struct {
-		Multi    bool                 `json:"multi"`
-		Data     []model.CoreSqlOrder `json:"data"`
-		Page     int                  `json:"page"`
-		Executor []model.CoreAccount  `json:"multi_list"`
-	}{
-		model.GloOther.Multi,
-		order,
-		pg,
-		ex,
-	}
-	return c.JSON(http.StatusOK, call)
+	return c.JSON(http.StatusOK, map[string]interface{}{"multi": model.GloOther.Multi, "data": order, "page": pg, "multi_list": ex})
 }
 
-func FetchOrderSQL(c echo.Context) (err error) {
+func FetchOrderSQL(c yee.Context) (err error) {
 	u := c.QueryParam("k")
 	var sql model.CoreSqlOrder
 	var s []map[string]string
-	model.DB().Select(" `sql`, `delay`, `id_c`, `source`,`data_base`,`table`, `text`, `type`").Where("work_id =?", u).First(&sql)
+	model.DB().Select(" `sql`, `delay`, `id_c`, `source`,`data_base`,`table`, `text`, `type`, `work_id`").Where("work_id =?", u).First(&sql)
 	sqlParser := parser.New()
 	stmtNodes, _, err := sqlParser.Parse(sql.SQL, "", "")
 	if err != nil {
 		c.Logger().Error(err.Error())
-		return c.JSON(http.StatusOK, struct {
-			Delay  string              `json:"delay"`
-			SQL    []map[string]string `json:"sql"`
-			IDC    string              `json:"idc"`
-			Source string              `json:"source"`
-			Base   string              `json:"base"`
-			Table  string              `json:"table"`
-			Text   string              `json:"text"`
-			Type   uint                `json:"type"`
-		}{
-			sql.Delay,
-			[]map[string]string{{"SQL": sql.SQL}},
-			sql.IDC,
-			sql.Source,
-			sql.DataBase,
-			sql.Table,
-			sql.Text,
-			sql.Type,
-		})
+		return err
 	}
 	for _, i := range stmtNodes {
 		s = append(s, map[string]string{"SQL": i.Text()})
 	}
-	return c.JSON(http.StatusOK, struct {
-		Delay  string              `json:"delay"`
-		SQL    []map[string]string `json:"sql"`
-		IDC    string              `json:"idc"`
-		Source string              `json:"source"`
-		Base   string              `json:"base"`
-		Table  string              `json:"table"`
-		Text   string              `json:"text"`
-		Type   uint                `json:"type"`
-	}{
-		sql.Delay,
-		s,
-		sql.IDC,
-		sql.Source,
-		sql.DataBase,
-		sql.Table,
-		sql.Text,
-		sql.Type,
+	return c.JSON(http.StatusOK, singleOrder{
+		CoreSqlOrder: sql,
+		SQLS:         s,
 	})
 }
 
-func RejectOrder(c echo.Context) (err error) {
+func RejectOrder(c yee.Context) (err error) {
 	u := new(reject)
 	if err = c.Bind(u); err != nil {
 		c.Logger().Error(err.Error())
@@ -183,93 +138,34 @@ func RejectOrder(c echo.Context) (err error) {
 	}
 
 	model.DB().Model(&model.CoreSqlOrder{}).Where("work_id =?", u.Work).Updates(map[string]interface{}{"rejected": u.Text, "status": 0})
-	lib.MessagePush(c, u.Work, 0, u.Text)
+	lib.MessagePush(u.Work, 0, u.Text)
 	return c.JSON(http.StatusOK, "工单已驳回！")
 }
 
-func ExecuteOrder(c echo.Context) (err error) {
+func ExecuteOrder(c yee.Context) (err error) {
 	u := new(executeStr)
 	if err = c.Bind(u); err != nil {
 		c.Logger().Error(err.Error())
 		return
 	}
+
 	var order model.CoreSqlOrder
-	var sor model.CoreDataSource
-	var backup bool
+
 	model.DB().Where("work_id =?", u.WorkId).First(&order)
-	model.DB().Where("source =?", order.Source).First(&sor)
-
-	if order.Backup == 1 {
-		backup = true
-	}
-
-	ps := lib.Decrypt(sor.Password)
-
-	s := pb.LibraAuditOrder{
-		SQL:      order.SQL,
-		Backup:   backup,
-		Execute:  true,
-		Source:   &pb.Source{Addr: sor.IP, Port: int32(sor.Port), User: sor.Username, Password: ps},
-		WorkId:   order.WorkId,
-		IsDML:    false,
-		DataBase: order.DataBase,
-		Table:    order.Table,
-	}
 
 	if order.Status != 2 && order.Status != 5 {
 		c.Logger().Error("工单已执行过！操作不符合幂等性")
 		return c.JSON(http.StatusOK, "工单已执行过！操作不符合幂等性")
 	}
 
-	if order.Type == 0 {
-		go func() {
-			t1 := lib.TimerEx(&order)
-			if t1 > 0 {
-				tick := time.NewTicker(t1)
-				for {
-					select {
-					case <-tick.C:
-						lib.ExDDLClient(&s)
-						tick.Stop()
-						goto ENDCHECK
-					}
-				ENDCHECK:
-					break
-				}
-			} else {
-				lib.ExDDLClient(&s)
-			}
-		}()
-		model.DB().Model(&model.CoreSqlOrder{}).Where("work_id =?", order.WorkId).Updates(map[string]interface{}{"status": 3})
-	}
+	executor := apis.Review{Order: order}
 
-	if order.Type == 1 {
-		s.IsDML = true
-		go func() {
-			t1 := lib.TimerEx(&order)
-			if t1 > 0 {
-				tick := time.NewTicker(t1)
-				for {
-					select {
-					case <-tick.C:
-						lib.ExDMLClient(&s)
-						tick.Stop()
-						goto ENDCHECK
-					}
-				ENDCHECK:
-					break
-				}
-			} else {
-				lib.ExDMLClient(&s)
-			}
+	executor.Init().Executor()
 
-		}()
-		model.DB().Model(&model.CoreSqlOrder{}).Where("work_id =?", order.WorkId).Updates(map[string]interface{}{"status": 3})
-	}
 	return c.JSON(http.StatusOK, "工单已执行！")
 }
 
-func RollBackSQLOrder(c echo.Context) (err error) {
+func RollBackSQLOrder(c yee.Context) (err error) {
 	u := new(referorder)
 	if err = c.Bind(u); err != nil {
 		c.Logger().Error(err.Error())
@@ -294,38 +190,33 @@ func RollBackSQLOrder(c echo.Context) (err error) {
 		RealName: u.Data.RealName,
 		Time:     time.Now().Format("2006-01-02"),
 	})
-	lib.MessagePush(c, w, 2, "")
+	lib.MessagePush(w, 2, "")
 	return c.JSON(http.StatusOK, "工单已提交,请等待审核人审核！")
 }
 
-func MulitAuditOrder(c echo.Context) (err error) {
+func MulitAuditOrder(c yee.Context) (err error) {
 	req := new(executeStr)
 	if err = c.Bind(req); err != nil {
 		c.Logger().Error(err.Error())
 		return c.JSON(http.StatusInternalServerError, "")
 	}
 	model.DB().Model(&model.CoreSqlOrder{}).Where("work_id =?", req.WorkId).Update(&model.CoreSqlOrder{Executor: req.Perform, Status: 5})
-	lib.MessagePush(c, req.WorkId, 5, "")
+	lib.MessagePush(req.WorkId, 5, "")
 	return c.JSON(200, "工单已提交执行人！")
 
 }
 
-func OscPercent(c echo.Context) (err error) {
-	r := c.Param("work_id")
-	var d model.CoreSqlOrder
-	model.DB().Where("work_id =?", r).First(&d)
-	return c.JSON(http.StatusOK, map[string]int{"p": d.Percent, "s": d.Current})
+func OscPercent(c yee.Context) (err error) {
+	var k = &apis.OSC{WorkId: c.Params("work_id")}
+	return c.JSON(http.StatusOK, k.Percent())
 }
 
-func OscKill(c echo.Context) (err error) {
-	r := c.Param("work_id")
-	lib.ExKillOsc(&pb.LibraAuditOrder{WorkId:r})
-	return c.JSON(http.StatusOK, "kill指令已发送!如工单最后显示为执行失败则生效!")
+func OscKill(c yee.Context) (err error) {
+	var k = apis.OSC{WorkId: c.Params("work_id")}
+	return c.JSON(http.StatusOK, k.Kill())
 }
 
-func DelayKill(c echo.Context) (err error) {
-	r := c.Param("work_id")
-	model.DB().Model(model.CoreSqlOrder{}).Where("work_id =?", r).Update(&model.CoreSqlOrder{IsKill: 1})
-	model.DB().Model(&model.CoreSqlOrder{}).Where("work_id =?", r).Updates(map[string]interface{}{"status": 4, "execute_time": time.Now().Format("2006-01-02 15:04")})
-	return c.JSON(http.StatusOK, "kill指令已发送!将在到达执行时间时自动取消，状态已更改为执行失败！")
+func DelayKill(c yee.Context) (err error) {
+	var k apis.Reviewer = &apis.Review{WorkId: c.Params("work_id")}
+	return c.JSON(http.StatusOK, k.DelayKill())
 }

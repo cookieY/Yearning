@@ -21,8 +21,8 @@ import (
 	"Yearning-go/src/soar"
 	"encoding/json"
 	"fmt"
+	"github.com/cookieY/yee"
 	"github.com/jinzhu/gorm"
-	"github.com/labstack/echo/v4"
 	ser "github.com/pingcap/parser"
 	"net/http"
 	"net/url"
@@ -41,15 +41,15 @@ type cdx struct {
 	I []parser.IndexInfo `json:"i"`
 }
 
-func GeneralIDC(c echo.Context) (err error) {
+func GeneralIDC(c yee.Context) (err error) {
 
 	return c.JSON(http.StatusOK, model.GloOther.IDC)
 
 }
 
-func GeneralSource(c echo.Context) (err error) {
-	t := c.Param("idc")
-	x := c.Param("xxx")
+func GeneralSource(c yee.Context) (err error) {
+	t := c.Params("idc")
+	x := c.Params("xxx")
 	if t == "undefined" || x == "undefined" {
 		return
 	}
@@ -85,17 +85,17 @@ func GeneralSource(c echo.Context) (err error) {
 			inter = lib.Intersect(p.QuerySource, sList)
 		}
 	}
-	return c.JSON(http.StatusOK, map[string]interface{}{"assigned": p.Auditor, "source": inter, "x": x,})
+	return c.JSON(http.StatusOK, map[string]interface{}{"assigned": p.Auditor, "source": inter, "x": x})
 }
 
-func GeneralBase(c echo.Context) (err error) {
+func GeneralBase(c yee.Context) (err error) {
 
-	t := c.Param("source")
+	t := c.Params("source")
 
 	var s model.CoreDataSource
 	var dataBase string
 	var l []string
-	var mid [] string
+	var mid []string
 
 	if t == "undefined" {
 		return
@@ -134,7 +134,7 @@ func GeneralBase(c echo.Context) (err error) {
 	return c.JSON(http.StatusOK, l)
 }
 
-func GeneralTable(c echo.Context) (err error) {
+func GeneralTable(c yee.Context) (err error) {
 	u := new(fetch)
 	if err = c.Bind(u); err != nil {
 		c.Logger().Error(err.Error())
@@ -144,7 +144,6 @@ func GeneralTable(c echo.Context) (err error) {
 	var table string
 	var l []string
 	var highlist []map[string]string
-
 
 	model.DB().Where("source =?", u.Source).First(&s)
 
@@ -175,7 +174,7 @@ func GeneralTable(c echo.Context) (err error) {
 	return c.JSON(http.StatusOK, map[string]interface{}{"table": l, "highlight": highlist})
 }
 
-func GeneralTableInfo(c echo.Context) (err error) {
+func GeneralTableInfo(c yee.Context) (err error) {
 	u := new(fetch)
 	if err = c.Bind(u); err != nil {
 		c.Logger().Error(err.Error())
@@ -207,7 +206,7 @@ func GeneralTableInfo(c echo.Context) (err error) {
 	return c.JSON(http.StatusOK, cdx{I: idx, F: rows})
 }
 
-func GeneralSQLTest(c echo.Context) (err error) {
+func GeneralSQLTest(c yee.Context) (err error) {
 	u := new(ddl)
 	if err = c.Bind(u); err != nil {
 		c.Logger().Error(err.Error())
@@ -231,12 +230,12 @@ func GeneralSQLTest(c echo.Context) (err error) {
 	}
 	record, err := lib.TsClient(&y)
 	if err != nil {
-		return c.JSON(http.StatusOK,"")
+		return c.JSON(http.StatusOK, "")
 	}
 	return c.JSON(http.StatusOK, record)
 }
 
-func GeneralOrderDetailList(c echo.Context) (err error) {
+func GeneralOrderDetailList(c yee.Context) (err error) {
 	workId := c.QueryParam("workid")
 	var record []model.CoreSqlRecord
 	var count int
@@ -252,7 +251,7 @@ func GeneralOrderDetailList(c echo.Context) (err error) {
 	})
 }
 
-func GeneralOrderDetailRollSQL(c echo.Context) (err error) {
+func GeneralOrderDetailRollSQL(c yee.Context) (err error) {
 	workId := c.QueryParam("workid")
 	var order model.CoreSqlOrder
 	var roll []model.CoreRollback
@@ -267,7 +266,7 @@ func GeneralOrderDetailRollSQL(c echo.Context) (err error) {
 	})
 }
 
-func GeneralFetchMyOrder(c echo.Context) (err error) {
+func GeneralFetchMyOrder(c yee.Context) (err error) {
 	u := new(f)
 	if err = c.Bind(u); err != nil {
 		c.Logger().Error(err.Error())
@@ -309,30 +308,19 @@ func GeneralFetchMyOrder(c echo.Context) (err error) {
 	})
 }
 
-func GeneralFetchUndo(c echo.Context) (err error) {
+func GeneralFetchUndo(c yee.Context) (err error) {
 	u := c.QueryParam("work_id")
 	user, _ := lib.JwtParse(c)
 	var undo model.CoreSqlOrder
 	if model.DB().Where("username =? AND work_id =? AND `status` =? ", user, u, 2).First(&undo).RecordNotFound() {
 		return c.JSON(http.StatusOK, "工单状态已更改！无法撤销")
 	}
-	go lib.MessagePush(c, undo.WorkId, 6, "")
+	go lib.MessagePush(undo.WorkId, 6, "")
 	model.DB().Where("username =? AND work_id =? AND `status` =? ", user, u, 2).Delete(&model.CoreSqlOrder{})
 	return c.JSON(http.StatusOK, "工单已撤销！")
 }
 
-func GeneralQueryBeauty(c echo.Context) (err error) {
-	req := new(model.Queryresults)
-
-	if err = c.Bind(req); err != nil {
-		c.Logger().Error(err.Error())
-		return c.JSON(http.StatusOK, err.Error())
-	}
-	beauty := soar.PrettyFormat(req.Sql)
-	return c.JSON(http.StatusOK, beauty)
-}
-
-func GeneralMergeDDL(c echo.Context) (err error) {
+func GeneralMergeDDL(c yee.Context) (err error) {
 	req := new(model.Queryresults)
 	if err = c.Bind(req); err != nil {
 		c.Logger().Error(err.Error())
@@ -345,7 +333,7 @@ func GeneralMergeDDL(c echo.Context) (err error) {
 	return c.JSON(http.StatusOK, map[string]interface{}{"sols": m, "e": false})
 }
 
-func GeneralFetchSQLInfo(c echo.Context) (err error) {
+func GeneralFetchSQLInfo(c yee.Context) (err error) {
 	workId := c.QueryParam("k")
 	var sql model.CoreSqlOrder
 	var s []map[string]string
@@ -358,7 +346,7 @@ func GeneralFetchSQLInfo(c echo.Context) (err error) {
 	return c.JSON(http.StatusOK, s)
 }
 
-func GeneralPostBoard(c echo.Context) (err error) {
+func GeneralPostBoard(c yee.Context) (err error) {
 	req := new(fetch)
 	if err = c.Bind(req); err != nil {
 		c.Logger().Error(err.Error())
@@ -368,7 +356,7 @@ func GeneralPostBoard(c echo.Context) (err error) {
 	return c.JSON(http.StatusOK, "公告已保存")
 }
 
-func GeneralFetchBoard(c echo.Context) (err error) {
+func GeneralFetchBoard(c yee.Context) (err error) {
 	var k model.CoreGlobalConfiguration
 	model.DB().Where("id =?", 1).First(&k)
 	return c.JSON(http.StatusOK, k.Board)

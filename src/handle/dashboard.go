@@ -16,7 +16,7 @@ package handle
 import (
 	"Yearning-go/src/lib"
 	"Yearning-go/src/model"
-	"github.com/labstack/echo/v4"
+	"github.com/cookieY/yee"
 	"net/http"
 )
 
@@ -32,7 +32,7 @@ type wkid struct {
 	Permission model.PermissionList
 }
 
-func DashInit(c echo.Context) (err error) {
+func DashInit(c yee.Context) (err error) {
 	var permissionList model.CoreGrained
 	var super map[string]string
 	user, _ := lib.JwtParse(c)
@@ -45,7 +45,7 @@ func DashInit(c echo.Context) (err error) {
 	return c.JSON(http.StatusOK, map[string]interface{}{"c": permissionList.Permissions, "s": super})
 }
 
-func DashCount(c echo.Context) (err error) {
+func DashCount(c yee.Context) (err error) {
 	var (
 		userCount   int
 		orderCount  int
@@ -59,10 +59,10 @@ func DashCount(c echo.Context) (err error) {
 	model.DB().Model(&model.CoreSqlOrder{}).Select("id").Count(&orderCount)
 	model.DB().Model(&model.CoreDataSource{}).Select("id").Count(&sourceCount)
 
-	return c.JSON(http.StatusOK, map[string]interface{}{"createUser": userCount, "order": orderCount, "source": sourceCount, "query":queryCount , "dataTop5": s})
+	return c.JSON(http.StatusOK, map[string]interface{}{"createUser": userCount, "order": orderCount, "source": sourceCount, "query": queryCount, "dataTop5": s})
 }
 
-func DashUserInfo(c echo.Context) (err error) {
+func DashUserInfo(c yee.Context) (err error) {
 	user, _ := lib.JwtParse(c)
 	var (
 		u         model.CoreAccount
@@ -74,15 +74,15 @@ func DashUserInfo(c echo.Context) (err error) {
 	model.DB().Select("`group`").Where("username =?", user).First(&p)
 	model.DB().Select("`name`").Find(&groupList)
 	model.DB().Select("stmt").First(&s)
-	return c.JSON(http.StatusOK, map[string]interface{}{"u": u, "p": p.Group, "s": s,"g":groupList})
+	return c.JSON(http.StatusOK, map[string]interface{}{"u": u, "p": p.Group, "s": s, "g": groupList})
 }
 
-func DashStmt(c echo.Context) (err error) {
+func DashStmt(c yee.Context) (err error) {
 	model.DB().Model(&model.CoreGlobalConfiguration{}).Where("authorization =?", "global").Update("stmt", 1)
 	return c.JSON(http.StatusOK, "")
 }
 
-func DashPie(c echo.Context) (err error) {
+func DashPie(c yee.Context) (err error) {
 	var (
 		queryCount int
 		ddlCount   int
@@ -94,7 +94,7 @@ func DashPie(c echo.Context) (err error) {
 	return c.JSON(http.StatusOK, map[string]int{"ddl": ddlCount, "dml": dmlCount, "query": queryCount})
 }
 
-func DashAxis(c echo.Context) (err error) {
+func DashAxis(c yee.Context) (err error) {
 	var ddl []groupBy
 	var order []int
 	var count []string

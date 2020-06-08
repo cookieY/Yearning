@@ -16,7 +16,7 @@ package handle
 import (
 	"Yearning-go/src/lib"
 	"Yearning-go/src/model"
-	"github.com/labstack/echo/v4"
+	"github.com/cookieY/yee"
 	"net/http"
 )
 
@@ -35,7 +35,7 @@ type fetchAutoTask struct {
 	Tp autoTask
 }
 
-func SuperReferAutoTask(c echo.Context) (err error) {
+func SuperReferAutoTask(c yee.Context) (err error) {
 	u := new(fetchAutoTask)
 	var tmp model.CoreAutoTask
 	if err = c.Bind(u); err != nil {
@@ -58,12 +58,12 @@ func SuperReferAutoTask(c echo.Context) (err error) {
 	}
 }
 
-func SuperFetchAutoTaskSource(c echo.Context) (err error) {
+func SuperFetchAutoTaskSource(c yee.Context) (err error) {
 	var source []model.CoreDataSource
 	model.DB().Select("source").Where("is_query =? or is_query = ?", 0, 2).Find(&source)
 	return c.JSON(http.StatusOK, source)
 }
-func SuperFetchAutoTaskList(c echo.Context) (err error) {
+func SuperFetchAutoTaskList(c yee.Context) (err error) {
 	u := new(f)
 	if err = c.Bind(u); err != nil {
 		c.Logger().Error(err.Error())
@@ -82,7 +82,7 @@ func SuperFetchAutoTaskList(c echo.Context) (err error) {
 	return c.JSON(http.StatusOK, map[string]interface{}{"data": task, "pg": pg})
 }
 
-func SuperEditAutoTask(c echo.Context) (err error) {
+func SuperEditAutoTask(c yee.Context) (err error) {
 	u := new(fetchAutoTask)
 	if err = c.Bind(u); err != nil {
 		c.Logger().Error(err.Error())
@@ -99,18 +99,18 @@ func SuperEditAutoTask(c echo.Context) (err error) {
 	return c.JSON(http.StatusOK, "AutoTask信息已变更！")
 }
 
-func SuperDeleteAutoTask(c echo.Context) (err error) {
-	id := c.Param("id")
+func SuperDeleteAutoTask(c yee.Context) (err error) {
+	id := c.Params("id")
 	model.DB().Where("id =?", id).Delete(&model.CoreAutoTask{})
 	return c.JSON(http.StatusOK, "AutoTask工单已删除！")
 }
 
-func SuperAutoTaskActivation(c echo.Context) (err error) {
+func SuperAutoTaskActivation(c yee.Context) (err error) {
 	u := new(fetchAutoTask)
 	if err = c.Bind(u); err != nil {
 		c.Logger().Error(err.Error())
 		return c.JSON(http.StatusInternalServerError, err.Error())
 	}
-	model.DB().Model(model.CoreAutoTask{}).Where("id =?", u.Tp.Id).Update("status",u.Tp.Status)
-	return c.JSON(http.StatusOK,"AutoTask工单状态已变更！")
+	model.DB().Model(model.CoreAutoTask{}).Where("id =?", u.Tp.Id).Update("status", u.Tp.Status)
+	return c.JSON(http.StatusOK, "AutoTask工单状态已变更！")
 }

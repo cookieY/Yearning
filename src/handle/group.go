@@ -18,19 +18,19 @@ import (
 	"Yearning-go/src/model"
 	"encoding/json"
 	"fmt"
-	"github.com/labstack/echo/v4"
+	"github.com/cookieY/yee"
 	"net/http"
 	"net/url"
 	"strings"
 )
 
 type s struct {
-	Data   []model.CoreGrained    `json:"data"`
-	GroupList  []model.CoreRoleGroup `json:"group_list"`
-	Page   int                    `json:"page"`
-	Source []model.CoreDataSource `json:"source"`
-	Audit  []model.CoreAccount    `json:"audit"`
-	Query  []model.CoreDataSource `json:"query"`
+	Data      []model.CoreGrained    `json:"data"`
+	GroupList []model.CoreRoleGroup  `json:"group_list"`
+	Page      int                    `json:"page"`
+	Source    []model.CoreDataSource `json:"source"`
+	Audit     []model.CoreAccount    `json:"audit"`
+	Query     []model.CoreDataSource `json:"query"`
 }
 
 type k struct {
@@ -46,8 +46,7 @@ type marge struct {
 	IsShow bool
 }
 
-
-func SuperGroup(c echo.Context) (err error) {
+func SuperGroup(c yee.Context) (err error) {
 	user, _ := lib.JwtParse(c)
 	if user == "admin" {
 		var f fetchdb
@@ -77,7 +76,7 @@ func SuperGroup(c echo.Context) (err error) {
 				model.DB().Offset(start).Limit(end).Find(&r)
 				model.DB().Model(model.CoreRoleGroup{}).Count(&pg)
 			}
-			return c.JSON(http.StatusOK, s{GroupList: r, Page: pg, Source: source, Audit: u, Query: query,})
+			return c.JSON(http.StatusOK, s{GroupList: r, Page: pg, Source: source, Audit: u, Query: query})
 		} else {
 			if f.Valve {
 				model.DB().Select("id,username,rule,`group`").Where("username LIKE ?", "%"+fmt.Sprintf("%s", f.Username)+"%").Offset(start).Limit(end).Find(&g)
@@ -93,7 +92,7 @@ func SuperGroup(c echo.Context) (err error) {
 	return c.JSON(http.StatusForbidden, "非法越权操作！")
 }
 
-func SuperGroupUpdate(c echo.Context) (err error) {
+func SuperGroupUpdate(c yee.Context) (err error) {
 	user, _ := lib.JwtParse(c)
 	if user == "admin" {
 		u := new(k)
@@ -130,14 +129,14 @@ func SuperGroupUpdate(c echo.Context) (err error) {
 			t, _ := json.Marshal(u.Permission)
 			g, _ := json.Marshal(u.Group)
 			model.DB().Model(model.CoreGrained{}).Where("username = ?", u.Username).Updates(model.CoreGrained{Permissions: t, Group: g})
-			return c.JSON(http.StatusOK, fmt.Sprintf("用户:%s 权限已更新！", u.Username))
+			return c.JSON(http.StatusOK, fmt.Sprintf("%s的权限已更新！", u.Username))
 		}
 	}
 	return c.JSON(http.StatusForbidden, "非法越权操作！")
 }
 
-func SuperClearUserRule(c echo.Context) (err error) {
-	gx := c.Param("clear")
+func SuperClearUserRule(c yee.Context) (err error) {
+	gx := c.Params("clear")
 	g, _ := url.QueryUnescape(gx)
 	var j []model.CoreGrained
 	var k model.CoreRoleGroup
@@ -159,7 +158,7 @@ func SuperClearUserRule(c echo.Context) (err error) {
 	return c.JSON(http.StatusOK, fmt.Sprintf("权限组: %s 已删除", g))
 }
 
-func SuperUserRuleMarge(c echo.Context) (err error) {
+func SuperUserRuleMarge(c yee.Context) (err error) {
 	u := new(marge)
 	if err = c.Bind(u); err != nil {
 		c.Logger().Error(err.Error())

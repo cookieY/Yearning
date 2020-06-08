@@ -20,8 +20,8 @@ import (
 	"Yearning-go/src/router"
 	"encoding/json"
 	"fmt"
-	"github.com/labstack/echo/v4"
-	"github.com/labstack/echo/v4/middleware"
+	"github.com/cookieY/yee"
+	"github.com/cookieY/yee/middleware"
 )
 
 func StartYearning(port string, host string) {
@@ -31,17 +31,14 @@ func StartYearning(port string, host string) {
 	_ = json.Unmarshal(model.GloPer.Ldap, &model.GloLdap)
 	_ = json.Unmarshal(model.GloPer.Other, &model.GloOther)
 	_ = json.Unmarshal(model.GloPer.AuditRole, &parser.FetchAuditRole)
-	e := echo.New()
-	e.Static("/", "dist")
-	//e.Use(middleware.CORSWithConfig(middleware.CORSConfig{
-	//	AllowOrigins: []string{"*"},
-	//}))
+	e := yee.New()
+	//e.Static("/", "dist")
+	e.Use(middleware.Cors())
 	e.Use(middleware.Secure())
-	e.Use(middleware.Recover())
+	e.Use(middleware.Recovery())
 	e.Use(middleware.GzipWithConfig(middleware.GzipConfig{
 		Level: 5,
 	}))
 	router.AddRouter(e)
-	e.Logger.SetLevel(1)
-	e.Logger.Fatal(e.Start(fmt.Sprintf(":%s", port)))
+	e.Start(fmt.Sprintf(":%s", port))
 }

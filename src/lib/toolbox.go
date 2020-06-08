@@ -19,9 +19,9 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"github.com/cookieY/yee"
+	"github.com/cookieY/sqlx"
 	_ "github.com/go-sql-driver/mysql"
-	"github.com/jmoiron/sqlx"
-	"github.com/labstack/echo/v4"
 	"gopkg.in/ldap.v3"
 	"log"
 	"math"
@@ -30,7 +30,7 @@ import (
 	"time"
 )
 
-func SuperAuth(c echo.Context, r string) bool {
+func SuperAuth(c yee.Context, r string) bool {
 	var p model.CoreGrained
 	var px model.PermissionList
 	user, role := JwtParse(c)
@@ -76,14 +76,14 @@ func Paging(page interface{}, total int) (start int, end int) {
 	return
 }
 
-func LdapConnenct(c echo.Context, l *model.Ldap, user string, pass string, isTest bool) bool {
+func LdapConnenct(c yee.Context, l *model.Ldap, user string, pass string, isTest bool) bool {
 
 	var s string
 
 	ld, err := ldap.Dial("tcp", l.Url)
 
 	if l.Ldaps {
-		if err := ld.StartTLS(&tls.Config{InsecureSkipVerify: true});err != nil {
+		if err := ld.StartTLS(&tls.Config{InsecureSkipVerify: true}); err != nil {
 			log.Println(err.Error())
 		}
 	}
