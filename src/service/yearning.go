@@ -32,7 +32,7 @@ func StartYearning(port string, host string) {
 	_ = json.Unmarshal(model.GloPer.Other, &model.GloOther)
 	_ = json.Unmarshal(model.GloPer.AuditRole, &parser.FetchAuditRole)
 	e := yee.New()
-	//e.Static("/", "dist")
+	e.Static("/front", "dist")
 	e.Use(middleware.Cors())
 	e.Use(middleware.Secure())
 	e.Use(middleware.Recovery())

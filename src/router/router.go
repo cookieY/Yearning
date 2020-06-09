@@ -77,6 +77,9 @@ func AuditGroup() yee.HandlerFunc {
 }
 
 func AddRouter(e *yee.Core) {
+	e.GET("/", func(c yee.Context) error {
+		return c.HTMLTml(http.StatusOK,"./dist/index.html")
+	})
 	e.POST("/login", handle.UserGeneralLogin)
 	e.POST("/register", handle.UserRegister)
 	e.GET("/fetch", handle.UserReqSwitch)
