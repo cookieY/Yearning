@@ -7,6 +7,9 @@ __pycache__/
 *.so
 conf.toml
 
+# ignore vendor
+vendor
+
 webpage/dist
 # Distribution / packaging
 .Python
