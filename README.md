@@ -9,6 +9,10 @@
 
 ##### MYSQL web端 SQL审核平台。
 
+## US_EN
+
+[US_EN guide](README_EN.md)
+
 ## Yearning2.0 前端项目 
 
 [Gemini](https://github.com/cookieY/Yearning-gemini)
