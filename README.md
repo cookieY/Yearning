@@ -9,6 +9,10 @@
 
 ##### MYSQL web端 SQL审核平台。
 
+<a href="https://tracking.gitads.io/?campaign=gitads&repo=Yearning&redirect=gitads.io" target="_blank">
+   <img width="222px" src="img/ad.png">
+</a>
+
 ## US_EN
 
 [US_EN guide](README_EN.md)
