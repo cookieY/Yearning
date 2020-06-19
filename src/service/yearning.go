@@ -34,11 +34,12 @@ func StartYearning(port string, host string) {
 	e := yee.New()
 	e.Static("/front", "dist")
 	e.Use(middleware.Cors())
+	e.Use(middleware.Logger())
 	e.Use(middleware.Secure())
 	e.Use(middleware.Recovery())
 	e.Use(middleware.GzipWithConfig(middleware.GzipConfig{
 		Level: 5,
 	}))
 	router.AddRouter(e)
-	e.Start(fmt.Sprintf(":%s", port))
+	e.Run(fmt.Sprintf(":%s", port))
 }

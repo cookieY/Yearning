@@ -29,8 +29,8 @@ type OSCer interface {
 }
 
 func (r *Review) DelayKill() string {
-	model.DB().Model(model.CoreSqlOrder{}).Where("work_id =?", r).Update(&model.CoreSqlOrder{IsKill: 1})
-	model.DB().Model(&model.CoreSqlOrder{}).Where("work_id =?", r).Updates(map[string]interface{}{"status": 4, "execute_time": time.Now().Format("2006-01-02 15:04")})
+	model.DB().Model(model.CoreSqlOrder{}).Where("work_id =?", r.WorkId).Update(&model.CoreSqlOrder{IsKill: 1})
+	model.DB().Model(&model.CoreSqlOrder{}).Where("work_id =?", r.WorkId).Updates(map[string]interface{}{"status": 4, "execute_time": time.Now().Format("2006-01-02 15:04")})
 	return "kill指令已发送!将在到达执行时间时自动取消，状态已更改为执行失败！"
 }
 

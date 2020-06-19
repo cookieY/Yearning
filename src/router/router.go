@@ -23,62 +23,51 @@ import (
 )
 
 func SuperManageDB() yee.HandlerFunc {
-	return yee.HandlerFunc{
-		Func: func(c yee.Context) (err error) {
-			if lib.SuperAuth(c, "db") {
-				c.Next()
-				return nil
-			}
-			return c.JSON(http.StatusForbidden, "非法越权操作！")
-		},
-		IsMiddleware: true,
+	return func(c yee.Context) (err error) {
+		if lib.SuperAuth(c, "db") {
+			c.Next()
+			return nil
+		}
+		return c.JSON(http.StatusForbidden, "非法越权操作！")
 	}
 }
 
 func SuperManageUser() yee.HandlerFunc {
-	return yee.HandlerFunc{
-		Func: func(c yee.Context) (err error) {
-			if lib.SuperAuth(c, "user") {
-				c.Next()
-				return
-			}
-			return c.JSON(http.StatusForbidden, "非法越权操作！")
-		},
-		IsMiddleware: true,
+	return func(c yee.Context) (err error) {
+		if lib.SuperAuth(c, "user") {
+			c.Next()
+			return
+		}
+		return c.JSON(http.StatusForbidden, "非法越权操作！")
+
 	}
 }
 
 func SuperManageGroup() yee.HandlerFunc {
-	return yee.HandlerFunc{
-		Func: func(c yee.Context) (err error) {
-			user, _ := lib.JwtParse(c)
-			if user == "admin" {
-				c.Next()
-				return
-			}
-			return c.JSON(http.StatusForbidden, "非法越权操作！")
-		},
-		IsMiddleware: true,
+	return func(c yee.Context) (err error) {
+		user, _ := lib.JwtParse(c)
+		if user == "admin" {
+			c.Next()
+			return
+		}
+		return c.JSON(http.StatusForbidden, "非法越权操作！")
 	}
 }
 
 func AuditGroup() yee.HandlerFunc {
-	return yee.HandlerFunc{
-		Func: func(c yee.Context) (err error) {
-			_, rule := lib.JwtParse(c)
-			if rule == "admin" || rule == "perform" {
-				c.Next()
-				return
-			}
-			return c.JSON(http.StatusForbidden, "非法越权操作！")
-		},
-		IsMiddleware: true,
+	return func(c yee.Context) (err error) {
+		_, rule := lib.JwtParse(c)
+		if rule == "admin" || rule == "perform" {
+			c.Next()
+			return
+		}
+		return c.JSON(http.StatusForbidden, "非法越权操作！")
 	}
 }
 
 func AddRouter(e *yee.Core) {
 	e.GET("/", func(c yee.Context) error {
-		return c.HTMLTml(http.StatusOK,"./dist/index.html")
+		return c.HTMLTml(http.StatusOK, "./dist/index.html")
 	})
 	e.POST("/login", handle.UserGeneralLogin)
 	e.POST("/register", handle.UserRegister)
