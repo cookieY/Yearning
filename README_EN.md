@@ -9,6 +9,11 @@
 
 ##### An awesome SQL Audit platform for Mysql 
 
+<a href="https://tracking.gitads.io/?campaign=popsql&repo=Yearning&redirect=popsql.com%2F%3Futm_source%3Dgitads" target="_blank">
+   <img width="475px" src="img/ad.png">
+</a>
+<br><i>This advert was placed by <a href="https://tracking.gitads.io/?campaign=gitads&repo=Yearning&redirect=gitads.io" rel="gitads">GitAds</a> </i>
+
 ## Yearning Front-end project
 
 [Gemini](https://github.com/cookieY/Yearning-gemini)

@@ -9,9 +9,10 @@
 
 ##### MYSQL web端 SQL审核平台。
 
-<a href="https://tracking.gitads.io/?campaign=gitads&repo=Yearning&redirect=gitads.io" target="_blank">
-   <img width="222px" src="img/ad.png">
+<a href="https://tracking.gitads.io/?campaign=popsql&repo=Yearning&redirect=popsql.com%2F%3Futm_source%3Dgitads" target="_blank">
+   <img width="475px" src="img/ad.png">
 </a>
+<br><i>This advert was placed by <a href="https://tracking.gitads.io/?campaign=gitads&repo=Yearning&redirect=gitads.io" rel="gitads">GitAds</a> </i>
 
 ## US_EN
 
