@@ -6,6 +6,7 @@
 ![LICENSE](https://img.shields.io/badge/license-AGPL%20-blue.svg)
 ![](https://img.shields.io/badge/build-release-brightgreen.svg)  
 ![](https://img.shields.io/badge/version-v2.2.0-brightgreen.svg)  
+[![Gitter](https://badges.gitter.im/talk-to-yearning/community.svg)](https://gitter.im/talk-to-yearning/community?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge)
 
 ##### MYSQL web端 SQL审核平台。
 
@@ -28,6 +29,7 @@
 
 
 ## Community 社区
+   [Gitter](https://gitter.im/talk-to-yearning/community?utm_source=share-link&utm_medium=link&utm_campaign=share-link)
    Yearning2.0(Go) 使用交流     Q群: 747364310
 ## Feature 功能
 
