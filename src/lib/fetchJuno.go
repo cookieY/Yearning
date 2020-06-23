@@ -69,7 +69,7 @@ func ExAutoTask(order *pb.LibraAuditOrder) bool {
 	return r.Ok
 }
 
-func ExQuery(order *pb.LibraAuditOrder) *pb.InsulateWordList {
+func ExQuery(order *pb.LibraAuditOrder) (*pb.InsulateWordList, error) {
 
 	c := pb.NewJunoClient(model.Conn)
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
@@ -79,8 +79,9 @@ func ExQuery(order *pb.LibraAuditOrder) *pb.InsulateWordList {
 	r, err := c.Query(ctx, order)
 	if err != nil {
 		log.Printf("could not connect: %v", err)
+		return nil, err
 	}
-	return r
+	return r, nil
 }
 
 func ExKillOsc(order *pb.LibraAuditOrder) *pb.Isok {
