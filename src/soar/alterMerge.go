@@ -85,7 +85,7 @@ func MergeAlterTables(sql string) (string, error) {
 				log.Printf("rename not match: %v", n.Text())
 			}
 		default:
-			nonSqls += n.Text() + ";\n"
+			nonSqls += n.Text() + "\n"
 		}
 		if alterSQL != "" && tableName != "" && tableName != "dual" {
 			if dbName == "" {

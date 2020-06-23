@@ -5,13 +5,63 @@ import (
 	pb "Yearning-go/src/proto"
 	"context"
 	"fmt"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/connectivity"
 	"log"
+	"sync"
+	"sync/atomic"
 	"time"
+	"unsafe"
 )
+
+var (
+	globalGRPCconns unsafe.Pointer
+	lock            sync.Mutex
+)
+
+func FetchGRPCConn() (*grpc.ClientConn, error) {
+
+	if atomic.LoadPointer(&globalGRPCconns) != nil {
+		if (*grpc.ClientConn)(globalGRPCconns).GetState() == connectivity.Connecting{
+			return (*grpc.ClientConn)(globalGRPCconns), nil
+		}
+	}
+
+	lock.Lock()
+
+	defer lock.Unlock()
+
+	cli, err := newGrpcConn()
+
+	if err != nil {
+		return nil, err
+	}
+
+	atomic.StorePointer(&globalGRPCconns, unsafe.Pointer(cli))
+
+	return cli, nil
+}
+
+func newGrpcConn() (*grpc.ClientConn, error) {
+	conn, err := grpc.Dial(
+		model.Grpc,
+		grpc.WithInsecure(),
+	)
+	if err != nil {
+		return nil, err
+	}
+	return conn, nil
+}
 
 func TsClient(order *pb.LibraAuditOrder) ([]*pb.Record, error) {
 
-	c := pb.NewJunoClient(model.Conn)
+	conn, err := FetchGRPCConn()
+
+	if err != nil {
+		return nil, err
+	}
+
+	c := pb.NewJunoClient(conn)
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	r, err := c.OrderDeal(ctx, order)
 	if err != nil {
@@ -27,7 +77,15 @@ func TsClient(order *pb.LibraAuditOrder) ([]*pb.Record, error) {
 
 func ExDDLClient(order *pb.LibraAuditOrder) {
 	// Set up a connection to the server.
-	c := pb.NewJunoClient(model.Conn)
+
+	conn, err := FetchGRPCConn()
+
+	if err != nil {
+		log.Println(err.Error())
+		return
+	}
+
+	c := pb.NewJunoClient(conn)
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer func() {
 		cancel()
@@ -41,8 +99,15 @@ func ExDDLClient(order *pb.LibraAuditOrder) {
 
 func ExDMLClient(order *pb.LibraAuditOrder) {
 
+	conn, err := FetchGRPCConn()
+
+	if err != nil {
+		log.Println(err.Error())
+		return
+	}
+
 	// Set up a connection to the server.
-	c := pb.NewJunoClient(model.Conn)
+	c := pb.NewJunoClient(conn)
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer func() {
@@ -57,8 +122,17 @@ func ExDMLClient(order *pb.LibraAuditOrder) {
 
 func ExAutoTask(order *pb.LibraAuditOrder) bool {
 
-	c := pb.NewJunoClient(model.Conn)
+	conn, err := FetchGRPCConn()
+
+	if err != nil {
+		log.Println(err.Error())
+		return false
+	}
+
+	c := pb.NewJunoClient(conn)
+
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+
 	defer func() {
 		cancel()
 	}()
