@@ -19,9 +19,11 @@
 
 [US_EN guide](README_EN.md)
 
-## Yearning2.0 前端项目 
+## Depend on 依赖项
 
-[Gemini](https://github.com/cookieY/Yearning-gemini)
+[Gemini](https://github.com/cookieY/Yearning-gemini) front-end 
+
+[Yee](https://github.com/cookieY/yee) web framwork
 
 ## Website 官网
 
