@@ -279,8 +279,10 @@ func FetchQueryResults(c yee.Context) (err error) {
 
 	//需自行实现查询SQL LIMIT限制
 
-	r := lib.ExQuery(&pb.LibraAuditOrder{SQL: req.Sql})
-
+	r, err := lib.ExQuery(&pb.LibraAuditOrder{SQL: req.Sql})
+	if err != nil {
+		return c.JSON(http.StatusOK, err.Error())
+	}
 	req.Sql = r.SQL
 
 	//结束
