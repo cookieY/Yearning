@@ -29,6 +29,10 @@
 
 [www.yearning.io](http://yearning.io)
 
+## Recommend 推荐
+
+[Spug - 开源轻量自动化运维平台](https://github.com/openspug/spug)
+
 
 ## Community 社区
    [Gitter](https://gitter.im/talk-to-yearning/community?utm_source=share-link&utm_medium=link&utm_campaign=share-link)
