@@ -170,3 +170,17 @@ func ExKillOsc(order *pb.LibraAuditOrder) *pb.Isok {
 	}
 	return r
 }
+
+func OverrideConfig(order *pb.LibraAuditOrder) *pb.Isok {
+
+	c := pb.NewJunoClient(model.Conn)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer func() {
+		cancel()
+	}()
+	r, err := c.OverrideConfig(ctx, order)
+	if err != nil {
+		log.Printf("could not connect: %v", err)
+	}
+	return r
+}

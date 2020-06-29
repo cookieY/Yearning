@@ -26,7 +26,7 @@ func JwtAuth(username string, role string) (t string, err error) {
 	claims := token.Claims.(jwt.MapClaims)
 	claims["name"] = username
 	claims["role"] = role
-	claims["exp"] = time.Now().Add(time.Hour * 4).Unix()
+	claims["exp"] = time.Now().Add(time.Hour * 8).Unix()
 	t, err = token.SignedString([]byte(model.JWT))
 	if err != nil {
 		return "", errors.New("JWT Generate Failure")

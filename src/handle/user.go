@@ -18,47 +18,25 @@ import (
 	"Yearning-go/src/model"
 	"encoding/json"
 	"fmt"
-	"github.com/cookieY/yee"
 	"net/http"
+
+	"github.com/cookieY/yee"
 )
 
 type userInfo struct {
-	Username string `json:"username"`
-	Password string `json:"password"`
+	Username   string `json:"username"`
+	Password   string `json:"password"`
+	New        string `json:"new"`
+	Mail       string `json:"mail"`
+	Real       string `json:"real"`
+	Rule       string `json:"rule"`
+	Department string `json:"department"`
+	Valve      bool   `json:"valve"`
+	Tp         string `json:"tp"`
 }
 
 type register struct {
 	UserInfo map[string]string
-}
-
-type changePassword struct {
-	Username string `json:"username"`
-	New      string `json:"new"`
-}
-
-type changeMail struct {
-	Username string
-	Real     string
-	Mail     string
-}
-
-type modifyUser struct {
-	Username   string
-	Department string
-	RealName   string
-	Rule       string
-	Email      string
-}
-
-type fetchuser struct {
-	User       string
-	Department string
-	Valve      bool
-}
-type ur struct {
-	Page  int                 `json:"page"`
-	Data  []model.CoreAccount `json:"data"`
-	Multi bool                `json:"multi"`
 }
 
 func UserLdapLogin(c yee.Context) (err error) {
@@ -80,7 +58,7 @@ func UserLdapLogin(c yee.Context) (err error) {
 				Email:      "",
 			})
 			ix, _ := json.Marshal([]string{})
-			model.DB().Create(&model.CoreGrained{Username: u.Username, Permissions: g, Rule: "guest",Group:ix})
+			model.DB().Create(&model.CoreGrained{Username: u.Username, Permissions: g, Rule: "guest", Group: ix})
 		}
 		token, tokenErr := lib.JwtAuth(u.Username, account.Rule)
 		if tokenErr != nil {
@@ -126,9 +104,9 @@ func UserGeneralLogin(c yee.Context) (err error) {
 
 func UserReqSwitch(c yee.Context) (err error) {
 	if model.GloOther.Register {
-		return c.JSON(http.StatusOK, 1)
+		return c.JSON(http.StatusOK, map[string]interface{}{"reg": 1, "valid": true})
 	}
-	return c.JSON(http.StatusOK, 0)
+	return c.JSON(http.StatusOK, map[string]interface{}{"reg": 0, "valid": true})
 }
 
 func UserRegister(c yee.Context) (err error) {
@@ -154,11 +132,32 @@ func UserRegister(c yee.Context) (err error) {
 			Department: u.UserInfo["department"],
 			Email:      u.UserInfo["email"],
 		})
-        model.DB().Create(&model.CoreGrained{Username: u.UserInfo["username"], Permissions: g, Rule: "guest", Group: ix})
+		model.DB().Create(&model.CoreGrained{Username: u.UserInfo["username"], Permissions: g, Rule: "guest", Group: ix})
 		return c.JSON(http.StatusOK, "注册成功！")
 	}
 	return c.JSON(http.StatusForbidden, "没有开启注册通道！")
 
+}
+
+func GeneralUserEdit(c yee.Context) (err error) {
+	param := c.Params("tp")
+
+	u := new(userInfo)
+	if err = c.Bind(u); err != nil {
+		c.Logger().Error(err.Error())
+		return c.JSON(http.StatusInternalServerError, "")
+	}
+	user, _ := lib.JwtParse(c)
+	switch param {
+	case "password":
+		model.DB().Model(&model.CoreAccount{}).Where("username = ?", user).Update("password", lib.DjangoEncrypt(u.New, string(lib.GetRandom())))
+		return c.JSON(http.StatusOK, "密码修改成功！")
+	case "mail":
+		model.DB().Model(&model.CoreAccount{}).Where("username = ?", user).Updates(model.CoreAccount{Email: u.Mail, RealName: u.Real})
+		return c.JSON(http.StatusOK, "邮箱/真实姓名修改成功！刷新后显示最新信息!")
+	default:
+		return c.JSON(http.StatusOK, "Forbidden")
+	}
 }
 
 func SuperUserRegister(c yee.Context) (err error) {
@@ -183,60 +182,36 @@ func SuperUserRegister(c yee.Context) (err error) {
 		Email:      u.UserInfo["email"],
 	})
 	ix, _ := json.Marshal([]string{})
-	model.DB().Create(&model.CoreGrained{Username: u.UserInfo["username"], Permissions: g, Rule: u.UserInfo["group"],Group:ix})
+	model.DB().Create(&model.CoreGrained{Username: u.UserInfo["username"], Permissions: g, Rule: u.UserInfo["group"], Group: ix})
 	return c.JSON(http.StatusOK, "注册成功！")
 }
 
-func ChangePassword(c yee.Context) (err error) {
-	u := new(changePassword)
+func SuperUserEdit(c yee.Context) (err error) {
+	u := new(userInfo)
 	if err = c.Bind(u); err != nil {
 		c.Logger().Error(err.Error())
 		return c.JSON(http.StatusInternalServerError, "")
 	}
-	user, _ := lib.JwtParse(c)
-	model.DB().Model(&model.CoreAccount{}).Where("username = ?", user).Update("password", lib.DjangoEncrypt(u.New, string(lib.GetRandom())))
-	return c.JSON(http.StatusOK, "密码修改成功！")
-}
-
-func ChangeMail(c yee.Context) (err error) {
-	u := new(changeMail)
-	if err = c.Bind(u); err != nil {
-		c.Logger().Error(err.Error())
-		return c.JSON(http.StatusInternalServerError, "")
+	switch u.Tp {
+	case "info":
+		tx := model.DB().Begin()
+		tx.Model(model.CoreAccount{}).Where("username = ?", u.Username).Updates(model.CoreAccount{Email: u.Mail, RealName: u.Real, Rule: u.Rule, Department: u.Department})
+		tx.Model(model.CoreGrained{}).Where("username =?", u.Username).Update(model.CoreGrained{Rule: u.Rule})
+		tx.Model(model.CoreSqlOrder{}).Where("username =?", u.Username).Update(model.CoreSqlOrder{RealName: u.Real})
+		tx.Model(model.CoreQueryOrder{}).Where("username =?", u.Username).Update(model.CoreQueryOrder{Realname: u.Real})
+		tx.Commit()
+		return c.JSON(http.StatusOK, "邮箱/真实姓名修改成功！刷新后显示最新信息!")
+	case "password":
+		model.DB().Model(&model.CoreAccount{}).Where("username = ?", u.Username).Update("password", lib.DjangoEncrypt(u.New, string(lib.GetRandom())))
+		return c.JSON(http.StatusOK, "密码修改成功！")
+	default:
+		return c.JSON(http.StatusOK, "Forbidden")
 	}
-	user, _ := lib.JwtParse(c)
-	model.DB().Model(&model.CoreAccount{}).Where("username = ?", user).Updates(model.CoreAccount{Email: u.Mail, RealName: u.Real})
-	return c.JSON(http.StatusOK, "邮箱/真实姓名修改成功！刷新后显示最新信息!")
-}
 
-func SuperModifyUser(c yee.Context) (err error) {
-	u := new(modifyUser)
-	if err = c.Bind(u); err != nil {
-		c.Logger().Error(err.Error())
-		return c.JSON(http.StatusInternalServerError, "")
-	}
-	tx := model.DB().Begin()
-	tx.Model(model.CoreAccount{}).Where("username = ?", u.Username).Updates(model.CoreAccount{Email: u.Email, RealName: u.RealName, Rule: u.Rule, Department: u.Department})
-	tx.Model(model.CoreGrained{}).Where("username =?", u.Username).Update(model.CoreGrained{Rule: u.Rule})
-	tx.Model(model.CoreSqlOrder{}).Where("username =?", u.Username).Update(model.CoreSqlOrder{RealName: u.RealName})
-	tx.Model(model.CoreQueryOrder{}).Where("username =?", u.Username).Update(model.CoreQueryOrder{Realname: u.RealName})
-	tx.Commit()
-	return c.JSON(http.StatusOK, "邮箱/真实姓名修改成功！刷新后显示最新信息!")
-}
-
-func SuperChangePassword(c yee.Context) (err error) {
-
-	u := new(changePassword)
-	if err = c.Bind(u); err != nil {
-		c.Logger().Error(err.Error())
-		return c.JSON(http.StatusInternalServerError, "")
-	}
-	model.DB().Model(&model.CoreAccount{}).Where("username = ?", u.Username).Update("password", lib.DjangoEncrypt(u.New, string(lib.GetRandom())))
-	return c.JSON(http.StatusOK, "密码修改成功！")
 }
 
 func SuperFetchUser(c yee.Context) (err error) {
-	var f fetchuser
+	var f userInfo
 	var u []model.CoreAccount
 	var pg int
 	con := c.QueryParam("con")
@@ -246,21 +221,19 @@ func SuperFetchUser(c yee.Context) (err error) {
 	start, end := lib.Paging(c.QueryParam("page"), 10)
 
 	if f.Valve {
-		model.DB().Where("username LIKE ? and department LIKE ?", "%"+fmt.Sprintf("%s", f.User)+"%", "%"+fmt.Sprintf("%s", f.Department)+"%").Count(&pg)
-		model.DB().Where("username LIKE ? and department LIKE ?", "%"+fmt.Sprintf("%s", f.User)+"%", "%"+fmt.Sprintf("%s", f.Department)+"%").Offset(start).Limit(end).Find(&u)
+		model.DB().Model(model.CoreAccount{}).Where("username LIKE ? and department LIKE ?", "%"+fmt.Sprintf("%s", f.Username)+"%", "%"+fmt.Sprintf("%s", f.Department)+"%").Count(&pg).Offset(start).Limit(end).Find(&u)
 	} else {
-		model.DB().Offset(start).Limit(end).Find(&u)
-		model.DB().Model(model.CoreAccount{}).Count(&pg)
+		model.DB().Model(model.CoreAccount{}).Count(&pg).Offset(start).Limit(end).Find(&u)
 	}
 
-	return c.JSON(http.StatusOK, ur{Page: pg, Data: u, Multi: model.GloOther.Multi})
+	return c.JSON(http.StatusOK, map[string]interface{}{"page": pg, "data": u, "multi": model.GloOther.Multi})
 }
 
 func SuperDeleteUser(c yee.Context) (err error) {
-	user := c.Params("user")
+	user := c.QueryParam("user")
 
 	if user == "admin" {
-		return c.JSON(http.StatusOK,"admin用户无法被删除!")
+		return c.JSON(http.StatusOK, "admin用户无法被删除!")
 	}
 
 	var g []model.CoreGrained
@@ -297,4 +270,13 @@ func SuperDeleteUser(c yee.Context) (err error) {
 	}
 	tx.Commit()
 	return c.JSON(http.StatusOK, fmt.Sprintf("用户: %s 已删除", user))
+}
+
+func SuperUserApi() yee.RestfulAPI {
+	return yee.RestfulAPI{
+		Put:    SuperUserEdit,
+		Post:   SuperUserRegister,
+		Delete: SuperDeleteUser,
+		Get:    SuperFetchUser,
+	}
 }

@@ -17,9 +17,10 @@ import (
 	"Yearning-go/src/handle"
 	"Yearning-go/src/lib"
 	"Yearning-go/src/model"
+	"net/http"
+
 	"github.com/cookieY/yee"
 	"github.com/cookieY/yee/middleware"
-	"net/http"
 )
 
 func SuperManageDB() yee.HandlerFunc {
@@ -28,18 +29,16 @@ func SuperManageDB() yee.HandlerFunc {
 			c.Next()
 			return nil
 		}
-		return c.JSON(http.StatusForbidden, "非法越权操作！")
+		return c.ServerError(http.StatusForbidden, "非法越权操作！")
 	}
 }
 
 func SuperManageUser() yee.HandlerFunc {
 	return func(c yee.Context) (err error) {
 		if lib.SuperAuth(c, "user") {
-			c.Next()
 			return
 		}
-		return c.JSON(http.StatusForbidden, "非法越权操作！")
-
+		return c.ServerError(http.StatusForbidden, "非法越权操作！")
 	}
 }
 
@@ -47,10 +46,9 @@ func SuperManageGroup() yee.HandlerFunc {
 	return func(c yee.Context) (err error) {
 		user, _ := lib.JwtParse(c)
 		if user == "admin" {
-			c.Next()
 			return
 		}
-		return c.JSON(http.StatusForbidden, "非法越权操作！")
+		return c.ServerError(http.StatusForbidden, "非法越权操作！")
 	}
 }
 
@@ -58,17 +56,18 @@ func AuditGroup() yee.HandlerFunc {
 	return func(c yee.Context) (err error) {
 		_, rule := lib.JwtParse(c)
 		if rule == "admin" || rule == "perform" {
-			c.Next()
 			return
 		}
-		return c.JSON(http.StatusForbidden, "非法越权操作！")
+		return c.ServerError(http.StatusForbidden, "非法越权操作！")
 	}
 }
 
 func AddRouter(e *yee.Core) {
+
 	e.GET("/", func(c yee.Context) error {
 		return c.HTMLTml(http.StatusOK, "./dist/index.html")
 	})
+
 	e.POST("/login", handle.UserGeneralLogin)
 	e.POST("/register", handle.UserRegister)
 	e.GET("/fetch", handle.UserReqSwitch)
@@ -81,9 +80,7 @@ func AddRouter(e *yee.Core) {
 	r.GET("/dash/count", handle.DashCount)
 	r.PUT("/dash/userinfo", handle.DashUserInfo)
 	r.PUT("/dash/stmt", handle.DashStmt)
-
-	r.POST("/user/password_reset", handle.ChangePassword)
-	r.POST("/user/mail_reset", handle.ChangeMail)
+	r.PUT("/user/edit/:tp", handle.GeneralUserEdit)
 	r.PUT("/user/order", handle.GeneralFetchMyOrder)
 	r.GET("/fetch/sql", handle.GeneralFetchSQLInfo)
 	r.GET("/fetch/idc", handle.GeneralIDC)
@@ -130,6 +127,7 @@ func AddRouter(e *yee.Core) {
 	group := r.Group("/group", SuperManageGroup())
 	group.GET("", handle.SuperGroup)
 	group.POST("/update", handle.SuperGroupUpdate)
+	group.POST("/fetch/marge", handle.SuperUserRuleMarge)
 	group.DELETE("/del/:clear", handle.SuperClearUserRule)
 	group.GET("/setting", handle.SuperFetchSetting)
 	group.POST("/setting/add", handle.SuperSaveSetting)
@@ -139,19 +137,12 @@ func AddRouter(e *yee.Core) {
 	group.POST("/setting/del/query", handle.DelQueryOrder)
 	group.POST("/board/post", handle.GeneralPostBoard)
 
-	user := r.Group("/management_user", SuperManageUser())
-	user.POST("/modify", handle.SuperModifyUser)
-	user.POST("/password_reset", handle.SuperChangePassword)
-	user.GET("/fetch", handle.SuperFetchUser)
-	user.DELETE("/del/:user", handle.SuperDeleteUser)
-	user.POST("/register", handle.SuperUserRegister)
+	user := r.Group("/manage_user", SuperManageUser())
+	user.Restful("", handle.SuperUserApi())
 
 	db := r.Group("/management_db", SuperManageDB())
-	db.GET("/fetch/", handle.SuperFetchDB)
-	db.POST("/add", handle.SuperAddDB)
+	db.Restful("", handle.ManageDbApi())
 	db.PUT("/test", handle.SuperTestDBConnect)
-	db.DELETE("/del/:source", handle.SuperDeleteDb)
-	db.PUT("/edit", handle.SuperModifyDb)
 
 	autoTask := r.Group("/auto", SuperManageGroup())
 	autoTask.GET("", handle.SuperFetchAutoTaskSource)

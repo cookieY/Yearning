@@ -17,6 +17,7 @@ import (
 	"Yearning-go/src/lib"
 	"Yearning-go/src/model"
 	ser "Yearning-go/src/parser"
+	pb "Yearning-go/src/proto"
 	"encoding/json"
 	"github.com/cookieY/yee"
 	"net/http"
@@ -124,7 +125,7 @@ func SuperSaveRoles(c yee.Context) (err error) {
 	ser.FetchAuditRole = u.Juno
 	audit, _ := json.Marshal(u.Juno)
 	model.DB().Model(model.CoreGlobalConfiguration{}).Where("authorization =?", "global").Updates(&model.CoreGlobalConfiguration{AuditRole: audit})
-
+	lib.OverrideConfig(&pb.LibraAuditOrder{})
 	return c.JSON(http.StatusOK, "配置信息已保存！")
 }
 

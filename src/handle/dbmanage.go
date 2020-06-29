@@ -18,51 +18,50 @@ import (
 	"Yearning-go/src/model"
 	"encoding/json"
 	"fmt"
-	"github.com/cookieY/yee"
-	"github.com/jinzhu/gorm"
-	"log"
 	"net/http"
 	"net/url"
+
+	"github.com/cookieY/yee"
+	"github.com/jinzhu/gorm"
 )
 
-type fetchdb struct {
-	ComputerRoom   string `json:"computer_room"`
-	ConnectionName string `json:"connection_name"`
-	Valve          bool   `json:"valve"`
-	Username       string `json:"username"`
-}
-
-type gr struct {
-	Page   int                    `json:"page"`
-	Data   []model.CoreDataSource `json:"data"`
-	Custom []string               `json:"custom"`
-}
-
-type adddb struct {
-	Source   string
-	IDC      string
-	Port     int
-	Password string
-	User     string
-	IP       string
-	Username string
-	IsQuery  int
-}
-
-type testconn struct {
-	Ip       string
-	User     string
-	Password string
-	Port     int
+type dbInfo struct {
+	Source   string `json:"source"`
+	IDC      string `json:"idc"`
+	Port     int    `json:"port"`
+	Password string `json:"password"`
+	IP       string `json:"ip"`
+	Username string `json:"username"`
+	IsQuery  int    `json:"is_query"`
+	Valve    bool   `json:"valve"`
 }
 
 type editDb struct {
-	Data adddb
+	Data dbInfo
 }
 
-func SuperFetchDB(c yee.Context) (err error) {
+func SuperTestDBConnect(c yee.Context) (err error) {
 
-	var f fetchdb
+	u := new(dbInfo)
+	if err = c.Bind(u); err != nil {
+		c.Logger().Error(err.Error())
+		return c.JSON(http.StatusInternalServerError, "")
+	}
+	db, e := gorm.Open("mysql", fmt.Sprintf("%s:%s@(%s:%d)/?charset=utf8&parseTime=True&loc=Local", u.Username, u.Password, u.IP, u.Port))
+	defer func() {
+		if err := db.Close(); err != nil {
+			c.Logger().Error(err.Error())
+		}
+	}()
+	if e != nil {
+		return c.JSON(http.StatusOK, "数据库实例连接失败！请检查相关配置是否正确！")
+	}
+	return c.JSON(http.StatusOK, "数据库实例连接成功！")
+}
+
+func SuperFetchSource(c yee.Context) (err error) {
+
+	var f dbInfo
 	var u []model.CoreDataSource
 	var pg int
 	con := c.QueryParam("con")
@@ -72,35 +71,30 @@ func SuperFetchDB(c yee.Context) (err error) {
 	start, end := lib.Paging(c.QueryParam("page"), 10)
 
 	if f.Valve {
-		model.DB().Model(model.CoreDataSource{}).Where("id_c LIKE ? and source LIKE ?", "%"+fmt.Sprintf("%s", f.ComputerRoom)+"%", "%"+fmt.Sprintf("%s", f.ConnectionName)+"%").Count(&pg)
-		model.DB().Model(model.CoreDataSource{}).Where("id_c LIKE ? and source LIKE ?", "%"+fmt.Sprintf("%s", f.ComputerRoom)+"%", "%"+fmt.Sprintf("%s", f.ConnectionName)+"%").Order("id desc").Offset(start).Limit(end).Find(&u)
+		model.DB().Model(model.CoreDataSource{}).Where("id_c LIKE ? and source LIKE ?", "%"+fmt.Sprintf("%s", f.IDC)+"%", "%"+fmt.Sprintf("%s", f.Source)+"%").Order("id desc").Count(&pg).Offset(start).Limit(end).Find(&u)
 	} else {
-		model.DB().Order("id desc").Offset(start).Limit(end).Find(&u)
-		model.DB().Model(model.CoreDataSource{}).Count(&pg)
+		model.DB().Model(model.CoreDataSource{}).Order("id desc").Count(&pg).Offset(start).Limit(end).Find(&u)
 	}
 	for idx := range u {
 		u[idx].Password = "***********"
 	}
 
-	return c.JSON(http.StatusOK, gr{Page: pg, Data: u, Custom: model.GloOther.IDC})
+	return c.JSON(http.StatusOK, map[string]interface{}{"page": pg, "data": u, "custom": model.GloOther.IDC})
 
 }
 
-func SuperAddDB(c yee.Context) (err error) {
+func SuperCreateSource(c yee.Context) (err error) {
 
 	var refer model.CoreDataSource
 
-	u := new(adddb)
+	u := new(dbInfo)
 	if err = c.Bind(u); err != nil {
 		c.Logger().Error(err.Error())
 		return c.JSON(http.StatusInternalServerError, "")
 	}
-	model.DB().Where("source =?", u.Source).First(&refer)
-
-	if refer.Source == "" {
-
+	if model.DB().Where("source =?", u.Source).First(&refer).RecordNotFound() {
 		x := lib.Encrypt(u.Password)
-
+		fmt.Println(u.IsQuery)
 		if x != "" {
 			model.DB().Create(&model.CoreDataSource{
 				IDC:      u.IDC,
@@ -108,7 +102,7 @@ func SuperAddDB(c yee.Context) (err error) {
 				Port:     u.Port,
 				IP:       u.IP,
 				Password: x,
-				Username: u.User,
+				Username: u.Username,
 				IsQuery:  u.IsQuery,
 			})
 			return c.JSON(http.StatusOK, "连接名添加成功！")
@@ -120,18 +114,19 @@ func SuperAddDB(c yee.Context) (err error) {
 	}
 }
 
-func SuperDeleteDb(c yee.Context) (err error) {
+func SuperDeleteSource(c yee.Context) (err error) {
 
 	var g []model.CoreGrained
 	var k []model.CoreRoleGroup
 
 	tx := model.DB().Begin()
 
-	source := c.Params("source")
+	source := c.QueryParam("source")
 
 	unescape, _ := url.QueryUnescape(source)
 
 	model.DB().Find(&g)
+
 	model.DB().Find(&k)
 
 	if er := tx.Where("source =?", unescape).Delete(&model.CoreDataSource{}).Error; er != nil {
@@ -172,34 +167,27 @@ func SuperDeleteDb(c yee.Context) (err error) {
 	return c.JSON(http.StatusOK, "数据库信息已删除")
 }
 
-func SuperTestDBConnect(c yee.Context) (err error) {
-
-	u := new(testconn)
-	if err = c.Bind(u); err != nil {
-		c.Logger().Error(err.Error())
-		return c.JSON(http.StatusInternalServerError, "")
-	}
-
-	db, e := gorm.Open("mysql", fmt.Sprintf("%s:%s@(%s:%d)/?charset=utf8&parseTime=True&loc=Local", u.User, u.Password, u.Ip, u.Port))
-	defer func() {
-		if err := db.Close(); err != nil {
-			log.Println(err.Error())
-		}
-	}()
-	if e != nil {
-		c.Logger().Error(e.Error())
-		return c.JSON(http.StatusOK, "数据库实例连接失败！请检查相关配置是否正确！")
-	}
-	return c.JSON(http.StatusOK, "数据库实例连接成功！")
-}
-
-func SuperModifyDb(c yee.Context) (err error) {
+func SuperEditSource(c yee.Context) (err error) {
 	u := new(editDb)
 	if err = c.Bind(u); err != nil {
 		c.Logger().Error(err.Error())
 		return c.JSON(http.StatusInternalServerError, "")
 	}
-	x := lib.Encrypt(u.Data.Password)
-	model.DB().Model(&model.CoreDataSource{}).Where("source =?", u.Data.Source).Update(&model.CoreDataSource{IP: u.Data.IP, Port: u.Data.Port, Username: u.Data.Username, Password: x})
+	if u.Data.Password == "***********" {
+		model.DB().Model(&model.CoreDataSource{}).Where("source =?", u.Data.Source).Updates(&model.CoreDataSource{IP: u.Data.IP, Port: u.Data.Port, Username: u.Data.Username})
+	} else {
+		x := lib.Encrypt(u.Data.Password)
+		model.DB().Model(&model.CoreDataSource{}).Where("source =?", u.Data.Source).Updates(&model.CoreDataSource{IP: u.Data.IP, Port: u.Data.Port, Username: u.Data.Username, Password: x})
+	}
+
 	return c.JSON(http.StatusOK, "数据源信息已更新!")
+}
+
+func ManageDbApi() yee.RestfulAPI {
+	return yee.RestfulAPI{
+		Get:    SuperFetchSource,
+		Post:   SuperCreateSource,
+		Delete: SuperDeleteSource,
+		Put:    SuperEditSource,
+	}
 }

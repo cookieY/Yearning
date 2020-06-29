@@ -49,7 +49,7 @@ type marge struct {
 func SuperGroup(c yee.Context) (err error) {
 	user, _ := lib.JwtParse(c)
 	if user == "admin" {
-		var f fetchdb
+		var f dbInfo
 		var pg int
 		var g []model.CoreGrained
 		var r []model.CoreRoleGroup
@@ -165,6 +165,7 @@ func SuperUserRuleMarge(c yee.Context) (err error) {
 		return c.JSON(http.StatusInternalServerError, err.Error())
 	}
 	m3 := MulitUserRuleMarge(u.Group)
+
 	return c.JSON(http.StatusOK, m3)
 }
 

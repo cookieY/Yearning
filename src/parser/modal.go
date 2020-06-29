@@ -53,8 +53,6 @@ type AuditRole struct {
 	MaxTableNameLen                int    //表名最大长度
 	MaxAffectRows                  uint   //最大影响行数
 	MaxDDLAffectRows               uint   //最大影响行数
-	EnableSetCollation             bool   //是否允许设置排列顺序
-	EnableSetCharset               bool   //是否允许设置字符集
 	SupportCharset                 string //允许的字符集范围
 	SupportCollation               string //允许的排列顺序范围
 	CheckIdentifier                bool   //是否检查关键词
@@ -64,6 +62,8 @@ type AuditRole struct {
 	DDLAllowColumnType             bool   // ddl语句允许更改字段类型
 	DDLImplicitTypeConversion      bool
 	DDLAllowPRINotInt              bool
+	DDLColumnsMustHaveIndex        string // 如果表包含以下列，列必须有索引。可指定多个列,以逗号分隔.列类型可选.   格式: 列名 [列类型,可选],...
+	DDLAllowChangeColumnPosition   bool   // ddl语句允许使用after/first
 	IsOSC                          bool
 	OscBinDir                      string // pt-osc path
 	OscDropNewTable                bool
@@ -81,9 +81,11 @@ type AuditRole struct {
 	OscPrintSql                    bool
 	OscChunkTime                   float32
 	OscSize                        uint
-	AllowCreatePartition           bool
 	AllowCreateView                bool
+	AllowCreatePartition           bool
 	AllowSpecialType               bool
+	AllowForeignKey                bool
+	PRIRollBackErr                 bool
 }
 
 type IndexInfo struct {

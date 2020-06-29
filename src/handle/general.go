@@ -41,8 +41,12 @@ type cdx struct {
 	I []parser.IndexInfo `json:"i"`
 }
 
-func GeneralIDC(c yee.Context) (err error) {
+type _dbInfo struct {
+	results   []string
+	highlight []map[string]string
+}
 
+func GeneralIDC(c yee.Context) (err error) {
 	return c.JSON(http.StatusOK, model.GloOther.IDC)
 
 }
@@ -93,8 +97,7 @@ func GeneralBase(c yee.Context) (err error) {
 	t := c.Params("source")
 
 	var s model.CoreDataSource
-	var dataBase string
-	var l []string
+
 	var mid []string
 
 	if t == "undefined" {
@@ -104,34 +107,19 @@ func GeneralBase(c yee.Context) (err error) {
 	unescape, _ := url.QueryUnescape(t)
 
 	model.DB().Where("source =?", unescape).First(&s)
-	ps := lib.Decrypt(s.Password)
 
-	db, err := gorm.Open("mysql", fmt.Sprintf("%s:%s@(%s:%s)/?charset=utf8&parseTime=True&loc=Local", s.Username, ps, s.IP, strconv.Itoa(int(s.Port))))
-
-	defer db.Close()
+	result, err := ScanDataRows(s, "", "SHOW DATABASES;","库名")
 
 	if err != nil {
 		c.Logger().Error(err.Error())
 		return
-	}
-	sql := "SHOW DATABASES;"
-	rows, err := db.Raw(sql).Rows()
-	if err != nil {
-		c.Logger().Error(err.Error())
-		return
-	}
-	defer rows.Close()
-	for rows.Next() {
-		rows.Scan(&dataBase)
-		l = append(l, dataBase)
 	}
 
 	if len(model.GloOther.ExcludeDbList) > 0 {
-		mid = lib.Intersect(l, model.GloOther.ExcludeDbList)
-		l = lib.NonIntersect(mid, l)
+		mid = lib.Intersect(result.results, model.GloOther.ExcludeDbList)
+		result.results = lib.NonIntersect(mid, result.results)
 	}
-
-	return c.JSON(http.StatusOK, l)
+	return c.JSON(http.StatusOK, result.results)
 }
 
 func GeneralTable(c yee.Context) (err error) {
@@ -141,37 +129,17 @@ func GeneralTable(c yee.Context) (err error) {
 		return c.JSON(http.StatusInternalServerError, "")
 	}
 	var s model.CoreDataSource
-	var table string
-	var l []string
-	var highlist []map[string]string
 
 	model.DB().Where("source =?", u.Source).First(&s)
 
-	ps := lib.Decrypt(s.Password)
+	result, err := ScanDataRows(s, u.Base, "SHOW TABLES;","表名")
 
-	db, err := gorm.Open("mysql", fmt.Sprintf("%s:%s@(%s:%s)/%s?charset=utf8&parseTime=True&loc=Local", s.Username, ps, s.IP, strconv.Itoa(int(s.Port)), u.Base))
-
-	defer db.Close()
-
-	if err != nil {
-		c.Logger().Error(err.Error())
-		return err
-	}
-
-	sql := "show tables"
-	rows, err := db.Raw(sql).Rows()
 	if err != nil {
 		c.Logger().Error(err.Error())
 		return
 	}
-	defer rows.Close()
-	for rows.Next() {
-		rows.Scan(&table)
-		highlist = append(highlist, map[string]string{"vl": table, "meta": "表名"})
-		l = append(l, table)
-	}
 
-	return c.JSON(http.StatusOK, map[string]interface{}{"table": l, "highlight": highlist})
+	return c.JSON(http.StatusOK, map[string]interface{}{"table": result.results, "highlight": result.highlight})
 }
 
 func GeneralTableInfo(c yee.Context) (err error) {
@@ -240,8 +208,7 @@ func GeneralOrderDetailList(c yee.Context) (err error) {
 	var record []model.CoreSqlRecord
 	var count int
 	start, end := lib.Paging(c.QueryParam("page"), 20)
-	model.DB().Model(&model.CoreSqlRecord{}).Where("work_id =?", workId).Offset(start).Limit(end).Find(&record)
-	model.DB().Model(&model.CoreSqlRecord{}).Where("work_id =?", workId).Count(&count)
+	model.DB().Model(&model.CoreSqlRecord{}).Where("work_id =?", workId).Count(&count).Offset(start).Limit(end).Find(&record)
 	return c.JSON(http.StatusOK, struct {
 		Record []model.CoreSqlRecord `json:"record"`
 		Count  int                   `json:"count"`
@@ -257,13 +224,7 @@ func GeneralOrderDetailRollSQL(c yee.Context) (err error) {
 	var roll []model.CoreRollback
 	model.DB().Where("work_id =?", workId).First(&order)
 	model.DB().Select("`sql`").Where("work_id =?", workId).Find(&roll)
-	return c.JSON(http.StatusOK, struct {
-		Order model.CoreSqlOrder   `json:"order"`
-		Sql   []model.CoreRollback `json:"sql"`
-	}{
-		Order: order,
-		Sql:   roll,
-	})
+	return c.JSON(http.StatusOK,map[string]interface{}{"order":order,"sql":roll})
 }
 
 func GeneralFetchMyOrder(c yee.Context) (err error) {
@@ -294,18 +255,10 @@ func GeneralFetchMyOrder(c yee.Context) (err error) {
 			model.DB().Model(&model.CoreSqlOrder{}).Where(whereField+dateField, user, "%"+fmt.Sprintf("%s", u.Find.Text)+"%", u.Find.Picker[0], u.Find.Picker[1]).Count(&pg)
 		}
 	} else {
-		model.DB().Select(queryField).Where("username = ?", user).Order("id desc").Offset(start).Limit(end).Find(&order)
-		model.DB().Model(&model.CoreSqlOrder{}).Where("username = ?", user).Count(&pg)
+		model.DB().Model(&model.CoreSqlOrder{}).Select(queryField).Where("username = ?", user).Order("id desc").Count(&pg).Offset(start).Limit(end).Find(&order)
 	}
-	return c.JSON(http.StatusOK, struct {
-		Data  []model.CoreSqlOrder `json:"data"`
-		Page  int                  `json:"page"`
-		Multi bool                 `json:"multi"`
-	}{
-		order,
-		pg,
-		model.GloOther.Multi,
-	})
+
+	return c.JSON(http.StatusOK,map[string]interface{}{"data":order,"page":pg,"multi":model.GloOther.Multi})
 }
 
 func GeneralFetchUndo(c yee.Context) (err error) {
@@ -315,7 +268,7 @@ func GeneralFetchUndo(c yee.Context) (err error) {
 	if model.DB().Where("username =? AND work_id =? AND `status` =? ", user, u, 2).First(&undo).RecordNotFound() {
 		return c.JSON(http.StatusOK, "工单状态已更改！无法撤销")
 	}
-	go lib.MessagePush(undo.WorkId, 6, "")
+	lib.MessagePush(undo.WorkId, 6, "")
 	model.DB().Where("username =? AND work_id =? AND `status` =? ", user, u, 2).Delete(&model.CoreSqlOrder{})
 	return c.JSON(http.StatusOK, "工单已撤销！")
 }
@@ -360,4 +313,34 @@ func GeneralFetchBoard(c yee.Context) (err error) {
 	var k model.CoreGlobalConfiguration
 	model.DB().Where("id =?", 1).First(&k)
 	return c.JSON(http.StatusOK, k.Board)
+}
+
+func ScanDataRows(s model.CoreDataSource, database, sql, meta string) (res _dbInfo, err error) {
+
+	ps := lib.Decrypt(s.Password)
+
+	db, err := gorm.Open("mysql", fmt.Sprintf("%s:%s@(%s:%s)/%s?charset=utf8&parseTime=True&loc=Local", s.Username, ps, s.IP, strconv.Itoa(int(s.Port)), database))
+
+	defer func() {
+		_ = db.Close()
+	}()
+
+	var _tmp string
+
+	if err != nil {
+		return _dbInfo{}, err
+	}
+
+	rows, err := db.Raw(sql).Rows()
+
+	if err != nil {
+		return _dbInfo{}, err
+	}
+
+	for rows.Next() {
+		rows.Scan(&_tmp)
+		res.results = append(res.results, _tmp)
+		res.highlight = append(res.highlight, map[string]string{"vl": _tmp, "meta": meta})
+	}
+	return res, nil
 }
