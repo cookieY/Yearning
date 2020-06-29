@@ -29,9 +29,6 @@
 
 [www.yearning.io](http://yearning.io)
 
-## Recommend 推荐
-
-[Spug - 开源轻量自动化运维平台](https://github.com/openspug/spug)
 
 
 ## Community 社区
@@ -74,6 +71,11 @@
 ## About 联系方式
    
    E-mail: henry@yearning.io
+   
+
+## Recommend 推荐
+
+[Spug - 开源轻量自动化运维平台](https://github.com/openspug/spug)
 
 ## Snapshot 效果展示
 
