@@ -71,7 +71,7 @@ func ReferQueryOrder(c yee.Context) (err error) {
 		})
 
 		if state == 2 {
-			lib.MessagePush(work, 6, "")
+			lib.MessagePush(work, 7, "")
 		}
 
 		return c.JSON(http.StatusOK, "查询工单已提交!")
@@ -313,7 +313,7 @@ func AgreedQueryOrder(c yee.Context) (err error) {
 	}
 
 	model.DB().Model(model.CoreQueryOrder{}).Where("work_id =?", u.WorkId).Update(map[string]interface{}{"query_per": 1, "ex_date": time.Now().Format("2006-01-02 15:04")})
-	lib.MessagePush(u.WorkId, 7, "")
+	lib.MessagePush(u.WorkId, 8, "")
 	return c.JSON(http.StatusOK, "该次工单查询已同意！")
 }
 
@@ -330,7 +330,7 @@ func DisAgreedQueryOrder(c yee.Context) (err error) {
 	}
 
 	model.DB().Model(model.CoreQueryOrder{}).Where("work_id =?", u.WorkId).Update(map[string]interface{}{"query_per": 0})
-	lib.MessagePush(u.WorkId, 8, "")
+	lib.MessagePush(u.WorkId, 9, "")
 	return c.JSON(http.StatusOK, "该次工单查询已驳回！")
 }
 

@@ -94,7 +94,6 @@ func SuperCreateSource(c yee.Context) (err error) {
 	}
 	if model.DB().Where("source =?", u.Source).First(&refer).RecordNotFound() {
 		x := lib.Encrypt(u.Password)
-		fmt.Println(u.IsQuery)
 		if x != "" {
 			model.DB().Create(&model.CoreDataSource{
 				IDC:      u.IDC,

@@ -143,22 +143,22 @@ func MessagePush(workid string, t uint, reject string) {
 	s := model.GloMessage
 	s.ToUser = user.Email
 
-	if model.GloOther.Query {
+	if model.GloOther.Query && t > 6 {
 		var op model.CoreQueryOrder
 		model.DB().Select("work_id,username,text,assigned").Where("work_id =?", workid).First(&op)
 		model.DB().Select("email").Where("username =?", op.Username).First(&user)
 		s.ToUser = user.Email
-		if t == 6 {
+		if t == 7 {
 			model.DB().Select("email").Where("username =?", op.Assigned).First(&user)
 			s.ToUser = user.Email
 			ding = fmt.Sprintf(TmplQueryRefer, op.WorkId, op.Username, op.Assigned, model.Host, op.Text)
 			mail = fmt.Sprintf(TmplMail, "查询申请", op.WorkId, op.Username, model.Host, model.Host, "已提交")
 		}
-		if t == 7 {
+		if t == 8 {
 			ding = fmt.Sprintf(TmplSuccessQuery, op.WorkId, op.Username, op.Assigned, model.Host)
 			mail = fmt.Sprintf(TmplMail, "查询申请", op.WorkId, op.Username, model.Host, model.Host, "已同意")
 		}
-		if t == 8 {
+		if t == 9 {
 			ding = fmt.Sprintf(TmplRejectQuery, op.WorkId, op.Username, op.Assigned, model.Host)
 			mail = fmt.Sprintf(TmplMail, "查询申请", op.WorkId, op.Username, model.Host, model.Host, "已驳回")
 		}
