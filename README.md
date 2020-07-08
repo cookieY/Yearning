@@ -63,7 +63,7 @@
 
 ## Install 安装及使用日志
 
-[使用及安装文档](http://guide.yearning.io)
+[使用及安装文档](http://guide.yearning.io) 解决95%的疑问,不做十万个为什么!
 
 ## Develop 二次开发
 
