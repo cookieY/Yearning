@@ -14,6 +14,7 @@
    <img width="450px" src="https://images.gitads.io/Yearning">
 </a>
 <br><i>This advert was placed by <a href="https://tracking.gitads.io/?campaign=gitads&repo=Yearning&redirect=gitads.io" rel="gitads">GitAds</a> </i>
+ <br><a href="tracking.gitads.io/?repo=Yearning"><imgsrc="Yearning" alt="GitAds"/></a>
 
 ## US_EN
 
