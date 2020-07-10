@@ -189,7 +189,7 @@ func FetchQueryTableInfo(c yee.Context) (err error) {
 
 	if d.QueryPer == 1 {
 
-		var table string
+		var table, column string
 
 		var highlist []map[string]string
 
@@ -219,7 +219,17 @@ func FetchQueryTableInfo(c yee.Context) (err error) {
 			highlist = append(highlist, map[string]string{"vl": table, "meta": "表名"})
 			tablelist = append(tablelist, map[string]interface{}{"title": table})
 		}
+		colSql := fmt.Sprintf("SELECT TABLE_NAME, COLUMN_NAME FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = \"%s\"", t)
+		colRows, colErr := db.Raw(colSql).Rows()
 
+		if colErr != nil {
+			c.Logger().Error(colErr.Error())
+		}
+		defer colRows.Close()
+		for colRows.Next() {
+			colRows.Scan(&table, &column)
+			highlist = append(highlist, map[string]string{"vl": column, "meta": fmt.Sprintf("%s", table)})
+		}
 		return c.JSON(http.StatusOK, map[string]interface{}{"table": tablelist, "highlight": highlist})
 
 	} else {

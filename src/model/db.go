@@ -53,12 +53,13 @@ type Message struct {
 }
 
 type Ldap struct {
-	Url      string `json:"url"`
-	User     string `json:"user"`
-	Password string `json:"password"`
-	Type     int    `json:"type"`
-	Sc       string `json:"sc"`
-	Ldaps    bool   `json:"ldaps"`
+	Url          string `json:"url"`
+	User         string `json:"user"`
+	Password     string `json:"password"`
+	SearchFilter string `json:"search_filter"`
+	Type         int    `json:"type"`
+	Sc           string `json:"sc"`
+	Ldaps        bool   `json:"ldaps"`
 }
 
 type PermissionList struct {

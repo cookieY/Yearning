@@ -70,6 +70,7 @@ type CoreAccount struct {
 	Password   string `gorm:"type:varchar(150);not null";json:"password"`
 	Rule       string `gorm:"type:varchar(10);not null";json:"rule"`
 	Department string `gorm:"type:varchar(50);";json:"department"`
+	AuthType   string `gorm:"type:varchar(10);not null";json:"auth_type"`
 	RealName   string `gorm:"type:varchar(50);";json:"realname"`
 	Email      string `gorm:"type:varchar(50);";json:"email"`
 }

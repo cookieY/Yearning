@@ -30,12 +30,13 @@ func DataInit(o *parser.AuditRole, other *model.Other, ldap *model.Ldap, message
 	ak, _ := json.Marshal(a)
 	group, _ := json.Marshal([]string{"admin"})
 	model.DB().Debug().Create(&model.CoreAccount{
-		Username:   "admin",
-		RealName:   "超级管理员",
-		Password:   lib.DjangoEncrypt("Yearning_admin", string(lib.GetRandom())),
-		Rule:       "admin",
-		Department: "DBA",
-		Email:      "",
+		Username:     "admin",
+		RealName:     "超级管理员",
+		Password:     lib.DjangoEncrypt("Yearning_admin", string(lib.GetRandom())),
+		Rule:         "admin",
+		Department:   "DBA",
+		AuthType:   "local",
+		Email:        "",
 	})
 	model.DB().Debug().Create(&model.CoreGlobalConfiguration{
 		Authorization: "global",
@@ -126,11 +127,11 @@ func Migrate() {
 		}
 
 		ldap := model.Ldap{
-			Url:      "",
-			User:     "",
-			Password: "",
-			Type:     1,
-			Sc:       "",
+			Url:          "",
+			User:         "",
+			Password:     "",
+			SearchFilter: "",
+			Sc:           "",
 		}
 
 		message := model.Message{

@@ -129,6 +129,7 @@ func UserRegister(c yee.Context) (err error) {
 			RealName:   u.UserInfo["realname"],
 			Password:   lib.DjangoEncrypt(u.UserInfo["password"], string(lib.GetRandom())),
 			Rule:       "guest",
+			AuthType:   "local",
 			Department: u.UserInfo["department"],
 			Email:      u.UserInfo["email"],
 		})
@@ -177,6 +178,7 @@ func SuperUserRegister(c yee.Context) (err error) {
 		Username:   u.UserInfo["username"],
 		RealName:   u.UserInfo["realname"],
 		Password:   lib.DjangoEncrypt(u.UserInfo["password"], string(lib.GetRandom())),
+		AuthType:   "local",
 		Rule:       u.UserInfo["group"],
 		Department: u.UserInfo["department"],
 		Email:      u.UserInfo["email"],

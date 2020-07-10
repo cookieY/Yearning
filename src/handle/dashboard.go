@@ -70,7 +70,7 @@ func DashUserInfo(c yee.Context) (err error) {
 		groupList []model.CoreRoleGroup
 		s         model.CoreGlobalConfiguration
 	)
-	model.DB().Select("username,rule,department,real_name,email").Where("username =?", user).Find(&u)
+	model.DB().Select("username,rule,department,real_name,email,auth_type").Where("username =?", user).Find(&u)
 	model.DB().Select("`group`").Where("username =?", user).First(&p)
 	model.DB().Select("`name`").Find(&groupList)
 	model.DB().Select("stmt").First(&s)

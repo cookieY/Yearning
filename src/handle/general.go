@@ -138,8 +138,14 @@ func GeneralTable(c yee.Context) (err error) {
 		c.Logger().Error(err.Error())
 		return
 	}
+	colSql := fmt.Sprintf("SELECT TABLE_NAME, COLUMN_NAME FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = \"%s\"", u.Base)
+	colName, colErr := ScanDataRowsMetaAndMerge(result, s, u.Base, colSql)
+	if colErr != nil {
+		c.Logger().Error(colErr.Error())
+	return
+   }
 
-	return c.JSON(http.StatusOK, map[string]interface{}{"table": result.results, "highlight": result.highlight})
+	return c.JSON(http.StatusOK, map[string]interface{}{"table": result.results, "highlight": colName.highlight})
 }
 
 func GeneralTableInfo(c yee.Context) (err error) {
@@ -341,6 +347,35 @@ func ScanDataRows(s model.CoreDataSource, database, sql, meta string) (res _dbIn
 		rows.Scan(&_tmp)
 		res.results = append(res.results, _tmp)
 		res.highlight = append(res.highlight, map[string]string{"vl": _tmp, "meta": meta})
+	}
+	return res, nil
+}
+
+func ScanDataRowsMetaAndMerge(mer _dbInfo, s model.CoreDataSource, database, sql string) (res _dbInfo, err error) {
+
+	ps := lib.Decrypt(s.Password)
+
+	db, err := gorm.Open("mysql", fmt.Sprintf("%s:%s@(%s:%s)/%s?charset=utf8&parseTime=True&loc=Local", s.Username, ps, s.IP, strconv.Itoa(int(s.Port)), database))
+
+	defer func() {
+		_ = db.Close()
+	}()
+
+	var _tmp, _colName string
+
+	if err != nil {
+		return _dbInfo{}, err
+	}
+
+	rows, err := db.Raw(sql).Rows()
+
+	if err != nil {
+		return _dbInfo{}, err
+	}
+
+	for rows.Next() {
+		rows.Scan(&_tmp, &_colName)
+		res.highlight = append(mer.highlight, map[string]string{"vl": _tmp, "meta": _colName})
 	}
 	return res, nil
 }
