@@ -6,7 +6,6 @@
 ![LICENSE](https://img.shields.io/badge/license-AGPL%20-blue.svg)
 ![](https://img.shields.io/badge/build-release-brightgreen.svg)  
 ![](https://img.shields.io/badge/version-v2.2.0-brightgreen.svg)  
-[![Gitter](https://badges.gitter.im/talk-to-yearning/community.svg)](https://gitter.im/talk-to-yearning/community?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge)
 
 ##### MYSQL web端 SQL审核平台。
 
