@@ -1,16 +1,3 @@
-// Copyright 2019 HenryYee.
-//
-// Licensed under the AGPL, Version 3.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//    https://www.gnu.org/licenses/agpl-3.0.en.html
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// See the License for the specific language governing permissions and
-// limitations under the License.
-
 package model
 
 import (
@@ -65,13 +52,13 @@ func (j JSON) Equals(j1 JSON) bool {
 }
 
 type CoreAccount struct {
-	ID         uint   `gorm:"primary_key;AUTO_INCREMENT";json:"id"`
-	Username   string `gorm:"type:varchar(50);not null;index:user_idx";json:"username"`
-	Password   string `gorm:"type:varchar(150);not null";json:"password"`
-	Rule       string `gorm:"type:varchar(10);not null";json:"rule"`
-	Department string `gorm:"type:varchar(50);";json:"department"`
-	RealName   string `gorm:"type:varchar(50);";json:"realname"`
-	Email      string `gorm:"type:varchar(50);";json:"email"`
+	ID         uint   `gorm:"primary_key;AUTO_INCREMENT" json:"id"`
+	Username   string `gorm:"type:varchar(50);not null;index:user_idx" json:"username"`
+	Password   string `gorm:"type:varchar(150);not null" json:"password"`
+	Rule       string `gorm:"type:varchar(10);not null" json:"rule"`
+	Department string `gorm:"type:varchar(50);" json:"department"`
+	RealName   string `gorm:"type:varchar(50);" json:"real_name"`
+	Email      string `gorm:"type:varchar(50);" json:"email"`
 }
 
 type CoreGlobalConfiguration struct {
@@ -86,113 +73,118 @@ type CoreGlobalConfiguration struct {
 }
 
 type CoreSqlRecord struct {
-	ID        uint   `gorm:"primary_key;AUTO_INCREMENT";json:"id"`
-	WorkId    string `gorm:"type:varchar(50);not null;index:workId_idx"`
-	SQL       string `gorm:"type:longtext;not null"`
-	State     string `gorm:"type:varchar(50);not null;"`
-	Affectrow uint   `gorm:"type:int(50);not null;"`
-	Time      string `gorm:"type:varchar(50);not null;"`
-	Error     string `gorm:"type:longtext"`
+	ID        uint   `gorm:"primary_key;AUTO_INCREMENT" json:"id"`
+	WorkId    string `gorm:"type:varchar(50);not null;index:workId_idx" json:"work_id"`
+	SQL       string `gorm:"type:longtext;not null" json:"sql"`
+	State     string `gorm:"type:varchar(50);not null;" json:"state"`
+	Affectrow uint   `gorm:"type:int(50);not null;" json:"affect_row"`
+	Time      string `gorm:"type:varchar(50);not null;" json:"time"`
+	Error     string `gorm:"type:longtext" json:"error"`
 }
 
 type CoreSqlOrder struct {
-	ID          uint   `gorm:"primary_key;AUTO_INCREMENT"`
-	WorkId      string `gorm:"type:varchar(50);not null;index:workId_idx"`
-	Username    string `gorm:"type:varchar(50);not null;index:query_idx"`
-	Status      uint   `gorm:"type:tinyint(2);not null;"`
-	Type        uint   `gorm:"type:tinyint(2);not null"`
-	Backup      uint   `gorm:"type:tinyint(2);not null"`
-	IDC         string `gorm:"type:varchar(50);not null"`
-	Source      string `gorm:"type:varchar(50);not null"`
-	DataBase    string `gorm:"type:varchar(50);not null"`
-	Table       string `gorm:"type:varchar(50);not null"`
-	Date        string `gorm:"type:varchar(50);not null"`
-	SQL         string `gorm:"type:longtext;not null"`
-	Text        string `gorm:"type:longtext;not null"`
-	Assigned    string `gorm:"type:varchar(50);not null"`
-	Delay       string `gorm:"type:varchar(50);not null;default:'none'"`
-	Rejected    string `gorm:"type:longtext;"`
-	RealName    string `gorm:"type:varchar(50);not null"`
-	Executor    string `gorm:"type:varchar(50);"`
-	ExecuteTime string `gorm:"type:varchar(50);"`
-	Time        string `gorm:"type:varchar(50);not null;"`
-	Percent     int    `gorm:"type:int(50);"`
-	Current     int    `gorm:"type:int(50);"`
-	IsKill      uint   `gorm:"type:tinyint(2);not null;default:'0'"`
+	ID          uint   `gorm:"primary_key;AUTO_INCREMENT" json:"id"`
+	WorkId      string `gorm:"type:varchar(50);not null;index:workId_idx" json:"work_id"`
+	Username    string `gorm:"type:varchar(50);not null;index:query_idx" json:"username"`
+	Status      uint   `gorm:"type:tinyint(2);not null;" json:"status"`
+	Type        uint   `gorm:"type:tinyint(2);not null" json:"type"` // 1 dml  0 ddl
+	Backup      uint   `gorm:"type:tinyint(2);not null" json:"backup"`
+	IDC         string `gorm:"type:varchar(50);not null" json:"idc"`
+	Source      string `gorm:"type:varchar(50);not null" json:"source"`
+	DataBase    string `gorm:"type:varchar(50);not null" json:"data_base"`
+	Table       string `gorm:"type:varchar(50);not null" json:"table"`
+	Date        string `gorm:"type:varchar(50);not null" json:"date"`
+	SQL         string `gorm:"type:longtext;not null" json:"sql"`
+	Text        string `gorm:"type:longtext;not null" json:"text"`
+	Assigned    string `gorm:"type:varchar(50);not null" json:"assigned"`
+	Delay       string `gorm:"type:varchar(50);not null;default:'none'" json:"delay"`
+	RealName    string `gorm:"type:varchar(50);not null" json:"real_name"`
+	Executor    string `gorm:"type:varchar(50);" json:"executor"`
+	ExecuteTime string `gorm:"type:varchar(50);" json:"execute_time"`
+	Time        string `gorm:"type:varchar(50);not null;" json:"time"`
+	IsKill      uint   `gorm:"type:tinyint(2);not null;default:'0'" json:"is_kill"`
+	CurrentStep int    `gorm:"type:int(50);not null default 1;" json:"current_step"`
+	Relevant    JSON   `gorm:"type:json" json:"relevant"`
+	Percent     int    `gorm:"type:int(50);not null default 0;" json:"percent"`
+	Current     int    `gorm:"type:int(50);not null default 0;" json:"current"`
+	UUID        string `gorm:"type:varchar(50);not null;" json:"uuid"`
 }
 
 type CoreRollback struct {
-	ID     uint   `gorm:"primary_key;AUTO_INCREMENT"`
-	WorkId string `gorm:"type:varchar(50);not null;index:workId_idx"`
-	SQL    string `gorm:"type:longtext;not null"`
-}
-
-type CoreGroupOrder struct {
-	ID          uint   `gorm:"primary_key;AUTO_INCREMENT"`
-	WorkId      string `gorm:"type:varchar(50);not null;index:workId_idx"`
-	Permissions JSON   `gorm:"type:json"`
-	Status      int    `gorm:"type:tinyint(5);not null;default 2"`
-	Date        string `gorm:"type:varchar(50);not null;"`
-	Username    string `gorm:"type:varchar(50);not null"`
+	ID     uint   `gorm:"primary_key;AUTO_INCREMENT" json:"id"`
+	WorkId string `gorm:"type:varchar(50);not null;index:workId_idx" json:"work_id"`
+	SQL    string `gorm:"type:longtext;not null" json:"sql"`
 }
 
 type CoreDataSource struct {
-	ID       uint   `gorm:"primary_key;AUTO_INCREMENT"`
-	IDC      string `gorm:"type:varchar(50);not null"`
-	Source   string `gorm:"type:varchar(50);not null"`
-	IP       string `gorm:"type:varchar(200);not null"`
-	Port     int    `gorm:"type:int(10);not null"`
-	Username string `gorm:"type:varchar(50);not null"`
-	Password string `gorm:"type:varchar(150);not null"`
-	IsQuery  int    `gorm:"type:tinyint(2);not null"` // 0写 1读 2读写
+	ID       uint   `gorm:"primary_key;AUTO_INCREMENT" json:"id"`
+	IDC      string `gorm:"type:varchar(50);not null" json:"idc"`
+	Source   string `gorm:"type:varchar(50);not null" json:"source"`
+	IP       string `gorm:"type:varchar(200);not null" json:"ip"`
+	Port     int    `gorm:"type:int(10);not null" json:"port"`
+	Username string `gorm:"type:varchar(50);not null" json:"username"`
+	Password string `gorm:"type:varchar(150);not null" json:"password"`
+	IsQuery  int    `gorm:"type:tinyint(2);not null" json:"is_query"` // 0写 1读 2读写
 }
 
 type CoreGrained struct {
-	ID          uint   `gorm:"primary_key;AUTO_INCREMENT"`
-	Username    string `gorm:"type:varchar(50);not null"`
-	Rule        string `gorm:"type:varchar(10);not null";json:"rule"`
-	Permissions JSON   `gorm:"type:json"`
-	Group       JSON   `gorm:"type:json"`
+	ID       uint   `gorm:"primary_key;AUTO_INCREMENT" json:"id"`
+	Username string `gorm:"type:varchar(50);not null" json:"username"`
+	Group    JSON   `gorm:"type:json" json:"group"`
 }
 
 type CoreRoleGroup struct {
-	ID          uint   `gorm:"primary_key;AUTO_INCREMENT"`
-	Name        string `gorm:"type:varchar(50);not null"`
-	Permissions JSON   `gorm:"type:json"`
+	ID          uint   `gorm:"primary_key;AUTO_INCREMENT" json:"id"`
+	Name        string `gorm:"type:varchar(50);not null" json:"name"`
+	Permissions JSON   `gorm:"type:json" json:"permissions"`
 }
 
-
 type CoreQueryOrder struct {
-	ID       uint   `gorm:"primary_key;AUTO_INCREMENT"`
-	WorkId   string `gorm:"type:varchar(50);not null;index:workId_idx"`
-	Username string `gorm:"type:varchar(50);not null"`
-	Date     string `gorm:"type:varchar(50);not null;index:query_idx"`
-	Text     string `gorm:"type:longtext;not null"`
-	IDC      string `gorm:"type:varchar(50);not null"`
-	Assigned string `gorm:"type:varchar(50);not null"`
-	Realname string `gorm:"type:varchar(50);not null"`
-	Export   uint   `gorm:"type:tinyint(2);not null"`
-	QueryPer int    `gorm:"type:tinyint(2);not null"`
-	ExDate   string `gorm:"type:varchar(50);"`
+	ID       uint   `gorm:"primary_key;AUTO_INCREMENT" json:"id"`
+	WorkId   string `gorm:"type:varchar(50);not null;index:workId_idx" json:"work_id"`
+	Username string `gorm:"type:varchar(50);not null" json:"username"`
+	Date     string `gorm:"type:varchar(50);not null;index:query_idx" json:"date"`
+	Text     string `gorm:"type:longtext;not null" json:"text"`
+	IDC      string `gorm:"type:varchar(50);not null" json:"idc"`
+	Assigned string `gorm:"type:varchar(50);not null" json:"assigned"`
+	Realname string `gorm:"type:varchar(50);not null" json:"real_name"`
+	Export   uint   `gorm:"type:tinyint(2);not null" json:"export"`
+	QueryPer int    `gorm:"type:tinyint(2);not null" json:"query_per"`
+	ExDate   string `gorm:"type:varchar(50);" json:"ex_date"`
 }
 
 type CoreQueryRecord struct {
-	ID       uint   `gorm:"primary_key;AUTO_INCREMENT"`
-	WorkId   string `gorm:"type:varchar(50);not null;index:workId_idx"`
-	SQL      string `gorm:"type:longtext;not null"`
-	ExTime   int    `gorm:"type:int(10);not null"`
-	Time     string `gorm:"type:varchar(50);not null"`
-	Source   string `gorm:"type:varchar(50);not null"`
-	BaseName string `gorm:"type:varchar(50);not null"`
+	ID       uint   `gorm:"primary_key;AUTO_INCREMENT" json:"id"`
+	WorkId   string `gorm:"type:varchar(50);not null;index:workId_idx" json:"work_id"`
+	SQL      string `gorm:"type:longtext;not null" json:"sql"`
+	ExTime   int    `gorm:"type:int(10);not null" json:"ex_time"`
+	Time     string `gorm:"type:varchar(50);not null" json:"time"`
+	Source   string `gorm:"type:varchar(50);not null" json:"source"`
+	BaseName string `gorm:"type:varchar(50);not null" json:"base_name"`
 }
 
 type CoreAutoTask struct {
-	ID        uint   `gorm:"primary_key;AUTO_INCREMENT"`
-	Name      string `gorm:"type:varchar(50);not null"`
-	Source    string `gorm:"type:varchar(50);not null"`
-	Base      string `gorm:"type:varchar(50);not null"`
-	Table     string `gorm:"type:varchar(50);not null"`
-	Tp        int    `gorm:"type:tinyint(2);not null"` // 0 insert 1 update 2delete
-	Affectrow uint   `gorm:"type:int(50);not null default 0;"`
-	Status    int    `gorm:"type:tinyint(2);not null default 0"` // 0 close 1 on
+	ID        uint   `gorm:"primary_key;AUTO_INCREMENT" json:"id"`
+	Name      string `gorm:"type:varchar(50);not null" json:"name"`
+	Source    string `gorm:"type:varchar(50);not null" json:"source"`
+	Base      string `gorm:"type:varchar(50);not null" json:"base"`
+	Table     string `gorm:"type:varchar(50);not null" json:"table"`
+	Tp        int    `gorm:"type:tinyint(2);not null" json:"tp"` // 0 insert 1 update 2delete
+	Affectrow uint   `gorm:"type:int(50);not null default 0;" json:"affect_rows"`
+	Status    int    `gorm:"type:tinyint(2);not null default 0" json:"status"` // 0 close 1 on
+}
+
+type CoreWorkflowTpl struct {
+	ID     uint   `gorm:"primary_key;AUTO_INCREMENT" json:"id"`
+	Source string `gorm:"type:varchar(50);not null;index:source_idx" json:"source"`
+	Steps  JSON   `gorm:"type:json" json:"steps"`
+}
+
+type CoreWorkflowDetail struct {
+	ID       uint   `gorm:"primary_key;AUTO_INCREMENT" json:"id"`
+	WorkId   string `gorm:"type:varchar(50);not null;index:workId_idx" json:"work_id"`
+	Username string `gorm:"type:varchar(50);not null;index:query_idx" json:"username"`
+	Rejected string `gorm:"type:longtext;" json:"rejected"`
+	Time     string `gorm:"type:varchar(50);not null;" json:"time"`
+	Action   string `gorm:"type:varchar(50);not null;" json:"action"`
 }

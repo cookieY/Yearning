@@ -37,7 +37,7 @@ var (
 )
 
 func usage() {
-	_, err := fmt.Fprintf(os.Stderr, `version: Yearning/2.2.2 author: HenryYee
+	_, err := fmt.Fprintf(os.Stderr, `version: Yearning/2.3.0 author: HenryYee
 Usage: Yearning [-m migrate] [-p port] [-s start] [-b web-bind] [-h help] [-c config file]
 
 Options:
@@ -85,7 +85,7 @@ func main() {
 			defer func() {
 				model.Conn.Close()
 			}()
-			service.UpdateSoft()
+			service.UpdateData()
 			service.StartYearning(p, b)
 		}
 		if x {

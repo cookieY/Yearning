@@ -4,7 +4,6 @@ import (
 	"Yearning-go/src/model"
 	pb "Yearning-go/src/proto"
 	"context"
-	"fmt"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/connectivity"
 	"log"
@@ -22,7 +21,7 @@ var (
 func FetchGRPCConn() (*grpc.ClientConn, error) {
 
 	if atomic.LoadPointer(&globalGRPCconns) != nil {
-		if (*grpc.ClientConn)(globalGRPCconns).GetState() == connectivity.Connecting{
+		if (*grpc.ClientConn)(globalGRPCconns).GetState() == connectivity.Connecting {
 			return (*grpc.ClientConn)(globalGRPCconns), nil
 		}
 	}
@@ -32,6 +31,7 @@ func FetchGRPCConn() (*grpc.ClientConn, error) {
 	defer lock.Unlock()
 
 	cli, err := newGrpcConn()
+	cli.Target()
 
 	if err != nil {
 		return nil, err
@@ -90,11 +90,12 @@ func ExDDLClient(order *pb.LibraAuditOrder) {
 	defer func() {
 		cancel()
 	}()
-	r, err := c.OrderDDLExec(ctx, order)
+	_, err = c.OrderDDLExec(ctx, order)
 	if err != nil {
 		log.Printf("could not connect: %v", err)
+		MessagePush(order.WorkId, 4, "")
 	}
-	fmt.Println(r.Message)
+	MessagePush(order.WorkId, 1, "")
 }
 
 func ExDMLClient(order *pb.LibraAuditOrder) {
@@ -113,11 +114,12 @@ func ExDMLClient(order *pb.LibraAuditOrder) {
 	defer func() {
 		cancel()
 	}()
-	r, err := c.OrderDMLExec(ctx, order)
+	_, err = c.OrderDMLExec(ctx, order)
 	if err != nil {
 		log.Printf("could not connect: %v", err)
+		MessagePush(order.WorkId, 4, "")
 	}
-	fmt.Println(r.Message)
+	MessagePush(order.WorkId, 1, "")
 }
 
 func ExAutoTask(order *pb.LibraAuditOrder) bool {
@@ -143,23 +145,31 @@ func ExAutoTask(order *pb.LibraAuditOrder) bool {
 	return r.Ok
 }
 
-func ExQuery(order *pb.LibraAuditOrder) *pb.InsulateWordList {
+func ExQuery(order *pb.LibraAuditOrder) (*pb.InsulateWordList, error) {
+	conn, err := FetchGRPCConn()
 
-	c := pb.NewJunoClient(model.Conn)
+	if err != nil {
+		log.Println(err.Error())
+	}
+	c := pb.NewJunoClient(conn)
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer func() {
 		cancel()
 	}()
 	r, err := c.Query(ctx, order)
 	if err != nil {
-		log.Printf("could not connect: %v", err)
+		return r, err
 	}
-	return r
+	return r, nil
 }
 
 func ExKillOsc(order *pb.LibraAuditOrder) *pb.Isok {
+	conn, err := FetchGRPCConn()
 
-	c := pb.NewJunoClient(model.Conn)
+	if err != nil {
+		log.Println(err.Error())
+	}
+	c := pb.NewJunoClient(conn)
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer func() {
 		cancel()
@@ -172,8 +182,12 @@ func ExKillOsc(order *pb.LibraAuditOrder) *pb.Isok {
 }
 
 func OverrideConfig(order *pb.LibraAuditOrder) *pb.Isok {
+	conn, err := FetchGRPCConn()
 
-	c := pb.NewJunoClient(model.Conn)
+	if err != nil {
+		log.Println(err.Error())
+	}
+	c := pb.NewJunoClient(conn)
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer func() {
 		cancel()

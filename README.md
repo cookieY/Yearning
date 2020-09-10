@@ -5,7 +5,7 @@
 # Yearning SQL审核平台
 ![LICENSE](https://img.shields.io/badge/license-AGPL%20-blue.svg)
 ![](https://img.shields.io/badge/build-release-brightgreen.svg)  
-![](https://img.shields.io/badge/version-v2.2.0-brightgreen.svg)  
+![](https://img.shields.io/badge/version-v2.3.0-brightgreen.svg)  
 [![Gitter](https://badges.gitter.im/talk-to-yearning/community.svg)](https://gitter.im/talk-to-yearning/community?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge)
 
 ##### MYSQL web端 SQL审核平台。
@@ -48,6 +48,7 @@
     - SQL语句检测与执行
     - SQL回滚
     - 历史审核记录
+    - 自定义审核层级
 - 推送
     - E-mail工单推送
     - 钉钉webhook机器人工单推送

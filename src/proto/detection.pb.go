@@ -204,11 +204,11 @@ func (m *Source) GetPort() int32 {
 }
 
 type Record struct {
-	SQL                  string   `protobuf:"bytes,1,opt,name=SQL,proto3" json:"SQL,omitempty"`
-	AffectRows           int32    `protobuf:"varint,2,opt,name=AffectRows,proto3" json:"AffectRows,omitempty"`
-	Status               string   `protobuf:"bytes,3,opt,name=Status,proto3" json:"Status,omitempty"`
-	Error                string   `protobuf:"bytes,4,opt,name=Error,proto3" json:"Error,omitempty"`
-	Level                int32    `protobuf:"varint,6,opt,name=Level,proto3" json:"Level,omitempty"`
+	SQL                  string   `protobuf:"bytes,1,opt,name=SQL,proto3" json:"sql"`
+	AffectRows           int32    `protobuf:"varint,2,opt,name=AffectRows,proto3" json:"affect_rows"`
+	Status               string   `protobuf:"bytes,3,opt,name=Status,proto3" json:"status"`
+	Error                string   `protobuf:"bytes,4,opt,name=Error,proto3" json:"error"`
+	Level                int32    `protobuf:"varint,6,opt,name=Level,proto3" json:"level"`
 	XXX_NoUnkeyedLiteral struct{} `json:"-"`
 	XXX_unrecognized     []byte   `json:"-"`
 	XXX_sizecache        int32    `json:"-"`
@@ -274,7 +274,7 @@ func (m *Record) GetLevel() int32 {
 }
 
 type RecordSet struct {
-	Record               []*Record `protobuf:"bytes,1,rep,name=record,proto3" json:"record,omitempty"`
+	Record               []*Record `protobuf:"bytes,1,rep,name=record,proto3" json:"record"`
 	XXX_NoUnkeyedLiteral struct{}  `json:"-"`
 	XXX_unrecognized     []byte    `json:"-"`
 	XXX_sizecache        int32     `json:"-"`
@@ -312,7 +312,7 @@ func (m *RecordSet) GetRecord() []*Record {
 }
 
 type ExecOrder struct {
-	Message              string   `protobuf:"bytes,1,opt,name=Message,proto3" json:"Message,omitempty"`
+	Message              string   `protobuf:"bytes,1,opt,name=Message,proto3" json:"json:"message""`
 	XXX_NoUnkeyedLiteral struct{} `json:"-"`
 	XXX_unrecognized     []byte   `json:"-"`
 	XXX_sizecache        int32    `json:"-"`
@@ -350,7 +350,7 @@ func (m *ExecOrder) GetMessage() string {
 }
 
 type Isok struct {
-	Ok                   bool     `protobuf:"varint,1,opt,name=Ok,proto3" json:"Ok,omitempty"`
+	Ok                   bool     `protobuf:"varint,1,opt,name=Ok,proto3" json:"ok"`
 	XXX_NoUnkeyedLiteral struct{} `json:"-"`
 	XXX_unrecognized     []byte   `json:"-"`
 	XXX_sizecache        int32    `json:"-"`
@@ -388,8 +388,8 @@ func (m *Isok) GetOk() bool {
 }
 
 type InsulateWordList struct {
-	InsulateWordList     []string `protobuf:"bytes,1,rep,name=InsulateWordList,proto3" json:"InsulateWordList,omitempty"`
-	SQL                  string   `protobuf:"bytes,2,opt,name=SQL,proto3" json:"SQL,omitempty"`
+	InsulateWordList     []string `protobuf:"bytes,1,rep,name=InsulateWordList,proto3" json:"insulate_word_list"`
+	SQL                  string   `protobuf:"bytes,2,opt,name=SQL,proto3" json:"sql"`
 	XXX_NoUnkeyedLiteral struct{} `json:"-"`
 	XXX_unrecognized     []byte   `json:"-"`
 	XXX_sizecache        int32    `json:"-"`

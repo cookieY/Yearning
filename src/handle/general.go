@@ -14,6 +14,8 @@
 package handle
 
 import (
+	"Yearning-go/src/handle/commom"
+	"Yearning-go/src/handle/manage"
 	"Yearning-go/src/lib"
 	"Yearning-go/src/model"
 	"Yearning-go/src/parser"
@@ -23,10 +25,10 @@ import (
 	"fmt"
 	"github.com/cookieY/yee"
 	"github.com/jinzhu/gorm"
-	ser "github.com/pingcap/parser"
 	"net/http"
 	"net/url"
 	"strconv"
+	"strings"
 )
 
 type fetch struct {
@@ -41,9 +43,12 @@ type cdx struct {
 	I []parser.IndexInfo `json:"i"`
 }
 
-type _dbInfo struct {
-	results   []string
-	highlight []map[string]string
+type _testInfo struct {
+	Source   string `json:"source"`
+	SQL      string `json:"sql"`
+	Database string `json:"data_base"`
+	IsDML    bool   `json:"is_dml"`
+	WorkId   string `json:"work_id"`
 }
 
 func GeneralIDC(c yee.Context) (err error) {
@@ -52,8 +57,8 @@ func GeneralIDC(c yee.Context) (err error) {
 }
 
 func GeneralSource(c yee.Context) (err error) {
-	t := c.Params("idc")
-	x := c.Params("xxx")
+	t := c.QueryParam("idc")
+	x := c.QueryParam("xxx")
 	if t == "undefined" || x == "undefined" {
 		return
 	}
@@ -61,16 +66,19 @@ func GeneralSource(c yee.Context) (err error) {
 	unescape, _ := url.QueryUnescape(t)
 
 	var s model.CoreGrained
-	var p model.PermissionList
+	var groups []string
 	var sList []string
 	var source []model.CoreDataSource
 	var inter []string
+	var queryAuditor []string
 	user, _ := lib.JwtParse(c)
 	model.DB().Where("username =?", user).First(&s)
-	if err := json.Unmarshal(s.Permissions, &p); err != nil {
+	if err := json.Unmarshal(s.Group, &groups); err != nil {
 		c.Logger().Error(err.Error())
 		return err
 	}
+
+	p := lib.MulitUserRuleMarge(groups)
 
 	model.DB().Select("source").Where("id_c =?", unescape).Find(&source)
 
@@ -87,16 +95,22 @@ func GeneralSource(c yee.Context) (err error) {
 
 		if x == "query" {
 			inter = lib.Intersect(p.QuerySource, sList)
+			queryAuditor = p.Auditor
+		}
+		if x == "all" {
+			inter = sList
 		}
 	}
-	return c.JSON(http.StatusOK, map[string]interface{}{"assigned": p.Auditor, "source": inter, "x": x})
+	return c.JSON(http.StatusOK, map[string]interface{}{"assigned": queryAuditor, "source": inter, "x": x})
 }
 
 func GeneralBase(c yee.Context) (err error) {
 
-	t := c.Params("source")
+	t := c.QueryParam("source")
 
 	var s model.CoreDataSource
+
+	var tpl model.CoreWorkflowTpl
 
 	var mid []string
 
@@ -106,9 +120,13 @@ func GeneralBase(c yee.Context) (err error) {
 
 	unescape, _ := url.QueryUnescape(t)
 
+	if model.DB().Where("source =?", unescape).First(&tpl).RecordNotFound() {
+		return c.JSON(http.StatusOK, map[string]interface{}{"results": nil, "highlight": nil, "admin": nil})
+	}
+
 	model.DB().Where("source =?", unescape).First(&s)
 
-	result, err := ScanDataRows(s, "", "SHOW DATABASES;","库名")
+	result, err := commom.ScanDataRows(s, "", "SHOW DATABASES;", "库名", false)
 
 	if err != nil {
 		c.Logger().Error(err.Error())
@@ -116,10 +134,15 @@ func GeneralBase(c yee.Context) (err error) {
 	}
 
 	if len(model.GloOther.ExcludeDbList) > 0 {
-		mid = lib.Intersect(result.results, model.GloOther.ExcludeDbList)
-		result.results = lib.NonIntersect(mid, result.results)
+		mid = lib.Intersect(result.Results, model.GloOther.ExcludeDbList)
+		result.Results = lib.NonIntersect(mid, result.Results)
 	}
-	return c.JSON(http.StatusOK, result.results)
+
+	var whoIsAuditor []manage.Tpl
+
+	_ = json.Unmarshal(tpl.Steps, &whoIsAuditor)
+
+	return c.JSON(http.StatusOK, map[string]interface{}{"results": result.Results, "highlight": result.Highlight, "admin": whoIsAuditor[1].Auditor})
 }
 
 func GeneralTable(c yee.Context) (err error) {
@@ -132,14 +155,14 @@ func GeneralTable(c yee.Context) (err error) {
 
 	model.DB().Where("source =?", u.Source).First(&s)
 
-	result, err := ScanDataRows(s, u.Base, "SHOW TABLES;","表名")
+	result, err := commom.ScanDataRows(s, u.Base, "SHOW TABLES;", "表名", false)
 
 	if err != nil {
 		c.Logger().Error(err.Error())
 		return
 	}
 
-	return c.JSON(http.StatusOK, map[string]interface{}{"table": result.results, "highlight": result.highlight})
+	return c.JSON(http.StatusOK, map[string]interface{}{"table": result.Results, "highlight": result.Highlight})
 }
 
 func GeneralTableInfo(c yee.Context) (err error) {
@@ -175,7 +198,7 @@ func GeneralTableInfo(c yee.Context) (err error) {
 }
 
 func GeneralSQLTest(c yee.Context) (err error) {
-	u := new(ddl)
+	u := new(_testInfo)
 	if err = c.Bind(u); err != nil {
 		c.Logger().Error(err.Error())
 		return c.JSON(http.StatusInternalServerError, "")
@@ -203,62 +226,53 @@ func GeneralSQLTest(c yee.Context) (err error) {
 	return c.JSON(http.StatusOK, record)
 }
 
+func SuperSQLTest(c yee.Context) (err error) {
+	u := new(_testInfo)
+	if err = c.Bind(u); err != nil {
+		c.Logger().Error(err.Error())
+		return c.JSON(http.StatusInternalServerError, "")
+	}
+	var s model.CoreDataSource
+	var order model.CoreSqlOrder
+	model.DB().Where("work_id =?", u.WorkId).First(&order)
+	model.DB().Where("source =?", order.Source).First(&s)
+	ps := lib.Decrypt(s.Password)
+	y := pb.LibraAuditOrder{
+		IsDML:    order.Type == 1,
+		SQL:     order.SQL,
+		DataBase: order.DataBase,
+		Source: &pb.Source{
+			Addr:     s.IP,
+			User:     s.Username,
+			Port:     int32(s.Port),
+			Password: ps,
+		},
+		Execute: false,
+		Check:   true,
+	}
+	record, err := lib.TsClient(&y)
+	if err != nil {
+		return c.JSON(http.StatusOK, "")
+	}
+	return c.JSON(http.StatusOK, record)
+}
+
 func GeneralOrderDetailList(c yee.Context) (err error) {
 	workId := c.QueryParam("workid")
 	var record []model.CoreSqlRecord
 	var count int
-	start, end := lib.Paging(c.QueryParam("page"), 20)
+	start, end := lib.Paging(c.QueryParam("page"), 10)
 	model.DB().Model(&model.CoreSqlRecord{}).Where("work_id =?", workId).Count(&count).Offset(start).Limit(end).Find(&record)
-	return c.JSON(http.StatusOK, struct {
-		Record []model.CoreSqlRecord `json:"record"`
-		Count  int                   `json:"count"`
-	}{
-		Record: record,
-		Count:  count,
-	})
+	return c.JSON(http.StatusOK, map[string]interface{}{"record": record, "count": count})
 }
 
 func GeneralOrderDetailRollSQL(c yee.Context) (err error) {
 	workId := c.QueryParam("workid")
-	var order model.CoreSqlOrder
+	start, end := lib.Paging(c.QueryParam("page"), 5)
 	var roll []model.CoreRollback
-	model.DB().Where("work_id =?", workId).First(&order)
-	model.DB().Select("`sql`").Where("work_id =?", workId).Find(&roll)
-	return c.JSON(http.StatusOK,map[string]interface{}{"order":order,"sql":roll})
-}
-
-func GeneralFetchMyOrder(c yee.Context) (err error) {
-	u := new(f)
-	if err = c.Bind(u); err != nil {
-		c.Logger().Error(err.Error())
-		return
-	}
-	user, _ := lib.JwtParse(c)
-
-	var pg int
-
-	var order []model.CoreSqlOrder
-
-	queryField := "work_id, username, text, backup, date, real_name, executor, status, `data_base`, `table`,assigned,rejected,delay,source,id_c"
-	whereField := "username = ? AND text LIKE ? "
-	dateField := " AND date >= ? AND date <= ?"
-
-	start, end := lib.Paging(u.Page, 20)
-
-	if u.Find.Valve {
-		if u.Find.Picker[0] == "" {
-			model.DB().Select(queryField).Where(whereField, user, "%"+fmt.Sprintf("%s", u.Find.Text)+"%").Order("id desc").Offset(start).Limit(end).Find(&order)
-			model.DB().Model(&model.CoreSqlOrder{}).Where(whereField, user, "%"+fmt.Sprintf("%s", u.Find.Text)+"%").Count(&pg)
-		} else {
-			model.DB().Select(queryField).
-				Where(whereField+dateField, user, "%"+fmt.Sprintf("%s", u.Find.Text)+"%", u.Find.Picker[0], u.Find.Picker[1]).Order("id desc").Offset(start).Limit(end).Find(&order)
-			model.DB().Model(&model.CoreSqlOrder{}).Where(whereField+dateField, user, "%"+fmt.Sprintf("%s", u.Find.Text)+"%", u.Find.Picker[0], u.Find.Picker[1]).Count(&pg)
-		}
-	} else {
-		model.DB().Model(&model.CoreSqlOrder{}).Select(queryField).Where("username = ?", user).Order("id desc").Count(&pg).Offset(start).Limit(end).Find(&order)
-	}
-
-	return c.JSON(http.StatusOK,map[string]interface{}{"data":order,"page":pg,"multi":model.GloOther.Multi})
+	var count int
+	model.DB().Select("`sql`").Model(model.CoreRollback{}).Where("work_id =?", workId).Count(&count).Offset(start).Limit(end).Find(&roll)
+	return c.JSON(http.StatusOK, map[string]interface{}{"sql": roll, "count": count})
 }
 
 func GeneralFetchUndo(c yee.Context) (err error) {
@@ -287,16 +301,18 @@ func GeneralMergeDDL(c yee.Context) (err error) {
 }
 
 func GeneralFetchSQLInfo(c yee.Context) (err error) {
-	workId := c.QueryParam("k")
+	workId := c.QueryParam("work_id")
+	limit := c.QueryParam("limit")
 	var sql model.CoreSqlOrder
-	var s []map[string]string
 	model.DB().Select("`sql`").Where("work_id =?", workId).First(&sql)
-	sqlParser := ser.New()
-	stmtNodes, _, err := sqlParser.Parse(sql.SQL, "", "")
-	for _, i := range stmtNodes {
-		s = append(s, map[string]string{"SQL": i.Text()})
+	realSQL := sql.SQL
+	if limit == "10" {
+		tmp := strings.Split(sql.SQL, ";")
+		if len(tmp) > 10 {
+			realSQL = strings.Join(tmp[:9], "")
+		}
 	}
-	return c.JSON(http.StatusOK, s)
+	return c.JSON(http.StatusOK, realSQL)
 }
 
 func GeneralPostBoard(c yee.Context) (err error) {
@@ -313,34 +329,4 @@ func GeneralFetchBoard(c yee.Context) (err error) {
 	var k model.CoreGlobalConfiguration
 	model.DB().Where("id =?", 1).First(&k)
 	return c.JSON(http.StatusOK, k.Board)
-}
-
-func ScanDataRows(s model.CoreDataSource, database, sql, meta string) (res _dbInfo, err error) {
-
-	ps := lib.Decrypt(s.Password)
-
-	db, err := gorm.Open("mysql", fmt.Sprintf("%s:%s@(%s:%s)/%s?charset=utf8&parseTime=True&loc=Local", s.Username, ps, s.IP, strconv.Itoa(int(s.Port)), database))
-
-	defer func() {
-		_ = db.Close()
-	}()
-
-	var _tmp string
-
-	if err != nil {
-		return _dbInfo{}, err
-	}
-
-	rows, err := db.Raw(sql).Rows()
-
-	if err != nil {
-		return _dbInfo{}, err
-	}
-
-	for rows.Next() {
-		rows.Scan(&_tmp)
-		res.results = append(res.results, _tmp)
-		res.highlight = append(res.highlight, map[string]string{"vl": _tmp, "meta": meta})
-	}
-	return res, nil
 }

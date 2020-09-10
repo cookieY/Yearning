@@ -19,8 +19,8 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"github.com/cookieY/yee"
 	"github.com/cookieY/sqlx"
+	"github.com/cookieY/yee"
 	_ "github.com/go-sql-driver/mysql"
 	"gopkg.in/ldap.v3"
 	"log"
@@ -29,29 +29,6 @@ import (
 	"strconv"
 	"time"
 )
-
-func SuperAuth(c yee.Context, r string) bool {
-	var p model.CoreGrained
-	var px model.PermissionList
-	user, role := JwtParse(c)
-	if role == "admin" {
-		model.DB().Model(&model.CoreGrained{}).Where("username =?", user).First(&p)
-
-		if err := json.Unmarshal(p.Permissions, &px); err != nil {
-			c.Logger().Error(err.Error())
-			return false
-		}
-
-		switch r {
-		case "user":
-			return px.User == "1"
-		case "db":
-			return px.Base == "1"
-		}
-
-	}
-	return false
-}
 
 func ResearchDel(s []string, p string) []string {
 	for in := 0; in < len(s); in++ {
@@ -79,7 +56,6 @@ func Paging(page interface{}, total int) (start int, end int) {
 func LdapConnenct(c yee.Context, l *model.Ldap, user string, pass string, isTest bool) bool {
 
 	var s string
-
 	ld, err := ldap.Dial("tcp", l.Url)
 
 	if l.Ldaps {
@@ -92,7 +68,6 @@ func LdapConnenct(c yee.Context, l *model.Ldap, user string, pass string, isTest
 		c.Logger().Error(err.Error())
 		return false
 	}
-
 	defer ld.Close()
 
 	if ld != nil {
@@ -190,10 +165,10 @@ func NonIntersect(o, n []string) []string {
 	return arr
 }
 
-func TimerEx(order *model.CoreSqlOrder) time.Duration {
-	if order.Delay != "none" {
+func Time2StrDiff(delay string) time.Duration {
+	if delay != "none" {
 		now := time.Now()
-		dt, _ := time.ParseInLocation("2006-01-02 15:04 ", order.Delay, time.Local)
+		dt, _ := time.ParseInLocation("2006-01-02 15:04 ", delay, time.Local)
 		after := dt.Sub(now)
 		if after+1 > 0 {
 			return after
@@ -223,7 +198,6 @@ func QueryMethod(source *model.CoreDataSource, req *model.Queryresults, wordList
 	ps := Decrypt(source.Password)
 
 	db, err := sqlx.Connect("mysql", fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?charset=utf8mb4", source.Username, ps, source.IP, source.Port, req.Basename))
-
 	if err != nil {
 		return qd, err
 	}
@@ -243,11 +217,8 @@ func QueryMethod(source *model.CoreDataSource, req *model.Queryresults, wordList
 	}
 	defer rows.Close()
 	for rows.Next() {
-
 		results := make(map[string]interface{})
-
-		rows.MapScan(results)
-
+		_ = rows.MapScan(results)
 		for idx := range results {
 			switch r := results[idx].(type) {
 			case []uint8:
@@ -264,7 +235,6 @@ func QueryMethod(source *model.CoreDataSource, req *model.Queryresults, wordList
 				}
 			}
 		}
-
 		if len(wordList) > 0 {
 			for ok := range results {
 				for _, exclude := range wordList {
@@ -288,11 +258,11 @@ func QueryMethod(source *model.CoreDataSource, req *model.Queryresults, wordList
 	return qd, nil
 }
 
-func removeDuplicateElement(slice []string) []string {
-	result := make([]string, 0, len(slice))
+func removeDuplicateElement(addrs []string) []string {
+	result := make([]string, 0, len(addrs))
 	temp := map[string]struct{}{}
 	idx := 0
-	for _, item := range slice {
+	for _, item := range addrs {
 		if _, ok := temp[item]; !ok {
 			temp[item] = struct{}{}
 			result = append(result, item)
@@ -303,4 +273,43 @@ func removeDuplicateElement(slice []string) []string {
 		}
 	}
 	return result
+}
+
+func JsonStringify(i interface{}) []byte {
+	o, _ := json.Marshal(i)
+	return o
+}
+
+
+
+func removeDuplicateElementForRule(addrs []string) []string {
+	result := make([]string, 0, len(addrs))
+	temp := map[string]struct{}{}
+	for _, item := range addrs {
+		if _, ok := temp[item]; !ok {
+			temp[item] = struct{}{}
+			result = append(result, item)
+		}
+	}
+	return result
+}
+
+func MulitUserRuleMarge(group []string) model.PermissionList {
+	var u model.PermissionList
+	for _, i := range group {
+		var k model.CoreRoleGroup
+		model.DB().Where("name =?", i).First(&k)
+		var m1 model.PermissionList
+		_ = json.Unmarshal(k.Permissions, &m1)
+		u.DDLSource = append(u.DDLSource, m1.DDLSource...)
+		u.DMLSource = append(u.DMLSource, m1.DMLSource...)
+		u.QuerySource = append(u.QuerySource, m1.QuerySource...)
+		u.Auditor = append(u.Auditor, m1.Auditor...)
+	}
+	u.DDLSource = removeDuplicateElementForRule(u.DDLSource)
+	u.DMLSource = removeDuplicateElementForRule(u.DMLSource)
+	u.Auditor = removeDuplicateElementForRule(u.Auditor)
+	u.QuerySource = removeDuplicateElementForRule(u.QuerySource)
+
+	return u
 }

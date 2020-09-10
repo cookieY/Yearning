@@ -26,25 +26,6 @@ type groupBy struct {
 	Time     string
 }
 
-type wkid struct {
-	WorkId     string
-	Username   string
-	Permission model.PermissionList
-}
-
-func DashInit(c yee.Context) (err error) {
-	var permissionList model.CoreGrained
-	var super map[string]string
-	user, _ := lib.JwtParse(c)
-	model.DB().Select("permissions").Where("username =?", user).First(&permissionList)
-	if user == "admin" {
-		super = map[string]string{"group": "1", "setting": "1", "perOrder": "1", "roles": "1", "task": "1", "roleGroup": "1"}
-	} else {
-		super = map[string]string{"group": "0", "setting": "0", "perOrder": "0", "roles": "0"}
-	}
-	return c.JSON(http.StatusOK, map[string]interface{}{"c": permissionList.Permissions, "s": super})
-}
-
 func DashCount(c yee.Context) (err error) {
 	var (
 		userCount   int

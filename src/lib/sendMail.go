@@ -67,17 +67,30 @@ var TmplMail = `
 </html>
 `
 
+var Tmpl2Mail = `
+<html>
+<body>
+<h1>Yearning 工单%s通知</h1>
+<br><p>工单号: %s</p>
+<br><p>发起人: %s</p>
+<br><p>下一步操作人: %s <p>
+<br><p>地址: <a href="%s">%s</a></p>
+<br><p>状态: %s</p>
+</body>
+</html>
+`
+
 var TmplTestDing = `
 # Yearning 测试！
 `
 
-var TmplReferDing = `# Yearning工单提交通知 #  \n \n  **工单编号:**  %s \n \n **提交人员:**  <font color=\"#78beea\">%s</font> \n \n **审核人员:** <font color=\"#fe8696\">%s</font> \n \n **平台地址:** http://%s \n \n **工单说明:**  %s \n \n **状态:** <font color=\"#1abefa\">已提交</font> \n \n `
+var TmplReferDing = `# Yearning工单提交通知 #  \n \n  **工单编号:**  %s \n \n **数据源:** %s \n \n **提交人员:**  <font color=\"#78beea\">%s</font> \n \n **下一步操作人:** <font color=\"#fe8696\">%s</font> \n \n **平台地址:** http://%s \n \n **工单说明:**  %s \n \n **状态:** <font color=\"#1abefa\">已提交</font> \n \n `
 
-var TmplRejectDing = `# Yearning工单驳回通知 #  \n \n  **工单编号:**  %s \n \n **提交人员:**  <font color=\"#78beea\">%s</font> \n \n **审核人员:** <font color=\"#fe8696\">%s</font> \n \n **平台地址:** http://%s \n \n **工单说明:**  %s \n \n **状态:** <font color=\"#df117e\">驳回</font>  \n \n **驳回说明:**  %s `
-var TmplSuccessDing = `# Yearning工单执行通知 #  \n \n  **工单编号:**  %s \n \n **提交人员:**  <font color=\"#78beea\">%s</font> \n \n **审核人员:** <font color=\"#fe8696\">%s</font> \n \n **平台地址:** http://%s \n \n **工单说明:**  %s \n \n **状态:** <font color=\"#3fd2bd\">执行成功</font>`
-var TmplFailedDing = `# Yearning工单执行通知 #  \n \n  **工单编号:**  %s \n \n **提交人员:**  <font color=\"#78beea\">%s</font> \n \n **审核人员:** <font color=\"#fe8696\">%s</font> \n \n **平台地址:** http://%s \n \n **工单说明:**  %s \n \n **状态:** <font color=\"#ea2426\">执行失败</font>`
-var TmplPerformDing = `# Yearning工单转交通知 #  \n \n  **工单编号:**  %s \n \n **提交人员:**  <font color=\"#78beea\">%s</font> \n \n **审核人员:** <font color=\"#fe8696\">%s</font> \n \n **平台地址:** http://%s \n \n **工单说明:**  %s \n \n **状态:** <font color=\"#de4943\">等待执行人执行</font>`
-var TmplBackDing = `# Yearning工单执行通知 #  \n \n  **工单编号:**  %s \n \n **提交人员:**  <font color=\"#78beea\">%s</font> \n \n **审核人员:** <font color=\"#fe8696\">%s</font> \n \n **平台地址:** http://%s \n \n **工单说明:**  %s \n \n **状态:** <font color=\"#ea2426\">已撤回</font>`
+var TmplRejectDing = `# Yearning工单驳回通知 #  \n \n  **工单编号:**  %s \n \n **数据源:** %s \n \n **提交人员:**  <font color=\"#78beea\">%s</font> \n \n **下一步操作人:** <font color=\"#fe8696\">%s</font> \n \n **平台地址:** http://%s \n \n **工单说明:**  %s \n \n **状态:** <font color=\"#df117e\">驳回</font>  \n \n **驳回说明:**  %s `
+var TmplSuccessDing = `# Yearning工单执行通知 #  \n \n  **工单编号:**  %s \n \n **数据源:** %s \n \n **提交人员:**  <font color=\"#78beea\">%s</font> \n \n **执行人:** <font color=\"#fe8696\">%s</font> \n \n **平台地址:** http://%s \n \n **工单说明:**  %s \n \n **状态:** <font color=\"#3fd2bd\">执行成功</font>`
+var TmplFailedDing = `# Yearning工单执行通知 #  \n \n  **工单编号:**  %s \n \n **数据源:** %s \n \n **提交人员:**  <font color=\"#78beea\">%s</font> \n \n **执行人:** <font color=\"#fe8696\">%s</font> \n \n **平台地址:** http://%s \n \n **工单说明:**  %s \n \n **状态:** <font color=\"#ea2426\">执行失败</font>`
+var TmplPerformDing = `# Yearning工单转交通知 #  \n \n  **工单编号:**  %s \n \n **数据源:** %s \n \n **提交人员:**  <font color=\"#78beea\">%s</font> \n \n **下一步操作人:** <font color=\"#fe8696\">%s</font> \n \n **平台地址:** http://%s \n \n **工单说明:**  %s \n \n **状态:** <font color=\"#de4943\">已转交至下一操作人</font>`
+var TmplBackDing = `# Yearning工单执行通知 #  \n \n  **工单编号:**  %s \n \n **数据源:** %s  \n \n **提交人员:**  <font color=\"#78beea\">%s</font> \n \n **下一步操作人:** <font color=\"#fe8696\">%s</font> \n \n **平台地址:** http://%s \n \n **工单说明:**  %s \n \n **状态:** <font color=\"#ea2426\">已撤回</font>`
 
 var TmplQueryRefer = `# Yearning查询申请通知 #  \n \n  **工单编号:**  %s \n \n **提交人员:**  <font color=\"#78beea\">%s</font> \n \n **审核人员:** <font color=\"#fe8696\">%s</font> \n \n **平台地址:** http://%s \n \n **工单说明:**  %s \n \n **状态:** <font color=\"#1abefa\">已提交</font>`
 var TmplSuccessQuery = `# Yearning查询申请通知 #  \n \n  **工单编号:**  %s \n \n **提交人员:**  <font color=\"#78beea\">%s</font> \n \n **审核人员:** <font color=\"#fe8696\">%s</font> \n \n **平台地址:** http://%s \n \n **状态:** <font color=\"#3fd2bd\">同意</font>`
@@ -93,7 +106,6 @@ func SendMail(mail model.Message, tmpl string) {
 	if mail.Ssl {
 		d.TLSConfig = &tls.Config{InsecureSkipVerify: true}
 	}
-
 	// Send the email to Bob, Cora and Dan.
 	if err := d.DialAndSend(m); err != nil {
 		log.Println(err.Error())
@@ -105,9 +117,14 @@ func SendDingMsg(msg model.Message, sv string) {
 	//请求地址模板
 
 	//创建一个请求
+
 	var mx string
 
+	//if msg.PushType {
+	//	mx = fmt.Sprintf(`{"msgtype": "markdown", "markdown": {"content": "%s"}}`, sv)
+	//} else {
 	mx = fmt.Sprintf(`{"msgtype": "markdown", "markdown": {"title": "Yearning sql审计平台", "text": "%s"}}`, sv)
+	//}
 
 	req, err := http.NewRequest("POST", msg.WebHook, strings.NewReader(mx))
 	if err != nil {
@@ -138,7 +155,7 @@ func MessagePush(workid string, t uint, reject string) {
 	var user model.CoreAccount
 	var o model.CoreSqlOrder
 	var ding, mail string
-	model.DB().Select("work_id,username,text,assigned,executor").Where("work_id =?", workid).First(&o)
+	model.DB().Select("work_id,username,text,assigned,executor,source").Where("work_id =?", workid).First(&o)
 	model.DB().Select("email").Where("username =?", o.Username).First(&user)
 	s := model.GloMessage
 	s.ToUser = user.Email
@@ -164,36 +181,36 @@ func MessagePush(workid string, t uint, reject string) {
 		}
 	} else {
 		if t == 0 {
-			ding = fmt.Sprintf(TmplRejectDing, o.WorkId, o.Username, o.Assigned, model.Host, o.Text, reject)
+			ding = fmt.Sprintf(TmplRejectDing, o.WorkId, o.Source, o.Username, o.Assigned, model.Host, o.Text, reject)
 			mail = fmt.Sprintf(TmplRejectMail, o.WorkId, o.Username, model.Host, model.Host, reject)
 		}
 
 		if t == 1 {
-			ding = fmt.Sprintf(TmplSuccessDing, o.WorkId, o.Username, o.Assigned, model.Host, o.Text)
+			ding = fmt.Sprintf(TmplSuccessDing, o.WorkId, o.Source, o.Username, o.Assigned, model.Host, o.Text)
 			mail = fmt.Sprintf(TmplMail, "执行", o.WorkId, o.Username, model.Host, model.Host, "执行成功")
 		}
 
 		if t == 2 {
 			model.DB().Select("email").Where("username =?", o.Assigned).First(&user)
 			s.ToUser = user.Email
-			ding = fmt.Sprintf(TmplReferDing, o.WorkId, o.Username, o.Assigned, model.Host, o.Text)
+			ding = fmt.Sprintf(TmplReferDing, o.WorkId, o.Source, o.Username, o.Assigned, model.Host, o.Text)
 			mail = fmt.Sprintf(TmplMail, "提交", o.WorkId, o.Username, model.Host, model.Host, "已提交")
 		}
 
 		if t == 4 {
-			ding = fmt.Sprintf(TmplFailedDing, o.WorkId, o.Username, o.Assigned, model.Host, o.Text)
+			ding = fmt.Sprintf(TmplFailedDing, o.Source, o.WorkId, o.Username, o.Assigned, model.Host, o.Text)
 			mail = fmt.Sprintf(TmplMail, "执行", o.WorkId, o.Username, model.Host, model.Host, "执行失败")
 		}
 
 		if t == 5 {
-			model.DB().Select("email").Where("username =?", o.Executor).First(&user)
+			model.DB().Select("email").Where("username =?", o.Assigned).First(&user)
 			s.ToUser = user.Email
-			ding = fmt.Sprintf(TmplPerformDing, o.WorkId, o.Username, o.Assigned, model.Host, o.Text)
-			mail = fmt.Sprintf(TmplMail, "转交", o.WorkId, o.Username, model.Host, model.Host, "等待执行人执行")
+			ding = fmt.Sprintf(TmplPerformDing, o.Source, o.WorkId, o.Username, o.Assigned, model.Host, o.Text)
+			mail = fmt.Sprintf(Tmpl2Mail, "转交", o.WorkId, o.Username, o.Assigned, model.Host, model.Host, "已转交至下一操作人")
 		}
 
 		if t == 6 {
-			ding = fmt.Sprintf(TmplBackDing, o.WorkId, o.Username, o.Assigned, model.Host, o.Text)
+			ding = fmt.Sprintf(TmplBackDing, o.Source, o.WorkId, o.Username, o.Assigned, model.Host, o.Text)
 			mail = fmt.Sprintf(TmplMail, "提交", o.WorkId, o.Username, model.Host, model.Host, "已撤销")
 		}
 	}
@@ -206,7 +223,6 @@ func MessagePush(workid string, t uint, reject string) {
 	if model.GloMessage.Ding {
 		if model.GloMessage.WebHook != "" {
 			go SendDingMsg(s, ding)
-
 		}
 	}
 }

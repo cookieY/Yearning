@@ -6,6 +6,7 @@ import (
 	"testing"
 )
 
+
 func TestJsonGet(t *testing.T) {
 	//var a GlobalConfiguration
 	//var c Inception

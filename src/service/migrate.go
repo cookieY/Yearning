@@ -33,7 +33,7 @@ func DataInit(o *parser.AuditRole, other *model.Other, ldap *model.Ldap, message
 		Username:   "admin",
 		RealName:   "超级管理员",
 		Password:   lib.DjangoEncrypt("Yearning_admin", string(lib.GetRandom())),
-		Rule:       "admin",
+		Rule:       "super",
 		Department: "DBA",
 		Email:      "",
 	})
@@ -45,9 +45,8 @@ func DataInit(o *parser.AuditRole, other *model.Other, ldap *model.Ldap, message
 		Ldap:          l,
 	})
 	model.DB().Debug().Create(&model.CoreGrained{
-		Username:    "admin",
-		Permissions: ak,
-		Group:       group,
+		Username: "admin",
+		Group:    group,
 	})
 	model.DB().Debug().Create(&model.CoreRoleGroup{
 		Name:        "admin",
@@ -68,7 +67,8 @@ func Migrate() {
 		model.DB().CreateTable(&model.CoreQueryOrder{})
 		model.DB().CreateTable(&model.CoreAutoTask{})
 		model.DB().CreateTable(&model.CoreRoleGroup{})
-
+		model.DB().CreateTable(&model.CoreWorkflowTpl{})
+		model.DB().AutoMigrate(&model.CoreWorkflowDetail{})
 		o := parser.AuditRole{
 			DMLInsertColumns:               false,
 			DMLMaxInsertRows:               10,
@@ -110,6 +110,7 @@ func Migrate() {
 			AllowCreatePartition:           false,
 			AllowCreateView:                false,
 			AllowSpecialType:               false,
+			AllowForeignKey:                false,
 		}
 
 		other := model.Other{
@@ -146,15 +147,10 @@ func Migrate() {
 		}
 
 		a := model.PermissionList{
-			DDL:         "1",
-			DML:         "1",
-			Query:       "1",
 			DDLSource:   []string{},
 			DMLSource:   []string{},
 			QuerySource: []string{},
 			Auditor:     []string{},
-			User:        "1",
-			Base:        "1",
 		}
 		time.Sleep(2)
 		DataInit(&o, &other, &ldap, &message, &a)
@@ -165,7 +161,7 @@ func Migrate() {
 	}
 }
 
-func UpdateSoft() {
+func UpdateData() {
 	fmt.Println("检查更新.......")
 	model.DB().AutoMigrate(&model.CoreAccount{})
 	model.DB().AutoMigrate(&model.CoreDataSource{})
@@ -178,6 +174,8 @@ func UpdateSoft() {
 	model.DB().AutoMigrate(&model.CoreQueryOrder{})
 	model.DB().AutoMigrate(&model.CoreAutoTask{})
 	model.DB().AutoMigrate(&model.CoreRoleGroup{})
+	model.DB().AutoMigrate(&model.CoreWorkflowTpl{})
+	model.DB().AutoMigrate(&model.CoreWorkflowDetail{})
 	fmt.Println("数据已更新!")
 }
 
@@ -186,17 +184,11 @@ func DelCol() {
 }
 
 func MargeRuleGroup() {
-	fmt.Println("权限迁移…………")
-	var j []model.CoreGrained
-	model.DB().Find(&j)
-	for _, i := range j {
-		model.DB().Create(&model.CoreRoleGroup{
-			Name:        i.Username,
-			Permissions: i.Permissions,
-		})
-		k := []string{i.Username}
-		k1, _ := json.Marshal(k)
-		model.DB().Model(model.CoreGrained{}).Where("username =?", i.Username).Update(&model.CoreGrained{Group: k1})
-	}
-	fmt.Println("权限迁移成功!")
+	fmt.Println("破坏性变更修复…………")
+	model.DB().Model(&model.CoreSqlOrder{}).DropColumn("rejected")
+	model.DB().Model(&model.CoreGrained{}).DropColumn("permissions")
+	model.DB().Model(&model.CoreGrained{}).DropColumn("rule")
+	model.DB().Model(model.CoreAccount{}).Where("rule = ?", "perform").Update(&model.CoreAccount{Rule: "admin"})
+	model.DB().Model(model.CoreAccount{}).Where("username = ?", "admin").Update(&model.CoreAccount{Rule: "super"})
+	fmt.Println("修复成功!")
 }
