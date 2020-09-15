@@ -4,7 +4,6 @@ import (
 	"Yearning-go/src/model"
 	pb "Yearning-go/src/proto"
 	"context"
-	"fmt"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/connectivity"
 	"log"
@@ -17,7 +16,6 @@ var (
 	globalGRPCconns *grpc.ClientConn
 	lock            sync.Mutex
 	config          atomic.Value
-	io              int
 )
 
 func FetchGRPCConn() (*grpc.ClientConn, error) {
@@ -26,14 +24,13 @@ func FetchGRPCConn() (*grpc.ClientConn, error) {
 			return c.(*grpc.ClientConn), nil
 		}
 	}
-	io++
-	fmt.Printf("%d \n", io)
 
 	lock.Lock()
 
 	defer lock.Unlock()
 
 	cli, err := newGrpcConn()
+
 	cli.Target()
 
 	if err != nil {
