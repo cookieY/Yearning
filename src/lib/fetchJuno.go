@@ -4,27 +4,30 @@ import (
 	"Yearning-go/src/model"
 	pb "Yearning-go/src/proto"
 	"context"
+	"fmt"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/connectivity"
 	"log"
 	"sync"
 	"sync/atomic"
 	"time"
-	"unsafe"
 )
 
 var (
-	globalGRPCconns unsafe.Pointer
+	globalGRPCconns *grpc.ClientConn
 	lock            sync.Mutex
+	config          atomic.Value
+	io              int
 )
 
 func FetchGRPCConn() (*grpc.ClientConn, error) {
-
-	if atomic.LoadPointer(&globalGRPCconns) != nil {
-		if (*grpc.ClientConn)(globalGRPCconns).GetState() == connectivity.Connecting {
-			return (*grpc.ClientConn)(globalGRPCconns), nil
+	if c := config.Load(); c != nil {
+		if c.(*grpc.ClientConn).GetState() == connectivity.Ready {
+			return c.(*grpc.ClientConn), nil
 		}
 	}
+	io++
+	fmt.Printf("%d \n", io)
 
 	lock.Lock()
 
@@ -37,7 +40,7 @@ func FetchGRPCConn() (*grpc.ClientConn, error) {
 		return nil, err
 	}
 
-	atomic.StorePointer(&globalGRPCconns, unsafe.Pointer(cli))
+	config.Store(cli)
 
 	return cli, nil
 }

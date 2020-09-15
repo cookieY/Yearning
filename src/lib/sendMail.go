@@ -84,17 +84,17 @@ var TmplTestDing = `
 # Yearning 测试！
 `
 
-var TmplReferDing = `# Yearning工单提交通知 #  \n \n  **工单编号:**  %s \n \n **数据源:** %s \n \n **提交人员:**  <font color=\"#78beea\">%s</font> \n \n **下一步操作人:** <font color=\"#fe8696\">%s</font> \n \n **平台地址:** http://%s \n \n **工单说明:**  %s \n \n **状态:** <font color=\"#1abefa\">已提交</font> \n \n `
+var TmplReferDing = `# Yearning工单提交通知 #  \n \n  **工单编号:**  %s \n \n **数据源:** %s \n \n **提交人员:**  <font color=\"#78beea\">%s</font> \n \n **下一步操作人:** <font color=\"#fe8696\">%s</font> \n \n **平台地址:** %s \n \n **工单说明:**  %s \n \n **状态:** <font color=\"#1abefa\">已提交</font> \n \n `
 
-var TmplRejectDing = `# Yearning工单驳回通知 #  \n \n  **工单编号:**  %s \n \n **数据源:** %s \n \n **提交人员:**  <font color=\"#78beea\">%s</font> \n \n **下一步操作人:** <font color=\"#fe8696\">%s</font> \n \n **平台地址:** http://%s \n \n **工单说明:**  %s \n \n **状态:** <font color=\"#df117e\">驳回</font>  \n \n **驳回说明:**  %s `
-var TmplSuccessDing = `# Yearning工单执行通知 #  \n \n  **工单编号:**  %s \n \n **数据源:** %s \n \n **提交人员:**  <font color=\"#78beea\">%s</font> \n \n **执行人:** <font color=\"#fe8696\">%s</font> \n \n **平台地址:** http://%s \n \n **工单说明:**  %s \n \n **状态:** <font color=\"#3fd2bd\">执行成功</font>`
-var TmplFailedDing = `# Yearning工单执行通知 #  \n \n  **工单编号:**  %s \n \n **数据源:** %s \n \n **提交人员:**  <font color=\"#78beea\">%s</font> \n \n **执行人:** <font color=\"#fe8696\">%s</font> \n \n **平台地址:** http://%s \n \n **工单说明:**  %s \n \n **状态:** <font color=\"#ea2426\">执行失败</font>`
-var TmplPerformDing = `# Yearning工单转交通知 #  \n \n  **工单编号:**  %s \n \n **数据源:** %s \n \n **提交人员:**  <font color=\"#78beea\">%s</font> \n \n **下一步操作人:** <font color=\"#fe8696\">%s</font> \n \n **平台地址:** http://%s \n \n **工单说明:**  %s \n \n **状态:** <font color=\"#de4943\">已转交至下一操作人</font>`
-var TmplBackDing = `# Yearning工单执行通知 #  \n \n  **工单编号:**  %s \n \n **数据源:** %s  \n \n **提交人员:**  <font color=\"#78beea\">%s</font> \n \n **下一步操作人:** <font color=\"#fe8696\">%s</font> \n \n **平台地址:** http://%s \n \n **工单说明:**  %s \n \n **状态:** <font color=\"#ea2426\">已撤回</font>`
+var TmplRejectDing = `# Yearning工单驳回通知 #  \n \n  **工单编号:**  %s \n \n **数据源:** %s \n \n **提交人员:**  <font color=\"#78beea\">%s</font> \n \n **下一步操作人:** <font color=\"#fe8696\">%s</font> \n \n **平台地址:** %s \n \n **工单说明:**  %s \n \n **状态:** <font color=\"#df117e\">驳回</font>  \n \n **驳回说明:**  %s `
+var TmplSuccessDing = `# Yearning工单执行通知 #  \n \n  **工单编号:**  %s \n \n **数据源:** %s \n \n **提交人员:**  <font color=\"#78beea\">%s</font> \n \n **执行人:** <font color=\"#fe8696\">%s</font> \n \n **平台地址:** %s \n \n **工单说明:**  %s \n \n **状态:** <font color=\"#3fd2bd\">执行成功</font>`
+var TmplFailedDing = `# Yearning工单执行通知 #  \n \n  **工单编号:**  %s \n \n **数据源:** %s \n \n **提交人员:**  <font color=\"#78beea\">%s</font> \n \n **执行人:** <font color=\"#fe8696\">%s</font> \n \n **平台地址:** %s \n \n **工单说明:**  %s \n \n **状态:** <font color=\"#ea2426\">执行失败</font>`
+var TmplPerformDing = `# Yearning工单转交通知 #  \n \n  **工单编号:**  %s \n \n **数据源:** %s \n \n **提交人员:**  <font color=\"#78beea\">%s</font> \n \n **下一步操作人:** <font color=\"#fe8696\">%s</font> \n \n **平台地址:** %s \n \n **工单说明:**  %s \n \n **状态:** <font color=\"#de4943\">已转交至下一操作人</font>`
+var TmplBackDing = `# Yearning工单执行通知 #  \n \n  **工单编号:**  %s \n \n **数据源:** %s  \n \n **提交人员:**  <font color=\"#78beea\">%s</font> \n \n **下一步操作人:** <font color=\"#fe8696\">%s</font> \n \n **平台地址:** %s \n \n **工单说明:**  %s \n \n **状态:** <font color=\"#ea2426\">已撤回</font>`
 
-var TmplQueryRefer = `# Yearning查询申请通知 #  \n \n  **工单编号:**  %s \n \n **提交人员:**  <font color=\"#78beea\">%s</font> \n \n **审核人员:** <font color=\"#fe8696\">%s</font> \n \n **平台地址:** http://%s \n \n **工单说明:**  %s \n \n **状态:** <font color=\"#1abefa\">已提交</font>`
-var TmplSuccessQuery = `# Yearning查询申请通知 #  \n \n  **工单编号:**  %s \n \n **提交人员:**  <font color=\"#78beea\">%s</font> \n \n **审核人员:** <font color=\"#fe8696\">%s</font> \n \n **平台地址:** http://%s \n \n **状态:** <font color=\"#3fd2bd\">同意</font>`
-var TmplRejectQuery = `# Yearning查询申请通知 #  \n \n  **工单编号:**  %s \n \n **提交人员:**  <font color=\"#78beea\">%s</font> \n \n **审核人员:** <font color=\"#fe8696\">%s</font> \n \n **平台地址:** http://%s \n \n **状态:** <font color=\"#df117e\">已驳回</font>`
+var TmplQueryRefer = `# Yearning查询申请通知 #  \n \n  **工单编号:**  %s \n \n **提交人员:**  <font color=\"#78beea\">%s</font> \n \n **审核人员:** <font color=\"#fe8696\">%s</font> \n \n **平台地址:** %s \n \n **工单说明:**  %s \n \n **状态:** <font color=\"#1abefa\">已提交</font>`
+var TmplSuccessQuery = `# Yearning查询申请通知 #  \n \n  **工单编号:**  %s \n \n **提交人员:**  <font color=\"#78beea\">%s</font> \n \n **审核人员:** <font color=\"#fe8696\">%s</font> \n \n **平台地址:** %s \n \n **状态:** <font color=\"#3fd2bd\">同意</font>`
+var TmplRejectQuery = `# Yearning查询申请通知 #  \n \n  **工单编号:**  %s \n \n **提交人员:**  <font color=\"#78beea\">%s</font> \n \n **审核人员:** <font color=\"#fe8696\">%s</font> \n \n **平台地址:** %s \n \n **状态:** <font color=\"#df117e\">已驳回</font>`
 
 func SendMail(mail model.Message, tmpl string) {
 	m := gomail.NewMessage()
@@ -198,19 +198,19 @@ func MessagePush(workid string, t uint, reject string) {
 		}
 
 		if t == 4 {
-			ding = fmt.Sprintf(TmplFailedDing, o.Source, o.WorkId, o.Username, o.Assigned, model.Host, o.Text)
+			ding = fmt.Sprintf(TmplFailedDing, o.WorkId, o.Source, o.Username, o.Assigned, model.Host, o.Text)
 			mail = fmt.Sprintf(TmplMail, "执行", o.WorkId, o.Username, model.Host, model.Host, "执行失败")
 		}
 
 		if t == 5 {
 			model.DB().Select("email").Where("username =?", o.Assigned).First(&user)
 			s.ToUser = user.Email
-			ding = fmt.Sprintf(TmplPerformDing, o.Source, o.WorkId, o.Username, o.Assigned, model.Host, o.Text)
+			ding = fmt.Sprintf(TmplPerformDing, o.WorkId, o.Source, o.Username, o.Assigned, model.Host, o.Text)
 			mail = fmt.Sprintf(Tmpl2Mail, "转交", o.WorkId, o.Username, o.Assigned, model.Host, model.Host, "已转交至下一操作人")
 		}
 
 		if t == 6 {
-			ding = fmt.Sprintf(TmplBackDing, o.Source, o.WorkId, o.Username, o.Assigned, model.Host, o.Text)
+			ding = fmt.Sprintf(TmplBackDing, o.WorkId, o.Source, o.Username, o.Assigned, model.Host, o.Text)
 			mail = fmt.Sprintf(TmplMail, "提交", o.WorkId, o.Username, model.Host, model.Host, "已撤销")
 		}
 	}
