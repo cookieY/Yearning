@@ -34,7 +34,6 @@ type ber struct {
 	Date string `json:"date"`
 }
 
-
 type mt struct {
 	Mail model.Message
 }
@@ -82,7 +81,7 @@ func SuperTestSetting(c yee.Context) (err error) {
 			c.Logger().Error(err.Error())
 			return c.JSON(http.StatusInternalServerError, err.Error())
 		}
-		go lib.SendMail( u.Mail, lib.TemoplateTestMail)
+		go lib.SendMail(u.Mail, lib.TemoplateTestMail)
 		return c.JSON(http.StatusOK, "测试邮件已发送！请注意查收！")
 	}
 
@@ -92,7 +91,7 @@ func SuperTestSetting(c yee.Context) (err error) {
 			c.Logger().Error(err.Error())
 			return c.JSON(http.StatusInternalServerError, err.Error())
 		}
-		go lib.SendDingMsg( u.Mail, lib.TmplTestDing)
+		go lib.SendDingMsg(u.Mail, lib.TmplTestDing)
 		return c.JSON(http.StatusOK, "测试消息已发送！请注意查收！")
 	}
 
@@ -114,7 +113,7 @@ func SuperTestSetting(c yee.Context) (err error) {
 	return c.JSON(http.StatusInternalServerError, "未知传参！")
 }
 
-func SuperSaveRoles(c yee.Context) (err error)  {
+func SuperSaveRoles(c yee.Context) (err error) {
 
 	u := new(set)
 
@@ -136,7 +135,7 @@ func DelQueryOrder(c yee.Context) (err error) {
 		return c.JSON(http.StatusOK, err.Error())
 	}
 	var order []model.CoreQueryOrder
-	model.DB().Where("`date` < ?",u.Date).Find(&order)
+	model.DB().Where("`date` < ?", u.Date).Find(&order)
 
 	tx := model.DB().Begin()
 	for _, i := range order {
@@ -155,14 +154,16 @@ func UndoAuditOrder(c yee.Context) (err error) {
 		c.Logger().Error(err.Error())
 		return
 	}
-	var order []model.CoreSqlOrder
-	model.DB().Where("`date` < ?",u.Date).Find(&order)
-	tx := model.DB().Begin()
-	for _, i := range order {
-		tx.Where("work_id =?", i.WorkId).Delete(&model.CoreSqlOrder{})
-		tx.Where("work_id =?", i.WorkId).Delete(&model.CoreRollback{})
-		tx.Where("work_id =?", i.WorkId).Delete(&model.CoreSqlRecord{})
-	}
-	tx.Commit()
+	go func() {
+		var order []model.CoreSqlOrder
+		model.DB().Where("`date` < ?", u.Date).Find(&order)
+		tx := model.DB().Begin()
+		for _, i := range order {
+			tx.Where("work_id =?", i.WorkId).Delete(&model.CoreSqlOrder{})
+			tx.Where("work_id =?", i.WorkId).Delete(&model.CoreRollback{})
+			tx.Where("work_id =?", i.WorkId).Delete(&model.CoreSqlRecord{})
+		}
+		tx.Commit()
+	}()
 	return c.JSON(http.StatusOK, "工单已删除！")
 }

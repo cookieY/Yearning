@@ -193,7 +193,7 @@ func SuperUserEdit(c yee.Context) (err error) {
 	switch u.Tp {
 	case "info":
 		tx := model.DB().Begin()
-		tx.Model(model.CoreAccount{}).Where("username = ?", u.Username).Updates(model.CoreAccount{Email: u.Mail, RealName: u.RealName, Department: u.Department})
+		tx.Model(model.CoreAccount{}).Where("username = ?", u.Username).Updates(model.CoreAccount{Email: u.Mail, RealName: u.RealName, Department: u.Department, Rule: u.Rule})
 		tx.Model(model.CoreSqlOrder{}).Where("username =?", u.Username).Update(model.CoreSqlOrder{RealName: u.RealName})
 		tx.Model(model.CoreQueryOrder{}).Where("username =?", u.Username).Update(model.CoreQueryOrder{Realname: u.RealName})
 		tx.Commit()
