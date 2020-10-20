@@ -36,9 +36,16 @@ type userInfo struct {
 	Group      string `json:"group"`
 }
 
+type userFetch struct {
+	Page  int      `json:"page"`
+	Query userInfo `json:"query"`
+}
+
 type register struct {
 	UserInfo userInfo `json:"user_info"`
 }
+
+var CommonExpr = "username,rule,id,department,real_name,email"
 
 func UserLdapLogin(c yee.Context) (err error) {
 	var account model.CoreAccount
@@ -208,22 +215,23 @@ func SuperUserEdit(c yee.Context) (err error) {
 }
 
 func SuperFetchUser(c yee.Context) (err error) {
-	var f userInfo
-	var u []model.CoreAccount
-	var pg int
-	con := c.QueryParam("con")
-	if err := json.Unmarshal([]byte(con), &f); err != nil {
+	u := new(userFetch)
+	if err := c.Bind(u); err != nil {
 		c.Logger().Error(err.Error())
 	}
-	start, end := lib.Paging(c.QueryParam("page"), 10)
 
-	if f.Valve {
-		model.DB().Model(model.CoreAccount{}).Where("username LIKE ? and department LIKE ?", "%"+fmt.Sprintf("%s", f.Username)+"%", "%"+fmt.Sprintf("%s", f.Department)+"%").Count(&pg).Offset(start).Limit(end).Find(&u)
+	var user []model.CoreAccount
+	var uCount int
+
+	start, end := lib.Paging(u.Page, 10)
+
+	if u.Query.Valve {
+		model.DB().Model(model.CoreAccount{}).Select(CommonExpr).Where("username LIKE ? and department LIKE ?", "%"+fmt.Sprintf("%s", u.Query.Username)+"%", "%"+fmt.Sprintf("%s", u.Query.Department)+"%").Count(&uCount).Offset(start).Limit(end).Find(&user)
 	} else {
-		model.DB().Model(model.CoreAccount{}).Count(&pg).Offset(start).Limit(end).Find(&u)
+		model.DB().Model(model.CoreAccount{}).Select(CommonExpr).Count(&uCount).Offset(start).Limit(end).Find(&user)
 	}
 
-	return c.JSON(http.StatusOK, map[string]interface{}{"page": pg, "data": u, "multi": model.GloOther.Multi})
+	return c.JSON(http.StatusOK, map[string]interface{}{"page": uCount, "data": user, "multi": model.GloOther.Multi})
 }
 
 func SuperDeleteUser(c yee.Context) (err error) {
@@ -260,6 +268,5 @@ func SuperUserApi() yee.RestfulAPI {
 		Put:    SuperUserEdit,
 		Post:   SuperUserRegister,
 		Delete: SuperDeleteUser,
-		Get:    SuperFetchUser,
 	}
 }

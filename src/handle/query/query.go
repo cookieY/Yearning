@@ -117,10 +117,6 @@ func FetchQueryDatabaseInfo(c yee.Context) (err error) {
 
 	if d.QueryPer == 1 {
 
-		var dc []string
-
-		var mid []string
-
 		source := new(queryOrder)
 
 		if err = c.Bind(source); err != nil {
@@ -137,11 +133,6 @@ func FetchQueryDatabaseInfo(c yee.Context) (err error) {
 			return err
 		}
 
-		if len(model.GloOther.ExcludeDbList) > 0 {
-			mid = lib.Intersect(dc, model.GloOther.ExcludeDbList)
-			dc = lib.NonIntersect(mid, dc)
-		}
-
 		var info []map[string]interface{}
 
 		info = append(info, map[string]interface{}{
@@ -150,7 +141,7 @@ func FetchQueryDatabaseInfo(c yee.Context) (err error) {
 			"children": result.BaseList,
 		})
 
-		return c.JSON(http.StatusOK, map[string]interface{}{"info": info, "status": d.Export, "highlight": result.Highlight, "sign": ass.Auditor})
+		return c.JSON(http.StatusOK, map[string]interface{}{"info": info, "status": d.Export, "highlight": result.Highlight, "sign": ass.Auditor, "idc": u.IDC})
 
 	} else {
 		return c.JSON(http.StatusOK, 0)

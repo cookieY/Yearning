@@ -110,7 +110,6 @@ func Migrate() {
 			AllowCreatePartition:           false,
 			AllowCreateView:                false,
 			AllowSpecialType:               false,
-			AllowForeignKey:                false,
 		}
 
 		other := model.Other{

@@ -115,6 +115,7 @@ func AddRouter(e *yee.Core) {
 
 	managerUser := r.Group("/manage_user", SuperManageGroup())
 	managerUser.Restful("", user.SuperUserApi())
+	managerUser.PUT("/fetch",user.SuperFetchUser)
 	managerUser.GET("/depend", user.FetchUserDepend)
 	managerUser.POST("/fetch/group", user.FetchUserPermissions)
 

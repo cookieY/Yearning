@@ -40,12 +40,28 @@ func ScanDataRows(s model.CoreDataSource, database, sql, meta string, isQuery bo
 	for rows.Next() {
 		_ = rows.Scan(&_tmp)
 		if isQuery {
-			res.Query = append(res.Query, map[string]interface{}{"title": _tmp})
-			res.BaseList = append(res.BaseList, map[string]interface{}{"title": _tmp, "children": []map[string]string{{}}})
+			if len(model.GloOther.ExcludeDbList) > 0 {
+				if !validExcludeDbList(_tmp) {
+					res.Query = append(res.Query, map[string]interface{}{"title": _tmp})
+					res.BaseList = append(res.BaseList, map[string]interface{}{"title": _tmp, "children": []map[string]string{{}}})
+				}
+			} else {
+				res.Query = append(res.Query, map[string]interface{}{"title": _tmp})
+				res.BaseList = append(res.BaseList, map[string]interface{}{"title": _tmp, "children": []map[string]string{{}}})
+			}
 		} else {
 			res.Results = append(res.Results, _tmp)
 		}
 		res.Highlight = append(res.Highlight, map[string]string{"vl": _tmp, "meta": meta})
 	}
 	return res, nil
+}
+
+func validExcludeDbList(db string) bool {
+	for _, i := range model.GloOther.ExcludeDbList {
+		if db == i {
+			return true
+		}
+	}
+	return false
 }
