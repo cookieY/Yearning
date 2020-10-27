@@ -10,6 +10,12 @@
 
 ##### MYSQL web 端 SQL 审核平台。
 
+## 投票
+
+Yearning正在参加OSC开源评选活动，如果Yearning能帮到你.请投Yearning一票~
+
+投票地址: https://www.oschina.net/project/top_cn_2020?utm_source=projectdetail  开发工具类(倒序第二)
+
 ## US_EN
 
 [US_EN guide](README_EN.md)
