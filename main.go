@@ -37,7 +37,7 @@ var (
 )
 
 func usage() {
-	_, err := fmt.Fprintf(os.Stderr, `version: Yearning/2.3.0 GA author: HenryYee
+	_, err := fmt.Fprintf(os.Stderr, `version: Yearning/2.3.1 Interstellar author: HenryYee
 Usage: Yearning [-m migrate] [-p port] [-s start] [-b web-bind] [-h help] [-c config file]
 
 Options:

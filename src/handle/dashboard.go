@@ -79,7 +79,7 @@ func DashAxis(c yee.Context) (err error) {
 	var ddl []groupBy
 	var order []int
 	var count []string
-	model.DB().Table("core_sql_orders").Select("time, count(*) as c").Group("time").Order("time desc").Limit(7).Scan(&ddl)
+	model.DB().Model(model.CoreSqlOrder{}).Select("time, count(*) as c").Group("time").Scan(&ddl)
 
 	for _, i := range ddl {
 		order = append(order, i.C)

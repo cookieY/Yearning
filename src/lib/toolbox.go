@@ -27,6 +27,7 @@ import (
 	"math"
 	"math/rand"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -238,7 +239,7 @@ func QueryMethod(source *model.CoreDataSource, req *model.Queryresults, wordList
 		if len(wordList) > 0 {
 			for ok := range results {
 				for _, exclude := range wordList {
-					if ok == exclude {
+					if strings.ToLower(ok) == exclude {
 						results[ok] = "****脱敏字段"
 					}
 				}

@@ -73,7 +73,7 @@ func SuperFetchAutoTaskList(c yee.Context) (err error) {
 	} else {
 		model.DB().Model(model.CoreAutoTask{}).Order("id desc").Count(&pg).Offset(start).Limit(end).Find(&task)
 	}
-	return c.JSON(http.StatusOK, map[string]interface{}{"data": task, "pg": pg})
+	return c.JSON(http.StatusOK, map[string]interface{}{"data": task, "page_number": pg})
 }
 
 func SuperEditAutoTask(c yee.Context) (err error) {

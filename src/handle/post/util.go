@@ -26,6 +26,7 @@ func CallAutoTask(u *model.CoreSqlOrder, w string, c yee.Context) {
 		},
 		SQL: u.SQL,
 	}
+
 	r := lib.ExAutoTask(&s)
 	if r {
 		// todo 调整参数

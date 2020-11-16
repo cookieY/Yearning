@@ -80,9 +80,7 @@ var Tmpl2Mail = `
 </html>
 `
 
-var TmplTestDing = `
-# Yearning 测试！
-`
+var TmplTestDing = `# Yearning 测试！`
 
 var TmplReferDing = `# Yearning工单提交通知 #  \n \n  **工单编号:**  %s \n \n **数据源:** %s \n \n **提交人员:**  <font color=\"#78beea\">%s</font> \n \n **下一步操作人:** <font color=\"#fe8696\">%s</font> \n \n **平台地址:** %s \n \n **工单说明:**  %s \n \n **状态:** <font color=\"#1abefa\">已提交</font> \n \n `
 
