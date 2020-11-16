@@ -62,8 +62,6 @@ type AuditRole struct {
 	DDLAllowColumnType             bool   // ddl语句允许更改字段类型
 	DDLImplicitTypeConversion      bool
 	DDLAllowPRINotInt              bool
-	DDLEnableForeignKey            bool    // 允许外键
-	DDLTablePrefix                 string  // 指定表名前缀
 	DDLColumnsMustHaveIndex        string // 如果表包含以下列，列必须有索引。可指定多个列,以逗号分隔.列类型可选.   格式: 列名 [列类型,可选],...
 	DDLAllowChangeColumnPosition   bool   // ddl语句允许使用after/first
 	IsOSC                          bool
