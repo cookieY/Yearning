@@ -241,7 +241,10 @@ func SuperDeleteUser(c yee.Context) (err error) {
 		return c.JSON(http.StatusOK, "admin用户无法被删除!")
 	}
 
-	model.DB().Where("username =?",user).Delete(&model.CoreAccount{})
+	tx := model.DB().Begin()
+	model.DB().Where("username =?", user).Delete(&model.CoreAccount{})
+	model.DB().Where("username =?", user).Delete(&model.CoreGrained{})
+	tx.Commit()
 
 	return c.JSON(http.StatusOK, fmt.Sprintf("用户: %s 已删除", user))
 }

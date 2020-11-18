@@ -311,7 +311,7 @@ func QueryHandlerSets(c yee.Context) (err error) {
 		c.Logger().Error(err.Error())
 		return c.JSON(http.StatusOK, err.Error())
 	}
-	found := !model.DB().Where("work_id=? AND query_per=?", u.WorkId, 2).Last(&s).RecordNotFound()
+	found := !model.DB().Where("work_id=? AND query_per=?", u.WorkId, 2).First(&s).RecordNotFound()
 
 	switch param {
 	case "agreed":
@@ -327,9 +327,7 @@ func QueryHandlerSets(c yee.Context) (err error) {
 		}
 		return c.JSON(http.StatusOK, "该次工单查询已驳回！")
 	case "stop":
-		if found {
-			model.DB().Model(model.CoreQueryOrder{}).Where("work_id =?", s.WorkId).Update(map[string]interface{}{"query_per": 3})
-		}
+		model.DB().Model(model.CoreQueryOrder{}).Where("work_id =?", s.WorkId).Update(map[string]interface{}{"query_per": 3})
 		return c.JSON(http.StatusOK, "查询已终止！")
 	default:
 		model.DB().Model(model.CoreQueryOrder{}).Updates(&model.CoreQueryOrder{QueryPer: 3})
