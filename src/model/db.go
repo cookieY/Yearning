@@ -85,9 +85,9 @@ type Permission struct {
 }
 
 type Queryresults struct {
-	Sql      string
-	Basename string
-	Source   string
+	Sql      string `json:"sql"`
+	DataBase string `json:"data_base"`
+	Source   string `json:"source"`
 }
 
 func DbInit(c string) {

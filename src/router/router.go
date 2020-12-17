@@ -15,29 +15,50 @@ package router
 
 import (
 	"Yearning-go/src/apis"
-	"Yearning-go/src/handle"
-	"Yearning-go/src/handle/manage"
-	"Yearning-go/src/handle/order"
-	"Yearning-go/src/handle/post"
-	"Yearning-go/src/handle/query"
-	"Yearning-go/src/handle/record"
-	"Yearning-go/src/handle/user"
+	"Yearning-go/src/handler/login"
+	"Yearning-go/src/handler/manage"
+	autoTask2 "Yearning-go/src/handler/manage/autoTask"
+	db2 "Yearning-go/src/handler/manage/db"
+	group2 "Yearning-go/src/handler/manage/group"
+	roles2 "Yearning-go/src/handler/manage/roles"
+	"Yearning-go/src/handler/manage/settings"
+	tpl2 "Yearning-go/src/handler/manage/tpl"
+	user2 "Yearning-go/src/handler/manage/user"
+	audit2 "Yearning-go/src/handler/order/audit"
+	"Yearning-go/src/handler/order/osc"
+	query2 "Yearning-go/src/handler/order/query"
+	"Yearning-go/src/handler/personal"
 	"Yearning-go/src/lib"
 	"Yearning-go/src/model"
-	"net/http"
-
 	"github.com/cookieY/yee"
 	"github.com/cookieY/yee/middleware"
+	"github.com/gobuffalo/packr/v2"
+	"log"
+	"net/http"
+	"os"
+	"strings"
 )
 
 func SuperManageGroup() yee.HandlerFunc {
 	return func(c yee.Context) (err error) {
 		_, role := lib.JwtParse(c)
-		if role == "super" {
+		if role == "super" || focalPoint(c) {
 			return
 		}
 		return c.ServerError(http.StatusForbidden, "非法越权操作！")
 	}
+}
+
+func focalPoint(c yee.Context) bool {
+
+	if strings.Contains(c.RequestURI(), "/api/v2/manage/tpl") && c.Request().Method == http.MethodPut {
+		return true
+	}
+
+	if strings.Contains(c.RequestURI(), "/api/v2/manage/group") && c.Request().Method == http.MethodGet {
+		return true
+	}
+	return false
 }
 
 func AuditGroup() yee.HandlerFunc {
@@ -50,86 +71,53 @@ func AuditGroup() yee.HandlerFunc {
 	}
 }
 
-func TplGroup() yee.HandlerFunc {
-	return func(c yee.Context) (err error) {
-		_, rule := lib.JwtParse(c)
-		if rule != "guest" || c.Request().Method == http.MethodPut {
-			return
+func AddRouter(e *yee.Core, box *packr.Box) {
+	if os.Getenv("DEV") == "" {
+		s, err := box.FindString("index.html")
+		if err != nil {
+			log.Fatal(err)
 		}
-		return c.ServerError(http.StatusForbidden, "非法越权操作！")
+		e.GET("/", func(c yee.Context) error {
+			return c.HTML(http.StatusOK, s)
+		})
 	}
-}
-
-func AddRouter(e *yee.Core) {
-
-	e.GET("/", func(c yee.Context) error {
-		return c.HTMLTml(http.StatusOK, "./dist/index.html")
-	})
-
-	e.POST("/login", user.UserGeneralLogin)
-	e.POST("/register", user.UserRegister)
-	e.GET("/fetch", user.UserReqSwitch)
-	e.POST("/ldap", user.UserLdapLogin)
+	e.POST("/login", login.UserGeneralLogin)
+	e.POST("/register", login.UserRegister)
+	e.GET("/fetch", login.UserReqSwitch)
+	e.POST("/ldap", login.UserLdapLogin)
 
 	r := e.Group("/api/v2", middleware.JWTWithConfig(middleware.JwtConfig{SigningKey: []byte(model.JWT)}))
-	r.PUT("/user/edit/:tp", user.GeneralUserEdit)
-	r.PUT("/user/order", order.GeneralFetchMyOrder)
-
-	r.Restful("/dash/:tp",apis.YearningDashApis())
+	r.Restful("/common/:tp", personal.PersonalRestFulAPis())
+	r.Restful("/dash/:tp", apis.YearningDashApis())
 	r.Restful("/fetch/:tp", apis.YearningFetchApis())
 	r.Restful("/query/:tp", apis.YearningQueryApis())
 
-	r.POST("/sql/refer", post.SQLReferToOrder)
-	r.GET("/board", handle.GeneralFetchBoard)
-	r.GET("/steps", order.FetchStepsDetail)
-
 	audit := r.Group("/audit", AuditGroup())
-	audit.POST("/test", handle.SuperSQLTest)
-	audit.POST("/agree", order.MultiAuditOrder)
-	audit.PUT("", order.FetchAuditOrder)
-	audit.GET("/sql", order.FetchOrderSQL)
-	audit.GET("/kill/:work_id", order.DelayKill)
-	audit.POST("/reject", order.RejectOrder)
-	audit.POST("/execute", order.ExecuteOrder)
-	audit.PUT("/record", record.FetchRecord)
-	audit.PUT("/query/fetch", query.FetchQueryOrder)
-	audit.POST("/query/handle/:tp", query.QueryHandlerSets)
-	audit.DELETE("/query/empty", query.QueryDeleteEmptyRecord)
-	audit.PUT("/query/fetch/record", record.FetchQueryRecord)
-	audit.PUT("/query/fetch/record/detail", record.FetchQueryRecordDetail)
-	audit.GET("/fetch_osc/:work_id", order.OscPercent)
-	audit.DELETE("/fetch_osc/:work_id", order.OscKill)
+	audit.Restful("/order/:tp", audit2.AuditRestFulAPis())
+	audit.Restful("/osc/:work_id", osc.AuditOSCFetchStateApis())
+	audit.Restful("/query/:tp", query2.AuditQueryRestFulAPis())
 
-	group := r.Group("/group", SuperManageGroup())
-	group.PUT("", manage.SuperGroup)
-	group.POST("/update", manage.SuperGroupUpdate)
-	group.POST("/fetch/marge", manage.SuperUserRuleMarge)
-	group.DELETE("/del/:clear", manage.SuperClearUserRule)
-	group.GET("/setting", manage.SuperFetchSetting)
-	group.POST("/setting/add", manage.SuperSaveSetting)
-	group.POST("/setting/roles", manage.SuperSaveRoles)
-	group.PUT("/setting/test/:el", manage.SuperTestSetting)
-	group.POST("/setting/del/order", manage.UndoAuditOrder)
-	group.POST("/setting/del/query", manage.DelQueryOrder)
-	group.POST("/board/post", handle.GeneralPostBoard)
+	manager := r.Group("/manage", SuperManageGroup())
+	manager.POST("/board/post", manage.GeneralPostBoard)
 
-	managerUser := r.Group("/manage_user", SuperManageGroup())
-	managerUser.Restful("", user.SuperUserApi())
-	managerUser.PUT("/fetch",user.SuperFetchUser)
-	managerUser.GET("/depend", user.FetchUserDepend)
-	managerUser.POST("/fetch/group", user.FetchUserPermissions)
+	db := manager.Group("/db")
+	db.Restful("", db2.ManageDbApi())
 
-	db := r.Group("/management_db", SuperManageGroup())
-	db.Restful("", manage.ManageDbApi())
-	db.PUT("/test", manage.SuperTestDBConnect)
+	account := manager.Group("/user")
+	account.Restful("", user2.SuperUserApi())
 
-	tpl := r.Group("/tpl", TplGroup())
-	tpl.Restful("", manage.TplRestApis())
+	tpl := manager.Group("/tpl")
+	tpl.Restful("", tpl2.TplRestApis())
 
-	autoTask := r.Group("/auto", SuperManageGroup())
-	autoTask.POST("", manage.SuperReferAutoTask)
-	autoTask.PUT("/fetch", manage.SuperFetchAutoTaskList)
-	autoTask.POST("/edit", manage.SuperEditAutoTask)
-	autoTask.DELETE("/:id", manage.SuperDeleteAutoTask)
-	autoTask.POST("/active", manage.SuperAutoTaskActivation)
+	group := manager.Group("/group")
+	group.Restful("", group2.GroupsApis())
+
+	setting := manager.Group("/setting")
+	setting.Restful("", settings.SettingsApis())
+
+	roles := manager.Group("/roles")
+	roles.Restful("", roles2.RolesApis())
+
+	autoTask := manager.Group("/task")
+	autoTask.Restful("", autoTask2.SuperAutoTaskApis())
 }

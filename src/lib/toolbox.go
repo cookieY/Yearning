@@ -198,7 +198,7 @@ func QueryMethod(source *model.CoreDataSource, req *model.Queryresults, wordList
 
 	ps := Decrypt(source.Password)
 
-	db, err := sqlx.Connect("mysql", fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?charset=utf8mb4", source.Username, ps, source.IP, source.Port, req.Basename))
+	db, err := sqlx.Connect("mysql", fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?charset=utf8mb4", source.Username, ps, source.IP, source.Port, req.DataBase))
 	if err != nil {
 		return qd, err
 	}
@@ -295,7 +295,7 @@ func removeDuplicateElementForRule(addrs []string) []string {
 	return result
 }
 
-func MulitUserRuleMarge(group []string) model.PermissionList {
+func MultiUserRuleMarge(group []string) model.PermissionList {
 	var u model.PermissionList
 	for _, i := range group {
 		var k model.CoreRoleGroup
@@ -313,4 +313,9 @@ func MulitUserRuleMarge(group []string) model.PermissionList {
 	u.QuerySource = removeDuplicateElementForRule(u.QuerySource)
 
 	return u
+}
+
+func EmptyGroup() []byte {
+	group, _ := json.Marshal([]string{})
+	return group
 }

@@ -22,9 +22,11 @@ import (
 	"fmt"
 	"github.com/cookieY/yee"
 	"github.com/cookieY/yee/middleware"
+	"github.com/gobuffalo/packr/v2"
 )
 
 func StartYearning(port string, host string) {
+	box := packr.New("gemini", "./dist")
 	model.DB().First(&model.GloPer)
 	model.Host = host
 	_ = json.Unmarshal(model.GloPer.Message, &model.GloMessage)
@@ -40,6 +42,6 @@ func StartYearning(port string, host string) {
 	e.Use(middleware.GzipWithConfig(middleware.GzipConfig{
 		Level: 5,
 	}))
-	router.AddRouter(e)
+	router.AddRouter(e,box)
 	e.Run(fmt.Sprintf(":%s", port))
 }

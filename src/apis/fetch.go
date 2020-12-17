@@ -1,9 +1,8 @@
 package apis
 
 import (
-	"Yearning-go/src/handle"
-	"Yearning-go/src/handle/manage"
-	"Yearning-go/src/handle/order"
+	"Yearning-go/src/handler/fetch"
+	"Yearning-go/src/handler/manage/group"
 	"github.com/cookieY/yee"
 	"net/http"
 )
@@ -12,22 +11,29 @@ func FetchResourceForGet(y yee.Context) (err error) {
 	tp := y.Params("tp")
 	switch tp {
 	case "detail":
-		return handle.GeneralOrderDetailList(y)
+		return fetch.FetchOrderDetailList(y)
 	case "roll":
-		return handle.GeneralOrderDetailRollSQL(y)
+		return fetch.FetchOrderDetailRollSQL(y)
 	case "undo":
-		return handle.GeneralFetchUndo(y)
+		return fetch.FetchUndo(y)
 	case "sql":
-		return handle.GeneralFetchSQLInfo(y)
+		return fetch.FetchSQLInfo(y)
 	case "perform":
-		return order.FetchPerformList(y)
+		return fetch.FetchPerformList(y)
 	case "idc":
-		return handle.GeneralIDC(y)
+		return fetch.FetchIDC(y)
 	case "source":
-		return handle.GeneralSource(y)
+		return fetch.FetchSource(y)
 	case "base":
-		return handle.GeneralBase(y)
-
+		return fetch.FetchBase(y)
+	case "table":
+		return fetch.FetchTable(y)
+	case "fields":
+		return fetch.FetchTableInfo(y)
+	case "steps":
+		return fetch.FetchStepsProfile(y)
+	case "board":
+		return fetch.FetchBoard(y)
 	}
 	return y.JSON(http.StatusOK, "Illegal")
 }
@@ -35,12 +41,10 @@ func FetchResourceForGet(y yee.Context) (err error) {
 func FetchResourceForPut(y yee.Context) (err error) {
 	tp := y.Params("tp")
 	switch tp {
-	case "table":
-		return handle.GeneralTable(y)
-	case "table_info":
-		return handle.GeneralTableInfo(y)
 	case "test":
-		return handle.GeneralSQLTest(y)
+		return fetch.FetchSQLTest(y)
+	case "merge":
+		return fetch.FetchMergeDDL(y)
 	}
 	return y.JSON(http.StatusOK, "Illegal")
 }
@@ -49,9 +53,9 @@ func FetchResourceForPost(y yee.Context) (err error) {
 	tp := y.Params("tp")
 	switch tp {
 	case "marge":
-		return manage.SuperUserRuleMarge(y)
+		return group.SuperUserRuleMarge(y)
 	case "roll_order":
-		return order.RollBackSQLOrder(y)
+		return fetch.RollBackSQLOrder(y)
 	}
 	return y.JSON(http.StatusOK, "Illegal")
 }

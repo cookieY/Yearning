@@ -38,7 +38,6 @@ type AuditRole struct {
 	DDlCheckColumnComment          bool   //是否检查列注释
 	DDLCheckColumnNullable         bool   //是否检查ddl语句有null值
 	DDLCheckColumnDefault          bool   //是否检查列默认值
-	DDLTimeFieldDefault            bool   //检测时间字段是否拥有默认值
 	DDLEnableAcrossDBRename        bool   //是否允许跨库表迁移
 	DDLEnableAutoincrementInit     bool   //是否强制自增列初始值为1
 	DDLEnableAutoIncrement         bool   //是否强制主键为自增列
@@ -103,18 +102,17 @@ type IndexInfo struct {
 type FieldInfo struct {
 	gorm.Model
 
-	Field      string  `gorm:"Column:Field";json:"field"`
-	Type       string  `gorm:"Column:Type";json:"type"`
-	Collation  string  `gorm:"Column:Collation";json:"collation"`
-	Null       string  `gorm:"Column:Null";json:"null"`
-	Key        string  `gorm:"Column:Key";json:"key"`
-	Default    *string `gorm:"Column:Default";json:"default"`
-	Extra      string  `gorm:"Column:Extra";json:"extra"`
-	Privileges string  `gorm:"Column:Privileges";json:"privileges"`
-	Comment    string  `gorm:"Column:Comment";json:"comment"`
-
-	IsDeleted bool `gorm:"-"`
-	IsNew     bool `gorm:"-"`
+	Field      string  `gorm:"Column:Field" json:"field"`
+	Type       string  `gorm:"Column:Type" json:"type"`
+	Collation  string  `gorm:"Column:Collation" json:"collation"`
+	Null       string  `gorm:"Column:Null" json:"null"`
+	Key        string  `gorm:"Column:Key" json:"key"`
+	Default    *string `gorm:"Column:Default" json:"default"`
+	Extra      string  `gorm:"Column:Extra" json:"extra"`
+	Privileges string  `gorm:"Column:Privileges" json:"privileges"`
+	Comment    string  `gorm:"Column:Comment" json:"comment"`
+	IsDeleted  bool    `gorm:"-"`
+	IsNew      bool    `gorm:"-"`
 
 	Tp *types.FieldType `gorm:"-"`
 }

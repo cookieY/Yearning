@@ -184,6 +184,7 @@ func DelCol() {
 
 func MargeRuleGroup() {
 	fmt.Println("破坏性变更修复…………")
+	model.DB().Exec("alter table core_auto_tasks change COLUMN base data_base varchar(50) not null")
 	model.DB().Model(&model.CoreSqlOrder{}).DropColumn("rejected")
 	model.DB().Model(&model.CoreGrained{}).DropColumn("permissions")
 	model.DB().Model(&model.CoreGrained{}).DropColumn("rule")
