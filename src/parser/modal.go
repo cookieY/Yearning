@@ -15,7 +15,6 @@ package parser
 
 import (
 	"github.com/jinzhu/gorm"
-	"github.com/pingcap/parser/types"
 )
 
 var FetchAuditRole AuditRole
@@ -95,8 +94,6 @@ type IndexInfo struct {
 	Seq        int    `gorm:"Column:Seq_in_index"`
 	ColumnName string `gorm:"Column:Column_name"`
 	IndexType  string `gorm:"Column:Index_type"`
-
-	IsDeleted bool `gorm:"-"`
 }
 
 type FieldInfo struct {
@@ -111,8 +108,4 @@ type FieldInfo struct {
 	Extra      string  `gorm:"Column:Extra" json:"extra"`
 	Privileges string  `gorm:"Column:Privileges" json:"privileges"`
 	Comment    string  `gorm:"Column:Comment" json:"comment"`
-	IsDeleted  bool    `gorm:"-"`
-	IsNew      bool    `gorm:"-"`
-
-	Tp *types.FieldType `gorm:"-"`
 }
