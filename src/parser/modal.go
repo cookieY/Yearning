@@ -13,10 +13,6 @@
 
 package parser
 
-import (
-	"github.com/jinzhu/gorm"
-)
-
 var FetchAuditRole AuditRole
 
 type Record struct {
@@ -83,11 +79,12 @@ type AuditRole struct {
 	AllowCreatePartition           bool
 	AllowSpecialType               bool
 	PRIRollBackErr                 bool
+	OscLockWaitTimeout             int
+	OscSleep                       float32
+	OscCheckUniqueKeyChange        bool
 }
 
 type IndexInfo struct {
-	gorm.Model
-
 	Table      string `gorm:"Column:Table"`
 	NonUnique  int    `gorm:"Column:Non_unique"`
 	IndexName  string `gorm:"Column:Key_name"`
@@ -97,8 +94,6 @@ type IndexInfo struct {
 }
 
 type FieldInfo struct {
-	gorm.Model
-
 	Field      string  `gorm:"Column:Field" json:"field"`
 	Type       string  `gorm:"Column:Type" json:"type"`
 	Collation  string  `gorm:"Column:Collation" json:"collation"`

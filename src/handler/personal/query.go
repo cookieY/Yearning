@@ -228,8 +228,7 @@ func FetchQueryResults(c yee.Context) (err error) {
 	go func(w string, s string, ex int) {
 		model.DB().Create(&model.CoreQueryRecord{SQL: s, WorkId: w, ExTime: ex, Time: time.Now().Format("2006-01-02 15:04"), Source: req.Source, BaseName: req.DataBase})
 	}(d.WorkId, req.Sql, queryTime)
-
-	return c.JSON(http.StatusOK, commom.SuccessPayload(map[string]interface{}{"title": data.Field, "data": data.Data, "status": false, "time": queryTime}))
+	return c.JSON(http.StatusOK, commom.SuccessPayload(map[string]interface{}{"title": data.Field, "data": data.Data, "status": false, "time": queryTime,"total":len(data.Data)}))
 }
 
 func UndoQueryOrder(c yee.Context) (err error) {

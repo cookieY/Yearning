@@ -68,9 +68,15 @@ func AccordingToRelevant(user string) func(db *gorm.DB) *gorm.DB {
 	}
 }
 
-func AccordingToGuest(user string) func(db *gorm.DB) *gorm.DB {
+func AccordingToUsernameEqual(user string) func(db *gorm.DB) *gorm.DB {
 	return func(db *gorm.DB) *gorm.DB {
 		return db.Where("username = ?", user)
+	}
+}
+
+func AccordingToNameEqual(user string) func(db *gorm.DB) *gorm.DB {
+	return func(db *gorm.DB) *gorm.DB {
+		return db.Where("`name` = ?", user)
 	}
 }
 
@@ -122,5 +128,20 @@ func AccordingToOrderDept(text string) func(db *gorm.DB) *gorm.DB {
 func AccordingToRuleSuperOrAdmin() func(db *gorm.DB) *gorm.DB {
 	return func(db *gorm.DB) *gorm.DB {
 		return db.Where("rule in (?)", []string{"admin", "super"})
+	}
+}
+
+func AccordingToGroupSourceIsQuery(start,end int) func(db *gorm.DB) *gorm.DB {
+	return func(db *gorm.DB) *gorm.DB {
+		return db.Where("is_query =? or is_query = ?", start,end)
+	}
+}
+
+func AccordingToGroupNameIsLike(text string) func(db *gorm.DB) *gorm.DB {
+	return func(db *gorm.DB) *gorm.DB {
+		if text == "" {
+			return db
+		}
+		return db.Where("`group` like ?", "%"+text+"%")
 	}
 }

@@ -110,6 +110,9 @@ func Migrate() {
 			AllowCreatePartition:           false,
 			AllowCreateView:                false,
 			AllowSpecialType:               false,
+			OscLockWaitTimeout:             60,
+			OscSleep:                       0.0,
+			OscCheckUniqueKeyChange:        false,
 		}
 
 		other := model.Other{
@@ -175,16 +178,16 @@ func UpdateData() {
 	model.DB().AutoMigrate(&model.CoreRoleGroup{})
 	model.DB().AutoMigrate(&model.CoreWorkflowTpl{})
 	model.DB().AutoMigrate(&model.CoreWorkflowDetail{})
+	model.DB().LogMode(false).Exec("alter table core_auto_tasks change COLUMN base data_base varchar(50) not null")
 	fmt.Println("数据已更新!")
 }
 
 func DelCol() {
-	model.DB().Model(&model.CoreQueryOrder{}).DropColumn("source")
+	model.DB().LogMode(false).Model(&model.CoreQueryOrder{}).DropColumn("source")
 }
 
 func MargeRuleGroup() {
 	fmt.Println("破坏性变更修复…………")
-	model.DB().Exec("alter table core_auto_tasks change COLUMN base data_base varchar(50) not null")
 	model.DB().Model(&model.CoreSqlOrder{}).DropColumn("rejected")
 	model.DB().Model(&model.CoreGrained{}).DropColumn("permissions")
 	model.DB().Model(&model.CoreGrained{}).DropColumn("rule")

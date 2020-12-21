@@ -37,8 +37,8 @@ func SuperGroup(c yee.Context) (err error) {
 	var source []model.CoreDataSource
 	var query []model.CoreDataSource
 	var u []model.CoreAccount
-	model.DB().Select("source").Where("is_query =? or is_query = ?", 0, 2).Find(&source)
-	model.DB().Select("source").Where("is_query =? or is_query = ?", 1, 2).Find(&query)
+	model.DB().Select("source").Scopes(commom.AccordingToGroupSourceIsQuery(0, 2)).Find(&source)
+	model.DB().Select("source").Scopes(commom.AccordingToGroupSourceIsQuery(1, 2)).Find(&query)
 	model.DB().Select("username").Scopes(commom.AccordingToRuleSuperOrAdmin()).Find(&u)
 	if f.Find.Valve {
 		model.DB().Model(model.CoreRoleGroup{}).Scopes(commom.AccordingToOrderName(f.Find.Text)).Count(&page).Offset(start).Limit(end).Find(&roles)
@@ -71,18 +71,18 @@ func SuperGroupUpdate(c yee.Context) (err error) {
 		}
 		if u.Tp == 1 {
 			var s model.CoreRoleGroup
-			if model.DB().Where("`name` =?", u.Username).First(&s).RecordNotFound() {
+			if model.DB().Scopes(commom.AccordingToNameEqual(u.Username)).First(&s).RecordNotFound() {
 				model.DB().Create(&model.CoreRoleGroup{
 					Name:        u.Username,
 					Permissions: g,
 				})
 			} else {
-				model.DB().Model(model.CoreRoleGroup{}).Where("`name` =?", u.Username).Update(&model.CoreRoleGroup{Permissions: g})
+				model.DB().Model(model.CoreRoleGroup{}).Scopes(commom.AccordingToNameEqual(u.Username)).Update(&model.CoreRoleGroup{Permissions: g})
 			}
 			return c.JSON(http.StatusOK, commom.SuccessPayLoadToMessage(fmt.Sprintf(GROUP_CREATE_SUCCESS, u.Username)))
 		} else {
 			g, _ := json.Marshal(u.Group)
-			model.DB().Model(model.CoreGrained{}).Where("username = ?", u.Username).Updates(model.CoreGrained{Group: g})
+			model.DB().Model(model.CoreGrained{}).Scopes(commom.AccordingToUsernameEqual(u.Username)).Updates(model.CoreGrained{Group: g})
 			return c.JSON(http.StatusOK, commom.SuccessPayLoadToMessage(fmt.Sprintf(GROUP_EDIT_SUCCESS, u.Username)))
 		}
 	}

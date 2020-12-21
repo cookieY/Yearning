@@ -25,12 +25,12 @@ func PersonalFetchMyOrder(c yee.Context) (err error) {
 	if u.Find.Valve {
 		model.DB().Model(&model.CoreSqlOrder{}).Select(commom.QueryField).
 			Scopes(
-				commom.AccordingToGuest(user),
-				commom.AccordingToDatetime(u.Find.Picker),
+			commom.AccordingToUsernameEqual(user),
+			commom.AccordingToDatetime(u.Find.Picker),
 				commom.AccordingToText(u.Find.Text),
 			).Order("id desc").Count(&pg).Offset(start).Limit(end).Find(&order)
 	} else {
-		model.DB().Model(&model.CoreSqlOrder{}).Select(commom.QueryField).Scopes(commom.AccordingToGuest(user)).Count(&pg).Order("id desc").Offset(start).Limit(end).Find(&order)
+		model.DB().Model(&model.CoreSqlOrder{}).Select(commom.QueryField).Scopes(commom.AccordingToUsernameEqual(user)).Count(&pg).Order("id desc").Offset(start).Limit(end).Find(&order)
 	}
 	return c.JSON(http.StatusOK, commom.SuccessPayload(commom.CommonList{Data: order,Page: pg,Multi: model.GloOther.Multi}))
 }
