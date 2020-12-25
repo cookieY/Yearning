@@ -68,18 +68,6 @@ type PermissionList struct {
 	QuerySource []string `json:"query_source"`
 }
 
-type MargeList struct {
-	DDL         int      `json:"ddl"`
-	DDLSource   []string `json:"ddl_source"`
-	DML         int      `json:"dml"`
-	DMLSource   []string `json:"dml_source"`
-	User        int      `json:"user"`
-	Base        int      `json:"base"`
-	Auditor     []string `json:"auditor"`
-	Query       int      `json:"query"`
-	QuerySource []string `json:"query_source"`
-}
-
 type Permission struct {
 	Permissions PermissionList `json:"permissions"`
 }

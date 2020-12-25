@@ -283,6 +283,14 @@ func RollBackSQLOrder(c yee.Context) (err error) {
 	u.Data.CurrentStep = 1
 	u.Data.Time = time.Now().Format("2006-01-02")
 	u.Data.Relevant = lib.JsonStringify([]string{auditor[0]})
+	u.Data.Assigned = auditor[0]
+	model.DB().Create(&model.CoreWorkflowDetail{
+		WorkId:   w,
+		Username: u.Data.Username,
+		Action:   "已提交",
+		Rejected: "",
+		Time:     time.Now().Format("2006-01-02 15:04"),
+	})
 	model.DB().Model(model.CoreSqlOrder{}).Create(&u.Data)
 	lib.MessagePush(w, 2, "")
 	return c.JSON(http.StatusOK, commom.SuccessPayLoadToMessage(commom.ORDER_IS_CREATE))

@@ -29,7 +29,7 @@ func SuperFetchSource(c yee.Context) (err error) {
 		c.Logger().Error(err.Error())
 		return
 	}
-	start, end := lib.Paging(req.Find, 10)
+	start, end := lib.Paging(req.Page, 10)
 	var u []model.CoreDataSource
 	var pg int
 	if req.Find.Valve {
