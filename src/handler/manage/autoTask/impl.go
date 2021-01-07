@@ -18,25 +18,27 @@ type fetchAutoTask struct {
 	Tp   string             `json:"tp"`
 	Page int                ` json:"page"`
 	Find commom.Search      `json:"find"`
+	Resp commom.Resp        `json:"resp"`
 }
 
-func SuperCreateAutoTask(task model.CoreAutoTask) commom.Resp {
+func (task *fetchAutoTask) Create() {
 	var tmp model.CoreAutoTask
 	if model.DB().Model(model.CoreAutoTask{}).Where(
-		QUERY_EXPR, task.Name, task.Source, task.Table, task.DataBase, task.Tp).
+		QUERY_EXPR, task.Task.Name, task.Task.Source, task.Task.Table, task.Task.DataBase, task.Task.Tp).
 		First(&tmp).RecordNotFound() {
-		model.DB().Create(&task)
-		return commom.SuccessPayLoadToMessage(CREATE_MESSAGE_SUCCESS)
+		model.DB().Create(&task.Task)
+		task.Resp = commom.SuccessPayLoadToMessage(CREATE_MESSAGE_SUCCESS)
+	} else {
+		task.Resp = commom.SuccessPayLoadToMessage(CREATE_MESSAGE_ERROR)
 	}
-	return commom.SuccessPayLoadToMessage(CREATE_MESSAGE_ERROR)
 }
 
-func SuperEditAutoTask(task model.CoreAutoTask) commom.Resp {
-	model.DB().Model(model.CoreAutoTask{}).Where("id =?", task.ID).Update(task)
-	return commom.SuccessPayLoadToMessage(EDIT_MESSAGE_SUCCESS)
+func (task *fetchAutoTask) Edit() {
+	model.DB().Model(model.CoreAutoTask{}).Where("id =?", task.Task.ID).Update(task.Task)
+	task.Resp = commom.SuccessPayLoadToMessage(EDIT_MESSAGE_SUCCESS)
 }
 
-func SuperAutoTaskActivation(task model.CoreAutoTask) commom.Resp {
-	model.DB().Model(model.CoreAutoTask{}).Where("id =?", task.ID).Update("status", task.Status)
-	return commom.SuccessPayLoadToMessage(EDIT_MESSAGE_ACTIVE)
+func (task *fetchAutoTask) Activation() {
+	model.DB().Model(model.CoreAutoTask{}).Where("id =?", task.Task.ID).Update("status", task.Task.Status)
+	task.Resp = commom.SuccessPayLoadToMessage(EDIT_MESSAGE_ACTIVE)
 }

@@ -52,11 +52,11 @@ func SuperAutoTaskCreateOrEdit(c yee.Context) (err error) {
 	}
 	switch u.Tp {
 	case "create":
-		return c.JSON(http.StatusOK, SuperCreateAutoTask(u.Task))
+		u.Create()
 	case "edit":
-		return c.JSON(http.StatusOK, SuperEditAutoTask(u.Task))
+		u.Edit()
 	case "active":
-		return c.JSON(http.StatusOK, SuperAutoTaskActivation(u.Task))
+		u.Activation()
 	}
-	return
+	return c.JSON(http.StatusOK,u.Resp)
 }

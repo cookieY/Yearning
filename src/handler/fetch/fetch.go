@@ -265,21 +265,22 @@ func RollBackSQLOrder(c yee.Context) (err error) {
 		return c.JSON(http.StatusOK, commom.SuccessPayLoadToMessage(AUDITOR_IS_NOT_EXIST))
 	}
 
-	var sql string
+	var sql strings.Builder
 	if u.Tp != 1 {
-		sql = u.SQLs
+		sql.WriteString(u.SQLs)
 	} else {
 		var roll []model.CoreRollback
 		model.DB().Select("`sql`").Where("work_id =?", u.Data.WorkId).Find(&roll)
 		for _, i := range roll {
-			sql += i.SQL + "\n"
+			sql.WriteString(i.SQL)
+			sql.WriteString("\n")
 		}
 	}
 	w := lib.GenWorkid()
 	u.Data.WorkId = w
 	u.Data.Status = 2
 	u.Data.Date = time.Now().Format("2006-01-02 15:04")
-	u.Data.SQL = sql
+	u.Data.SQL = sql.String()
 	u.Data.CurrentStep = 1
 	u.Data.Time = time.Now().Format("2006-01-02")
 	u.Data.Relevant = lib.JsonStringify([]string{auditor[0]})

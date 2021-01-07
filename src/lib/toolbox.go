@@ -239,20 +239,19 @@ func QueryMethod(source *model.CoreDataSource, req *model.Queryresults, wordList
 		if len(wordList) > 0 {
 			for ok := range results {
 				for _, exclude := range wordList {
-					if strings.ToLower(ok) == exclude {
+					if (strings.Contains(strings.ToLower(ok), exclude) && strings.Contains(ok,")")) || strings.ToLower(ok) == exclude {
 						results[ok] = "****脱敏字段"
 					}
 				}
 			}
 		}
-
 		qd.Data = append(qd.Data, results)
 	}
 
 	ele := removeDuplicateElement(cols)
 
-	for _, cv := range ele {
-		qd.Field = append(qd.Field, map[string]string{"title": cv, "key": cv, "width": "200"})
+	for cv := range ele {
+		qd.Field = append(qd.Field, map[string]string{"title": ele[cv], "key": ele[cv], "width": "200"})
 	}
 	qd.Field[0]["fixed"] = "left"
 

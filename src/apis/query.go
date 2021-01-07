@@ -4,6 +4,7 @@ import (
 	"Yearning-go/src/handler/commom"
 	"Yearning-go/src/handler/fetch"
 	"Yearning-go/src/handler/personal"
+	"Yearning-go/src/lib"
 	"github.com/cookieY/yee"
 	"net/http"
 )
@@ -34,11 +35,12 @@ func YearningQueryForPut(y yee.Context) (err error) {
 
 func YearningQueryForPost(y yee.Context) (err error) {
 	tp := y.Params("tp")
+	user, _ := lib.JwtParse(y)
 	switch tp {
 	case "refer":
-		return personal.ReferQueryOrder(y)
+		return personal.ReferQueryOrder(y,&user)
 	case "results":
-		return personal.FetchQueryResults(y)
+		return personal.FetchQueryResults(y, &user)
 	}
 	return y.JSON(http.StatusOK, "Illegal")
 }

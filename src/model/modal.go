@@ -129,7 +129,7 @@ type CoreDataSource struct {
 
 type CoreGrained struct {
 	ID       uint   `gorm:"primary_key;AUTO_INCREMENT" json:"id"`
-	Username string `gorm:"type:varchar(50);not null" json:"username"`
+	Username string `gorm:"type:varchar(50);not null;index:user_idx" json:"username"`
 	Group    JSON   `gorm:"type:json" json:"group"`
 }
 

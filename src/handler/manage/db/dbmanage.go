@@ -62,16 +62,16 @@ func SuperDeleteSource(c yee.Context) (err error) {
 		return c.JSON(http.StatusOK, commom.ERR_REQ_BIND)
 	}
 
-	for _, i := range k {
+	for i := range k {
 		var p model.PermissionList
-		if err := json.Unmarshal(i.Permissions, &p); err != nil {
+		if err := json.Unmarshal(k[i].Permissions, &p); err != nil {
 			c.Logger().Error(err.Error())
 		}
 		p.DDLSource = lib.ResearchDel(p.DDLSource, source)
 		p.DMLSource = lib.ResearchDel(p.DMLSource, source)
 		p.QuerySource = lib.ResearchDel(p.QuerySource, source)
 		r, _ := json.Marshal(p)
-		if e := tx.Model(&model.CoreRoleGroup{}).Where("id =?", i.ID).Update(model.CoreRoleGroup{Permissions: r}).Error; e != nil {
+		if e := tx.Model(&model.CoreRoleGroup{}).Where("id =?", k[i].ID).Update(model.CoreRoleGroup{Permissions: r}).Error; e != nil {
 			tx.Rollback()
 			c.Logger().Error(e.Error())
 		}
@@ -97,5 +97,5 @@ func ManageDBCreateOrEdit(c yee.Context) (err error) {
 	case "test":
 		return c.JSON(http.StatusOK, SuperTestDBConnect(&u.DB))
 	}
-	return c.JSON(http.StatusOK,commom.ERR_REQ_FAKE)
+	return c.JSON(http.StatusOK, commom.ERR_REQ_FAKE)
 }

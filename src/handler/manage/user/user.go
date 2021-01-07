@@ -56,7 +56,7 @@ func ManageUserCreateOrEdit(c yee.Context) (err error) {
 	case "edit":
 		return c.JSON(http.StatusOK, SuperUserEdit(&u.User))
 	case "create":
-		return c.JSON(http.StatusOK, SuperUserRegister(&u.User))  // 这里有问题！！！！！！
+		return c.JSON(http.StatusOK, SuperUserRegister(&u.User))
 	case "password":
 		model.DB().Model(&model.CoreAccount{}).Where("username = ?", u.User.Username).Update(
 			model.CoreAccount{Password: lib.DjangoEncrypt(u.User.Password, string(lib.GetRandom()))})

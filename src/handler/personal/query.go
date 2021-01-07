@@ -29,10 +29,9 @@ import (
 	"github.com/jinzhu/gorm"
 )
 
-func ReferQueryOrder(c yee.Context) (err error) {
+func ReferQueryOrder(c yee.Context, user *string) (err error) {
 	var u model.CoreAccount
 	var t model.CoreQueryOrder
-	user, _ := lib.JwtParse(c)
 
 	d := new(commom.QueryOrder)
 	if err = c.Bind(d); err != nil {
@@ -54,7 +53,7 @@ func ReferQueryOrder(c yee.Context) (err error) {
 
 		model.DB().Create(&model.CoreQueryOrder{
 			WorkId:   work,
-			Username: user,
+			Username: *user,
 			Date:     time.Now().Format("2006-01-02 15:04"),
 			Text:     d.Text,
 			Assigned: d.Assigned,
@@ -183,7 +182,7 @@ func FetchQueryTableStruct(c yee.Context) (err error) {
 	return c.JSON(http.StatusOK, commom.SuccessPayload(f))
 }
 
-func FetchQueryResults(c yee.Context) (err error) {
+func FetchQueryResults(c yee.Context, user *string) (err error) {
 
 	req := new(model.Queryresults)
 
@@ -195,8 +194,6 @@ func FetchQueryResults(c yee.Context) (err error) {
 	var d model.CoreQueryOrder
 
 	var u model.CoreDataSource
-
-	user, _ := lib.JwtParse(c)
 
 	model.DB().Where("username =? AND query_per =?", user, 1).Last(&d)
 
@@ -228,7 +225,7 @@ func FetchQueryResults(c yee.Context) (err error) {
 	go func(w string, s string, ex int) {
 		model.DB().Create(&model.CoreQueryRecord{SQL: s, WorkId: w, ExTime: ex, Time: time.Now().Format("2006-01-02 15:04"), Source: req.Source, BaseName: req.DataBase})
 	}(d.WorkId, req.Sql, queryTime)
-	return c.JSON(http.StatusOK, commom.SuccessPayload(map[string]interface{}{"title": data.Field, "data": data.Data, "status": false, "time": queryTime,"total":len(data.Data)}))
+	return c.JSON(http.StatusOK, commom.SuccessPayload(map[string]interface{}{"title": data.Field, "data": data.Data, "status": false, "time": queryTime, "total": len(data.Data)}))
 }
 
 func UndoQueryOrder(c yee.Context) (err error) {
