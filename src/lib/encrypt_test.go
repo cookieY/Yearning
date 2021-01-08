@@ -1,21 +1,22 @@
 package lib
 
 import (
-	"fmt"
+	"Yearning-go/src/model"
+	"github.com/stretchr/testify/assert"
 	"testing"
 )
 
+func init() {
+	model.DbInit("../../conf.toml")
+}
+
 func TestEncryptToken_Encrypt(t *testing.T) {
-	//ts := EncryptToken{
-	//	Password: "Yearning_admin",
-	//	Key: "ZAQdOtbgynh2",
-	//}
-	//e := Encrypt()
-	//fmt.Println(e)
-	d := Decrypt("XTwgVLwyFSR3Rc6IjYaDcg==")
-	fmt.Println(d)
-	//c := DjangoEncrypt("Yearning_admin", "321312312321")
-	//fmt.Println(c)
-	//perfix :=strings.Split(c,"$")[2]
-	//fmt.Println(perfix)
+	password := "123abc"
+	enc := Encrypt(password)
+	assert.Equal(t, password, Decrypt(enc))
+}
+
+func TestDjangoEncrypt(t *testing.T) {
+	enc := DjangoEncrypt("Yearning_admin", "321312312321")
+	assert.Equal(t, true, DjangoCheckPassword(&model.CoreAccount{Password: enc},"Yearning_admin"))
 }

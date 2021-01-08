@@ -17,7 +17,6 @@ import (
 	"Yearning-go/src/handler/commom"
 	"Yearning-go/src/model"
 	"Yearning-go/src/test"
-	"fmt"
 	"github.com/cookieY/yee"
 	"github.com/stretchr/testify/assert"
 	"net/http"
@@ -29,50 +28,74 @@ import (
 
 func init() {
 	model.DbInit("../../../../conf.toml")
+	apis.NewTest()
 }
 
-var apis = []test.Case{
-	{Method: http.MethodPut, Uri: "/api/v2/manage/user", Handler: SuperFetchUser, Payload: `{"page":1,"find":{"valve":false}}`},
-	{Method: http.MethodPut, Uri: "/api/v2/manage/user", Handler: SuperFetchUser, Payload: `{"page":1,"find":{"valve":true,"dept":"DBA","username":"ad"}}`},
-	{Method: http.MethodDelete, Uri: "/api/v2/manage/user?user=admin", Handler: SuperDeleteUser},
-	{Method: http.MethodGet, Uri: "/api/v2/manage/user?user=admin&tp=depend", Handler: ManageUserFetch},
-	{Method: http.MethodGet, Uri: "/api/v2/manage/user?user=admin&tp=group", Handler: ManageUserFetch},
+var apis = test.Case{
+	Method:  http.MethodPost,
+	Uri:     "/api/v2/manage/user",
+	Handler: SuperUserApi(),
 }
 
-func TestSuperFetchUser(t *testing.T) {
-	k := assert.New(t)
+func TestFetchUser(t *testing.T) {
 	var Ref commom.Resp
-	apis[0].Put().Do().Unmarshal(&Ref)
-	k.NotEqual(nil, Ref.Payload)
-	k.Equal(1200, Ref.Code)
-	k.Equal(float64(12), Ref.Payload.(map[string]interface{})["page"].(float64))
-	apis[1].Do().Unmarshal(&Ref)
-	k.Equal(float64(1), Ref.Payload.(map[string]interface{})["page"].(float64))
+	apis.Put(`{"page":1,"find":{"valve":false}}`).Do().Unmarshal(&Ref)
+	assert.NotEqual(t, nil, Ref.Payload)
+	assert.Equal(t, 1200, Ref.Code)
+	assert.Equal(t, float64(12), Ref.Payload.(map[string]interface{})["page"].(float64))
+
+	apis.Put(`{"page":1,"find":{"valve":true,"dept":"DBA","username":"ad"}}`).Do().Unmarshal(&Ref)
+	assert.Equal(t, float64(1), Ref.Payload.(map[string]interface{})["page"].(float64))
+
+	apis.Put(`1{"page":"0"}`).Do().Unmarshal(&Ref)
+	assert.Equal(t, 1310, Ref.Code)
 }
 
 func TestSuperDeleteUser(t *testing.T) {
 	k := assert.New(t)
 	var Ref commom.Resp
-	apis[2].Delete().Do().Unmarshal(&Ref)
+	apis.Delete("?user=admin").Do().Unmarshal(&Ref)
 	k.Equal(ADMIN_NOT_DELETE, Ref.Text)
 	k.Equal(1200, Ref.Code)
-}
 
-func TestDelUserDepend(t *testing.T) {
-	var Ref commom.Resp
-	k := assert.New(t)
-	apis[3].Get().Do().Unmarshal(&Ref)
-	k.NotEqual(nil, Ref.Payload)
+	apis.Delete("?user=empty").Do().Unmarshal(&Ref)
+	k.NotEqual(ADMIN_NOT_DELETE, Ref.Text)
 	k.Equal(1200, Ref.Code)
 }
 
-func TestFetchUserGroups(t *testing.T) {
+func TestDelUserDependAndGroup(t *testing.T) {
 	var Ref commom.Resp
-	k := assert.New(t)
-	apis[4].Get().Do().Unmarshal(&Ref)
-	k.NotEqual(nil, Ref.Payload)
-	k.Equal(1200, Ref.Code)
-	fmt.Println(Ref.Payload)
+
+	apis.Get("?user=admin&tp=depend").Do().Unmarshal(&Ref)
+	assert.NotEqual(t, nil, Ref.Payload)
+	assert.Equal(t, 1200, Ref.Code)
+
+	apis.Get("?user=admin&tp=group").Do().Unmarshal(&Ref)
+	assert.NotEqual(t, nil, Ref.Payload)
+	assert.Equal(t, 1200, Ref.Code)
+
+	apis.Get("?user=admin&tp=error").Do().Unmarshal(&Ref)
+	assert.Equal(t, 1310, Ref.Code)
+}
+
+func TestManageUserCreateOrEdit(t *testing.T) {
+	var Ref commom.Resp
+	apis.Post(`{"tp":"error","user":{"password":"123123Zz","username":"testAdmin"}}`).Do().Unmarshal(&Ref)
+	assert.Equal(t, 1310, Ref.Code)
+
+	apis.Post(`{"tp":"edit","user":{"real_name":"Henry","username":"admin"}}`).Do().Unmarshal(&Ref)
+	assert.Equal(t, USER_EDIT_SUCCESS, Ref.Text)
+
+	apis.Post(`{"tp":"password","user":{"password":"123123Zz","username":"admin"}}`).Do().Unmarshal(&Ref)
+	assert.Equal(t, USER_EDIT_PASSWORD_SUCCESS, Ref.Text)
+
+	apis.Post(`{"tp":"create","user":{"password":"123123Zz","username":"testAdmin"}}`).Do().Unmarshal(&Ref)
+	assert.Equal(t, USER_REGUSTER_SUCCESS, Ref.Text)
+
+	apis.Post(`{"tp":"create","user":{"password":"123123Zz","username":"testAdmin"}}`).Do().Unmarshal(&Ref)
+	assert.Equal(t, ER_USER_REGUSTER, Ref.Text)
+
+	model.DB().Model(model.CoreAccount{}).Where("username = ?", "testAdmin").Delete(&model.CoreAccount{})
 }
 
 func BenchmarkSuperFetchUser(b *testing.B) {
