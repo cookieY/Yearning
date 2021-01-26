@@ -18,6 +18,13 @@ var (
 	config          atomic.Value
 )
 
+type QueryDeal struct {
+	Sql              string   `json:"sql"`
+	DataBase         string   `json:"data_base"`
+	Source           string   `json:"source"`
+	InsulateWordList []string `json:"insulate_word_list"`
+}
+
 func FetchGRPCConn() (*grpc.ClientConn, error) {
 	if c := config.Load(); c != nil {
 		if c.(*grpc.ClientConn).GetState() == connectivity.Ready {
@@ -145,7 +152,7 @@ func ExAutoTask(order *pb.LibraAuditOrder) bool {
 	return r.Ok
 }
 
-func ExQuery(order *pb.LibraAuditOrder) (*pb.InsulateWordList, error) {
+func (q *QueryDeal) Limit(order *pb.LibraAuditOrder) error {
 	conn, err := FetchGRPCConn()
 
 	if err != nil {
@@ -158,9 +165,11 @@ func ExQuery(order *pb.LibraAuditOrder) (*pb.InsulateWordList, error) {
 	}()
 	r, err := c.Query(ctx, order)
 	if err != nil {
-		return r, err
+		return err
 	}
-	return r, nil
+	q.Sql = r.SQL
+
+	return nil
 }
 
 func ExKillOsc(order *pb.LibraAuditOrder) *pb.Isok {

@@ -219,9 +219,8 @@ func FetchUndo(c yee.Context) (err error) {
 }
 
 func FetchMergeDDL(c yee.Context) (err error) {
-	req := new(model.Queryresults)
+	req := new(lib.QueryDeal)
 	if err = c.Bind(req); err != nil {
-		c.Logger().Error(err.Error())
 		return c.JSON(http.StatusOK, err.Error())
 	}
 	m, err := soar.MergeAlterTables(req.Sql)
@@ -271,8 +270,8 @@ func RollBackSQLOrder(c yee.Context) (err error) {
 	} else {
 		var roll []model.CoreRollback
 		model.DB().Select("`sql`").Where("work_id =?", u.Data.WorkId).Find(&roll)
-		for _, i := range roll {
-			sql.WriteString(i.SQL)
+		for i := range roll {
+			sql.WriteString(roll[i].SQL)
 			sql.WriteString("\n")
 		}
 	}

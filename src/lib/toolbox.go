@@ -187,36 +187,35 @@ func TimeDifference(t string) bool {
 	return false
 }
 
-type querydata struct {
+type Query struct {
 	Field []map[string]string
 	Data  []map[string]interface{}
 }
 
-func QueryMethod(source *model.CoreDataSource, req *model.Queryresults, wordList []string) (querydata, error) {
+func (q *Query) QueryRun(source *model.CoreDataSource, deal *QueryDeal) error {
 
-	var qd querydata
+	db, err := sqlx.Connect("mysql", fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?charset=utf8mb4", source.Username, Decrypt(source.Password), source.IP, source.Port, deal.DataBase))
 
-	ps := Decrypt(source.Password)
-
-	db, err := sqlx.Connect("mysql", fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?charset=utf8mb4", source.Username, ps, source.IP, source.Port, req.DataBase))
 	if err != nil {
-		return qd, err
+		return err
 	}
 
 	defer db.Close()
 
-	rows, err := db.Queryx(req.Sql)
+	rows, err := db.Queryx(deal.Sql)
 
 	if err != nil {
-		return qd, err
+		return err
 	}
 
 	cols, err := rows.Columns()
 
 	if err != nil {
-		return qd, err
+		return err
 	}
+
 	defer rows.Close()
+
 	for rows.Next() {
 		results := make(map[string]interface{})
 		_ = rows.MapScan(results)
@@ -236,26 +235,27 @@ func QueryMethod(source *model.CoreDataSource, req *model.Queryresults, wordList
 				}
 			}
 		}
-		if len(wordList) > 0 {
+		if len(deal.InsulateWordList) > 0 {
 			for ok := range results {
-				for _, exclude := range wordList {
-					if (strings.Contains(strings.ToLower(ok), exclude) && strings.Contains(ok,")")) || strings.ToLower(ok) == exclude {
+				for _, exclude := range deal.InsulateWordList {
+					if (strings.Contains(strings.ToLower(ok), exclude) && strings.Contains(ok, ")")) || strings.ToLower(ok) == exclude {
 						results[ok] = "****脱敏字段"
 					}
 				}
 			}
 		}
-		qd.Data = append(qd.Data, results)
+		q.Data = append(q.Data, results)
 	}
 
 	ele := removeDuplicateElement(cols)
 
 	for cv := range ele {
-		qd.Field = append(qd.Field, map[string]string{"title": ele[cv], "key": ele[cv], "width": "200"})
+		q.Field = append(q.Field, map[string]string{"title": ele[cv], "key": ele[cv], "width": "200"})
 	}
-	qd.Field[0]["fixed"] = "left"
 
-	return qd, nil
+	q.Field[0]["fixed"] = "left"
+
+	return nil
 }
 
 func removeDuplicateElement(addrs []string) []string {
@@ -279,8 +279,6 @@ func JsonStringify(i interface{}) []byte {
 	o, _ := json.Marshal(i)
 	return o
 }
-
-
 
 func removeDuplicateElementForRule(addrs []string) []string {
 	result := make([]string, 0, len(addrs))

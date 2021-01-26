@@ -184,16 +184,20 @@ func FetchQueryTableStruct(c yee.Context) (err error) {
 
 func FetchQueryResults(c yee.Context, user *string) (err error) {
 
-	req := new(model.Queryresults)
+	req := new(lib.QueryDeal)
 
 	if err = c.Bind(req); err != nil {
-		c.Logger().Error(err.Error())
 		return c.JSON(http.StatusOK, err.Error())
 	}
 
-	var d model.CoreQueryOrder
+	//需自行实现查询SQL LIMIT限制
+	err = req.Limit(&pb.LibraAuditOrder{SQL: req.Sql})
 
-	var u model.CoreDataSource
+	if err != nil {
+		return c.JSON(http.StatusOK, commom.ERR_COMMON_MESSAGE(err))
+	}
+
+	var d model.CoreQueryOrder
 
 	model.DB().Where("username =? AND query_per =?", user, 1).Last(&d)
 
@@ -201,30 +205,26 @@ func FetchQueryResults(c yee.Context, user *string) (err error) {
 		model.DB().Model(model.CoreQueryOrder{}).Where("username =?", user).Update(&model.CoreQueryOrder{QueryPer: 3})
 		return c.JSON(http.StatusOK, commom.SuccessPayload(map[string]interface{}{"status": true}))
 	}
-	model.DB().Where("source =?", req.Source).First(&u)
-
-	//需自行实现查询SQL LIMIT限制
-	r, err := lib.ExQuery(&pb.LibraAuditOrder{SQL: req.Sql})
-
-	if err != nil {
-		return c.JSON(http.StatusOK, commom.ERR_COMMON_MESSAGE(err))
-	}
-
-	req.Sql = r.SQL
 
 	//结束
-	t1 := time.Now()
-	data, err := lib.QueryMethod(&u, req, r.InsulateWordList)
+	data := new(lib.Query)
+
+	var u model.CoreDataSource
+
+	model.DB().Where("source =?", req.Source).First(&u)
+
+	err = data.QueryRun(&u, req)
 
 	if err != nil {
 		return c.JSON(http.StatusOK, commom.ERR_COMMON_MESSAGE(err))
 	}
 
-	queryTime := int(time.Since(t1).Seconds() * 1000)
+	queryTime := int(time.Since(time.Now()).Seconds() * 1000)
 
-	go func(w string, s string, ex int) {
+	go func(w, s string, ex int) {
 		model.DB().Create(&model.CoreQueryRecord{SQL: s, WorkId: w, ExTime: ex, Time: time.Now().Format("2006-01-02 15:04"), Source: req.Source, BaseName: req.DataBase})
 	}(d.WorkId, req.Sql, queryTime)
+
 	return c.JSON(http.StatusOK, commom.SuccessPayload(map[string]interface{}{"title": data.Field, "data": data.Data, "status": false, "time": queryTime, "total": len(data.Data)}))
 }
 

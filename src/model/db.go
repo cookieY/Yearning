@@ -72,12 +72,6 @@ type Permission struct {
 	Permissions PermissionList `json:"permissions"`
 }
 
-type Queryresults struct {
-	Sql      string `json:"sql"`
-	DataBase string `json:"data_base"`
-	Source   string `json:"source"`
-}
-
 func DbInit(c string) {
 	_, err := toml.DecodeFile(c, &C)
 	if err != nil {
