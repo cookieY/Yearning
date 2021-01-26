@@ -11,8 +11,7 @@ import (
 func PersonalFetchMyOrder(c yee.Context) (err error) {
 	u := new(commom.PageInfo)
 	if err = c.Bind(u); err != nil {
-		c.Logger().Error(err.Error())
-		return
+		return c.JSON(http.StatusOK, commom.ERR_REQ_BIND)
 	}
 	user, _ := lib.JwtParse(c)
 
@@ -40,7 +39,6 @@ func PersonalUserEdit(c yee.Context) (err error) {
 	param := c.QueryParam("tp")
 	u := new(model.CoreAccount)
 	if err = c.Bind(u); err != nil {
-		c.Logger().Error(err.Error())
 		return c.JSON(http.StatusOK, commom.ERR_REQ_BIND)
 	}
 	user, _ := lib.JwtParse(c)

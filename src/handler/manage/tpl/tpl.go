@@ -9,15 +9,12 @@ import (
 )
 
 func GeneralAllSources(c yee.Context) (err error) {
-	var source []model.CoreDataSource
-	model.DB().Select("source").Find(&source)
-	return c.JSON(http.StatusOK, commom.SuccessPayload(source))
+	return c.JSON(http.StatusOK, commom.SuccessPayload(model.GloOther.IDC))
 }
 
 func TplPostSourceTemplate(c yee.Context) (err error) {
 	u := new(tplTypes)
 	if err = c.Bind(u); err != nil {
-		c.Logger().Error(err.Error())
 		return c.JSON(http.StatusOK, commom.ERR_REQ_BIND)
 	}
 	var t model.CoreWorkflowTpl
@@ -34,7 +31,6 @@ func TplPostSourceTemplate(c yee.Context) (err error) {
 func TplEditSourceTemplateInfo(c yee.Context) (err error) {
 	u := new(tplTypes)
 	if err = c.Bind(u); err != nil {
-		c.Logger().Error(err.Error())
 		return c.JSON(http.StatusOK, commom.ERR_REQ_BIND)
 	}
 	var t model.CoreWorkflowTpl

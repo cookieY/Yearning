@@ -20,7 +20,6 @@ func SuperSQLTest(c yee.Context) (err error) {
 	var order model.CoreSqlOrder
 	model.DB().Where("work_id =?", u.WorkId).First(&order)
 	model.DB().Where("source =?", order.Source).First(&s)
-	ps := lib.Decrypt(s.Password)
 	y := pb.LibraAuditOrder{
 		IsDML:    order.Type == 1,
 		SQL:     order.SQL,
@@ -29,7 +28,7 @@ func SuperSQLTest(c yee.Context) (err error) {
 			Addr:     s.IP,
 			User:     s.Username,
 			Port:     int32(s.Port),
-			Password: ps,
+			Password: lib.Decrypt(s.Password),
 		},
 		Execute: false,
 		Check:   true,

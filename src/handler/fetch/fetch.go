@@ -21,6 +21,7 @@ import (
 	pb "Yearning-go/src/proto"
 	"Yearning-go/src/soar"
 	"encoding/json"
+	"errors"
 	"github.com/cookieY/yee"
 	"net/http"
 	"net/url"
@@ -59,12 +60,23 @@ func FetchSource(c yee.Context) (err error) {
 
 	if err := json.Unmarshal(s.Group, &groups); err != nil {
 		c.Logger().Error(err.Error())
-		return err
+		return c.JSON(http.StatusOK, commom.ERR_REQ_BIND)
 	}
 
 	p := lib.MultiUserRuleMarge(groups)
 
 	model.DB().Select("source").Where("id_c =?", unescape).Find(&source)
+
+	var tpl model.CoreWorkflowTpl
+
+	var whoIsAuditor []tpl2.Tpl
+
+	if model.DB().Model(model.CoreWorkflowTpl{}).Where("source =?", unescape).Find(&tpl).RecordNotFound() {
+		return c.JSON(http.StatusOK, commom.ERR_COMMON_MESSAGE(errors.New("环境没有添加流程!无法提交工单")))
+	}
+	_ = json.Unmarshal(tpl.Steps, &whoIsAuditor)
+
+	queryAuditor = whoIsAuditor[1].Auditor
 
 	if source != nil {
 		for _, i := range source {
@@ -82,7 +94,8 @@ func FetchSource(c yee.Context) (err error) {
 			inter = sList
 		}
 	}
-	return c.JSON(http.StatusOK, commom.SuccessPayload(map[string]interface{}{"assigned": queryAuditor, "source": inter, "x": u.Tp}))
+
+	return c.JSON(http.StatusOK, commom.SuccessPayload(map[string]interface{}{"assigned": queryAuditor, "source": inter}))
 }
 
 func FetchBase(c yee.Context) (err error) {
@@ -96,15 +109,9 @@ func FetchBase(c yee.Context) (err error) {
 	}
 	var s model.CoreDataSource
 
-	var tpl model.CoreWorkflowTpl
-
 	var mid []string
 
 	unescape, _ := url.QueryUnescape(u.Source)
-
-	if model.DB().Where("source =?", unescape).First(&tpl).RecordNotFound() {
-		return c.JSON(http.StatusOK, commom.SuccessPayload(map[string]interface{}{"results": nil, "highlight": nil, "admin": nil}))
-	}
 
 	model.DB().Where("source =?", unescape).First(&s)
 
@@ -119,12 +126,7 @@ func FetchBase(c yee.Context) (err error) {
 		mid = lib.Intersect(result.Results, model.GloOther.ExcludeDbList)
 		result.Results = lib.NonIntersect(mid, result.Results)
 	}
-
-	var whoIsAuditor []tpl2.Tpl
-
-	_ = json.Unmarshal(tpl.Steps, &whoIsAuditor)
-
-	return c.JSON(http.StatusOK, commom.SuccessPayload(map[string]interface{}{"results": result.Results, "highlight": result.Highlight, "admin": whoIsAuditor[1].Auditor}))
+	return c.JSON(http.StatusOK, commom.SuccessPayload(map[string]interface{}{"results": result.Results, "highlight": result.Highlight}))
 }
 
 func FetchTable(c yee.Context) (err error) {
@@ -219,11 +221,11 @@ func FetchUndo(c yee.Context) (err error) {
 }
 
 func FetchMergeDDL(c yee.Context) (err error) {
-	req := new(lib.QueryDeal)
+	req := new(referOrder)
 	if err = c.Bind(req); err != nil {
-		return c.JSON(http.StatusOK, err.Error())
+		return c.JSON(http.StatusOK, commom.ERR_COMMON_MESSAGE(err))
 	}
-	m, err := soar.MergeAlterTables(req.Sql)
+	m, err := soar.MergeAlterTables(req.SQLs)
 	if err != nil {
 		return c.JSON(http.StatusOK, commom.ERR_SOAR_ALTER_MERGE(err))
 	}
@@ -270,8 +272,8 @@ func RollBackSQLOrder(c yee.Context) (err error) {
 	} else {
 		var roll []model.CoreRollback
 		model.DB().Select("`sql`").Where("work_id =?", u.Data.WorkId).Find(&roll)
-		for i := range roll {
-			sql.WriteString(roll[i].SQL)
+		for _, i := range roll {
+			sql.WriteString(i.SQL)
 			sql.WriteString("\n")
 		}
 	}
@@ -284,6 +286,7 @@ func RollBackSQLOrder(c yee.Context) (err error) {
 	u.Data.Time = time.Now().Format("2006-01-02")
 	u.Data.Relevant = lib.JsonStringify([]string{auditor[0]})
 	u.Data.Assigned = auditor[0]
+	model.DB().Model(model.CoreSqlOrder{}).Create(&u.Data)
 	model.DB().Create(&model.CoreWorkflowDetail{
 		WorkId:   w,
 		Username: u.Data.Username,
@@ -291,7 +294,6 @@ func RollBackSQLOrder(c yee.Context) (err error) {
 		Rejected: "",
 		Time:     time.Now().Format("2006-01-02 15:04"),
 	})
-	model.DB().Model(model.CoreSqlOrder{}).Create(&u.Data)
 	lib.MessagePush(w, 2, "")
 	return c.JSON(http.StatusOK, commom.SuccessPayLoadToMessage(commom.ORDER_IS_CREATE))
 }

@@ -77,8 +77,6 @@ func SuperDeleteSource(c yee.Context) (err error) {
 		}
 	}
 
-	tx.Model(model.CoreWorkflowTpl{}).Where("source =?", unescape).Delete(&model.CoreWorkflowTpl{})
-
 	tx.Commit()
 	return c.JSON(http.StatusOK, commom.SuccessPayLoadToMessage(commom.DATA_IS_DELETE))
 }

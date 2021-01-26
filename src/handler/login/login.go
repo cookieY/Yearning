@@ -30,13 +30,16 @@ type loginForm struct {
 }
 
 func UserLdapLogin(c yee.Context) (err error) {
-	var account model.CoreAccount
 	u := new(loginForm)
 	if err = c.Bind(u); err != nil {
-		c.Logger().Error(err.Error())
 		return c.JSON(http.StatusOK, commom.ERR_REQ_BIND)
 	}
-	if lib.LdapConnenct(c, &model.GloLdap, u.Username, u.Password, false) {
+	isOk, err := lib.LdapConnenct(&model.GloLdap, u.Username, u.Password, false)
+	if err != nil {
+		return c.JSON(http.StatusOK, commom.ERR_COMMON_MESSAGE(err))
+	}
+	if isOk {
+		var account model.CoreAccount
 		if model.DB().Where("username = ?", u.Username).First(&account).RecordNotFound() {
 			model.DB().Create(&model.CoreAccount{
 				Username:   u.Username,

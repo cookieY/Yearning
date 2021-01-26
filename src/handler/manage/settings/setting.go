@@ -55,18 +55,29 @@ func SuperSaveSetting(c yee.Context) (err error) {
 	u := new(set)
 
 	if err = c.Bind(u); err != nil {
-		c.Logger().Error(err.Error())
 		return c.JSON(http.StatusOK, commom.ERR_REQ_BIND)
 	}
 
 	other, _ := json.Marshal(u.Other)
 	message, _ := json.Marshal(u.Message)
 	ldap, _ := json.Marshal(u.Ldap)
+	diffIDC(u.Other.IDC)
 	model.DB().Model(model.CoreGlobalConfiguration{}).Updates(&model.CoreGlobalConfiguration{Other: other, Message: message, Ldap: ldap})
 	model.GloOther = u.Other
 	model.GloLdap = u.Ldap
 	model.GloMessage = u.Message
 	return c.JSON(http.StatusOK, commom.SuccessPayLoadToMessage(commom.DATA_IS_EDIT))
+}
+
+func diffIDC(src []string) {
+	var idc model.CoreGlobalConfiguration
+	var env model.Other
+	model.DB().Find(&idc)
+	_ = json.Unmarshal(idc.Other, &env)
+	p := lib.NonIntersect(src, env.IDC)
+	for _, i := range p {
+		model.DB().Model(model.CoreWorkflowTpl{}).Where("source =?", i).Delete(&model.CoreWorkflowTpl{})
+	}
 }
 
 func SuperTestSetting(c yee.Context) (err error) {
@@ -89,7 +100,7 @@ func SuperTestSetting(c yee.Context) (err error) {
 	}
 
 	if el == "ldap" {
-		if k := lib.LdapConnenct(c, &u.Ldap, "", "", true); k {
+		if k, _ := lib.LdapConnenct(&u.Ldap, "", "", true); k {
 			return c.JSON(http.StatusOK, commom.SuccessPayLoadToMessage(SUCCESS_LDAP_TEST))
 		}
 		return c.JSON(http.StatusOK, commom.SuccessPayLoadToMessage(ERR_LDAP_TEST))

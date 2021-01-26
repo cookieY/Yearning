@@ -15,15 +15,11 @@ package lib
 
 import (
 	"Yearning-go/src/model"
-	"crypto/tls"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"github.com/cookieY/sqlx"
-	"github.com/cookieY/yee"
 	_ "github.com/go-sql-driver/mysql"
-	"gopkg.in/ldap.v3"
-	"log"
 	"math"
 	"math/rand"
 	"strconv"
@@ -52,70 +48,6 @@ func Paging(page interface{}, total int) (start int, end int) {
 	start = i*total - total
 	end = total
 	return
-}
-
-func LdapConnenct(c yee.Context, l *model.Ldap, user string, pass string, isTest bool) bool {
-
-	var s string
-	ld, err := ldap.Dial("tcp", l.Url)
-
-	if l.Ldaps {
-		if err := ld.StartTLS(&tls.Config{InsecureSkipVerify: true}); err != nil {
-			log.Println(err.Error())
-		}
-	}
-
-	if err != nil {
-		c.Logger().Error(err.Error())
-		return false
-	}
-	defer ld.Close()
-
-	if ld != nil {
-		if err := ld.Bind(l.User, l.Password); err != nil {
-			return false
-		}
-		if isTest {
-			return true
-		}
-
-	}
-
-	if l.Type == 1 {
-		s = fmt.Sprintf("(sAMAccountName=%s)", user)
-	} else if l.Type == 2 {
-		s = fmt.Sprintf("(uid=%s)", user)
-	} else {
-		s = fmt.Sprintf("(cn=%s)", user)
-	}
-
-	searchRequest := ldap.NewSearchRequest(
-		l.Sc,
-		ldap.ScopeWholeSubtree, ldap.NeverDerefAliases, 0, 0, false,
-		fmt.Sprintf("(&(objectClass=organizationalPerson)%s)", s),
-		[]string{"dn"},
-		nil,
-	)
-
-	sr, err := ld.Search(searchRequest)
-
-	if err != nil {
-		log.Println(err.Error())
-		return false
-	}
-
-	if len(sr.Entries) != 1 {
-		log.Println("User does not exist or too many entries returned")
-		return false
-	}
-
-	userdn := sr.Entries[0].DN
-
-	if err := ld.Bind(userdn, pass); err != nil {
-		c.Logger().Error(err.Error())
-		return false
-	}
-	return true
 }
 
 func Axis() []string {

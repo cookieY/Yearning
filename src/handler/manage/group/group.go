@@ -90,26 +90,18 @@ func SuperGroupUpdate(c yee.Context) (err error) {
 }
 
 func SuperClearUserRule(c yee.Context) (err error) {
-	gx := c.QueryParam("clear")
-	g, _ := url.QueryUnescape(gx)
+	args := c.QueryParam("clear")
+	scape, _ := url.QueryUnescape(args)
 	var j []model.CoreGrained
-	var k model.CoreRoleGroup
-	w := "%" + g + "%"
-	model.DB().Where("`group` like ?", w).Find(&j)
-	model.DB().Where("`name` =?", gx).First(&k)
-	var m2 model.PermissionList
-	_ = json.Unmarshal(k.Permissions, &m2)
+	var m1 []string
+	model.DB().Scopes(commom.AccordingToGroupNameIsLike(scape)).Find(&j)
 	for _, i := range j {
-		var m1 []string
 		_ = json.Unmarshal(i.Group, &m1)
-		new := lib.ResearchDel(m1, g)
-		per := lib.MultiUserRuleMarge(new)
-		s_new, _ := json.Marshal(new)
-		s_per, _ := json.Marshal(per)
-		model.DB().Model(model.CoreGrained{}).Where("username =?", i.Username).Update(map[string]interface{}{"group": s_new, "permissions": s_per})
+		marshalGroup, _ := json.Marshal(lib.ResearchDel(m1, scape))
+		model.DB().Model(model.CoreGrained{}).Scopes(commom.AccordingToUsernameEqual(i.Username)).Update(&model.CoreGrained{Group: marshalGroup})
 	}
-	model.DB().Model(model.CoreRoleGroup{}).Where("`name` =?", g).Delete(&model.CoreRoleGroup{})
-	return c.JSON(http.StatusOK, commom.SuccessPayLoadToMessage(fmt.Sprintf(GROUP_DELETE_SUCCESS, g)))
+	model.DB().Model(model.CoreRoleGroup{}).Scopes(commom.AccordingToNameEqual(scape)).Delete(&model.CoreRoleGroup{})
+	return c.JSON(http.StatusOK, commom.SuccessPayLoadToMessage(fmt.Sprintf(GROUP_DELETE_SUCCESS, scape)))
 }
 
 func SuperUserRuleMarge(c yee.Context) (err error) {

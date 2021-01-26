@@ -12,7 +12,6 @@ import (
 func SuperFetchUser(c yee.Context) (err error) {
 	u := new(fetchUser)
 	if err := c.Bind(u); err != nil {
-		c.Logger().Error(err.Error())
 		return c.JSON(http.StatusOK, commom.ERR_REQ_BIND)
 	}
 	var user []model.CoreAccount
@@ -49,7 +48,6 @@ func SuperDeleteUser(c yee.Context) (err error) {
 func ManageUserCreateOrEdit(c yee.Context) (err error) {
 	u := new(CommonUserPost)
 	if err = c.Bind(u); err != nil {
-		c.Logger().Error(err.Error())
 		return c.JSON(http.StatusOK, commom.ERR_REQ_BIND)
 	}
 	switch u.Tp {
@@ -69,7 +67,6 @@ func ManageUserCreateOrEdit(c yee.Context) (err error) {
 func ManageUserFetch(c yee.Context) (err error) {
 	u := new(CommonUserGet)
 	if err = c.Bind(u); err != nil {
-		c.Logger().Error(err.Error())
 		return c.JSON(http.StatusOK, commom.ERR_REQ_BIND)
 	}
 	switch u.Tp {
