@@ -186,6 +186,8 @@ func FetchQueryResults(c yee.Context, user *string) (err error) {
 
 	req := new(lib.QueryDeal)
 
+	clock := time.Now()
+
 	if err = c.Bind(req); err != nil {
 		return c.JSON(http.StatusOK, err.Error())
 	}
@@ -219,7 +221,7 @@ func FetchQueryResults(c yee.Context, user *string) (err error) {
 		return c.JSON(http.StatusOK, commom.ERR_COMMON_MESSAGE(err))
 	}
 
-	queryTime := int(time.Since(time.Now()).Seconds() * 1000)
+	queryTime := int(time.Since(clock).Seconds() * 1000)
 
 	go func(w, s string, ex int) {
 		model.DB().Create(&model.CoreQueryRecord{SQL: s, WorkId: w, ExTime: ex, Time: time.Now().Format("2006-01-02 15:04"), Source: req.Source, BaseName: req.DataBase})

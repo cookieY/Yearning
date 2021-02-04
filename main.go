@@ -75,30 +75,33 @@ func main() {
 	flag.Parse()
 	if h {
 		flag.Usage()
-	} else {
-		model.DbInit(c)
-		if k {
-			service.MargeRuleGroup()
-		}
-		if s {
-			model.Conn, _ = grpc.Dial(model.Grpc, grpc.WithInsecure())
-			defer func() {
-				model.Conn.Close()
-			}()
-			service.UpdateData()
-			service.StartYearning(p, b)
-		}
-		if x {
-			service.DelCol()
-		}
-		if f {
-			model.DB().Model(model.CoreAccount{}).Where("username =?", "admin").Update(&model.CoreAccount{Password: lib.DjangoEncrypt("Yearning_admin", string(lib.GetRandom()))})
-			fmt.Println("admin密码已重新设置为:Yearning_admin")
-		}
+		return
+	}
+
+	model.DbInit(c)
+	if k {
+		service.MargeRuleGroup()
+	}
+
+	if s {
+		model.Conn, _ = grpc.Dial(model.Grpc, grpc.WithInsecure())
+		defer func() {
+			model.Conn.Close()
+		}()
+		service.UpdateData()
+		service.StartYearning(p, b)
+	}
+
+	if x {
+		service.DelCol()
+	}
+
+	if f {
+		model.DB().Model(model.CoreAccount{}).Where("username =?", "admin").Update(&model.CoreAccount{Password: lib.DjangoEncrypt("Yearning_admin", string(lib.GetRandom()))})
+		fmt.Println("admin密码已重新设置为:Yearning_admin")
 	}
 
 	if m {
-
 		service.Migrate()
 	}
 }

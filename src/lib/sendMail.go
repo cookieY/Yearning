@@ -178,36 +178,27 @@ func MessagePush(workid string, t uint, reject string) {
 			mail = fmt.Sprintf(TmplMail, "查询申请", op.WorkId, op.Username, model.Host, model.Host, "已驳回")
 		}
 	} else {
-		if t == 0 {
+		switch t {
+		case 0:
 			ding = fmt.Sprintf(TmplRejectDing, o.WorkId, o.Source, o.Username, o.Assigned, model.Host, o.Text, reject)
 			mail = fmt.Sprintf(TmplRejectMail, o.WorkId, o.Username, model.Host, model.Host, reject)
-		}
-
-		if t == 1 {
+		case 1:
 			ding = fmt.Sprintf(TmplSuccessDing, o.WorkId, o.Source, o.Username, o.Assigned, model.Host, o.Text)
 			mail = fmt.Sprintf(TmplMail, "执行", o.WorkId, o.Username, model.Host, model.Host, "执行成功")
-		}
-
-		if t == 2 {
+		case 2:
 			model.DB().Select("email").Where("username =?", o.Assigned).First(&user)
 			s.ToUser = user.Email
 			ding = fmt.Sprintf(TmplReferDing, o.WorkId, o.Source, o.Username, o.Assigned, model.Host, o.Text)
 			mail = fmt.Sprintf(TmplMail, "提交", o.WorkId, o.Username, model.Host, model.Host, "已提交")
-		}
-
-		if t == 4 {
+		case 4:
 			ding = fmt.Sprintf(TmplFailedDing, o.WorkId, o.Source, o.Username, o.Assigned, model.Host, o.Text)
 			mail = fmt.Sprintf(TmplMail, "执行", o.WorkId, o.Username, model.Host, model.Host, "执行失败")
-		}
-
-		if t == 5 {
+		case 5:
 			model.DB().Select("email").Where("username =?", o.Assigned).First(&user)
 			s.ToUser = user.Email
 			ding = fmt.Sprintf(TmplPerformDing, o.WorkId, o.Source, o.Username, o.Assigned, model.Host, o.Text)
 			mail = fmt.Sprintf(Tmpl2Mail, "转交", o.WorkId, o.Username, o.Assigned, model.Host, model.Host, "已转交至下一操作人")
-		}
-
-		if t == 6 {
+		case 6:
 			ding = fmt.Sprintf(TmplBackDing, o.WorkId, o.Source, o.Username, o.Assigned, model.Host, o.Text)
 			mail = fmt.Sprintf(TmplMail, "提交", o.WorkId, o.Username, model.Host, model.Host, "已撤销")
 		}
