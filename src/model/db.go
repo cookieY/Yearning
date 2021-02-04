@@ -50,6 +50,7 @@ type Message struct {
 	Ding     bool   `json:"ding"`
 	Ssl      bool   `json:"ssl"`
 	PushType bool   `json:"push_type"`
+	Key      string `json:"key"`
 }
 
 type Ldap struct {

@@ -34,7 +34,7 @@ func UserLdapLogin(c yee.Context) (err error) {
 	if err = c.Bind(u); err != nil {
 		return c.JSON(http.StatusOK, commom.ERR_REQ_BIND)
 	}
-	isOk, err := lib.LdapConnenct(&model.GloLdap, u.Username, u.Password, false)
+	isOk, err := lib.LdapContent(&model.GloLdap, u.Username, u.Password, false)
 	if err != nil {
 		return c.JSON(http.StatusOK, commom.ERR_COMMON_MESSAGE(err))
 	}

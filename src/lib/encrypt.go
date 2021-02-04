@@ -18,6 +18,7 @@ import (
 	"bytes"
 	"crypto/aes"
 	"crypto/cipher"
+	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/base64"
 	"golang.org/x/crypto/pbkdf2"
@@ -122,4 +123,10 @@ func PKCS7UnPadding(origData []byte) []byte {
 		return origData[:(length - unpadding)]
 	}
 	return nil
+}
+
+func hmacSha256(stringToSign string, secret string) string {
+	h := hmac.New(sha256.New, []byte(secret))
+	h.Write([]byte(stringToSign))
+	return base64.StdEncoding.EncodeToString(h.Sum(nil))
 }

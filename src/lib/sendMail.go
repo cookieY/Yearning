@@ -19,8 +19,6 @@ import (
 	"fmt"
 	"gopkg.in/gomail.v2"
 	"log"
-	"net/http"
-	"strings"
 )
 
 type UserInfo struct {
@@ -109,44 +107,6 @@ func SendMail(mail model.Message, tmpl string) {
 		log.Println(err.Error())
 		return
 	}
-}
-
-func SendDingMsg(msg model.Message, sv string) {
-	//请求地址模板
-
-	//创建一个请求
-
-	var mx string
-
-	//if msg.PushType {
-	//	mx = fmt.Sprintf(`{"msgtype": "markdown", "markdown": {"content": "%s"}}`, sv)
-	//} else {
-	mx = fmt.Sprintf(`{"msgtype": "markdown", "markdown": {"title": "Yearning sql审计平台", "text": "%s"}}`, sv)
-	//}
-
-	req, err := http.NewRequest("POST", msg.WebHook, strings.NewReader(mx))
-	if err != nil {
-		log.Println(err.Error())
-		return
-	}
-
-	tr := &http.Transport{
-		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-	}
-
-	client := &http.Client{Transport: tr}
-	//设置请求头
-	req.Header.Set("Content-Type", "application/json; charset=utf-8")
-	//发送请求
-	resp, err := client.Do(req)
-
-	if err != nil {
-		log.Println(err.Error())
-		return
-	}
-
-	//关闭请求
-	defer resp.Body.Close()
 }
 
 func MessagePush(workid string, t uint, reject string) {

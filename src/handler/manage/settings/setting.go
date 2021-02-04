@@ -100,7 +100,7 @@ func SuperTestSetting(c yee.Context) (err error) {
 	}
 
 	if el == "ldap" {
-		if k, _ := lib.LdapConnenct(&u.Ldap, "", "", true); k {
+		if k, _ := lib.LdapContent(&u.Ldap, "", "", true); k {
 			return c.JSON(http.StatusOK, commom.SuccessPayLoadToMessage(SUCCESS_LDAP_TEST))
 		}
 		return c.JSON(http.StatusOK, commom.SuccessPayLoadToMessage(ERR_LDAP_TEST))
