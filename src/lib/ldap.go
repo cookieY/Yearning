@@ -15,9 +15,9 @@ func LdapConnenct(l *model.Ldap, user string, pass string, isTest bool) (isOk bo
 	ld, err := ldap.Dial("tcp", l.Url)
 
 	if l.Ldaps {
-		if err := ld.StartTLS(&tls.Config{InsecureSkipVerify: true}); err != nil {
-			return false, err
-		}
+		ld, err = ldap.DialTLS("tcp", l.Url, &tls.Config{InsecureSkipVerify: true})
+	} else {
+		ld, err = ldap.Dial("tcp", l.Url)
 	}
 
 	if err != nil {
