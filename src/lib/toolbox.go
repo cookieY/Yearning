@@ -228,8 +228,8 @@ func MultiUserRuleMarge(group []string) model.PermissionList {
 	var u model.PermissionList
 	for _, i := range group {
 		var k model.CoreRoleGroup
-		model.DB().Where("name =?", i).First(&k)
 		var m1 model.PermissionList
+		model.DB().Where("name =?", i).First(&k)
 		_ = json.Unmarshal(k.Permissions, &m1)
 		u.DDLSource = append(u.DDLSource, m1.DDLSource...)
 		u.DMLSource = append(u.DMLSource, m1.DMLSource...)
