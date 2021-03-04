@@ -240,7 +240,6 @@ func MultiUserRuleMarge(group []string) model.PermissionList {
 	u.DMLSource = removeDuplicateElementForRule(u.DMLSource)
 	u.Auditor = removeDuplicateElementForRule(u.Auditor)
 	u.QuerySource = removeDuplicateElementForRule(u.QuerySource)
-
 	return u
 }
 
