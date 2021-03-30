@@ -147,20 +147,12 @@ func FetchRecord(c yee.Context) (err error) {
 	var order []model.CoreSqlOrder
 
 	if u.Find.Valve {
-		if u.Find.Picker[0] == "" {
-			model.DB().Model(&model.CoreSqlOrder{}).Select(commom.QueryField).
-				Scopes(
-					commom.AccordingToOrderState(),
-					commom.AccordingToWorkId(u.Find.Text),
-				).Order("id desc").Count(&pg).Offset(start).Limit(end).Find(&order)
-		} else {
-			model.DB().Model(&model.CoreSqlOrder{}).Select(commom.QueryField).
-				Scopes(
-					commom.AccordingToOrderState(),
-					commom.AccordingToWorkId(u.Find.Text),
-					commom.AccordingToDatetime(u.Find.Picker),
-				).Count(&pg).Order("id desc").Offset(start).Limit(end).Find(&order)
-		}
+		model.DB().Model(&model.CoreSqlOrder{}).Select(commom.QueryField).
+			Scopes(
+				commom.AccordingToOrderState(),
+				commom.AccordingToWorkId(u.Find.Text),
+				commom.AccordingToDatetime(u.Find.Picker),
+			).Count(&pg).Order("id desc").Offset(start).Limit(end).Find(&order)
 	} else {
 		model.DB().Model(&model.CoreSqlOrder{}).Select(commom.QueryField).Scopes(
 			commom.AccordingToOrderState(),

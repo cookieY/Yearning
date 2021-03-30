@@ -23,18 +23,11 @@ func FetchQueryRecord(c yee.Context) (err error) {
 	var order []model.CoreQueryOrder
 
 	if u.Find.Valve {
-		if u.Find.Picker[0] == "" {
-			model.DB().Model(model.CoreQueryOrder{}).Scopes(
-				commom.AccordingToWorkId(u.Find.Text),
-				commom.AccordingToQueryPer(),
-			).Order("id desc").Count(&pg).Offset(start).Limit(end).Find(&order)
-		} else {
-			model.DB().Model(model.CoreQueryOrder{}).Scopes(
-				commom.AccordingToQueryPer(),
-				commom.AccordingToWorkId(u.Find.Text),
-				commom.AccordingToDate(u.Find.Picker),
-			).Order("id desc").Count(&pg).Offset(start).Limit(end).Find(&order)
-		}
+		model.DB().Model(model.CoreQueryOrder{}).Scopes(
+			commom.AccordingToQueryPer(),
+			commom.AccordingToWorkId(u.Find.Text),
+			commom.AccordingToDate(u.Find.Picker),
+		).Order("id desc").Count(&pg).Offset(start).Limit(end).Find(&order)
 	} else {
 		model.DB().Model(model.CoreQueryOrder{}).Scopes(
 			commom.AccordingToQueryPer(),

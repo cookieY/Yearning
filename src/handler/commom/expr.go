@@ -45,7 +45,7 @@ func AccordingToUsername(user string) func(db *gorm.DB) *gorm.DB {
 
 func AccordingToDatetime(time []string) func(db *gorm.DB) *gorm.DB {
 	return func(db *gorm.DB) *gorm.DB {
-		if reflect.DeepEqual(time, []string{"", ""}) {
+		if reflect.DeepEqual(time, []string{"", ""}) || len(time)  != 2 {
 			return db
 		}
 		return db.Where("time >= ? AND time <= ?", time[0], time[1])
@@ -54,7 +54,7 @@ func AccordingToDatetime(time []string) func(db *gorm.DB) *gorm.DB {
 
 func AccordingToDate(time []string) func(db *gorm.DB) *gorm.DB {
 	return func(db *gorm.DB) *gorm.DB {
-		if reflect.DeepEqual(time, []string{"", ""}) {
+		if reflect.DeepEqual(time, []string{"", ""}) || len(time)  != 2 {
 			return db
 		}
 		return db.Where("date >= ? AND date <= ?", time[0], time[1])
