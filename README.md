@@ -76,7 +76,7 @@ E-mail: henry@yearning.io
 
 -   Login
 
-![login](img/login.png)
+![login](https://wuchen-1252812685.cos.ap-shanghai.myqcloud.com/img/yearning/20210330162509.png)
 
 -   Dashboard
 
