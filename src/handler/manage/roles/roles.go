@@ -4,6 +4,7 @@ import (
 	"Yearning-go/src/handler/commom"
 	"Yearning-go/src/model"
 	ser "Yearning-go/src/parser"
+	pb "Yearning-go/src/proto"
 	"encoding/json"
 	"github.com/cookieY/yee"
 	"net/http"
@@ -20,7 +21,7 @@ func SuperSaveRoles(c yee.Context) (err error) {
 	ser.FetchAuditRole = *u
 	audit, _ := json.Marshal(u)
 	model.DB().Model(model.CoreGlobalConfiguration{}).Updates(&model.CoreGlobalConfiguration{AuditRole: audit})
-
+	lib.OverrideConfig(&pb.LibraAuditOrder{})
 	return c.JSON(http.StatusOK, commom.SuccessPayLoadToMessage(commom.DATA_IS_EDIT))
 }
 
