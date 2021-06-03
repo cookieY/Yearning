@@ -6,7 +6,7 @@
 
 ![LICENSE](https://img.shields.io/badge/license-AGPL%20-blue.svg)
 ![](https://img.shields.io/badge/build-release-brightgreen.svg)  
-![](https://img.shields.io/badge/version-v2.3.1-brightgreen.svg)
+![](https://img.shields.io/badge/version-v2.3.3-brightgreen.svg)
 
 ##### MYSQL web 端 SQL 审核平台。
 
@@ -28,8 +28,7 @@
 
 [Gitter](https://gitter.im/talk-to-yearning/community?utm_source=share-link&utm_medium=link&utm_campaign=share-link)
 
-Yearning2.0(Go) 使用交流 Q 群: 747364310
-
+Yearning 使用交流QQ群 1群: 747364310(已满) 2群:363323798
 ## Feature 功能
 
 -   SQL 查询
@@ -37,12 +36,13 @@ Yearning2.0(Go) 使用交流 Q 群: 747364310
     -   导出
     -   自动补全，智能提示
     -   查询语句审计
+    -   查询结果脱敏
 -   SQL 审核
     -   流程化工单
-    -   SQL 语句检测与执行
-    -   SQL 回滚
+    -   SQL语句语法检测
+    -   根据规则检测SQL语句合规性    
+    -   自动生成DDL/DML回滚语句
     -   历史审核记录
-    -   自定义审核层级
 -   推送
     -   E-mail 工单推送
     -   钉钉 webhook 机器人工单推送
@@ -54,6 +54,7 @@ Yearning2.0(Go) 使用交流 Q 群: 747364310
     -   todoList
     -   LDAP 登录
     -   动态审核规则配置
+    -   自定义审核层级
 -   AutoTask 自动执行
 
 ## Install 安装及使用日志
@@ -86,19 +87,14 @@ E-mail: henry@yearning.io
 
 ![](img/audit.png)
 
--   SQL 语法高亮及自动补全
+-   SQL语法及规则检测
 
-![](img/highlight.png)
+![](img/postorder.png)
 
--   查询
+-   查询(SQL 语法高亮及自动补全)
 
 ![](img/query.png)
 
--   细粒度的权限分配
-    ![](img/PER.png)
-
--   我的工单
-    ![](img/myorder.png)
 
 ## License
 
@@ -106,4 +102,4 @@ E-mail: henry@yearning.io
 
 任何二次开发及二次开源项目请严格遵守相应开源许可
 
-2020 © Henry Yee
+2021 © Henry Yee

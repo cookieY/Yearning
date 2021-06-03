@@ -23,6 +23,7 @@ import (
 	"github.com/cookieY/yee"
 	"github.com/cookieY/yee/middleware"
 	"github.com/gobuffalo/packr/v2"
+	"net/http"
 )
 
 func StartYearning(port string, host string) {
@@ -34,7 +35,7 @@ func StartYearning(port string, host string) {
 	_ = json.Unmarshal(model.GloPer.Other, &model.GloOther)
 	_ = json.Unmarshal(model.GloPer.AuditRole, &parser.FetchAuditRole)
 	e := yee.New()
-	e.Static("/front", "dist")
+	e.Packr("/front", http.FileSystem(box))
 	e.Use(middleware.Cors())
 	e.Use(middleware.Logger())
 	e.Use(middleware.Secure())
@@ -42,6 +43,6 @@ func StartYearning(port string, host string) {
 	e.Use(middleware.GzipWithConfig(middleware.GzipConfig{
 		Level: 5,
 	}))
-	router.AddRouter(e,box)
+	router.AddRouter(e, box)
 	e.Run(fmt.Sprintf(":%s", port))
 }

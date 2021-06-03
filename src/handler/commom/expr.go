@@ -10,7 +10,7 @@ const QueryField = "work_id, username, text, backup, date, real_name, executor, 
 func AccordingToWorkId(workId string) func(db *gorm.DB) *gorm.DB {
 	return func(db *gorm.DB) *gorm.DB {
 		if workId == "" {
-			 return db
+			return db
 		}
 		return db.Where("work_id like ?", "%"+workId+"%")
 	}
@@ -22,9 +22,31 @@ func AccordingToQueryPer() func(db *gorm.DB) *gorm.DB {
 	}
 }
 
+func AccordingToAllQueryOrderState(state int) func(db *gorm.DB) *gorm.DB {
+	return func(db *gorm.DB) *gorm.DB {
+		switch state {
+		case 7:
+			return db
+		default:
+			return db.Where("`query_per` = ?", state)
+		}
+	}
+}
+
 func AccordingToOrderState() func(db *gorm.DB) *gorm.DB {
 	return func(db *gorm.DB) *gorm.DB {
 		return db.Where("`status` in (?)", []int{1, 4})
+	}
+}
+
+func AccordingToAllOrderState(state int) func(db *gorm.DB) *gorm.DB {
+	return func(db *gorm.DB) *gorm.DB {
+		switch state {
+		case 7:
+			return db
+		default:
+			return db.Where("`status` = (?)", state)
+		}
 	}
 }
 
@@ -45,7 +67,7 @@ func AccordingToUsername(user string) func(db *gorm.DB) *gorm.DB {
 
 func AccordingToDatetime(time []string) func(db *gorm.DB) *gorm.DB {
 	return func(db *gorm.DB) *gorm.DB {
-		if reflect.DeepEqual(time, []string{"", ""}) {
+		if reflect.DeepEqual(time, []string{"", ""}) || len(time) != 2 {
 			return db
 		}
 		return db.Where("time >= ? AND time <= ?", time[0], time[1])
@@ -54,7 +76,7 @@ func AccordingToDatetime(time []string) func(db *gorm.DB) *gorm.DB {
 
 func AccordingToDate(time []string) func(db *gorm.DB) *gorm.DB {
 	return func(db *gorm.DB) *gorm.DB {
-		if reflect.DeepEqual(time, []string{"", ""}) {
+		if reflect.DeepEqual(time, []string{"", ""}) || len(time) != 2 {
 			return db
 		}
 		return db.Where("date >= ? AND date <= ?", time[0], time[1])
@@ -131,9 +153,9 @@ func AccordingToRuleSuperOrAdmin() func(db *gorm.DB) *gorm.DB {
 	}
 }
 
-func AccordingToGroupSourceIsQuery(start,end int) func(db *gorm.DB) *gorm.DB {
+func AccordingToGroupSourceIsQuery(start, end int) func(db *gorm.DB) *gorm.DB {
 	return func(db *gorm.DB) *gorm.DB {
-		return db.Where("is_query =? or is_query = ?", start,end)
+		return db.Where("is_query =? or is_query = ?", start, end)
 	}
 }
 

@@ -17,14 +17,17 @@ import (
 	"Yearning-go/src/handler/commom"
 	"Yearning-go/src/lib"
 	"Yearning-go/src/model"
+	"fmt"
 	"github.com/cookieY/yee"
 	"net/http"
+	"time"
 )
 
 type groupBy struct {
-	DataBase string
-	C        int
-	Time     string
+	DataBase string `json:"data_base"`
+	C        int    `json:"count"`
+	Time     string `json:"time"`
+	Type     string `json:"type"`
 }
 
 func DashCount(c yee.Context) (err error) {
@@ -33,15 +36,13 @@ func DashCount(c yee.Context) (err error) {
 		orderCount  int
 		queryCount  int
 		sourceCount int
-		s           []groupBy
 	)
-	model.DB().Table("core_sql_orders").Select("data_base, count(*) as c").Group("data_base").Order("c desc").Limit(5).Scan(&s)
 	model.DB().Model(&model.CoreAccount{}).Count(&userCount)
 	model.DB().Model(&model.CoreQueryOrder{}).Select("id").Count(&queryCount)
 	model.DB().Model(&model.CoreSqlOrder{}).Select("id").Count(&orderCount)
 	model.DB().Model(&model.CoreDataSource{}).Select("id").Count(&sourceCount)
 
-	return c.JSON(http.StatusOK, commom.SuccessPayload(map[string]interface{}{"createUser": userCount, "order": orderCount, "source": sourceCount, "query": queryCount, "dataTop5": s}))
+	return c.JSON(http.StatusOK, commom.SuccessPayload(map[string]interface{}{"createUser": userCount, "order": orderCount, "source": sourceCount, "query": queryCount}))
 }
 
 func DashUserInfo(c yee.Context) (err error) {
@@ -65,26 +66,18 @@ func DashStmt(c yee.Context) (err error) {
 }
 
 func DashPie(c yee.Context) (err error) {
-	var (
-		queryCount int
-		ddlCount   int
-		dmlCount   int
-	)
-	model.DB().Model(&model.CoreQueryOrder{}).Select("id").Count(&queryCount)
-	model.DB().Model(&model.CoreSqlOrder{}).Where("`type` =? ", 1).Count(&dmlCount)
-	model.DB().Model(&model.CoreSqlOrder{}).Where("`type` =? ", 0).Count(&ddlCount)
-	return c.JSON(http.StatusOK, commom.SuccessPayload(map[string]int{"ddl": ddlCount, "dml": dmlCount, "query": queryCount}))
+	var source []groupBy
+	model.DB().Table("core_sql_orders").Select("data_base, count(*) as c").Group("data_base").Order("c desc").Limit(10).Scan(&source)
+	return c.JSON(http.StatusOK, commom.SuccessPayload(source))
 }
 
 func DashAxis(c yee.Context) (err error) {
-	var ddl []groupBy
-	var order []int
-	var count []string
-	model.DB().Model(model.CoreSqlOrder{}).Select("time, count(*) as c").Group("time").Scan(&ddl)
+	var order []groupBy
+	model.DB().Model(model.CoreSqlOrder{}).Select("time, count(*) as c,type").Where("time > ?", timeAdd("-2160")).Group("time,type").Scan(&order)
+	return c.JSON(http.StatusOK, commom.SuccessPayload(order))
+}
 
-	for _, i := range ddl {
-		order = append(order, i.C)
-		count = append(count, i.Time)
-	}
-	return c.JSON(http.StatusOK, commom.SuccessPayload(map[string]interface{}{"o": order, "c": count}))
+func timeAdd(add string) string {
+	m, _ := time.ParseDuration(fmt.Sprintf("%sh", add))
+	return time.Now().Add(m).Format("2006-01-02")
 }

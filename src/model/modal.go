@@ -107,7 +107,6 @@ type CoreSqlOrder struct {
 	Relevant    JSON   `gorm:"type:json" json:"relevant"`
 	Percent     int    `gorm:"type:int(50);not null default 0;" json:"percent"`
 	Current     int    `gorm:"type:int(50);not null default 0;" json:"current"`
-	UUID        string `gorm:"type:varchar(50);not null;" json:"uuid"`
 }
 
 type CoreRollback struct {

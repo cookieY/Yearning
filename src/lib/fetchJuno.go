@@ -18,6 +18,8 @@ var (
 	config          atomic.Value
 )
 
+const TIMEOUT = time.Second * 60
+
 type QueryDeal struct {
 	Sql              string   `json:"sql"`
 	DataBase         string   `json:"data_base"`
@@ -69,7 +71,7 @@ func TsClient(order *pb.LibraAuditOrder) ([]*pb.Record, error) {
 	}
 
 	c := pb.NewJunoClient(conn)
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), TIMEOUT)
 	r, err := c.OrderDeal(ctx, order)
 	if err != nil {
 		log.Printf("could not connect: %v", err)
@@ -93,7 +95,7 @@ func ExDDLClient(order *pb.LibraAuditOrder) {
 	}
 
 	c := pb.NewJunoClient(conn)
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), TIMEOUT)
 	defer func() {
 		cancel()
 	}()
@@ -117,7 +119,7 @@ func ExDMLClient(order *pb.LibraAuditOrder) {
 	// Set up a connection to the server.
 	c := pb.NewJunoClient(conn)
 
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), TIMEOUT)
 	defer func() {
 		cancel()
 	}()
@@ -140,7 +142,7 @@ func ExAutoTask(order *pb.LibraAuditOrder) bool {
 
 	c := pb.NewJunoClient(conn)
 
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), TIMEOUT)
 
 	defer func() {
 		cancel()
@@ -159,7 +161,7 @@ func (q *QueryDeal) Limit(order *pb.LibraAuditOrder) error {
 		log.Println(err.Error())
 	}
 	c := pb.NewJunoClient(conn)
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), TIMEOUT)
 	defer func() {
 		cancel()
 	}()
@@ -179,7 +181,7 @@ func ExKillOsc(order *pb.LibraAuditOrder) *pb.Isok {
 		log.Println(err.Error())
 	}
 	c := pb.NewJunoClient(conn)
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), TIMEOUT)
 	defer func() {
 		cancel()
 	}()
@@ -197,7 +199,7 @@ func OverrideConfig(order *pb.LibraAuditOrder) *pb.Isok {
 		log.Println(err.Error())
 	}
 	c := pb.NewJunoClient(conn)
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), TIMEOUT)
 	defer func() {
 		cancel()
 	}()

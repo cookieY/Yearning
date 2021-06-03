@@ -1,16 +1,17 @@
 package lib
 
 import (
-"Yearning-go/src/model"
-"crypto/tls"
-"errors"
-"fmt"
-"gopkg.in/ldap.v3"
+	"Yearning-go/src/model"
+	"crypto/tls"
+	"errors"
+	"fmt"
+	"gopkg.in/ldap.v3"
 )
 
-func LdapConnenct(l *model.Ldap, user string, pass string, isTest bool) (isOk bool, err error) {
+func LdapContent(l *model.Ldap, user string, pass string, isTest bool) (isOk bool, err error) {
 
 	var s string
+
 	var ld *ldap.Conn
 
 	if l.Ldaps {
@@ -69,4 +70,3 @@ func LdapConnenct(l *model.Ldap, user string, pass string, isTest bool) (isOk bo
 	}
 	return true, nil
 }
-

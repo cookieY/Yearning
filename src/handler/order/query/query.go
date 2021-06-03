@@ -16,30 +16,17 @@ func FetchQueryRecord(c yee.Context) (err error) {
 		return
 	}
 
-	start, end := lib.Paging(u.Page, 20)
+	start, end := lib.Paging(u.Page, 15)
 
 	var pg int
 
 	var order []model.CoreQueryOrder
 
-	if u.Find.Valve {
-		if u.Find.Picker[0] == "" {
-			model.DB().Model(model.CoreQueryOrder{}).Scopes(
-				commom.AccordingToWorkId(u.Find.Text),
-				commom.AccordingToQueryPer(),
-			).Order("id desc").Count(&pg).Offset(start).Limit(end).Find(&order)
-		} else {
-			model.DB().Model(model.CoreQueryOrder{}).Scopes(
-				commom.AccordingToQueryPer(),
-				commom.AccordingToWorkId(u.Find.Text),
-				commom.AccordingToDate(u.Find.Picker),
-			).Order("id desc").Count(&pg).Offset(start).Limit(end).Find(&order)
-		}
-	} else {
-		model.DB().Model(model.CoreQueryOrder{}).Scopes(
-			commom.AccordingToQueryPer(),
-		).Order("id desc").Count(&pg).Offset(start).Limit(end).Find(&order)
-	}
+	model.DB().Model(model.CoreQueryOrder{}).Scopes(
+		commom.AccordingToQueryPer(),
+		commom.AccordingToWorkId(u.Find.Text),
+		commom.AccordingToDate(u.Find.Picker),
+	).Order("id desc").Count(&pg).Offset(start).Limit(end).Find(&order)
 	return c.JSON(http.StatusOK, commom.SuccessPayload(commom.CommonList{Data: order, Page: pg}))
 }
 
@@ -64,29 +51,19 @@ func FetchQueryOrder(c yee.Context) (err error) {
 		return
 	}
 
-	start, end := lib.Paging(u.Page, 20)
+	start, end := lib.Paging(u.Page, 15)
 	var pg int
 
 	var order []model.CoreQueryOrder
 
 	user, _ := lib.JwtParse(c)
 
-	if u.Find.Valve {
-		if u.Find.Picker[0] == "" {
-			model.DB().Model(model.CoreQueryOrder{}).Scopes(
-				commom.AccordingToUsername(u.Find.Text),
-				commom.AccordingToAssigned(user),
-			).Order("id desc").Count(&pg).Offset(start).Limit(end).Find(&order)
-		} else {
-			model.DB().Model(model.CoreQueryOrder{}).Scopes(
-				commom.AccordingToUsername(u.Find.Text),
-				commom.AccordingToAssigned(user),
-				commom.AccordingToDate(u.Find.Picker),
-			).Order("id desc").Count(&pg).Offset(start).Limit(end).Find(&order)
-		}
-	} else {
-		model.DB().Model(model.CoreQueryOrder{}).Scopes(commom.AccordingToAssigned(user)).Order("id desc").Count(&pg).Offset(start).Limit(end).Find(&order)
-	}
+	model.DB().Model(model.CoreQueryOrder{}).Scopes(
+		commom.AccordingToUsername(u.Find.Text),
+		commom.AccordingToAssigned(user),
+		commom.AccordingToDate(u.Find.Picker),
+		commom.AccordingToAllQueryOrderState(u.Find.Status),
+	).Order("id desc").Count(&pg).Offset(start).Limit(end).Find(&order)
 	return c.JSON(http.StatusOK, commom.SuccessPayload(commom.CommonList{Data: order, Page: pg}))
 }
 
