@@ -19,21 +19,17 @@ func PersonalFetchMyOrder(c yee.Context) (err error) {
 
 	var order []model.CoreSqlOrder
 
-	start, end := lib.Paging(u.Page, 20)
+	start, end := lib.Paging(u.Page, 15)
 
-	if u.Find.Valve {
-		model.DB().Model(&model.CoreSqlOrder{}).Select(commom.QueryField).
-			Scopes(
+	model.DB().Model(&model.CoreSqlOrder{}).Select(commom.QueryField).
+		Scopes(
+			commom.AccordingToAllOrderState(u.Find.Status),
 			commom.AccordingToUsernameEqual(user),
 			commom.AccordingToDatetime(u.Find.Picker),
-				commom.AccordingToText(u.Find.Text),
-			).Order("id desc").Count(&pg).Offset(start).Limit(end).Find(&order)
-	} else {
-		model.DB().Model(&model.CoreSqlOrder{}).Select(commom.QueryField).Scopes(commom.AccordingToUsernameEqual(user)).Count(&pg).Order("id desc").Offset(start).Limit(end).Find(&order)
-	}
-	return c.JSON(http.StatusOK, commom.SuccessPayload(commom.CommonList{Data: order,Page: pg,Multi: model.GloOther.Multi}))
+			commom.AccordingToText(u.Find.Text),
+		).Order("id desc").Count(&pg).Offset(start).Limit(end).Find(&order)
+	return c.JSON(http.StatusOK, commom.SuccessPayload(commom.CommonList{Data: order, Page: pg, Multi: model.GloOther.Multi}))
 }
-
 
 func PersonalUserEdit(c yee.Context) (err error) {
 	param := c.QueryParam("tp")
@@ -62,6 +58,6 @@ func PersonalFetchOrderListOrProfile(c yee.Context) (err error) {
 	case "edit":
 		return PersonalUserEdit(c)
 	default:
-		return c.JSON(http.StatusOK,commom.ERR_REQ_FAKE)
+		return c.JSON(http.StatusOK, commom.ERR_REQ_FAKE)
 	}
 }

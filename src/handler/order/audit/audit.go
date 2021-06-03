@@ -22,7 +22,7 @@ func SuperSQLTest(c yee.Context) (err error) {
 	model.DB().Where("source =?", order.Source).First(&s)
 	y := pb.LibraAuditOrder{
 		IsDML:    order.Type == 1,
-		SQL:     order.SQL,
+		SQL:      order.SQL,
 		DataBase: order.DataBase,
 		Source: &pb.Source{
 			Addr:     s.IP,
@@ -120,17 +120,14 @@ func FetchAuditOrder(c yee.Context) (err error) {
 	user, _ := lib.JwtParse(c)
 	var pg int
 	var order []model.CoreSqlOrder
-	start, end := lib.Paging(u.Page, 20)
-	if u.Find.Valve {
-		model.DB().Model(&model.CoreSqlOrder{}).Select(commom.QueryField).
-			Scopes(
-				commom.AccordingToRelevant(user),
-				commom.AccordingToText(u.Find.Text),
-				commom.AccordingToDatetime(u.Find.Picker),
-			).Count(&pg).Order("id desc").Offset(start).Limit(end).Find(&order)
-	} else {
-		model.DB().Model(&model.CoreSqlOrder{}).Select(commom.QueryField).Scopes(commom.AccordingToRelevant(user)).Count(&pg).Order("id desc").Offset(start).Limit(end).Find(&order)
-	}
+	start, end := lib.Paging(u.Page, 15)
+	model.DB().Model(&model.CoreSqlOrder{}).Select(commom.QueryField).
+		Scopes(
+			commom.AccordingToAllOrderState(u.Find.Status),
+			commom.AccordingToRelevant(user),
+			commom.AccordingToText(u.Find.Text),
+			commom.AccordingToDatetime(u.Find.Picker),
+		).Count(&pg).Order("id desc").Offset(start).Limit(end).Find(&order)
 	return c.JSON(http.StatusOK, commom.SuccessPayload(commom.CommonList{Page: pg, Data: order}))
 }
 
@@ -140,24 +137,17 @@ func FetchRecord(c yee.Context) (err error) {
 		c.Logger().Error(err.Error())
 		return
 	}
-	start, end := lib.Paging(u.Page, 20)
+	start, end := lib.Paging(u.Page, 15)
 
 	var pg int
 
 	var order []model.CoreSqlOrder
-
-	if u.Find.Valve {
-		model.DB().Model(&model.CoreSqlOrder{}).Select(commom.QueryField).
-			Scopes(
-				commom.AccordingToOrderState(),
-				commom.AccordingToWorkId(u.Find.Text),
-				commom.AccordingToDatetime(u.Find.Picker),
-			).Count(&pg).Order("id desc").Offset(start).Limit(end).Find(&order)
-	} else {
-		model.DB().Model(&model.CoreSqlOrder{}).Select(commom.QueryField).Scopes(
+	model.DB().Model(&model.CoreSqlOrder{}).Select(commom.QueryField).
+		Scopes(
 			commom.AccordingToOrderState(),
+			commom.AccordingToWorkId(u.Find.Text),
+			commom.AccordingToDatetime(u.Find.Picker),
 		).Count(&pg).Order("id desc").Offset(start).Limit(end).Find(&order)
-	}
 	return c.JSON(http.StatusOK, commom.SuccessPayload(commom.CommonList{Page: pg, Data: order, Multi: model.GloOther.Multi}))
 }
 
