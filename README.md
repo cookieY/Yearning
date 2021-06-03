@@ -6,7 +6,7 @@
 
 ![LICENSE](https://img.shields.io/badge/license-AGPL%20-blue.svg)
 ![](https://img.shields.io/badge/build-release-brightgreen.svg)  
-![](https://img.shields.io/badge/version-v2.3.1-brightgreen.svg)
+![](https://img.shields.io/badge/version-v2.3.3-brightgreen.svg)
 
 ##### MYSQL web 端 SQL 审核平台。
 
@@ -28,8 +28,7 @@
 
 [Gitter](https://gitter.im/talk-to-yearning/community?utm_source=share-link&utm_medium=link&utm_campaign=share-link)
 
-Yearning2.0(Go) 使用交流 Q 群: 747364310
-
+Yearning 使用交流QQ群 1群: 747364310(已满) 2群:363323798
 ## Feature 功能
 
 -   SQL 查询
