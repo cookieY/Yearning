@@ -170,7 +170,7 @@ func (q *QueryDeal) Limit(order *pb.LibraAuditOrder) error {
 		return err
 	}
 	q.Sql = r.SQL
-
+	q.InsulateWordList = r.InsulateWordList
 	return nil
 }
 

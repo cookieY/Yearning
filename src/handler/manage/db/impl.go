@@ -4,6 +4,7 @@ import (
 	"Yearning-go/src/handler/commom"
 	"Yearning-go/src/lib"
 	"Yearning-go/src/model"
+	"encoding/json"
 	"fmt"
 	"github.com/jinzhu/gorm"
 )
@@ -39,13 +40,34 @@ func ConnTest(u *model.CoreDataSource) error {
 }
 
 func SuperEditSource(source *model.CoreDataSource) commom.Resp {
-	if source.Password == "***********" {
-		model.DB().Model(&model.CoreDataSource{}).Where("source =?", source.Source).Updates(&model.CoreDataSource{IP: source.IP, Port: source.Port, Username: source.Username})
-	} else {
+	if source.Password != "***********" {
 		source.Password = lib.Encrypt(source.Password)
-		model.DB().Model(&model.CoreDataSource{}).Where("source =?", source.Source).Updates(source)
 	}
-
+	model.DB().Model(&model.CoreDataSource{}).Where("source =?", source.Source).Update(map[string]interface{}{
+		"id_c":     source.IDC,
+		"ip":       source.IP,
+		"port":     source.Port,
+		"username": source.Username,
+		"password": source.Password,
+		"is_query": source.IsQuery,
+	})
+	var k []model.CoreRoleGroup
+	model.DB().Find(&k)
+	for i := range k {
+		var p model.PermissionList
+		if err := json.Unmarshal(k[i].Permissions, &p); err != nil {
+			return commom.ERR_COMMON_MESSAGE(err)
+		}
+		if source.IsQuery == 0 {
+			p.QuerySource = lib.ResearchDel(p.QuerySource, source.Source)
+		}
+		if source.IsQuery == 1 {
+			p.DDLSource = lib.ResearchDel(p.DDLSource, source.Source)
+			p.DMLSource = lib.ResearchDel(p.DMLSource, source.Source)
+		}
+		r, _ := json.Marshal(p)
+		model.DB().Model(&model.CoreRoleGroup{}).Where("id =?", k[i].ID).Update(model.CoreRoleGroup{Permissions: r})
+	}
 	return commom.SuccessPayLoadToMessage(DB_EDIT_SUCCESS)
 }
 
