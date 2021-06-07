@@ -261,7 +261,7 @@ func RollBackSQLOrder(c yee.Context) (err error) {
 		return c.JSON(http.StatusOK, commom.ERR_REQ_BIND)
 	}
 
-	auditor := FetchTplAuditor(u.Data.Source)
+	auditor := FetchTplAuditor(u.Data.IDC)
 	if auditor == nil {
 		return c.JSON(http.StatusOK, commom.SuccessPayLoadToMessage(AUDITOR_IS_NOT_EXIST))
 	}
