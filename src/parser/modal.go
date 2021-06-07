@@ -58,6 +58,10 @@ type AuditRole struct {
 	DDLAllowPRINotInt              bool
 	DDLColumnsMustHaveIndex        string // 如果表包含以下列，列必须有索引。可指定多个列,以逗号分隔.列类型可选.   格式: 列名 [列类型,可选],...
 	DDLAllowChangeColumnPosition   bool   // ddl语句允许使用after/first
+	DDLCheckFloatDouble            bool   //float/double 类型 强制变更为decimal类型
+	AllowCreateView                bool
+	AllowCreatePartition           bool
+	AllowSpecialType               bool
 	IsOSC                          bool
 	OscBinDir                      string // pt-osc path
 	OscDropNewTable                bool
@@ -75,9 +79,6 @@ type AuditRole struct {
 	OscPrintSql                    bool
 	OscChunkTime                   float32
 	OscSize                        uint
-	AllowCreateView                bool
-	AllowCreatePartition           bool
-	AllowSpecialType               bool
 	PRIRollBackErr                 bool
 	OscLockWaitTimeout             int
 	OscSleep                       float32
