@@ -4,6 +4,8 @@ import (
 	"Yearning-go/src/lib"
 	"Yearning-go/src/model"
 	pb "Yearning-go/src/proto"
+	"fmt"
+	"log"
 	"time"
 )
 
@@ -45,46 +47,37 @@ func (r *Review) Init(order model.CoreSqlOrder) *Review {
 }
 
 func (r *Review) Executor() {
-	switch r.Type {
-	case 0:
-		go func() {
-			t1 := lib.Time2StrDiff(r.Delay)
-			if t1 > 0 {
-				tick := time.NewTicker(t1)
-				for {
-					select {
-					case <-tick.C:
-						lib.ExDDLClient(&r.Juno)
-						tick.Stop()
-						goto ENDCHECK
+	go func() {
+		r.Juno.IsDML = true
+		t1 := lib.Time2StrDiff(r.Delay)
+		if t1 > 0 {
+			tick := time.NewTicker(t1)
+			for {
+				select {
+				case <-tick.C:
+					if r.IsKill() {
+						log.Println(fmt.Sprintf("工单: %s 已被终止执行！", r.Juno.WorkId))
+						return
 					}
-				ENDCHECK:
-					break
+					selectedType(r.Type, &r.Juno)
+					tick.Stop()
+					goto ENDCHECK
 				}
-			} else {
-				lib.ExDDLClient(&r.Juno)
+			ENDCHECK:
+				break
 			}
-		}()
-	case 1:
-		go func() {
-			r.Juno.IsDML = true
-			t1 := lib.Time2StrDiff(r.Delay)
-			if t1 > 0 {
-				tick := time.NewTicker(t1)
-				for {
-					select {
-					case <-tick.C:
-						lib.ExDMLClient(&r.Juno)
-						tick.Stop()
-						goto ENDCHECK
-					}
-				ENDCHECK:
-					break
-				}
-			} else {
-				lib.ExDMLClient(&r.Juno)
-			}
-		}()
-	}
+		} else {
+			lib.ExDMLClient(&r.Juno)
+		}
+	}()
 	model.DB().Model(&model.CoreSqlOrder{}).Where("work_id =?", r.Juno.WorkId).Updates(map[string]interface{}{"status": 3, "current_step": r.Step, "assigned": r.User})
+}
+func selectedType(ty uint, juno *pb.LibraAuditOrder) {
+	switch ty {
+	case 0:
+		lib.ExDDLClient(juno)
+	case 1:
+		juno.IsDML = true
+		lib.ExDMLClient(juno)
+	}
 }

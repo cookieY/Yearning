@@ -17,6 +17,7 @@ import (
 	"Yearning-go/src/handler/commom"
 	"Yearning-go/src/lib"
 	"Yearning-go/src/model"
+	pb "Yearning-go/src/proto"
 	"encoding/json"
 	"github.com/cookieY/yee"
 	"net/http"
@@ -66,6 +67,7 @@ func SuperSaveSetting(c yee.Context) (err error) {
 	model.GloOther = u.Other
 	model.GloLdap = u.Ldap
 	model.GloMessage = u.Message
+	lib.OverrideConfig(&pb.LibraAuditOrder{})
 	return c.JSON(http.StatusOK, commom.SuccessPayLoadToMessage(commom.DATA_IS_EDIT))
 }
 
