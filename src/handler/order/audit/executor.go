@@ -67,7 +67,7 @@ func (r *Review) Executor() {
 				break
 			}
 		} else {
-			lib.ExDMLClient(&r.Juno)
+			selectedType(r.Type, &r.Juno)
 		}
 	}()
 	model.DB().Model(&model.CoreSqlOrder{}).Where("work_id =?", r.Juno.WorkId).Updates(map[string]interface{}{"status": 3, "current_step": r.Step, "assigned": r.User})
