@@ -48,7 +48,6 @@ func (r *Review) Init(order model.CoreSqlOrder) *Review {
 
 func (r *Review) Executor() {
 	go func() {
-		r.Juno.IsDML = true
 		t1 := lib.Time2StrDiff(r.Delay)
 		if t1 > 0 {
 			tick := time.NewTicker(t1)
