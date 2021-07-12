@@ -118,17 +118,11 @@ func FetchAuditOrder(c yee.Context) (err error) {
 		return
 	}
 	user, _ := lib.JwtParse(c)
-	var pg int
-	var order []model.CoreSqlOrder
-	start, end := lib.Paging(u.Page, 15)
-	model.DB().Model(&model.CoreSqlOrder{}).Select(commom.QueryField).
-		Scopes(
-			commom.AccordingToAllOrderState(u.Find.Status),
-			commom.AccordingToRelevant(user),
-			commom.AccordingToText(u.Find.Text),
-			commom.AccordingToDatetime(u.Find.Picker),
-		).Count(&pg).Order("id desc").Offset(start).Limit(end).Find(&order)
-	return c.JSON(http.StatusOK, commom.SuccessPayload(commom.CommonList{Page: pg, Data: order}))
+	order := u.GetSQLOrderList(commom.AccordingToAllOrderState(u.Find.Status),
+		commom.AccordingToRelevant(user),
+		commom.AccordingToText(u.Find.Text),
+		commom.AccordingToDatetime(u.Find.Picker))
+	return c.JSON(http.StatusOK, commom.SuccessPayload(order))
 }
 
 func FetchRecord(c yee.Context) (err error) {
@@ -137,18 +131,10 @@ func FetchRecord(c yee.Context) (err error) {
 		c.Logger().Error(err.Error())
 		return
 	}
-	start, end := lib.Paging(u.Page, 15)
-
-	var pg int
-
-	var order []model.CoreSqlOrder
-	model.DB().Model(&model.CoreSqlOrder{}).Select(commom.QueryField).
-		Scopes(
-			commom.AccordingToOrderState(),
-			commom.AccordingToWorkId(u.Find.Text),
-			commom.AccordingToDatetime(u.Find.Picker),
-		).Count(&pg).Order("id desc").Offset(start).Limit(end).Find(&order)
-	return c.JSON(http.StatusOK, commom.SuccessPayload(commom.CommonList{Page: pg, Data: order, Multi: model.GloOther.Multi}))
+	order := u.GetSQLOrderList(commom.AccordingToOrderState(),
+		commom.AccordingToWorkId(u.Find.Text),
+		commom.AccordingToDatetime(u.Find.Picker))
+	return c.JSON(http.StatusOK, commom.SuccessPayload(order))
 }
 
 func AuditOrderApis(c yee.Context) (err error) {

@@ -49,6 +49,7 @@ func SuperFetchSource(c yee.Context) (err error) {
 func SuperDeleteSource(c yee.Context) (err error) {
 
 	var k []model.CoreRoleGroup
+
 	source := c.QueryParam("source")
 
 	unescape, _ := url.QueryUnescape(source)
