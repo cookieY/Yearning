@@ -72,15 +72,14 @@ func TsClient(order *pb.LibraAuditOrder) ([]*pb.Record, error) {
 
 	c := pb.NewJunoClient(conn)
 	ctx, cancel := context.WithTimeout(context.Background(), TIMEOUT)
+	defer func() {
+		cancel()
+	}()
 	r, err := c.OrderDeal(ctx, order)
 	if err != nil {
 		log.Printf("could not connect: %v", err)
 		return []*pb.Record{}, err
 	}
-	defer func() {
-		cancel()
-	}()
-
 	return r.Record, nil
 }
 
@@ -103,6 +102,7 @@ func ExDDLClient(order *pb.LibraAuditOrder) {
 	if err != nil {
 		log.Printf("could not connect: %v", err)
 		MessagePush(order.WorkId, 4, "")
+		return
 	}
 	MessagePush(order.WorkId, 1, "")
 }

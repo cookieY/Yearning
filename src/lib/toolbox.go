@@ -27,6 +27,10 @@ import (
 	"time"
 )
 
+const  (
+	BUF                     = 1<<20 - 1
+)
+
 func ResearchDel(s []string, p string) []string {
 	for in := 0; in < len(s); in++ {
 		if s[in] == p {
@@ -151,27 +155,22 @@ func (q *Query) QueryRun(source *model.CoreDataSource, deal *QueryDeal) error {
 	for rows.Next() {
 		results := make(map[string]interface{})
 		_ = rows.MapScan(results)
-		for idx := range results {
-			switch r := results[idx].(type) {
+		for key := range results {
+			switch r := results[key].(type) {
 			case []uint8:
-				if len(r) > 10000 {
-					results[idx] = "blob字段无法显示"
+				if len(r) > BUF {
+					results[key] = "blob字段无法显示"
 				} else {
-					if hex.EncodeToString(r) == "01" {
-						results[idx] = "true"
-					} else if hex.EncodeToString(r) == "00" {
-						results[idx] = "false"
-					} else {
-						results[idx] = string(r)
+					switch hex.EncodeToString(r) {
+					case "01":
+						results[key] = "true"
+					case "00":
+						results[key] = "false"
+					default:
+						results[key] = string(r)
 					}
-				}
-			}
-		}
-		if len(deal.InsulateWordList) > 0 {
-			for ok := range results {
-				for _, exclude := range deal.InsulateWordList {
-					if (strings.Contains(strings.ToLower(ok), exclude) && strings.Contains(ok, ")")) || strings.ToLower(ok) == exclude {
-						results[ok] = "****脱敏字段"
+					if excludeFieldContext(key, deal) {
+						results[key] = "****脱敏字段"
 					}
 				}
 			}
@@ -188,6 +187,17 @@ func (q *Query) QueryRun(source *model.CoreDataSource, deal *QueryDeal) error {
 	q.Field[0]["fixed"] = "left"
 
 	return nil
+}
+
+func excludeFieldContext(field string, req *QueryDeal) bool {
+	if len(req.InsulateWordList) > 0 {
+		for _, exclude := range req.InsulateWordList {
+			if (strings.Contains(strings.ToLower(field), exclude) && strings.Contains(field, ")")) || strings.ToLower(field) == exclude {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func removeDuplicateElement(addrs []string) []string {

@@ -2,7 +2,7 @@ package apis
 
 import (
 	"Yearning-go/src/handler/fetch"
-	"Yearning-go/src/handler/manage/group"
+	"Yearning-go/src/handler/manager/group"
 	"github.com/cookieY/yee"
 	"net/http"
 )

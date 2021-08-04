@@ -1,7 +1,7 @@
 package personal
 
 import (
-	tpl2 "Yearning-go/src/handler/manage/tpl"
+	tpl2 "Yearning-go/src/handler/manager/tpl"
 	"Yearning-go/src/handler/order/audit"
 	"Yearning-go/src/lib"
 	"Yearning-go/src/model"

@@ -24,9 +24,10 @@ type Record struct {
 }
 
 type AuditRole struct {
-	DMLInsertColumns               bool   //是否检查插入语句存在列名
-	DMLMaxInsertRows               int    //inert语句最大多少个字段
-	DMLWhere                       bool   //是否检查dml语句where条件
+	DMLAllowLimitSTMT              bool   `json:"DMLAllowLimitSTMT"` // 是否允许update/insert 语句使用limit关键字
+	DMLInsertColumns               bool   `json:"DMLInsertColumns"`  //是否检查插入语句存在列名
+	DMLMaxInsertRows               int    `json:"DMLMaxInsertRows"`  //inert语句最大多少个字段
+	DMLWhere                       bool   `json:"DMLWhere"`          //是否检查dml语句where条件
 	DMLOrder                       bool   // 是否检查dml语句order条件
 	DMLSelect                      bool   //是否检查dml语句有select语句
 	DDLCheckTableComment           bool   //是否检查表注释
@@ -59,9 +60,6 @@ type AuditRole struct {
 	DDLColumnsMustHaveIndex        string // 如果表包含以下列，列必须有索引。可指定多个列,以逗号分隔.列类型可选.   格式: 列名 [列类型,可选],...
 	DDLAllowChangeColumnPosition   bool   // ddl语句允许使用after/first
 	DDLCheckFloatDouble            bool   //float/double 类型 强制变更为decimal类型
-	AllowCreateView                bool
-	AllowCreatePartition           bool
-	AllowSpecialType               bool
 	IsOSC                          bool
 	OscBinDir                      string // pt-osc path
 	OscDropNewTable                bool
@@ -78,11 +76,14 @@ type AuditRole struct {
 	OscCriticalThreadRunning       int
 	OscPrintSql                    bool
 	OscChunkTime                   float32
+	OscChunkSize                   float32
 	OscSize                        uint
-	PRIRollBackErr                 bool
-	OscLockWaitTimeout             int
+	AllowCreateView                bool
+	AllowCreatePartition           bool
+	AllowSpecialType               bool
 	OscSleep                       float32
 	OscCheckUniqueKeyChange        bool
+	OscLockWaitTimeout             int
 }
 
 type IndexInfo struct {

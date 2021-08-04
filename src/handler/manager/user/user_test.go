@@ -100,11 +100,11 @@ func TestManageUserCreateOrEdit(t *testing.T) {
 
 func BenchmarkSuperFetchUser(b *testing.B) {
 	y := yee.C()
-	y.PUT("/api/v2/manage/user", SuperFetchUser)
+	y.PUT("/api/v2/manager/user", SuperFetchUser)
 	b.ReportAllocs()
 	b.SetBytes(1024 * 1024)
 	for i := 0; i < b.N; i++ {
-		req := httptest.NewRequest(http.MethodPut, "/api/v2/manage/user", strings.NewReader(`{"page":1,"find":{"valve":false}}`))
+		req := httptest.NewRequest(http.MethodPut, "/api/v2/manager/user", strings.NewReader(`{"page":1,"find":{"valve":false}}`))
 		req.Header.Set("Content-Type", yee.MIMEApplicationJSON)
 		rec := httptest.NewRecorder()
 		y.ServeHTTP(rec, req)
@@ -113,11 +113,11 @@ func BenchmarkSuperFetchUser(b *testing.B) {
 
 func BenchmarkSuperDeleteUser(b *testing.B) {
 	y := yee.C()
-	y.DELETE("/api/v2/manage/user", SuperDeleteUser)
+	y.DELETE("/api/v2/manager/user", SuperDeleteUser)
 	b.ReportAllocs()
 	b.SetBytes(1024 * 1024)
 	for i := 0; i < b.N; i++ {
-		req := httptest.NewRequest(http.MethodDelete, "/api/v2/manage/user?user=admin", nil)
+		req := httptest.NewRequest(http.MethodDelete, "/api/v2/manager/user?user=admin", nil)
 		req.Header.Set("Content-Type", yee.MIMEApplicationJSON)
 		rec := httptest.NewRecorder()
 		y.ServeHTTP(rec, req)
@@ -126,11 +126,11 @@ func BenchmarkSuperDeleteUser(b *testing.B) {
 
 func BenchmarkFetchUserGroups(b *testing.B) {
 	y := yee.C()
-	y.GET("/api/v2/manage/user", ManageUserFetch)
+	y.GET("/api/v2/manager/user", ManageUserFetch)
 	b.ReportAllocs()
 	b.SetBytes(1024 * 1024)
 	for i := 0; i < b.N; i++ {
-		req := httptest.NewRequest(http.MethodGet, "/api/v2/manage/user?user=admin&tp=group", nil)
+		req := httptest.NewRequest(http.MethodGet, "/api/v2/manager/user?user=admin&tp=group", nil)
 		req.Header.Set("Content-Type", yee.MIMEApplicationJSON)
 		rec := httptest.NewRecorder()
 		y.ServeHTTP(rec, req)
@@ -139,11 +139,11 @@ func BenchmarkFetchUserGroups(b *testing.B) {
 
 func BenchmarkDelUserDepend(b *testing.B) {
 	y := yee.C()
-	y.GET("/api/v2/manage/user", ManageUserFetch)
+	y.GET("/api/v2/manager/user", ManageUserFetch)
 	b.ReportAllocs()
 	b.SetBytes(1024 * 1024)
 	for i := 0; i < b.N; i++ {
-		req := httptest.NewRequest(http.MethodGet, "/api/v2/manage/user?user=admin&tp=depend", nil)
+		req := httptest.NewRequest(http.MethodGet, "/api/v2/manager/user?user=admin&tp=depend", nil)
 		req.Header.Set("Content-Type", yee.MIMEApplicationJSON)
 		rec := httptest.NewRecorder()
 		y.ServeHTTP(rec, req)

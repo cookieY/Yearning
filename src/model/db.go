@@ -57,7 +57,7 @@ type Ldap struct {
 	Url      string `json:"url"`
 	User     string `json:"user"`
 	Password string `json:"password"`
-	Type     int    `json:"type"`
+	Type     string `json:"type"`
 	Sc       string `json:"sc"`
 	Ldaps    bool   `json:"ldaps"`
 }

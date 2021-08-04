@@ -10,8 +10,6 @@ import (
 
 func LdapContent(l *model.Ldap, user string, pass string, isTest bool) (isOk bool, err error) {
 
-	var s string
-
 	var ld *ldap.Conn
 
 	if l.Ldaps {
@@ -36,19 +34,10 @@ func LdapContent(l *model.Ldap, user string, pass string, isTest bool) (isOk boo
 
 	}
 
-	switch l.Type {
-	case 1:
-		s = fmt.Sprintf("(sAMAccountName=%s)", user)
-	case 2:
-		s = fmt.Sprintf("(uid=%s)", user)
-	default:
-		s = fmt.Sprintf("(cn=%s)", user)
-	}
-
 	searchRequest := ldap.NewSearchRequest(
 		l.Sc,
 		ldap.ScopeWholeSubtree, ldap.NeverDerefAliases, 0, 0, false,
-		fmt.Sprintf("(&(objectClass=organizationalPerson)%s)", s),
+		fmt.Sprintf(l.Type, user),
 		[]string{"dn"},
 		nil,
 	)
