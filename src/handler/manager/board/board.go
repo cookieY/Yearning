@@ -1,4 +1,4 @@
-package manage
+package board
 
 import (
 	"Yearning-go/src/handler/commom"
@@ -8,7 +8,7 @@ import (
 )
 
 type board struct {
-	Board string
+	Board string `json:"board"`
 }
 
 const BOARD_MESSAGE_SAVE = "公告已保存"

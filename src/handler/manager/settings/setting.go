@@ -56,6 +56,7 @@ func SuperSaveSetting(c yee.Context) (err error) {
 	u := new(set)
 
 	if err = c.Bind(u); err != nil {
+		c.Logger().Error(err.Error())
 		return c.JSON(http.StatusOK, commom.ERR_REQ_BIND)
 	}
 

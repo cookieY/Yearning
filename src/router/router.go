@@ -16,14 +16,14 @@ package router
 import (
 	"Yearning-go/src/apis"
 	"Yearning-go/src/handler/login"
-	"Yearning-go/src/handler/manage"
-	autoTask2 "Yearning-go/src/handler/manage/autoTask"
-	db2 "Yearning-go/src/handler/manage/db"
-	group2 "Yearning-go/src/handler/manage/group"
-	roles2 "Yearning-go/src/handler/manage/roles"
-	"Yearning-go/src/handler/manage/settings"
-	tpl2 "Yearning-go/src/handler/manage/tpl"
-	user2 "Yearning-go/src/handler/manage/user"
+	autoTask2 "Yearning-go/src/handler/manager/autoTask"
+	"Yearning-go/src/handler/manager/board"
+	db2 "Yearning-go/src/handler/manager/db"
+	group2 "Yearning-go/src/handler/manager/group"
+	roles2 "Yearning-go/src/handler/manager/roles"
+	"Yearning-go/src/handler/manager/settings"
+	tpl2 "Yearning-go/src/handler/manager/tpl"
+	user2 "Yearning-go/src/handler/manager/user"
 	audit2 "Yearning-go/src/handler/order/audit"
 	"Yearning-go/src/handler/order/osc"
 	query2 "Yearning-go/src/handler/order/query"
@@ -51,11 +51,11 @@ func SuperManageGroup() yee.HandlerFunc {
 
 func focalPoint(c yee.Context) bool {
 
-	if strings.Contains(c.RequestURI(), "/api/v2/manage/tpl") && c.Request().Method == http.MethodPut {
+	if strings.Contains(c.RequestURI(), "/api/v2/manager/tpl") && c.Request().Method == http.MethodPut {
 		return true
 	}
 
-	if strings.Contains(c.RequestURI(), "/api/v2/manage/group") && c.Request().Method == http.MethodGet {
+	if strings.Contains(c.RequestURI(), "/api/v2/manager/group") && c.Request().Method == http.MethodGet {
 		return true
 	}
 	return false
@@ -98,7 +98,7 @@ func AddRouter(e *yee.Core, box *packr.Box) {
 	audit.Restful("/query/:tp", query2.AuditQueryRestFulAPis())
 
 	manager := r.Group("/manage", SuperManageGroup())
-	manager.POST("/board/post", manage.GeneralPostBoard)
+	manager.POST("/board/post", board.GeneralPostBoard)
 
 	db := manager.Group("/db")
 	db.Restful("", db2.ManageDbApi())

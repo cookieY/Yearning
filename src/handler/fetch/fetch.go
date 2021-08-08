@@ -15,7 +15,7 @@ package fetch
 
 import (
 	"Yearning-go/src/handler/commom"
-	tpl2 "Yearning-go/src/handler/manage/tpl"
+	tpl2 "Yearning-go/src/handler/manager/tpl"
 	"Yearning-go/src/lib"
 	"Yearning-go/src/model"
 	pb "Yearning-go/src/proto"

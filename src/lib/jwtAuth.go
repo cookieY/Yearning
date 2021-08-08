@@ -17,7 +17,7 @@ import (
 	"Yearning-go/src/model"
 	"errors"
 	"github.com/cookieY/yee"
-	"github.com/dgrijalva/jwt-go"
+	"github.com/golang-jwt/jwt"
 	"time"
 )
 
