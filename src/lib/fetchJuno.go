@@ -127,6 +127,7 @@ func ExDMLClient(order *pb.LibraAuditOrder) {
 	if err != nil {
 		log.Printf("could not connect: %v", err)
 		MessagePush(order.WorkId, 4, "")
+		return
 	}
 	MessagePush(order.WorkId, 1, "")
 }
