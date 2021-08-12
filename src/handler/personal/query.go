@@ -119,7 +119,7 @@ func FetchQueryDatabaseInfo(c yee.Context) (err error) {
 			"expand":   "true",
 			"children": result.BaseList,
 		})
-		return c.JSON(http.StatusOK, commom.SuccessPayload(map[string]interface{}{"info": info, "status": d.Export, "highlight": result.Highlight, "sign": fetch.FetchTplAuditor(source.Source), "idc": u.IDC}))
+		return c.JSON(http.StatusOK, commom.SuccessPayload(map[string]interface{}{"info": info, "status": d.Export, "highlight": result.Highlight, "sign": fetch.FetchTplAuditor(u.IDC), "idc": u.IDC}))
 
 	} else {
 		return c.JSON(http.StatusOK, commom.SuccessPayload(0))
