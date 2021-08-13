@@ -213,11 +213,11 @@ func FetchUndo(c yee.Context) (err error) {
 	user, _ := lib.JwtParse(c)
 	var undo model.CoreSqlOrder
 	if model.DB().Where(UNDO_EXPR, user, u, 2).First(&undo).RecordNotFound() {
-		return c.JSON(http.StatusOK, UNDO_MESSAGE_SUCCESS)
+		return c.JSON(http.StatusOK, UNDO_MESSAGE_ERROR)
 	}
 	lib.MessagePush(undo.WorkId, 6, "")
 	model.DB().Where(UNDO_EXPR, user, u, 2).Delete(&model.CoreSqlOrder{})
-	return c.JSON(http.StatusOK, commom.SuccessPayLoadToMessage(UNDO_MESSAGE_ERROR))
+	return c.JSON(http.StatusOK, commom.SuccessPayLoadToMessage(UNDO_MESSAGE_SUCCESS))
 }
 
 func FetchMergeDDL(c yee.Context) (err error) {

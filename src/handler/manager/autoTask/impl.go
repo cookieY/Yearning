@@ -26,7 +26,7 @@ func (task *fetchAutoTask) Create() {
 	if model.DB().Model(model.CoreAutoTask{}).Where(
 		QUERY_EXPR, task.Task.Name, task.Task.Source, task.Task.Table, task.Task.DataBase, task.Task.Tp).
 		First(&tmp).RecordNotFound() {
-		model.DB().Create(&task.Task)
+		model.DB().Model(model.CoreAutoTask{}).Create(&task.Task)
 		task.Resp = commom.SuccessPayLoadToMessage(CREATE_MESSAGE_SUCCESS)
 	} else {
 		task.Resp = commom.SuccessPayLoadToMessage(CREATE_MESSAGE_ERROR)
