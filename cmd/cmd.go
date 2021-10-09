@@ -7,9 +7,11 @@ import (
 	"fmt"
 	"github.com/gookit/gcli/v2"
 	"github.com/gookit/gcli/v2/builtin"
+	"net"
 )
 
 var RunOpts = struct {
+	addr       string
 	port       string
 	push       string
 	config     string
@@ -63,6 +65,7 @@ var RunServer = &gcli.Command{
 	Name:   "run",
 	UseFor: "启动Yearning",
 	Config: func(c *gcli.Command) {
+		c.StrOpt(&RunOpts.addr, "addr", "a", "0.0.0.0", "Yearning启动地址")
 		c.StrOpt(&RunOpts.port, "port", "p", "8000", "Yearning启动端口")
 		c.StrOpt(&RunOpts.push, "push", "b", "127.0.0.1:8000", "钉钉/邮件推送时显示的平台地址")
 		c.StrOpt(&RunOpts.config, "config", "c", "conf.toml", "配置文件路径")
@@ -71,7 +74,7 @@ var RunServer = &gcli.Command{
 	Func: func(c *gcli.Command, args []string) error {
 		model.DbInit(RunOpts.config)
 		service.UpdateData()
-		service.StartYearning(RunOpts.port, RunOpts.push)
+		service.StartYearning(net.JoinHostPort(RunOpts.addr, RunOpts.port), RunOpts.push)
 		return nil
 	},
 }

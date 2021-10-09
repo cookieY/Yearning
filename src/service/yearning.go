@@ -19,14 +19,13 @@ import (
 	"Yearning-go/src/parser"
 	"Yearning-go/src/router"
 	"encoding/json"
-	"fmt"
 	"github.com/cookieY/yee"
 	"github.com/cookieY/yee/middleware"
 	"github.com/gobuffalo/packr/v2"
 	"net/http"
 )
 
-func StartYearning(port string, host string) {
+func StartYearning(addr string, host string) {
 	box := packr.New("gemini", "./dist")
 	model.DB().First(&model.GloPer)
 	model.Host = host
@@ -44,5 +43,5 @@ func StartYearning(port string, host string) {
 		Level: 5,
 	}))
 	router.AddRouter(e, box)
-	e.Run(fmt.Sprintf(":%s", port))
+	e.Run(addr)
 }
