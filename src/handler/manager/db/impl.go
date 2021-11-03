@@ -41,14 +41,13 @@ func ConnTest(u *model.CoreDataSource) error {
 
 func SuperEditSource(source *model.CoreDataSource) commom.Resp {
 	if source.Password != "***********" {
-		source.Password = lib.Encrypt(source.Password)
+		model.DB().Model(&model.CoreDataSource{}).Where("source =?", source.Source).Update(&model.CoreDataSource{Password: lib.Encrypt(source.Password)})
 	}
 	model.DB().Model(&model.CoreDataSource{}).Where("source =?", source.Source).Update(map[string]interface{}{
 		"id_c":     source.IDC,
 		"ip":       source.IP,
 		"port":     source.Port,
 		"username": source.Username,
-		"password": source.Password,
 		"is_query": source.IsQuery,
 	})
 	var k []model.CoreRoleGroup
