@@ -51,11 +51,11 @@ func SuperManageGroup() yee.HandlerFunc {
 
 func focalPoint(c yee.Context) bool {
 
-	if strings.Contains(c.RequestURI(), "/api/v2/manager/tpl") && c.Request().Method == http.MethodPut {
+	if strings.Contains(c.RequestURI(), "/api/v2/manage/tpl") && c.Request().Method == http.MethodPut {
 		return true
 	}
 
-	if strings.Contains(c.RequestURI(), "/api/v2/manager/group") && c.Request().Method == http.MethodGet {
+	if strings.Contains(c.RequestURI(), "/api/v2/manage/group") && c.Request().Method == http.MethodGet {
 		return true
 	}
 	return false
