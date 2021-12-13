@@ -1,0 +1,33 @@
+version: '3'
+
+services:
+    yearning:
+        image: chaiyd/yearning:latest
+        environment:
+           MYSQL_USER: yearning
+           MYSQL_PASSWORD: ukC2ZkcG_ZTeb
+           MYSQL_ADDR: mysql
+           MYSQL_DB: yearning
+        ports:
+           - 8000:8000
+        #volumes:
+        #   - ./conf.toml:/opt/conf.toml
+        depends_on:
+           - mysql
+        restart: always
+
+    mysql:
+        image: mysql:5.7
+        environment:
+           MYSQL_ROOT_PASSWORD: ukC2ZkcG_ZTeb
+           MYSQL_DATABASE: yearning
+           MYSQL_USER: yearning
+           MYSQL_PASSWORD: ukC2ZkcG_ZTeb
+        command:
+           - --character-set-server=utf8mb4
+           - --collation-server=utf8mb4_unicode_ci
+        volumes:
+           - mysql-data:/var/lib/mysql
+volumes:
+  mysql-data:      
+# 默认账号：admin，默认密码：Yearning_admin
