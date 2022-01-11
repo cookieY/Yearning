@@ -42,6 +42,6 @@ jobs:
           builder: ${{ steps.buildx.outputs.name }}
           push: true
           build-args: |
-            YEARNING_VER=${{ steps.meta.outputs.tags.version }}
+            YEARNING_VER=${{ fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.version'] }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
