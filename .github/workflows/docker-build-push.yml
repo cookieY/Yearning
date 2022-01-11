@@ -42,6 +42,6 @@ jobs:
           builder: ${{ steps.buildx.outputs.name }}
           push: true
           build-args: |
-            YEARNING_VER=${{ steps.meta.outputs.tags }}
+            YEARNING_VER=${{ steps.meta.outputs.tags.version }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
