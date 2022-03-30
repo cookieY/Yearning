@@ -5,7 +5,7 @@ go 1.16
 require (
 	github.com/BurntSushi/toml v0.3.1
 	github.com/cookieY/sqlx v1.3.0
-	github.com/cookieY/yee v0.2.6
+	github.com/cookieY/yee v0.3.2
 	github.com/go-sql-driver/mysql v1.4.1
 	github.com/gobuffalo/packr/v2 v2.8.1
 	github.com/golang-jwt/jwt v3.2.2+incompatible
