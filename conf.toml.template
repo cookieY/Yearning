@@ -7,4 +7,4 @@ User = "root"
 
 [General]
 SecretKey = "dbcjqheupqjsuwsm"
-GrpcAddr = "127.0.0.1:50001"
+RpcAddr = "127.0.0.1:50001"
