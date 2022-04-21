@@ -1,5 +1,5 @@
 <p align="center">
-        <img  src="img/logo.jpg">
+        <img  src="img/logo.jpeg">
 </p>
 
 # Yearning SQL 审核平台
