@@ -31,7 +31,7 @@ func RecordDashAxis(c yee.Context) (err error) {
 	var count count
 	model.DB().Model(model.CoreSqlOrder{}).Where("time > ? and type = 1", timeAdd("-2160")).Count(&count.DML)
 	model.DB().Model(model.CoreSqlOrder{}).Where("time > ? and type = 0", timeAdd("-2160")).Count(&count.DDL)
-	model.DB().Model(model.CoreSqlOrder{}).Debug().Select("time, count(*) as c,type").Where("time > ?", timeAdd("-2160")).Group("time,type").Scan(&order)
+	model.DB().Model(model.CoreSqlOrder{}).Select("time, count(*) as c,type").Where("time > ?", timeAdd("-2160")).Group("time,type").Scan(&order)
 	return c.JSON(http.StatusOK, commom.SuccessPayload(map[string]interface{}{"order": order, "count": count}))
 }
 
@@ -45,7 +45,7 @@ func RecordOrderList(c yee.Context) (err error) {
 
 	start, end := lib.Paging(u.Current, u.PageSize)
 
-	model.DB().Debug().Model(&model.CoreSqlOrder{}).Select(commom.QueryField).
+	model.DB().Model(&model.CoreSqlOrder{}).Select(commom.QueryField).
 		Scopes(
 			commom.AccordingToAllOrderType(u.Expr.Type),
 			commom.AccordingToAllOrderState(u.Expr.Status),

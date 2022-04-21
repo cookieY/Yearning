@@ -5,8 +5,9 @@
 # Yearning SQL 审核平台
 
 ![LICENSE](https://img.shields.io/badge/license-AGPL%20-blue.svg)
-![](https://img.shields.io/badge/build-release-brightgreen.svg)  
-![](https://img.shields.io/badge/version-v2.3.3-brightgreen.svg)
+![](https://img.shields.io/github/languages/top/cookieY/Yearning)
+![](https://img.shields.io/badge/build-prerelease-brightgreen.svg)  
+![](https://img.shields.io/badge/version-v3.0.0-brightgreen.svg)
 
 ##### MYSQL web 端 SQL 审核平台。
 
@@ -16,7 +17,7 @@
 
 ## Depend on 依赖项
 
-[Gemini](https://github.com/cookieY/Yearning-gemini) front-end
+[Gemini](https://github.com/cookieY/gemini-next) front-end
 
 [Yee](https://github.com/cookieY/yee) web framwork
 
@@ -87,13 +88,13 @@ E-mail: henry@yearning.io
 
 ![](img/audit.png)
 
--   SQL语法及规则检测
-
-![](img/postorder.png)
-
 -   查询(SQL 语法高亮及自动补全)
 
 ![](img/query.png)
+
+-   审计(工单审计)
+
+![](img/record.png)
 
 
 ## License
