@@ -16,32 +16,42 @@ package service
 import (
 	"Yearning-go/src/model"
 	_ "Yearning-go/src/model"
-	"Yearning-go/src/parser"
 	"Yearning-go/src/router"
+	"embed"
 	"encoding/json"
+	"fmt"
 	"github.com/cookieY/yee"
 	"github.com/cookieY/yee/middleware"
-	"github.com/gobuffalo/packr/v2"
 	"net/http"
 )
 
-func StartYearning(addr string, host string) {
-	box := packr.New("gemini", "./dist")
+//go:embed dist/*
+var f embed.FS
+
+//go:embed dist/index.html
+var html string
+
+func StartYearning(port string, host string) {
 	model.DB().First(&model.GloPer)
 	model.Host = host
 	_ = json.Unmarshal(model.GloPer.Message, &model.GloMessage)
 	_ = json.Unmarshal(model.GloPer.Ldap, &model.GloLdap)
 	_ = json.Unmarshal(model.GloPer.Other, &model.GloOther)
-	_ = json.Unmarshal(model.GloPer.AuditRole, &parser.FetchAuditRole)
+	_ = json.Unmarshal(model.GloPer.AuditRole, &model.GloRole)
 	e := yee.New()
-	e.Packr("/front", http.FileSystem(box))
+	e.Pack("/front", f, "dist")
 	e.Use(middleware.Cors())
 	e.Use(middleware.Logger())
 	e.Use(middleware.Secure())
 	e.Use(middleware.Recovery())
 	e.Use(middleware.GzipWithConfig(middleware.GzipConfig{
-		Level: 5,
+		Level: 9,
 	}))
-	router.AddRouter(e, box)
-	e.Run(addr)
+	e.SetLogLevel(2)
+	e.GET("/", func(c yee.Context) error {
+		return c.HTML(http.StatusOK, html)
+	})
+	router.AddRouter(e)
+
+	e.Run(fmt.Sprintf("%s", port))
 }

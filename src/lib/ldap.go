@@ -8,7 +8,7 @@ import (
 	"gopkg.in/ldap.v3"
 )
 
-func LdapContent(l *model.Ldap, user string, pass string, isTest bool) (isOk bool, err error) {
+func LdapConnenct(l *model.Ldap, user string, pass string, isTest bool) (isOk bool, err error) {
 
 	var ld *ldap.Conn
 

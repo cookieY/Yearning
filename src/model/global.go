@@ -14,7 +14,7 @@
 package model
 
 import (
-	"google.golang.org/grpc"
+	"Yearning-go/src/engine"
 	"time"
 )
 
@@ -30,7 +30,7 @@ type general struct {
 	SecretKey string
 	Host      string
 	Hours     time.Duration
-	GrpcAddr  string
+	RpcAddr   string
 }
 
 type DbInfo struct {
@@ -52,10 +52,6 @@ var JWT = ""
 
 var Host = ""
 
-var Grpc = ""
-
-var Conn *grpc.ClientConn
-
 var GloPer CoreGlobalConfiguration
 
 var GloLdap Ldap
@@ -63,3 +59,5 @@ var GloLdap Ldap
 var GloOther Other
 
 var GloMessage Message
+
+var GloRole engine.AuditRole

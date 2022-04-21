@@ -12,10 +12,14 @@ import (
 func YearningQueryForGet(y yee.Context) (err error) {
 	tp := y.Params("tp")
 	switch tp {
-	case "fetch_table":
+	case "tables":
 		return personal.FetchQueryTableInfo(y)
 	case "table_info":
 		return personal.FetchQueryTableStruct(y)
+	case "schema":
+		return personal.FetchQueryDatabaseInfo(y)
+	case "results":
+		return personal.SocketQueryResults(y)
 	}
 	return y.JSON(http.StatusOK, "Illegal")
 }
@@ -23,24 +27,18 @@ func YearningQueryForGet(y yee.Context) (err error) {
 func YearningQueryForPut(y yee.Context) (err error) {
 	tp := y.Params("tp")
 	switch tp {
-	case "fetch_base":
-		return personal.FetchQueryDatabaseInfo(y)
-	case "status":
-		return personal.FetchQueryStatus(y)
 	case "merge":
 		return fetch.FetchMergeDDL(y)
 	}
-	return y.JSON(http.StatusOK,commom.ERR_REQ_FAKE)
+	return y.JSON(http.StatusOK, commom.ERR_REQ_FAKE)
 }
 
 func YearningQueryForPost(y yee.Context) (err error) {
 	tp := y.Params("tp")
-	user, _ := lib.JwtParse(y)
+	user := new(lib.Token).JwtParse(y)
 	switch tp {
-	case "refer":
-		return personal.ReferQueryOrder(y,&user)
-	case "results":
-		return personal.FetchQueryResults(y, &user)
+	case "post":
+		return personal.ReferQueryOrder(y, user)
 	}
 	return y.JSON(http.StatusOK, "Illegal")
 }

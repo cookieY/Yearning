@@ -14,15 +14,15 @@
 package service
 
 import (
+	"Yearning-go/src/engine"
 	"Yearning-go/src/lib"
 	"Yearning-go/src/model"
-	"Yearning-go/src/parser"
 	"encoding/json"
 	"fmt"
 	"time"
 )
 
-func DataInit(o *parser.AuditRole, other *model.Other, ldap *model.Ldap, message *model.Message, a *model.PermissionList) {
+func DataInit(o *engine.AuditRole, other *model.Other, ldap *model.Ldap, message *model.Message, a *model.PermissionList) {
 	c, _ := json.Marshal(o)
 	oh, _ := json.Marshal(other)
 	l, _ := json.Marshal(ldap)
@@ -33,7 +33,6 @@ func DataInit(o *parser.AuditRole, other *model.Other, ldap *model.Ldap, message
 		Username:   "admin",
 		RealName:   "超级管理员",
 		Password:   lib.DjangoEncrypt("Yearning_admin", string(lib.GetRandom())),
-		Rule:       "super",
 		Department: "DBA",
 		Email:      "",
 	})
@@ -69,7 +68,7 @@ func Migrate() {
 		model.DB().CreateTable(&model.CoreRoleGroup{})
 		model.DB().CreateTable(&model.CoreWorkflowTpl{})
 		model.DB().AutoMigrate(&model.CoreWorkflowDetail{})
-		o := parser.AuditRole{
+		o := engine.AuditRole{
 			DMLInsertColumns:               false,
 			DMLMaxInsertRows:               10,
 			DMLWhere:                       false,
@@ -97,35 +96,21 @@ func Migrate() {
 			SupportCollation:               "",
 			CheckIdentifier:                false,
 			MustHaveColumns:                "",
-			DDLMultiToSubmit:               false,
-			OscAlterForeignKeysMethod:      "rebuild_constraints",
-			OscMaxLag:                      1,
-			OscChunkTime:                   0.5,
-			OscMaxThreadConnected:          25,
-			OscMaxThreadRunning:            25,
-			OscCriticalThreadConnected:     20,
-			OscCriticalThreadRunning:       20,
-			OscRecursionMethod:             "processlist",
-			OscCheckInterval:               1,
+			DDLMultiToCommit:               false,
 			AllowCreatePartition:           false,
 			AllowCreateView:                false,
 			AllowSpecialType:               false,
-			OscLockWaitTimeout:             60,
-			OscSleep:                       0.0,
-			OscCheckUniqueKeyChange:        false,
 		}
 
 		other := model.Other{
-			Limit:            "1000",
-			IDC:              []string{"Aliyun", "AWS"},
-			Multi:            false,
-			Query:            false,
-			ExcludeDbList:    []string{},
-			InsulateWordList: []string{},
-			Register:         false,
-			Export:           false,
-			ExQueryTime:      60,
-			PerOrder:         2,
+			Limit:       1000,
+			IDC:         []string{"Aliyun", "AWS"},
+			Multi:       false,
+			Query:       false,
+			Register:    false,
+			Export:      false,
+			ExQueryTime: 60,
+			PerOrder:    2,
 		}
 
 		ldap := model.Ldap{
@@ -152,12 +137,10 @@ func Migrate() {
 			DDLSource:   []string{},
 			DMLSource:   []string{},
 			QuerySource: []string{},
-			Auditor:     []string{},
 		}
 		time.Sleep(2)
 		DataInit(&o, &other, &ldap, &message, &a)
-
-		fmt.Println("初始化成功!\n 用户名: admin\n密码:Yearning_admin")
+		fmt.Println("初始化成功!\n 用户名: admin\n密码:Yearning_admin\n请通过./Yearning run 运行,默认地址:http://<host>:8000")
 	} else {
 		fmt.Println("已初始化过,请不要再次执行")
 	}
@@ -178,7 +161,10 @@ func UpdateData() {
 	model.DB().AutoMigrate(&model.CoreRoleGroup{})
 	model.DB().AutoMigrate(&model.CoreWorkflowTpl{})
 	model.DB().AutoMigrate(&model.CoreWorkflowDetail{})
+	model.DB().AutoMigrate(&model.CoreOrderComment{})
 	model.DB().LogMode(false).Exec("alter table core_auto_tasks change COLUMN base data_base varchar(50) not null")
+	model.DB().LogMode(false).Model(&model.CoreSqlOrder{}).DropColumn("uuid")
+	model.DB().LogMode(false).Model(&model.CoreWorkflowDetail{}).DropColumn("rejected")
 	model.DB().LogMode(false).Model(&model.CoreAutoTask{}).DropColumn("base")
 	fmt.Println("数据已更新!")
 }
@@ -189,11 +175,9 @@ func DelCol() {
 
 func MargeRuleGroup() {
 	fmt.Println("破坏性变更修复…………")
-	model.DB().Model(&model.CoreSqlOrder{}).DropColumn("rejected")
-	model.DB().Model(&model.CoreGrained{}).DropColumn("permissions")
-	model.DB().Model(&model.CoreGrained{}).DropColumn("rule")
-	model.DB().Model(model.CoreAccount{}).Where("rule = ?", "perform").Update(&model.CoreAccount{Rule: "admin"})
-	model.DB().Model(model.CoreAccount{}).Where("username = ?", "admin").Update(&model.CoreAccount{Rule: "super"})
+	model.DB().LogMode(false).Model(&model.CoreSqlOrder{}).DropColumn("rejected")
+	model.DB().LogMode(false).Model(&model.CoreGrained{}).DropColumn("permissions")
+	model.DB().LogMode(false).Model(&model.CoreGrained{}).DropColumn("rule")
 	ldap := model.Ldap{
 		Url:      "",
 		User:     "",

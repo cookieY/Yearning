@@ -5,27 +5,15 @@ import (
 	"Yearning-go/src/model"
 	"fmt"
 	"github.com/jinzhu/gorm"
-	"strconv"
+	"log"
+	"strings"
 )
 
-type _dbInfo struct {
-	Results   []string
-	Query     []map[string]interface{}
-	BaseList  []map[string]interface{}
-	Highlight []map[string]string
-}
-
-type Resp struct {
-	Payload interface{} `json:"payload"`
-	Code    int         `json:"code"`
-	Text    string      `json:"text"`
-}
-
-func ScanDataRows(s model.CoreDataSource, database, sql, meta string, isQuery bool) (res _dbInfo, err error) {
+func ScanDataRows(s model.CoreDataSource, database, sql, meta string, isQuery bool, isLeaf bool) (res _dbInfo, err error) {
 
 	ps := lib.Decrypt(s.Password)
 
-	db, err := gorm.Open("mysql", fmt.Sprintf("%s:%s@(%s:%s)/%s?charset=utf8&parseTime=True&loc=Local", s.Username, ps, s.IP, strconv.Itoa(int(s.Port)), database))
+	db, err := gorm.Open("mysql", fmt.Sprintf("%s:%s@(%s:%d)/%s?charset=utf8&parseTime=True&loc=Local", s.Username, ps, s.IP, s.Port, database))
 
 	defer func() {
 		_ = db.Close()
@@ -43,33 +31,66 @@ func ScanDataRows(s model.CoreDataSource, database, sql, meta string, isQuery bo
 		return _dbInfo{}, err
 	}
 
+	excludeDbList := lib.MapOn(strings.Split(s.ExcludeDbList, ","))
+
 	for rows.Next() {
 		_ = rows.Scan(&_tmp)
 		if isQuery {
-			if len(model.GloOther.ExcludeDbList) > 0 {
-				if !validExcludeDbList(_tmp) {
-					res.Query = append(res.Query, map[string]interface{}{"title": _tmp})
-					res.BaseList = append(res.BaseList, map[string]interface{}{"title": _tmp, "children": []map[string]string{{}}})
+			if len(excludeDbList) > 0 {
+				if _, ok := excludeDbList[_tmp]; ok {
+					continue
 				}
-			} else {
-				res.Query = append(res.Query, map[string]interface{}{"title": _tmp})
-				res.BaseList = append(res.BaseList, map[string]interface{}{"title": _tmp, "children": []map[string]string{{}}})
 			}
+			res.QueryList = append(res.QueryList, map[string]interface{}{"title": _tmp, "key": checkMeta(_tmp, database, meta), "meta": meta, "isLeaf": isLeaf})
 		} else {
 			res.Results = append(res.Results, _tmp)
 		}
-		res.Highlight = append(res.Highlight, map[string]string{"vl": _tmp, "meta": meta})
 	}
 	return res, nil
 }
 
-func validExcludeDbList(db string) bool {
-	for _, i := range model.GloOther.ExcludeDbList {
-		if db == i {
-			return true
-		}
+func checkMeta(s, database, flag string) string {
+	if flag == "Table" {
+		return fmt.Sprintf("`%s`.`%s`", database, s)
 	}
-	return false
+	return s
+}
+
+func Highlight(s *model.CoreDataSource) []map[string]string {
+	ps := lib.Decrypt(s.Password)
+	var list []map[string]string
+	db, err := gorm.Open("mysql", fmt.Sprintf("%s:%s@(%s:%d)/?charset=utf8&parseTime=True&loc=Local", s.Username, ps, s.IP, s.Port))
+	if err != nil {
+		log.Println(err)
+		return nil
+	}
+
+	defer func() {
+		_ = db.Close()
+	}()
+
+	var highlight string
+
+	excludeDbList := strings.Split(s.ExcludeDbList, ",")
+
+	schema, err := db.Table("information_schema.SCHEMATA").Select("SCHEMA_NAME").Scopes(AccordingToSchemaNotIn(true, excludeDbList)).Group("SCHEMA_NAME").Rows()
+	for schema.Next() {
+		schema.Scan(&highlight)
+		list = append(list, map[string]string{"vl": highlight, "meta": "Schema"})
+	}
+
+	tbl, err := db.Table("information_schema.tables").Select("table_name").Scopes(AccordingToSchemaNotIn(false, excludeDbList)).Group("table_name").Rows()
+	for tbl.Next() {
+		tbl.Scan(&highlight)
+		list = append(list, map[string]string{"vl": highlight, "meta": "Table"})
+	}
+	fields, err := db.Table("information_schema.Columns").Select("COLUMN_NAME").Scopes(AccordingToSchemaNotIn(false, excludeDbList)).Group("COLUMN_NAME").Rows()
+	for fields.Next() {
+		fields.Scan(&highlight)
+		list = append(list, map[string]string{"vl": highlight, "meta": "Fields"})
+	}
+
+	return list
 }
 
 func SuccessPayload(payload interface{}) Resp {

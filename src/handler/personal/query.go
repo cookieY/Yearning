@@ -15,161 +15,137 @@ package personal
 
 import (
 	"Yearning-go/src/handler/commom"
-	"Yearning-go/src/handler/fetch"
+	"Yearning-go/src/handler/manage/tpl"
 	"Yearning-go/src/lib"
 	"Yearning-go/src/model"
-	ser "Yearning-go/src/parser"
-	pb "Yearning-go/src/proto"
+	"encoding/json"
 	"fmt"
-	"net/http"
-	"net/url"
-	"time"
-
 	"github.com/cookieY/yee"
 	"github.com/jinzhu/gorm"
+	"github.com/vmihailenco/msgpack/v5"
+	"golang.org/x/net/websocket"
+	"io"
+	"net/http"
+	"net/url"
+	"strings"
+	"time"
 )
 
-func ReferQueryOrder(c yee.Context, user *string) (err error) {
-	var u model.CoreAccount
-	var t model.CoreQueryOrder
+type queryResults struct {
+	Export    bool     `msgpack:"export"`
+	Error     string   `msgpack:"error"`
+	Results   []*Query `msgpack:"results"`
+	QueryTime int      `msgpack:"query_time"`
+	Status    bool     `msgpack:"status"`
+}
 
+func reflect(flag bool) uint {
+	if flag {
+		return 1
+	}
+	return 0
+}
+
+func ReferQueryOrder(c yee.Context, user *lib.Token) (err error) {
+	var t model.CoreQueryOrder
 	d := new(commom.QueryOrder)
 	if err = c.Bind(d); err != nil {
-		c.Logger().Error(err.Error())
 		return c.JSON(http.StatusOK, commom.ERR_REQ_BIND)
 	}
-
-	state := 1
-
-	if model.GloOther.Query {
-		state = 2
+	work := lib.GenWorkid()
+	if !model.GloOther.Query {
+		model.DB().Create(&model.CoreQueryOrder{
+			WorkId:       work,
+			Username:     user.Username,
+			Date:         time.Now().Format("2006-01-02 15:04"),
+			Export:       reflect(model.GloOther.Export),
+			Status:       2,
+			RealName:     user.RealName,
+			Text:         "当前未开启查询审核,用户可自由查询",
+			Assigned:     "admin",
+			ApprovalTime: time.Now().Format("2006-01-02 15:04"),
+		})
+		return
 	}
 
-	model.DB().Select("real_name").Where("username =?", user).First(&u)
-
-	if model.DB().Model(model.CoreQueryOrder{}).Where("username =? and query_per =?", user, 2).First(&t).RecordNotFound() {
-
-		work := lib.GenWorkid()
-
+	if model.DB().Model(model.CoreQueryOrder{}).Where("username =? and status =?", user.Username, 2).First(&t).RecordNotFound() {
+		var flow model.CoreWorkflowTpl
+		var flowId model.CoreDataSource
+		var step []tpl.Tpl
+		model.DB().Model(model.CoreDataSource{}).Select("flow_id").Where("source_id = ?", d.SourceId).First(&flowId)
+		model.DB().Model(model.CoreWorkflowTpl{}).Where("id =?", flowId.FlowID).Find(&flow)
+		_ = json.Unmarshal(flow.Steps, &step)
 		model.DB().Create(&model.CoreQueryOrder{
 			WorkId:   work,
-			Username: *user,
+			Username: user.Username,
 			Date:     time.Now().Format("2006-01-02 15:04"),
 			Text:     d.Text,
-			Assigned: d.Assigned,
 			Export:   d.Export,
-			IDC:      d.IDC,
-			QueryPer: state,
-			Realname: u.RealName,
-			ExDate:   time.Now().Format("2006-01-02 15:04"),
+			Status:   1,
+			SourceId: d.SourceId,
+			Assigned: strings.Join(step[len(step)-1].Auditor, ","),
+			RealName: user.RealName,
 		})
-
-		if state == 2 {
-			lib.MessagePush(work, 7, "")
-		}
-
+		lib.MessagePush(work, 7, "")
 		return c.JSON(http.StatusOK, commom.SuccessPayLoadToMessage(commom.ORDER_IS_CREATE))
 	}
 	return c.JSON(http.StatusOK, commom.SuccessPayLoadToMessage(commom.ORDER_IS_DUP))
 }
 
-func FetchQueryStatus(c yee.Context) (err error) {
-
-	user, _ := lib.JwtParse(c)
-
-	var d model.CoreQueryOrder
-
-	model.DB().Where("username =?", user).Last(&d)
-
-	if lib.TimeDifference(d.ExDate) {
-		model.DB().Model(model.CoreQueryOrder{}).Where("username =?", user).Update(&model.CoreQueryOrder{QueryPer: 3})
-	}
-	return c.JSON(http.StatusOK, commom.SuccessPayload(map[string]interface{}{"status": d.QueryPer, "export": model.GloOther.Export, "idc": d.IDC}))
-}
-
 func FetchQueryDatabaseInfo(c yee.Context) (err error) {
-	user, _ := lib.JwtParse(c)
 	var d model.CoreQueryOrder
 	var u model.CoreDataSource
 
-	model.DB().Where("username =?", user).Last(&d)
+	model.DB().Where("source_id =?", c.QueryParam("source_id")).First(&u)
 
-	if d.QueryPer == 1 {
+	result, err := commom.ScanDataRows(u, "", "SHOW DATABASES;", "Schema", true, false)
 
-		source := new(commom.QueryOrder)
-
-		if err = c.Bind(source); err != nil {
-			c.Logger().Error(err.Error())
-			return c.JSON(http.StatusOK, commom.ERR_REQ_BIND)
-		}
-
-		model.DB().Where("source =?", source.Source).First(&u)
-
-		result, err := commom.ScanDataRows(u, "", "SHOW DATABASES;", "库名", true)
-
-		if err != nil {
-			c.Logger().Error(err.Error())
-			return c.JSON(http.StatusOK, commom.ERR_COMMON_MESSAGE(err))
-		}
-
-		var info []map[string]interface{}
-
-		info = append(info, map[string]interface{}{
-			"title":    source.Source,
-			"expand":   "true",
-			"children": result.BaseList,
-		})
-		return c.JSON(http.StatusOK, commom.SuccessPayload(map[string]interface{}{"info": info, "status": d.Export, "highlight": result.Highlight, "sign": fetch.FetchTplAuditor(u.IDC), "idc": u.IDC}))
-
-	} else {
-		return c.JSON(http.StatusOK, commom.SuccessPayload(0))
+	if err != nil {
+		c.Logger().Error(err.Error())
+		return c.JSON(http.StatusOK, commom.ERR_COMMON_MESSAGE(err))
 	}
+	return c.JSON(http.StatusOK, commom.SuccessPayload(map[string]interface{}{"info": result.QueryList, "status": d.Export}))
 }
 
 func FetchQueryTableInfo(c yee.Context) (err error) {
-	user, _ := lib.JwtParse(c)
-	t := c.QueryParam("title")
+
+	t := c.QueryParam("schema")
 	// todo source改方法 不然中文无法识别
-	source := c.QueryParam("source")
+	source := c.QueryParam("source_id")
 	unescape, _ := url.QueryUnescape(source)
-	var d model.CoreQueryOrder
+
 	var u model.CoreDataSource
-	model.DB().Where("username =?", user).Last(&d)
 
-	if d.QueryPer == 1 {
+	model.DB().Where("source_id =?", unescape).First(&u)
 
-		model.DB().Where("source =?", unescape).First(&u)
-
-		result, err := commom.ScanDataRows(u, t, "SHOW TABLES;", "表名", true)
-		if err != nil {
-			c.Logger().Error(err.Error())
-			return c.JSON(http.StatusOK, commom.ERR_COMMON_MESSAGE(err))
-		}
-		return c.JSON(http.StatusOK, commom.SuccessPayload(map[string]interface{}{"table": result.Query, "highlight": result.Highlight}))
-
-	} else {
-		return c.JSON(http.StatusOK, commom.SuccessPayload(0))
+	result, err := commom.ScanDataRows(u, t, "SHOW TABLES;", "Table", true, true)
+	if err != nil {
+		c.Logger().Error(err.Error())
+		return c.JSON(http.StatusOK, commom.ERR_COMMON_MESSAGE(err))
 	}
+	return c.JSON(http.StatusOK, commom.SuccessPayload(map[string]interface{}{"table": result.QueryList}))
+
 }
 
 func FetchQueryTableStruct(c yee.Context) (err error) {
+
 	t := new(queryBind)
+
 	if err := c.Bind(t); err != nil {
 		return c.JSON(http.StatusOK, commom.ERR_REQ_BIND)
 	}
 
 	unescape, _ := url.QueryUnescape(t.Source)
-	user, _ := lib.JwtParse(c)
-	var d model.CoreQueryOrder
-	var u model.CoreDataSource
-	var f []ser.FieldInfo
-	model.DB().Where("username =?", user).Last(&d)
-	model.DB().Where("source =?", unescape).First(&u)
-	ps := lib.Decrypt(u.Password)
 
-	db, e := gorm.Open("mysql", fmt.Sprintf("%s:%s@(%s:%d)/%s?charset=utf8&parseTime=True&loc=Local", u.Username, ps, u.IP, u.Port, t.DataBase))
-	if e != nil {
-		c.Logger().Error(e.Error())
+	var u model.CoreDataSource
+
+	var f []commom.FieldInfo
+
+	model.DB().Where("source =?", unescape).First(&u)
+
+	db, err := gorm.Open("mysql", fmt.Sprintf("%s:%s@(%s:%d)/%s?charset=utf8&parseTime=True&loc=Local", u.Username, lib.Decrypt(u.Password), u.IP, u.Port, t.DataBase))
+	if err != nil {
+		c.Logger().Error(err.Error())
 		return c.JSON(http.StatusInternalServerError, commom.SuccessPayLoadToMessage(ER_DB_CONNENT))
 	}
 	defer db.Close()
@@ -182,56 +158,96 @@ func FetchQueryTableStruct(c yee.Context) (err error) {
 	return c.JSON(http.StatusOK, commom.SuccessPayload(f))
 }
 
-func FetchQueryResults(c yee.Context, user *string) (err error) {
+func SocketQueryResults(c yee.Context) (err error) {
+	user := c.QueryParam("user")
+	websocket.Handler(func(ws *websocket.Conn) {
+		defer ws.Close()
+		var b []byte
+		valid, err := lib.WSTokenIsValid(ws.Request().Header.Get("Sec-WebSocket-Protocol"))
+		if err != nil {
+			c.Logger().Error(err)
+			return
+		}
+		if valid {
+			for {
+				var msg QueryDeal
+				if err := websocket.Message.Receive(ws, &b); err != nil {
+					if err != io.EOF {
+						c.Logger().Error(err)
+					}
+					break
+				}
 
-	req := new(lib.QueryDeal)
+				if err := msgpack.Unmarshal(b, &msg.Ref); err != nil {
+					c.Logger().Error(err)
+					break
+				}
 
-	clock := time.Now()
+				switch msg.Ref.Type {
+				case commom.CLOSE:
+					break
+				default:
+					var d model.CoreQueryOrder
+					clock := time.Now()
+					if model.DB().Where("username =? AND status =?", user, 2).Last(&d).RecordNotFound() {
+						if err := websocket.Message.Send(ws, lib.ToMsg(queryResults{Error: "查询工单获取失败或工单已过期,请返回上一级菜单"})); err != nil {
+							c.Logger().Error(err)
+						}
+						continue
+					}
 
-	if err = c.Bind(req); err != nil {
-		return c.JSON(http.StatusOK, err.Error())
-	}
+					if lib.TimeDifference(d.ApprovalTime) {
+						model.DB().Model(model.CoreQueryOrder{}).Where("username =?", user).Update(&model.CoreQueryOrder{Status: 3})
+						if err := websocket.Message.Send(ws, lib.ToMsg(queryResults{Status: true})); err != nil {
+							c.Logger().Error(err)
+						}
+						continue
+					}
 
-	//需自行实现查询SQL LIMIT限制
-	err = req.Limit(&pb.LibraAuditOrder{SQL: req.Sql})
+					var u model.CoreDataSource
 
-	if err != nil {
-		return c.JSON(http.StatusOK, commom.ERR_COMMON_MESSAGE(err))
-	}
+					var queryData []*Query
 
-	var d model.CoreQueryOrder
+					model.DB().Where("source_id =?", msg.Ref.SourceId).First(&u)
 
-	model.DB().Where("username =? AND query_per =?", user, 1).Last(&d)
+					if err := msg.PreCheck(u.InsulateWordList); err != nil {
+						if err := websocket.Message.Send(ws, lib.ToMsg(queryResults{Error: err.Error()})); err != nil {
+							c.Logger().Error(err)
+						}
+						continue
+					}
 
-	if lib.TimeDifference(d.ExDate) {
-		model.DB().Model(model.CoreQueryOrder{}).Where("username =?", user).Update(&model.CoreQueryOrder{QueryPer: 3})
-		return c.JSON(http.StatusOK, commom.SuccessPayload(map[string]interface{}{"status": true}))
-	}
+					for _, i := range msg.MultiSQLRunner {
+						result, err := i.Run(&u, msg.Ref.Schema)
+						if err != nil {
+							if err := websocket.Message.Send(ws, lib.ToMsg(queryResults{Error: err.Error()})); err != nil {
+								c.Logger().Error(err)
+							}
+							goto NEXT
+						}
+						queryData = append(queryData, result)
+					}
 
-	//结束
-	data := new(lib.Query)
+					queryTime := int(time.Since(clock).Seconds() * 1000)
 
-	var u model.CoreDataSource
+					go func(w string, s string, ex int) {
+						model.DB().Create(&model.CoreQueryRecord{SQL: s, WorkId: w, ExTime: ex, Time: time.Now().Format("2006-01-02 15:04"), Source: u.Source, Schema: msg.Ref.Schema})
+					}(d.WorkId, msg.Ref.Sql, queryTime)
+					if err := websocket.Message.Send(ws, lib.ToMsg(queryResults{Export: d.Export == 1, Error: "", Results: queryData, QueryTime: queryTime})); err != nil {
+						c.Logger().Error(err)
+					}
+				}
+			NEXT:
+				continue
+			}
+		}
 
-	model.DB().Where("source =?", req.Source).First(&u)
-
-	err = data.QueryRun(&u, req)
-
-	if err != nil {
-		return c.JSON(http.StatusOK, commom.ERR_COMMON_MESSAGE(err))
-	}
-
-	queryTime := int(time.Since(clock).Seconds() * 1000)
-
-	go func(w, s string, ex int) {
-		model.DB().Create(&model.CoreQueryRecord{SQL: s, WorkId: w, ExTime: ex, Time: time.Now().Format("2006-01-02 15:04"), Source: req.Source, BaseName: req.DataBase})
-	}(d.WorkId, req.Sql, queryTime)
-
-	return c.JSON(http.StatusOK, commom.SuccessPayload(map[string]interface{}{"title": data.Field, "data": data.Data, "status": false, "time": queryTime, "total": len(data.Data)}))
+	}).ServeHTTP(c.Response(), c.Request())
+	return nil
 }
 
 func UndoQueryOrder(c yee.Context) (err error) {
-	user, _ := lib.JwtParse(c)
-	model.DB().Model(model.CoreQueryOrder{}).Where("username =?", user).Update(map[string]interface{}{"query_per": 3})
+	user := new(lib.Token).JwtParse(c)
+	model.DB().Model(model.CoreQueryOrder{}).Where("username =?", user.Username).Update(map[string]interface{}{"status": 3})
 	return c.JSON(http.StatusOK, commom.SuccessPayLoadToMessage(commom.ORDER_IS_END))
 }

@@ -34,7 +34,7 @@ func UserLdapLogin(c yee.Context) (err error) {
 	if err = c.Bind(u); err != nil {
 		return c.JSON(http.StatusOK, commom.ERR_REQ_BIND)
 	}
-	isOk, err := lib.LdapContent(&model.GloLdap, u.Username, u.Password, false)
+	isOk, err := lib.LdapConnenct(&model.GloLdap, u.Username, u.Password, false)
 	if err != nil {
 		return c.JSON(http.StatusOK, commom.ERR_COMMON_MESSAGE(err))
 	}
@@ -45,22 +45,25 @@ func UserLdapLogin(c yee.Context) (err error) {
 				Username:   u.Username,
 				RealName:   "请重置你的真实姓名",
 				Password:   lib.DjangoEncrypt(lib.GenWorkid(), string(lib.GetRandom())),
-				Rule:       "guest",
 				Department: "all",
 				Email:      "",
 			})
 			ix, _ := json.Marshal([]string{})
 			model.DB().Create(&model.CoreGrained{Username: u.Username, Group: ix})
 		}
-		token, tokenErr := lib.JwtAuth(u.Username, account.Rule)
+
+		token, tokenErr := lib.JwtAuth(lib.Token{
+			Username: u.Username,
+			RealName: account.RealName,
+		})
 		if tokenErr != nil {
 			c.Logger().Error(tokenErr.Error())
 			return
 		}
 		dataStore := map[string]string{
-			"token":       token,
-			"permissions": account.Rule,
-			"real_name":   account.RealName,
+			"token":     token,
+			"real_name": account.RealName,
+			"user":      u.Username,
 		}
 		return c.JSON(http.StatusOK, commom.SuccessPayload(dataStore))
 	}
@@ -79,15 +82,18 @@ func UserGeneralLogin(c yee.Context) (err error) {
 			return c.JSON(http.StatusOK, commom.ERR_LOGIN)
 		}
 		if e := lib.DjangoCheckPassword(&account, u.Password); e {
-			token, tokenErr := lib.JwtAuth(u.Username, account.Rule)
+			token, tokenErr := lib.JwtAuth(lib.Token{
+				Username: u.Username,
+				RealName: account.RealName,
+			})
 			if tokenErr != nil {
 				c.Logger().Error(tokenErr.Error())
 				return
 			}
 			dataStore := map[string]string{
-				"token":       token,
-				"permissions": account.Rule,
-				"real_name":   account.RealName,
+				"token":     token,
+				"real_name": account.RealName,
+				"user":      account.Username,
 			}
 			return c.JSON(http.StatusOK, commom.SuccessPayload(dataStore))
 		}
@@ -115,7 +121,6 @@ func UserRegister(c yee.Context) (err error) {
 			Username:   u.Username,
 			RealName:   u.RealName,
 			Password:   lib.DjangoEncrypt(u.Password, string(lib.GetRandom())),
-			Rule:       "guest",
 			Department: u.Department,
 			Email:      u.Email,
 		})

@@ -6,17 +6,6 @@ import (
 	"github.com/jinzhu/gorm"
 )
 
-const QueryField = "work_id, username, text, backup, date, real_name, executor, `status`, `type`, `delay`, `source`,`id_c`,`data_base`,`table`,`execute_time`,assigned,current_step,relevant"
-
-type ExecuteStr struct {
-	WorkId  string `json:"work_id"`
-	Perform string `json:"perform"`
-	Page    int    `json:"page"`
-	Flag    int    `json:"flag"`
-	Text    string `json:"text"`
-	Tp      string `json:"tp"`
-}
-
 type PageInfo struct {
 	Page int    `json:"page"`
 	Find Search `json:"find"`
@@ -41,11 +30,11 @@ type SQLOrder struct {
 
 type SQLQuery struct {
 	List  []model.CoreQueryOrder `json:"data"`
-	Count int                  `json:"page"`
+	Count int                    `json:"page"`
 }
 
-func (p *PageInfo) GetSQLOrderList(scopes ...func(*gorm.DB) *gorm.DB) (order SQLOrder) {
-	start, offset := lib.Paging(p.Page, 15)
+func (p *PageChange) GetSQLOrderList(scopes ...func(*gorm.DB) *gorm.DB) (order SQLOrder) {
+	start, offset := lib.Paging(p.Current, p.PageSize)
 	model.DB().Model(model.CoreSqlOrder{}).Select(QueryField).
 		Scopes(scopes...).Count(&order.Count).Order("id desc").
 		Offset(start).Limit(offset).Find(&order.List)
@@ -53,12 +42,18 @@ func (p *PageInfo) GetSQLOrderList(scopes ...func(*gorm.DB) *gorm.DB) (order SQL
 	return
 }
 
-func (p *PageInfo) GetSQLQueryList(scopes ...func(*gorm.DB) *gorm.DB) (query SQLQuery) {
-	start, offset := lib.Paging(p.Page, 15)
+func (p *PageChange) GetSQLQueryList(scopes ...func(*gorm.DB) *gorm.DB) (query SQLQuery) {
+	start, offset := lib.Paging(p.Current, p.PageSize)
 	model.DB().Model(model.CoreQueryOrder{}).
 		Scopes(scopes...).Count(&query.Count).Order("id desc").
 		Offset(start).Limit(offset).Find(&query.List)
 	return
+}
+
+type PageChange struct {
+	Current  int    ` json:"current"`
+	PageSize int    `json:"pageSize"`
+	Expr     Search `json:"expr"`
 }
 
 type Search struct {
@@ -73,24 +68,59 @@ type Search struct {
 	Source   string   `json:"source"`
 	Username string   `json:"username"`
 	Dept     string   `json:"dept"`
+	RealName string   `json:"real_name"`
+	Rule     string   `json:"rule"`
+	Email    string   `json:"email"`
+	IP       string   `json:"ip"`
+	IsQuery  int      `json:"is_query"`
 }
 
 type SQLTest struct {
 	Source   string `json:"source"`
 	SQL      string `json:"sql"`
 	Database string `json:"data_base"`
-	IsDML    bool   `json:"is_dml"`
+	Kind     int    `json:"kind"`
 	WorkId   string `json:"work_id"`
 }
 
 type QueryOrder struct {
-	IDC      string `json:"idc"`
-	Source   string `json:"source"`
+	SourceId string `json:"source_id"`
 	Export   uint   `json:"export"`
-	Assigned string `json:"assigned"`
 	Text     string `json:"text"`
 	WorkId   string `json:"work_id"`
 	Tp       string `json:"tp"`
+}
+
+type _dbInfo struct {
+	Results   []string
+	QueryList []map[string]interface{}
+}
+
+type FieldInfo struct {
+	Field      string  `gorm:"Column:Field" json:"field"`
+	Type       string  `gorm:"Column:Type" json:"type"`
+	Collation  string  `gorm:"Column:Collation" json:"collation"`
+	Null       string  `gorm:"Column:Null" json:"null"`
+	Key        string  `gorm:"Column:Key" json:"key"`
+	Default    *string `gorm:"Column:Default" json:"default"`
+	Extra      string  `gorm:"Column:Extra" json:"extra"`
+	Privileges string  `gorm:"Column:Privileges" json:"privileges"`
+	Comment    string  `gorm:"Column:Comment" json:"comment"`
+}
+
+type IndexInfo struct {
+	Table      string `gorm:"Column:Table"`
+	NonUnique  int    `gorm:"Column:Non_unique"`
+	IndexName  string `gorm:"Column:Key_name"`
+	Seq        int    `gorm:"Column:Seq_in_index"`
+	ColumnName string `gorm:"Column:Column_name"`
+	IndexType  string `gorm:"Column:Index_type"`
+}
+
+type Resp struct {
+	Payload interface{} `json:"payload"`
+	Code    int         `json:"code"`
+	Text    string      `json:"text"`
 }
 
 const (
@@ -108,3 +138,5 @@ const (
 	DATA_IS_EDIT        = "数据已编辑！"
 	DATA_IS_UPDATED     = "数据已更新"
 )
+
+const CLOSE = "1"

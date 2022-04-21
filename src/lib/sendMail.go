@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"gopkg.in/gomail.v2"
 	"log"
+	"strings"
 )
 
 type UserInfo struct {
@@ -27,6 +28,11 @@ type UserInfo struct {
 	Pawd    string
 	Smtp    string
 	PubName string
+}
+
+type sendInfo struct {
+	ToUser  []model.CoreAccount
+	Message model.Message
 }
 
 var TemoplateTestMail = `
@@ -92,10 +98,10 @@ var TmplQueryRefer = `# Yearning查询申请通知 #  \n \n  **工单编号:**  
 var TmplSuccessQuery = `# Yearning查询申请通知 #  \n \n  **工单编号:**  %s \n \n **提交人员:**  <font color=\"#78beea\">%s</font> \n \n **审核人员:** <font color=\"#fe8696\">%s</font> \n \n **平台地址:** %s \n \n **状态:** <font color=\"#3fd2bd\">同意</font>`
 var TmplRejectQuery = `# Yearning查询申请通知 #  \n \n  **工单编号:**  %s \n \n **提交人员:**  <font color=\"#78beea\">%s</font> \n \n **审核人员:** <font color=\"#fe8696\">%s</font> \n \n **平台地址:** %s \n \n **状态:** <font color=\"#df117e\">已驳回</font>`
 
-func SendMail(mail model.Message, tmpl string) {
+func SendMail(addr string, mail model.Message, tmpl string) {
 	m := gomail.NewMessage()
 	m.SetHeader("From", mail.User)
-	m.SetHeader("To", mail.ToUser)
+	m.SetHeader("To", addr)
 	m.SetHeader("Subject", "Yearning消息推送!")
 	m.SetBody("text/html", tmpl)
 	d := gomail.NewDialer(mail.Host, mail.Port, mail.User, mail.Password)
@@ -113,19 +119,18 @@ func MessagePush(workid string, t uint, reject string) {
 	var user model.CoreAccount
 	var o model.CoreSqlOrder
 	var ding, mail string
-	model.DB().Select("work_id,username,text,assigned,executor,source").Where("work_id =?", workid).First(&o)
-	model.DB().Select("email").Where("username =?", o.Username).First(&user)
-	s := model.GloMessage
-	s.ToUser = user.Email
+	model.DB().Select("work_id,username,text,assigned,source").Where("work_id =?", workid).First(&o)
+	model.DB().Select("email").Where("username = ?", o.Username).First(&user)
+	s := new(sendInfo)
+	s.ToUser = []model.CoreAccount{user}
+	s.Message = model.GloMessage
 
 	if model.GloOther.Query && t > 6 {
 		var op model.CoreQueryOrder
 		model.DB().Select("work_id,username,text,assigned").Where("work_id =?", workid).First(&op)
-		model.DB().Select("email").Where("username =?", op.Username).First(&user)
-		s.ToUser = user.Email
+		model.DB().Select("email").Where("username = ?", op.Username).First(&user)
 		if t == 7 {
-			model.DB().Select("email").Where("username =?", op.Assigned).First(&user)
-			s.ToUser = user.Email
+			model.DB().Select("email").Where("username IN (?)", strings.Split(op.Assigned, ",")).Find(&s.ToUser)
 			ding = fmt.Sprintf(TmplQueryRefer, op.WorkId, op.Username, op.Assigned, model.Host, op.Text)
 			mail = fmt.Sprintf(TmplMail, "查询申请", op.WorkId, op.Username, model.Host, model.Host, "已提交")
 		}
@@ -138,40 +143,49 @@ func MessagePush(workid string, t uint, reject string) {
 			mail = fmt.Sprintf(TmplMail, "查询申请", op.WorkId, op.Username, model.Host, model.Host, "已驳回")
 		}
 	} else {
-		switch t {
-		case 0:
+		if t == 0 {
 			ding = fmt.Sprintf(TmplRejectDing, o.WorkId, o.Source, o.Username, o.Assigned, model.Host, o.Text, reject)
 			mail = fmt.Sprintf(TmplRejectMail, o.WorkId, o.Username, model.Host, model.Host, reject)
-		case 1:
+		}
+
+		if t == 1 {
 			ding = fmt.Sprintf(TmplSuccessDing, o.WorkId, o.Source, o.Username, o.Assigned, model.Host, o.Text)
 			mail = fmt.Sprintf(TmplMail, "执行", o.WorkId, o.Username, model.Host, model.Host, "执行成功")
-		case 2:
-			model.DB().Select("email").Where("username =?", o.Assigned).First(&user)
-			s.ToUser = user.Email
+		}
+
+		if t == 2 {
+			model.DB().Select("email").Where("username IN (?)", strings.Split(o.Assigned, ",")).Find(&s.ToUser)
 			ding = fmt.Sprintf(TmplReferDing, o.WorkId, o.Source, o.Username, o.Assigned, model.Host, o.Text)
 			mail = fmt.Sprintf(TmplMail, "提交", o.WorkId, o.Username, model.Host, model.Host, "已提交")
-		case 4:
+		}
+
+		if t == 4 {
 			ding = fmt.Sprintf(TmplFailedDing, o.WorkId, o.Source, o.Username, o.Assigned, model.Host, o.Text)
 			mail = fmt.Sprintf(TmplMail, "执行", o.WorkId, o.Username, model.Host, model.Host, "执行失败")
-		case 5:
-			model.DB().Select("email").Where("username =?", o.Assigned).First(&user)
-			s.ToUser = user.Email
+		}
+
+		if t == 5 {
+			model.DB().Select("email").Where("username IN (?)", strings.Split(o.Assigned, ",")).Find(&s.ToUser)
 			ding = fmt.Sprintf(TmplPerformDing, o.WorkId, o.Source, o.Username, o.Assigned, model.Host, o.Text)
 			mail = fmt.Sprintf(Tmpl2Mail, "转交", o.WorkId, o.Username, o.Assigned, model.Host, model.Host, "已转交至下一操作人")
-		case 6:
+		}
+
+		if t == 6 {
 			ding = fmt.Sprintf(TmplBackDing, o.WorkId, o.Source, o.Username, o.Assigned, model.Host, o.Text)
 			mail = fmt.Sprintf(TmplMail, "提交", o.WorkId, o.Username, model.Host, model.Host, "已撤销")
 		}
 	}
 
 	if model.GloMessage.Mail {
-		if user.Email != "" {
-			go SendMail(s, mail)
+		for _, i := range s.ToUser {
+			if i.Email != "" {
+				go SendMail(i.Email, s.Message, mail)
+			}
 		}
 	}
 	if model.GloMessage.Ding {
 		if model.GloMessage.WebHook != "" {
-			go SendDingMsg(s, ding)
+			go SendDingMsg(s.Message, ding)
 		}
 	}
 }

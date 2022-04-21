@@ -1,19 +1,18 @@
 package osc
 
-import (
-	"Yearning-go/src/handler/commom"
-	"github.com/cookieY/yee"
-	"net/http"
-)
-
 // OscPercent show OSC percent
-func OscPercent(c yee.Context) (err error) {
-	var k = &OSC{WorkId: c.Params("work_id")}
-	return c.JSON(http.StatusOK, commom.SuccessPayload(k.Percent()))
-}
+//func OscInfo(c yee.Context) (err error) {
+//	var k = &OSC{WorkId: c.Params("work_id")}
+//	return c.JSON(http.StatusOK, commom.SuccessPayload(k.Percent()))
+//	websocket.Handler(func(ws *websocket.Conn) {
+//		defer ws.Close()
+//		workId := c.QueryParam("work_id")
+//		var msg string
+//	}
+//}
 
 // OscKill will kill OSC command
-func OscKill(c yee.Context) (err error) {
-	var k = OSC{WorkId: c.Params("work_id")}
-	return c.JSON(http.StatusOK, commom.SuccessPayLoadToMessage(k.Kill()))
-}
+//func OscKill(c yee.Context) (err error) {
+//	var k = OSC{WorkId: c.Params("work_id")}
+//	return c.JSON(http.StatusOK, commom.SuccessPayLoadToMessage(k.Kill()))
+//}

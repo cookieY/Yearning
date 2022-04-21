@@ -4,91 +4,24 @@ import (
 	"Yearning-go/src/handler/commom"
 	"Yearning-go/src/lib"
 	"Yearning-go/src/model"
-	pb "Yearning-go/src/proto"
 	"github.com/cookieY/yee"
+	"golang.org/x/net/websocket"
 	"net/http"
 	"time"
 )
 
-func SuperSQLTest(c yee.Context) (err error) {
-	u := new(commom.SQLTest)
-	if err = c.Bind(u); err != nil {
-		c.Logger().Error(err.Error())
-		return c.JSON(http.StatusOK, commom.ERR_REQ_BIND)
-	}
-	var s model.CoreDataSource
-	var order model.CoreSqlOrder
-	model.DB().Where("work_id =?", u.WorkId).First(&order)
-	model.DB().Where("source =?", order.Source).First(&s)
-	y := pb.LibraAuditOrder{
-		IsDML:    order.Type == 1,
-		SQL:      order.SQL,
-		DataBase: order.DataBase,
-		Source: &pb.Source{
-			Addr:     s.IP,
-			User:     s.Username,
-			Port:     int32(s.Port),
-			Password: lib.Decrypt(s.Password),
-		},
-		Execute: false,
-		Check:   true,
-	}
-	record, err := lib.TsClient(&y)
-	if err != nil {
-		return c.JSON(http.StatusOK, commom.ERR_COMMON_MESSAGE(err))
-	}
-	return c.JSON(http.StatusOK, commom.SuccessPayload(record))
-}
-
-func ExecuteOrder(c yee.Context) (err error) {
-	u := new(commom.ExecuteStr)
-	if err = c.Bind(u); err != nil {
-		c.Logger().Error(err.Error())
-		return
-	}
-	user, _ := lib.JwtParse(c)
-	var order model.CoreSqlOrder
-
-	model.DB().Where("work_id =?", u.WorkId).First(&order)
-
-	if order.Status != 2 && order.Status != 5 {
-		c.Logger().Error(IDEMPOTENT)
-		return c.JSON(http.StatusOK, commom.SuccessPayLoadToMessage(IDEMPOTENT))
-	}
-
-	if order.Type == 3 {
-		model.DB().Model(&model.CoreSqlOrder{}).Where("work_id =?", u.WorkId).Updates(map[string]interface{}{"status": 1, "execute_time": time.Now().Format("2006-01-02 15:04"), "current_step": order.CurrentStep + 1})
-		lib.MessagePush(u.WorkId, 1, "")
-	} else {
-		executor := new(Review)
-
-		order.Assigned = user
-
-		executor.Init(order).Executor()
-	}
-	model.DB().Create(&model.CoreWorkflowDetail{
-		WorkId:   u.WorkId,
-		Username: user,
-		Rejected: "",
-		Time:     time.Now().Format("2006-01-02 15:04"),
-		Action:   ORDER_EXECUTE_STATE,
-	})
-
-	return c.JSON(http.StatusOK, commom.SuccessPayLoadToMessage(ORDER_EXECUTE_STATE))
-}
-
 func AuditOrderState(c yee.Context) (err error) {
-	u := new(commom.ExecuteStr)
-	user, _ := lib.JwtParse(c)
+	u := new(Confirm)
+	user := new(lib.Token).JwtParse(c)
 	if err = c.Bind(u); err != nil {
 		c.Logger().Error(err.Error())
 		return c.JSON(http.StatusOK, commom.ERR_REQ_BIND)
 	}
 	switch u.Tp {
 	case "agree":
-		return c.JSON(http.StatusOK, MultiAuditOrder(u, user))
+		return c.JSON(http.StatusOK, MultiAuditOrder(u, user.Username))
 	case "reject":
-		return c.JSON(http.StatusOK, RejectOrder(u, user))
+		return c.JSON(http.StatusOK, RejectOrder(u, user.Username))
 	default:
 		return c.JSON(http.StatusOK, commom.ERR_REQ_FAKE)
 	}
@@ -96,15 +29,15 @@ func AuditOrderState(c yee.Context) (err error) {
 
 //DelayKill will stop delay order
 func DelayKill(c yee.Context) (err error) {
-	u := new(commom.ExecuteStr)
+	u := new(Confirm)
 	if err = c.Bind(u); err != nil {
 		c.Logger().Error(err.Error())
 		return c.JSON(http.StatusOK, commom.ERR_REQ_BIND)
 	}
-	user, _ := lib.JwtParse(c)
+	user := new(lib.Token).JwtParse(c)
 	model.DB().Create(&model.CoreWorkflowDetail{
 		WorkId:   u.WorkId,
-		Username: user,
+		Username: user.Username,
 		Time:     time.Now().Format("2006-01-02 15:04"),
 		Action:   ORDER_KILL_STATE,
 	})
@@ -112,39 +45,51 @@ func DelayKill(c yee.Context) (err error) {
 }
 
 func FetchAuditOrder(c yee.Context) (err error) {
-	u := new(commom.PageInfo)
+	u := new(commom.PageChange)
 	if err = c.Bind(u); err != nil {
 		c.Logger().Error(err.Error())
 		return
 	}
-	user, _ := lib.JwtParse(c)
-	order := u.GetSQLOrderList(commom.AccordingToAllOrderState(u.Find.Status),
-		commom.AccordingToRelevant(user),
-		commom.AccordingToText(u.Find.Text),
-		commom.AccordingToDatetime(u.Find.Picker))
+	user := new(lib.Token).JwtParse(c)
+	order := u.GetSQLOrderList(commom.AccordingToAllOrderState(u.Expr.Status),
+		commom.AccordingToAllOrderType(u.Expr.Type),
+		commom.AccordingToRelevant(user.Username),
+		commom.AccordingToText(u.Expr.Text),
+		commom.AccordingToUsernameEqual(u.Expr.Username),
+		commom.AccordingToDatetime(u.Expr.Picker))
 	return c.JSON(http.StatusOK, commom.SuccessPayload(order))
 }
 
-func FetchRecord(c yee.Context) (err error) {
-	u := new(commom.PageInfo)
-	if err = c.Bind(u); err != nil {
-		c.Logger().Error(err.Error())
-		return
-	}
-	order := u.GetSQLOrderList(commom.AccordingToOrderState(),
-		commom.AccordingToWorkId(u.Find.Text),
-		commom.AccordingToDatetime(u.Find.Picker))
-	return c.JSON(http.StatusOK, commom.SuccessPayload(order))
+func FetchOSCAPI(c yee.Context) (err error) {
+	websocket.Handler(func(ws *websocket.Conn) {
+		defer ws.Close()
+		workId := c.QueryParam("work_id")
+		var msg string
+		for {
+			if workId != "" {
+				var osc model.CoreSqlOrder
+				model.DB().Model(model.CoreOrderComment{}).Where("work_id =?", workId).Find(&osc)
+				err := websocket.Message.Send(ws, osc.OSCInfo)
+				if err != nil {
+					c.Logger().Error(err)
+					break
+				}
+			}
+			if err := websocket.Message.Receive(ws, &msg); err != nil {
+				break
+			}
+			if msg == commom.CLOSE {
+				break
+			}
+		}
+	}).ServeHTTP(c.Response(), c.Request())
+	return nil
 }
 
 func AuditOrderApis(c yee.Context) (err error) {
 	switch c.Params("tp") {
-	case "test":
-		return SuperSQLTest(c)
 	case "state":
 		return AuditOrderState(c)
-	case "execute":
-		return ExecuteOrder(c)
 	case "kill":
 		return DelayKill(c)
 	default:
@@ -156,8 +101,19 @@ func AuditOrRecordOrderFetchApis(c yee.Context) (err error) {
 	switch c.Params("tp") {
 	case "list":
 		return FetchAuditOrder(c)
-	case "record":
-		return FetchRecord(c)
+	//case "record":
+	//	return FetchRecord(c)
+	default:
+		return c.JSON(http.StatusOK, commom.ERR_REQ_FAKE)
+	}
+}
+
+func AuditOSCFetchAndKillApis(c yee.Context) (err error) {
+	switch c.Params("tp") {
+	case "osc":
+		return FetchOSCAPI(c)
+	case "kill":
+		return nil
 	default:
 		return c.JSON(http.StatusOK, commom.ERR_REQ_FAKE)
 	}

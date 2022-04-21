@@ -14,15 +14,15 @@
 package fetch
 
 import (
+	"Yearning-go/src/engine"
 	"Yearning-go/src/handler/commom"
-	tpl2 "Yearning-go/src/handler/manager/tpl"
+	tpl2 "Yearning-go/src/handler/manage/tpl"
 	"Yearning-go/src/lib"
 	"Yearning-go/src/model"
-	pb "Yearning-go/src/proto"
-	"Yearning-go/src/soar"
 	"encoding/json"
 	"errors"
 	"github.com/cookieY/yee"
+	"golang.org/x/net/websocket"
 	"net/http"
 	"net/url"
 	"reflect"
@@ -35,6 +35,28 @@ func FetchIDC(c yee.Context) (err error) {
 
 }
 
+func FetchIsQueryAudit(c yee.Context) (err error) {
+	return c.JSON(http.StatusOK, commom.SuccessPayload(map[string]interface{}{
+		"status": model.GloOther.Query,
+		"export": model.GloOther.Export,
+	}))
+}
+
+func FetchQueryStatus(c yee.Context) (err error) {
+	var check model.CoreQueryOrder
+	t := new(lib.Token).JwtParse(c)
+	model.DB().Model(model.CoreQueryOrder{}).Where("username =?", t.Username).Last(&check)
+	if check.Status == 2 {
+		isExpire := lib.TimeDifference(check.ApprovalTime)
+		if isExpire {
+			model.DB().Model(model.CoreQueryOrder{}).Where("work_id =?", check.WorkId).Update(&model.CoreSqlOrder{Status: 3})
+		}
+		return c.JSON(http.StatusOK, commom.SuccessPayload(isExpire))
+	}
+
+	return c.JSON(http.StatusOK, commom.SuccessPayload(true))
+}
+
 func FetchSource(c yee.Context) (err error) {
 
 	u := new(_FetchBind)
@@ -45,57 +67,61 @@ func FetchSource(c yee.Context) (err error) {
 		return
 	}
 
-	unescape, _ := url.QueryUnescape(u.IDC)
-
 	var s model.CoreGrained
 	var groups []string
-	var sList []string
 	var source []model.CoreDataSource
-	var inter []string
-	var queryAuditor []string
 
-	user, _ := lib.JwtParse(c)
+	user := new(lib.Token).JwtParse(c)
 
-	model.DB().Where("username =?", user).First(&s)
-
+	model.DB().Where("username =?", user.Username).First(&s)
 	if err := json.Unmarshal(s.Group, &groups); err != nil {
 		c.Logger().Error(err.Error())
 		return c.JSON(http.StatusOK, commom.ERR_REQ_BIND)
 	}
-
 	p := lib.MultiUserRuleMarge(groups)
+	switch u.Tp {
+	case "count":
+		return c.JSON(http.StatusOK, commom.SuccessPayload(map[string]interface{}{"ddl": len(p.DDLSource), "dml": len(p.DMLSource), "query": len(p.QuerySource)}))
+	case "dml":
+		model.DB().Select("source,id_c,source_id").Where("source_id IN (?)", p.DMLSource).Find(&source)
+	case "ddl":
+		model.DB().Select("source,id_c,source_id").Where("source_id IN (?)", p.DDLSource).Find(&source)
+	case "query":
+		var ord model.CoreQueryOrder
+		// 如果打开查询审核,判断该用户是否存在查询中的工单.如果存在则直接返回该查询工单允许的数据源
+		if model.GloOther.Query && !model.DB().Model(model.CoreQueryOrder{}).Where("username =? and `status` =2", user.Username).Last(&ord).RecordNotFound() {
+			model.DB().Select("source,id_c,source_id").Where("source_id =?", ord.SourceId).Find(&source)
+		} else {
+			model.DB().Select("source,id_c,source_id").Where("source_id IN (?)", p.QuerySource).Find(&source)
+		}
+	case "all":
+		model.DB().Select("source,id_c,source_id").Find(&source)
+	case "idc":
+		model.DB().Select("source,source_id").Where("id_c = ?", u.IDC).Find(&source)
+	}
+	return c.JSON(http.StatusOK, commom.SuccessPayload(source))
+}
 
-	model.DB().Select("source").Where("id_c =?", unescape).Find(&source)
-
+func FetchAuditSteps(c yee.Context) (err error) {
+	u := c.QueryParam("source_id")
+	unescape, _ := url.QueryUnescape(u)
+	var s model.CoreDataSource
 	var tpl model.CoreWorkflowTpl
-
 	var whoIsAuditor []tpl2.Tpl
-
-	if model.DB().Model(model.CoreWorkflowTpl{}).Where("source =?", unescape).Find(&tpl).RecordNotFound() {
-		return c.JSON(http.StatusOK, commom.ERR_COMMON_MESSAGE(errors.New("环境没有添加流程!无法提交工单")))
+	model.DB().Model(model.CoreDataSource{}).Where("source_id = ?", unescape).First(&s)
+	if model.DB().Model(model.CoreWorkflowTpl{}).Where("id =?", s.FlowID).Find(&tpl).RecordNotFound() {
+		return c.JSON(http.StatusOK, commom.ERR_COMMON_MESSAGE(errors.New("数据源没有添加流程!无法提交工单")))
 	}
 	_ = json.Unmarshal(tpl.Steps, &whoIsAuditor)
 
-	queryAuditor = whoIsAuditor[1].Auditor
+	return c.JSON(http.StatusOK, commom.SuccessPayload(whoIsAuditor))
 
-	if source != nil {
-		for _, i := range source {
-			sList = append(sList, i.Source)
-		}
-		switch u.Tp {
-		case "dml":
-			inter = lib.Intersect(p.DMLSource, sList)
-		case "ddl":
-			inter = lib.Intersect(p.DDLSource, sList)
-		case "query":
-			inter = lib.Intersect(p.QuerySource, sList)
-			queryAuditor = p.Auditor
-		case "all":
-			inter = sList
-		}
-	}
+}
 
-	return c.JSON(http.StatusOK, commom.SuccessPayload(map[string]interface{}{"assigned": queryAuditor, "source": inter}))
+func FetchHighLight(c yee.Context) (err error) {
+	var s model.CoreDataSource
+	model.DB().Where("source_id =?", c.QueryParam("source_id")).First(&s)
+	return c.JSON(http.StatusOK, commom.SuccessPayload(commom.Highlight(&s)))
 }
 
 func FetchBase(c yee.Context) (err error) {
@@ -109,24 +135,27 @@ func FetchBase(c yee.Context) (err error) {
 	}
 	var s model.CoreDataSource
 
-	var mid []string
+	unescape, _ := url.QueryUnescape(u.SourceId)
 
-	unescape, _ := url.QueryUnescape(u.Source)
+	model.DB().Where("source_id =?", unescape).First(&s)
 
-	model.DB().Where("source =?", unescape).First(&s)
-
-	result, err := commom.ScanDataRows(s, "", "SHOW DATABASES;", "库名", false)
+	result, err := commom.ScanDataRows(s, "", "SHOW DATABASES;", "Schema", false, false)
 
 	if err != nil {
 		c.Logger().Error(err.Error())
-		return
+		return c.JSON(http.StatusOK, commom.ERR_COMMON_MESSAGE(err))
 	}
-
-	if len(model.GloOther.ExcludeDbList) > 0 {
-		mid = lib.Intersect(result.Results, model.GloOther.ExcludeDbList)
-		result.Results = lib.NonIntersect(mid, result.Results)
+	if u.Hide {
+		var _t []string
+		mp := lib.MapOn(strings.Split(s.ExcludeDbList, ","))
+		for _, i := range result.Results {
+			if _, ok := mp[i]; !ok {
+				_t = append(_t, i)
+			}
+		}
+		result.Results = _t
 	}
-	return c.JSON(http.StatusOK, commom.SuccessPayload(map[string]interface{}{"results": result.Results, "highlight": result.Highlight}))
+	return c.JSON(http.StatusOK, commom.SuccessPayload(map[string]interface{}{"results": result.Results}))
 }
 
 func FetchTable(c yee.Context) (err error) {
@@ -136,17 +165,16 @@ func FetchTable(c yee.Context) (err error) {
 		return c.JSON(http.StatusOK, commom.ERR_REQ_BIND)
 	}
 	var s model.CoreDataSource
+	unescape, _ := url.QueryUnescape(u.SourceId)
+	model.DB().Where("source_id =?", unescape).First(&s)
 
-	model.DB().Where("source =?", u.Source).First(&s)
-
-	result, err := commom.ScanDataRows(s, u.DataBase, "SHOW TABLES;", "表名", false)
+	result, err := commom.ScanDataRows(s, u.DataBase, "SHOW TABLES;", "Table", false, false)
 
 	if err != nil {
 		c.Logger().Error(err.Error())
-		return
+		return c.JSON(http.StatusOK, commom.ERR_COMMON_MESSAGE(err))
 	}
-
-	return c.JSON(http.StatusOK, commom.SuccessPayload(map[string]interface{}{"table": result.Results, "highlight": result.Highlight}))
+	return c.JSON(http.StatusOK, commom.SuccessPayload(map[string]interface{}{"results": result.Results}))
 }
 
 func FetchTableInfo(c yee.Context) (err error) {
@@ -155,10 +183,14 @@ func FetchTableInfo(c yee.Context) (err error) {
 		c.Logger().Error(err.Error())
 		return c.JSON(http.StatusOK, commom.ERR_REQ_BIND)
 	}
-	if err := u.FetchTableFieldsOrIndexes(); err != nil {
-		c.Logger().Critical(err.Error())
+
+	if u.DataBase != "" && u.Table != "" {
+		if err := u.FetchTableFieldsOrIndexes(); err != nil {
+			c.Logger().Critical(err.Error())
+		}
+		return c.JSON(http.StatusOK, commom.SuccessPayload(map[string]interface{}{"rows": u.Rows, "idx": u.Idx}))
 	}
-	return c.JSON(http.StatusOK, commom.SuccessPayload(map[string]interface{}{"rows": u.Rows, "idx": u.Idx}))
+	return c.JSON(http.StatusOK, commom.ERR_COMMON_MESSAGE(errors.New("请选择库名以及表名后再点击获取表结构信息")))
 }
 
 func FetchSQLTest(c yee.Context) (err error) {
@@ -169,54 +201,55 @@ func FetchSQLTest(c yee.Context) (err error) {
 	}
 	var s model.CoreDataSource
 	model.DB().Where("source =?", u.Source).First(&s)
-	ps := lib.Decrypt(s.Password)
-	y := pb.LibraAuditOrder{
-		IsDML:    u.IsDML,
-		SQL:      u.SQL,
-		DataBase: u.Database,
-		Source: &pb.Source{
-			Addr:     s.IP,
-			User:     s.Username,
-			Port:     int32(s.Port),
-			Password: ps,
-		},
-		Execute: false,
-		Check:   true,
+	var rs []engine.Record
+	if client := lib.NewRpc(); client != nil {
+		if err := client.Call("Engine.Check", engine.CheckArgs{
+			SQL:      u.SQL,
+			Schema:   u.Database,
+			IP:       s.IP,
+			Username: s.Username,
+			Port:     s.Port,
+			Password: lib.Decrypt(s.Password),
+			Kind:     u.Kind,
+			Lang:     "zh-cn",
+			Rule:     model.GloRole,
+		}, &rs); err != nil {
+			return c.JSON(http.StatusOK, commom.ERR_RPC)
+		}
+		return c.JSON(http.StatusOK, commom.SuccessPayload(rs))
 	}
-	record, err := lib.TsClient(&y)
-	if err != nil {
-		return c.JSON(http.StatusOK, commom.ERR_COMMON_MESSAGE(err))
-	}
-	return c.JSON(http.StatusOK, commom.SuccessPayload(record))
+	return c.JSON(http.StatusOK, commom.ERR_RPC)
 }
 
 func FetchOrderDetailList(c yee.Context) (err error) {
-	workId := c.QueryParam("work_id")
+	expr := new(PageSizeRef)
+	if err := c.Bind(expr); err != nil {
+		return c.JSON(http.StatusOK, commom.ERR_COMMON_MESSAGE(err))
+	}
 	var record []model.CoreSqlRecord
 	var count int
-	start, end := lib.Paging(c.QueryParam("page"), 10)
-	model.DB().Model(&model.CoreSqlRecord{}).Where("work_id =?", workId).Count(&count).Offset(start).Limit(end).Find(&record)
+	start, end := lib.Paging(expr.Page, expr.PageSize)
+	model.DB().Model(&model.CoreSqlRecord{}).Where("work_id =?", expr.WorkId).Count(&count).Offset(start).Limit(end).Find(&record)
 	return c.JSON(http.StatusOK, commom.SuccessPayload(map[string]interface{}{"record": record, "count": count}))
 }
 
 func FetchOrderDetailRollSQL(c yee.Context) (err error) {
 	workId := c.QueryParam("work_id")
-	start, end := lib.Paging(c.QueryParam("page"), 5)
 	var roll []model.CoreRollback
 	var count int
-	model.DB().Select("`sql`").Model(model.CoreRollback{}).Where("work_id =?", workId).Count(&count).Offset(start).Limit(end).Find(&roll)
+	model.DB().Select("`sql`").Model(model.CoreRollback{}).Where("work_id =?", workId).Count(&count).Find(&roll)
 	return c.JSON(http.StatusOK, commom.SuccessPayload(map[string]interface{}{"sql": roll, "count": count}))
 }
 
 func FetchUndo(c yee.Context) (err error) {
 	u := c.QueryParam("work_id")
-	user, _ := lib.JwtParse(c)
+	user := new(lib.Token).JwtParse(c)
 	var undo model.CoreSqlOrder
-	if model.DB().Where(UNDO_EXPR, user, u, 2).First(&undo).RecordNotFound() {
+	if model.DB().Where(UNDO_EXPR, user.Username, u, 2).First(&undo).RecordNotFound() {
 		return c.JSON(http.StatusOK, UNDO_MESSAGE_ERROR)
 	}
 	lib.MessagePush(undo.WorkId, 6, "")
-	model.DB().Where(UNDO_EXPR, user, u, 2).Delete(&model.CoreSqlOrder{})
+	model.DB().Where(UNDO_EXPR, user.Username, u, 2).Delete(&model.CoreSqlOrder{})
 	return c.JSON(http.StatusOK, commom.SuccessPayLoadToMessage(UNDO_MESSAGE_SUCCESS))
 }
 
@@ -225,32 +258,20 @@ func FetchMergeDDL(c yee.Context) (err error) {
 	if err = c.Bind(req); err != nil {
 		return c.JSON(http.StatusOK, commom.ERR_COMMON_MESSAGE(err))
 	}
-	m, err := soar.MergeAlterTables(req.SQLs)
-	if err != nil {
-		return c.JSON(http.StatusOK, commom.ERR_SOAR_ALTER_MERGE(err))
+	var m string
+	if client := lib.NewRpc(); client != nil {
+		if err := client.Call("Engine.Check", req.SQLs, &m); err != nil {
+			return c.JSON(http.StatusOK, commom.SuccessPayload(m))
+		}
 	}
-	return c.JSON(http.StatusOK, commom.SuccessPayload(m))
+	return c.JSON(http.StatusOK, commom.ERR_SOAR_ALTER_MERGE(err))
 }
 
 func FetchSQLInfo(c yee.Context) (err error) {
 	workId := c.QueryParam("work_id")
-	limit := c.QueryParam("limit")
 	var sql model.CoreSqlOrder
 	model.DB().Select("`sql`").Where("work_id =?", workId).First(&sql)
-	realSQL := sql.SQL
-	if limit == "10" {
-		tmp := strings.Split(sql.SQL, ";")
-		if len(tmp) > 10 {
-			realSQL = strings.Join(tmp[:9], "")
-		}
-	}
-	return c.JSON(http.StatusOK, commom.SuccessPayload(map[string]interface{}{"sqls": realSQL}))
-}
-
-func FetchPerformList(c yee.Context) (err error) { // 获取审核人范围
-	var user []model.CoreAccount
-	model.DB().Scopes(commom.AccordingToRuleSuperOrAdmin()).Find(&user)
-	return c.JSON(http.StatusOK, commom.SuccessPayload(map[string]interface{}{"perform": user}))
+	return c.JSON(http.StatusOK, commom.SuccessPayload(map[string]interface{}{"sqls": sql.SQL}))
 }
 
 // RollBackSQLOrder create order record if order type of rollback
@@ -284,14 +305,12 @@ func RollBackSQLOrder(c yee.Context) (err error) {
 	u.Data.SQL = sql.String()
 	u.Data.CurrentStep = 1
 	u.Data.Time = time.Now().Format("2006-01-02")
-	u.Data.Relevant = lib.JsonStringify([]string{auditor[0]})
 	u.Data.Assigned = auditor[0]
 	model.DB().Model(model.CoreSqlOrder{}).Create(&u.Data)
 	model.DB().Create(&model.CoreWorkflowDetail{
 		WorkId:   w,
 		Username: u.Data.Username,
 		Action:   "已提交",
-		Rejected: "",
 		Time:     time.Now().Format("2006-01-02 15:04"),
 	})
 	lib.MessagePush(w, 2, "")
@@ -311,6 +330,52 @@ func FetchBoard(c yee.Context) (err error) {
 	return c.JSON(http.StatusOK, commom.SuccessPayload(board))
 }
 
+func FetchOrderComment(c yee.Context) (err error) {
+	websocket.Handler(func(ws *websocket.Conn) {
+		defer ws.Close()
+		workId := c.QueryParam("work_id")
+		var msg string
+		valid, err := lib.WSTokenIsValid(ws.Request().Header.Get("Sec-WebSocket-Protocol"))
+		if err != nil {
+			c.Logger().Error(err)
+			return
+		}
+		if valid {
+			for {
+				if workId != "" {
+					var comment []model.CoreOrderComment
+					model.DB().Model(model.CoreOrderComment{}).Where("work_id =?", workId).Find(&comment)
+					err := websocket.Message.Send(ws, lib.ToJson(comment))
+					if err != nil {
+						c.Logger().Error(err)
+						break
+					}
+				}
+				if err := websocket.Message.Receive(ws, &msg); err != nil {
+					break
+				}
+				if msg == commom.CLOSE {
+					break
+				}
+			}
+		}
+
+	}).ServeHTTP(c.Response(), c.Request())
+	return nil
+}
+
+func PostOrderComment(c yee.Context) (err error) {
+	u := new(model.CoreOrderComment)
+	if err := c.Bind(u); err != nil {
+		return c.JSON(http.StatusOK, commom.ERR_REQ_BIND)
+	}
+	t := new(lib.Token).JwtParse(c)
+	u.Time = time.Now().Format("2006-01-02 15:04")
+	u.Username = t.Username
+	model.DB().Model(model.CoreOrderComment{}).Create(u)
+	return c.JSON(http.StatusOK, commom.SuccessPayLoadToMessage(COMMENT_IS_POST))
+}
+
 func FetchTplAuditor(source string) []string {
 	var tpl model.CoreWorkflowTpl
 	var list []tpl2.Tpl
@@ -323,4 +388,68 @@ func FetchTplAuditor(source string) []string {
 		return nil
 	}
 	return nil
+}
+
+func FetchUserGroups(c yee.Context) (err error) {
+	user := new(lib.Token).JwtParse(c)
+	toUser := c.QueryParam("user")
+	if user.Username != "admin" && user.Username != toUser {
+		return c.JSON(http.StatusOK, commom.ERR_COMMON_MESSAGE(errors.New("非法获取信息")))
+	}
+	var (
+		p      model.CoreGrained
+		g      []model.CoreRoleGroup
+		groups []string
+		//s         model.CoreGlobalConfiguration
+	)
+
+	//model.DB().Select("username,rule,department,real_name,email").Where("username =?", user).Find(&u)
+	model.DB().Select("`group`").Where("username =?", toUser).First(&p)
+	model.DB().Select("`group_id`,`name`").Find(&g)
+	err = json.Unmarshal(p.Group, &groups)
+	if err != nil {
+		return c.JSON(http.StatusOK, commom.ERR_COMMON_MESSAGE(err))
+	}
+	//model.DB().Select("stmt").First(&s)
+	return c.JSON(http.StatusOK, commom.SuccessPayload(map[string]interface{}{"own": p.Group, "groups": g}))
+}
+
+func FetchOrderState(c yee.Context) (err error) {
+	websocket.Handler(func(ws *websocket.Conn) {
+		defer ws.Close()
+		workId := c.QueryParam("work_id")
+		var msg string
+		valid, err := lib.WSTokenIsValid(ws.Request().Header.Get("Sec-WebSocket-Protocol"))
+		if err != nil {
+			c.Logger().Error(err)
+			return
+		}
+		if valid {
+			for {
+				if workId != "" {
+					var order model.CoreSqlOrder
+					model.DB().Model(model.CoreSqlOrder{}).Select("status").Where("work_id =?", workId).First(&order)
+					err := websocket.Message.Send(ws, lib.ToJson(order.Status))
+					if err != nil {
+						c.Logger().Error(err)
+						break
+					}
+				}
+				if err := websocket.Message.Receive(ws, &msg); err != nil {
+					break
+				}
+				if msg == commom.CLOSE {
+					break
+				}
+			}
+		}
+	}).ServeHTTP(c.Response(), c.Request())
+	return nil
+}
+
+func FetchUserInfo(c yee.Context) (err error) {
+	t := new(lib.Token).JwtParse(c)
+	var userInfo model.CoreAccount
+	model.DB().Select("department,username,real_name,email").Model(model.CoreAccount{}).Where("username =?", t.Username).First(&userInfo)
+	return c.JSON(http.StatusOK, commom.SuccessPayload(userInfo))
 }

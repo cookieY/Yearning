@@ -16,33 +16,31 @@ package router
 import (
 	"Yearning-go/src/apis"
 	"Yearning-go/src/handler/login"
-	autoTask2 "Yearning-go/src/handler/manager/autoTask"
-	"Yearning-go/src/handler/manager/board"
-	db2 "Yearning-go/src/handler/manager/db"
-	group2 "Yearning-go/src/handler/manager/group"
-	roles2 "Yearning-go/src/handler/manager/roles"
-	"Yearning-go/src/handler/manager/settings"
-	tpl2 "Yearning-go/src/handler/manager/tpl"
-	user2 "Yearning-go/src/handler/manager/user"
+	"Yearning-go/src/handler/manage"
+	autoTask2 "Yearning-go/src/handler/manage/autoTask"
+	db2 "Yearning-go/src/handler/manage/db"
+	group2 "Yearning-go/src/handler/manage/group"
+	roles2 "Yearning-go/src/handler/manage/roles"
+	"Yearning-go/src/handler/manage/settings"
+	tpl2 "Yearning-go/src/handler/manage/tpl"
+	user2 "Yearning-go/src/handler/manage/user"
 	audit2 "Yearning-go/src/handler/order/audit"
-	"Yearning-go/src/handler/order/osc"
 	query2 "Yearning-go/src/handler/order/query"
+	"Yearning-go/src/handler/order/record"
 	"Yearning-go/src/handler/personal"
 	"Yearning-go/src/lib"
 	"Yearning-go/src/model"
+	"net/http"
+	"strings"
+
 	"github.com/cookieY/yee"
 	"github.com/cookieY/yee/middleware"
-	"github.com/gobuffalo/packr/v2"
-	"log"
-	"net/http"
-	"os"
-	"strings"
 )
 
 func SuperManageGroup() yee.HandlerFunc {
 	return func(c yee.Context) (err error) {
-		_, role := lib.JwtParse(c)
-		if role == "super" || focalPoint(c) {
+		role := new(lib.Token).JwtParse(c)
+		if role.Username == "admin" || focalPoint(c) {
 			return
 		}
 		return c.ServerError(http.StatusForbidden, "非法越权操作！")
@@ -61,26 +59,17 @@ func focalPoint(c yee.Context) bool {
 	return false
 }
 
-func AuditGroup() yee.HandlerFunc {
-	return func(c yee.Context) (err error) {
-		_, rule := lib.JwtParse(c)
-		if rule != "guest" {
-			return
-		}
-		return c.ServerError(http.StatusForbidden, "非法越权操作！")
-	}
-}
+//func AuditGroup() yee.HandlerFunc {
+//	return func(c yee.Context) (err error) {
+//		role := new(lib.Token).JwtParse(c)
+//		if role.Role != "guest" {
+//			return
+//		}
+//		return c.ServerError(http.StatusForbidden, "非法越权操作！")
+//	}
+//}
 
-func AddRouter(e *yee.Core, box *packr.Box) {
-	if os.Getenv("DEV") == "" {
-		s, err := box.FindString("index.html")
-		if err != nil {
-			log.Fatal(err)
-		}
-		e.GET("/", func(c yee.Context) error {
-			return c.HTML(http.StatusOK, s)
-		})
-	}
+func AddRouter(e *yee.Core) {
 	e.POST("/login", login.UserGeneralLogin)
 	e.POST("/register", login.UserRegister)
 	e.GET("/fetch", login.UserReqSwitch)
@@ -91,14 +80,20 @@ func AddRouter(e *yee.Core, box *packr.Box) {
 	r.Restful("/dash/:tp", apis.YearningDashApis())
 	r.Restful("/fetch/:tp", apis.YearningFetchApis())
 	r.Restful("/query/:tp", apis.YearningQueryApis())
+	r.GET("/board/get", manage.GeneralGetBoard)
 
-	audit := r.Group("/audit", AuditGroup())
+	audit := r.Group("/audit")
 	audit.Restful("/order/:tp", audit2.AuditRestFulAPis())
-	audit.Restful("/osc/:work_id", osc.AuditOSCFetchStateApis())
+	//audit.Restful("/osc/:work_id", osc.AuditOSCFetchStateApis())
 	audit.Restful("/query/:tp", query2.AuditQueryRestFulAPis())
 
+	re := r.Group("/record")
+	re.GET("/axis", record.RecordDashAxis)
+	re.PUT("/list", record.RecordOrderList)
+
 	manager := r.Group("/manage", SuperManageGroup())
-	manager.POST("/board/post", board.GeneralPostBoard)
+	manager.POST("/board/post", manage.GeneralPostBoard)
+	manager.GET("/board/get", manage.GeneralGetBoard)
 
 	db := manager.Group("/db")
 	db.Restful("", db2.ManageDbApi())
@@ -109,8 +104,9 @@ func AddRouter(e *yee.Core, box *packr.Box) {
 	tpl := manager.Group("/tpl")
 	tpl.Restful("", tpl2.TplRestApis())
 
-	group := manager.Group("/group")
+	group := manager.Group("/policy")
 	group.Restful("", group2.GroupsApis())
+	group.GET("/source", group2.SuperGetRuseSource)
 
 	setting := manager.Group("/setting")
 	setting.Restful("", settings.SettingsApis())

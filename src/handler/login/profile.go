@@ -8,5 +8,5 @@ import (
 )
 
 func UserReqSwitch(c yee.Context) (err error) {
-	return c.JSON(http.StatusOK, commom.SuccessPayload(map[string]interface{}{"reg": model.GloOther.Register, "valid": true}))
+	return c.JSON(http.StatusOK, commom.SuccessPayload(map[string]interface{}{"reg": model.GloOther.Register}))
 }

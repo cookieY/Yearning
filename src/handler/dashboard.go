@@ -17,47 +17,55 @@ import (
 	"Yearning-go/src/handler/commom"
 	"Yearning-go/src/lib"
 	"Yearning-go/src/model"
-	"fmt"
 	"github.com/cookieY/yee"
 	"net/http"
-	"time"
 )
 
 type groupBy struct {
-	DataBase string `json:"data_base"`
-	C        int    `json:"count"`
-	Time     string `json:"time"`
-	Type     string `json:"type"`
+	Source string `json:"source"`
+	C      int    `json:"count"`
+	Time   string `json:"time"`
+	Type   string `json:"type"`
 }
 
-func DashCount(c yee.Context) (err error) {
-	var (
-		userCount   int
-		orderCount  int
-		queryCount  int
-		sourceCount int
-	)
-	model.DB().Model(&model.CoreAccount{}).Count(&userCount)
-	model.DB().Model(&model.CoreQueryOrder{}).Select("id").Count(&queryCount)
-	model.DB().Model(&model.CoreSqlOrder{}).Select("id").Count(&orderCount)
-	model.DB().Model(&model.CoreDataSource{}).Select("id").Count(&sourceCount)
+type bannerCount struct {
+	User      int `json:"user"`
+	Order     int `json:"order"`
+	Query     int `json:"query"`
+	Source    int `json:"source"`
+	SelfDDL   int `json:"self_ddl"`
+	SelfDML   int `json:"self_dml"`
+	SelfAudit int `json:"self_audit"`
+	SelfQuery int `json:"self_query"`
+}
 
-	return c.JSON(http.StatusOK, commom.SuccessPayload(map[string]interface{}{"createUser": userCount, "order": orderCount, "source": sourceCount, "query": queryCount}))
+func DashBanner(c yee.Context) (err error) {
+	var b bannerCount
+	user := new(lib.Token).JwtParse(c)
+	model.DB().Model(model.CoreAccount{}).Count(&b.User)
+	model.DB().Model(model.CoreQueryOrder{}).Count(&b.Query)
+	model.DB().Model(model.CoreSqlOrder{}).Count(&b.Order)
+	model.DB().Model(model.CoreDataSource{}).Count(&b.Source)
+	model.DB().Model(model.CoreSqlOrder{}).Where("username =? and `type` =?", user.Username, 0).Count(&b.SelfDDL)
+	model.DB().Model(model.CoreSqlOrder{}).Where("username =? and `type` =?", user.Username, 1).Count(&b.SelfDML)
+	model.DB().Model(model.CoreQueryOrder{}).Where("username =?", user.Username).Count(&b.SelfQuery)
+	model.DB().Model(model.CoreSqlOrder{}).Where("status = ? and assigned like ?", 2, "%"+user.Username+"%").Count(&b.SelfAudit)
+	return c.JSON(http.StatusOK, commom.SuccessPayload(b))
 }
 
 func DashUserInfo(c yee.Context) (err error) {
-	user, _ := lib.JwtParse(c)
+	user := new(lib.Token).JwtParse(c)
 	var (
-		u         model.CoreAccount
+		//u         model.CoreAccount
 		p         model.CoreGrained
 		groupList []model.CoreRoleGroup
-		s         model.CoreGlobalConfiguration
+		//s         model.CoreGlobalConfiguration
 	)
-	model.DB().Select("username,rule,department,real_name,email").Where("username =?", user).Find(&u)
+	//model.DB().Select("username,rule,department,real_name,email").Where("username =?", user).Find(&u)
 	model.DB().Select("`group`").Where("username =?", user).First(&p)
 	model.DB().Select("`name`").Find(&groupList)
-	model.DB().Select("stmt").First(&s)
-	return c.JSON(http.StatusOK, commom.SuccessPayload(map[string]interface{}{"u": u, "p": p.Group, "s": s, "g": groupList}))
+	//model.DB().Select("stmt").First(&s)
+	return c.JSON(http.StatusOK, commom.SuccessPayload(map[string]interface{}{"p": p.Group, "g": groupList}))
 }
 
 func DashStmt(c yee.Context) (err error) {
@@ -65,19 +73,8 @@ func DashStmt(c yee.Context) (err error) {
 	return c.JSON(http.StatusOK, nil)
 }
 
-func DashPie(c yee.Context) (err error) {
+func DashTop(c yee.Context) (err error) {
 	var source []groupBy
-	model.DB().Table("core_sql_orders").Select("data_base, count(*) as c").Group("data_base").Order("c desc").Limit(10).Scan(&source)
+	model.DB().Model(model.CoreSqlOrder{}).Select("source, count(*) as c").Group("source").Order("c desc").Limit(10).Scan(&source)
 	return c.JSON(http.StatusOK, commom.SuccessPayload(source))
-}
-
-func DashAxis(c yee.Context) (err error) {
-	var order []groupBy
-	model.DB().Model(model.CoreSqlOrder{}).Select("time, count(*) as c,type").Where("time > ?", timeAdd("-2160")).Group("time,type").Scan(&order)
-	return c.JSON(http.StatusOK, commom.SuccessPayload(order))
-}
-
-func timeAdd(add string) string {
-	m, _ := time.ParseDuration(fmt.Sprintf("%sh", add))
-	return time.Now().Add(m).Format("2006-01-02")
 }

@@ -98,6 +98,9 @@ func Decrypt(cryted string) string {
 	// 创建数组
 	orig := make([]byte, len(crytedByte))
 	// 解密
+	if len(orig)%blockMode.BlockSize() != 0 {
+		return ""
+	}
 	blockMode.CryptBlocks(orig, crytedByte)
 	// 去补全码
 	orig = PKCS7UnPadding(orig)
@@ -117,6 +120,9 @@ func PKCS7Padding(ciphertext []byte, blocksize int) []byte {
 
 //去码
 func PKCS7UnPadding(origData []byte) []byte {
+	if origData == nil {
+		return nil
+	}
 	if len(origData) > 0 {
 		length := len(origData)
 		unpadding := int(origData[length-1])

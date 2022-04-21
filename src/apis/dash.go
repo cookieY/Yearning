@@ -9,12 +9,10 @@ import (
 func YearningDashGet(y yee.Context) (err error) {
 	tp := y.Params("tp")
 	switch tp {
-	case "pie":
-		return handler.DashPie(y)
-	case "axis":
-		return handler.DashAxis(y)
-	case "count":
-		return handler.DashCount(y)
+	case "top":
+		return handler.DashTop(y)
+	case "banner":
+		return handler.DashBanner(y)
 	}
 	return y.JSON(http.StatusOK, "Illegal")
 }

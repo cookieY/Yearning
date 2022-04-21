@@ -26,17 +26,15 @@ import (
 var db *gorm.DB
 
 type Other struct {
-	Limit            string   `json:"limit"`
-	IDC              []string `json:"idc"`
-	Multi            bool     `json:"multi"`
-	Query            bool     `json:"query"`
-	ExcludeDbList    []string `json:"exclude_db_list"`
-	InsulateWordList []string `json:"insulate_word_list"`
-	Register         bool     `json:"register"`
-	Export           bool     `json:"export"`
-	PerOrder         int      `json:"per_order"`
-	ExQueryTime      int      `json:"ex_query_time"`
-	QueryTimeout     int      `json:"query_timeout"`
+	Limit        uint64   `json:"limit"`
+	IDC          []string `json:"idc"`
+	Multi        bool     `json:"multi"`
+	Query        bool     `json:"query"`
+	Register     bool     `json:"register"`
+	Export       bool     `json:"export"`
+	PerOrder     int      `json:"per_order"`
+	ExQueryTime  int      `json:"ex_query_time"`
+	QueryTimeout int      `json:"query_timeout"`
 }
 
 type Message struct {
@@ -62,10 +60,14 @@ type Ldap struct {
 	Ldaps    bool   `json:"ldaps"`
 }
 
+type LabelWithValue struct {
+	Key   string `json:"key"`
+	Label string `json:"label"`
+}
+
 type PermissionList struct {
 	DDLSource   []string `json:"ddl_source"`
 	DMLSource   []string `json:"dml_source"`
-	Auditor     []string `json:"auditor"`
 	QuerySource []string `json:"query_source"`
 }
 
@@ -78,7 +80,6 @@ func DbInit(c string) {
 	if err != nil {
 		log.Println(err.Error())
 	}
-	Grpc = C.General.GrpcAddr
 	JWT = C.General.SecretKey
 	newDb, err := gorm.Open("mysql", fmt.Sprintf("%s:%s@(%s:%s)/%s?charset=utf8mb4&parseTime=True&loc=Local", C.Mysql.User, C.Mysql.Password, C.Mysql.Host, C.Mysql.Port, C.Mysql.Db))
 	if err != nil {

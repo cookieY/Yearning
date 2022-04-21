@@ -5,6 +5,8 @@ import (
 	"reflect"
 )
 
+const QueryField = "work_id, username, text, backup, date, real_name, `status`, `type`, `delay`, `source`,`id_c`,`data_base`,`table`,`execute_time`,source_id,assigned,current_step,relevant,`file`"
+
 func AccordingToWorkId(workId string) func(db *gorm.DB) *gorm.DB {
 	return func(db *gorm.DB) *gorm.DB {
 		if workId == "" {
@@ -16,7 +18,7 @@ func AccordingToWorkId(workId string) func(db *gorm.DB) *gorm.DB {
 
 func AccordingToQueryPer() func(db *gorm.DB) *gorm.DB {
 	return func(db *gorm.DB) *gorm.DB {
-		return db.Where("`query_per` in (?)", []int{1, 3})
+		return db.Where("`status` in (?)", []int{1, 3})
 	}
 }
 
@@ -26,14 +28,14 @@ func AccordingToAllQueryOrderState(state int) func(db *gorm.DB) *gorm.DB {
 		case 7:
 			return db
 		default:
-			return db.Where("`query_per` = ?", state)
+			return db.Where("`status` = ?", state)
 		}
 	}
 }
 
 func AccordingToOrderState() func(db *gorm.DB) *gorm.DB {
 	return func(db *gorm.DB) *gorm.DB {
-		return db.Where("`status` in (?)", []int{1, 4})
+		return db.Where("`status` in (?)", []int{1, 4, 0})
 	}
 }
 
@@ -43,14 +45,25 @@ func AccordingToAllOrderState(state int) func(db *gorm.DB) *gorm.DB {
 		case 7:
 			return db
 		default:
-			return db.Where("`status` = (?)", state)
+			return db.Where("`status` = ?", state)
+		}
+	}
+}
+
+func AccordingToAllOrderType(state int) func(db *gorm.DB) *gorm.DB {
+	return func(db *gorm.DB) *gorm.DB {
+		switch state {
+		case 2:
+			return db
+		default:
+			return db.Where("`type` = ?", state)
 		}
 	}
 }
 
 func AccordingToAssigned(user string) func(db *gorm.DB) *gorm.DB {
 	return func(db *gorm.DB) *gorm.DB {
-		return db.Where("`assigned` = ?", user)
+		return db.Where("`assigned` like ?", "%"+user+"%")
 	}
 }
 
@@ -60,6 +73,33 @@ func AccordingToUsername(user string) func(db *gorm.DB) *gorm.DB {
 			return db
 		}
 		return db.Where("username like ?", "%"+user+"%")
+	}
+}
+
+func AccordingToDept(user string) func(db *gorm.DB) *gorm.DB {
+	return func(db *gorm.DB) *gorm.DB {
+		if user == "" {
+			return db
+		}
+		return db.Where("department like ?", "%"+user+"%")
+	}
+}
+
+func AccordingToRealName(user string) func(db *gorm.DB) *gorm.DB {
+	return func(db *gorm.DB) *gorm.DB {
+		if user == "" {
+			return db
+		}
+		return db.Where("real_name like ?", "%"+user+"%")
+	}
+}
+
+func AccordingToMail(user string) func(db *gorm.DB) *gorm.DB {
+	return func(db *gorm.DB) *gorm.DB {
+		if user == "" {
+			return db
+		}
+		return db.Where("email like ?", "%"+user+"%")
 	}
 }
 
@@ -84,19 +124,22 @@ func AccordingToDate(time []string) func(db *gorm.DB) *gorm.DB {
 func AccordingToRelevant(user string) func(db *gorm.DB) *gorm.DB {
 	return func(db *gorm.DB) *gorm.DB {
 
-		return db.Where("JSON_SEARCH(relevant, 'one', ?) IS NOT NULL", user)
+		return db.Where("JSON_SEARCH(relevant, 'all', ?) IS NOT NULL", user)
 	}
 }
 
 func AccordingToUsernameEqual(user string) func(db *gorm.DB) *gorm.DB {
 	return func(db *gorm.DB) *gorm.DB {
+		if user == "" {
+			return db
+		}
 		return db.Where("username = ?", user)
 	}
 }
 
-func AccordingToNameEqual(user string) func(db *gorm.DB) *gorm.DB {
+func AccordingToIDEqual(id int) func(db *gorm.DB) *gorm.DB {
 	return func(db *gorm.DB) *gorm.DB {
-		return db.Where("`name` = ?", user)
+		return db.Where("`id` = ?", id)
 	}
 }
 
@@ -127,12 +170,39 @@ func AccordingToOrderIDC(text string) func(db *gorm.DB) *gorm.DB {
 	}
 }
 
+func AccordingToOrderAccurateIDC(text string) func(db *gorm.DB) *gorm.DB {
+	return func(db *gorm.DB) *gorm.DB {
+		if text == "" {
+			return db
+		}
+		return db.Where("id_c = ? ", text)
+	}
+}
+
+func AccordingToOrderIP(text string) func(db *gorm.DB) *gorm.DB {
+	return func(db *gorm.DB) *gorm.DB {
+		if text == "" {
+			return db
+		}
+		return db.Where("ip LIKE ? ", "%"+text+"%")
+	}
+}
+
 func AccordingToOrderSource(text string) func(db *gorm.DB) *gorm.DB {
 	return func(db *gorm.DB) *gorm.DB {
 		if text == "" {
 			return db
 		}
-		return db.Where("`source` LIKE ?", "%"+text+"%")
+		return db.Where("source LIKE ? ", "%"+text+"%")
+	}
+}
+
+func AccordingToOrderType(text int) func(db *gorm.DB) *gorm.DB {
+	return func(db *gorm.DB) *gorm.DB {
+		if text == -1 {
+			return db
+		}
+		return db.Where("`is_query` = ?", text)
 	}
 }
 
@@ -142,12 +212,6 @@ func AccordingToOrderDept(text string) func(db *gorm.DB) *gorm.DB {
 			return db
 		}
 		return db.Where("department LIKE ?", "%"+text+"%")
-	}
-}
-
-func AccordingToRuleSuperOrAdmin() func(db *gorm.DB) *gorm.DB {
-	return func(db *gorm.DB) *gorm.DB {
-		return db.Where("rule in (?)", []string{"admin", "super"})
 	}
 }
 
@@ -163,5 +227,17 @@ func AccordingToGroupNameIsLike(text string) func(db *gorm.DB) *gorm.DB {
 			return db
 		}
 		return db.Where("`group` like ?", "%"+text+"%")
+	}
+}
+
+func AccordingToSchemaNotIn(isSchema bool, excludeDbList []string) func(db *gorm.DB) *gorm.DB {
+	return func(db *gorm.DB) *gorm.DB {
+		if len(excludeDbList) == 0 {
+			return db
+		}
+		if isSchema {
+			return db.Where("SCHEMA_NAME not in (?)", excludeDbList)
+		}
+		return db.Where("table_schema not in (?)", excludeDbList)
 	}
 }

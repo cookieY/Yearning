@@ -20,6 +20,14 @@ var (
 		Code: 1310,
 		Text: "非法传参！",
 	}
+	ERR_REQ_PASSWORD_FAKE = Resp{
+		Code: 1310,
+		Text: "密码更改失败！",
+	}
+	ERR_RPC = Resp{
+		Code: 1311,
+		Text: "RPC调用失败！",
+	}
 )
 
 // SOAR 错误码 1900-1999

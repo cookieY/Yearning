@@ -21,11 +21,18 @@ import (
 	"time"
 )
 
-func JwtAuth(username string, role string) (t string, err error) {
+type Token struct {
+	Username string
+	RealName string
+	Role     string
+}
+
+func JwtAuth(h Token) (t string, err error) {
 	token := jwt.New(jwt.SigningMethodHS256)
 	claims := token.Claims.(jwt.MapClaims)
-	claims["name"] = username
-	claims["role"] = role
+	claims["name"] = h.Username
+	claims["role"] = h.Role
+	claims["real_name"] = h.RealName
 	claims["exp"] = time.Now().Add(time.Hour * 8).Unix()
 	t, err = token.SignedString([]byte(model.JWT))
 	if err != nil {
@@ -34,8 +41,18 @@ func JwtAuth(username string, role string) (t string, err error) {
 	return t, nil
 }
 
-func JwtParse(c yee.Context) (string, string) {
+func (h *Token) JwtParse(c yee.Context) *Token {
 	user := c.Get("auth").(*jwt.Token)
 	claims := user.Claims.(jwt.MapClaims)
-	return claims["name"].(string), claims["role"].(string)
+	h.Username = claims["name"].(string)
+	h.RealName = claims["real_name"].(string)
+	h.Role = claims["role"].(string)
+	return h
+}
+
+func WSTokenIsValid(token string) (bool, error) {
+	t, err := jwt.Parse(token, func(token *jwt.Token) (interface{}, error) {
+		return []byte(model.JWT), nil
+	})
+	return t.Valid, err
 }
