@@ -58,6 +58,7 @@ type CoreAccount struct {
 	Department string `gorm:"type:varchar(50);" json:"department"`
 	RealName   string `gorm:"type:varchar(50);" json:"real_name"`
 	Email      string `gorm:"type:varchar(50);" json:"email"`
+	IsRecorder uint   `gorm:"type:tinyint(2) not null default 2" json:"is_recorder"`
 }
 
 type CoreGlobalConfiguration struct {

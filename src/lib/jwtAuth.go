@@ -24,15 +24,15 @@ import (
 type Token struct {
 	Username string
 	RealName string
-	Role     string
+	IsRecord bool
 }
 
 func JwtAuth(h Token) (t string, err error) {
 	token := jwt.New(jwt.SigningMethodHS256)
 	claims := token.Claims.(jwt.MapClaims)
 	claims["name"] = h.Username
-	claims["role"] = h.Role
 	claims["real_name"] = h.RealName
+	claims["is_record"] = h.IsRecord
 	claims["exp"] = time.Now().Add(time.Hour * 8).Unix()
 	t, err = token.SignedString([]byte(model.JWT))
 	if err != nil {
@@ -46,7 +46,7 @@ func (h *Token) JwtParse(c yee.Context) *Token {
 	claims := user.Claims.(jwt.MapClaims)
 	h.Username = claims["name"].(string)
 	h.RealName = claims["real_name"].(string)
-	h.Role = claims["role"].(string)
+	h.IsRecord = claims["is_record"].(bool)
 	return h
 }
 

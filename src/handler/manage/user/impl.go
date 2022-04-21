@@ -17,7 +17,7 @@ const (
 	USER_PROLICY_EDIT_SUCCESS  = "%s的权限已更新！"
 	USER_CANNOT_DELETE         = "用户: %s 当前属于流程: %s 节点审核人,请在相关节点删除该用户审核人之后删除"
 
-	CommonExpr = "username,id,department,real_name,email"
+	CommonExpr = "username,id,department,real_name,email,is_recorder"
 )
 
 type CommonUserPost struct {

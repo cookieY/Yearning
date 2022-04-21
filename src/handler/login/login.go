@@ -55,15 +55,17 @@ func UserLdapLogin(c yee.Context) (err error) {
 		token, tokenErr := lib.JwtAuth(lib.Token{
 			Username: u.Username,
 			RealName: account.RealName,
+			IsRecord: account.IsRecorder == 1,
 		})
 		if tokenErr != nil {
 			c.Logger().Error(tokenErr.Error())
 			return
 		}
-		dataStore := map[string]string{
+		dataStore := map[string]interface{}{
 			"token":     token,
 			"real_name": account.RealName,
-			"user":      u.Username,
+			"user":      account.Username,
+			"is_record": account.IsRecorder,
 		}
 		return c.JSON(http.StatusOK, commom.SuccessPayload(dataStore))
 	}
@@ -85,15 +87,17 @@ func UserGeneralLogin(c yee.Context) (err error) {
 			token, tokenErr := lib.JwtAuth(lib.Token{
 				Username: u.Username,
 				RealName: account.RealName,
+				IsRecord: account.IsRecorder == 1,
 			})
 			if tokenErr != nil {
 				c.Logger().Error(tokenErr.Error())
 				return
 			}
-			dataStore := map[string]string{
+			dataStore := map[string]interface{}{
 				"token":     token,
 				"real_name": account.RealName,
 				"user":      account.Username,
+				"is_record": account.IsRecorder,
 			}
 			return c.JSON(http.StatusOK, commom.SuccessPayload(dataStore))
 		}

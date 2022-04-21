@@ -47,6 +47,16 @@ func SuperManageGroup() yee.HandlerFunc {
 	}
 }
 
+func SuperRecorderGroup() yee.HandlerFunc {
+	return func(c yee.Context) (err error) {
+		role := new(lib.Token).JwtParse(c)
+		if role.IsRecord {
+			return
+		}
+		return c.ServerError(http.StatusForbidden, "非法越权操作！")
+	}
+}
+
 func focalPoint(c yee.Context) bool {
 
 	if strings.Contains(c.RequestURI(), "/api/v2/manage/tpl") && c.Request().Method == http.MethodPut {
@@ -87,7 +97,7 @@ func AddRouter(e *yee.Core) {
 	//audit.Restful("/osc/:work_id", osc.AuditOSCFetchStateApis())
 	audit.Restful("/query/:tp", query2.AuditQueryRestFulAPis())
 
-	re := r.Group("/record")
+	re := r.Group("/record", SuperRecorderGroup())
 	re.GET("/axis", record.RecordDashAxis)
 	re.PUT("/list", record.RecordOrderList)
 
