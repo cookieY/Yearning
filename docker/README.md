@@ -2,6 +2,7 @@
 
 - https://github.com/chaiyd/docker.git
 - 遵循yearning官方,具体查看yearning官方文档
+- 请在启动前先执行 yearning install 命令
 
 ### docker启动时传入相应变量
 ```
