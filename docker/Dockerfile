@@ -8,7 +8,7 @@ RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.aliyun.com/g' /etc/apk/repositories
 
 ARG YEARNING_VER=2.3.5
 
-ARG YEARNING_URL=https://github.com/cookieY/Yearning/releases/download/${YEARNING_VER}/Yearning-${YEARNING_VER}-linux-amd64.zip
+ARG YEARNING_URL=https://github.com/cookieY/Yearning/releases/download/v3.0.0-rc7/Yearning-RC7.zip
 RUN wget -cO yearning.zip $YEARNING_URL && \
     unzip yearning.zip -d /opt
 
