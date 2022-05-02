@@ -24,9 +24,9 @@ RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.aliyun.com/g' /etc/apk/repositories
     && echo "Asia/Shanghai" > /etc/timezone \
     && echo 'hosts: files mdns4_minimal [NOTFOUND=return] dns mdns4' >> /etc/nsswitch.conf
 
-COPY --from=builder /opt/Yearning /opt/Yearning
+COPY --from=builder /opt/Yearning-go/Yearning /opt/Yearning
 #COPY --from=builder /opt/Yearning-go/dist /opt/Yearning-go/dist
-COPY --from=builder /opt/conf.toml /opt/conf.toml
+COPY --from=builder /opt/Yearning-go/conf.toml /opt/conf.toml
 
 WORKDIR /opt/
 
