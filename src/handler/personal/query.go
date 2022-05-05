@@ -15,10 +15,8 @@ package personal
 
 import (
 	"Yearning-go/src/handler/commom"
-	"Yearning-go/src/handler/manage/tpl"
 	"Yearning-go/src/lib"
 	"Yearning-go/src/model"
-	"encoding/json"
 	"fmt"
 	"github.com/cookieY/yee"
 	"github.com/jinzhu/gorm"
@@ -27,7 +25,6 @@ import (
 	"io"
 	"net/http"
 	"net/url"
-	"strings"
 	"time"
 )
 
@@ -69,12 +66,8 @@ func ReferQueryOrder(c yee.Context, user *lib.Token) (err error) {
 	}
 
 	if model.DB().Model(model.CoreQueryOrder{}).Where("username =? and status =?", user.Username, 2).First(&t).RecordNotFound() {
-		var flow model.CoreWorkflowTpl
-		var flowId model.CoreDataSource
-		var step []tpl.Tpl
-		model.DB().Model(model.CoreDataSource{}).Select("flow_id").Where("source_id = ?", d.SourceId).First(&flowId)
-		model.DB().Model(model.CoreWorkflowTpl{}).Where("id =?", flowId.FlowID).Find(&flow)
-		_ = json.Unmarshal(flow.Steps, &step)
+		var principal model.CoreDataSource
+		model.DB().Model(model.CoreDataSource{}).Where("source_id = ?", d.SourceId).First(&principal)
 		model.DB().Create(&model.CoreQueryOrder{
 			WorkId:   work,
 			Username: user.Username,
@@ -83,7 +76,7 @@ func ReferQueryOrder(c yee.Context, user *lib.Token) (err error) {
 			Export:   d.Export,
 			Status:   1,
 			SourceId: d.SourceId,
-			Assigned: strings.Join(step[len(step)-1].Auditor, ","),
+			Assigned: principal.Principal,
 			RealName: user.RealName,
 		})
 		lib.MessagePush(work, 7, "")

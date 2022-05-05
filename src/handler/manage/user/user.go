@@ -75,6 +75,10 @@ func ManageUserCreateOrEdit(c yee.Context) (err error) {
 		return c.JSON(http.StatusOK, commom.ERR_REQ_BIND)
 	}
 	switch c.QueryParam("tp") {
+	case "principal":
+		var account []model.CoreAccount
+		model.DB().Model(&model.CoreAccount{}).Find(&account)
+		return c.JSON(http.StatusOK, commom.SuccessPayload(account))
 	case "edit":
 		return c.JSON(http.StatusOK, SuperUserEdit(u))
 	case "add":

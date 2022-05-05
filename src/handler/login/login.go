@@ -34,7 +34,8 @@ func UserLdapLogin(c yee.Context) (err error) {
 	if err = c.Bind(u); err != nil {
 		return c.JSON(http.StatusOK, commom.ERR_REQ_BIND)
 	}
-	isOk, err := lib.LdapConnenct(&model.GloLdap, u.Username, u.Password, false)
+	ldap := model.ALdap{Ldap: model.GloLdap}
+	isOk, err := ldap.LdapConnect(u.Username, u.Password, false)
 	if err != nil {
 		return c.JSON(http.StatusOK, commom.ERR_COMMON_MESSAGE(err))
 	}
@@ -43,10 +44,10 @@ func UserLdapLogin(c yee.Context) (err error) {
 		if model.DB().Where("username = ?", u.Username).First(&account).RecordNotFound() {
 			model.DB().Create(&model.CoreAccount{
 				Username:   u.Username,
-				RealName:   "请重置你的真实姓名",
+				RealName:   ldap.RealName,
 				Password:   lib.DjangoEncrypt(lib.GenWorkid(), string(lib.GetRandom())),
-				Department: "all",
-				Email:      "",
+				Department: ldap.Department,
+				Email:      ldap.Email,
 			})
 			ix, _ := json.Marshal([]string{})
 			model.DB().Create(&model.CoreGrained{Username: u.Username, Group: ix})

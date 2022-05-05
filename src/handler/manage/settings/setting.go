@@ -88,10 +88,15 @@ func SuperTestSetting(c yee.Context) (err error) {
 		go lib.SendDingMsg(u.Message, lib.TmplTestDing)
 		return c.JSON(http.StatusOK, commom.SuccessPayLoadToMessage(WEBHOOK_TEST))
 	case "ldap":
-		if k, _ := lib.LdapConnenct(&u.Ldap, "", "", true); k {
+		ldap := model.ALdap{Ldap: u.Ldap}
+		k, err := ldap.LdapConnect("", "", true)
+		if err != nil {
+			c.Logger().Error(err)
+			return c.JSON(http.StatusOK, commom.SuccessPayLoadToMessage(ERR_LDAP_TEST))
+		}
+		if k {
 			return c.JSON(http.StatusOK, commom.SuccessPayLoadToMessage(SUCCESS_LDAP_TEST))
 		}
-		return c.JSON(http.StatusOK, commom.SuccessPayLoadToMessage(ERR_LDAP_TEST))
 	}
 	return c.JSON(http.StatusOK, commom.ERR_REQ_FAKE)
 }

@@ -7,7 +7,7 @@ import (
 	"github.com/google/uuid"
 )
 
-func migrateTools() {
+func MigrateTools() {
 	var s []model.CoreDataSource
 	model.DB().AutoMigrate(model.CoreDataSource{})
 	model.DB().Model(model.CoreDataSource{}).Find(&s)
@@ -32,6 +32,7 @@ func migrateTools() {
 		var px model.PermissionList
 		var dml []string
 		var ddl []string
+		var query []string
 		json.Unmarshal(i.Permissions, &px)
 		for _, j1 := range px.DMLSource {
 			var sdml model.CoreDataSource
@@ -43,6 +44,12 @@ func migrateTools() {
 			model.DB().Model(model.CoreDataSource{}).Select("source_id").Where("source =?", j1).First(&sddl)
 			ddl = append(ddl, sddl.SourceId)
 		}
+		for _, j1 := range px.QuerySource {
+			var squery model.CoreDataSource
+			model.DB().Model(model.CoreDataSource{}).Select("source_id").Where("source =?", j1).First(&squery)
+			query = append(query, squery.SourceId)
+		}
+		px.QuerySource = query
 		px.DMLSource = dml
 		px.DDLSource = ddl
 		uj, _ := json.Marshal(px)

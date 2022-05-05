@@ -1,6 +1,7 @@
 package commom
 
 import (
+	"Yearning-go/src/lib"
 	"github.com/jinzhu/gorm"
 	"reflect"
 )
@@ -67,6 +68,15 @@ func AccordingToAssigned(user string) func(db *gorm.DB) *gorm.DB {
 	}
 }
 
+func AccordingQueryToAssigned(t *lib.Token) func(db *gorm.DB) *gorm.DB {
+	return func(db *gorm.DB) *gorm.DB {
+		if t.IsRecord {
+			return db
+		}
+		return db.Where("`assigned` like ?", "%"+t.Username+"%")
+	}
+}
+
 func AccordingToUsername(user string) func(db *gorm.DB) *gorm.DB {
 	return func(db *gorm.DB) *gorm.DB {
 		if user == "" {
@@ -76,12 +86,12 @@ func AccordingToUsername(user string) func(db *gorm.DB) *gorm.DB {
 	}
 }
 
-func AccordingToDept(user string) func(db *gorm.DB) *gorm.DB {
+func AccordingToPrincipal(principal string) func(db *gorm.DB) *gorm.DB {
 	return func(db *gorm.DB) *gorm.DB {
-		if user == "" {
+		if principal == "" {
 			return db
 		}
-		return db.Where("department like ?", "%"+user+"%")
+		return db.Where("principal like ?", "%"+principal+"%")
 	}
 }
 

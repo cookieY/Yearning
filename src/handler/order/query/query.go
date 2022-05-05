@@ -16,7 +16,12 @@ func FetchQueryOrder(c yee.Context) (err error) {
 		c.Logger().Error(err.Error())
 		return
 	}
+	t := new(lib.Token).JwtParse(c)
+	if c.QueryParam("tp") != "record" {
+		t.IsRecord = false
+	}
 	order := u.GetSQLQueryList(
+		commom.AccordingQueryToAssigned(t),
 		commom.AccordingToUsername(u.Expr.Username),
 		commom.AccordingToRealName(u.Expr.RealName),
 		commom.AccordingToDate(u.Expr.Picker),

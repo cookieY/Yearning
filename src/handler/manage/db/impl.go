@@ -52,6 +52,7 @@ func SuperEditSource(source *model.CoreDataSource) commom.Resp {
 		"is_query":           source.IsQuery,
 		"flow_id":            source.FlowID,
 		"exclude_db_list":    source.ExcludeDbList,
+		"principal":          source.Principal,
 		"insulate_word_list": source.InsulateWordList,
 	})
 	var k []model.CoreRoleGroup

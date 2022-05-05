@@ -128,6 +128,7 @@ type CoreDataSource struct {
 	SourceId         string `gorm:"type:varchar(200);not null;index:source_idx"  json:"source_id"`
 	ExcludeDbList    string `gorm:"type:varchar(200);not null" json:"exclude_db_list"`
 	InsulateWordList string `gorm:"type:varchar(200);not null" json:"insulate_word_list"`
+	Principal        string `gorm:"type:varchar(150);not null" json:"principal"`
 }
 
 type CoreGrained struct {
