@@ -6,9 +6,9 @@ RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.aliyun.com/g' /etc/apk/repositories
     && apk update  \
     && echo 'hosts: files mdns4_minimal [NOTFOUND=return] dns mdns4' >> /etc/nsswitch.conf
 
-ARG YEARNING_VER=2.3.5
+ARG YEARNING_VER=3.0.0
 
-ARG YEARNING_URL=https://github.com/cookieY/Yearning/releases/download/v3.0.0-rc7/Yearning-RC7.zip
+ARG YEARNING_URL=https://github.com/cookieY/Yearning/releases/download/v3.0.0-rc9/Yearning-RC9.zip
 RUN wget -cO yearning.zip $YEARNING_URL && \
     unzip yearning.zip -d /opt
 
