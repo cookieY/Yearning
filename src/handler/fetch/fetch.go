@@ -259,8 +259,11 @@ func FetchMergeDDL(c yee.Context) (err error) {
 		return c.JSON(http.StatusOK, commom.ERR_COMMON_MESSAGE(err))
 	}
 	var m string
-	if client := lib.NewRpc(); client != nil {
-		if err := client.Call("Engine.Check", req.SQLs, &m); err != nil {
+	if req.SQLs != "" {
+		if client := lib.NewRpc(); client != nil {
+			if err := client.Call("Engine.MergeAlterTables", req.SQLs, &m); err != nil {
+				return c.JSON(http.StatusOK, commom.ERR_SOAR_ALTER_MERGE(err))
+			}
 			return c.JSON(http.StatusOK, commom.SuccessPayload(m))
 		}
 	}

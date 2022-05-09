@@ -183,7 +183,7 @@ func SocketQueryResults(c yee.Context) (err error) {
 					var d model.CoreQueryOrder
 					clock := time.Now()
 					if model.DB().Where("username =? AND status =?", user, 2).Last(&d).RecordNotFound() {
-						if err := websocket.Message.Send(ws, lib.ToMsg(queryResults{Error: "查询工单获取失败或工单已过期,请返回上一级菜单"})); err != nil {
+						if err := websocket.Message.Send(ws, lib.ToMsg(queryResults{Status: true})); err != nil {
 							c.Logger().Error(err)
 						}
 						continue
