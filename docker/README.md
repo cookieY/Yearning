@@ -9,6 +9,12 @@
 docker run -d -it -p8000:8000 -e MYSQL_USER=root -e MYSQL_ADDR=10.0.0.3:3306 -e MYSQL_PASSWORD=123123 -e MYSQL_DB=Yearning chaiyd/yearning
 ```
 
+### docker tag
+- chaiyd/yearning:latest
+  - 默认为正式版，不包含RC 版
+- 获取RC版本
+  - docker pull chaiyd/yearning:3.0.0-rc10
+
 ### docker-compose
 ```
 version: '3'

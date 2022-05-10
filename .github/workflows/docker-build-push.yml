@@ -1,20 +1,31 @@
-name: Publish Docker image
+name: yearning
 
 on:
-  release:
-    types: [published]
+  push:
+    branches: [ next ]
+  pull_request:
+    branches: [ next ]
+
+env:
+  BASEIMAGES: '3.15' 
+  YEARNING_VER: '3.0.0-rc10'
+  YEARNING_URL: 'https://github.com/cookieY/Yearning/releases/download/v3.0.0-rc10/Yearning-RC10.zip'
   
 jobs:
   push_to_registries:
     name: Push Docker image to multiple registries
     runs-on: ubuntu-latest
     permissions:
+      security-events: write
       packages: write
       contents: read
     steps:
       - name: Check out the repo
         uses: actions/checkout@v2
-      
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v1
+
       - name: Log in to Docker Hub
         uses: docker/login-action@f054a8b539a109f9f41c372932f1ae047eff08c9
         with:
@@ -39,9 +50,30 @@ jobs:
         with:
           context: ./docker
           file: ./docker/Dockerfile
+          #platforms: linux/386,linux/amd64,linux/arm64,linux/arm/v7,linux/ppc64le,linux/s390x
           builder: ${{ steps.buildx.outputs.name }}
           push: true
           build-args: |
-            YEARNING_VER=${{ fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.version'] }}
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
+            BASEIMAGES=${{ env.BASEIMAGES }}
+            YEARNING_VER=${{ env.YEARNING_VER }}
+            YEARNING_URL=${{ env.YEARNING_URL }}
+            #YEARNING_VER=${{ fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.version'] }}
+          tags: |
+            chaiyd/yearning:${{ env.YEARNING_VER }}
+            
+          #chaiyd/yearning
+          labels: chaiyd/yearning:${{ env.YEARNING_VER }} 
+
+      - name: Run the Anchore scan action itself with GitHub Advanced Security code scanning integration enabled
+        uses: anchore/scan-action@v3
+        id: scan
+        with:
+          image: |
+            chaiyd/yearning:${{ env.YEARNING_VER }}
+          acs-report-enable: true
+          fail-build: false
+
+      - name: upload Anchore scan SARIF report
+        uses: github/codeql-action/upload-sarif@v1
+        with:
+          sarif_file: ${{ steps.scan.outputs.sarif }}            
