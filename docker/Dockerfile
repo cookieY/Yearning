@@ -1,4 +1,5 @@
-FROM alpine:3.12 AS builder
+ARG BASEIMAGES=3.15
+FROM alpine:${BASEIMAGES} AS builder
 
 LABEL maintainer="chaiyd <chaiyd.cn@gmail.com>"
 
@@ -6,14 +7,15 @@ RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.aliyun.com/g' /etc/apk/repositories
     && apk update  \
     && echo 'hosts: files mdns4_minimal [NOTFOUND=return] dns mdns4' >> /etc/nsswitch.conf
 
-ARG YEARNING_VER=3.0.0
+ARG YEARNING_VER=2.3.5
 
-ARG YEARNING_URL=https://github.com/cookieY/Yearning/releases/download/v3.0.0-rc9/Yearning-RC9.zip
+ARG YEARNING_URL=https://github.com/cookieY/Yearning/releases/download/${YEARNING_VER}/Yearning-${YEARNING_VER}-linux-amd64.zip
 RUN wget -cO yearning.zip $YEARNING_URL && \
-    unzip yearning.zip -d /opt
+    unzip yearning.zip && \
+    mv Yearning/* /opt
 
 
-FROM alpine:3.12
+FROM alpine:${BASEIMAGES}
 
 LABEL maintainer="chaiyd <chaiyd.cn@gmail.com>"
 
