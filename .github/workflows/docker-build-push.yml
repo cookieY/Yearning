@@ -60,7 +60,8 @@ jobs:
             #YEARNING_VER=${{ fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.version'] }}
           tags: |
             chaiyd/yearning:${{ env.YEARNING_VER }}
-            #chaiyd/yearning #正式版取消注释
+            
+          #chaiyd/yearning
           labels: chaiyd/yearning:${{ env.YEARNING_VER }} 
 
       - name: Run the Anchore scan action itself with GitHub Advanced Security code scanning integration enabled
