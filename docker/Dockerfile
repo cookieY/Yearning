@@ -3,7 +3,7 @@ FROM alpine:${BASEIMAGES} AS builder
 
 LABEL maintainer="chaiyd <chaiyd.cn@gmail.com>"
 
-ARG YEARNING_VER=2.3.5
+ARG YEARNING_VER=3.0.0-rc11
 
 ARG YEARNING_URL=https://github.com/cookieY/Yearning/releases/download/${YEARNING_VER}/Yearning-${YEARNING_VER}-linux-amd64.zip
 RUN wget -cO yearning.zip $YEARNING_URL && \
