@@ -7,8 +7,8 @@ on:
 
 env:
   BASEIMAGES: '3.15' 
-  YEARNING_VER: '3.0.0-rc11'
-  YEARNING_URL: 'https://github.com/cookieY/Yearning/releases/download/v3.0.0-rc11/Yearning-3.0.0-rc11-linux-amd64.zip'
+#   YEARNING_VER: '3.0.0-rc11'
+#   YEARNING_URL: 'https://github.com/cookieY/Yearning/releases/download/v3.0.0-rc11/Yearning-3.0.0-rc11-linux-amd64.zip'
   
 jobs:
   push_to_registries:
@@ -54,8 +54,8 @@ jobs:
           push: true
           build-args: |
             BASEIMAGES=${{ env.BASEIMAGES }}
-            YEARNING_VER=${{ env.YEARNING_VER }}
-            YEARNING_URL=${{ env.YEARNING_URL }}
+            # YEARNING_VER=${{ env.YEARNING_VER }}
+            # YEARNING_URL=${{ env.YEARNING_URL }}
 #            YEARNING_VER=${{ fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.version'] }}
           tags: |
             chaiyd/yearning:${{ fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.version'] }}
