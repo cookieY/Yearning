@@ -3,6 +3,7 @@ name: yearning
 on:
   release:
     types: [published]
+  workflow_dispatch:
 
 env:
   BASEIMAGES: '3.15' 
