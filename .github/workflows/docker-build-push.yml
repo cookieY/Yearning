@@ -54,9 +54,9 @@ jobs:
           push: true
           build-args: |
             BASEIMAGES=${{ env.BASEIMAGES }}
-            # YEARNING_VER=${{ env.YEARNING_VER }}
-            # YEARNING_URL=${{ env.YEARNING_URL }}
-#            YEARNING_VER=${{ fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.version'] }}
+#           YEARNING_VER=${{ env.YEARNING_VER }}
+#           YEARNING_URL=${{ env.YEARNING_URL }}
+#           YEARNING_VER=${{ fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.version'] }}
           tags: |
             chaiyd/yearning:${{ fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.version'] }}
           #chaiyd/yearning
