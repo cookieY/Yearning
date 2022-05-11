@@ -8,7 +8,7 @@ ARG YEARNING_VER=3.0.0-rc11
 ARG YEARNING_URL=https://github.com/cookieY/Yearning/releases/download/${YEARNING_VER}/Yearning-${YEARNING_VER}-linux-amd64.zip
 RUN wget -cO yearning.zip $YEARNING_URL && \
     unzip yearning.zip && \
-    mv Yearning/* /opt \
+    mv Yearning/* /opt
 
 
 FROM alpine:${BASEIMAGES}
@@ -22,7 +22,6 @@ RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.aliyun.com/g' /etc/apk/repositories
     && echo "Asia/Shanghai" > /etc/timezone
 
 COPY --from=builder /opt/Yearning /opt/Yearning
-#COPY --from=builder /opt/Yearning-go/dist /opt/Yearning-go/dist
 COPY --from=builder /opt/conf.toml /opt/conf.toml
 
 WORKDIR /opt/
