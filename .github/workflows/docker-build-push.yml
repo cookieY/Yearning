@@ -1,15 +1,13 @@
 name: yearning
 
 on:
-  push:
-    branches: [ next ]
-  pull_request:
-    branches: [ next ]
+  release:
+    types: [published]
 
 env:
   BASEIMAGES: '3.15' 
-  YEARNING_VER: '3.0.0-rc10'
-  YEARNING_URL: 'https://github.com/cookieY/Yearning/releases/download/v3.0.0-rc10/Yearning-RC10.zip'
+  #YEARNING_VER: '3.0.0-rc10'
+  #YEARNING_URL: 'https://github.com/cookieY/Yearning/releases/download/v3.0.0-rc10/Yearning-RC10.zip'
   
 jobs:
   push_to_registries:
@@ -55,21 +53,19 @@ jobs:
           push: true
           build-args: |
             BASEIMAGES=${{ env.BASEIMAGES }}
-            YEARNING_VER=${{ env.YEARNING_VER }}
-            YEARNING_URL=${{ env.YEARNING_URL }}
-            #YEARNING_VER=${{ fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.version'] }}
+            #YEARNING_VER=${{ env.YEARNING_VER }}
+            #YEARNING_URL=${{ env.YEARNING_URL }}
+            YEARNING_VER=${{ fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.version'] }}
           tags: |
-            chaiyd/yearning:${{ env.YEARNING_VER }}
-            
+            chaiyd/yearning:${{ fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.version'] }}
           #chaiyd/yearning
-          labels: chaiyd/yearning:${{ env.YEARNING_VER }} 
+          labels: ${{ steps.meta.outputs.labels }}
 
       - name: Run the Anchore scan action itself with GitHub Advanced Security code scanning integration enabled
         uses: anchore/scan-action@v3
         id: scan
         with:
-          image: |
-            chaiyd/yearning:${{ env.YEARNING_VER }}
+          image: chaiyd/yearning:${{ fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.version'] }}
           acs-report-enable: true
           fail-build: false
 
