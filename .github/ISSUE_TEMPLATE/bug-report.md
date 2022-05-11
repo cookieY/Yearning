@@ -1,12 +1,11 @@
 ---
-name: Bug Report
+name: Report
 about: Create a report to help us improve
-title: Bug Report
-labels: bug
+title: Report
 
 ---
 
-**Describe the bug** **描述Bug**
+**Describe** **描述**
 
 
 
