@@ -44,9 +44,7 @@ version: '3'
            - --character-set-server=utf8mb4
            - --collation-server=utf8mb4_unicode_ci
         volumes:
-           - mysql-data:/var/lib/mysql
-volumes:
-  mysql-data:
+           - ./data/mysql:/var/lib/mysql
 
 # 默认账号：admin，默认密码：Yearning_admin
 ```
