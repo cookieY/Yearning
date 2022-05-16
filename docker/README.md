@@ -9,6 +9,14 @@
 docker run -d -it -p8000:8000 -e MYSQL_USER=root -e MYSQL_ADDR=10.0.0.3:3306 -e MYSQL_PASSWORD=123123 -e MYSQL_DB=Yearning chaiyd/yearning
 ```
 
+### docker-compose
+- 第一次安装，取消下列compose 中的注释进行初始化
+  - `command: /bin/bash -c "./Yearning install"`
+- 升级使用
+  - `command: /bin/bash -c "./Yearning migrate"`
+- 重置admin密码
+  - `command: /bin/bash -c "./Yearning reset_super"`
+
 ### docker tag
 - chaiyd/yearning:latest
   - 默认为正式版，不包含RC 版
@@ -27,6 +35,7 @@ version: '3'
            MYSQL_DB: yearning
         ports:
            - 8000:8000
+        #command: /bin/bash -c "./Yearning install"
         #volumes:
         #   - ./conf.toml:/opt/conf.toml
         depends_on:

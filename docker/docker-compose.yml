@@ -10,6 +10,8 @@ services:
            MYSQL_DB: yearning
         ports:
            - 8000:8000
+        # 首次使用请先初始化
+        #command: /bin/bash -c "./Yearning install"
         #volumes:
         #   - ./conf.toml:/opt/conf.toml
         depends_on:
@@ -25,7 +27,7 @@ services:
            MYSQL_PASSWORD: ukC2ZkcG_ZTeb
         command:
            - --character-set-server=utf8mb4
-           - --collation-server=utf8mb4_unicode_ci
+           - --collation-server=utf8mb4_general_ci
         volumes:
            - ./data/mysql:/var/lib/mysql
 
