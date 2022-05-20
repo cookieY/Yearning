@@ -70,7 +70,7 @@ var RunServer = &gcli.Command{
 		c.StrOpt(&RunOpts.push, "push", "b", "127.0.0.1:8000", "钉钉/邮件推送时显示的平台地址")
 		c.StrOpt(&RunOpts.config, "config", "c", "conf.toml", "配置文件路径")
 	},
-	Examples: `<cyan>{$binName} {$cmd} --port 80 --push "yearning.io" -config ../config.toml</>`,
+	Examples: `<cyan>{$binName} {$cmd} --port 80 --push "yearning.io" --config ../config.toml</>`,
 	Func: func(c *gcli.Command, args []string) error {
 		model.DbInit(RunOpts.config)
 		service.UpdateData()
@@ -81,7 +81,7 @@ var RunServer = &gcli.Command{
 
 func Command() {
 	app := gcli.NewApp()
-	app.Version = "2.3.5 Neptune"
+	app.Version = "3.0.0 Uranus"
 	app.Name = "Yearning"
 	app.Logo = gcli.Logo{Text: LOGO, Style: "info"}
 	app.Description = "Yearning Mysql数据审核平台"

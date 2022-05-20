@@ -34,6 +34,7 @@ type queryResults struct {
 	Results   []*Query `msgpack:"results"`
 	QueryTime int      `msgpack:"query_time"`
 	Status    bool     `msgpack:"status"`
+	HeartBeat uint8    `msgpack:"heartbeat"`
 }
 
 func reflect(flag bool) uint {
@@ -174,6 +175,11 @@ func SocketQueryResults(c yee.Context) (err error) {
 				if err := msgpack.Unmarshal(b, &msg.Ref); err != nil {
 					c.Logger().Error(err)
 					break
+				}
+
+				if msg.Ref.HeartBeat == 1 {
+					_ = websocket.Message.Send(ws, lib.ToMsg(queryResults{HeartBeat: commom.PING}))
+					continue
 				}
 
 				switch msg.Ref.Type {

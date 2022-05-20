@@ -139,4 +139,7 @@ const (
 	DATA_IS_UPDATED     = "数据已更新"
 )
 
-const CLOSE = "1"
+const (
+	CLOSE = "1"
+	PING  = 1
+)

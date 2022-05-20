@@ -26,19 +26,13 @@ type queryBind struct {
 	Source   string `json:"source"`
 }
 
-type Ref struct {
-	Type     string `json:"type"` //0 conn 1 close
-	Sql      string `json:"sql"`
-	Schema   string `json:"schema"`
-	SourceId string `json:"source_id"`
-}
-
 type QueryDeal struct {
 	Ref struct {
-		Type     string `msgpack:"type"` //0 conn 1 close
-		Sql      string `msgpack:"sql"`
-		Schema   string `msgpack:"schema"`
-		SourceId string `msgpack:"source_id"`
+		Type      string `msgpack:"type"` //0 conn 1 close
+		Sql       string `msgpack:"sql"`
+		Schema    string `msgpack:"schema"`
+		SourceId  string `msgpack:"source_id"`
+		HeartBeat uint8  `msgpack:"heartbeat"`
 	}
 	MultiSQLRunner []MultiSQLRunner
 }
