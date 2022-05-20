@@ -8,7 +8,7 @@ ARG YEARNING_VER=3.0.0-rc11
 ARG YEARNING_URL=https://github.com/cookieY/Yearning/releases/download/${YEARNING_VER}/Yearning-${YEARNING_VER}-linux-amd64.zip
 RUN wget -cO yearning.zip $YEARNING_URL && \
     unzip yearning.zip && \
-    mv Yearning-${YEARNING_VER}-linux-amd64/* /opt
+    mv Yearning/* /opt
 
 
 FROM alpine:${BASEIMAGES}
