@@ -19,6 +19,7 @@ import (
 	"Yearning-go/src/model"
 	"encoding/json"
 	"fmt"
+	"github.com/gookit/gcli/v2/interact"
 	"time"
 )
 
@@ -55,6 +56,9 @@ func DataInit(o *engine.AuditRole, other *model.Other, ldap *model.Ldap, message
 
 func Migrate() {
 	if !model.DB().HasTable("core_accounts") {
+		if !interact.Confirm("是否已将数据库字符集设置为UTF8/UTF8MB4?") {
+			return
+		}
 		model.DB().CreateTable(&model.CoreAccount{})
 		model.DB().CreateTable(&model.CoreDataSource{})
 		model.DB().CreateTable(&model.CoreGlobalConfiguration{})
@@ -140,7 +144,7 @@ func Migrate() {
 		}
 		time.Sleep(2)
 		DataInit(&o, &other, &ldap, &message, &a)
-		fmt.Println("初始化成功!\n 用户名: admin\n密码:Yearning_admin\n请通过./Yearning run 运行,默认地址:http://<host>:8000")
+		fmt.Println("初始化成功!\n用户名: admin\n密码:Yearning_admin\n请通过./Yearning run 运行,默认地址:http://<host>:8000")
 	} else {
 		fmt.Println("已初始化过,请不要再次执行")
 	}

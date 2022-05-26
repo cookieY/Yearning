@@ -17,8 +17,8 @@ import (
 	"Yearning-go/src/model"
 	"crypto/tls"
 	"fmt"
+	"github.com/cookieY/yee/logger"
 	"gopkg.in/gomail.v2"
-	"log"
 	"strings"
 )
 
@@ -110,7 +110,7 @@ func SendMail(addr string, mail model.Message, tmpl string) {
 	}
 	// Send the email to Bob, Cora and Dan.
 	if err := d.DialAndSend(m); err != nil {
-		log.Println(err.Error())
+		logger.LogCreator().Errorf("send mail", err)
 		return
 	}
 }

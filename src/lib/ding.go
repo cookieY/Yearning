@@ -4,7 +4,7 @@ import (
 	"Yearning-go/src/model"
 	"crypto/tls"
 	"fmt"
-	"log"
+	"github.com/cookieY/yee/logger"
 	"net/http"
 	"strings"
 	"time"
@@ -27,7 +27,7 @@ func SendDingMsg(msg model.Message, sv string) {
 
 	req, err := http.NewRequest("POST", hook, strings.NewReader(mx))
 	if err != nil {
-		log.Println(err.Error())
+		logger.LogCreator().Errorf("request:", err)
 		return
 	}
 
@@ -42,7 +42,7 @@ func SendDingMsg(msg model.Message, sv string) {
 	resp, err := client.Do(req)
 
 	if err != nil {
-		log.Println(err.Error())
+		logger.LogCreator().Errorf("resp:", err)
 		return
 	}
 

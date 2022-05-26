@@ -16,9 +16,9 @@ package model
 import (
 	"fmt"
 	"github.com/BurntSushi/toml"
+	"github.com/cookieY/yee/logger"
 	"github.com/jinzhu/gorm"
 	_ "github.com/jinzhu/gorm/dialects/mysql"
-	"log"
 	"os"
 	"time"
 )
@@ -81,7 +81,7 @@ type Permission struct {
 func DbInit(c string) {
 	_, err := toml.DecodeFile(c, &C)
 	if err != nil {
-		log.Println(err.Error())
+		logger.LogCreator().Error("mysql连接失败! 请检查配置信息")
 	}
 	JWT = C.General.SecretKey
 	newDb, err := gorm.Open("mysql", fmt.Sprintf("%s:%s@(%s:%s)/%s?charset=utf8mb4&parseTime=True&loc=Local", C.Mysql.User, C.Mysql.Password, C.Mysql.Host, C.Mysql.Port, C.Mysql.Db))

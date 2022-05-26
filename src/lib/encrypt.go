@@ -21,8 +21,8 @@ import (
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/base64"
+	"github.com/cookieY/yee/logger"
 	"golang.org/x/crypto/pbkdf2"
-	"log"
 	"math/rand"
 	"strconv"
 	"strings"
@@ -98,14 +98,14 @@ func Decrypt(cryted string) string {
 	// 创建数组
 	orig := make([]byte, len(crytedByte))
 	// 解密
-	if len(orig)%blockMode.BlockSize() != 0 {
+	if (len(orig) % blockMode.BlockSize()) != 0 {
 		return ""
 	}
 	blockMode.CryptBlocks(orig, crytedByte)
-	// 去补全码
+	//// 去补全码
 	orig = PKCS7UnPadding(orig)
 	if orig == nil {
-		log.Println("无法获得传入密码")
+		logger.LogCreator().Error("秘钥解析失败,无法解密当前密码！")
 		return ""
 	}
 	return string(orig)
@@ -126,6 +126,9 @@ func PKCS7UnPadding(origData []byte) []byte {
 	if len(origData) > 0 {
 		length := len(origData)
 		unpadding := int(origData[length-1])
+		if (length - unpadding) < 0 {
+			return nil
+		}
 		return origData[:(length - unpadding)]
 	}
 	return nil

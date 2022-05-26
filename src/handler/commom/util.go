@@ -3,16 +3,19 @@ package commom
 import (
 	"Yearning-go/src/lib"
 	"Yearning-go/src/model"
+	"errors"
 	"fmt"
+	"github.com/cookieY/yee/logger"
 	"github.com/jinzhu/gorm"
-	"log"
 	"strings"
 )
 
 func ScanDataRows(s model.CoreDataSource, database, sql, meta string, isQuery bool, isLeaf bool) (res _dbInfo, err error) {
 
 	ps := lib.Decrypt(s.Password)
-
+	if ps == "" {
+		return res, errors.New("连接失败,密码解析错误！")
+	}
 	db, err := gorm.Open("mysql", fmt.Sprintf("%s:%s@(%s:%d)/%s?charset=utf8&parseTime=True&loc=Local", s.Username, ps, s.IP, s.Port, database))
 
 	defer func() {
@@ -61,7 +64,7 @@ func Highlight(s *model.CoreDataSource) []map[string]string {
 	var list []map[string]string
 	db, err := gorm.Open("mysql", fmt.Sprintf("%s:%s@(%s:%d)/?charset=utf8&parseTime=True&loc=Local", s.Username, ps, s.IP, s.Port))
 	if err != nil {
-		log.Println(err)
+		logger.LogCreator().Error(err)
 		return nil
 	}
 

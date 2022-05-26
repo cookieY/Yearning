@@ -3,6 +3,7 @@ package main
 import (
 	"Yearning-go/src/model"
 	"encoding/json"
+	"fmt"
 	"github.com/cookieY/yee/logger"
 	"github.com/google/uuid"
 )
@@ -64,16 +65,22 @@ func main() {
 		if err := json.Unmarshal(i.Group, &k); err != nil {
 			logger.LogCreator().Error(err)
 		}
-		var new []string
+		var newGroup []string
 		for _, j := range k {
 			var s1 model.CoreRoleGroup
 			model.DB().Model(model.CoreRoleGroup{}).Where("name =?", j).First(&s1)
-			new = append(new, s1.GroupId)
+			newGroup = append(newGroup, s1.GroupId)
 		}
-		n, _ := json.Marshal(new)
+		if newGroup == nil {
+			newGroup = []string{}
+		}
+		n, _ := json.Marshal(newGroup)
+
 		model.DB().Model(model.CoreGrained{}).Where("id =?", i.ID).Update(&model.CoreGrained{Group: n})
 	}
 
 	model.DB().AutoMigrate(model.CoreAccount{})
 	model.DB().Model(model.CoreAccount{}).Updates(&model.CoreAccount{IsRecorder: 2})
+
+	fmt.Println("迁移完成！")
 }
