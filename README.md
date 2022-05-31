@@ -60,11 +60,11 @@ Yearning 使用交流QQ群 1群: 747364310(已满) 2群:363323798
 
 ## Install 安装及使用日志
 
-[使用及安装文档](http://guide.yearning.io) 解决 95%的疑问,不做十万个为什么!
+[使用及安装文档](https://next.yearning.io) 解决 95%的疑问,不做十万个为什么!
 
 ## Develop 二次开发
 
-[二次开发注意事项](https://guide.yearning.io/developer.html)
+[二次开发注意事项](https://next.yearning.io/dev/declare.html)
 
 ## About 联系方式
 
