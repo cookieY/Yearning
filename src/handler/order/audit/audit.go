@@ -48,8 +48,26 @@ func ExecuteOrder(c yee.Context) (err error) {
 	}
 	user, _ := lib.JwtParse(c)
 	var order model.CoreSqlOrder
-
 	model.DB().Where("work_id =?", u.WorkId).First(&order)
+
+	var flowTpl model.CoreWorkflowTpl
+	model.DB().Where("source =?", order.IDC).First(&flowTpl)
+
+	var steps []tpl.Tpl
+	_ = json.Unmarshal(flowTpl.Steps, &steps)
+
+	var authCheck bool
+
+	for _, v := range steps[order.CurrentStep].Auditor {
+		if v == user {
+			authCheck = true
+			break
+		}
+	}
+
+	if !authCheck {
+		return c.JSON(http.StatusOK, commom.ERR_COMMON_MESSAGE(fmt.Errorf("你没有权限进行操作")))
+	}
 
 	if order.Status != 2 && order.Status != 5 {
 		c.Logger().Error(IDEMPOTENT)
@@ -84,6 +102,34 @@ func AuditOrderState(c yee.Context) (err error) {
 		c.Logger().Error(err.Error())
 		return c.JSON(http.StatusOK, commom.ERR_REQ_BIND)
 	}
+
+	// add user check
+	var order model.CoreSqlOrder
+	model.DB().Where("work_id =?", u.WorkId).First(&order)
+
+	var flowTpl model.CoreWorkflowTpl
+	model.DB().Where("source =?", order.IDC).First(&flowTpl)
+
+	var steps []tpl.Tpl
+	_ = json.Unmarshal(flowTpl.Steps, &steps)
+
+	if user == order.Username {
+		return commom.ERR_COMMON_MESSAGE(fmt.Errorf("你是提交人不能进行操作"))
+	}
+
+	var authCheck bool
+
+	for _, v := range steps[order.CurrentStep].Auditor {
+		if v == user {
+			authCheck = true
+			break
+		}
+	}
+
+	if !authCheck {
+		return commom.ERR_COMMON_MESSAGE(fmt.Errorf(ORDER_AUTH_CHECK_ERR))
+	}
+
 	switch u.Tp {
 	case "agree":
 		return c.JSON(http.StatusOK, MultiAuditOrder(u, user))
