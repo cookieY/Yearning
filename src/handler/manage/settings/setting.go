@@ -25,7 +25,7 @@ import (
 const (
 	WEBHOOK_TEST      = "测试消息已发送！请注意查收！"
 	MAIL_TEST         = "测试邮件已发送！请注意查收！"
-	ERR_LDAP_TEST     = "ldap连接失败!"
+	ERR_LDAP_TEST     = "ldap连接失败,请检查配置/测试用户密码！"
 	SUCCESS_LDAP_TEST = "ldap连接成功!"
 )
 

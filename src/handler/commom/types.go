@@ -38,7 +38,6 @@ func (p *PageChange) GetSQLOrderList(scopes ...func(*gorm.DB) *gorm.DB) (order S
 	model.DB().Model(model.CoreSqlOrder{}).Select(QueryField).
 		Scopes(scopes...).Count(&order.Count).Order("id desc").
 		Offset(start).Limit(offset).Find(&order.List)
-	order.Multi = model.GloOther.Multi
 	return
 }
 

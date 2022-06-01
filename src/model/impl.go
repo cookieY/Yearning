@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/cookieY/yee/logger"
 	"gopkg.in/ldap.v3"
 )
 
@@ -21,10 +22,6 @@ type ldapMap struct {
 
 func (l *ALdap) LdapConnect(user string, pass string, isTest bool) (isOk bool, err error) {
 	var ld *ldap.Conn
-	var lmap ldapMap
-	if err := json.Unmarshal([]byte(l.Map), &lmap); err != nil {
-		return false, err
-	}
 	if l.Ldaps {
 		ld, err = ldap.DialTLS("tcp", l.Url, &tls.Config{InsecureSkipVerify: true})
 	} else {
@@ -70,8 +67,13 @@ func (l *ALdap) LdapConnect(user string, pass string, isTest bool) (isOk bool, e
 	if err := ld.Bind(userdn, pass); err != nil {
 		return false, err
 	}
-	l.Email = sr.Entries[0].GetAttributeValue(lmap.Email)
-	l.Department = sr.Entries[0].GetAttributeValue(lmap.Department)
-	l.RealName = sr.Entries[0].GetAttributeValue(lmap.RealName)
+	var lmap ldapMap
+	if err := json.Unmarshal([]byte(l.Map), &lmap); err != nil {
+		logger.DefaultLogger.Error(err)
+	} else {
+		l.Email = sr.Entries[0].GetAttributeValue(lmap.Email)
+		l.Department = sr.Entries[0].GetAttributeValue(lmap.Department)
+		l.RealName = sr.Entries[0].GetAttributeValue(lmap.RealName)
+	}
 	return true, nil
 }

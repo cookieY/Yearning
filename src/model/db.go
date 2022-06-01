@@ -26,15 +26,12 @@ import (
 var db *gorm.DB
 
 type Other struct {
-	Limit        uint64   `json:"limit"`
-	IDC          []string `json:"idc"`
-	Multi        bool     `json:"multi"`
-	Query        bool     `json:"query"`
-	Register     bool     `json:"register"`
-	Export       bool     `json:"export"`
-	PerOrder     int      `json:"per_order"`
-	ExQueryTime  int      `json:"ex_query_time"`
-	QueryTimeout int      `json:"query_timeout"`
+	Limit       uint64   `json:"limit"`
+	IDC         []string `json:"idc"`
+	Query       bool     `json:"query"`
+	Register    bool     `json:"register"`
+	Export      bool     `json:"export"`
+	ExQueryTime int      `json:"ex_query_time"`
 }
 
 type Message struct {

@@ -27,9 +27,8 @@ func SuperFetchUser(c yee.Context) (err error) {
 		commom.AccordingToOrderDept(u.Expr.Dept),
 	).Count(&count).Offset(start).Limit(end).Find(&user)
 	return c.JSON(http.StatusOK, commom.SuccessPayload(commom.CommonList{
-		Page:  count,
-		Data:  user,
-		Multi: model.GloOther.Multi,
+		Page: count,
+		Data: user,
 	}))
 }
 

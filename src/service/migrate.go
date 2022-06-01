@@ -109,12 +109,10 @@ func Migrate() {
 		other := model.Other{
 			Limit:       1000,
 			IDC:         []string{"Aliyun", "AWS"},
-			Multi:       false,
 			Query:       false,
 			Register:    false,
 			Export:      false,
 			ExQueryTime: 60,
-			PerOrder:    2,
 		}
 
 		ldap := model.Ldap{

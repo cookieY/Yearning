@@ -6,7 +6,26 @@ import (
 	"fmt"
 	"github.com/cookieY/yee/logger"
 	"github.com/google/uuid"
+	"strconv"
 )
+
+type originOther struct {
+	Limit       string   `json:"limit"`
+	IDC         []string `json:"idc"`
+	Query       bool     `json:"query"`
+	Register    bool     `json:"register"`
+	Export      bool     `json:"export"`
+	ExQueryTime int      `json:"ex_query_time"`
+}
+
+type originLDAP struct {
+	Url      string `json:"url"`
+	User     string `json:"user"`
+	Password string `json:"password"`
+	Type     string `json:"type"`
+	Sc       string `json:"sc"`
+	Ldaps    bool   `json:"ldaps"`
+}
 
 func main() {
 	model.DbInit("./conf.toml")
@@ -75,12 +94,37 @@ func main() {
 			newGroup = []string{}
 		}
 		n, _ := json.Marshal(newGroup)
-
 		model.DB().Model(model.CoreGrained{}).Where("id =?", i.ID).Update(&model.CoreGrained{Group: n})
 	}
 
 	model.DB().AutoMigrate(model.CoreAccount{})
 	model.DB().Model(model.CoreAccount{}).Updates(&model.CoreAccount{IsRecorder: 2})
 
+	var conf model.CoreGlobalConfiguration
+	model.DB().Model(model.CoreGlobalConfiguration{}).First(&conf)
+	var o originOther
+	var l originLDAP
+	_ = json.Unmarshal(conf.Other, &o)
+	_ = json.Unmarshal(conf.Ldap, &l)
+	num, _ := strconv.Atoi(o.Limit)
+	other := model.Other{
+		Limit:       uint64(num),
+		IDC:         o.IDC,
+		ExQueryTime: o.ExQueryTime,
+		Register:    o.Register,
+		Export:      o.Export,
+		Query:       o.Query,
+	}
+	ldap := model.Ldap{
+		Url:      l.Url,
+		User:     l.User,
+		Password: l.Password,
+		Type:     "(&(objectClass=organizationalPerson)(sAMAccountName=%s))",
+		Sc:       l.Sc,
+		Ldaps:    l.Ldaps,
+	}
+	b, _ := json.Marshal(other)
+	ld, _ := json.Marshal(ldap)
+	model.DB().Model(model.CoreGlobalConfiguration{}).Update(&model.CoreGlobalConfiguration{Other: b, Ldap: ld})
 	fmt.Println("迁移完成！")
 }
