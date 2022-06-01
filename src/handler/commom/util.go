@@ -64,7 +64,7 @@ func Highlight(s *model.CoreDataSource) []map[string]string {
 	var list []map[string]string
 	db, err := gorm.Open("mysql", fmt.Sprintf("%s:%s@(%s:%d)/?charset=utf8&parseTime=True&loc=Local", s.Username, ps, s.IP, s.Port))
 	if err != nil {
-		logger.LogCreator().Error(err)
+		logger.DefaultLogger.Error(err)
 		return nil
 	}
 

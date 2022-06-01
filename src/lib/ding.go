@@ -27,7 +27,7 @@ func SendDingMsg(msg model.Message, sv string) {
 
 	req, err := http.NewRequest("POST", hook, strings.NewReader(mx))
 	if err != nil {
-		logger.LogCreator().Errorf("request:", err)
+		logger.DefaultLogger.Errorf("request:", err)
 		return
 	}
 
@@ -42,7 +42,7 @@ func SendDingMsg(msg model.Message, sv string) {
 	resp, err := client.Do(req)
 
 	if err != nil {
-		logger.LogCreator().Errorf("resp:", err)
+		logger.DefaultLogger.Errorf("resp:", err)
 		return
 	}
 

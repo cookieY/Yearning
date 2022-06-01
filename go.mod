@@ -6,13 +6,14 @@ require (
 	github.com/BurntSushi/toml v0.3.1
 	github.com/Jeffail/gabs/v2 v2.6.1
 	github.com/cookieY/sqlx v1.3.0
-	github.com/cookieY/yee v0.3.2
+	github.com/cookieY/yee v0.3.3
 	github.com/go-sql-driver/mysql v1.4.1
 	github.com/golang-jwt/jwt v3.2.2+incompatible
 	github.com/golang/protobuf v1.5.2
 	github.com/google/uuid v1.1.1
 	github.com/gookit/gcli/v2 v2.3.4
 	github.com/jinzhu/gorm v1.9.12
+	github.com/robfig/cron/v3 v3.0.1
 	github.com/stretchr/testify v1.7.0
 	github.com/vmihailenco/msgpack/v5 v5.3.5
 	golang.org/x/crypto v0.0.0-20200709230013-948cd5f35899

@@ -14,6 +14,7 @@
 package service
 
 import (
+	"Yearning-go/src/lib"
 	"Yearning-go/src/model"
 	_ "Yearning-go/src/model"
 	"Yearning-go/src/router"
@@ -21,7 +22,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/cookieY/yee"
+	"github.com/cookieY/yee/logger"
 	"github.com/cookieY/yee/middleware"
+	"github.com/robfig/cron/v3"
 	"net/http"
 )
 
@@ -31,7 +34,24 @@ var f embed.FS
 //go:embed dist/index.html
 var html string
 
+func cronTabMaskQuery() {
+	crontab := cron.New()
+	if _, err := crontab.AddFunc("* * * * *", func() {
+		var queryOrder []model.CoreQueryOrder
+		model.DB().Model(model.CoreQueryOrder{}).Where("`status` =?", 2).Find(&queryOrder)
+		for _, i := range queryOrder {
+			if lib.TimeDifference(i.ApprovalTime) {
+				model.DB().Model(model.CoreQueryOrder{}).Where("work_id =?", i.WorkId).Update(&model.CoreQueryOrder{Status: 3})
+			}
+		}
+	}); err != nil {
+		logger.DefaultLogger.Error(err)
+	}
+	crontab.Start()
+}
+
 func StartYearning(port string, host string) {
+	go cronTabMaskQuery()
 	model.DB().First(&model.GloPer)
 	model.Host = host
 	_ = json.Unmarshal(model.GloPer.Message, &model.GloMessage)

@@ -155,7 +155,7 @@ type CoreQueryOrder struct {
 	RealName     string `gorm:"type:varchar(50);not null" json:"real_name"`
 	Export       uint   `gorm:"type:tinyint(2);not null" json:"export"`
 	SourceId     string `gorm:"type:varchar(200);not null;index:source_idx"  json:"source_id"`
-	Status       int    `gorm:"type:tinyint(2);not null" json:"status"`
+	Status       int    `gorm:"type:tinyint(2);not null;index:status_idx" json:"status"`
 }
 
 type CoreQueryRecord struct {

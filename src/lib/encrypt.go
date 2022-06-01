@@ -105,7 +105,7 @@ func Decrypt(cryted string) string {
 	//// 去补全码
 	orig = PKCS7UnPadding(orig)
 	if orig == nil {
-		logger.LogCreator().Error("秘钥解析失败,无法解密当前密码！")
+		logger.DefaultLogger.Error("秘钥解析失败,无法解密当前密码！")
 		return ""
 	}
 	return string(orig)

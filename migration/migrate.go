@@ -63,7 +63,7 @@ func main() {
 	for _, i := range p {
 		var k []string
 		if err := json.Unmarshal(i.Group, &k); err != nil {
-			logger.LogCreator().Error(err)
+			logger.DefaultLogger.Error(err)
 		}
 		var newGroup []string
 		for _, j := range k {
