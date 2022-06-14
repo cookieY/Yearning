@@ -19,7 +19,7 @@
 
 [Gemini](https://github.com/cookieY/gemini-next) front-end
 
-[Yee](https://github.com/cookieY/yee) web framwork
+[Yee](https://github.com/cookieY/yee) web framework
 
 ## Website 官网
 
