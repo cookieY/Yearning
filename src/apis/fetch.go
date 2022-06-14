@@ -68,8 +68,6 @@ func FetchResourceForPost(y yee.Context) (err error) {
 	switch tp {
 	case "marge":
 		return group.SuperUserRuleMarge(y)
-	case "roll_order":
-		return fetch.RollBackSQLOrder(y)
 	case "comment":
 		return fetch.PostOrderComment(y)
 	}

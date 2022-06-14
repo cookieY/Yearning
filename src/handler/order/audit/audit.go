@@ -18,6 +18,10 @@ func AuditOrderState(c yee.Context) (err error) {
 		return c.JSON(http.StatusOK, commom.ERR_REQ_BIND)
 	}
 	switch u.Tp {
+	case "undo":
+		lib.MessagePush(u.WorkId, 6, "")
+		model.DB().Model(model.CoreQueryOrder{}).Where("work_id =?", u.WorkId).Delete(&model.CoreSqlOrder{})
+		return c.JSON(http.StatusOK, commom.SuccessPayLoadToMessage(commom.ORDER_IS_UNDO))
 	case "agree":
 		return c.JSON(http.StatusOK, MultiAuditOrder(u, user.Username))
 	case "reject":

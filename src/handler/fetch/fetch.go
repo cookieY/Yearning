@@ -200,7 +200,7 @@ func FetchSQLTest(c yee.Context) (err error) {
 		return c.JSON(http.StatusOK, commom.ERR_REQ_BIND)
 	}
 	var s model.CoreDataSource
-	model.DB().Where("source =?", u.Source).First(&s)
+	model.DB().Where("source_id =?", u.SourceId).First(&s)
 	var rs []engine.Record
 	if client := lib.NewRpc(); client != nil {
 		if err := client.Call("Engine.Check", engine.CheckArgs{
@@ -277,49 +277,6 @@ func FetchSQLInfo(c yee.Context) (err error) {
 	return c.JSON(http.StatusOK, commom.SuccessPayload(map[string]interface{}{"sqls": sql.SQL}))
 }
 
-// RollBackSQLOrder create order record if order type of rollback
-func RollBackSQLOrder(c yee.Context) (err error) {
-	u := new(referOrder)
-	if err = c.Bind(u); err != nil {
-		c.Logger().Error(err.Error())
-		return c.JSON(http.StatusOK, commom.ERR_REQ_BIND)
-	}
-
-	auditor := FetchTplAuditor(u.Data.IDC)
-	if auditor == nil {
-		return c.JSON(http.StatusOK, commom.SuccessPayLoadToMessage(AUDITOR_IS_NOT_EXIST))
-	}
-
-	var sql strings.Builder
-	if u.Tp != 1 {
-		sql.WriteString(u.SQLs)
-	} else {
-		var roll []model.CoreRollback
-		model.DB().Select("`sql`").Where("work_id =?", u.Data.WorkId).Find(&roll)
-		for _, i := range roll {
-			sql.WriteString(i.SQL)
-			sql.WriteString("\n")
-		}
-	}
-	w := lib.GenWorkid()
-	u.Data.WorkId = w
-	u.Data.Status = 2
-	u.Data.Date = time.Now().Format("2006-01-02 15:04")
-	u.Data.SQL = sql.String()
-	u.Data.CurrentStep = 1
-	u.Data.Time = time.Now().Format("2006-01-02")
-	u.Data.Assigned = auditor[0]
-	model.DB().Model(model.CoreSqlOrder{}).Create(&u.Data)
-	model.DB().Create(&model.CoreWorkflowDetail{
-		WorkId:   w,
-		Username: u.Data.Username,
-		Action:   "已提交",
-		Time:     time.Now().Format("2006-01-02 15:04"),
-	})
-	lib.MessagePush(w, 2, "")
-	return c.JSON(http.StatusOK, commom.SuccessPayLoadToMessage(commom.ORDER_IS_CREATE))
-}
-
 func FetchStepsProfile(c yee.Context) (err error) {
 	workId := c.QueryParam("work_id")
 	var s []model.CoreWorkflowDetail
@@ -377,20 +334,6 @@ func PostOrderComment(c yee.Context) (err error) {
 	u.Username = t.Username
 	model.DB().Model(model.CoreOrderComment{}).Create(u)
 	return c.JSON(http.StatusOK, commom.SuccessPayLoadToMessage(COMMENT_IS_POST))
-}
-
-func FetchTplAuditor(source string) []string {
-	var tpl model.CoreWorkflowTpl
-	var list []tpl2.Tpl
-	model.DB().Model(model.CoreWorkflowTpl{}).Where("source =?", source).First(&tpl)
-	_ = json.Unmarshal(tpl.Steps, &list)
-	if len(list) > 1 {
-		if len(list[1].Auditor) > 0 {
-			return list[1].Auditor
-		}
-		return nil
-	}
-	return nil
 }
 
 func FetchUserGroups(c yee.Context) (err error) {

@@ -76,6 +76,13 @@ func QueryHandlerSets(c yee.Context) (err error) {
 			lib.MessagePush(u.WorkId, 9, "")
 		}
 		return c.JSON(http.StatusOK, commom.SuccessPayLoadToMessage(commom.ORDER_IS_REJECT))
+	case "undo":
+		t := new(lib.Token)
+		t.JwtParse(c)
+		var order model.CoreQueryOrder
+		model.DB().Model(model.CoreQueryOrder{}).Select("work_id").Where("username =?", t.Username).Last(&order)
+		model.DB().Model(model.CoreQueryOrder{}).Where("work_id =?", order.WorkId).Update(&model.CoreSqlOrder{Status: 3})
+		return c.JSON(http.StatusOK, commom.SuccessPayLoadToMessage(commom.ORDER_IS_END))
 	case "stop":
 		model.DB().Model(model.CoreQueryOrder{}).Where("work_id =?", u.WorkId).Update(&model.CoreSqlOrder{Status: 3})
 		return c.JSON(http.StatusOK, commom.SuccessPayLoadToMessage(commom.ORDER_IS_END))

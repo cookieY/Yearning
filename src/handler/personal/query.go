@@ -17,9 +17,7 @@ import (
 	"Yearning-go/src/handler/commom"
 	"Yearning-go/src/lib"
 	"Yearning-go/src/model"
-	"fmt"
 	"github.com/cookieY/yee"
-	"github.com/jinzhu/gorm"
 	"github.com/vmihailenco/msgpack/v5"
 	"golang.org/x/net/websocket"
 	"io"
@@ -35,6 +33,7 @@ type queryResults struct {
 	QueryTime int      `msgpack:"query_time"`
 	Status    bool     `msgpack:"status"`
 	HeartBeat uint8    `msgpack:"heartbeat"`
+	IsOnly    bool     `msgpack:"is_only"`
 }
 
 func reflect(flag bool) uint {
@@ -87,7 +86,6 @@ func ReferQueryOrder(c yee.Context, user *lib.Token) (err error) {
 }
 
 func FetchQueryDatabaseInfo(c yee.Context) (err error) {
-	var d model.CoreQueryOrder
 	var u model.CoreDataSource
 
 	model.DB().Where("source_id =?", c.QueryParam("source_id")).First(&u)
@@ -98,7 +96,7 @@ func FetchQueryDatabaseInfo(c yee.Context) (err error) {
 		c.Logger().Error(err.Error())
 		return c.JSON(http.StatusOK, commom.ERR_COMMON_MESSAGE(err))
 	}
-	return c.JSON(http.StatusOK, commom.SuccessPayload(map[string]interface{}{"info": result.QueryList, "status": d.Export}))
+	return c.JSON(http.StatusOK, commom.SuccessPayload(map[string]interface{}{"info": result.QueryList}))
 }
 
 func FetchQueryTableInfo(c yee.Context) (err error) {
@@ -119,37 +117,6 @@ func FetchQueryTableInfo(c yee.Context) (err error) {
 	}
 	return c.JSON(http.StatusOK, commom.SuccessPayload(map[string]interface{}{"table": result.QueryList}))
 
-}
-
-func FetchQueryTableStruct(c yee.Context) (err error) {
-
-	t := new(queryBind)
-
-	if err := c.Bind(t); err != nil {
-		return c.JSON(http.StatusOK, commom.ERR_REQ_BIND)
-	}
-
-	unescape, _ := url.QueryUnescape(t.Source)
-
-	var u model.CoreDataSource
-
-	var f []commom.FieldInfo
-
-	model.DB().Where("source =?", unescape).First(&u)
-
-	db, err := gorm.Open("mysql", fmt.Sprintf("%s:%s@(%s:%d)/%s?charset=utf8&parseTime=True&loc=Local", u.Username, lib.Decrypt(u.Password), u.IP, u.Port, t.DataBase))
-	if err != nil {
-		c.Logger().Error(err.Error())
-		return c.JSON(http.StatusInternalServerError, commom.SuccessPayLoadToMessage(ER_DB_CONNENT))
-	}
-	defer db.Close()
-
-	if err := db.Raw(fmt.Sprintf("SHOW FULL FIELDS FROM `%s`.`%s`", t.DataBase, t.Table)).Scan(&f).Error; err != nil {
-		c.Logger().Error(err.Error())
-		return c.JSON(http.StatusOK, commom.ERR_COMMON_MESSAGE(err))
-	}
-
-	return c.JSON(http.StatusOK, commom.SuccessPayload(f))
 }
 
 func SocketQueryResults(c yee.Context) (err error) {
@@ -178,7 +145,7 @@ func SocketQueryResults(c yee.Context) (err error) {
 				}
 
 				if msg.Ref.HeartBeat == 1 {
-					_ = websocket.Message.Send(ws, lib.ToMsg(queryResults{HeartBeat: commom.PING}))
+					_ = websocket.Message.Send(ws, lib.ToMsg(queryResults{HeartBeat: commom.PING, IsOnly: model.GloOther.Query}))
 					continue
 				}
 

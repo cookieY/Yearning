@@ -11,11 +11,9 @@ import (
 )
 
 const (
-	ERR_CONN_TEST     = "数据库实例连接失败！请检查相关配置是否正确！"
 	CONN_TEST_SUCCESS = "数据库实例连接成功！"
 	DB_SAVE_SUCCESS   = "连接名添加成功！"
 	ERR_DB_SAVE       = "config.toml文件中SecretKey值必须为16位！"
-	ERR_DB_SAVE_DUP   = "连接名称重复,请更改为其他!"
 	DB_EDIT_SUCCESS   = "数据源信息已更新!"
 )
 
@@ -48,6 +46,7 @@ func SuperEditSource(source *model.CoreDataSource) commom.Resp {
 		"id_c":               source.IDC,
 		"ip":                 source.IP,
 		"port":               source.Port,
+		"source":             source.Source,
 		"username":           source.Username,
 		"is_query":           source.IsQuery,
 		"flow_id":            source.FlowID,

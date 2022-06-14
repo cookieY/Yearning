@@ -14,8 +14,6 @@ func YearningQueryForGet(y yee.Context) (err error) {
 	switch tp {
 	case "tables":
 		return personal.FetchQueryTableInfo(y)
-	case "table_info":
-		return personal.FetchQueryTableStruct(y)
 	case "schema":
 		return personal.FetchQueryDatabaseInfo(y)
 	case "results":

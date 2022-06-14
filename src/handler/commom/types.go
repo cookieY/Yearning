@@ -75,7 +75,7 @@ type Search struct {
 }
 
 type SQLTest struct {
-	Source   string `json:"source"`
+	SourceId string `json:"source_id"`
 	SQL      string `json:"sql"`
 	Database string `json:"data_base"`
 	Kind     int    `json:"kind"`
@@ -129,6 +129,7 @@ const (
 	ORDER_IS_DELETE     = "工单已删除！"
 	ORDER_IS_CLEAR      = "工单已清除"
 	ORDER_IS_AGREE      = "工单已同意"
+	ORDER_IS_UNDO       = "工单已撤销"
 	ORDER_IS_REJECT     = "工单已拒绝"
 	ORDER_IS_ALL_END    = "所有工单已终止"
 	ORDER_IS_END        = "工单已终止"
