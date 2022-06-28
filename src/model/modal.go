@@ -97,7 +97,7 @@ type CoreSqlOrder struct {
 	Date        string `gorm:"type:varchar(50);not null" json:"date"`
 	SQL         string `gorm:"type:longtext;not null" json:"sql"`
 	Text        string `gorm:"type:longtext;not null" json:"text"`
-	Assigned    string `gorm:"type:varchar(50);not null" json:"assigned"`
+	Assigned    string `gorm:"type:varchar(500);not null" json:"assigned"`
 	Delay       string `gorm:"type:varchar(50);not null;default:'none'" json:"delay"`
 	RealName    string `gorm:"type:varchar(50);not null" json:"real_name"`
 	ExecuteTime string `gorm:"type:varchar(50);" json:"execute_time"`
@@ -151,7 +151,7 @@ type CoreQueryOrder struct {
 	Date         string `gorm:"type:varchar(50);not null" json:"date"`
 	ApprovalTime string `gorm:"type:varchar(50);not null" json:"approval_time"`
 	Text         string `gorm:"type:longtext;not null" json:"text"`
-	Assigned     string `gorm:"type:varchar(50);not null" json:"assigned"`
+	Assigned     string `gorm:"type:varchar(500);not null" json:"assigned"`
 	RealName     string `gorm:"type:varchar(50);not null" json:"real_name"`
 	Export       uint   `gorm:"type:tinyint(2);not null" json:"export"`
 	SourceId     string `gorm:"type:varchar(200);not null;index:source_idx"  json:"source_id"`
@@ -193,7 +193,7 @@ type CoreWorkflowDetail struct {
 	WorkId   string `gorm:"type:varchar(50);not null;index:workId_idx" json:"work_id"`
 	Username string `gorm:"type:varchar(50);not null;index:query_idx" json:"username"`
 	Time     string `gorm:"type:varchar(50);not null;" json:"time"`
-	Action   string `gorm:"type:varchar(50);not null;" json:"action"`
+	Action   string `gorm:"type:varchar(600);not null;" json:"action"`
 }
 
 type CoreOrderComment struct {

@@ -41,10 +41,12 @@ func main() {
 	model.DB().Model(model.CoreQueryOrder{}).DropColumn("id_c")
 	model.DB().Model(model.CoreQueryOrder{}).DropColumn("ex_date")
 	model.DB().LogMode(true).Exec("alter table core_query_records change COLUMN base_name `schema` varchar(50) not null")
+	model.DB().LogMode(true).Exec("alter table core_query_records change COLUMN assigned `assigned` varchar(500) not null")
 	model.DB().Model(model.CoreAccount{}).DropColumn("rule")
 	model.DB().Model(model.CoreSqlOrder{}).DropColumn("percent")
 	model.DB().Model(model.CoreSqlOrder{}).DropColumn("current")
 	model.DB().Model(model.CoreSqlOrder{}).DropColumn("executor")
+	model.DB().LogMode(true).Exec("alter table core_sql_orders change COLUMN assigned `assigned` varchar(500) not null")
 	model.DB().LogMode(true).Exec("alter table core_query_orders change COLUMN realname `real_name` varchar(50) not null")
 	model.DB().AutoMigrate(model.CoreRoleGroup{})
 	var r []model.CoreRoleGroup
