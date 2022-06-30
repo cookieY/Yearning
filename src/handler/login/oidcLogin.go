@@ -76,16 +76,10 @@ func OidcLogin(c yee.Context) (err error) {
 		return
 	}
 
-	vuex :=
-		fmt.Sprintf("{'user':{'account':{'is_record':1,'real_name':'%s','token':'%s','user':'%s'}},'menu':{'selectedKey':['/home'],'activeKey':'dml'},'order':{'order':{},'enabled':true,'history':[]},'highlight':{'highligt':{}}}",
-			account.RealName, token, account.Username)
-	html := `
-		<script>
-    		sessionStorage.setItem("vuex", "%s")
-    		window.location.href="/"
-		</script>
-	`
-	return c.HTML(200, fmt.Sprintf(html, vuex))
+	return c.Redirect(302, fmt.Sprintf(
+		"/#/login?oidcLogin=1&token=%s&user=%s&real_name=%s&is_record=%s",
+		token, account.Username, account.RealName, account.IsRecorder),
+	)
 }
 
 func getAccount(code string, session_state string) (ac *model.CoreAccount, err error) {
