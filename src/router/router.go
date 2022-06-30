@@ -84,6 +84,8 @@ func AddRouter(e *yee.Core) {
 	e.POST("/register", login.UserRegister)
 	e.GET("/fetch", login.UserReqSwitch)
 	e.POST("/ldap", login.UserLdapLogin)
+	e.GET("/oidc/_token-login", login.OidcLogin)
+	e.GET("/oidc/state", login.OidcState)
 
 	r := e.Group("/api/v2", middleware.JWTWithConfig(middleware.JwtConfig{SigningKey: []byte(model.JWT)}))
 	r.Restful("/common/:tp", personal.PersonalRestFulAPis())
