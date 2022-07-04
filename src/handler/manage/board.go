@@ -1,7 +1,7 @@
 package manage
 
 import (
-	"Yearning-go/src/handler/commom"
+	"Yearning-go/src/handler/common"
 	"Yearning-go/src/model"
 	"github.com/cookieY/yee"
 	"net/http"
@@ -19,12 +19,12 @@ func GeneralPostBoard(c yee.Context) (err error) {
 		c.Logger().Error(err.Error())
 		return c.JSON(http.StatusOK, err.Error())
 	}
-	model.DB().Model(model.CoreGlobalConfiguration{}).Update(&model.CoreGlobalConfiguration{Board: req.Board})
-	return c.JSON(http.StatusOK, commom.SuccessPayLoadToMessage(BOARD_MESSAGE_SAVE))
+	model.DB().Model(model.CoreGlobalConfiguration{}).Where("1=1").Updates(&model.CoreGlobalConfiguration{Board: req.Board})
+	return c.JSON(http.StatusOK, common.SuccessPayLoadToMessage(BOARD_MESSAGE_SAVE))
 }
 
 func GeneralGetBoard(c yee.Context) (err error) {
 	var board model.CoreGlobalConfiguration
 	model.DB().Select("board").First(&board)
-	return c.JSON(http.StatusOK, commom.SuccessPayload(board.Board))
+	return c.JSON(http.StatusOK, common.SuccessPayload(board.Board))
 }

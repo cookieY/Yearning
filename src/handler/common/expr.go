@@ -1,8 +1,8 @@
-package commom
+package common
 
 import (
 	"Yearning-go/src/lib"
-	"github.com/jinzhu/gorm"
+	"gorm.io/gorm"
 	"reflect"
 )
 

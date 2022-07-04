@@ -14,7 +14,7 @@
 package group
 
 import (
-	"Yearning-go/src/handler/commom"
+	"Yearning-go/src/handler/common"
 	"Yearning-go/src/lib"
 	"Yearning-go/src/model"
 	"encoding/json"
@@ -29,27 +29,17 @@ import (
 func SuperGetRuseSource(c yee.Context) (err error) {
 	var source []model.CoreDataSource
 	var query []model.CoreDataSource
-	model.DB().Select("source,source_id").Scopes(commom.AccordingToGroupSourceIsQuery(0, 2)).Find(&source)
-	model.DB().Select("source,source_id").Scopes(commom.AccordingToGroupSourceIsQuery(1, 2)).Find(&query)
-	return c.JSON(http.StatusOK, commom.SuccessPayload(map[string]interface{}{"source": source, "query": query}))
+	model.DB().Select("source,source_id").Scopes(common.AccordingToGroupSourceIsQuery(0, 2)).Find(&source)
+	model.DB().Select("source,source_id").Scopes(common.AccordingToGroupSourceIsQuery(1, 2)).Find(&query)
+	return c.JSON(http.StatusOK, common.SuccessPayload(map[string]interface{}{"source": source, "query": query}))
 }
 
 func SuperGroup(c yee.Context) (err error) {
-	var page int
-	var roles []model.CoreRoleGroup
-
-	f := new(commom.PageChange)
-	if err = c.Bind(f); err != nil {
+	u := new(common.PageList[[]model.CoreRoleGroup])
+	if err = c.Bind(u); err != nil {
 		return err
 	}
-	start, end := lib.Paging(f.Current, f.PageSize)
-	model.DB().Model(model.CoreRoleGroup{}).Scopes(commom.AccordingToOrderName(f.Expr.Text)).Count(&page).Offset(start).Limit(end).Find(&roles)
-	return c.JSON(http.StatusOK, commom.SuccessPayload(
-		commom.CommonList{
-			Page: page,
-			Data: roles,
-		},
-	))
+	return c.JSON(http.StatusOK, u.Paging().Query(common.AccordingToOrderName(u.Expr.Text)).ToMessage())
 }
 
 func SuperGroupUpdate(c yee.Context) (err error) {
@@ -58,12 +48,12 @@ func SuperGroupUpdate(c yee.Context) (err error) {
 		u := new(policy)
 		if err = c.Bind(u); err != nil {
 			c.Logger().Error(err.Error())
-			return c.JSON(http.StatusOK, commom.ERR_REQ_BIND)
+			return c.JSON(http.StatusOK, common.ERR_REQ_BIND)
 		}
 		g, err := json.Marshal(u.PermissionList)
 		if err != nil {
 			c.Logger().Error(err.Error())
-			return c.JSON(http.StatusOK, commom.ERR_COMMON_MESSAGE(err))
+			return c.JSON(http.StatusOK, common.ERR_COMMON_MESSAGE(err))
 		}
 
 		if u.ID == 0 {
@@ -73,34 +63,34 @@ func SuperGroupUpdate(c yee.Context) (err error) {
 				GroupId:     uuid.New().String(),
 			})
 		} else {
-			model.DB().Model(model.CoreRoleGroup{}).Scopes(commom.AccordingToIDEqual(u.ID)).Update(&model.CoreRoleGroup{Permissions: g, Name: u.Name})
+			model.DB().Model(model.CoreRoleGroup{}).Scopes(common.AccordingToIDEqual(u.ID)).Updates(&model.CoreRoleGroup{Permissions: g, Name: u.Name})
 		}
-		return c.JSON(http.StatusOK, commom.SuccessPayLoadToMessage(fmt.Sprintf(GROUP_CREATE_SUCCESS, u.Name)))
+		return c.JSON(http.StatusOK, common.SuccessPayLoadToMessage(fmt.Sprintf(GROUP_CREATE_SUCCESS, u.Name)))
 	}
-	return c.JSON(http.StatusOK, commom.ERR_REQ_FAKE)
+	return c.JSON(http.StatusOK, common.ERR_REQ_FAKE)
 }
 
 func SuperClearUserRule(c yee.Context) (err error) {
 	args := c.QueryParam("group_id")
 	scape, _ := url.QueryUnescape(args)
 	var j []model.CoreGrained
-	model.DB().Scopes(commom.AccordingToGroupNameIsLike(scape)).Find(&j)
+	model.DB().Scopes(common.AccordingToGroupNameIsLike(scape)).Find(&j)
 	for _, i := range j {
 		b, err := lib.ArrayRemove(i.Group, scape)
 		if err != nil {
-			return c.JSON(http.StatusOK, commom.ERR_COMMON_MESSAGE(err))
+			return c.JSON(http.StatusOK, common.ERR_COMMON_MESSAGE(err))
 		}
-		go model.DB().Model(model.CoreGrained{}).Scopes(commom.AccordingToUsernameEqual(i.Username)).Update(&model.CoreGrained{Group: b})
+		go model.DB().Model(model.CoreGrained{}).Scopes(common.AccordingToUsernameEqual(i.Username)).Updates(&model.CoreGrained{Group: b})
 	}
 	model.DB().Model(model.CoreRoleGroup{}).Where("group_id = ?", scape).Delete(&model.CoreRoleGroup{})
-	return c.JSON(http.StatusOK, commom.SuccessPayLoadToMessage(fmt.Sprintf(GROUP_DELETE_SUCCESS, scape)))
+	return c.JSON(http.StatusOK, common.SuccessPayLoadToMessage(fmt.Sprintf(GROUP_DELETE_SUCCESS, scape)))
 }
 
 func SuperUserRuleMarge(c yee.Context) (err error) {
 	u := new(marge)
 	if err = c.Bind(u); err != nil {
-		return c.JSON(http.StatusOK, commom.ERR_REQ_BIND)
+		return c.JSON(http.StatusOK, common.ERR_REQ_BIND)
 	}
 	m3 := lib.MultiUserRuleMarge(strings.Split(u.Group, ","))
-	return c.JSON(http.StatusOK, commom.SuccessPayload(m3))
+	return c.JSON(http.StatusOK, common.SuccessPayload(m3))
 }

@@ -1,7 +1,7 @@
 package personal
 
 import (
-	"Yearning-go/src/handler/commom"
+	"Yearning-go/src/handler/common"
 	"Yearning-go/src/lib"
 	"Yearning-go/src/model"
 	"github.com/cookieY/yee"
@@ -9,44 +9,36 @@ import (
 )
 
 func PersonalFetchMyOrder(c yee.Context) (err error) {
-	u := new(commom.PageChange)
+	var u = new(common.PageList[[]model.CoreSqlOrder])
 	if err = c.Bind(u); err != nil {
 		return
 	}
 	user := new(lib.Token).JwtParse(c)
-
-	var pg int
-
-	var order []model.CoreSqlOrder
-
-	start, end := lib.Paging(u.Current, u.PageSize)
-
-	model.DB().Model(&model.CoreSqlOrder{}).Select(commom.QueryField).
-		Scopes(
-			commom.AccordingToAllOrderType(u.Expr.Type),
-			commom.AccordingToAllOrderState(u.Expr.Status),
-			commom.AccordingToUsernameEqual(user.Username),
-			commom.AccordingToDatetime(u.Expr.Picker),
-			commom.AccordingToText(u.Expr.Text),
-		).Order("id desc").Count(&pg).Offset(start).Limit(end).Find(&order)
-	return c.JSON(http.StatusOK, commom.SuccessPayload(commom.CommonList{Data: order, Page: pg}))
+	u.Paging().Select(common.QueryField).Query(
+		common.AccordingToAllOrderType(u.Expr.Type),
+		common.AccordingToAllOrderState(u.Expr.Status),
+		common.AccordingToUsernameEqual(user.Username),
+		common.AccordingToDatetime(u.Expr.Picker),
+		common.AccordingToText(u.Expr.Text),
+	)
+	return c.JSON(http.StatusOK, u.ToMessage())
 }
 
 func PersonalUserEdit(c yee.Context) (err error) {
 	u := new(model.CoreAccount)
 	if err = c.Bind(u); err != nil {
-		return c.JSON(http.StatusOK, commom.ERR_REQ_BIND)
+		return c.JSON(http.StatusOK, common.ERR_REQ_BIND)
 	}
 	user := new(lib.Token).JwtParse(c)
 	if u.Password == "" {
-		model.DB().Model(&model.CoreAccount{}).Where("username = ?", user.Username).Update(
+		model.DB().Model(&model.CoreAccount{}).Where("username = ?", user.Username).Updates(
 			&model.CoreAccount{
 				Email:      u.Email,
 				RealName:   u.RealName,
 				Department: u.Department,
 			})
 	} else {
-		model.DB().Model(&model.CoreAccount{}).Where("username = ?", user.Username).Update(
+		model.DB().Model(&model.CoreAccount{}).Where("username = ?", user.Username).Updates(
 			&model.CoreAccount{
 				Password:   lib.DjangoEncrypt(u.Password, string(lib.GetRandom())),
 				Email:      u.Email,
@@ -55,7 +47,7 @@ func PersonalUserEdit(c yee.Context) (err error) {
 			})
 	}
 
-	return c.JSON(http.StatusOK, commom.SuccessPayLoadToMessage(CUSTOM_PASSWORD_SUCCESS))
+	return c.JSON(http.StatusOK, common.SuccessPayLoadToMessage(CUSTOM_PASSWORD_SUCCESS))
 }
 
 func Put(c yee.Context) (err error) {
@@ -63,6 +55,6 @@ func Put(c yee.Context) (err error) {
 	case "list":
 		return PersonalFetchMyOrder(c)
 	default:
-		return c.JSON(http.StatusOK, commom.ERR_REQ_FAKE)
+		return c.JSON(http.StatusOK, common.ERR_REQ_FAKE)
 	}
 }

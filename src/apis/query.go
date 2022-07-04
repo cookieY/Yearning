@@ -1,7 +1,7 @@
 package apis
 
 import (
-	"Yearning-go/src/handler/commom"
+	"Yearning-go/src/handler/common"
 	"Yearning-go/src/handler/fetch"
 	"Yearning-go/src/handler/personal"
 	"Yearning-go/src/lib"
@@ -28,7 +28,7 @@ func YearningQueryForPut(y yee.Context) (err error) {
 	case "merge":
 		return fetch.FetchMergeDDL(y)
 	}
-	return y.JSON(http.StatusOK, commom.ERR_REQ_FAKE)
+	return y.JSON(http.StatusOK, common.ERR_REQ_FAKE)
 }
 
 func YearningQueryForPost(y yee.Context) (err error) {

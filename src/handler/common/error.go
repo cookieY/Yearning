@@ -1,4 +1,4 @@
-package commom
+package common
 
 var (
 	ERR_LOGIN = Resp{

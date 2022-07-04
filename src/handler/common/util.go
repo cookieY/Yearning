@@ -1,4 +1,4 @@
-package commom
+package common
 
 import (
 	"Yearning-go/src/lib"
@@ -6,47 +6,54 @@ import (
 	"errors"
 	"fmt"
 	"github.com/cookieY/yee/logger"
-	"github.com/jinzhu/gorm"
 	"strings"
 )
 
-func ScanDataRows(s model.CoreDataSource, database, sql, meta string, isQuery bool, isLeaf bool) (res _dbInfo, err error) {
+func unifiedLabel(col []string) []any {
+	var s []any
+	for i := 0; i < len(col); i++ {
+		var t string
+		s = append(s, &t)
+	}
+	return s
+}
 
+func ScanDataRows(s model.CoreDataSource, database, sql, meta string, isQuery bool, isLeaf bool) (*_dbInfo, error) {
+	res := new(_dbInfo)
 	ps := lib.Decrypt(s.Password)
 	if ps == "" {
 		return res, errors.New("连接失败,密码解析错误！")
 	}
-	db, err := gorm.Open("mysql", fmt.Sprintf("%s:%s@(%s:%d)/%s?charset=utf8&parseTime=True&loc=Local", s.Username, ps, s.IP, s.Port, database))
+
+	db, err := model.NewDBSub(fmt.Sprintf("%s:%s@(%s:%d)/%s?charset=utf8&parseTime=True&loc=Local", s.Username, ps, s.IP, s.Port, database))
 
 	defer func() {
-		_ = db.Close()
+		_ = model.Close(db)
 	}()
-
-	var _tmp string
-
-	if err != nil {
-		return _dbInfo{}, err
-	}
-
 	rows, err := db.Raw(sql).Rows()
-
 	if err != nil {
-		return _dbInfo{}, err
+		return nil, err
 	}
-
+	col, _ := rows.Columns()
+	_tmp := unifiedLabel(col)
+	if len(_tmp) == 0 {
+		return nil, errors.New("field is empty")
+	}
 	excludeDbList := lib.MapOn(strings.Split(s.ExcludeDbList, ","))
-
 	for rows.Next() {
-		_ = rows.Scan(&_tmp)
+		if err = rows.Scan(_tmp...); err != nil {
+			logger.DefaultLogger.Error(err)
+		}
+		j := *_tmp[0].(*string)
 		if isQuery {
 			if len(excludeDbList) > 0 {
-				if _, ok := excludeDbList[_tmp]; ok {
+				if _, ok := excludeDbList[j]; ok {
 					continue
 				}
 			}
-			res.QueryList = append(res.QueryList, map[string]interface{}{"title": _tmp, "key": checkMeta(_tmp, database, meta), "meta": meta, "isLeaf": isLeaf})
+			res.QueryList = append(res.QueryList, map[string]interface{}{"title": j, "key": checkMeta(j, database, meta), "meta": meta, "isLeaf": isLeaf})
 		} else {
-			res.Results = append(res.Results, _tmp)
+			res.Results = append(res.Results, j)
 		}
 	}
 	return res, nil
@@ -62,14 +69,14 @@ func checkMeta(s, database, flag string) string {
 func Highlight(s *model.CoreDataSource) []map[string]string {
 	ps := lib.Decrypt(s.Password)
 	var list []map[string]string
-	db, err := gorm.Open("mysql", fmt.Sprintf("%s:%s@(%s:%d)/?charset=utf8&parseTime=True&loc=Local", s.Username, ps, s.IP, s.Port))
+	db, err := model.NewDBSub(fmt.Sprintf("%s:%s@(%s:%d)/?charset=utf8&parseTime=True&loc=Local", s.Username, ps, s.IP, s.Port))
 	if err != nil {
 		logger.DefaultLogger.Error(err)
 		return nil
 	}
 
 	defer func() {
-		_ = db.Close()
+		_ = model.Close(db)
 	}()
 
 	var highlight string

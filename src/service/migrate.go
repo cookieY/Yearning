@@ -55,23 +55,23 @@ func DataInit(o *engine.AuditRole, other *model.Other, ldap *model.Ldap, message
 }
 
 func Migrate() {
-	if !model.DB().HasTable("core_accounts") {
+	if !model.DB().Migrator().HasTable("core_accounts") {
 		if !interact.Confirm("是否已将数据库字符集设置为UTF8/UTF8MB4?") {
 			return
 		}
-		model.DB().CreateTable(&model.CoreAccount{})
-		model.DB().CreateTable(&model.CoreDataSource{})
-		model.DB().CreateTable(&model.CoreGlobalConfiguration{})
-		model.DB().CreateTable(&model.CoreGrained{})
-		model.DB().CreateTable(&model.CoreSqlOrder{})
-		model.DB().CreateTable(&model.CoreSqlRecord{})
-		model.DB().CreateTable(&model.CoreRollback{})
-		model.DB().CreateTable(&model.CoreQueryRecord{})
-		model.DB().CreateTable(&model.CoreQueryOrder{})
-		model.DB().CreateTable(&model.CoreAutoTask{})
-		model.DB().CreateTable(&model.CoreRoleGroup{})
-		model.DB().CreateTable(&model.CoreWorkflowTpl{})
-		model.DB().AutoMigrate(&model.CoreWorkflowDetail{})
+		_ = model.DB().AutoMigrate(&model.CoreAccount{})
+		_ = model.DB().AutoMigrate(&model.CoreDataSource{})
+		_ = model.DB().AutoMigrate(&model.CoreGlobalConfiguration{})
+		_ = model.DB().AutoMigrate(&model.CoreGrained{})
+		_ = model.DB().AutoMigrate(&model.CoreSqlOrder{})
+		_ = model.DB().AutoMigrate(&model.CoreSqlRecord{})
+		_ = model.DB().AutoMigrate(&model.CoreRollback{})
+		_ = model.DB().AutoMigrate(&model.CoreQueryRecord{})
+		_ = model.DB().AutoMigrate(&model.CoreQueryOrder{})
+		_ = model.DB().AutoMigrate(&model.CoreAutoTask{})
+		_ = model.DB().AutoMigrate(&model.CoreRoleGroup{})
+		_ = model.DB().AutoMigrate(&model.CoreWorkflowTpl{})
+		_ = model.DB().AutoMigrate(&model.CoreWorkflowDetail{})
 		o := engine.AuditRole{
 			DMLInsertColumns:               false,
 			DMLMaxInsertRows:               10,
@@ -150,36 +150,44 @@ func Migrate() {
 
 func UpdateData() {
 	fmt.Println("检查更新.......")
-	model.DB().AutoMigrate(&model.CoreAccount{})
-	model.DB().AutoMigrate(&model.CoreDataSource{})
-	model.DB().AutoMigrate(&model.CoreGlobalConfiguration{})
-	model.DB().AutoMigrate(&model.CoreGrained{})
-	model.DB().AutoMigrate(&model.CoreSqlOrder{})
-	model.DB().AutoMigrate(&model.CoreSqlRecord{})
-	model.DB().AutoMigrate(&model.CoreRollback{})
-	model.DB().AutoMigrate(&model.CoreQueryRecord{})
-	model.DB().AutoMigrate(&model.CoreQueryOrder{})
-	model.DB().AutoMigrate(&model.CoreAutoTask{})
-	model.DB().AutoMigrate(&model.CoreRoleGroup{})
-	model.DB().AutoMigrate(&model.CoreWorkflowTpl{})
-	model.DB().AutoMigrate(&model.CoreWorkflowDetail{})
-	model.DB().AutoMigrate(&model.CoreOrderComment{})
-	model.DB().LogMode(false).Exec("alter table core_auto_tasks change COLUMN base data_base varchar(50) not null")
-	model.DB().LogMode(false).Model(&model.CoreSqlOrder{}).DropColumn("uuid")
-	model.DB().LogMode(false).Model(&model.CoreWorkflowDetail{}).DropColumn("rejected")
-	model.DB().LogMode(false).Model(&model.CoreAutoTask{}).DropColumn("base")
+	_ = model.DB().AutoMigrate(&model.CoreAccount{})
+	_ = model.DB().AutoMigrate(&model.CoreDataSource{})
+	_ = model.DB().AutoMigrate(&model.CoreGlobalConfiguration{})
+	_ = model.DB().AutoMigrate(&model.CoreGrained{})
+	_ = model.DB().AutoMigrate(&model.CoreSqlOrder{})
+	_ = model.DB().AutoMigrate(&model.CoreSqlRecord{})
+	_ = model.DB().AutoMigrate(&model.CoreRollback{})
+	_ = model.DB().AutoMigrate(&model.CoreQueryRecord{})
+	_ = model.DB().AutoMigrate(&model.CoreQueryOrder{})
+	_ = model.DB().AutoMigrate(&model.CoreAutoTask{})
+	_ = model.DB().AutoMigrate(&model.CoreRoleGroup{})
+	_ = model.DB().AutoMigrate(&model.CoreWorkflowTpl{})
+	_ = model.DB().AutoMigrate(&model.CoreWorkflowDetail{})
+	_ = model.DB().AutoMigrate(&model.CoreOrderComment{})
+	if model.DB().Migrator().HasColumn(&model.CoreAutoTask{}, "base") {
+		_ = model.DB().Migrator().RenameColumn(&model.CoreAutoTask{}, "base", "data_base")
+	}
+	if model.DB().Migrator().HasColumn(&model.CoreSqlOrder{}, "uuid") {
+		_ = model.DB().Migrator().DropColumn(&model.CoreSqlOrder{}, "uuid")
+	}
+	if model.DB().Migrator().HasColumn(&model.CoreWorkflowDetail{}, "rejected") {
+		_ = model.DB().Migrator().DropColumn(&model.CoreWorkflowDetail{}, "rejected")
+	}
+	if model.DB().Migrator().HasColumn(&model.CoreAutoTask{}, "base") {
+		_ = model.DB().Migrator().DropColumn(&model.CoreAutoTask{}, "base")
+	}
 	fmt.Println("数据已更新!")
 }
 
 func DelCol() {
-	model.DB().LogMode(false).Model(&model.CoreQueryOrder{}).DropColumn("source")
+	_ = model.DB().Migrator().DropColumn(&model.CoreQueryOrder{}, "source")
 }
 
 func MargeRuleGroup() {
 	fmt.Println("破坏性变更修复…………")
-	model.DB().LogMode(false).Model(&model.CoreSqlOrder{}).DropColumn("rejected")
-	model.DB().LogMode(false).Model(&model.CoreGrained{}).DropColumn("permissions")
-	model.DB().LogMode(false).Model(&model.CoreGrained{}).DropColumn("rule")
+	_ = model.DB().Migrator().DropColumn(&model.CoreSqlOrder{}, "rejected")
+	_ = model.DB().Migrator().DropColumn(&model.CoreGrained{}, "permissions")
+	_ = model.DB().Migrator().DropColumn(&model.CoreGrained{}, "rule")
 	ldap := model.Ldap{
 		Url:      "",
 		User:     "",
@@ -188,6 +196,8 @@ func MargeRuleGroup() {
 		Sc:       "",
 	}
 	b, _ := json.Marshal(ldap)
-	model.DB().LogMode(false).Model(model.CoreGlobalConfiguration{}).Update(&model.CoreGlobalConfiguration{Ldap: b})
+	model.DB().Model(model.CoreGlobalConfiguration{}).Where("1=1").Updates(&model.CoreGlobalConfiguration{Ldap: b})
+	_ = model.DB().Exec("alter table core_sql_orders modify assigned varchar(550) not null")
+	_ = model.DB().Exec("alter table core_workflow_details modify action varchar(550) not null")
 	fmt.Println("修复成功!")
 }

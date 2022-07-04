@@ -1,52 +1,19 @@
-package commom
+package common
 
-import (
-	"Yearning-go/src/lib"
-	"Yearning-go/src/model"
-	"github.com/jinzhu/gorm"
-)
-
-type PageInfo struct {
-	Page int    `json:"page"`
-	Find Search `json:"find"`
-	Tp   string `json:"tp"`
+type GeneralList[T any] struct {
+	Page int64 `json:"page"`
+	Data T     `json:"data"`
 }
 
-type CommonList struct {
-	Page    int         `json:"page"`
-	Data    interface{} `json:"data"`
-	IDC     []string    `json:"idc"`
-	Source  interface{} `json:"source"`
-	Query   interface{} `json:"query"`
-	Auditor interface{} `json:"auditor"`
-	Multi   bool        `json:"multi"`
-}
-
-type SQLOrder struct {
-	List  []model.CoreSqlOrder `json:"data"`
-	Multi bool                 `json:"multi"`
-	Count int                  `json:"page"`
-}
-
-type SQLQuery struct {
-	List  []model.CoreQueryOrder `json:"data"`
-	Count int                    `json:"page"`
-}
-
-func (p *PageChange) GetSQLOrderList(scopes ...func(*gorm.DB) *gorm.DB) (order SQLOrder) {
-	start, offset := lib.Paging(p.Current, p.PageSize)
-	model.DB().Model(model.CoreSqlOrder{}).Select(QueryField).
-		Scopes(scopes...).Count(&order.Count).Order("id desc").
-		Offset(start).Limit(offset).Find(&order.List)
-	return
-}
-
-func (p *PageChange) GetSQLQueryList(scopes ...func(*gorm.DB) *gorm.DB) (query SQLQuery) {
-	start, offset := lib.Paging(p.Current, p.PageSize)
-	model.DB().Model(model.CoreQueryOrder{}).
-		Scopes(scopes...).Count(&query.Count).Order("id desc").
-		Offset(start).Limit(offset).Find(&query.List)
-	return
+type PageList[T any] struct {
+	Current  int    ` json:"current"`
+	PageSize int    `json:"pageSize"`
+	Expr     Search `json:"expr"`
+	Page     int64  `json:"page"`
+	Data     T      `json:"data"`
+	startAt  int
+	endAt    int
+	sel      string
 }
 
 type PageChange struct {

@@ -1,11 +1,10 @@
 package model
 
 import (
-	"github.com/jinzhu/gorm"
+	"gorm.io/gorm"
 	"sync"
 	"testing"
 )
-
 
 func TestJsonGet(t *testing.T) {
 	//var a GlobalConfiguration
@@ -26,7 +25,7 @@ func Mock(db *gorm.DB, wg *sync.WaitGroup) {
 			Port:     2,
 			Source:   "cnnskj",
 			IP:       "156237123032810",
-			IsQuery: 1,
+			IsQuery:  1,
 		})
 	}
 	wg.Done()
@@ -38,7 +37,7 @@ func TestMockData(t *testing.T) {
 	defer db2.Close()
 	wg.Add(10)
 	for i := 0; i < 10; i++ {
-		go Mock(db2,&wg)
+		go Mock(db2, &wg)
 	}
 	wg.Wait()
 }
