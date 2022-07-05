@@ -8,6 +8,7 @@ services:
            MYSQL_PASSWORD: ukC2ZkcG_ZTeb
            MYSQL_ADDR: mysql
            MYSQL_DB: yearning
+           IS_DOCKER: is_docker
         ports:
            - 8000:8000
         # 首次使用请先初始化

@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/gookit/gcli/v2/interact"
+	"os"
 	"time"
 )
 
@@ -56,9 +57,12 @@ func DataInit(o *engine.AuditRole, other *model.Other, ldap *model.Ldap, message
 
 func Migrate() {
 	if !model.DB().Migrator().HasTable("core_accounts") {
-		if !interact.Confirm("是否已将数据库字符集设置为UTF8/UTF8MB4?") {
-			return
+		if os.Getenv("IS_DOCKER") == "" {
+			if !interact.Confirm("是否已将数据库字符集设置为UTF8/UTF8MB4?") {
+				return
+			}
 		}
+
 		_ = model.DB().AutoMigrate(&model.CoreAccount{})
 		_ = model.DB().AutoMigrate(&model.CoreDataSource{})
 		_ = model.DB().AutoMigrate(&model.CoreGlobalConfiguration{})
