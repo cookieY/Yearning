@@ -5,6 +5,7 @@ type AuditRole struct {
 	DMLInsertColumns               bool   `json:"DMLInsertColumns"`  //是否检查插入语句存在列名
 	DMLMaxInsertRows               int    `json:"DMLMaxInsertRows"`  //inert语句最大多少个字段
 	DMLWhere                       bool   `json:"DMLWhere"`          //是否检查dml语句where条件
+	DMLAllowInsertNull             bool   // 允许insert语句插入Null值
 	DMLOrder                       bool   // 是否检查dml语句order条件
 	DMLSelect                      bool   //是否检查dml语句有select语句
 	DMLInsertMustExplicitly        bool   //是否检查insert语句必须显式声明字段
