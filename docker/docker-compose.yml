@@ -10,8 +10,6 @@ services:
            MYSQL_DB: yearning
         ports:
            - 8000:8000
-        # 首次使用请先初始化
-        #command: /bin/bash -c "./Yearning install"
         #volumes:
         #   - ./conf.toml:/opt/conf.toml
         depends_on:
@@ -29,6 +27,7 @@ services:
            - --character-set-server=utf8mb4
            - --collation-server=utf8mb4_general_ci
         volumes:
+           - ./data/init:/docker-entrypoint-initdb.d/
            - ./data/mysql:/var/lib/mysql
 
 # 默认账号：admin，默认密码：Yearning_admin
