@@ -14,37 +14,32 @@
 package autoTask
 
 import (
-	"Yearning-go/src/handler/commom"
-	"Yearning-go/src/lib"
+	"Yearning-go/src/handler/common"
 	"Yearning-go/src/model"
 	"github.com/cookieY/yee"
 	"net/http"
 )
 
 func SuperFetchAutoTaskList(c yee.Context) (err error) {
-	u := new(commom.PageChange)
+	u := new(common.PageList[[]model.CoreAutoTask])
 	if err = c.Bind(u); err != nil {
 		c.Logger().Error(err.Error())
-		return c.JSON(http.StatusOK, commom.ERR_REQ_BIND)
+		return c.JSON(http.StatusOK, common.ERR_REQ_BIND)
 	}
-	var task []model.CoreAutoTask
-	var pg int
-	start, end := lib.Paging(u.Current, u.PageSize)
-	model.DB().Model(model.CoreAutoTask{}).Scopes(commom.AccordingToOrderName(u.Expr.Text)).Order("id desc").Count(&pg).Offset(start).Limit(end).Find(&task)
-	return c.JSON(http.StatusOK, commom.SuccessPayload(&commom.CommonList{Data: task, Page: pg}))
+	return c.JSON(http.StatusOK, u.Paging().Query(common.AccordingToOrderName(u.Expr.Text)).ToMessage())
 }
 
 func SuperDeleteAutoTask(c yee.Context) (err error) {
 	id := c.QueryParam("task_id")
 	model.DB().Where("task_id =?", id).Delete(&model.CoreAutoTask{})
-	return c.JSON(http.StatusOK, commom.SuccessPayLoadToMessage(commom.ORDER_IS_DELETE))
+	return c.JSON(http.StatusOK, common.SuccessPayLoadToMessage(common.ORDER_IS_DELETE))
 }
 
 func SuperAutoTaskCreateOrEdit(c yee.Context) (err error) {
 	u := new(fetchAutoTask)
 	if err = c.Bind(u); err != nil {
 		c.Logger().Error(err.Error())
-		return c.JSON(http.StatusOK, commom.ERR_REQ_BIND)
+		return c.JSON(http.StatusOK, common.ERR_REQ_BIND)
 	}
 	switch u.Tp {
 	case "curd":

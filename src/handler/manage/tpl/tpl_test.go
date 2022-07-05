@@ -1,7 +1,7 @@
 package tpl
 
 import (
-	"Yearning-go/src/handler/commom"
+	"Yearning-go/src/handler/common"
 	"Yearning-go/src/model"
 	"Yearning-go/src/test"
 	"encoding/json"
@@ -35,17 +35,17 @@ func TestMain(m *testing.M) {
 }
 
 func TestGeneralAllSources(t *testing.T) {
-	var Ref commom.Resp
+	var Ref common.Resp
 	apis.Get("").Do().Unmarshal(&Ref)
 	assert.NotEqual(t, 0, len(Ref.Payload.([]interface{})))
 	assert.Equal(t, 1200, Ref.Code)
 }
 
 func TestTplPostSourceTemplate(t *testing.T) {
-	var Ref commom.Resp
+	var Ref common.Resp
 	args := `{"steps":[{"desc": "提交阶段", "type": 0, "auditor": ["提交人"]}, {"desc": "321", "type": 1, "auditor": ["admin", "hj"]}],"source":"test"}`
 	apis.Post(args).Do().Unmarshal(&Ref)
-	assert.Equal(t, commom.DATA_IS_UPDATED, Ref.Text)
+	assert.Equal(t, common.DATA_IS_UPDATED, Ref.Text)
 
 	args = `{"steps":[{"desc": "提交阶段", "type": 0, "auditor": ["提交人"]}, {"desc": "321", "type": 2, "auditor": ["admin", "hj"]}],"source":"test"}`
 	apis.Post(args).Do().Unmarshal(&Ref)
@@ -61,7 +61,7 @@ func TestTplPostSourceTemplate(t *testing.T) {
 }
 
 func TestTplEditSourceTemplateInfo(t *testing.T) {
-	var Ref commom.Resp
+	var Ref common.Resp
 	apis.Put(`{"source": "test"}`).Do().Unmarshal(&Ref)
 	assert.NotNil(t, Ref.Payload.(map[string]interface{})["steps"])
 	apis.Put(`{"source": 123}`).Do().Unmarshal(&Ref)
@@ -69,5 +69,5 @@ func TestTplEditSourceTemplateInfo(t *testing.T) {
 }
 
 func TestGeneralAllSources2(t *testing.T) {
-	fmt.Println( 1<<20 - 1)
+	fmt.Println(1<<20 - 1)
 }

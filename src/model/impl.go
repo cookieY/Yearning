@@ -75,5 +75,6 @@ func (l *ALdap) LdapConnect(user string, pass string, isTest bool) (isOk bool, e
 		l.Department = sr.Entries[0].GetAttributeValue(lmap.Department)
 		l.RealName = sr.Entries[0].GetAttributeValue(lmap.RealName)
 	}
+
 	return true, nil
 }

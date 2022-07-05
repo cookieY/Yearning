@@ -41,7 +41,7 @@ func cronTabMaskQuery() {
 		model.DB().Model(model.CoreQueryOrder{}).Where("`status` =?", 2).Find(&queryOrder)
 		for _, i := range queryOrder {
 			if lib.TimeDifference(i.ApprovalTime) {
-				model.DB().Model(model.CoreQueryOrder{}).Where("work_id =?", i.WorkId).Update(&model.CoreQueryOrder{Status: 3})
+				model.DB().Model(model.CoreQueryOrder{}).Where("work_id =?", i.WorkId).Updates(&model.CoreQueryOrder{Status: 3})
 			}
 		}
 	}); err != nil {

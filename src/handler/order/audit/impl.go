@@ -2,7 +2,7 @@ package audit
 
 import (
 	"Yearning-go/src/engine"
-	"Yearning-go/src/handler/commom"
+	"Yearning-go/src/handler/common"
 	"Yearning-go/src/handler/manage/tpl"
 	"Yearning-go/src/lib"
 	"Yearning-go/src/model"
@@ -54,13 +54,13 @@ func (e *Confirm) GetTPL() []tpl.Tpl {
 	return tpl
 }
 
-func ExecuteOrder(u *Confirm, user string) commom.Resp {
+func ExecuteOrder(u *Confirm, user string) common.Resp {
 	var order model.CoreSqlOrder
 	var source model.CoreDataSource
 	model.DB().Where("work_id =?", u.WorkId).First(&order)
 
 	if order.Status != 2 && order.Status != 5 {
-		return commom.ERR_COMMON_MESSAGE(errors.New(ORDER_NOT_SEARCH))
+		return common.ERR_COMMON_MESSAGE(errors.New(ORDER_NOT_SEARCH))
 	}
 	order.Assigned = user
 
@@ -76,7 +76,7 @@ func ExecuteOrder(u *Confirm, user string) commom.Resp {
 			Password: lib.Decrypt(source.Password),
 			Message:  model.GloMessage,
 		}, &isCall); err != nil {
-			return commom.ERR_RPC
+			return common.ERR_RPC
 		}
 		model.DB().Create(&model.CoreWorkflowDetail{
 			WorkId:   u.WorkId,
@@ -84,19 +84,18 @@ func ExecuteOrder(u *Confirm, user string) commom.Resp {
 			Time:     time.Now().Format("2006-01-02 15:04"),
 			Action:   ORDER_EXECUTE_STATE,
 		})
-		return commom.SuccessPayLoadToMessage(ORDER_EXECUTE_STATE)
+		return common.SuccessPayLoadToMessage(ORDER_EXECUTE_STATE)
 	}
-	return commom.ERR_RPC
+	return common.ERR_RPC
 
 }
 
-func MultiAuditOrder(req *Confirm, user string) commom.Resp {
-
+func MultiAuditOrder(req *Confirm, user string) common.Resp {
 	if assigned, isExecute, ok := IsNotIdempotent(req, user); ok {
 		if isExecute {
 			return ExecuteOrder(req, user)
 		}
-		model.DB().Model(model.CoreSqlOrder{}).Where("work_id = ?", req.WorkId).Update(&model.CoreSqlOrder{CurrentStep: req.Flag + 1, Assigned: strings.Join(assigned, ",")})
+		model.DB().Model(model.CoreSqlOrder{}).Where("work_id = ?", req.WorkId).Updates(&model.CoreSqlOrder{CurrentStep: req.Flag + 1, Assigned: strings.Join(assigned, ",")})
 		model.DB().Create(&model.CoreWorkflowDetail{
 			WorkId:   req.WorkId,
 			Username: user,
@@ -104,12 +103,12 @@ func MultiAuditOrder(req *Confirm, user string) commom.Resp {
 			Action:   fmt.Sprintf(ORDER_AGREE_MESSAGE, strings.Join(assigned, " ")),
 		})
 		lib.MessagePush(req.WorkId, 5, "")
-		return commom.SuccessPayLoadToMessage(ORDER_AGREE_STATE)
+		return common.SuccessPayLoadToMessage(ORDER_AGREE_STATE)
 	}
-	return commom.ERR_COMMON_MESSAGE(errors.New(ORDER_NOT_SEARCH))
+	return common.ERR_COMMON_MESSAGE(errors.New(ORDER_NOT_SEARCH))
 }
 
-func RejectOrder(u *Confirm, user string) commom.Resp {
+func RejectOrder(u *Confirm, user string) common.Resp {
 	model.DB().Model(&model.CoreSqlOrder{}).Where("work_id =?", u.WorkId).Updates(map[string]interface{}{"status": 0})
 	model.DB().Create(&model.CoreWorkflowDetail{
 		WorkId:   u.WorkId,
@@ -124,7 +123,7 @@ func RejectOrder(u *Confirm, user string) commom.Resp {
 		Time:     time.Now().Format("2006-01-02 15:04"),
 	})
 	lib.MessagePush(u.WorkId, 0, u.Text)
-	return commom.SuccessPayLoadToMessage(ORDER_REJECT_STATE)
+	return common.SuccessPayLoadToMessage(ORDER_REJECT_STATE)
 }
 
 func delayKill(workId string) string {

@@ -28,24 +28,24 @@ type originLDAP struct {
 }
 
 func main() {
-	model.DbInit("./conf.toml")
+	model.DBNew("./conf.toml")
 	var s []model.CoreDataSource
 	model.DB().AutoMigrate(model.CoreDataSource{})
 	model.DB().Model(model.CoreDataSource{}).Find(&s)
 	for _, i := range s {
 		if i.SourceId == "" {
-			model.DB().Model(model.CoreDataSource{}).Where("id =?", i.ID).Update(&model.CoreDataSource{SourceId: uuid.New().String()})
+			model.DB().Model(model.CoreDataSource{}).Where("id =?", i.ID).Updates(&model.CoreDataSource{SourceId: uuid.New().String()})
 		}
 	}
 	model.DB().Exec("alter table core_query_orders change COLUMN query_per status tinyint(2) not null")
-	model.DB().Model(model.CoreQueryOrder{}).DropColumn("id_c")
-	model.DB().Model(model.CoreQueryOrder{}).DropColumn("ex_date")
-	model.DB().LogMode(true).Exec("alter table core_query_records change COLUMN base_name `schema` varchar(50) not null")
-	model.DB().Model(model.CoreAccount{}).DropColumn("rule")
-	model.DB().Model(model.CoreSqlOrder{}).DropColumn("percent")
-	model.DB().Model(model.CoreSqlOrder{}).DropColumn("current")
-	model.DB().Model(model.CoreSqlOrder{}).DropColumn("executor")
-	model.DB().LogMode(true).Exec("alter table core_query_orders change COLUMN realname `real_name` varchar(50) not null")
+	model.DB().Migrator().DropColumn(model.CoreQueryOrder{}, "id_c")
+	model.DB().Migrator().DropColumn(model.CoreQueryOrder{}, "ex_date")
+	model.DB().Exec("alter table core_query_records change COLUMN base_name `schema` varchar(50) not null")
+	model.DB().Migrator().DropColumn(model.CoreAccount{}, "rule")
+	model.DB().Migrator().DropColumn(model.CoreSqlOrder{}, "percent")
+	model.DB().Migrator().DropColumn(model.CoreSqlOrder{}, "current")
+	model.DB().Migrator().DropColumn(model.CoreSqlOrder{}, "executor")
+	model.DB().Exec("alter table core_query_orders change COLUMN realname `real_name` varchar(50) not null")
 	model.DB().AutoMigrate(model.CoreRoleGroup{})
 	var r []model.CoreRoleGroup
 	model.DB().Model(model.CoreRoleGroup{}).Find(&r)
@@ -74,7 +74,7 @@ func main() {
 		px.DMLSource = dml
 		px.DDLSource = ddl
 		uj, _ := json.Marshal(px)
-		model.DB().Model(model.CoreRoleGroup{}).Where("id =?", i.ID).Update(&model.CoreRoleGroup{GroupId: uuid.New().String(), Permissions: uj})
+		model.DB().Model(model.CoreRoleGroup{}).Where("id =?", i.ID).Updates(&model.CoreRoleGroup{GroupId: uuid.New().String(), Permissions: uj})
 	}
 
 	var p []model.CoreGrained
@@ -94,7 +94,7 @@ func main() {
 			newGroup = []string{}
 		}
 		n, _ := json.Marshal(newGroup)
-		model.DB().Model(model.CoreGrained{}).Where("id =?", i.ID).Update(&model.CoreGrained{Group: n})
+		model.DB().Model(model.CoreGrained{}).Where("id =?", i.ID).Updates(&model.CoreGrained{Group: n})
 	}
 
 	model.DB().AutoMigrate(model.CoreAccount{})
@@ -125,6 +125,6 @@ func main() {
 	}
 	b, _ := json.Marshal(other)
 	ld, _ := json.Marshal(ldap)
-	model.DB().Model(model.CoreGlobalConfiguration{}).Update(&model.CoreGlobalConfiguration{Other: b, Ldap: ld})
+	model.DB().Model(model.CoreGlobalConfiguration{}).Where("1=1").Updates(&model.CoreGlobalConfiguration{Other: b, Ldap: ld})
 	fmt.Println("迁移完成！")
 }

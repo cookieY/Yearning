@@ -1,8 +1,7 @@
 package record
 
 import (
-	"Yearning-go/src/handler/commom"
-	"Yearning-go/src/lib"
+	"Yearning-go/src/handler/common"
 	"Yearning-go/src/model"
 	"fmt"
 	"github.com/cookieY/yee"
@@ -17,8 +16,8 @@ type groupBy struct {
 }
 
 type count struct {
-	DDL int `json:"ddl"`
-	DML int `json:"dml"`
+	DDL int64 `json:"ddl"`
+	DML int64 `json:"dml"`
 }
 
 func timeAdd(add string) string {
@@ -32,25 +31,20 @@ func RecordDashAxis(c yee.Context) (err error) {
 	model.DB().Model(model.CoreSqlOrder{}).Where("time > ? and type = 1", timeAdd("-2160")).Count(&count.DML)
 	model.DB().Model(model.CoreSqlOrder{}).Where("time > ? and type = 0", timeAdd("-2160")).Count(&count.DDL)
 	model.DB().Model(model.CoreSqlOrder{}).Select("time, count(*) as c,type").Where("time > ?", timeAdd("-2160")).Group("time,type").Scan(&order)
-	return c.JSON(http.StatusOK, commom.SuccessPayload(map[string]interface{}{"order": order, "count": count}))
+	return c.JSON(http.StatusOK, common.SuccessPayload(map[string]interface{}{"order": order, "count": count}))
 }
 
 func RecordOrderList(c yee.Context) (err error) {
-	u := new(commom.PageChange)
+	u := new(common.PageList[[]model.CoreSqlOrder])
 	if err = c.Bind(u); err != nil {
 		return
 	}
-	var pg int
-	var order []model.CoreSqlOrder
-
-	start, end := lib.Paging(u.Current, u.PageSize)
-
-	model.DB().Model(&model.CoreSqlOrder{}).Select(commom.QueryField).
-		Scopes(
-			commom.AccordingToAllOrderType(u.Expr.Type),
-			commom.AccordingToAllOrderState(u.Expr.Status),
-			commom.AccordingToDatetime(u.Expr.Picker),
-			commom.AccordingToText(u.Expr.Text),
-		).Order("id desc").Count(&pg).Offset(start).Limit(end).Find(&order)
-	return c.JSON(http.StatusOK, commom.SuccessPayload(commom.CommonList{Data: order, Page: pg}))
+	u.Paging().Select(common.QueryField).
+		Query(
+			common.AccordingToAllOrderType(u.Expr.Type),
+			common.AccordingToAllOrderState(u.Expr.Status),
+			common.AccordingToDatetime(u.Expr.Picker),
+			common.AccordingToText(u.Expr.Text),
+		)
+	return c.JSON(http.StatusOK, u.ToMessage())
 }

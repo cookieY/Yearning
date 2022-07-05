@@ -1,7 +1,7 @@
 package settings
 
 import (
-	"Yearning-go/src/handler/commom"
+	"Yearning-go/src/handler/common"
 	"Yearning-go/src/model"
 	"Yearning-go/src/test"
 	"github.com/stretchr/testify/assert"
@@ -28,7 +28,7 @@ func TestMain(m *testing.M) {
 }
 
 func TestSuperFetchSetting(t *testing.T) {
-	var Ref commom.Resp
+	var Ref common.Resp
 	apis.Get("").Do().Unmarshal(&Ref)
 	assert.NotNil(t, len(Ref.Payload.(map[string]interface{})))
 	assert.Equal(t, 1200, Ref.Code)

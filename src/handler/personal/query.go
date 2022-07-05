@@ -14,12 +14,14 @@
 package personal
 
 import (
-	"Yearning-go/src/handler/commom"
+	"Yearning-go/src/handler/common"
 	"Yearning-go/src/lib"
 	"Yearning-go/src/model"
+	"errors"
 	"github.com/cookieY/yee"
 	"github.com/vmihailenco/msgpack/v5"
 	"golang.org/x/net/websocket"
+	"gorm.io/gorm"
 	"io"
 	"net/http"
 	"net/url"
@@ -45,9 +47,9 @@ func reflect(flag bool) uint {
 
 func ReferQueryOrder(c yee.Context, user *lib.Token) (err error) {
 	var t model.CoreQueryOrder
-	d := new(commom.QueryOrder)
+	d := new(common.QueryOrder)
 	if err = c.Bind(d); err != nil {
-		return c.JSON(http.StatusOK, commom.ERR_REQ_BIND)
+		return c.JSON(http.StatusOK, common.ERR_REQ_BIND)
 	}
 	work := lib.GenWorkid()
 	if !model.GloOther.Query {
@@ -65,7 +67,7 @@ func ReferQueryOrder(c yee.Context, user *lib.Token) (err error) {
 		return
 	}
 
-	if model.DB().Model(model.CoreQueryOrder{}).Where("username =? and status =?", user.Username, 2).First(&t).RecordNotFound() {
+	if err := model.DB().Model(model.CoreQueryOrder{}).Where("username =? and status =?", user.Username, 2).First(&t).Error; errors.Is(err, gorm.ErrRecordNotFound) {
 		var principal model.CoreDataSource
 		model.DB().Model(model.CoreDataSource{}).Where("source_id = ?", d.SourceId).First(&principal)
 		model.DB().Create(&model.CoreQueryOrder{
@@ -80,9 +82,9 @@ func ReferQueryOrder(c yee.Context, user *lib.Token) (err error) {
 			RealName: user.RealName,
 		})
 		lib.MessagePush(work, 7, "")
-		return c.JSON(http.StatusOK, commom.SuccessPayLoadToMessage(commom.ORDER_IS_CREATE))
+		return c.JSON(http.StatusOK, common.SuccessPayLoadToMessage(common.ORDER_IS_CREATE))
 	}
-	return c.JSON(http.StatusOK, commom.SuccessPayLoadToMessage(commom.ORDER_IS_DUP))
+	return c.JSON(http.StatusOK, common.SuccessPayLoadToMessage(common.ORDER_IS_DUP))
 }
 
 func FetchQueryDatabaseInfo(c yee.Context) (err error) {
@@ -90,13 +92,13 @@ func FetchQueryDatabaseInfo(c yee.Context) (err error) {
 
 	model.DB().Where("source_id =?", c.QueryParam("source_id")).First(&u)
 
-	result, err := commom.ScanDataRows(u, "", "SHOW DATABASES;", "Schema", true, false)
+	result, err := common.ScanDataRows(u, "", "SHOW DATABASES;", "Schema", true, false)
 
 	if err != nil {
 		c.Logger().Error(err.Error())
-		return c.JSON(http.StatusOK, commom.ERR_COMMON_MESSAGE(err))
+		return c.JSON(http.StatusOK, common.ERR_COMMON_MESSAGE(err))
 	}
-	return c.JSON(http.StatusOK, commom.SuccessPayload(map[string]interface{}{"info": result.QueryList}))
+	return c.JSON(http.StatusOK, common.SuccessPayload(map[string]interface{}{"info": result.QueryList}))
 }
 
 func FetchQueryTableInfo(c yee.Context) (err error) {
@@ -110,12 +112,12 @@ func FetchQueryTableInfo(c yee.Context) (err error) {
 
 	model.DB().Where("source_id =?", unescape).First(&u)
 
-	result, err := commom.ScanDataRows(u, t, "SHOW TABLES;", "Table", true, true)
+	result, err := common.ScanDataRows(u, t, "SHOW TABLES;", "Table", true, true)
 	if err != nil {
 		c.Logger().Error(err.Error())
-		return c.JSON(http.StatusOK, commom.ERR_COMMON_MESSAGE(err))
+		return c.JSON(http.StatusOK, common.ERR_COMMON_MESSAGE(err))
 	}
-	return c.JSON(http.StatusOK, commom.SuccessPayload(map[string]interface{}{"table": result.QueryList}))
+	return c.JSON(http.StatusOK, common.SuccessPayload(map[string]interface{}{"table": result.QueryList}))
 
 }
 
@@ -145,17 +147,17 @@ func SocketQueryResults(c yee.Context) (err error) {
 				}
 
 				if msg.Ref.HeartBeat == 1 {
-					_ = websocket.Message.Send(ws, lib.ToMsg(queryResults{HeartBeat: commom.PING, IsOnly: model.GloOther.Query}))
+					_ = websocket.Message.Send(ws, lib.ToMsg(queryResults{HeartBeat: common.PING, IsOnly: model.GloOther.Query}))
 					continue
 				}
 
 				switch msg.Ref.Type {
-				case commom.CLOSE:
+				case common.CLOSE:
 					break
 				default:
 					var d model.CoreQueryOrder
 					clock := time.Now()
-					if model.DB().Where("username =? AND status =?", user, 2).Last(&d).RecordNotFound() {
+					if err := model.DB().Where("username =? AND status =?", user, 2).Last(&d).Error; errors.Is(err, gorm.ErrRecordNotFound) {
 						if err := websocket.Message.Send(ws, lib.ToMsg(queryResults{Status: true})); err != nil {
 							c.Logger().Error(err)
 						}
@@ -163,7 +165,7 @@ func SocketQueryResults(c yee.Context) (err error) {
 					}
 
 					if lib.TimeDifference(d.ApprovalTime) {
-						model.DB().Model(model.CoreQueryOrder{}).Where("username =?", user).Update(&model.CoreQueryOrder{Status: 3})
+						model.DB().Model(model.CoreQueryOrder{}).Where("username =?", user).Updates(&model.CoreQueryOrder{Status: 3})
 						if err := websocket.Message.Send(ws, lib.ToMsg(queryResults{Status: true})); err != nil {
 							c.Logger().Error(err)
 						}
@@ -214,6 +216,6 @@ func SocketQueryResults(c yee.Context) (err error) {
 
 func UndoQueryOrder(c yee.Context) (err error) {
 	user := new(lib.Token).JwtParse(c)
-	model.DB().Model(model.CoreQueryOrder{}).Where("username =?", user.Username).Update(map[string]interface{}{"status": 3})
-	return c.JSON(http.StatusOK, commom.SuccessPayLoadToMessage(commom.ORDER_IS_END))
+	model.DB().Model(model.CoreQueryOrder{}).Where("username =?", user.Username).Updates(map[string]interface{}{"status": 3})
+	return c.JSON(http.StatusOK, common.SuccessPayLoadToMessage(common.ORDER_IS_END))
 }

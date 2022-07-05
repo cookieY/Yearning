@@ -14,14 +14,14 @@
 package login
 
 import (
-	"Yearning-go/src/handler/commom"
+	"Yearning-go/src/handler/common"
 	"Yearning-go/src/lib"
 	"Yearning-go/src/model"
 	"encoding/json"
 	"errors"
-	"net/http"
-
 	"github.com/cookieY/yee"
+	"gorm.io/gorm"
+	"net/http"
 )
 
 type loginForm struct {
@@ -32,16 +32,16 @@ type loginForm struct {
 func UserLdapLogin(c yee.Context) (err error) {
 	u := new(loginForm)
 	if err = c.Bind(u); err != nil {
-		return c.JSON(http.StatusOK, commom.ERR_REQ_BIND)
+		return c.JSON(http.StatusOK, common.ERR_REQ_BIND)
 	}
 	ldap := model.ALdap{Ldap: model.GloLdap}
 	isOk, err := ldap.LdapConnect(u.Username, u.Password, false)
 	if err != nil {
-		return c.JSON(http.StatusOK, commom.ERR_COMMON_MESSAGE(err))
+		return c.JSON(http.StatusOK, common.ERR_COMMON_MESSAGE(err))
 	}
 	if isOk {
 		var account model.CoreAccount
-		if model.DB().Where("username = ?", u.Username).First(&account).RecordNotFound() {
+		if err := model.DB().Where("username = ?", u.Username).First(&account).Error; errors.Is(err, gorm.ErrRecordNotFound) {
 			model.DB().Create(&model.CoreAccount{
 				Username:   u.Username,
 				RealName:   ldap.RealName,
@@ -65,24 +65,24 @@ func UserLdapLogin(c yee.Context) (err error) {
 		dataStore := map[string]interface{}{
 			"token":     token,
 			"real_name": account.RealName,
-			"user":      account.Username,
+			"user":      u.Username,
 			"is_record": account.IsRecorder,
 		}
-		return c.JSON(http.StatusOK, commom.SuccessPayload(dataStore))
+		return c.JSON(http.StatusOK, common.SuccessPayload(dataStore))
 	}
-	return c.JSON(http.StatusOK, commom.ERR_LOGIN)
+	return c.JSON(http.StatusOK, common.ERR_LOGIN)
 }
 
 func UserGeneralLogin(c yee.Context) (err error) {
 	u := new(loginForm)
 	if err = c.Bind(u); err != nil {
 		c.Logger().Error(err.Error())
-		return c.JSON(http.StatusOK, commom.ERR_REQ_BIND)
+		return c.JSON(http.StatusOK, common.ERR_REQ_BIND)
 	}
 	var account model.CoreAccount
-	if !model.DB().Where("username = ?", u.Username).First(&account).RecordNotFound() {
+	if err := model.DB().Where("username = ?", u.Username).First(&account).Error; !errors.Is(err, gorm.ErrRecordNotFound) {
 		if account.Username != u.Username {
-			return c.JSON(http.StatusOK, commom.ERR_LOGIN)
+			return c.JSON(http.StatusOK, common.ERR_LOGIN)
 		}
 		if e := lib.DjangoCheckPassword(&account, u.Password); e {
 			token, tokenErr := lib.JwtAuth(lib.Token{
@@ -90,9 +90,10 @@ func UserGeneralLogin(c yee.Context) (err error) {
 				RealName: account.RealName,
 				IsRecord: account.IsRecorder == 1,
 			})
+
 			if tokenErr != nil {
 				c.Logger().Error(tokenErr.Error())
-				return
+				return err
 			}
 			dataStore := map[string]interface{}{
 				"token":     token,
@@ -100,11 +101,11 @@ func UserGeneralLogin(c yee.Context) (err error) {
 				"user":      account.Username,
 				"is_record": account.IsRecorder,
 			}
-			return c.JSON(http.StatusOK, commom.SuccessPayload(dataStore))
+			return c.JSON(http.StatusOK, common.SuccessPayload(dataStore))
 		}
 
 	}
-	return c.JSON(http.StatusOK, commom.ERR_LOGIN)
+	return c.JSON(http.StatusOK, common.ERR_LOGIN)
 
 }
 
@@ -114,24 +115,23 @@ func UserRegister(c yee.Context) (err error) {
 		u := new(model.CoreAccount)
 		if err = c.Bind(u); err != nil {
 			c.Logger().Error(err.Error())
-			return c.JSON(http.StatusOK, commom.ERR_REQ_BIND)
+			return c.JSON(http.StatusOK, common.ERR_REQ_BIND)
 		}
 		var unique model.CoreAccount
 		ix, _ := json.Marshal([]string{})
-		model.DB().Where("username = ?", u.Username).Select("username").First(&unique)
-		if unique.Username != "" {
-			return c.JSON(http.StatusOK, commom.ERR_COMMON_MESSAGE(errors.New("用户已存在请重新注册！")))
+		if model.DB().Where("username = ?", u.Username).Select("username").First(&unique).Error == gorm.ErrRecordNotFound {
+			model.DB().Create(&model.CoreAccount{
+				Username:   u.Username,
+				RealName:   u.RealName,
+				Password:   lib.DjangoEncrypt(u.Password, string(lib.GetRandom())),
+				Department: u.Department,
+				Email:      u.Email,
+			})
+			model.DB().Create(&model.CoreGrained{Username: u.Username, Group: ix})
+			return c.JSON(http.StatusOK, common.SuccessPayLoadToMessage("注册成功！"))
 		}
-		model.DB().Create(&model.CoreAccount{
-			Username:   u.Username,
-			RealName:   u.RealName,
-			Password:   lib.DjangoEncrypt(u.Password, string(lib.GetRandom())),
-			Department: u.Department,
-			Email:      u.Email,
-		})
-		model.DB().Create(&model.CoreGrained{Username: u.Username, Group: ix})
-		return c.JSON(http.StatusOK, commom.SuccessPayLoadToMessage("注册成功！"))
+		return c.JSON(http.StatusOK, common.ERR_COMMON_MESSAGE(errors.New("用户已存在请重新注册！")))
 	}
-	return c.JSON(http.StatusOK, commom.ERR_REGISTER)
+	return c.JSON(http.StatusOK, common.ERR_REGISTER)
 
 }

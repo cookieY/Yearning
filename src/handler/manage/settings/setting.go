@@ -14,7 +14,7 @@
 package settings
 
 import (
-	"Yearning-go/src/handler/commom"
+	"Yearning-go/src/handler/common"
 	"Yearning-go/src/lib"
 	"Yearning-go/src/model"
 	"encoding/json"
@@ -46,7 +46,7 @@ func SuperFetchSetting(c yee.Context) (err error) {
 
 	model.DB().Select("ldap,message,other").First(&k)
 
-	return c.JSON(http.StatusOK, commom.SuccessPayload(k))
+	return c.JSON(http.StatusOK, common.SuccessPayload(k))
 }
 
 func SuperSaveSetting(c yee.Context) (err error) {
@@ -54,7 +54,7 @@ func SuperSaveSetting(c yee.Context) (err error) {
 	u := new(set)
 	if err = c.Bind(u); err != nil {
 		c.Logger().Error(err)
-		return c.JSON(http.StatusOK, commom.ERR_REQ_BIND)
+		return c.JSON(http.StatusOK, common.ERR_REQ_BIND)
 	}
 	other, _ := json.Marshal(u.Other)
 	message, _ := json.Marshal(u.Message)
@@ -64,11 +64,11 @@ func SuperSaveSetting(c yee.Context) (err error) {
 		model.DB().Model(model.CoreQueryOrder{}).Where("`status` in (?)", []int{1, 2}).Updates(&model.CoreQueryOrder{Status: 3})
 	}
 
-	model.DB().Model(model.CoreGlobalConfiguration{}).Updates(&model.CoreGlobalConfiguration{Other: other, Message: message, Ldap: ldap})
+	model.DB().Model(model.CoreGlobalConfiguration{}).Where("1=1").Updates(&model.CoreGlobalConfiguration{Other: other, Message: message, Ldap: ldap})
 	model.GloOther = u.Other
 	model.GloLdap = u.Ldap
 	model.GloMessage = u.Message
-	return c.JSON(http.StatusOK, commom.SuccessPayLoadToMessage(commom.DATA_IS_EDIT))
+	return c.JSON(http.StatusOK, common.SuccessPayLoadToMessage(common.DATA_IS_EDIT))
 }
 
 func SuperTestSetting(c yee.Context) (err error) {
@@ -77,41 +77,41 @@ func SuperTestSetting(c yee.Context) (err error) {
 	u := new(set)
 	if err = c.Bind(u); err != nil {
 		c.Logger().Error(err.Error())
-		return c.JSON(http.StatusOK, commom.ERR_REQ_BIND)
+		return c.JSON(http.StatusOK, common.ERR_REQ_BIND)
 	}
 
 	switch el {
 	case "mail":
 		go lib.SendMail(u.Message.ToUser, u.Message, lib.TemoplateTestMail)
-		return c.JSON(http.StatusOK, commom.SuccessPayLoadToMessage(MAIL_TEST))
+		return c.JSON(http.StatusOK, common.SuccessPayLoadToMessage(MAIL_TEST))
 	case "ding":
 		go lib.SendDingMsg(u.Message, lib.TmplTestDing)
-		return c.JSON(http.StatusOK, commom.SuccessPayLoadToMessage(WEBHOOK_TEST))
+		return c.JSON(http.StatusOK, common.SuccessPayLoadToMessage(WEBHOOK_TEST))
 	case "ldap":
 		ldap := model.ALdap{Ldap: u.Ldap}
 		k, err := ldap.LdapConnect("", "", true)
 		if err != nil {
 			c.Logger().Error(err)
-			return c.JSON(http.StatusOK, commom.SuccessPayLoadToMessage(ERR_LDAP_TEST))
+			return c.JSON(http.StatusOK, common.SuccessPayLoadToMessage(ERR_LDAP_TEST))
 		}
 		if k {
-			return c.JSON(http.StatusOK, commom.SuccessPayLoadToMessage(SUCCESS_LDAP_TEST))
+			return c.JSON(http.StatusOK, common.SuccessPayLoadToMessage(SUCCESS_LDAP_TEST))
 		}
 	}
-	return c.JSON(http.StatusOK, commom.ERR_REQ_FAKE)
+	return c.JSON(http.StatusOK, common.ERR_REQ_FAKE)
 }
 
 func SuperDelOrder(c yee.Context) (err error) {
 	u := new(delOrder)
 	if err := c.Bind(u); err != nil {
 		c.Logger().Error(err.Error())
-		return c.JSON(http.StatusOK, commom.ERR_REQ_BIND)
+		return c.JSON(http.StatusOK, common.ERR_REQ_BIND)
 	}
 
 	if u.Tp {
 		go func() {
 			if len(u.Date) == 2 {
-				var order []model.CoreSqlOrder
+				var order []model.CoreQueryOrder
 				tx := model.DB().Begin()
 				model.DB().Select("work_id").Where("`date` >= ? and `date` <= ? ", u.Date[0], u.Date[1]).Find(&order).Delete(&model.CoreQueryOrder{})
 				for _, i := range order {
@@ -135,5 +135,5 @@ func SuperDelOrder(c yee.Context) (err error) {
 			}
 		}()
 	}
-	return c.JSON(http.StatusOK, commom.SuccessPayLoadToMessage(commom.ORDER_IS_DELETE))
+	return c.JSON(http.StatusOK, common.SuccessPayLoadToMessage(common.ORDER_IS_DELETE))
 }

@@ -1,7 +1,7 @@
 package autoTask
 
 import (
-	"Yearning-go/src/handler/commom"
+	"Yearning-go/src/handler/common"
 	"Yearning-go/src/model"
 	"github.com/google/uuid"
 )
@@ -18,22 +18,22 @@ type fetchAutoTask struct {
 	Task model.CoreAutoTask `json:"task"`
 	Tp   string             `json:"tp"`
 	Page int                ` json:"page"`
-	Find commom.Search      `json:"find"`
-	Resp commom.Resp        `json:"resp"`
+	Find common.Search      `json:"find"`
+	Resp common.Resp        `json:"resp"`
 }
 
 func (task *fetchAutoTask) CURD() {
 	if task.Task.TaskId == "" {
 		task.Task.TaskId = uuid.New().String()
 		model.DB().Model(model.CoreAutoTask{}).Create(&task.Task)
-		task.Resp = commom.SuccessPayLoadToMessage(CREATE_MESSAGE_SUCCESS)
+		task.Resp = common.SuccessPayLoadToMessage(CREATE_MESSAGE_SUCCESS)
 	} else {
-		model.DB().Model(model.CoreAutoTask{}).Where("task_id =?", task.Task.TaskId).Update(task.Task)
-		task.Resp = commom.SuccessPayLoadToMessage(EDIT_MESSAGE_SUCCESS)
+		model.DB().Model(model.CoreAutoTask{}).Where("task_id =?", task.Task.TaskId).Updates(task.Task)
+		task.Resp = common.SuccessPayLoadToMessage(EDIT_MESSAGE_SUCCESS)
 	}
 }
 
 func (task *fetchAutoTask) Activation() {
 	model.DB().Model(model.CoreAutoTask{}).Where("id =?", task.Task.ID).Update("status", task.Task.Status)
-	task.Resp = commom.SuccessPayLoadToMessage(EDIT_MESSAGE_ACTIVE)
+	task.Resp = common.SuccessPayLoadToMessage(EDIT_MESSAGE_ACTIVE)
 }

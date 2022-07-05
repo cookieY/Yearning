@@ -16,8 +16,8 @@ const (
 	CUSTOM_INFO_SUCCESS     = "邮箱/真实姓名修改成功！刷新后显示最新信息!"
 	CUSTOM_PASSWORD_SUCCESS = "密码修改成功！"
 	ER_SQL_EMPTY            = "无查询语句！"
-	ER_RPC                  = "rpc调用失败"
 	BUF                     = 1<<20 - 1
+	ER_RPC                  = "rpc调用失败"
 )
 
 type queryBind struct {

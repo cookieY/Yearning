@@ -14,70 +14,65 @@
 package db
 
 import (
-	"Yearning-go/src/handler/commom"
+	"Yearning-go/src/handler/common"
 	"Yearning-go/src/lib"
 	"Yearning-go/src/model"
 	"github.com/cookieY/yee"
 	"net/http"
-	"net/url"
 )
 
 func SuperFetchSource(c yee.Context) (err error) {
-	req := new(commom.PageChange)
+	req := new(common.PageList[[]model.CoreDataSource])
 	if err = c.Bind(req); err != nil {
 		c.Logger().Error(err.Error())
 		return
 	}
-	start, end := lib.Paging(req.Current, req.PageSize)
-	var u []model.CoreDataSource
-	var pg int
-	model.DB().Model(model.CoreDataSource{}).Scopes(
-		commom.AccordingToOrderIDC(req.Expr.IDC),
-		commom.AccordingToOrderIP(req.Expr.IP),
-		commom.AccordingToOrderType(req.Expr.IsQuery),
-		commom.AccordingToOrderSource(req.Expr.Source),
-	).Order("id desc").Count(&pg).Offset(start).Limit(end).Find(&u)
-	return c.JSON(http.StatusOK, commom.SuccessPayload(commom.CommonList{Page: pg, Data: u}))
+	req.Paging().Query(
+		common.AccordingToOrderIDC(req.Expr.IDC),
+		common.AccordingToOrderIP(req.Expr.IP),
+		common.AccordingToOrderType(req.Expr.IsQuery),
+		common.AccordingToOrderSource(req.Expr.Source))
+	return c.JSON(http.StatusOK, req.ToMessage())
 }
 
 func SuperDeleteSource(c yee.Context) (err error) {
 	user := new(lib.Token).JwtParse(c)
 	if user.Username != "admin" {
-		return c.JSON(http.StatusOK, commom.ERR_REQ_FAKE)
+		return c.JSON(http.StatusOK, common.ERR_REQ_FAKE)
 	}
-	var k []model.CoreRoleGroup
-	sourceId := c.QueryParam("source_id")
 
-	unescape, _ := url.QueryUnescape(sourceId)
+	var k []model.CoreRoleGroup
+
+	sourceId := c.QueryParam("source_id")
 
 	model.DB().Find(&k)
 
 	tx := model.DB().Begin()
-	if er := tx.Where("source_id =?", unescape).Delete(&model.CoreDataSource{}).Error; er != nil {
+	if er := tx.Where("source_id =?", sourceId).Delete(&model.CoreDataSource{}).Error; er != nil {
 		tx.Rollback()
 		c.Logger().Error(er.Error())
-		return c.JSON(http.StatusOK, commom.ERR_REQ_BIND)
+		return c.JSON(http.StatusOK, common.ERR_REQ_BIND)
 	}
 	for i := range k {
-		b, err := lib.MultiArrayRemove(k[i].Permissions, []string{"ddl_source", "dml_source", "query_source"}, unescape)
+		b, err := lib.MultiArrayRemove(k[i].Permissions, []string{"ddl_source", "dml_source", "query_source"}, sourceId)
 		if err != nil {
 			return c.JSON(http.StatusOK, err)
 		}
-		if e := tx.Model(&model.CoreRoleGroup{}).Where("id =?", k[i].ID).Update(model.CoreRoleGroup{Permissions: b}).Error; e != nil {
+		if e := tx.Model(&model.CoreRoleGroup{}).Where("id =?", k[i].ID).Updates(model.CoreRoleGroup{Permissions: b}).Error; e != nil {
 			tx.Rollback()
 			c.Logger().Error(e.Error())
 		}
 	}
 
 	tx.Commit()
-	return c.JSON(http.StatusOK, commom.SuccessPayLoadToMessage(commom.DATA_IS_DELETE))
+	return c.JSON(http.StatusOK, common.SuccessPayLoadToMessage(common.DATA_IS_DELETE))
 }
 
 func ManageDBCreateOrEdit(c yee.Context) (err error) {
 	u := new(CommonDBPost)
 	if err = c.Bind(u); err != nil {
 		c.Logger().Error(err.Error())
-		return c.JSON(http.StatusOK, commom.ERR_REQ_BIND)
+		return c.JSON(http.StatusOK, common.ERR_REQ_BIND)
 	}
 	switch u.Tp {
 	case "edit":
@@ -90,5 +85,5 @@ func ManageDBCreateOrEdit(c yee.Context) (err error) {
 		}
 		return c.JSON(http.StatusOK, SuperTestDBConnect(&u.DB))
 	}
-	return c.JSON(http.StatusOK, commom.ERR_REQ_FAKE)
+	return c.JSON(http.StatusOK, common.ERR_REQ_FAKE)
 }

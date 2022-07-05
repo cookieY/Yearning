@@ -1,9 +1,11 @@
 package user
 
 import (
-	"Yearning-go/src/handler/commom"
+	"Yearning-go/src/handler/common"
 	"Yearning-go/src/lib"
 	"Yearning-go/src/model"
+	"errors"
+	"gorm.io/gorm"
 )
 
 const (
@@ -37,33 +39,33 @@ type warning struct {
 	Up      []model.CoreGrained     `json:"up"`
 }
 
-func DelUserDepend(user string) commom.Resp {
+func DelUserDepend(user string) common.Resp {
 	var flow []model.CoreWorkflowTpl
 	var grained []model.CoreRoleGroup
 	model.DB().Select("source").Where("JSON_SEARCH(steps, 'one', ?) IS NOT NULL", user).Find(&flow)
 	model.DB().Select("name").Where("JSON_SEARCH(permissions, 'one',?,null,'$.auditor') IS NOT NULL", user).Find(&grained)
-	return commom.SuccessPayload(warning{
+	return common.SuccessPayload(warning{
 		Source:  flow,
 		Grained: grained,
 	})
 }
 
-func SuperUserEdit(u *CommonUserPost) commom.Resp {
+func SuperUserEdit(u *CommonUserPost) common.Resp {
 	tx := model.DB().Begin()
-	tx.Model(model.CoreAccount{}).Where("username = ?", u.Username).Updates(u)
-	tx.Model(model.CoreSqlOrder{}).Where("username =?", u.Username).Update(model.CoreSqlOrder{RealName: u.RealName})
-	tx.Model(model.CoreQueryOrder{}).Where("username =?", u.Username).Update(model.CoreQueryOrder{RealName: u.RealName})
+	tx.Model(model.CoreAccount{}).Where("username = ?", u.Username).Updates(&u.CoreAccount)
+	tx.Model(model.CoreSqlOrder{}).Where("username =?", u.Username).Updates(model.CoreSqlOrder{RealName: u.RealName})
+	tx.Model(model.CoreQueryOrder{}).Where("username =?", u.Username).Updates(model.CoreQueryOrder{RealName: u.RealName})
 	tx.Commit()
-	return commom.SuccessPayLoadToMessage(USER_EDIT_SUCCESS)
+	return common.SuccessPayLoadToMessage(USER_EDIT_SUCCESS)
 }
 
-func SuperUserRegister(u *CommonUserPost) commom.Resp {
+func SuperUserRegister(u *CommonUserPost) common.Resp {
 	var unique model.CoreAccount
-	if !model.DB().Where("username = ?", u.Username).Select("username").First(&unique).RecordNotFound() {
-		return commom.SuccessPayLoadToMessage(ER_USER_REGUSTER)
+	if err := model.DB().Where("username = ?", u.Username).Select("username").First(&unique).Error; errors.Is(err, gorm.ErrRecordNotFound) {
+		return common.SuccessPayLoadToMessage(ER_USER_REGUSTER)
 	}
 	u.Password = lib.DjangoEncrypt(u.Password, string(lib.GetRandom()))
 	model.DB().Create(&u.CoreAccount)
 	model.DB().Create(&model.CoreGrained{Username: u.Username, Group: lib.EmptyGroup()})
-	return commom.SuccessPayLoadToMessage(USER_REGUSTER_SUCCESS)
+	return common.SuccessPayLoadToMessage(USER_REGUSTER_SUCCESS)
 }
