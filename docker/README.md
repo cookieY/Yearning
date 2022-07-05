@@ -17,7 +17,7 @@ docker run -d -it -p8000:8000 -e MYSQL_USER=root -e MYSQL_ADDR=10.0.0.3:3306 -e 
   - data/init/yearning.sql
     - 请勿更改文件目录，启动mysql时会自动加载该文件，进行初始化数据库
     - 默认使用库名yearning
-
+  - Yearning install 初始化命令依然可用
 - 升级使用
   - `command: /bin/bash -c "./Yearning migrate"`
 - 重置admin密码
@@ -45,6 +45,8 @@ services:
            MYSQL_DB: yearning
         ports:
            - 8000:8000
+        #重置admin密码
+        #command: /bin/bash -c "./Yearning reset_super"
         #volumes:
         #   - ./conf.toml:/opt/conf.toml
         depends_on:

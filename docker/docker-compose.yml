@@ -10,6 +10,8 @@ services:
            MYSQL_DB: yearning
         ports:
            - 8000:8000
+        #重置admin密码
+        #command: /bin/bash -c "./Yearning reset_super"
         #volumes:
         #   - ./conf.toml:/opt/conf.toml
         depends_on:
