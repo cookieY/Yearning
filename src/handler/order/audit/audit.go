@@ -1,7 +1,7 @@
 package audit
 
 import (
-	"Yearning-go/src/handler/commom"
+	"Yearning-go/src/handler/common"
 	"Yearning-go/src/lib"
 	"Yearning-go/src/model"
 	"github.com/cookieY/yee"
@@ -15,19 +15,20 @@ func AuditOrderState(c yee.Context) (err error) {
 	user := new(lib.Token).JwtParse(c)
 	if err = c.Bind(u); err != nil {
 		c.Logger().Error(err.Error())
-		return c.JSON(http.StatusOK, commom.ERR_REQ_BIND)
+		return c.JSON(http.StatusOK, common.ERR_REQ_BIND)
 	}
+
 	switch u.Tp {
 	case "undo":
 		lib.MessagePush(u.WorkId, 6, "")
 		model.DB().Model(model.CoreQueryOrder{}).Where("work_id =?", u.WorkId).Delete(&model.CoreSqlOrder{})
-		return c.JSON(http.StatusOK, commom.SuccessPayLoadToMessage(commom.ORDER_IS_UNDO))
+		return c.JSON(http.StatusOK, common.SuccessPayLoadToMessage(common.ORDER_IS_UNDO))
 	case "agree":
 		return c.JSON(http.StatusOK, MultiAuditOrder(u, user.Username))
 	case "reject":
 		return c.JSON(http.StatusOK, RejectOrder(u, user.Username))
 	default:
-		return c.JSON(http.StatusOK, commom.ERR_REQ_FAKE)
+		return c.JSON(http.StatusOK, common.ERR_REQ_FAKE)
 	}
 }
 
@@ -36,7 +37,7 @@ func DelayKill(c yee.Context) (err error) {
 	u := new(Confirm)
 	if err = c.Bind(u); err != nil {
 		c.Logger().Error(err.Error())
-		return c.JSON(http.StatusOK, commom.ERR_REQ_BIND)
+		return c.JSON(http.StatusOK, common.ERR_REQ_BIND)
 	}
 	user := new(lib.Token).JwtParse(c)
 	model.DB().Create(&model.CoreWorkflowDetail{
@@ -45,23 +46,23 @@ func DelayKill(c yee.Context) (err error) {
 		Time:     time.Now().Format("2006-01-02 15:04"),
 		Action:   ORDER_KILL_STATE,
 	})
-	return c.JSON(http.StatusOK, commom.SuccessPayLoadToMessage(delayKill(u.WorkId)))
+	return c.JSON(http.StatusOK, common.SuccessPayLoadToMessage(delayKill(u.WorkId)))
 }
 
 func FetchAuditOrder(c yee.Context) (err error) {
-	u := new(commom.PageChange)
+	u := new(common.PageList[[]model.CoreSqlOrder])
 	if err = c.Bind(u); err != nil {
 		c.Logger().Error(err.Error())
 		return
 	}
 	user := new(lib.Token).JwtParse(c)
-	order := u.GetSQLOrderList(commom.AccordingToAllOrderState(u.Expr.Status),
-		commom.AccordingToAllOrderType(u.Expr.Type),
-		commom.AccordingToRelevant(user.Username),
-		commom.AccordingToText(u.Expr.Text),
-		commom.AccordingToUsernameEqual(u.Expr.Username),
-		commom.AccordingToDatetime(u.Expr.Picker))
-	return c.JSON(http.StatusOK, commom.SuccessPayload(order))
+	u.Paging().Query(common.AccordingToAllOrderState(u.Expr.Status),
+		common.AccordingToAllOrderType(u.Expr.Type),
+		common.AccordingToRelevant(user.Username),
+		common.AccordingToText(u.Expr.Text),
+		common.AccordingToUsernameEqual(u.Expr.Username),
+		common.AccordingToDatetime(u.Expr.Picker))
+	return c.JSON(http.StatusOK, u.ToMessage())
 }
 
 func FetchOSCAPI(c yee.Context) (err error) {
@@ -82,7 +83,7 @@ func FetchOSCAPI(c yee.Context) (err error) {
 			if err := websocket.Message.Receive(ws, &msg); err != nil {
 				break
 			}
-			if msg == commom.CLOSE {
+			if msg == common.CLOSE {
 				break
 			}
 		}
@@ -97,7 +98,7 @@ func AuditOrderApis(c yee.Context) (err error) {
 	case "kill":
 		return DelayKill(c)
 	default:
-		return c.JSON(http.StatusOK, commom.ERR_REQ_FAKE)
+		return c.JSON(http.StatusOK, common.ERR_REQ_FAKE)
 	}
 }
 
@@ -108,7 +109,7 @@ func AuditOrRecordOrderFetchApis(c yee.Context) (err error) {
 	//case "record":
 	//	return FetchRecord(c)
 	default:
-		return c.JSON(http.StatusOK, commom.ERR_REQ_FAKE)
+		return c.JSON(http.StatusOK, common.ERR_REQ_FAKE)
 	}
 }
 
@@ -119,6 +120,6 @@ func AuditOSCFetchAndKillApis(c yee.Context) (err error) {
 	case "kill":
 		return nil
 	default:
-		return c.JSON(http.StatusOK, commom.ERR_REQ_FAKE)
+		return c.JSON(http.StatusOK, common.ERR_REQ_FAKE)
 	}
 }

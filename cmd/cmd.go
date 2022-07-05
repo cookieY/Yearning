@@ -27,7 +27,7 @@ var Migrate = &gcli.Command{
 		c.StrOpt(&RunOpts.config, "config", "c", "conf.toml", "配置文件路径,默认为conf.toml.如无移动配置文件则无需配置！")
 	},
 	Func: func(c *gcli.Command, args []string) error {
-		model.DbInit(RunOpts.config)
+		model.DBNew(RunOpts.config)
 		service.Migrate()
 		return nil
 	},
@@ -40,7 +40,7 @@ var Fix = &gcli.Command{
 		c.StrOpt(&RunOpts.config, "config", "c", "conf.toml", "配置文件路径,默认为conf.toml.如无移动配置文件则无需配置！")
 	},
 	Func: func(c *gcli.Command, args []string) error {
-		model.DbInit(RunOpts.config)
+		model.DBNew(RunOpts.config)
 		service.DelCol()
 		service.MargeRuleGroup()
 		return nil
@@ -54,8 +54,8 @@ var Super = &gcli.Command{
 		c.StrOpt(&RunOpts.config, "config", "c", "conf.toml", "配置文件路径,默认为conf.toml.如无移动配置文件则无需配置！")
 	},
 	Func: func(c *gcli.Command, args []string) error {
-		model.DbInit(RunOpts.config)
-		model.DB().Model(model.CoreAccount{}).Where("username =?", "admin").Update(&model.CoreAccount{Password: lib.DjangoEncrypt("Yearning_admin", string(lib.GetRandom()))})
+		model.DBNew(RunOpts.config)
+		model.DB().Model(model.CoreAccount{}).Where("username =?", "admin").Updates(&model.CoreAccount{Password: lib.DjangoEncrypt("Yearning_admin", string(lib.GetRandom()))})
 		fmt.Println("admin密码已重新设置为:Yearning_admin")
 		return nil
 	},
@@ -72,7 +72,7 @@ var RunServer = &gcli.Command{
 	},
 	Examples: `<cyan>{$binName} {$cmd} --port 80 --push "yearning.io" --config ../config.toml</>`,
 	Func: func(c *gcli.Command, args []string) error {
-		model.DbInit(RunOpts.config)
+		model.DBNew(RunOpts.config)
 		service.UpdateData()
 		service.StartYearning(net.JoinHostPort(RunOpts.addr, RunOpts.port), RunOpts.push)
 		return nil

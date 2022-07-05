@@ -14,7 +14,7 @@
 package handler
 
 import (
-	"Yearning-go/src/handler/commom"
+	"Yearning-go/src/handler/common"
 	"Yearning-go/src/lib"
 	"Yearning-go/src/model"
 	"github.com/cookieY/yee"
@@ -29,14 +29,14 @@ type groupBy struct {
 }
 
 type bannerCount struct {
-	User      int `json:"user"`
-	Order     int `json:"order"`
-	Query     int `json:"query"`
-	Source    int `json:"source"`
-	SelfDDL   int `json:"self_ddl"`
-	SelfDML   int `json:"self_dml"`
-	SelfAudit int `json:"self_audit"`
-	SelfQuery int `json:"self_query"`
+	User      int64 `json:"user"`
+	Order     int64 `json:"order"`
+	Query     int64 `json:"query"`
+	Source    int64 `json:"source"`
+	SelfDDL   int64 `json:"self_ddl"`
+	SelfDML   int64 `json:"self_dml"`
+	SelfAudit int64 `json:"self_audit"`
+	SelfQuery int64 `json:"self_query"`
 }
 
 func DashBanner(c yee.Context) (err error) {
@@ -50,7 +50,7 @@ func DashBanner(c yee.Context) (err error) {
 	model.DB().Model(model.CoreSqlOrder{}).Where("username =? and `type` =?", user.Username, 1).Count(&b.SelfDML)
 	model.DB().Model(model.CoreQueryOrder{}).Where("username =?", user.Username).Count(&b.SelfQuery)
 	model.DB().Model(model.CoreSqlOrder{}).Where("status = ? and assigned like ?", 2, "%"+user.Username+"%").Count(&b.SelfAudit)
-	return c.JSON(http.StatusOK, commom.SuccessPayload(b))
+	return c.JSON(http.StatusOK, common.SuccessPayload(b))
 }
 
 func DashUserInfo(c yee.Context) (err error) {
@@ -65,7 +65,7 @@ func DashUserInfo(c yee.Context) (err error) {
 	model.DB().Select("`group`").Where("username =?", user).First(&p)
 	model.DB().Select("`name`").Find(&groupList)
 	//model.DB().Select("stmt").First(&s)
-	return c.JSON(http.StatusOK, commom.SuccessPayload(map[string]interface{}{"p": p.Group, "g": groupList}))
+	return c.JSON(http.StatusOK, common.SuccessPayload(map[string]interface{}{"p": p.Group, "g": groupList}))
 }
 
 func DashStmt(c yee.Context) (err error) {
@@ -76,5 +76,5 @@ func DashStmt(c yee.Context) (err error) {
 func DashTop(c yee.Context) (err error) {
 	var source []groupBy
 	model.DB().Model(model.CoreSqlOrder{}).Select("source, count(*) as c").Group("source").Order("c desc").Limit(10).Scan(&source)
-	return c.JSON(http.StatusOK, commom.SuccessPayload(source))
+	return c.JSON(http.StatusOK, common.SuccessPayload(source))
 }

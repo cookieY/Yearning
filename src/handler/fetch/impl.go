@@ -1,11 +1,10 @@
 package fetch
 
 import (
-	"Yearning-go/src/handler/commom"
+	"Yearning-go/src/handler/common"
 	"Yearning-go/src/lib"
 	"Yearning-go/src/model"
 	"fmt"
-	"github.com/jinzhu/gorm"
 	"strconv"
 )
 
@@ -36,8 +35,8 @@ type _FetchBind struct {
 	SourceId string             `json:"source_id"`
 	DataBase string             `json:"data_base"`
 	Table    string             `json:"table"`
-	Rows     []commom.FieldInfo `json:"rows"`
-	Idx      []commom.IndexInfo `json:"idx"`
+	Rows     []common.FieldInfo `json:"rows"`
+	Idx      []common.IndexInfo `json:"idx"`
 	Hide     bool               `json:"hide"`
 }
 
@@ -47,12 +46,12 @@ func (u *_FetchBind) FetchTableFieldsOrIndexes() error {
 	model.DB().Where("source_id =?", u.SourceId).First(&s)
 
 	ps := lib.Decrypt(s.Password)
-	db, err := gorm.Open("mysql", fmt.Sprintf("%s:%s@(%s:%s)/%s?charset=utf8&parseTime=True&loc=Local", s.Username, ps, s.IP, strconv.Itoa(int(s.Port)), u.DataBase))
+	db, err := model.NewDBSub(fmt.Sprintf("%s:%s@(%s:%s)/%s?charset=utf8&parseTime=True&loc=Local", s.Username, ps, s.IP, strconv.Itoa(s.Port), u.DataBase))
 	if err != nil {
 		return err
 	}
 
-	defer db.Close()
+	defer model.Close(db)
 
 	if err := db.Raw(fmt.Sprintf("SHOW FULL FIELDS FROM `%s`.`%s`", u.DataBase, u.Table)).Scan(&u.Rows).Error; err != nil {
 		return err

@@ -14,7 +14,7 @@
 package personal
 
 import (
-	"Yearning-go/src/handler/commom"
+	"Yearning-go/src/handler/common"
 	"Yearning-go/src/handler/manage/tpl"
 	"Yearning-go/src/lib"
 	"Yearning-go/src/model"
@@ -41,11 +41,11 @@ func sqlOrderPost(c yee.Context) (err error) {
 	user := new(lib.Token).JwtParse(c)
 	if err = c.Bind(u); err != nil {
 		c.Logger().Error(err.Error())
-		return c.JSON(http.StatusOK, commom.ERR_REQ_BIND)
+		return c.JSON(http.StatusOK, common.ERR_REQ_BIND)
 	}
 	length, err := wrapperPostOrderInfo(u, c)
 	if err != nil {
-		return c.JSON(http.StatusOK, commom.ERR_COMMON_MESSAGE(err))
+		return c.JSON(http.StatusOK, common.ERR_COMMON_MESSAGE(err))
 	}
 	model.DB().Create(u)
 	model.DB().Create(&model.CoreWorkflowDetail{
@@ -59,7 +59,7 @@ func sqlOrderPost(c yee.Context) (err error) {
 
 	CallAutoTask(u, length)
 
-	return c.JSON(http.StatusOK, commom.SuccessPayLoadToMessage(ORDER_POST_SUCCESS))
+	return c.JSON(http.StatusOK, common.SuccessPayLoadToMessage(ORDER_POST_SUCCESS))
 }
 
 func wrapperPostOrderInfo(order *model.CoreSqlOrder, y yee.Context) (length int, err error) {

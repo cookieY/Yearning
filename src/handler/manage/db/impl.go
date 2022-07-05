@@ -1,13 +1,14 @@
 package db
 
 import (
-	"Yearning-go/src/handler/commom"
+	"Yearning-go/src/handler/common"
 	"Yearning-go/src/lib"
 	"Yearning-go/src/model"
 	"encoding/json"
 	"fmt"
 	"github.com/google/uuid"
-	"github.com/jinzhu/gorm"
+	drive "gorm.io/driver/mysql"
+	"gorm.io/gorm"
 )
 
 const (
@@ -26,23 +27,24 @@ type CommonDBPost struct {
 }
 
 func ConnTest(u *model.CoreDataSource) error {
-	db, err := gorm.Open("mysql", fmt.Sprintf("%s:%s@(%s:%d)/?charset=utf8&parseTime=True&loc=Local", u.Username, u.Password, u.IP, u.Port))
-	defer func() {
-		_ = db.Close()
-	}()
+	db, err := gorm.Open(drive.New(drive.Config{
+		DSN:                       fmt.Sprintf("%s:%s@(%s:%d)/?charset=utf8&parseTime=True&loc=Local", u.Username, u.Password, u.IP, u.Port),
+		DefaultStringSize:         256,   // string 类型字段的默认长度
+		SkipInitializeWithVersion: false, // 根据当前 MySQL 版本自动配置
+	}), &gorm.Config{})
 	if err != nil {
 		return err
 	}
-	return nil
+	d, _ := db.DB()
+	return d.Close()
 }
 
-func SuperEditSource(source *model.CoreDataSource) commom.Resp {
+func SuperEditSource(source *model.CoreDataSource) common.Resp {
 
 	if source.Password != "" && lib.Decrypt(source.Password) == "" {
-		model.DB().Model(&model.CoreDataSource{}).Where("source_id =?", source.SourceId).Update(&model.CoreDataSource{Password: lib.Encrypt(source.Password)})
+		model.DB().Model(&model.CoreDataSource{}).Where("source_id =?", source.SourceId).Updates(&model.CoreDataSource{Password: lib.Encrypt(source.Password)})
 	}
-
-	model.DB().Model(&model.CoreDataSource{}).Where("source_id =?", source.SourceId).Update(map[string]interface{}{
+	model.DB().Model(&model.CoreDataSource{}).Where("source_id =?", source.SourceId).Updates(map[string]interface{}{
 		"id_c":               source.IDC,
 		"ip":                 source.IP,
 		"port":               source.Port,
@@ -59,7 +61,7 @@ func SuperEditSource(source *model.CoreDataSource) commom.Resp {
 	for i := range k {
 		var p model.PermissionList
 		if err := json.Unmarshal(k[i].Permissions, &p); err != nil {
-			return commom.ERR_COMMON_MESSAGE(err)
+			return common.ERR_COMMON_MESSAGE(err)
 		}
 		if source.IsQuery == 0 {
 			p.QuerySource = lib.ResearchDel(p.QuerySource, source.Source)
@@ -69,24 +71,24 @@ func SuperEditSource(source *model.CoreDataSource) commom.Resp {
 			p.DMLSource = lib.ResearchDel(p.DMLSource, source.Source)
 		}
 		r, _ := json.Marshal(p)
-		model.DB().Model(&model.CoreRoleGroup{}).Where("id =?", k[i].ID).Update(model.CoreRoleGroup{Permissions: r})
+		model.DB().Model(&model.CoreRoleGroup{}).Where("id =?", k[i].ID).Updates(model.CoreRoleGroup{Permissions: r})
 	}
-	return commom.SuccessPayLoadToMessage(DB_EDIT_SUCCESS)
+	return common.SuccessPayLoadToMessage(DB_EDIT_SUCCESS)
 }
 
-func SuperCreateSource(source *model.CoreDataSource) commom.Resp {
+func SuperCreateSource(source *model.CoreDataSource) common.Resp {
 	source.Password = lib.Encrypt(source.Password)
 	if source.Password != "" {
 		source.SourceId = uuid.New().String()
 		model.DB().Create(source)
-		return commom.SuccessPayLoadToMessage(DB_SAVE_SUCCESS)
+		return common.SuccessPayLoadToMessage(DB_SAVE_SUCCESS)
 	}
-	return commom.SuccessPayLoadToMessage(ERR_DB_SAVE)
+	return common.SuccessPayLoadToMessage(ERR_DB_SAVE)
 }
 
-func SuperTestDBConnect(source *model.CoreDataSource) commom.Resp {
+func SuperTestDBConnect(source *model.CoreDataSource) common.Resp {
 	if err := ConnTest(source); err != nil {
-		return commom.ERR_COMMON_MESSAGE(err)
+		return common.ERR_COMMON_MESSAGE(err)
 	}
-	return commom.SuccessPayLoadToMessage(CONN_TEST_SUCCESS)
+	return common.SuccessPayLoadToMessage(CONN_TEST_SUCCESS)
 }

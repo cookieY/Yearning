@@ -14,7 +14,7 @@
 package user
 
 import (
-	"Yearning-go/src/handler/commom"
+	"Yearning-go/src/handler/common"
 	"Yearning-go/src/model"
 	"Yearning-go/src/test"
 	"github.com/cookieY/yee"
@@ -38,7 +38,7 @@ var apis = test.Case{
 }
 
 func TestFetchUser(t *testing.T) {
-	var Ref commom.Resp
+	var Ref common.Resp
 	apis.Put(`{"page":1,"find":{"valve":false}}`).Do().Unmarshal(&Ref)
 	assert.NotEqual(t, nil, Ref.Payload)
 	assert.Equal(t, 1200, Ref.Code)
@@ -53,7 +53,7 @@ func TestFetchUser(t *testing.T) {
 
 func TestSuperDeleteUser(t *testing.T) {
 	k := assert.New(t)
-	var Ref commom.Resp
+	var Ref common.Resp
 	apis.Delete("?user=admin").Do().Unmarshal(&Ref)
 	k.Equal(ADMIN_NOT_DELETE, Ref.Text)
 	k.Equal(1200, Ref.Code)
@@ -64,7 +64,7 @@ func TestSuperDeleteUser(t *testing.T) {
 }
 
 func TestDelUserDependAndGroup(t *testing.T) {
-	var Ref commom.Resp
+	var Ref common.Resp
 
 	apis.Get("?user=admin&tp=depend").Do().Unmarshal(&Ref)
 	assert.NotEqual(t, nil, Ref.Payload)
@@ -79,7 +79,7 @@ func TestDelUserDependAndGroup(t *testing.T) {
 }
 
 func TestManageUserCreateOrEdit(t *testing.T) {
-	var Ref commom.Resp
+	var Ref common.Resp
 	apis.Post(`{"tp":"error","user":{"password":"123123Zz","username":"testAdmin"}}`).Do().Unmarshal(&Ref)
 	assert.Equal(t, 1310, Ref.Code)
 
