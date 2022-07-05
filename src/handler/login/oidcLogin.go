@@ -14,12 +14,14 @@
 package login
 
 import (
-	"Yearning-go/src/handler/commom"
+	"Yearning-go/src/handler/common"
 	"Yearning-go/src/lib"
 	"Yearning-go/src/model"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"github.com/cookieY/yee"
+	"gorm.io/gorm"
 	"io"
 	"net/http"
 	"net/url"
@@ -35,12 +37,12 @@ func OidcState(c yee.Context) (err error) {
 		model.C.Oidc.Scope)
 	oidcEnable := model.C.Oidc.Enable
 	if oidcEnable {
-		return c.JSON(http.StatusOK, commom.SuccessPayload(map[string]interface{}{
+		return c.JSON(http.StatusOK, common.SuccessPayload(map[string]interface{}{
 			"authUrl": oidcAuthUrl,
 			"enabled": oidcEnable,
 		}))
 	} else {
-		return c.JSON(http.StatusOK, commom.SuccessPayload(map[string]interface{}{
+		return c.JSON(http.StatusOK, common.SuccessPayload(map[string]interface{}{
 			"enabled": false,
 		}))
 	}
@@ -96,7 +98,7 @@ func getAccount(code string, session_state string) (ac *model.CoreAccount, err e
 	email := userMap[model.C.Oidc.EmailKey].(string)
 
 	var account = new(model.CoreAccount)
-	if model.DB().Where("username = ?", username).First(&account).RecordNotFound() {
+	if err := model.DB().Where("username = ?", username).First(&account).Error; errors.Is(err, gorm.ErrRecordNotFound) {
 		coreAccount := model.CoreAccount{
 			Username:   username,
 			RealName:   realname,
