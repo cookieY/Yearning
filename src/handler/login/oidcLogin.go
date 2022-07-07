@@ -21,15 +21,19 @@ import (
 	"errors"
 	"fmt"
 	"github.com/cookieY/yee"
+	"github.com/golang-jwt/jwt"
 	"gorm.io/gorm"
 	"io"
 	"net/http"
 	"net/url"
+	"strconv"
+	"strings"
+	"time"
 )
 
 func OidcState(c yee.Context) (err error) {
 
-	oidcAuthUrl, _ := oidcAuthUrl()
+	oidcAuthUrl, _ := oidcAuthUrl(c)
 	oidcEnable := model.C.Oidc.Enable
 	if oidcEnable {
 		return c.JSON(http.StatusOK, common.SuccessPayload(map[string]interface{}{
@@ -43,8 +47,8 @@ func OidcState(c yee.Context) (err error) {
 	}
 }
 
-func oidcAuthUrl() (oidcAuthUrl string, state string) {
-	state = string(lib.GetRandom())
+func oidcAuthUrl(c yee.Context) (oidcAuthUrl string, state string) {
+	state = generateState()
 	return fmt.Sprintf(
 		"%s?response_type=code&client_id=%s&redirect_uri=%s&scope=%s&state=%s",
 		model.C.Oidc.AuthUrl,
@@ -53,6 +57,31 @@ func oidcAuthUrl() (oidcAuthUrl string, state string) {
 		model.C.Oidc.Scope,
 		state,
 	), state
+}
+
+// 生成 state，state 格式为 hs265签名.当前分钟数
+func generateState() string {
+	curMinutes := strconv.FormatInt(time.Now().Unix()/60, 10)
+	sign, err := jwt.GetSigningMethod("HS256").Sign(curMinutes, []byte(model.JWT))
+	if err != nil {
+		return ""
+	}
+	return sign + "." + curMinutes
+}
+
+// 由于没有session 机制，所以使用如下方法校验 state
+// 2分钟之内的 state 有效
+func validState(state string) error {
+	split := strings.Split(state, ".")
+	sign := split[0]
+	curMinutes := time.Now().Unix() / 60
+	for i := 0; i < 3; i++ {
+		err := jwt.GetSigningMethod("HS256").Verify(strconv.FormatInt(curMinutes-int64(i), 10), sign, []byte(model.JWT))
+		if err == nil {
+			return nil
+		}
+	}
+	return errors.New("state 不合法")
 }
 
 func OidcLogin(c yee.Context) (err error) {
@@ -65,12 +94,21 @@ func OidcLogin(c yee.Context) (err error) {
 	state := c.FormValue("state")
 	sessionState := c.FormValue("session_state")
 
-	// 严谨场景需要校验 state 是否为系统生产的 state
 	if code == "" || state == "" {
-		oidcAuthUrl, _ := oidcAuthUrl()
+		oidcAuthUrl, _ := oidcAuthUrl(c)
 		return c.Redirect(302, oidcAuthUrl)
 	}
+	err = validState(state)
+	if err != nil {
+		oidcAuthUrl, _ := oidcAuthUrl(c)
+		return c.Redirect(302, oidcAuthUrl)
+	}
+
 	account, err := getAccount(code, sessionState)
+	if err != nil {
+		oidcAuthUrl, _ := oidcAuthUrl(c)
+		return c.Redirect(302, oidcAuthUrl)
+	}
 
 	token, tokenErr := lib.JwtAuth(lib.Token{
 		Username: account.Username,
@@ -79,7 +117,8 @@ func OidcLogin(c yee.Context) (err error) {
 	})
 	if tokenErr != nil {
 		c.Logger().Error(tokenErr.Error())
-		return
+		oidcAuthUrl, _ := oidcAuthUrl(c)
+		return c.Redirect(302, oidcAuthUrl)
 	}
 
 	return c.Redirect(302, fmt.Sprintf(
