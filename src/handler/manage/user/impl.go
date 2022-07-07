@@ -61,7 +61,7 @@ func SuperUserEdit(u *CommonUserPost) common.Resp {
 
 func SuperUserRegister(u *CommonUserPost) common.Resp {
 	var unique model.CoreAccount
-	if err := model.DB().Where("username = ?", u.Username).Select("username").First(&unique).Error; errors.Is(err, gorm.ErrRecordNotFound) {
+	if err := model.DB().Where("username = ?", u.Username).Select("username").First(&unique).Error; !errors.Is(err, gorm.ErrRecordNotFound) {
 		return common.SuccessPayLoadToMessage(ER_USER_REGUSTER)
 	}
 	u.Password = lib.DjangoEncrypt(u.Password, string(lib.GetRandom()))
