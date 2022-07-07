@@ -41,9 +41,26 @@ type DbInfo struct {
 	Db       string
 }
 
+type oidc struct {
+	Enable       bool
+	ClientId     string
+	ClientSecret string
+	Scope        string
+	AuthUrl      string
+	TokenUrl     string
+	UserUrl      string
+	RedirectUrL  string
+	SessionKey   string
+
+	UserNameKey string
+	RealNameKey string
+	EmailKey    string
+}
+
 type Config struct {
 	General general
 	Mysql   mysql
+	Oidc    oidc
 }
 
 var C Config
