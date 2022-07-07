@@ -29,12 +29,7 @@ import (
 
 func OidcState(c yee.Context) (err error) {
 
-	oidcAuthUrl := fmt.Sprintf(
-		"%s?response_type=code&client_id=%s&redirect_uri=%s&scope=%s&state=367126378168",
-		model.C.Oidc.AuthUrl,
-		model.C.Oidc.ClientId,
-		model.C.Oidc.RedirectUrL,
-		model.C.Oidc.Scope)
+	oidcAuthUrl, _ := oidcAuthUrl()
 	oidcEnable := model.C.Oidc.Enable
 	if oidcEnable {
 		return c.JSON(http.StatusOK, common.SuccessPayload(map[string]interface{}{
@@ -48,6 +43,18 @@ func OidcState(c yee.Context) (err error) {
 	}
 }
 
+func oidcAuthUrl() (oidcAuthUrl string, state string) {
+	state = string(lib.GetRandom())
+	return fmt.Sprintf(
+		"%s?response_type=code&client_id=%s&redirect_uri=%s&scope=%s&state=%s",
+		model.C.Oidc.AuthUrl,
+		model.C.Oidc.ClientId,
+		model.C.Oidc.RedirectUrL,
+		model.C.Oidc.Scope,
+		state,
+	), state
+}
+
 func OidcLogin(c yee.Context) (err error) {
 
 	if !model.C.Oidc.Enable {
@@ -55,16 +62,13 @@ func OidcLogin(c yee.Context) (err error) {
 	}
 
 	code := c.FormValue("code")
-	sessionState := c.FormValue(model.C.Oidc.SessionKey)
+	state := c.FormValue("state")
+	sessionState := c.FormValue("session_state")
 
-	if code == "" || sessionState == "" {
-		authUri := fmt.Sprintf(
-			"%s?response_type=code&client_id=%s&redirect_uri=%s&scope=%s",
-			model.C.Oidc.AuthUrl,
-			model.C.Oidc.ClientId,
-			model.C.Oidc.RedirectUrL,
-			model.C.Oidc.Scope)
-		return c.Redirect(302, authUri)
+	// 严谨场景需要校验 state 是否为系统生产的 state
+	if code == "" || state == "" {
+		oidcAuthUrl, _ := oidcAuthUrl()
+		return c.Redirect(302, oidcAuthUrl)
 	}
 	account, err := getAccount(code, sessionState)
 
@@ -84,8 +88,8 @@ func OidcLogin(c yee.Context) (err error) {
 	)
 }
 
-func getAccount(code string, session_state string) (ac *model.CoreAccount, err error) {
-	oidcToken, err := getOidcToken(code, session_state)
+func getAccount(code string, sessionState string) (ac *model.CoreAccount, err error) {
+	oidcToken, err := getOidcToken(code, sessionState)
 	if err != nil {
 		return nil, err
 	}
@@ -138,14 +142,14 @@ func getOidcUser(token *OidcToken) (userMap map[string]interface{}, err error) {
 	return userMap, nil
 }
 
-func getOidcToken(code string, session_state string) (oidc_token *OidcToken, err error) {
+func getOidcToken(code string, sessionState string) (oidc_token *OidcToken, err error) {
 	resp, err := http.PostForm(model.C.Oidc.TokenUrl, url.Values{
-		model.C.Oidc.SessionKey: {session_state},
-		"code":                  {code},
-		"client_id":             {model.C.Oidc.ClientId},
-		"client_secret":         {model.C.Oidc.ClientSecret},
-		"grant_type":            {"authorization_code"},
-		"redirect_uri":          {model.C.Oidc.RedirectUrL},
+		"session_state": {sessionState},
+		"code":          {code},
+		"client_id":     {model.C.Oidc.ClientId},
+		"client_secret": {model.C.Oidc.ClientSecret},
+		"grant_type":    {"authorization_code"},
+		"redirect_uri":  {model.C.Oidc.RedirectUrL},
 	})
 	if err != nil {
 		return nil, err

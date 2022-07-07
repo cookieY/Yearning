@@ -50,7 +50,6 @@ type oidc struct {
 	TokenUrl     string
 	UserUrl      string
 	RedirectUrL  string
-	SessionKey   string
 
 	UserNameKey string
 	RealNameKey string
