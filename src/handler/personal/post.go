@@ -47,6 +47,7 @@ func sqlOrderPost(c yee.Context) (err error) {
 	if err != nil {
 		return c.JSON(http.StatusOK, common.ERR_COMMON_MESSAGE(err))
 	}
+	u.ID = 0
 	model.DB().Create(u)
 	model.DB().Create(&model.CoreWorkflowDetail{
 		WorkId:   u.WorkId,

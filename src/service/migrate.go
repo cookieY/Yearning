@@ -67,6 +67,7 @@ func Migrate() {
 		_ = model.DB().AutoMigrate(&model.CoreDataSource{})
 		_ = model.DB().AutoMigrate(&model.CoreGlobalConfiguration{})
 		_ = model.DB().AutoMigrate(&model.CoreGrained{})
+		_ = model.DB().AutoMigrate(&model.CoreOrderComment{})
 		_ = model.DB().AutoMigrate(&model.CoreSqlOrder{})
 		_ = model.DB().AutoMigrate(&model.CoreSqlRecord{})
 		_ = model.DB().AutoMigrate(&model.CoreRollback{})

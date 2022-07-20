@@ -81,7 +81,7 @@ var RunServer = &gcli.Command{
 
 func Command() {
 	app := gcli.NewApp()
-	app.Version = "3.0.0 Uranus"
+	app.Version = "3.0.4 Uranus"
 	app.Name = "Yearning"
 	app.Logo = gcli.Logo{Text: LOGO, Style: "info"}
 	app.Description = "Yearning Mysql数据审核平台"
