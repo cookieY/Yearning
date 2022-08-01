@@ -124,7 +124,7 @@ func (m *MultiSQLRunner) Run(source *model.CoreDataSource, schema string) (*Quer
 	ele := removeDuplicateElement(cols)
 
 	for cv := range ele {
-		query.Field = append(query.Field, map[string]interface{}{"title": ele[cv], "dataIndex": ele[cv], "width": 200, "resizable": true})
+		query.Field = append(query.Field, map[string]interface{}{"title": ele[cv], "dataIndex": ele[cv], "width": 200, "resizable": true, "ellipsis": true})
 	}
 	query.Field[0]["fixed"] = "left"
 
