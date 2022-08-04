@@ -91,6 +91,6 @@ func SuperUserRuleMarge(c yee.Context) (err error) {
 	if err = c.Bind(u); err != nil {
 		return c.JSON(http.StatusOK, common.ERR_REQ_BIND)
 	}
-	m3 := lib.MultiUserRuleMarge(strings.Split(u.Group, ","))
+	m3 := lib.NewMultiUserRuleSet(strings.Split(u.Group, ","))
 	return c.JSON(http.StatusOK, common.SuccessPayload(m3))
 }

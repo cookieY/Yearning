@@ -28,11 +28,10 @@ type queryBind struct {
 
 type QueryDeal struct {
 	Ref struct {
-		Type      string `msgpack:"type"` //0 conn 1 close
-		Sql       string `msgpack:"sql"`
-		Schema    string `msgpack:"schema"`
-		SourceId  string `msgpack:"source_id"`
-		HeartBeat uint8  `msgpack:"heartbeat"`
+		Type     int    `msgpack:"type"` //0 conn 1 close
+		Sql      string `msgpack:"sql"`
+		Schema   string `msgpack:"schema"`
+		SourceId string `msgpack:"source_id"`
 	}
 	MultiSQLRunner []MultiSQLRunner
 }
@@ -74,15 +73,12 @@ func (q *QueryDeal) PreCheck(insulateWordList string) error {
 	return errors.New(ER_RPC)
 }
 
-func (m *MultiSQLRunner) Run(source *model.CoreDataSource, schema string) (*Query, error) {
+func (m *MultiSQLRunner) Run(db *sqlx.DB, schema string) (*Query, error) {
 	query := new(Query)
-	db, err := sqlx.Connect("mysql", fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?charset=utf8mb4", source.Username, lib.Decrypt(source.Password), source.IP, source.Port, schema))
-	if err != nil {
-		return nil, err
+	if db == nil {
+		return nil, errors.New("数据库连接失败！")
 	}
-
-	defer db.Close()
-
+	db.Exec(fmt.Sprintf("use %s", schema))
 	rows, err := db.Queryx(m.SQL)
 
 	if err != nil {

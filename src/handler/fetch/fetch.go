@@ -79,7 +79,7 @@ func FetchSource(c yee.Context) (err error) {
 		c.Logger().Error(err.Error())
 		return c.JSON(http.StatusOK, common.ERR_REQ_BIND)
 	}
-	p := lib.MultiUserRuleMarge(groups)
+	p := lib.NewMultiUserRuleSet(groups)
 	switch u.Tp {
 	case "count":
 		return c.JSON(http.StatusOK, common.SuccessPayload(map[string]interface{}{"ddl": len(p.DDLSource), "dml": len(p.DMLSource), "query": len(p.QuerySource)}))
@@ -199,6 +199,13 @@ func FetchSQLTest(c yee.Context) (err error) {
 		c.Logger().Error(err.Error())
 		return c.JSON(http.StatusOK, common.ERR_REQ_BIND)
 	}
+
+	t := new(lib.Token).JwtParse(c)
+	control := lib.SourceControl{User: t.Username, Kind: u.Kind, SourceId: u.SourceId}
+	if !control.Equal() {
+		return c.JSON(http.StatusOK, common.ERR_COMMON_MESSAGE(errors.New("您没有该数据源权限，无法执行该操作")))
+	}
+
 	var s model.CoreDataSource
 	model.DB().Where("source_id =?", u.SourceId).First(&s)
 	var rs []engine.Record

@@ -18,7 +18,10 @@ import (
 	"Yearning-go/src/lib"
 	"Yearning-go/src/model"
 	"errors"
+	"fmt"
+	"github.com/cookieY/sqlx"
 	"github.com/cookieY/yee"
+	"github.com/golang-jwt/jwt"
 	"github.com/vmihailenco/msgpack/v5"
 	"golang.org/x/net/websocket"
 	"gorm.io/gorm"
@@ -36,6 +39,23 @@ type queryResults struct {
 	Status    bool     `msgpack:"status"`
 	HeartBeat uint8    `msgpack:"heartbeat"`
 	IsOnly    bool     `msgpack:"is_only"`
+}
+
+const (
+	None = iota
+	QUERY_CLOSE
+	QUERY_OPEN
+	QUERY_PING
+)
+
+type queryArgs struct {
+	SourceId string `json:"source_id"`
+}
+
+type queryCore struct {
+	db               *sqlx.DB
+	insulateWordList string
+	source           string
 }
 
 func reflect(flag bool) uint {
@@ -122,38 +142,56 @@ func FetchQueryTableInfo(c yee.Context) (err error) {
 }
 
 func SocketQueryResults(c yee.Context) (err error) {
-	user := c.QueryParam("user")
+	args := new(queryArgs)
+	if err = c.Bind(args); err != nil {
+		return
+	}
 	websocket.Handler(func(ws *websocket.Conn) {
 		defer ws.Close()
 		var b []byte
-		valid, err := lib.WSTokenIsValid(ws.Request().Header.Get("Sec-WebSocket-Protocol"))
+		token, err := lib.WsTokenParse(ws.Request().Header.Get("Sec-WebSocket-Protocol"))
 		if err != nil {
 			c.Logger().Error(err)
 			return
 		}
-		if valid {
+		user := token.Claims.(jwt.MapClaims)["name"].(string)
+		control := lib.SourceControl{User: user, Kind: lib.QUERY, SourceId: args.SourceId}
+		if !control.Equal() {
+			c.Logger().Criticalf("user:%s没有该数据源(%s)权限，无法执行该操作", user, args.SourceId)
+			return
+		}
+		if token.Valid {
+			msg := new(QueryDeal)
+			core := new(queryCore)
 			for {
-				var msg QueryDeal
 				if err := websocket.Message.Receive(ws, &b); err != nil {
 					if err != io.EOF {
 						c.Logger().Error(err)
 					}
 					break
 				}
-
 				if err := msgpack.Unmarshal(b, &msg.Ref); err != nil {
 					c.Logger().Error(err)
 					break
 				}
-
-				if msg.Ref.HeartBeat == 1 {
+				switch msg.Ref.Type {
+				case QUERY_PING:
 					_ = websocket.Message.Send(ws, lib.ToMsg(queryResults{HeartBeat: common.PING, IsOnly: model.GloOther.Query}))
 					continue
-				}
-
-				switch msg.Ref.Type {
-				case common.CLOSE:
+				case QUERY_CLOSE:
+					_ = core.db.Close()
 					break
+				case QUERY_OPEN:
+					var u model.CoreDataSource
+					model.DB().Where("source_id =?", args.SourceId).First(&u)
+					core.db, err = sqlx.Connect("mysql", fmt.Sprintf("%s:%s@tcp(%s:%d)/?charset=utf8mb4", u.Username, lib.Decrypt(u.Password), u.IP, u.Port))
+					if err != nil {
+						c.Logger().Error(err)
+						_ = websocket.Message.Send(ws, lib.ToMsg(queryResults{Error: err.Error()}))
+						return
+					}
+					core.insulateWordList = u.InsulateWordList
+					core.source = u.Source
 				default:
 					var d model.CoreQueryOrder
 					clock := time.Now()
@@ -178,7 +216,7 @@ func SocketQueryResults(c yee.Context) (err error) {
 
 					model.DB().Where("source_id =?", msg.Ref.SourceId).First(&u)
 
-					if err := msg.PreCheck(u.InsulateWordList); err != nil {
+					if err := msg.PreCheck(core.insulateWordList); err != nil {
 						if err := websocket.Message.Send(ws, lib.ToMsg(queryResults{Error: err.Error()})); err != nil {
 							c.Logger().Error(err)
 						}
@@ -186,7 +224,7 @@ func SocketQueryResults(c yee.Context) (err error) {
 					}
 
 					for _, i := range msg.MultiSQLRunner {
-						result, err := i.Run(&u, msg.Ref.Schema)
+						result, err := i.Run(core.db, msg.Ref.Schema)
 						if err != nil {
 							if err := websocket.Message.Send(ws, lib.ToMsg(queryResults{Error: err.Error()})); err != nil {
 								c.Logger().Error(err)
@@ -199,7 +237,7 @@ func SocketQueryResults(c yee.Context) (err error) {
 					queryTime := int(time.Since(clock).Seconds() * 1000)
 
 					go func(w string, s string, ex int) {
-						model.DB().Create(&model.CoreQueryRecord{SQL: s, WorkId: w, ExTime: ex, Time: time.Now().Format("2006-01-02 15:04"), Source: u.Source, Schema: msg.Ref.Schema})
+						model.DB().Create(&model.CoreQueryRecord{SQL: s, WorkId: w, ExTime: ex, Time: time.Now().Format("2006-01-02 15:04"), Source: core.source, Schema: msg.Ref.Schema})
 					}(d.WorkId, msg.Ref.Sql, queryTime)
 					if err := websocket.Message.Send(ws, lib.ToMsg(queryResults{Export: d.Export == 1, Error: "", Results: queryData, QueryTime: queryTime})); err != nil {
 						c.Logger().Error(err)

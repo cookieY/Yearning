@@ -17,6 +17,7 @@ import (
 	"Yearning-go/src/model"
 	"encoding/json"
 	"fmt"
+	mapset "github.com/deckarep/golang-set/v2"
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/vmihailenco/msgpack/v5"
 	"math"
@@ -103,32 +104,19 @@ func JsonStringify(i interface{}) []byte {
 	return o
 }
 
-func RemoveDuplicateElementForRule(addrs []string) []string {
-	result := make([]string, 0, len(addrs))
-	temp := map[string]struct{}{}
-	for _, item := range addrs {
-		if _, ok := temp[item]; !ok {
-			temp[item] = struct{}{}
-			result = append(result, item)
-		}
-	}
-	return result
-}
-
-func MultiUserRuleMarge(group []string) model.PermissionList {
-	var u model.PermissionList
+func NewMultiUserRuleSet(group []string) (u model.PermissionList) {
 	for _, i := range group {
 		var k model.CoreRoleGroup
 		var m1 model.PermissionList
 		model.DB().Where("group_id =?", i).First(&k)
-		_ = json.Unmarshal(k.Permissions, &m1)
+		_ = k.Permissions.UnmarshalJSON(&m1)
 		u.DDLSource = append(u.DDLSource, m1.DDLSource...)
 		u.DMLSource = append(u.DMLSource, m1.DMLSource...)
 		u.QuerySource = append(u.QuerySource, m1.QuerySource...)
 	}
-	u.DDLSource = RemoveDuplicateElementForRule(u.DDLSource)
-	u.DMLSource = RemoveDuplicateElementForRule(u.DMLSource)
-	u.QuerySource = RemoveDuplicateElementForRule(u.QuerySource)
+	u.DDLSource = mapset.NewSet[string](u.DDLSource...).ToSlice()
+	u.DMLSource = mapset.NewSet[string](u.DMLSource...).ToSlice()
+	u.QuerySource = mapset.NewSet[string](u.QuerySource...).ToSlice()
 	return u
 }
 
@@ -157,3 +145,32 @@ func ToMsg(v interface{}) []byte {
 	}
 	return b
 }
+
+type SourceControl struct {
+	User     string
+	Kind     int
+	SourceId string
+}
+
+func (i *SourceControl) Equal() bool {
+	var u model.CoreGrained
+	var rl []string
+	model.DB().Model(model.CoreGrained{}).Where("username =?", i.User).First(&u)
+	_ = u.Group.UnmarshalJSON(&rl)
+	p := NewMultiUserRuleSet(rl)
+	switch i.Kind {
+	case DDL:
+		return mapset.NewSet[string](p.DDLSource...).Contains(i.SourceId)
+	case DML:
+		return mapset.NewSet[string](p.DMLSource...).Contains(i.SourceId)
+	case QUERY:
+		return mapset.NewSet[string](p.QuerySource...).Contains(i.SourceId)
+	}
+	return false
+}
+
+const (
+	DDL = iota
+	DML
+	QUERY
+)

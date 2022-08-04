@@ -56,3 +56,9 @@ func WSTokenIsValid(token string) (bool, error) {
 	})
 	return t.Valid, err
 }
+
+func WsTokenParse(token string) (*jwt.Token, error) {
+	return jwt.Parse(token, func(token *jwt.Token) (interface{}, error) {
+		return []byte(model.JWT), nil
+	})
+}
