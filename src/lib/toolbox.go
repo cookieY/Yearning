@@ -109,7 +109,7 @@ func NewMultiUserRuleSet(group []string) (u model.PermissionList) {
 		var k model.CoreRoleGroup
 		var m1 model.PermissionList
 		model.DB().Where("group_id =?", i).First(&k)
-		_ = k.Permissions.UnmarshalJSON(&m1)
+		_ = k.Permissions.UnmarshalToJSON(&m1)
 		u.DDLSource = append(u.DDLSource, m1.DDLSource...)
 		u.DMLSource = append(u.DMLSource, m1.DMLSource...)
 		u.QuerySource = append(u.QuerySource, m1.QuerySource...)
@@ -156,7 +156,7 @@ func (i *SourceControl) Equal() bool {
 	var u model.CoreGrained
 	var rl []string
 	model.DB().Model(model.CoreGrained{}).Where("username =?", i.User).First(&u)
-	_ = u.Group.UnmarshalJSON(&rl)
+	_ = u.Group.UnmarshalToJSON(&rl)
 	p := NewMultiUserRuleSet(rl)
 	switch i.Kind {
 	case DDL:

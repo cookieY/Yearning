@@ -4,21 +4,21 @@ import (
 	"database/sql/driver"
 	"encoding/json"
 	"errors"
-	"fmt"
 )
 
-type JSON json.RawMessage
+type JSON []byte
 
 func (j *JSON) Scan(value interface{}) error {
-	bytes, ok := value.([]byte)
-	if !ok {
-		return errors.New(fmt.Sprint("Failed to unmarshal JSONB value:", value))
+	if value == nil {
+		*j = nil
+		return nil
 	}
-
-	result := json.RawMessage{}
-	err := json.Unmarshal(bytes, &result)
-	*j = JSON(result)
-	return err
+	s, ok := value.([]byte)
+	if !ok {
+		return errors.New("Invalid Scan Source")
+	}
+	*j = append((*j)[0:0], s...)
+	return nil
 }
 
 func (j JSON) Value() (driver.Value, error) {
@@ -34,7 +34,16 @@ func (j JSON) MarshalJSON() ([]byte, error) {
 	}
 	return j, nil
 }
-func (j *JSON) UnmarshalJSON(i interface{}) error {
+
+func (j *JSON) UnmarshalJSON(data []byte) error {
+	if j == nil {
+		return errors.New("null point exception")
+	}
+	*j = append((*j)[0:0], data...)
+	return nil
+}
+
+func (j *JSON) UnmarshalToJSON(i interface{}) error {
 	err := json.Unmarshal(*j, i)
 	return err
 }

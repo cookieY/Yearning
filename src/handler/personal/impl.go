@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/cookieY/sqlx"
+	"strings"
 )
 
 const (
@@ -128,7 +129,7 @@ func (m *MultiSQLRunner) Run(db *sqlx.DB, schema string) (*Query, error) {
 }
 
 func (m *MultiSQLRunner) excludeFieldContext(field string) bool {
-	_, ok := m.InsulateWordList[field]
+	_, ok := m.InsulateWordList[strings.ToLower(field)]
 	return ok
 }
 

@@ -58,7 +58,9 @@ func sqlOrderPost(c yee.Context) (err error) {
 
 	lib.MessagePush(u.WorkId, 2, "")
 
-	CallAutoTask(u, length)
+	if u.Type == lib.DML {
+		CallAutoTask(u, length)
+	}
 
 	return c.JSON(http.StatusOK, common.SuccessPayLoadToMessage(ORDER_POST_SUCCESS))
 }

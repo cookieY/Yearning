@@ -179,7 +179,9 @@ func SocketQueryResults(c yee.Context) (err error) {
 					_ = websocket.Message.Send(ws, lib.ToMsg(queryResults{HeartBeat: common.PING, IsOnly: model.GloOther.Query}))
 					continue
 				case QUERY_CLOSE:
-					_ = core.db.Close()
+					if core.db != nil {
+						_ = core.db.Close()
+					}
 					break
 				case QUERY_OPEN:
 					var u model.CoreDataSource
@@ -193,6 +195,7 @@ func SocketQueryResults(c yee.Context) (err error) {
 					core.insulateWordList = u.InsulateWordList
 					core.source = u.Source
 				default:
+					msg.MultiSQLRunner = []MultiSQLRunner{}
 					var d model.CoreQueryOrder
 					clock := time.Now()
 					if err := model.DB().Where("username =? AND status =?", user, 2).Last(&d).Error; errors.Is(err, gorm.ErrRecordNotFound) {

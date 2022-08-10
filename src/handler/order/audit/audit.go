@@ -73,7 +73,7 @@ func FetchOSCAPI(c yee.Context) (err error) {
 		for {
 			if workId != "" {
 				var osc model.CoreSqlOrder
-				model.DB().Model(model.CoreOrderComment{}).Where("work_id =?", workId).Find(&osc)
+				model.DB().Model(model.CoreSqlOrder{}).Where("work_id =?", workId).Find(&osc)
 				err := websocket.Message.Send(ws, osc.OSCInfo)
 				if err != nil {
 					c.Logger().Error(err)
