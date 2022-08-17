@@ -50,10 +50,10 @@ type oidc struct {
 	TokenUrl     string
 	UserUrl      string
 	RedirectUrL  string
-
-	UserNameKey string
-	RealNameKey string
-	EmailKey    string
+	SessionKey   string
+	UserNameKey  string
+	RealNameKey  string
+	EmailKey     string
 }
 
 type Config struct {

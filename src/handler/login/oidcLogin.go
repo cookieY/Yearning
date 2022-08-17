@@ -92,7 +92,7 @@ func OidcLogin(c yee.Context) (err error) {
 
 	code := c.FormValue("code")
 	state := c.FormValue("state")
-	sessionState := c.FormValue("session_state")
+	sessionState := c.FormValue(model.C.Oidc.SessionKey)
 
 	if code == "" || state == "" {
 		oidcAuthUrl, _ := oidcAuthUrl(c)
@@ -183,12 +183,12 @@ func getOidcUser(token *OidcToken) (userMap map[string]interface{}, err error) {
 
 func getOidcToken(code string, sessionState string) (oidc_token *OidcToken, err error) {
 	resp, err := http.PostForm(model.C.Oidc.TokenUrl, url.Values{
-		"session_state": {sessionState},
-		"code":          {code},
-		"client_id":     {model.C.Oidc.ClientId},
-		"client_secret": {model.C.Oidc.ClientSecret},
-		"grant_type":    {"authorization_code"},
-		"redirect_uri":  {model.C.Oidc.RedirectUrL},
+		model.C.Oidc.SessionKey: {sessionState},
+		"code":                  {code},
+		"client_id":             {model.C.Oidc.ClientId},
+		"client_secret":         {model.C.Oidc.ClientSecret},
+		"grant_type":            {"authorization_code"},
+		"redirect_uri":          {model.C.Oidc.RedirectUrL},
 	})
 	if err != nil {
 		return nil, err

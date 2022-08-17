@@ -30,10 +30,11 @@ func DBNew(c string) {
 	if err != nil {
 		logger.DefaultLogger.Error(err)
 	}
-	JWT = C.General.SecretKey
+	JWT = os.Getenv("SECRET_KEY")
 
 	dsn := fmt.Sprintf("%s:%s@tcp(%s)/%s?charset=utf8mb4&parseTime=True&loc=Local", os.Getenv("MYSQL_USER"), os.Getenv("MYSQL_PASSWORD"), os.Getenv("MYSQL_ADDR"), os.Getenv("MYSQL_DB"))
 	if os.Getenv("MYSQL_USER") == "" {
+		JWT = C.General.SecretKey
 		dsn = fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?charset=utf8mb4&parseTime=True&loc=Local", C.Mysql.User, C.Mysql.Password, C.Mysql.Host, C.Mysql.Port, C.Mysql.Db)
 	}
 	db, err := gorm.Open(drive.New(drive.Config{
