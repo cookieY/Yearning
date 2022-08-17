@@ -81,7 +81,11 @@ E-mail: henry@yearning.io
 
 ![login](img/login.png)
 
--   Dashboard
+- OIDC Login (Keycloak 为例)
+
+![oicdLogin](img/oidclogin.gif)
+
+- Dashboard
 
 ![](img/dash.png)
 

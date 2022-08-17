@@ -21,20 +21,19 @@ import (
 	"errors"
 	"fmt"
 	"github.com/cookieY/yee"
+	"github.com/golang-jwt/jwt"
 	"gorm.io/gorm"
 	"io"
 	"net/http"
 	"net/url"
+	"strconv"
+	"strings"
+	"time"
 )
 
 func OidcState(c yee.Context) (err error) {
 
-	oidcAuthUrl := fmt.Sprintf(
-		"%s?response_type=code&client_id=%s&redirect_uri=%s&scope=%s&state=367126378168",
-		model.C.Oidc.AuthUrl,
-		model.C.Oidc.ClientId,
-		model.C.Oidc.RedirectUrL,
-		model.C.Oidc.Scope)
+	oidcAuthUrl, _ := oidcAuthUrl(c)
 	oidcEnable := model.C.Oidc.Enable
 	if oidcEnable {
 		return c.JSON(http.StatusOK, common.SuccessPayload(map[string]interface{}{
@@ -48,6 +47,43 @@ func OidcState(c yee.Context) (err error) {
 	}
 }
 
+func oidcAuthUrl(c yee.Context) (oidcAuthUrl string, state string) {
+	state = generateState()
+	return fmt.Sprintf(
+		"%s?response_type=code&client_id=%s&redirect_uri=%s&scope=%s&state=%s",
+		model.C.Oidc.AuthUrl,
+		model.C.Oidc.ClientId,
+		model.C.Oidc.RedirectUrL,
+		model.C.Oidc.Scope,
+		state,
+	), state
+}
+
+// 生成 state，state 格式为 hs265签名.当前分钟数
+func generateState() string {
+	curMinutes := strconv.FormatInt(time.Now().Unix()/60, 10)
+	sign, err := jwt.GetSigningMethod("HS256").Sign(curMinutes, []byte(model.JWT))
+	if err != nil {
+		return ""
+	}
+	return sign + "." + curMinutes
+}
+
+// 由于没有session 机制，所以使用如下方法校验 state
+// 2分钟之内的 state 有效
+func validState(state string) error {
+	split := strings.Split(state, ".")
+	sign := split[0]
+	curMinutes := time.Now().Unix() / 60
+	for i := 0; i < 3; i++ {
+		err := jwt.GetSigningMethod("HS256").Verify(strconv.FormatInt(curMinutes-int64(i), 10), sign, []byte(model.JWT))
+		if err == nil {
+			return nil
+		}
+	}
+	return errors.New("state 不合法")
+}
+
 func OidcLogin(c yee.Context) (err error) {
 
 	if !model.C.Oidc.Enable {
@@ -55,18 +91,24 @@ func OidcLogin(c yee.Context) (err error) {
 	}
 
 	code := c.FormValue("code")
-	sessionState := c.FormValue(model.C.Oidc.SessionKey)
+	state := c.FormValue("state")
+	sessionState := c.FormValue("session_state")
 
-	if code == "" || sessionState == "" {
-		authUri := fmt.Sprintf(
-			"%s?response_type=code&client_id=%s&redirect_uri=%s&scope=%s",
-			model.C.Oidc.AuthUrl,
-			model.C.Oidc.ClientId,
-			model.C.Oidc.RedirectUrL,
-			model.C.Oidc.Scope)
-		return c.Redirect(302, authUri)
+	if code == "" || state == "" {
+		oidcAuthUrl, _ := oidcAuthUrl(c)
+		return c.Redirect(302, oidcAuthUrl)
 	}
+	err = validState(state)
+	if err != nil {
+		oidcAuthUrl, _ := oidcAuthUrl(c)
+		return c.Redirect(302, oidcAuthUrl)
+	}
+
 	account, err := getAccount(code, sessionState)
+	if err != nil {
+		oidcAuthUrl, _ := oidcAuthUrl(c)
+		return c.Redirect(302, oidcAuthUrl)
+	}
 
 	token, tokenErr := lib.JwtAuth(lib.Token{
 		Username: account.Username,
@@ -75,7 +117,8 @@ func OidcLogin(c yee.Context) (err error) {
 	})
 	if tokenErr != nil {
 		c.Logger().Error(tokenErr.Error())
-		return
+		oidcAuthUrl, _ := oidcAuthUrl(c)
+		return c.Redirect(302, oidcAuthUrl)
 	}
 
 	return c.Redirect(302, fmt.Sprintf(
@@ -84,8 +127,8 @@ func OidcLogin(c yee.Context) (err error) {
 	)
 }
 
-func getAccount(code string, session_state string) (ac *model.CoreAccount, err error) {
-	oidcToken, err := getOidcToken(code, session_state)
+func getAccount(code string, sessionState string) (ac *model.CoreAccount, err error) {
+	oidcToken, err := getOidcToken(code, sessionState)
 	if err != nil {
 		return nil, err
 	}
@@ -138,14 +181,14 @@ func getOidcUser(token *OidcToken) (userMap map[string]interface{}, err error) {
 	return userMap, nil
 }
 
-func getOidcToken(code string, session_state string) (oidc_token *OidcToken, err error) {
+func getOidcToken(code string, sessionState string) (oidc_token *OidcToken, err error) {
 	resp, err := http.PostForm(model.C.Oidc.TokenUrl, url.Values{
-		model.C.Oidc.SessionKey: {session_state},
-		"code":                  {code},
-		"client_id":             {model.C.Oidc.ClientId},
-		"client_secret":         {model.C.Oidc.ClientSecret},
-		"grant_type":            {"authorization_code"},
-		"redirect_uri":          {model.C.Oidc.RedirectUrL},
+		"session_state": {sessionState},
+		"code":          {code},
+		"client_id":     {model.C.Oidc.ClientId},
+		"client_secret": {model.C.Oidc.ClientSecret},
+		"grant_type":    {"authorization_code"},
+		"redirect_uri":  {model.C.Oidc.RedirectUrL},
 	})
 	if err != nil {
 		return nil, err
