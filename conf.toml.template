@@ -10,7 +10,7 @@ SecretKey = "dbcjqheupqjsuwsm"
 RpcAddr = "127.0.0.1:50001"
 
 [Oidc]
-Enable = true
+Enable = false
 ClientId = "yearning"
 ClientSecret = "fefehelj23jlj22f3jfjdfd"
 Scope = "openid profile"
