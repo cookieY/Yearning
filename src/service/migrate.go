@@ -62,7 +62,6 @@ func Migrate() {
 				return
 			}
 		}
-
 		_ = model.DB().AutoMigrate(&model.CoreAccount{})
 		_ = model.DB().AutoMigrate(&model.CoreDataSource{})
 		_ = model.DB().AutoMigrate(&model.CoreGlobalConfiguration{})

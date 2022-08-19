@@ -8,14 +8,12 @@ services:
            MYSQL_PASSWORD: ukC2ZkcG_ZTeb
            MYSQL_ADDR: mysql
            MYSQL_DB: yearning
-           SECRET_KEY: UkkKAdwHG7xXuRPt
+           SECRET_KEY: dbcjqheupqjsuwsm
            IS_DOCKER: is_docker
         ports:
            - 8000:8000
         # 首次使用请先初始化
-        #command: /bin/bash -c "./Yearning install"
-        #volumes:
-        #   - ./conf.toml:/opt/conf.toml
+        command: /bin/bash -c "./Yearning install && ./Yearning run"
         depends_on:
            - mysql
         restart: always
