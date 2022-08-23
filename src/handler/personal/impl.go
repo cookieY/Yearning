@@ -79,7 +79,7 @@ func (m *MultiSQLRunner) Run(db *sqlx.DB, schema string) (*Query, error) {
 	if db == nil {
 		return nil, errors.New("数据库连接失败！")
 	}
-	db.Exec(fmt.Sprintf("use %s", schema))
+	db.Exec(fmt.Sprintf("use `%s`", schema))
 	rows, err := db.Queryx(m.SQL)
 
 	if err != nil {
