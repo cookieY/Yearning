@@ -3,14 +3,11 @@
 </p>
 
 # Yearning SQL 审核平台
-
+[![OSCS Status](https://www.oscs1024.com/platform/badge/cookieY/Yearning.svg?size=small)](https://www.murphysec.com/dr/nDuoncnUbuFMdrZsh7)
 ![LICENSE](https://img.shields.io/badge/license-AGPL%20-blue.svg)
 ![](https://img.shields.io/github/languages/top/cookieY/Yearning)
 ![](https://img.shields.io/badge/build-prerelease-brightgreen.svg)  
 ![](https://img.shields.io/badge/version-v3.0.0-brightgreen.svg)
-
-
-[![OSCS Status](https://www.oscs1024.com/platform/badge/cookieY/Yearning.svg?size=large)](https://www.oscs1024.com/project/cookieY/Yearning?ref=badge_large)
 
 ##### MYSQL web 端 SQL 审核平台。
 
