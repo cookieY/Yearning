@@ -26,6 +26,9 @@ func ScanDataRows(s model.CoreDataSource, database, sql, meta string, isQuery bo
 	}
 
 	db, err := model.NewDBSub(fmt.Sprintf("%s:%s@(%s:%d)/%s?charset=utf8&parseTime=True&loc=Local", s.Username, ps, s.IP, s.Port, database))
+	if err != nil {
+		return nil, err
+	}
 
 	defer func() {
 		_ = model.Close(db)
