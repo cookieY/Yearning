@@ -23,6 +23,7 @@ import (
 	"math"
 	"math/rand"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -150,11 +151,17 @@ type SourceControl struct {
 	User     string
 	Kind     int
 	SourceId string
+	WorkId   string
 }
 
 func (i *SourceControl) Equal() bool {
 	var u model.CoreGrained
 	var rl []string
+	var ord model.CoreSqlOrder
+	model.DB().Model(model.CoreSqlOrder{}).Where("work_id =?", i.WorkId).First(&ord)
+	if strings.Contains(string(ord.Relevant), i.User) {
+		return true
+	}
 	model.DB().Model(model.CoreGrained{}).Where("username =?", i.User).First(&u)
 	_ = u.Group.UnmarshalToJSON(&rl)
 	p := NewMultiUserRuleSet(rl)

@@ -91,7 +91,7 @@ func ExecuteOrder(u *Confirm, user string) common.Resp {
 }
 
 func MultiAuditOrder(req *Confirm, user string) common.Resp {
-	if assigned, isExecute, ok := IsNotIdempotent(req, user); ok {
+	if assigned, isExecute, ok := isNotIdempotent(req, user); ok {
 		if isExecute {
 			return ExecuteOrder(req, user)
 		}
@@ -131,7 +131,7 @@ func delayKill(workId string) string {
 	return ORDER_DELAY_KILL_DETAIL
 }
 
-func IsNotIdempotent(r *Confirm, user string) ([]string, bool, bool) {
+func isNotIdempotent(r *Confirm, user string) ([]string, bool, bool) {
 	tpl := r.GetTPL()
 	if len(tpl) > r.Flag {
 		pList := strings.Join(tpl[r.Flag].Auditor, ",")

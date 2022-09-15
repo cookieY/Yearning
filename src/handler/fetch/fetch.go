@@ -110,7 +110,7 @@ func FetchAuditSteps(c yee.Context) (err error) {
 	var tpl model.CoreWorkflowTpl
 	var whoIsAuditor []tpl2.Tpl
 	model.DB().Model(model.CoreDataSource{}).Where("source_id = ?", unescape).First(&s)
-	if err := model.DB().Model(model.CoreWorkflowTpl{}).Where("id =?", s.FlowID).Find(&tpl).Error; errors.Is(err, gorm.ErrRecordNotFound) {
+	if err := model.DB().Model(model.CoreWorkflowTpl{}).Where("id =?", s.FlowID).First(&tpl).Error; errors.Is(err, gorm.ErrRecordNotFound) {
 		return c.JSON(http.StatusOK, common.ERR_COMMON_MESSAGE(errors.New("数据源没有添加流程!无法提交工单")))
 	}
 	_ = json.Unmarshal(tpl.Steps, &whoIsAuditor)
@@ -201,7 +201,7 @@ func FetchSQLTest(c yee.Context) (err error) {
 	}
 
 	t := new(lib.Token).JwtParse(c)
-	control := lib.SourceControl{User: t.Username, Kind: u.Kind, SourceId: u.SourceId}
+	control := lib.SourceControl{User: t.Username, Kind: u.Kind, SourceId: u.SourceId, WorkId: u.WorkId}
 	if !control.Equal() {
 		return c.JSON(http.StatusOK, common.ERR_COMMON_MESSAGE(errors.New("您没有该数据源权限，无法执行该操作")))
 	}
