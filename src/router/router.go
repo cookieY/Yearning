@@ -43,7 +43,8 @@ func SuperManageGroup() yee.HandlerFunc {
 		if role.Username == "admin" || focalPoint(c) {
 			return
 		}
-		return c.ServerError(http.StatusForbidden, "非法越权操作！")
+		c.Abort()
+		return c.JSON(http.StatusForbidden, "非法越权操作！")
 	}
 }
 
@@ -53,7 +54,8 @@ func SuperRecorderGroup() yee.HandlerFunc {
 		if role.IsRecord {
 			return
 		}
-		return c.ServerError(http.StatusForbidden, "非法越权操作！")
+		c.Abort()
+		return c.JSON(http.StatusForbidden, "非法越权操作！")
 	}
 }
 
@@ -68,16 +70,6 @@ func focalPoint(c yee.Context) bool {
 	}
 	return false
 }
-
-//func AuditGroup() yee.HandlerFunc {
-//	return func(c yee.Context) (err error) {
-//		role := new(lib.Token).JwtParse(c)
-//		if role.Role != "guest" {
-//			return
-//		}
-//		return c.ServerError(http.StatusForbidden, "非法越权操作！")
-//	}
-//}
 
 func AddRouter(e *yee.Core) {
 	e.POST("/login", login.UserGeneralLogin)
