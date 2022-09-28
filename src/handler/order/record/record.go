@@ -27,11 +27,8 @@ func timeAdd(add string) string {
 
 func RecordDashAxis(c yee.Context) (err error) {
 	var order []groupBy
-	var count count
-	model.DB().Model(model.CoreSqlOrder{}).Where("time > ? and type = 1", timeAdd("-2160")).Count(&count.DML)
-	model.DB().Model(model.CoreSqlOrder{}).Where("time > ? and type = 0", timeAdd("-2160")).Count(&count.DDL)
-	model.DB().Model(model.CoreSqlOrder{}).Select("time, count(*) as c,type").Where("time > ?", timeAdd("-2160")).Group("time,type").Scan(&order)
-	return c.JSON(http.StatusOK, common.SuccessPayload(map[string]interface{}{"order": order, "count": count}))
+	model.DB().Model(model.CoreSqlOrder{}).Select("substring(date,1,10) as `time`, count(*) as c,type").Where("date > ?", timeAdd("-2160")).Group("substring(date,1,10) ,`type`").Scan(&order)
+	return c.JSON(http.StatusOK, common.SuccessPayload(order))
 }
 
 func RecordOrderList(c yee.Context) (err error) {
@@ -43,7 +40,7 @@ func RecordOrderList(c yee.Context) (err error) {
 		Query(
 			common.AccordingToAllOrderType(u.Expr.Type),
 			common.AccordingToAllOrderState(u.Expr.Status),
-			common.AccordingToDatetime(u.Expr.Picker),
+			common.AccordingToDate(u.Expr.Picker),
 			common.AccordingToText(u.Expr.Text),
 		)
 	return c.JSON(http.StatusOK, u.ToMessage())

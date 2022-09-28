@@ -155,7 +155,7 @@ func FetchBase(c yee.Context) (err error) {
 		}
 		result.Results = _t
 	}
-	return c.JSON(http.StatusOK, common.SuccessPayload(map[string]interface{}{"results": result.Results}))
+	return c.JSON(http.StatusOK, common.SuccessPayload(result.Results))
 }
 
 func FetchTable(c yee.Context) (err error) {
@@ -174,7 +174,7 @@ func FetchTable(c yee.Context) (err error) {
 		c.Logger().Error(err.Error())
 		return c.JSON(http.StatusOK, common.ERR_COMMON_MESSAGE(err))
 	}
-	return c.JSON(http.StatusOK, common.SuccessPayload(map[string]interface{}{"results": result.Results}))
+	return c.JSON(http.StatusOK, common.SuccessPayload(result.Results))
 }
 
 func FetchTableInfo(c yee.Context) (err error) {
@@ -244,7 +244,7 @@ func FetchOrderDetailRollSQL(c yee.Context) (err error) {
 	workId := c.QueryParam("work_id")
 	var roll []model.CoreRollback
 	var count int64
-	model.DB().Select("`sql`").Model(model.CoreRollback{}).Where("work_id =?", workId).Count(&count).Find(&roll)
+	model.DB().Select("`sql`").Model(model.CoreRollback{}).Where("work_id =?", workId).Count(&count).Order("id desc").Find(&roll)
 	return c.JSON(http.StatusOK, common.SuccessPayload(map[string]interface{}{"sql": roll, "count": count}))
 }
 

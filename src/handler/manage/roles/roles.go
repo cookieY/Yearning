@@ -26,5 +26,5 @@ func SuperSaveRoles(c yee.Context) (err error) {
 func SuperFetchRoles(c yee.Context) (err error) {
 	var k model.CoreGlobalConfiguration
 	model.DB().Select("audit_role").First(&k)
-	return c.JSON(http.StatusOK, common.SuccessPayload(k))
+	return c.JSON(http.StatusOK, common.SuccessPayload(k.AuditRole))
 }

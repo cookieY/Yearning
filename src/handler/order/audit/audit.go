@@ -63,7 +63,7 @@ func FetchAuditOrder(c yee.Context) (err error) {
 		common.AccordingToRelevant(user.Username),
 		common.AccordingToText(u.Expr.Text),
 		common.AccordingToUsernameEqual(u.Expr.Username),
-		common.AccordingToDatetime(u.Expr.Picker))
+		common.AccordingToDate(u.Expr.Picker))
 	return c.JSON(http.StatusOK, u.ToMessage())
 }
 

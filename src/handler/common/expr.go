@@ -113,15 +113,6 @@ func AccordingToMail(user string) func(db *gorm.DB) *gorm.DB {
 	}
 }
 
-func AccordingToDatetime(time []string) func(db *gorm.DB) *gorm.DB {
-	return func(db *gorm.DB) *gorm.DB {
-		if reflect.DeepEqual(time, []string{"", ""}) || len(time) != 2 {
-			return db
-		}
-		return db.Where("time >= ? AND time <= ?", time[0], time[1])
-	}
-}
-
 func AccordingToDate(time []string) func(db *gorm.DB) *gorm.DB {
 	return func(db *gorm.DB) *gorm.DB {
 		if reflect.DeepEqual(time, []string{"", ""}) || len(time) != 2 {

@@ -18,7 +18,7 @@ func PersonalFetchMyOrder(c yee.Context) (err error) {
 		common.AccordingToAllOrderType(u.Expr.Type),
 		common.AccordingToAllOrderState(u.Expr.Status),
 		common.AccordingToUsernameEqual(user.Username),
-		common.AccordingToDatetime(u.Expr.Picker),
+		common.AccordingToDate(u.Expr.Picker),
 		common.AccordingToText(u.Expr.Text),
 	)
 	return c.JSON(http.StatusOK, u.ToMessage())
