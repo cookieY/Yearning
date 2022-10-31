@@ -104,7 +104,7 @@ func SendMail(addr string, mail model.Message, tmpl string) {
 	m.SetHeader("To", addr)
 	m.SetHeader("Subject", "Yearning消息推送!")
 	m.SetBody("text/html", tmpl)
-	d := gomail.NewDialer(mail.Host, mail.Port, mail.User, mail.Password)
+	d := Dialer(mail)
 	if mail.Ssl {
 		d.TLSConfig = &tls.Config{InsecureSkipVerify: true}
 	}
@@ -113,6 +113,17 @@ func SendMail(addr string, mail model.Message, tmpl string) {
 		logger.DefaultLogger.Errorf("send mail", err)
 		return
 	}
+}
+
+func Dialer(mail model.Message) *gomail.Dialer {
+	d := gomail.Dialer{
+		Host:     mail.Host,
+		Port:     mail.Port,
+		Username: mail.User,
+		Password: mail.Password,
+		SSL:      mail.Ssl,
+	}
+	return &d
 }
 
 func MessagePush(workid string, t uint, reject string) {

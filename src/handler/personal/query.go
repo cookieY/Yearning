@@ -118,7 +118,7 @@ func FetchQueryDatabaseInfo(c yee.Context) (err error) {
 		c.Logger().Error(err.Error())
 		return c.JSON(http.StatusOK, common.ERR_COMMON_MESSAGE(err))
 	}
-	return c.JSON(http.StatusOK, common.SuccessPayload(map[string]interface{}{"info": result.QueryList}))
+	return c.JSON(http.StatusOK, common.SuccessPayload(result.QueryList))
 }
 
 func FetchQueryTableInfo(c yee.Context) (err error) {

@@ -1,12 +1,18 @@
 # yearning
 
-- https://github.com/chaiyd/docker.git
-- 遵循yearning官方,具体查看yearning官方文档
-- 请在启动前先执行 yearning install 命令
+- 具体查看yearning官方文档
+- 请在启动前先执行 yearning install 进行初始化
 
 ### docker启动时传入相应变量
 ```
-docker run -d -it -p8000:8000 -e MYSQL_USER=root -e MYSQL_ADDR=10.0.0.3:3306 -e MYSQL_PASSWORD=123123 -e MYSQL_DB=Yearning chaiyd/yearning
+docker run -d -it \
+           -p8000:8000 -e IS_DOCKER=is_docker \
+           -e SECRET_KEY=dbcjqheupqjsuwsm \
+           -e MYSQL_USER=root \
+           -e MYSQL_ADDR=10.0.0.3:3306 \
+           -e MYSQL_PASSWORD=123123 \
+           -e MYSQL_DB=Yearning \
+           chaiyd/yearning
 ```
 
 ### docker-compose
@@ -18,14 +24,13 @@ docker run -d -it -p8000:8000 -e MYSQL_USER=root -e MYSQL_ADDR=10.0.0.3:3306 -e 
   - `command: /bin/bash -c "./Yearning reset_super"`
 
 ### docker tag
-- chaiyd/yearning:latest
-  - 默认为正式版，不包含RC 版
-- 获取RC版本
-  - docker pull chaiyd/yearning:3.0.0-rc10
+  - https://hub.docker.com/r/chaiyd/yearning/tags
 
 ### docker-compose
 ```
 version: '3'
+
+services:
     yearning:
         image: chaiyd/yearning:latest
         environment:
@@ -33,11 +38,12 @@ version: '3'
            MYSQL_PASSWORD: ukC2ZkcG_ZTeb
            MYSQL_ADDR: mysql
            MYSQL_DB: yearning
+           SECRET_KEY: dbcjqheupqjsuwsm
+           IS_DOCKER: is_docker
         ports:
            - 8000:8000
-        #command: /bin/bash -c "./Yearning install"
-        #volumes:
-        #   - ./conf.toml:/opt/conf.toml
+        # 首次使用请先初始化
+        # command: /bin/bash -c "./Yearning install && ./Yearning run"
         depends_on:
            - mysql
         restart: always
@@ -51,7 +57,7 @@ version: '3'
            MYSQL_PASSWORD: ukC2ZkcG_ZTeb
         command:
            - --character-set-server=utf8mb4
-           - --collation-server=utf8mb4_unicode_ci
+           - --collation-server=utf8mb4_general_ci
         volumes:
            - ./data/mysql:/var/lib/mysql
 

@@ -10,6 +10,8 @@ import (
 	"time"
 )
 
+const QueryField = "work_id, username, text, backup, date, real_name, `status`, `type`, `delay`, `source`, `source_id`,`id_c`,`data_base`,`table`,`execute_time`,assigned,current_step,relevant"
+
 func AuditOrderState(c yee.Context) (err error) {
 	u := new(Confirm)
 	user := new(lib.Token).JwtParse(c)
@@ -32,7 +34,7 @@ func AuditOrderState(c yee.Context) (err error) {
 	}
 }
 
-//DelayKill will stop delay order
+// DelayKill will stop delay order
 func DelayKill(c yee.Context) (err error) {
 	u := new(Confirm)
 	if err = c.Bind(u); err != nil {
@@ -56,12 +58,12 @@ func FetchAuditOrder(c yee.Context) (err error) {
 		return
 	}
 	user := new(lib.Token).JwtParse(c)
-	u.Paging().Query(common.AccordingToAllOrderState(u.Expr.Status),
+	u.Paging().Select(QueryField).Query(common.AccordingToAllOrderState(u.Expr.Status),
 		common.AccordingToAllOrderType(u.Expr.Type),
 		common.AccordingToRelevant(user.Username),
 		common.AccordingToText(u.Expr.Text),
 		common.AccordingToUsernameEqual(u.Expr.Username),
-		common.AccordingToDatetime(u.Expr.Picker))
+		common.AccordingToDate(u.Expr.Picker))
 	return c.JSON(http.StatusOK, u.ToMessage())
 }
 

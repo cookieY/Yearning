@@ -110,7 +110,7 @@ func FetchAuditSteps(c yee.Context) (err error) {
 	var tpl model.CoreWorkflowTpl
 	var whoIsAuditor []tpl2.Tpl
 	model.DB().Model(model.CoreDataSource{}).Where("source_id = ?", unescape).First(&s)
-	if err := model.DB().Model(model.CoreWorkflowTpl{}).Where("id =?", s.FlowID).Find(&tpl).Error; errors.Is(err, gorm.ErrRecordNotFound) {
+	if err := model.DB().Model(model.CoreWorkflowTpl{}).Where("id =?", s.FlowID).First(&tpl).Error; errors.Is(err, gorm.ErrRecordNotFound) {
 		return c.JSON(http.StatusOK, common.ERR_COMMON_MESSAGE(errors.New("数据源没有添加流程!无法提交工单")))
 	}
 	_ = json.Unmarshal(tpl.Steps, &whoIsAuditor)
@@ -155,7 +155,7 @@ func FetchBase(c yee.Context) (err error) {
 		}
 		result.Results = _t
 	}
-	return c.JSON(http.StatusOK, common.SuccessPayload(map[string]interface{}{"results": result.Results}))
+	return c.JSON(http.StatusOK, common.SuccessPayload(result.Results))
 }
 
 func FetchTable(c yee.Context) (err error) {
@@ -174,7 +174,7 @@ func FetchTable(c yee.Context) (err error) {
 		c.Logger().Error(err.Error())
 		return c.JSON(http.StatusOK, common.ERR_COMMON_MESSAGE(err))
 	}
-	return c.JSON(http.StatusOK, common.SuccessPayload(map[string]interface{}{"results": result.Results}))
+	return c.JSON(http.StatusOK, common.SuccessPayload(result.Results))
 }
 
 func FetchTableInfo(c yee.Context) (err error) {
@@ -201,7 +201,7 @@ func FetchSQLTest(c yee.Context) (err error) {
 	}
 
 	t := new(lib.Token).JwtParse(c)
-	control := lib.SourceControl{User: t.Username, Kind: u.Kind, SourceId: u.SourceId}
+	control := lib.SourceControl{User: t.Username, Kind: u.Kind, SourceId: u.SourceId, WorkId: u.WorkId}
 	if !control.Equal() {
 		return c.JSON(http.StatusOK, common.ERR_COMMON_MESSAGE(errors.New("您没有该数据源权限，无法执行该操作")))
 	}
@@ -244,7 +244,7 @@ func FetchOrderDetailRollSQL(c yee.Context) (err error) {
 	workId := c.QueryParam("work_id")
 	var roll []model.CoreRollback
 	var count int64
-	model.DB().Select("`sql`").Model(model.CoreRollback{}).Where("work_id =?", workId).Count(&count).Find(&roll)
+	model.DB().Select("`sql`").Model(model.CoreRollback{}).Where("work_id =?", workId).Count(&count).Order("id desc").Find(&roll)
 	return c.JSON(http.StatusOK, common.SuccessPayload(map[string]interface{}{"sql": roll, "count": count}))
 }
 

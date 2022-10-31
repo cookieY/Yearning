@@ -49,13 +49,14 @@ func (j *JSON) UnmarshalToJSON(i interface{}) error {
 }
 
 type CoreAccount struct {
-	ID         uint   `gorm:"primary_key;AUTO_INCREMENT" json:"id"`
-	Username   string `gorm:"type:varchar(50);not null;index:user_idx" json:"username"`
-	Password   string `gorm:"type:varchar(150);not null" json:"password"`
-	Department string `gorm:"type:varchar(50);" json:"department"`
-	RealName   string `gorm:"type:varchar(50);" json:"real_name"`
-	Email      string `gorm:"type:varchar(50);" json:"email"`
-	IsRecorder uint   `gorm:"type:tinyint(2) not null default 2" json:"is_recorder"`
+	ID            uint   `gorm:"primary_key;AUTO_INCREMENT" json:"id"`
+	Username      string `gorm:"type:varchar(50);not null;index:user_idx" json:"username"`
+	Password      string `gorm:"type:varchar(150);not null" json:"password"`
+	Department    string `gorm:"type:varchar(50);" json:"department"`
+	RealName      string `gorm:"type:varchar(50);" json:"real_name"`
+	Email         string `gorm:"type:varchar(50);" json:"email"`
+	IsRecorder    uint   `gorm:"type:tinyint(2) not null default 2" json:"is_recorder"`
+	QueryPassword string `gorm:"type:varchar(150);not null default ''" json:"query_password"`
 }
 
 type CoreGlobalConfiguration struct {
