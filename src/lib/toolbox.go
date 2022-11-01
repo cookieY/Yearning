@@ -181,3 +181,14 @@ const (
 	DML
 	QUERY
 )
+
+// GenOSCParams 根据数据库实例类型，确定gh-ost的参数；如果是pt-osc,则不做调整
+func GenOSCParams(role engine.AuditRole,host string) engine.AuditRole{
+	reAliyunRDS := regexp.MustCompile(`.*\.mysql\.rds\.aliyuncs\.com`)
+	ghost := " -aliyun-rds -assume-master-host=$ADDR"
+	OSCExpr := role.OSCExpr
+	if strings.HasPrefix(OSCExpr,"gh-ost") && reAliyunRDS.MatchString(host){
+		role.OSCExpr = OSCExpr + ghost
+	}
+	return role
+}
