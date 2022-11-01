@@ -219,7 +219,7 @@ func FetchSQLTest(c yee.Context) (err error) {
 			Password: lib.Decrypt(s.Password),
 			Kind:     u.Kind,
 			Lang:     "zh-cn",
-			Rule:     model.GloRole,
+			Rule: lib.GenOSCParams(model.GloRole,s.IP),
 		}, &rs); err != nil {
 			return c.JSON(http.StatusOK, common.ERR_RPC)
 		}
