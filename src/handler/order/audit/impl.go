@@ -69,7 +69,7 @@ func ExecuteOrder(u *Confirm, user string) common.Resp {
 	if client := lib.NewRpc(); client != nil {
 		if err := client.Call("Engine.Exec", &ExecArgs{
 			Order:    &order,
-			Rules:    model.GloRole,
+			Rules:     lib.GenOSCParams(model.GloRole,source.IP),
 			IP:       source.IP,
 			Port:     source.Port,
 			Username: source.Username,
