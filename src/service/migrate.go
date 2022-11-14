@@ -19,6 +19,7 @@ import (
 	"Yearning-go/src/model"
 	"encoding/json"
 	"fmt"
+	"github.com/google/uuid"
 	"github.com/gookit/gcli/v2/interact"
 	"os"
 	"time"
@@ -30,7 +31,8 @@ func DataInit(o *engine.AuditRole, other *model.Other, ldap *model.Ldap, message
 	l, _ := json.Marshal(ldap)
 	m, _ := json.Marshal(message)
 	ak, _ := json.Marshal(a)
-	group, _ := json.Marshal([]string{"admin"})
+	sId := uuid.New().String()
+	group, _ := json.Marshal([]string{sId})
 	model.DB().Debug().Create(&model.CoreAccount{
 		Username:   "admin",
 		RealName:   "超级管理员",
@@ -52,6 +54,7 @@ func DataInit(o *engine.AuditRole, other *model.Other, ldap *model.Ldap, message
 	model.DB().Debug().Create(&model.CoreRoleGroup{
 		Name:        "admin",
 		Permissions: ak,
+		GroupId:     sId,
 	})
 }
 
@@ -108,6 +111,7 @@ func Migrate() {
 			AllowCreatePartition:           false,
 			AllowCreateView:                false,
 			AllowSpecialType:               false,
+			DDLEnablePrimaryKey:            false,
 		}
 
 		other := model.Other{

@@ -110,7 +110,7 @@ func SendMail(addr string, mail model.Message, tmpl string) {
 	}
 	// Send the email to Bob, Cora and Dan.
 	if err := d.DialAndSend(m); err != nil {
-		logger.DefaultLogger.Errorf("send mail", err)
+		logger.DefaultLogger.Errorf("send mail:%s", err)
 		return
 	}
 }
