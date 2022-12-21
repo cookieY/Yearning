@@ -5,7 +5,6 @@ import (
 	"Yearning-go/src/lib"
 	"Yearning-go/src/model"
 	"encoding/json"
-	"fmt"
 	"github.com/google/uuid"
 	drive "gorm.io/driver/mysql"
 	"gorm.io/gorm"
@@ -27,8 +26,21 @@ type CommonDBPost struct {
 }
 
 func ConnTest(u *model.CoreDataSource) error {
+	dsn, err := model.InitDSN(model.DSN{
+		Username: u.Username,
+		Password: u.Password,
+		Host:     u.IP,
+		Port:     u.Port,
+		DBName:   "",
+		CA:       u.CAFile,
+		Cert:     u.Cert,
+		Key:      u.KeyFile,
+	})
+	if err != nil {
+		return err
+	}
 	db, err := gorm.Open(drive.New(drive.Config{
-		DSN:                       fmt.Sprintf("%s:%s@(%s:%d)/?charset=utf8&parseTime=True&loc=Local", u.Username, u.Password, u.IP, u.Port),
+		DSN:                       dsn,
 		DefaultStringSize:         256,   // string 类型字段的默认长度
 		SkipInitializeWithVersion: false, // 根据当前 MySQL 版本自动配置
 	}), &gorm.Config{})
@@ -55,6 +67,9 @@ func SuperEditSource(source *model.CoreDataSource) common.Resp {
 		"exclude_db_list":    source.ExcludeDbList,
 		"principal":          source.Principal,
 		"insulate_word_list": source.InsulateWordList,
+		"ca_file":            source.CAFile,
+		"cert":               source.Cert,
+		"key_file":           source.KeyFile,
 	})
 	var k []model.CoreRoleGroup
 	model.DB().Find(&k)

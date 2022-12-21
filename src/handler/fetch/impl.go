@@ -5,7 +5,6 @@ import (
 	"Yearning-go/src/lib"
 	"Yearning-go/src/model"
 	"fmt"
-	"strconv"
 )
 
 const (
@@ -46,7 +45,16 @@ func (u *_FetchBind) FetchTableFieldsOrIndexes() error {
 	model.DB().Where("source_id =?", u.SourceId).First(&s)
 
 	ps := lib.Decrypt(s.Password)
-	db, err := model.NewDBSub(fmt.Sprintf("%s:%s@(%s:%s)/%s?charset=utf8&parseTime=True&loc=Local", s.Username, ps, s.IP, strconv.Itoa(s.Port), u.DataBase))
+	db, err := model.NewDBSub(model.DSN{
+		Username: s.Username,
+		Password: ps,
+		Host:     s.IP,
+		Port:     s.Port,
+		DBName:   u.DataBase,
+		CA:       s.CAFile,
+		Cert:     s.Cert,
+		Key:      s.KeyFile,
+	})
 	if err != nil {
 		return err
 	}

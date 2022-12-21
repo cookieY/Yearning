@@ -31,6 +31,9 @@ type ExecArgs struct {
 	Port          int
 	Username      string
 	Password      string
+	CA            string
+	Cert          string
+	Key           string
 	Message       model.Message
 	MaxAffectRows uint
 }
@@ -74,6 +77,9 @@ func ExecuteOrder(u *Confirm, user string) common.Resp {
 			Port:     source.Port,
 			Username: source.Username,
 			Password: lib.Decrypt(source.Password),
+			CA:       source.CAFile,
+			Cert:     source.Cert,
+			Key:      source.KeyFile,
 			Message:  model.GloMessage,
 		}, &isCall); err != nil {
 			return common.ERR_RPC

@@ -75,4 +75,7 @@ type CheckArgs struct {
 	Username string
 	Port     int
 	Password string
+	CA       string
+	Cert     string
+	Key      string
 }

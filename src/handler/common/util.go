@@ -25,10 +25,20 @@ func ScanDataRows(s model.CoreDataSource, database, sql, meta string, isQuery bo
 		return res, errors.New("连接失败,密码解析错误！")
 	}
 
-	db, err := model.NewDBSub(fmt.Sprintf("%s:%s@(%s:%d)/%s?charset=utf8&parseTime=True&loc=Local", s.Username, ps, s.IP, s.Port, database))
+	db, err := model.NewDBSub(model.DSN{
+		Username: s.Username,
+		Password: ps,
+		Host:     s.IP,
+		Port:     s.Port,
+		DBName:   database,
+		CA:       s.CAFile,
+		Cert:     s.Cert,
+		Key:      s.KeyFile,
+	})
 	if err != nil {
-		return nil, err
+		return res, err
 	}
+
 	defer func() {
 		_ = model.Close(db)
 	}()
@@ -71,7 +81,16 @@ func checkMeta(s, database, flag string) string {
 func Highlight(s *model.CoreDataSource) []map[string]string {
 	ps := lib.Decrypt(s.Password)
 	var list []map[string]string
-	db, err := model.NewDBSub(fmt.Sprintf("%s:%s@(%s:%d)/?charset=utf8&parseTime=True&loc=Local", s.Username, ps, s.IP, s.Port))
+	db, err := model.NewDBSub(model.DSN{
+		Username: s.Username,
+		Password: ps,
+		Host:     s.IP,
+		Port:     s.Port,
+		DBName:   "",
+		CA:       s.CAFile,
+		Cert:     s.Cert,
+		Key:      s.KeyFile,
+	})
 	if err != nil {
 		logger.DefaultLogger.Error(err)
 		return nil

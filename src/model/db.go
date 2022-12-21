@@ -14,9 +14,12 @@
 package model
 
 import (
+	"crypto/tls"
+	"crypto/x509"
 	"fmt"
 	"github.com/BurntSushi/toml"
 	"github.com/cookieY/yee/logger"
+	mmsql "github.com/go-sql-driver/mysql"
 	drive "gorm.io/driver/mysql"
 	"gorm.io/gorm"
 	"os"
@@ -24,6 +27,17 @@ import (
 )
 
 var sqlDB *gorm.DB
+
+type DSN struct {
+	Username string
+	Password string
+	Host     string
+	Port     int
+	DBName   string
+	CA       string
+	Cert     string
+	Key      string
+}
 
 func DBNew(c string) {
 	_, err := toml.DecodeFile(c, &C)
@@ -62,9 +76,13 @@ func DB() *gorm.DB {
 	return sqlDB
 }
 
-func NewDBSub(dsn string) (*gorm.DB, error) {
+func NewDBSub(dsn DSN) (*gorm.DB, error) {
+	d, err := InitDSN(dsn)
+	if err != nil {
+		return nil, err
+	}
 	db, err := gorm.Open(drive.New(drive.Config{
-		DSN:                       dsn,
+		DSN:                       d,
 		DefaultStringSize:         256,   // string 类型字段的默认长度
 		SkipInitializeWithVersion: false, // 根据当前 MySQL 版本自动配置
 	}), &gorm.Config{})
@@ -75,6 +93,45 @@ func NewDBSub(dsn string) (*gorm.DB, error) {
 }
 
 func Close(db *gorm.DB) error {
-	orm, _ := db.DB()
+	orm, err := db.DB()
+	if err != nil {
+		return err
+	}
 	return orm.Close()
+}
+
+func InitDSN(dsn DSN) (string, error) {
+	isTLS := false
+	if dsn.CA != "" && dsn.Cert != "" && dsn.Key != "" {
+		isTLS = true
+		certPool := x509.NewCertPool()
+		if ok := certPool.AppendCertsFromPEM([]byte(dsn.CA)); !ok {
+			return "", fmt.Errorf("failed to append ca certs")
+		}
+		clientCert := make([]tls.Certificate, 0, 1)
+		certs, err := tls.X509KeyPair([]byte(dsn.Cert), []byte(dsn.Key))
+		if err != nil {
+			return "", err
+		}
+		clientCert = append(clientCert, certs)
+		_ = mmsql.RegisterTLSConfig("custom", &tls.Config{
+			RootCAs:            certPool,
+			Certificates:       clientCert,
+			InsecureSkipVerify: true,
+		})
+	}
+	cfg := mmsql.Config{
+		User:                 dsn.Username,
+		Passwd:               dsn.Password,
+		Addr:                 fmt.Sprintf("%s:%d", dsn.Host, dsn.Port), //IP:PORT
+		Net:                  "tcp",
+		DBName:               dsn.DBName,
+		Loc:                  time.Local,
+		AllowNativePasswords: true,
+		ParseTime:            true,
+	}
+	if isTLS == true {
+		cfg.TLSConfig = "custom"
+	}
+	return cfg.FormatDSN(), nil
 }

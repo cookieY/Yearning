@@ -126,6 +126,9 @@ type CoreDataSource struct {
 	ExcludeDbList    string `gorm:"type:varchar(200);not null" json:"exclude_db_list"`
 	InsulateWordList string `gorm:"type:varchar(200);not null" json:"insulate_word_list"`
 	Principal        string `gorm:"type:varchar(150);not null" json:"principal"`
+	CAFile           string `gorm:"type:longtext;default ''" json:"ca_file"`
+	Cert             string `gorm:"type:longtext;default ''" json:"cert"`
+	KeyFile          string `gorm:"type:longtext;default ''" json:"key_file"`
 }
 
 type CoreGrained struct {
