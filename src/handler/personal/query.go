@@ -37,7 +37,7 @@ type queryResults struct {
 	Results   []*Query `msgpack:"results"`
 	QueryTime int      `msgpack:"query_time"`
 	Status    bool     `msgpack:"status"`
-	HeartBeat uint8    `msgpack:"heartbeat"`
+	HeartBeat string   `msgpack:"heartbeat"`
 	IsOnly    bool     `msgpack:"is_only"`
 }
 
@@ -160,9 +160,21 @@ func SocketQueryResults(c yee.Context) (err error) {
 			c.Logger().Criticalf("user:%s没有该数据源(%s)权限，无法执行该操作", user, args.SourceId)
 			return
 		}
+
 		if token.Valid {
 			msg := new(QueryDeal)
 			core := new(queryCore)
+			var u model.CoreDataSource
+			model.DB().Where("source_id =?", args.SourceId).First(&u)
+			core.db, err = sqlx.Connect("mysql", fmt.Sprintf("%s:%s@tcp(%s:%d)/?charset=utf8mb4", u.Username, lib.Decrypt(model.JWT, u.Password), u.IP, u.Port))
+			if err != nil {
+				c.Logger().Error(err)
+				_ = websocket.Message.Send(ws, lib.ToMsg(queryResults{Error: err.Error()}))
+				return
+			}
+			core.insulateWordList = u.InsulateWordList
+			core.source = u.Source
+			defer core.db.Close()
 			for {
 				if err := websocket.Message.Receive(ws, &b); err != nil {
 					if err != io.EOF {
@@ -170,84 +182,60 @@ func SocketQueryResults(c yee.Context) (err error) {
 					}
 					break
 				}
+				if string(b) == "ping" {
+					_ = websocket.Message.Send(ws, lib.ToMsg(queryResults{HeartBeat: common.Pong, IsOnly: model.GloOther.Query}))
+					continue
+				}
 				if err := msgpack.Unmarshal(b, &msg.Ref); err != nil {
 					c.Logger().Error(err)
 					break
 				}
-				switch msg.Ref.Type {
-				case QUERY_PING:
-					_ = websocket.Message.Send(ws, lib.ToMsg(queryResults{HeartBeat: common.PING, IsOnly: model.GloOther.Query}))
-					continue
-				case QUERY_CLOSE:
-					if core.db != nil {
-						_ = core.db.Close()
-					}
-					break
-				case QUERY_OPEN:
-					var u model.CoreDataSource
-					model.DB().Where("source_id =?", args.SourceId).First(&u)
-					core.db, err = sqlx.Connect("mysql", fmt.Sprintf("%s:%s@tcp(%s:%d)/?charset=utf8mb4", u.Username, lib.Decrypt(u.Password), u.IP, u.Port))
-					if err != nil {
+				var d model.CoreQueryOrder
+				msg.MultiSQLRunner = []MultiSQLRunner{}
+				clock := time.Now()
+				if err := model.DB().Where("username =? AND status =?", user, 2).Last(&d).Error; errors.Is(err, gorm.ErrRecordNotFound) {
+					if err := websocket.Message.Send(ws, lib.ToMsg(queryResults{Status: true})); err != nil {
 						c.Logger().Error(err)
-						_ = websocket.Message.Send(ws, lib.ToMsg(queryResults{Error: err.Error()}))
-						return
 					}
-					core.insulateWordList = u.InsulateWordList
-					core.source = u.Source
-				default:
-					msg.MultiSQLRunner = []MultiSQLRunner{}
-					var d model.CoreQueryOrder
-					clock := time.Now()
-					if err := model.DB().Where("username =? AND status =?", user, 2).Last(&d).Error; errors.Is(err, gorm.ErrRecordNotFound) {
-						if err := websocket.Message.Send(ws, lib.ToMsg(queryResults{Status: true})); err != nil {
-							c.Logger().Error(err)
-						}
-						continue
+					continue
+				}
+
+				if lib.TimeDifference(d.ApprovalTime) {
+					model.DB().Model(model.CoreQueryOrder{}).Where("username =?", user).Updates(&model.CoreQueryOrder{Status: 3})
+					if err := websocket.Message.Send(ws, lib.ToMsg(queryResults{Status: true})); err != nil {
+						c.Logger().Error(err)
 					}
+					continue
+				}
 
-					if lib.TimeDifference(d.ApprovalTime) {
-						model.DB().Model(model.CoreQueryOrder{}).Where("username =?", user).Updates(&model.CoreQueryOrder{Status: 3})
-						if err := websocket.Message.Send(ws, lib.ToMsg(queryResults{Status: true})); err != nil {
-							c.Logger().Error(err)
-						}
-						continue
+				var queryData []*Query
+
+				if err := msg.PreCheck(core.insulateWordList); err != nil {
+					if err := websocket.Message.Send(ws, lib.ToMsg(queryResults{Error: err.Error()})); err != nil {
+						c.Logger().Error(err)
 					}
+					continue
+				}
 
-					var u model.CoreDataSource
-
-					var queryData []*Query
-
-					model.DB().Where("source_id =?", msg.Ref.SourceId).First(&u)
-
-					if err := msg.PreCheck(core.insulateWordList); err != nil {
+				for _, i := range msg.MultiSQLRunner {
+					result, err := i.Run(core.db, msg.Ref.Schema)
+					if err != nil {
 						if err := websocket.Message.Send(ws, lib.ToMsg(queryResults{Error: err.Error()})); err != nil {
 							c.Logger().Error(err)
 						}
 						continue
 					}
 
-					for _, i := range msg.MultiSQLRunner {
-						result, err := i.Run(core.db, msg.Ref.Schema)
-						if err != nil {
-							if err := websocket.Message.Send(ws, lib.ToMsg(queryResults{Error: err.Error()})); err != nil {
-								c.Logger().Error(err)
-							}
-							goto NEXT
-						}
-						queryData = append(queryData, result)
-					}
-
-					queryTime := int(time.Since(clock).Seconds() * 1000)
-
-					go func(w string, s string, ex int) {
-						model.DB().Create(&model.CoreQueryRecord{SQL: s, WorkId: w, ExTime: ex, Time: time.Now().Format("2006-01-02 15:04"), Source: core.source, Schema: msg.Ref.Schema})
-					}(d.WorkId, msg.Ref.Sql, queryTime)
-					if err := websocket.Message.Send(ws, lib.ToMsg(queryResults{Export: d.Export == 1, Error: "", Results: queryData, QueryTime: queryTime})); err != nil {
-						c.Logger().Error(err)
-					}
+					queryData = append(queryData, result)
 				}
-			NEXT:
-				continue
+
+				queryTime := int(time.Since(clock).Seconds() * 1000)
+				go func(w string, s string, ex int) {
+					model.DB().Create(&model.CoreQueryRecord{SQL: s, WorkId: w, ExTime: ex, Time: time.Now().Format("2006-01-02 15:04"), Source: core.source, Schema: msg.Ref.Schema})
+				}(d.WorkId, msg.Ref.Sql, queryTime)
+				if err := websocket.Message.Send(ws, lib.ToMsg(queryResults{Export: d.Export == 1, Results: queryData, QueryTime: queryTime})); err != nil {
+					c.Logger().Error(err)
+				}
 			}
 		}
 

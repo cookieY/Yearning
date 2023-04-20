@@ -4,8 +4,11 @@ import (
 	"Yearning-go/src/handler/common"
 	"Yearning-go/src/lib"
 	"Yearning-go/src/model"
+	"encoding/json"
 	"github.com/cookieY/yee"
+	"github.com/golang-jwt/jwt"
 	"golang.org/x/net/websocket"
+	"io"
 	"net/http"
 	"time"
 )
@@ -52,19 +55,52 @@ func DelayKill(c yee.Context) (err error) {
 }
 
 func FetchAuditOrder(c yee.Context) (err error) {
-	u := new(common.PageList[[]model.CoreSqlOrder])
-	if err = c.Bind(u); err != nil {
-		c.Logger().Error(err.Error())
-		return
-	}
-	user := new(lib.Token).JwtParse(c)
-	u.Paging().Select(QueryField).Query(common.AccordingToAllOrderState(u.Expr.Status),
-		common.AccordingToAllOrderType(u.Expr.Type),
-		common.AccordingToRelevant(user.Username),
-		common.AccordingToText(u.Expr.Text),
-		common.AccordingToUsernameEqual(u.Expr.Username),
-		common.AccordingToDate(u.Expr.Picker))
-	return c.JSON(http.StatusOK, u.ToMessage())
+	websocket.Handler(func(ws *websocket.Conn) {
+		defer ws.Close()
+		valid, err := lib.WSTokenIsValid(ws.Request().Header.Get("Sec-WebSocket-Protocol"))
+		if err != nil {
+			c.Logger().Error(err)
+			return
+		}
+		if valid {
+			var u common.PageList[[]model.CoreSqlOrder]
+			var b []byte
+			for {
+				if err := websocket.Message.Receive(ws, &b); err != nil {
+					if err != io.EOF {
+						c.Logger().Error(err)
+					}
+					break
+				}
+				if string(b) == "ping" {
+					continue
+				}
+				if err := json.Unmarshal(b, &u); err != nil {
+					c.Logger().Error(err)
+					break
+				}
+				token, err := lib.WsTokenParse(ws.Request().Header.Get("Sec-WebSocket-Protocol"))
+				if err != nil {
+					c.Logger().Error(err)
+					break
+				}
+				user := token.Claims.(jwt.MapClaims)["name"].(string)
+				u.Paging().Select(QueryField).Query(common.AccordingToAllOrderState(u.Expr.Status),
+					common.AccordingToAllOrderType(u.Expr.Type),
+					common.AccordingToRelevant(user),
+					common.AccordingToText(u.Expr.Text),
+					common.AccordingToUsernameEqual(u.Expr.Username),
+					common.AccordingToDate(u.Expr.Picker),
+					common.AccordingToWorkId(u.Expr.WorkId),
+				)
+				if err = websocket.Message.Send(ws, lib.ToJson(u.ToMessage())); err != nil {
+					c.Logger().Error(err)
+					break
+				}
+			}
+		}
+	}).ServeHTTP(c.Response(), c.Request())
+	return nil
 }
 
 func FetchOSCAPI(c yee.Context) (err error) {
@@ -85,9 +121,6 @@ func FetchOSCAPI(c yee.Context) (err error) {
 			if err := websocket.Message.Receive(ws, &msg); err != nil {
 				break
 			}
-			if msg == common.CLOSE {
-				break
-			}
 		}
 	}).ServeHTTP(c.Response(), c.Request())
 	return nil
@@ -106,8 +139,8 @@ func AuditOrderApis(c yee.Context) (err error) {
 
 func AuditOrRecordOrderFetchApis(c yee.Context) (err error) {
 	switch c.Params("tp") {
-	case "list":
-		return FetchAuditOrder(c)
+	//case "list":
+	//	return FetchAuditOrder(c)
 	//case "record":
 	//	return FetchRecord(c)
 	default:
@@ -115,12 +148,14 @@ func AuditOrRecordOrderFetchApis(c yee.Context) (err error) {
 	}
 }
 
-func AuditOSCFetchAndKillApis(c yee.Context) (err error) {
+func AuditFetchApis(c yee.Context) (err error) {
 	switch c.Params("tp") {
 	case "osc":
 		return FetchOSCAPI(c)
 	case "kill":
 		return nil
+	case "list":
+		return FetchAuditOrder(c)
 	default:
 		return c.JSON(http.StatusOK, common.ERR_REQ_FAKE)
 	}

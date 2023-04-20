@@ -107,6 +107,7 @@ const (
 )
 
 const (
-	CLOSE = "1"
-	PING  = 1
+	Pong = "pong"
+	Ping = "ping"
+	PING = 1
 )

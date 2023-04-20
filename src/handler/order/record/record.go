@@ -2,9 +2,13 @@ package record
 
 import (
 	"Yearning-go/src/handler/common"
+	"Yearning-go/src/lib"
 	"Yearning-go/src/model"
+	"encoding/json"
 	"fmt"
 	"github.com/cookieY/yee"
+	"golang.org/x/net/websocket"
+	"io"
 	"net/http"
 	"time"
 )
@@ -32,16 +36,47 @@ func RecordDashAxis(c yee.Context) (err error) {
 }
 
 func RecordOrderList(c yee.Context) (err error) {
-	u := new(common.PageList[[]model.CoreSqlOrder])
-	if err = c.Bind(u); err != nil {
-		return
-	}
-	u.Paging().Select(common.QueryField).
-		Query(
-			common.AccordingToAllOrderType(u.Expr.Type),
-			common.AccordingToAllOrderState(u.Expr.Status),
-			common.AccordingToDate(u.Expr.Picker),
-			common.AccordingToText(u.Expr.Text),
-		)
-	return c.JSON(http.StatusOK, u.ToMessage())
+	websocket.Handler(func(ws *websocket.Conn) {
+		defer ws.Close()
+		valid, err := lib.WSTokenIsValid(ws.Request().Header.Get("Sec-WebSocket-Protocol"))
+		if err != nil {
+			c.Logger().Error(err)
+			return
+		}
+		if valid {
+			var u common.PageList[[]model.CoreSqlOrder]
+			var b []byte
+			for {
+				if err := websocket.Message.Receive(ws, &b); err != nil {
+					if err != io.EOF {
+						c.Logger().Error(err)
+					}
+					break
+				}
+				if string(b) == "ping" {
+					continue
+				}
+				if err := json.Unmarshal(b, &u); err != nil {
+					c.Logger().Error(err)
+					break
+				}
+				if err != nil {
+					c.Logger().Error(err)
+					break
+				}
+				u.Paging().Select(common.QueryField).
+					Query(
+						common.AccordingToAllOrderType(u.Expr.Type),
+						common.AccordingToAllOrderState(u.Expr.Status),
+						common.AccordingToDate(u.Expr.Picker),
+						common.AccordingToText(u.Expr.Text),
+					)
+				if err = websocket.Message.Send(ws, lib.ToJson(u.ToMessage())); err != nil {
+					c.Logger().Error(err)
+					break
+				}
+			}
+		}
+	}).ServeHTTP(c.Response(), c.Request())
+	return nil
 }

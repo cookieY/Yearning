@@ -50,12 +50,14 @@ func SuperManageGroup() yee.HandlerFunc {
 
 func SuperRecorderGroup() yee.HandlerFunc {
 	return func(c yee.Context) (err error) {
+		if c.IsWebsocket() {
+			return nil
+		}
 		role := new(lib.Token).JwtParse(c)
 		if role.IsRecord {
 			return
 		}
-		c.Abort()
-		return c.JSON(http.StatusForbidden, "非法越权操作！")
+		return c.ServerError(http.StatusForbidden, "非法越权操作！")
 	}
 }
 
@@ -93,7 +95,7 @@ func AddRouter(e *yee.Core) {
 
 	re := r.Group("/record", SuperRecorderGroup())
 	re.GET("/axis", record.RecordDashAxis)
-	re.PUT("/list", record.RecordOrderList)
+	re.GET("/list", record.RecordOrderList)
 
 	manager := r.Group("/manage", SuperManageGroup())
 	manager.POST("/board/post", manage.GeneralPostBoard)

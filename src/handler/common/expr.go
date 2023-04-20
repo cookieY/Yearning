@@ -1,7 +1,6 @@
 package common
 
 import (
-	"Yearning-go/src/lib"
 	"gorm.io/gorm"
 	"reflect"
 )
@@ -68,12 +67,13 @@ func AccordingToAssigned(user string) func(db *gorm.DB) *gorm.DB {
 	}
 }
 
-func AccordingQueryToAssigned(t *lib.Token) func(db *gorm.DB) *gorm.DB {
+func AccordingQueryToAssigned(isRecord bool, username string) func(db *gorm.DB) *gorm.DB {
+
 	return func(db *gorm.DB) *gorm.DB {
-		if t.IsRecord {
+		if isRecord {
 			return db
 		}
-		return db.Where("`assigned` like ?", "%"+t.Username+"%")
+		return db.Where("`assigned` like ?", "%"+username+"%")
 	}
 }
 

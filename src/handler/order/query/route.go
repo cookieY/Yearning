@@ -4,7 +4,8 @@ import "github.com/cookieY/yee"
 
 func AuditQueryRestFulAPis() yee.RestfulAPI {
 	return yee.RestfulAPI{
-		Put:    AuditOrRecordQueryOrderFetchApis,
+		Put:    AuditQueryOrderProfileFetchApis,
+		Get:    AuditQueryOrderApis,
 		Delete: QueryDeleteEmptyRecord,
 		Post:   QueryHandlerSets,
 	}

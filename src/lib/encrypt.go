@@ -84,10 +84,10 @@ func Encrypt(p string) string {
 	return ""
 }
 
-func Decrypt(cryted string) string {
+func Decrypt(s, cryted string) string {
 	// 转成字节数组
 	crytedByte, _ := base64.StdEncoding.DecodeString(cryted)
-	k := []byte(model.JWT)
+	k := []byte(s)
 
 	// 分组秘钥
 	block, _ := aes.NewCipher(k)
@@ -111,14 +111,14 @@ func Decrypt(cryted string) string {
 	return string(orig)
 }
 
-//补码
+// 补码
 func PKCS7Padding(ciphertext []byte, blocksize int) []byte {
 	padding := blocksize - len(ciphertext)%blocksize
 	padtext := bytes.Repeat([]byte{byte(padding)}, padding)
 	return append(ciphertext, padtext...)
 }
 
-//去码
+// 去码
 func PKCS7UnPadding(origData []byte) []byte {
 	if origData == nil {
 		return nil

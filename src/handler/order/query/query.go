@@ -5,32 +5,66 @@ import (
 	"Yearning-go/src/handler/order/audit"
 	"Yearning-go/src/lib"
 	"Yearning-go/src/model"
+	"encoding/json"
 	"errors"
 	"github.com/cookieY/yee"
+	"github.com/golang-jwt/jwt"
+	"golang.org/x/net/websocket"
 	"gorm.io/gorm"
+	"io"
 	"net/http"
 	"time"
 )
 
 func FetchQueryOrder(c yee.Context) (err error) {
-	u := new(common.PageList[[]model.CoreQueryOrder])
-	if err = c.Bind(u); err != nil {
-		c.Logger().Error(err.Error())
-		return
-	}
-	t := new(lib.Token).JwtParse(c)
-	if c.QueryParam("tp") != "record" {
-		t.IsRecord = false
-	}
-	u.Paging().Query(
-		common.AccordingQueryToAssigned(t),
-		common.AccordingToUsername(u.Expr.Username),
-		common.AccordingToRealName(u.Expr.RealName),
-		common.AccordingToDate(u.Expr.Picker),
-		common.AccordingToWorkId(u.Expr.WorkId),
-		common.AccordingToAllQueryOrderState(u.Expr.Status),
-	)
-	return c.JSON(http.StatusOK, u.ToMessage())
+	websocket.Handler(func(ws *websocket.Conn) {
+		defer ws.Close()
+		valid, err := lib.WSTokenIsValid(ws.Request().Header.Get("Sec-WebSocket-Protocol"))
+		if err != nil {
+			c.Logger().Error(err)
+			return
+		}
+		if valid {
+			var u common.PageList[[]model.CoreQueryOrder]
+			var b []byte
+			for {
+				if err := websocket.Message.Receive(ws, &b); err != nil {
+					if err != io.EOF {
+						c.Logger().Error(err)
+					}
+					break
+				}
+				if string(b) == "ping" {
+					continue
+				}
+				if err := json.Unmarshal(b, &u); err != nil {
+					c.Logger().Error(err)
+					break
+				}
+				token, err := lib.WsTokenParse(ws.Request().Header.Get("Sec-WebSocket-Protocol"))
+				if err != nil {
+					c.Logger().Error(err)
+					break
+				}
+				is_record := token.Claims.(jwt.MapClaims)["is_record"].(bool)
+				name := token.Claims.(jwt.MapClaims)["name"].(string)
+
+				u.Paging().Query(
+					common.AccordingQueryToAssigned(c.QueryParam("tp") != "record" && is_record, name),
+					common.AccordingToUsername(u.Expr.Username),
+					common.AccordingToRealName(u.Expr.RealName),
+					common.AccordingToDate(u.Expr.Picker),
+					common.AccordingToWorkId(u.Expr.WorkId),
+					common.AccordingToAllQueryOrderState(u.Expr.Status),
+				)
+				if err = websocket.Message.Send(ws, lib.ToJson(u.ToMessage())); err != nil {
+					c.Logger().Error(err)
+					break
+				}
+			}
+		}
+	}).ServeHTTP(c.Response(), c.Request())
+	return nil
 }
 
 func FetchQueryRecordProfile(c yee.Context) (err error) {
@@ -94,13 +128,15 @@ func QueryHandlerSets(c yee.Context) (err error) {
 	}
 }
 
-func AuditOrRecordQueryOrderFetchApis(c yee.Context) (err error) {
+func AuditQueryOrderProfileFetchApis(c yee.Context) (err error) {
 	switch c.Params("tp") {
-	case "list":
-		return FetchQueryOrder(c)
 	case "profile":
 		return FetchQueryRecordProfile(c)
 	default:
 		return c.JSON(http.StatusOK, common.ERR_REQ_FAKE)
 	}
+}
+
+func AuditQueryOrderApis(c yee.Context) (err error) {
+	return FetchQueryOrder(c)
 }

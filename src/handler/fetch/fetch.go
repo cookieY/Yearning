@@ -325,9 +325,6 @@ func FetchOrderComment(c yee.Context) (err error) {
 				if err := websocket.Message.Receive(ws, &msg); err != nil {
 					break
 				}
-				if msg == common.CLOSE {
-					break
-				}
 			}
 		}
 
@@ -389,9 +386,6 @@ func FetchOrderState(c yee.Context) (err error) {
 					}
 				}
 				if err := websocket.Message.Receive(ws, &msg); err != nil {
-					break
-				}
-				if msg == common.CLOSE {
 					break
 				}
 			}
