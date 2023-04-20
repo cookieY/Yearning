@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 env:
-  BASEIMAGES: '3.15' 
+  BASEIMAGES: '3.17' 
 #   YEARNING_VER: '3.0.0-rc11'
 #   YEARNING_URL: 'https://github.com/cookieY/Yearning/releases/download/v3.0.0-rc11/Yearning-3.0.0-rc11-linux-amd64.zip'
   
@@ -44,16 +44,34 @@ jobs:
         with:
           driver-opts: network=host
           
-      - name: Build and push Docker images
+      - name: Build and push Docker images amd64
         uses: docker/build-push-action@v2
         with:
           context: ./docker
           file: ./docker/Dockerfile
-          #platforms: linux/386,linux/amd64,linux/arm64,linux/arm/v7,linux/ppc64le,linux/s390x
+          platforms: linux/amd64
           builder: ${{ steps.buildx.outputs.name }}
           push: true
           build-args: |
             BASEIMAGES=${{ env.BASEIMAGES }}
+            LINUX_PLA=amd64
+            YEARNING_VER=${{ fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.version'] }}
+          tags: |
+            chaiyd/yearning:${{ fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.version'] }}
+            chaiyd/yearning
+          labels: ${{ steps.meta.outputs.labels }}
+
+      - name: Build and push Docker images arm
+        uses: docker/build-push-action@v2
+        with:
+          context: ./docker
+          file: ./docker/Dockerfile
+          platforms: linux/arm64
+          builder: ${{ steps.buildx.outputs.name }}
+          push: true
+          build-args: |
+            BASEIMAGES=${{ env.BASEIMAGES }}
+            LINUX_PLA=arm64
             YEARNING_VER=${{ fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.version'] }}
           tags: |
             chaiyd/yearning:${{ fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.version'] }}
