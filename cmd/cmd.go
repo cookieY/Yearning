@@ -5,8 +5,8 @@ import (
 	"Yearning-go/src/model"
 	"Yearning-go/src/service"
 	"fmt"
-	"github.com/gookit/gcli/v2"
-	"github.com/gookit/gcli/v2/builtin"
+	"github.com/gookit/gcli/v3"
+	"github.com/gookit/gcli/v3/builtin"
 	"net"
 )
 
@@ -21,7 +21,7 @@ var RunOpts = struct {
 
 var Migrate = &gcli.Command{
 	Name:     "install",
-	UseFor:   "Yearning安装及数据初始化",
+	Desc:     "Yearning安装及数据初始化",
 	Examples: `{$binName} {$cmd} --config conf.toml`,
 	Config: func(c *gcli.Command) {
 		c.StrOpt(&RunOpts.config, "config", "c", "conf.toml", "配置文件路径,默认为conf.toml.如无移动配置文件则无需配置！")
@@ -34,8 +34,8 @@ var Migrate = &gcli.Command{
 }
 
 var Fix = &gcli.Command{
-	Name:   "migrate",
-	UseFor: "破坏性版本升级修复",
+	Name: "migrate",
+	Desc: "破坏性版本升级修复",
 	Config: func(c *gcli.Command) {
 		c.StrOpt(&RunOpts.config, "config", "c", "conf.toml", "配置文件路径,默认为conf.toml.如无移动配置文件则无需配置！")
 	},
@@ -48,8 +48,8 @@ var Fix = &gcli.Command{
 }
 
 var Super = &gcli.Command{
-	Name:   "reset_super",
-	UseFor: "重置超级管理员密码",
+	Name: "reset_super",
+	Desc: "重置超级管理员密码",
 	Config: func(c *gcli.Command) {
 		c.StrOpt(&RunOpts.config, "config", "c", "conf.toml", "配置文件路径,默认为conf.toml.如无移动配置文件则无需配置！")
 	},
@@ -62,8 +62,8 @@ var Super = &gcli.Command{
 }
 
 var RunServer = &gcli.Command{
-	Name:   "run",
-	UseFor: "启动Yearning",
+	Name: "run",
+	Desc: "启动Yearning",
 	Config: func(c *gcli.Command) {
 		c.StrOpt(&RunOpts.addr, "addr", "a", "0.0.0.0", "Yearning启动地址")
 		c.StrOpt(&RunOpts.port, "port", "p", "8000", "Yearning启动端口")
@@ -83,12 +83,12 @@ func Command() {
 	app := gcli.NewApp()
 	app.Version = "3.1.3 Uranus"
 	app.Name = "Yearning"
-	app.Logo = gcli.Logo{Text: LOGO, Style: "info"}
-	app.Description = "Yearning Mysql数据审核平台"
+	app.Logo = &gcli.Logo{Text: LOGO, Style: "info"}
+	app.Desc = "Yearning Mysql数据审核平台"
 	app.Add(Migrate)
 	app.Add(RunServer)
 	app.Add(Fix)
 	app.Add(Super)
 	app.Add(builtin.GenAutoComplete())
-	app.Run()
+	app.Run(nil)
 }

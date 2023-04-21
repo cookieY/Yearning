@@ -44,7 +44,7 @@ func (u *_FetchBind) FetchTableFieldsOrIndexes() error {
 
 	model.DB().Where("source_id =?", u.SourceId).First(&s)
 
-	ps := lib.Decrypt(s.Password)
+	ps := lib.Decrypt(model.JWT, s.Password)
 	db, err := model.NewDBSub(model.DSN{
 		Username: s.Username,
 		Password: ps,

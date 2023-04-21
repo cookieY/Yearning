@@ -28,7 +28,7 @@ func CallAutoTask(order *model.CoreSqlOrder, length int) {
 			IP:            source.IP,
 			Port:          source.Port,
 			Username:      source.Username,
-			Password:      lib.Decrypt(source.Password),
+			Password:      lib.Decrypt(model.JWT, source.Password),
 			Message:       model.GloMessage,
 			MaxAffectRows: autoTask.Affectrow,
 		}, &isCall); err != nil {

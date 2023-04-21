@@ -53,7 +53,7 @@ func ConnTest(u *model.CoreDataSource) error {
 
 func SuperEditSource(source *model.CoreDataSource) common.Resp {
 
-	if source.Password != "" && lib.Decrypt(source.Password) == "" {
+	if source.Password != "" && lib.Decrypt(model.JWT, source.Password) == "" {
 		model.DB().Model(&model.CoreDataSource{}).Where("source_id =?", source.SourceId).Updates(&model.CoreDataSource{Password: lib.Encrypt(source.Password)})
 	}
 	model.DB().Model(&model.CoreDataSource{}).Where("source_id =?", source.SourceId).Updates(map[string]interface{}{

@@ -80,8 +80,8 @@ func ManageDBCreateOrEdit(c yee.Context) (err error) {
 	case "create":
 		return c.JSON(http.StatusOK, SuperCreateSource(&u.DB))
 	case "test":
-		if u.DB.Password != "" && lib.Decrypt(u.DB.Password) != "" {
-			u.DB.Password = lib.Decrypt(u.DB.Password)
+		if u.DB.Password != "" && lib.Decrypt(model.JWT, u.DB.Password) != "" {
+			u.DB.Password = lib.Decrypt(model.JWT, u.DB.Password)
 		}
 		return c.JSON(http.StatusOK, SuperTestDBConnect(&u.DB))
 	}

@@ -20,7 +20,7 @@ func unifiedLabel(col []string) []any {
 
 func ScanDataRows(s model.CoreDataSource, database, sql, meta string, isQuery bool, isLeaf bool) (*_dbInfo, error) {
 	res := new(_dbInfo)
-	ps := lib.Decrypt(s.Password)
+	ps := lib.Decrypt(model.JWT, s.Password)
 	if ps == "" {
 		return res, errors.New("连接失败,密码解析错误！")
 	}
@@ -79,7 +79,7 @@ func checkMeta(s, database, flag string) string {
 }
 
 func Highlight(s *model.CoreDataSource) []map[string]string {
-	ps := lib.Decrypt(s.Password)
+	ps := lib.Decrypt(model.JWT, s.Password)
 	var list []map[string]string
 	db, err := model.NewDBSub(model.DSN{
 		Username: s.Username,

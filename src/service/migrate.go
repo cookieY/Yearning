@@ -20,7 +20,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/google/uuid"
-	"github.com/gookit/gcli/v2/interact"
+	"github.com/gookit/gcli/v3/interact"
 	"os"
 	"time"
 )

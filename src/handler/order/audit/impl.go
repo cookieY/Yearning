@@ -76,7 +76,7 @@ func ExecuteOrder(u *Confirm, user string) common.Resp {
 			IP:       source.IP,
 			Port:     source.Port,
 			Username: source.Username,
-			Password: lib.Decrypt(source.Password),
+			Password: lib.Decrypt(model.JWT, source.Password),
 			CA:       source.CAFile,
 			Cert:     source.Cert,
 			Key:      source.KeyFile,
