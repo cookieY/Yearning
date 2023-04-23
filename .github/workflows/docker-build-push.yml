@@ -57,7 +57,7 @@ jobs:
             LINUX_PLA=amd64
             YEARNING_VER=${{ fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.version'] }}
           tags: |
-            chaiyd/yearning:${{ fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.version'] }}
+            chaiyd/yearning:${{ fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.version'] }}-amd64
             chaiyd/yearning
           labels: ${{ steps.meta.outputs.labels }}
 
@@ -74,19 +74,18 @@ jobs:
             LINUX_PLA=arm64
             YEARNING_VER=${{ fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.version'] }}
           tags: |
-            chaiyd/yearning:${{ fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.version'] }}
-            chaiyd/yearning
+            chaiyd/yearning:${{ fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.version'] }}-arm64
           labels: ${{ steps.meta.outputs.labels }}
 
       - name: Run the Anchore scan action itself with GitHub Advanced Security code scanning integration enabled
         uses: anchore/scan-action@v3
         id: scan
         with:
-          image: chaiyd/yearning:${{ fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.version'] }}
+          image: chaiyd/yearning:${{ fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.version'] }}-amd64
           acs-report-enable: true
           fail-build: false
 
       - name: upload Anchore scan SARIF report
         uses: github/codeql-action/upload-sarif@v2
         with:
-          sarif_file: ${{ steps.scan.outputs.sarif }}            
+          sarif_file: ${{ steps.scan.outputs.sarif }}
