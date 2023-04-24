@@ -3,18 +3,20 @@ FROM alpine:${BASEIMAGES} AS builder
 
 LABEL maintainer="chaiyd <chaiyd.cn@gmail.com>"
 
-ARG YEARNING_VER=3.0.0-rc11
+ARG YEARNING_VER=v3.1.4
 
-ARG LINUX_PLA=amd64
+ARG TARGETARCH
 
-ARG YEARNING_URL=https://github.com/cookieY/Yearning/releases/download/${YEARNING_VER}/Yearning-${YEARNING_VER}-linux-${LINUX_PLA}.zip
+ARG YEARNING_URL=https://github.com/cookieY/Yearning/releases/download/${YEARNING_VER}/Yearning-${YEARNING_VER}-linux-${TARGETARCH}.zip
 
 RUN wget -cO yearning.zip $YEARNING_URL && \
     unzip yearning.zip && \
     mv Yearning/* /opt
 
 
-FROM alpine:${BASEIMAGES}
+FROM  --platform=$TARGETPLATFORM alpine:${BASEIMAGES}
+
+ARG TARGETPLATFORM
 
 LABEL maintainer="chaiyd <chaiyd.cn@gmail.com>"
 
