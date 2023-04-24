@@ -6,9 +6,7 @@ on:
   workflow_dispatch:
 
 env:
-  BASEIMAGES: '3.17' 
-#   YEARNING_VER: '3.0.0-rc11'
-#   YEARNING_URL: 'https://github.com/cookieY/Yearning/releases/download/v3.0.0-rc11/Yearning-3.0.0-rc11-linux-amd64.zip'
+  BASEIMAGES: '3.17.3'
   
 jobs:
   push_to_registries:
@@ -36,7 +34,7 @@ jobs:
         uses: docker/metadata-action@v3
         with:
           images: |
-            chaiyd/yearning
+            yeelabs/yearning
 
       - name: Set up Docker Buildx
         id: buildx
@@ -49,7 +47,7 @@ jobs:
         with:
           context: ./docker
           file: ./docker/Dockerfile
-          platforms: linux/amd64
+          platforms: linux/amd64,linux/arm64
           builder: ${{ steps.buildx.outputs.name }}
           push: true
           build-args: |
@@ -57,31 +55,14 @@ jobs:
             LINUX_PLA=amd64
             YEARNING_VER=${{ fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.version'] }}
           tags: |
-            chaiyd/yearning:${{ fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.version'] }}-amd64
-            chaiyd/yearning
+            yeelabs/yearning:${{ fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.version'] }}
+            yeelabs/yearning
           labels: ${{ steps.meta.outputs.labels }}
-
-      - name: Build and push Docker images arm
-        uses: docker/build-push-action@v2
-        with:
-          context: ./docker
-          file: ./docker/Dockerfile
-          platforms: linux/arm64
-          builder: ${{ steps.buildx.outputs.name }}
-          push: true
-          build-args: |
-            BASEIMAGES=${{ env.BASEIMAGES }}
-            LINUX_PLA=arm64
-            YEARNING_VER=${{ fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.version'] }}
-          tags: |
-            chaiyd/yearning:${{ fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.version'] }}-arm64
-          labels: ${{ steps.meta.outputs.labels }}
-
       - name: Run the Anchore scan action itself with GitHub Advanced Security code scanning integration enabled
         uses: anchore/scan-action@v3
         id: scan
         with:
-          image: chaiyd/yearning:${{ fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.version'] }}-amd64
+          image: yeelabs/yearning:${{ fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.version'] }}
           acs-report-enable: true
           fail-build: false
 

@@ -1,7 +1,7 @@
 ARG BASEIMAGES=3.17
 FROM alpine:${BASEIMAGES} AS builder
 
-LABEL maintainer="chaiyd <chaiyd.cn@gmail.com>"
+LABEL maintainer="chaiyd <chaiyd.cn@gmail.com>,henryyee <henry@yearning.io>"
 
 ARG YEARNING_VER=v3.1.4
 
