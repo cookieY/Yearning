@@ -3,6 +3,7 @@ package common
 import (
 	"gorm.io/gorm"
 	"reflect"
+	std_time "time"
 )
 
 const QueryField = "work_id, username, text, backup, date, real_name, `status`, `type`, `delay`, `source`,`id_c`,`data_base`,`table`,`execute_time`,source_id,assigned,current_step,relevant,`file`"
@@ -117,6 +118,13 @@ func AccordingToDate(time []string) func(db *gorm.DB) *gorm.DB {
 	return func(db *gorm.DB) *gorm.DB {
 		if reflect.DeepEqual(time, []string{"", ""}) || len(time) != 2 {
 			return db
+		}
+
+		// 解决基于提交时间查询工单列表失真问题。先将 "2023-05-06T03:00:30.465Z" 解析成 "2023-05-06 03:00"，跟CoreSqlOrder.Date格式保持一致；
+		// 前端传往后端的实际时间会被减少8h，在解析完成后，需要加8h，从而与前端实际选择时间范围一致
+		for idx,timeStr := range time {
+			t,_ := std_time.Parse(std_time.RFC3339,timeStr)
+			time[idx] = t.Add(std_time.Hour * 8).Format("2006-01-02 15:04")
 		}
 		return db.Where("date >= ? AND date <= ?", time[0], time[1])
 	}
