@@ -1,0 +1,119 @@
+# This is an example .goreleaser.yml file with some sensible defaults.
+# Make sure to check the documentation at https://goreleaser.com
+project_name: yearning
+before:
+  hooks:
+    # You may remove this if you don't use go modules.
+    - go mod tidy
+builds:
+  - env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+    goarch:
+      - amd64
+      - arm64
+    id: yearning
+archives:
+  - replacements:
+      darwin: Darwin
+      linux: Linux
+      amd64: x86_64
+
+nfpms:
+  # note that this is an array of nfpm configs
+  -
+    # ID of the nfpm config, must be unique.
+    # Defaults to "default".
+    id: yearning
+
+    # Name of the package.
+    # Defaults to `ProjectName`.
+    package_name: yearning
+
+    # You can change the file name of the package.
+    #
+    # Default:`{{ .PackageName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}{{ with .Arm }}v{{ . }}{{ end }}{{ with .Mips }}_{{ . }}{{ end }}{{ if not (eq .Amd64 "v1") }}{{ .Amd64 }}{{ end }}`
+    file_name_template: "{{ .ConventionalFileName }}"
+
+    # Build IDs for the builds you want to create NFPM packages for.
+    # Defaults empty, which means no filtering.
+    builds:
+      - yearning
+
+    # Your app's vendor.
+    # Default is empty.
+    vendor: Drum Roll Inc.
+
+    # Template to your app's homepage.
+    # Default is empty.
+    homepage: https://example.com/
+
+    # Your app's maintainer (probably you).
+    # Default is empty.
+    maintainer: Drummer <drum-roll@example.com>
+
+    # Template to your app's description.
+    # Default is empty.
+    description: |-
+      Drum rolls installer package.
+      Software to create fast and easy drum rolls.
+
+    # Your app's license.
+    # Default is empty.
+
+    # Formats to be generated.
+    formats:
+      - deb
+      - rpm
+
+    # Packages that conflict with your package. (overridable)
+    conflicts:
+      - svn
+      - bash
+
+    # Packages it replaces. (overridable)
+    replaces:
+      - fish
+
+    # Template to the path that the binaries should be installed.
+    # Defaults to `/usr/bin`.
+    bindir: /usr/bin
+
+    # Version Epoch.
+    # Default is extracted from `version` if it is semver compatible.
+    epoch: 2
+
+    # Version Release.
+    release: 1
+
+    # Section.
+    section: default
+
+    # Priority.
+    priority: extra
+
+    # Makes a meta package - an empty package that contains only supporting
+    # files and dependencies.
+    # When set to `true`, the `builds` option is ignored.
+    # Defaults to false.
+    meta: true
+
+    # Changelog YAML file, see: https://github.com/goreleaser/chglog
+    #
+    # You can use goreleaser/chglog to create the changelog for your project,
+    # pass that changelog yaml file to GoReleaser,
+    # and it should in turn setup it accordingly for the given available
+    # formats (deb and rpm at the moment).
+
+checksum:
+  name_template: 'checksums.txt'
+snapshot:
+  name_template: "{{ incpatch .Version }}"
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - '^docs:'
+      - '^test:'
