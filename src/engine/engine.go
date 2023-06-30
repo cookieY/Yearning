@@ -35,6 +35,7 @@ type AuditRole struct {
 	DDLMultiToCommit               bool   //是否允许一个工单内有多条DDL语句
 	DDLPrimaryKeyMust              bool   //是否强制主键名为id
 	DDLAllowColumnType             bool   // ddl语句允许更改字段类型
+	DDLAllowMultiAlter             bool   // ddl语句允许多个alter语句
 	DDLImplicitTypeConversion      bool
 	DDLAllowPRINotInt              bool
 	DDLEnableForeignKey            bool   // 允许外键
