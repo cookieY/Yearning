@@ -71,6 +71,7 @@ func SuperEditSource(source *model.CoreDataSource) common.Resp {
 		"cert":               source.Cert,
 		"key_file":           source.KeyFile,
 	})
+	model.DB().Model(model.CoreQueryOrder{}).Where("status =? and source_id =?", 1, source.SourceId).Updates(&model.CoreQueryOrder{Assigned: source.Principal})
 	var k []model.CoreRoleGroup
 	model.DB().Find(&k)
 	for i := range k {

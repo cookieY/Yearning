@@ -16,7 +16,7 @@ package fetch
 import (
 	"Yearning-go/src/engine"
 	"Yearning-go/src/handler/common"
-	tpl2 "Yearning-go/src/handler/manage/tpl"
+	"Yearning-go/src/handler/manage/tpl"
 	"Yearning-go/src/lib"
 	"Yearning-go/src/model"
 	"encoding/json"
@@ -103,19 +103,30 @@ func FetchSource(c yee.Context) (err error) {
 	return c.JSON(http.StatusOK, common.SuccessPayload(source))
 }
 
+type StepInfo struct {
+	tpl.Tpl
+	model.CoreWorkflowDetail
+}
+
 func FetchAuditSteps(c yee.Context) (err error) {
 	u := c.QueryParam("source_id")
 	unescape, _ := url.QueryUnescape(u)
-	var s model.CoreDataSource
-	var tpl model.CoreWorkflowTpl
-	var whoIsAuditor []tpl2.Tpl
-	model.DB().Model(model.CoreDataSource{}).Where("source_id = ?", unescape).First(&s)
-	if err := model.DB().Model(model.CoreWorkflowTpl{}).Where("id =?", s.FlowID).First(&tpl).Error; errors.Is(err, gorm.ErrRecordNotFound) {
-		return c.JSON(http.StatusOK, common.ERR_COMMON_MESSAGE(errors.New("数据源没有添加流程!无法提交工单")))
+	whoIsAuditor, err := tpl.OrderRelation(unescape)
+	if err != nil {
+		return c.JSON(http.StatusOK, common.ERR_COMMON_MESSAGE(err))
 	}
-	_ = json.Unmarshal(tpl.Steps, &whoIsAuditor)
+	workId := c.QueryParam("work_id")
+	var s []model.CoreWorkflowDetail
+	model.DB().Where("work_id = ?", workId).Find(&s)
+	var steps []StepInfo
+	for _, v := range whoIsAuditor {
+		steps = append(steps, StepInfo{Tpl: v})
+	}
+	for i, v := range s {
+		steps[i].CoreWorkflowDetail = v
+	}
 
-	return c.JSON(http.StatusOK, common.SuccessPayload(whoIsAuditor))
+	return c.JSON(http.StatusOK, common.SuccessPayload(steps))
 
 }
 

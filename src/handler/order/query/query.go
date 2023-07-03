@@ -96,20 +96,24 @@ func QueryHandlerSets(c yee.Context) (err error) {
 		c.Logger().Error(err.Error())
 		return c.JSON(http.StatusOK, common.ERR_REQ_BIND)
 	}
-	found := model.DB().Where("work_id=? AND status=?", u.WorkId, 1).Error
+	token := new(lib.Token).JwtParse(c)
+	empty := new(model.CoreQueryOrder)
+	found := model.DB().Where("work_id=? AND status=? AND assigned = ?", u.WorkId, 1, token.Username).Find(empty).Error
 	switch c.Params("tp") {
 	case "agreed":
 		if !errors.Is(found, gorm.ErrRecordNotFound) {
 			model.DB().Model(model.CoreQueryOrder{}).Where("work_id =?", u.WorkId).Updates(&model.CoreQueryOrder{Status: 2, ApprovalTime: time.Now().Format("2006-01-02 15:04")})
 			lib.MessagePush(u.WorkId, 8, "")
+			return c.JSON(http.StatusOK, common.SuccessPayLoadToMessage(common.ORDER_IS_AGREE))
 		}
-		return c.JSON(http.StatusOK, common.SuccessPayLoadToMessage(common.ORDER_IS_AGREE))
+		return c.JSON(http.StatusOK, common.ERR_REQ_FAKE)
 	case "reject":
 		if !errors.Is(found, gorm.ErrRecordNotFound) {
 			model.DB().Model(model.CoreQueryOrder{}).Where("work_id =?", u.WorkId).Updates(&model.CoreQueryOrder{Status: 4})
 			lib.MessagePush(u.WorkId, 9, "")
+			return c.JSON(http.StatusOK, common.SuccessPayLoadToMessage(common.ORDER_IS_REJECT))
 		}
-		return c.JSON(http.StatusOK, common.SuccessPayLoadToMessage(common.ORDER_IS_REJECT))
+		return c.JSON(http.StatusOK, common.ERR_REQ_FAKE)
 	case "undo":
 		t := new(lib.Token)
 		t.JwtParse(c)
