@@ -3,7 +3,7 @@ FROM alpine:${BASEIMAGES} AS builder
 
 LABEL maintainer="chaiyd <chaiyd.cn@gmail.com>,henryyee <henry@yearning.io>"
 
-ARG YEARNING_VER=v3.1.4
+ARG YEARNING_VER=v3.1.5
 
 ARG TARGETARCH
 
