@@ -2,6 +2,7 @@ package personal
 
 import (
 	"Yearning-go/src/handler/common"
+	"Yearning-go/src/i18n"
 	"Yearning-go/src/lib"
 	"Yearning-go/src/model"
 	"encoding/json"
@@ -83,8 +84,7 @@ func PersonalUserEdit(c yee.Context) (err error) {
 				Department: u.Department,
 			})
 	}
-
-	return c.JSON(http.StatusOK, common.SuccessPayLoadToMessage(CUSTOM_PASSWORD_SUCCESS))
+	return c.JSON(http.StatusOK, common.SuccessPayLoadToMessage(i18n.DefaultLang.Load(i18n.CUSTOM_PASSWORD_SUCCESS)))
 }
 
 func Get(c yee.Context) (err error) {

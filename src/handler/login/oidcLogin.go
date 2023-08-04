@@ -15,6 +15,7 @@ package login
 
 import (
 	"Yearning-go/src/handler/common"
+	"Yearning-go/src/i18n"
 	"Yearning-go/src/lib"
 	"Yearning-go/src/model"
 	"encoding/json"
@@ -81,13 +82,13 @@ func validState(state string) error {
 			return nil
 		}
 	}
-	return errors.New("state 不合法")
+	return errors.New("state error")
 }
 
 func OidcLogin(c yee.Context) (err error) {
 
 	if !model.C.Oidc.Enable {
-		return c.HTML(400, "未开启 OIDC 登录")
+		return c.HTML(400, i18n.DefaultLang.Load(i18n.INFO_OIDC_LOGIN_DISABLED))
 	}
 
 	code := c.FormValue("code")

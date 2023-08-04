@@ -15,6 +15,7 @@ package db
 
 import (
 	"Yearning-go/src/handler/common"
+	"Yearning-go/src/i18n"
 	"Yearning-go/src/lib"
 	"Yearning-go/src/model"
 	"github.com/cookieY/yee"
@@ -65,7 +66,7 @@ func SuperDeleteSource(c yee.Context) (err error) {
 	}
 
 	tx.Commit()
-	return c.JSON(http.StatusOK, common.SuccessPayLoadToMessage(common.DATA_IS_DELETE))
+	return c.JSON(http.StatusOK, common.SuccessPayLoadToMessage(i18n.DefaultLang.Load(i18n.INFO_DATA_IS_DELETE)))
 }
 
 func ManageDBCreateOrEdit(c yee.Context) (err error) {

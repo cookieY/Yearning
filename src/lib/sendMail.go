@@ -39,7 +39,7 @@ var TemoplateTestMail = `
 <html>
 <body>
 	<div style="text-align:center;">
-		<h1>Yearning 2.0</h1>
+		<h1>Yearning 3.0</h1>
 		<h2>此邮件是测试邮件！</h2>
 	</div>
 </body>

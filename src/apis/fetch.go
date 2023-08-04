@@ -2,7 +2,6 @@ package apis
 
 import (
 	"Yearning-go/src/handler/fetch"
-	"Yearning-go/src/handler/manage/group"
 	"github.com/cookieY/yee"
 	"net/http"
 )
@@ -66,8 +65,6 @@ func FetchResourceForPut(y yee.Context) (err error) {
 func FetchResourceForPost(y yee.Context) (err error) {
 	tp := y.Params("tp")
 	switch tp {
-	case "marge":
-		return group.SuperUserRuleMarge(y)
 	case "comment":
 		return fetch.PostOrderComment(y)
 	}

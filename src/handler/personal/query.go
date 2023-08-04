@@ -15,6 +15,7 @@ package personal
 
 import (
 	"Yearning-go/src/handler/common"
+	"Yearning-go/src/i18n"
 	"Yearning-go/src/lib"
 	"Yearning-go/src/model"
 	"errors"
@@ -40,13 +41,6 @@ type queryResults struct {
 	HeartBeat string   `msgpack:"heartbeat"`
 	IsOnly    bool     `msgpack:"is_only"`
 }
-
-const (
-	None = iota
-	QUERY_CLOSE
-	QUERY_OPEN
-	QUERY_PING
-)
 
 type queryArgs struct {
 	SourceId string `json:"source_id"`
@@ -80,7 +74,7 @@ func ReferQueryOrder(c yee.Context, user *lib.Token) (err error) {
 			Export:       reflect(model.GloOther.Export),
 			Status:       2,
 			RealName:     user.RealName,
-			Text:         "当前未开启查询审核,用户可自由查询",
+			Text:         i18n.DefaultLang.Load(i18n.INFO_QUERY_AUDIT_DISABLED),
 			Assigned:     "admin",
 			ApprovalTime: time.Now().Format("2006-01-02 15:04"),
 		})
@@ -102,9 +96,9 @@ func ReferQueryOrder(c yee.Context, user *lib.Token) (err error) {
 			RealName: user.RealName,
 		})
 		lib.MessagePush(work, 7, "")
-		return c.JSON(http.StatusOK, common.SuccessPayLoadToMessage(common.ORDER_IS_CREATE))
+		return c.JSON(http.StatusOK, common.SuccessPayLoadToMessage(i18n.DefaultLang.Load(i18n.INFO_ORDER_IS_CREATE)))
 	}
-	return c.JSON(http.StatusOK, common.SuccessPayLoadToMessage(common.ORDER_IS_DUP))
+	return c.JSON(http.StatusOK, common.SuccessPayLoadToMessage(i18n.DefaultLang.Load(i18n.INFO_ORDER_IS_DUP)))
 }
 
 func FetchQueryDatabaseInfo(c yee.Context) (err error) {
@@ -157,7 +151,7 @@ func SocketQueryResults(c yee.Context) (err error) {
 		user := token.Claims.(jwt.MapClaims)["name"].(string)
 		control := lib.SourceControl{User: user, Kind: lib.QUERY, SourceId: args.SourceId}
 		if !control.Equal() {
-			c.Logger().Criticalf("user:%s没有该数据源(%s)权限，无法执行该操作", user, args.SourceId)
+			c.Logger().Criticalf(i18n.DefaultLang.Load(i18n.ER_USER_NO_PERMISSION), user, args.SourceId)
 			return
 		}
 
@@ -246,5 +240,5 @@ func SocketQueryResults(c yee.Context) (err error) {
 func UndoQueryOrder(c yee.Context) (err error) {
 	user := new(lib.Token).JwtParse(c)
 	model.DB().Model(model.CoreQueryOrder{}).Where("username =?", user.Username).Updates(map[string]interface{}{"status": 3})
-	return c.JSON(http.StatusOK, common.SuccessPayLoadToMessage(common.ORDER_IS_END))
+	return c.JSON(http.StatusOK, common.SuccessPayLoadToMessage(i18n.DefaultLang.Load(i18n.INFO_ORDER_IS_END)))
 }

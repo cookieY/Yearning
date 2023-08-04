@@ -2,6 +2,7 @@ package personal
 
 import (
 	"Yearning-go/src/handler/order/audit"
+	"Yearning-go/src/i18n"
 	"Yearning-go/src/lib"
 	"Yearning-go/src/model"
 	"errors"
@@ -40,7 +41,7 @@ func CallAutoTask(order *model.CoreSqlOrder, length int) {
 			WorkId:   order.WorkId,
 			Username: "AutoTask Robot",
 			Time:     time.Now().Format("2006-01-02 15:04"),
-			Action:   audit.ORDER_EXECUTE_STATE,
+			Action:   i18n.DefaultLang.Load(i18n.ORDER_EXECUTE_STATE),
 		})
 		model.DB().Model(model.CoreSqlOrder{}).Where("work_id =?", order.WorkId).Updates(&model.CoreSqlOrder{CurrentStep: length})
 	}

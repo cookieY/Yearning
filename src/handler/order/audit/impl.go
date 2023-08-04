@@ -4,24 +4,13 @@ import (
 	"Yearning-go/src/engine"
 	"Yearning-go/src/handler/common"
 	"Yearning-go/src/handler/manage/tpl"
+	"Yearning-go/src/i18n"
 	"Yearning-go/src/lib"
 	"Yearning-go/src/model"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"strings"
 	"time"
-)
-
-const (
-	ORDER_AGREE_MESSAGE     = "审核通过,并已转交至 %s"
-	ORDER_REJECT_MESSAGE    = "已驳回"
-	ORDER_AGREE_STATE       = "工单已转交！"
-	ORDER_REJECT_STATE      = "工单已驳回！"
-	ORDER_KILL_STATE        = "延时工单已终止！"
-	ORDER_EXECUTE_STATE     = "审核通过并执行！"
-	ORDER_DELAY_KILL_DETAIL = "kill指令已发送!将在到达执行时间时自动取消，状态已更改为执行失败！"
-	ORDER_NOT_SEARCH        = "该阶段已有人操作通过/你不是该阶段审核人！操作不符合幂等性"
 )
 
 type ExecArgs struct {
@@ -45,6 +34,7 @@ type Confirm struct {
 	Text     string `json:"text"`
 	Tp       string `json:"tp"`
 	SourceId string `json:"source_id"`
+	Delay    string `json:"delay"`
 }
 
 func (e *Confirm) GetTPL() []tpl.Tpl {
@@ -63,7 +53,7 @@ func ExecuteOrder(u *Confirm, user string) common.Resp {
 	model.DB().Where("work_id =?", u.WorkId).First(&order)
 
 	if order.Status != 2 && order.Status != 5 {
-		return common.ERR_COMMON_MESSAGE(errors.New(ORDER_NOT_SEARCH))
+		return common.ERR_COMMON_TEXT_MESSAGE(i18n.DefaultLang.Load(i18n.ORDER_NOT_SEARCH))
 	}
 	order.Assigned = user
 
@@ -88,9 +78,9 @@ func ExecuteOrder(u *Confirm, user string) common.Resp {
 			WorkId:   u.WorkId,
 			Username: user,
 			Time:     time.Now().Format("2006-01-02 15:04"),
-			Action:   ORDER_EXECUTE_STATE,
+			Action:   i18n.DefaultLang.Load(i18n.ORDER_EXECUTE_STATE),
 		})
-		return common.SuccessPayLoadToMessage(ORDER_EXECUTE_STATE)
+		return common.SuccessPayLoadToMessage(i18n.DefaultLang.Load(i18n.ORDER_EXECUTE_STATE))
 	}
 	return common.ERR_RPC
 
@@ -106,12 +96,12 @@ func MultiAuditOrder(req *Confirm, user string) common.Resp {
 			WorkId:   req.WorkId,
 			Username: user,
 			Time:     time.Now().Format("2006-01-02 15:04"),
-			Action:   fmt.Sprintf(ORDER_AGREE_MESSAGE, strings.Join(assigned, " ")),
+			Action:   fmt.Sprintf(i18n.DefaultLang.Load(i18n.ORDER_AGREE_MESSAGE), strings.Join(assigned, " ")),
 		})
 		lib.MessagePush(req.WorkId, 5, "")
-		return common.SuccessPayLoadToMessage(ORDER_AGREE_STATE)
+		return common.SuccessPayLoadToMessage(i18n.DefaultLang.Load(i18n.ORDER_AGREE_STATE))
 	}
-	return common.ERR_COMMON_MESSAGE(errors.New(ORDER_NOT_SEARCH))
+	return common.ERR_COMMON_TEXT_MESSAGE(i18n.DefaultLang.Load(i18n.ORDER_NOT_SEARCH))
 }
 
 func RejectOrder(u *Confirm, user string) common.Resp {
@@ -120,7 +110,7 @@ func RejectOrder(u *Confirm, user string) common.Resp {
 		WorkId:   u.WorkId,
 		Username: user,
 		Time:     time.Now().Format("2006-01-02 15:04"),
-		Action:   ORDER_REJECT_MESSAGE,
+		Action:   i18n.DefaultLang.Load(i18n.ORDER_REJECT_MESSAGE),
 	})
 	model.DB().Create(&model.CoreOrderComment{
 		WorkId:   u.WorkId,
@@ -129,12 +119,12 @@ func RejectOrder(u *Confirm, user string) common.Resp {
 		Time:     time.Now().Format("2006-01-02 15:04"),
 	})
 	lib.MessagePush(u.WorkId, 0, u.Text)
-	return common.SuccessPayLoadToMessage(ORDER_REJECT_STATE)
+	return common.SuccessPayLoadToMessage(i18n.DefaultLang.Load(i18n.ORDER_REJECT_STATE))
 }
 
 func delayKill(workId string) string {
 	model.DB().Model(&model.CoreSqlOrder{}).Where("work_id =?", workId).Updates(map[string]interface{}{"status": 4, "execute_time": time.Now().Format("2006-01-02 15:04"), "is_kill": 1})
-	return ORDER_DELAY_KILL_DETAIL
+	return i18n.DefaultLang.Load(i18n.ORDER_DELAY_KILL_DETAIL)
 }
 
 func isNotIdempotent(r *Confirm, user string) ([]string, bool, bool) {

@@ -3,6 +3,7 @@ package user
 import (
 	"Yearning-go/src/handler/common"
 	"Yearning-go/src/handler/manage/tpl"
+	"Yearning-go/src/i18n"
 	"Yearning-go/src/lib"
 	"Yearning-go/src/model"
 	"encoding/json"
@@ -29,12 +30,12 @@ func SuperFetchUser(c yee.Context) (err error) {
 func SuperDeleteUser(c yee.Context) (err error) {
 
 	if new(lib.Token).JwtParse(c).Username != "admin" {
-		return c.JSON(http.StatusOK, common.SuccessPayLoadToMessage(ADMIN_HAVE_DELETE_OTHER))
+		return c.JSON(http.StatusOK, common.SuccessPayLoadToMessage(i18n.DefaultLang.Load(i18n.ADMIN_HAVE_DELETE_OTHER)))
 	}
 
 	user := c.QueryParam("user")
 	if user == "admin" {
-		return c.JSON(http.StatusOK, common.SuccessPayLoadToMessage(ADMIN_NOT_DELETE))
+		return c.JSON(http.StatusOK, common.SuccessPayLoadToMessage(i18n.DefaultLang.Load(i18n.ADMIN_NOT_DELETE)))
 	}
 	var flows []model.CoreWorkflowTpl
 	var step []tpl.Tpl
@@ -51,7 +52,7 @@ func SuperDeleteUser(c yee.Context) (err error) {
 		}
 	}
 	if len(tips) != 0 {
-		return c.JSON(http.StatusOK, common.ERR_COMMON_MESSAGE(fmt.Errorf(USER_CANNOT_DELETE, user, strings.Join(tips, ","))))
+		return c.JSON(http.StatusOK, common.ERR_COMMON_MESSAGE(fmt.Errorf(i18n.DefaultLang.Load(i18n.USER_CANNOT_DELETE), user, strings.Join(tips, ","))))
 	}
 
 	tx := model.DB().Begin()
@@ -59,7 +60,7 @@ func SuperDeleteUser(c yee.Context) (err error) {
 	model.DB().Where("username =?", user).Delete(&model.CoreGrained{})
 	tx.Commit()
 
-	return c.JSON(http.StatusOK, common.SuccessPayLoadToMessage(fmt.Sprintf(USER_DELETE_SUCCESS, user)))
+	return c.JSON(http.StatusOK, common.SuccessPayLoadToMessage(fmt.Sprintf(i18n.DefaultLang.Load(i18n.USER_DELETE_SUCCESS), user)))
 }
 
 func ManageUserCreateOrEdit(c yee.Context) (err error) {
@@ -79,11 +80,11 @@ func ManageUserCreateOrEdit(c yee.Context) (err error) {
 	case "password":
 		model.DB().Model(&model.CoreAccount{}).Where("username = ?", u.Username).Updates(
 			model.CoreAccount{Password: lib.DjangoEncrypt(u.Password, string(lib.GetRandom()))})
-		return c.JSON(http.StatusOK, common.SuccessPayLoadToMessage(USER_EDIT_PASSWORD_SUCCESS))
+		return c.JSON(http.StatusOK, common.SuccessPayLoadToMessage(i18n.DefaultLang.Load(i18n.USER_EDIT_PASSWORD_SUCCESS)))
 	case "policy":
 		g, _ := json.Marshal(u.Group)
 		model.DB().Model(model.CoreGrained{}).Scopes(common.AccordingToUsernameEqual(u.Username)).Updates(model.CoreGrained{Group: g})
-		return c.JSON(http.StatusOK, common.SuccessPayLoadToMessage(fmt.Sprintf(USER_PROLICY_EDIT_SUCCESS, u.Username)))
+		return c.JSON(http.StatusOK, common.SuccessPayLoadToMessage(fmt.Sprintf(i18n.DefaultLang.Load(i18n.USER_PROLICY_EDIT_SUCCESS), u.Username)))
 	}
 	return c.JSON(http.StatusOK, common.ERR_REQ_PASSWORD_FAKE)
 }

@@ -2,6 +2,7 @@ package user
 
 import (
 	"Yearning-go/src/handler/common"
+	"Yearning-go/src/i18n"
 	"Yearning-go/src/lib"
 	"Yearning-go/src/model"
 	"errors"
@@ -9,16 +10,6 @@ import (
 )
 
 const (
-	ER_USER_REGUSTER           = "用户已存在请重新注册！"
-	USER_REGUSTER_SUCCESS      = "注册成功！"
-	USER_DELETE_SUCCESS        = "用户: %s 已删除"
-	USER_EDIT_SUCCESS          = "用户信息修改成功！"
-	USER_EDIT_PASSWORD_SUCCESS = "密码修改成功！"
-	ADMIN_NOT_DELETE           = "admin用户无法被删除!"
-	ADMIN_HAVE_DELETE_OTHER    = "非admin用户无法删除其他用户"
-	USER_PROLICY_EDIT_SUCCESS  = "%s的权限已更新！"
-	USER_CANNOT_DELETE         = "用户: %s 当前属于流程: %s 节点审核人,请在相关节点删除该用户审核人之后删除"
-
 	CommonExpr = "username,id,department,real_name,email,is_recorder"
 )
 
@@ -52,20 +43,25 @@ func DelUserDepend(user string) common.Resp {
 
 func SuperUserEdit(u *CommonUserPost) common.Resp {
 	tx := model.DB().Begin()
-	tx.Model(model.CoreAccount{}).Where("username = ?", u.Username).Updates(&u.CoreAccount)
+	tx.Model(model.CoreAccount{}).Where("username = ?", u.Username).Updates(map[string]interface{}{
+		"department":  u.Department,
+		"real_name":   u.RealName,
+		"email":       u.Email,
+		"is_recorder": u.IsRecorder,
+	})
 	tx.Model(model.CoreSqlOrder{}).Where("username =?", u.Username).Updates(model.CoreSqlOrder{RealName: u.RealName})
 	tx.Model(model.CoreQueryOrder{}).Where("username =?", u.Username).Updates(model.CoreQueryOrder{RealName: u.RealName})
 	tx.Commit()
-	return common.SuccessPayLoadToMessage(USER_EDIT_SUCCESS)
+	return common.SuccessPayLoadToMessage(i18n.DefaultLang.Load(i18n.USER_EDIT_SUCCESS))
 }
 
 func SuperUserRegister(u *CommonUserPost) common.Resp {
 	var unique model.CoreAccount
 	if err := model.DB().Where("username = ?", u.Username).Select("username").First(&unique).Error; !errors.Is(err, gorm.ErrRecordNotFound) {
-		return common.SuccessPayLoadToMessage(ER_USER_REGUSTER)
+		return common.SuccessPayLoadToMessage(i18n.DefaultLang.Load(i18n.ER_USER_REGUSTER))
 	}
 	u.Password = lib.DjangoEncrypt(u.Password, string(lib.GetRandom()))
 	model.DB().Create(&u.CoreAccount)
 	model.DB().Create(&model.CoreGrained{Username: u.Username, Group: lib.EmptyGroup()})
-	return common.SuccessPayLoadToMessage(USER_REGUSTER_SUCCESS)
+	return common.SuccessPayLoadToMessage(i18n.DefaultLang.Load(i18n.USER_REGUSTER_SUCCESS))
 }

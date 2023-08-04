@@ -3,6 +3,7 @@ package query
 import (
 	"Yearning-go/src/handler/common"
 	"Yearning-go/src/handler/order/audit"
+	"Yearning-go/src/i18n"
 	"Yearning-go/src/lib"
 	"Yearning-go/src/model"
 	"encoding/json"
@@ -49,7 +50,7 @@ func FetchQueryOrder(c yee.Context) (err error) {
 				is_record := token.Claims.(jwt.MapClaims)["is_record"].(bool)
 				name := token.Claims.(jwt.MapClaims)["name"].(string)
 
-				u.Paging().Query(
+				u.Paging().OrderBy("(status = 2) DESC, date DESC").Query(
 					common.AccordingQueryToAssigned(c.QueryParam("tp") != "record" && is_record, name),
 					common.AccordingToUsername(u.Expr.Username),
 					common.AccordingToRealName(u.Expr.RealName),
@@ -87,7 +88,7 @@ func QueryDeleteEmptyRecord(c yee.Context) (err error) {
 			model.DB().Where("work_id =?", i.WorkId).Delete(&model.CoreQueryOrder{})
 		}
 	}
-	return c.JSON(http.StatusOK, common.SuccessPayLoadToMessage(common.ORDER_IS_CLEAR))
+	return c.JSON(http.StatusOK, common.SuccessPayLoadToMessage(i18n.DefaultLang.Load(i18n.INFO_ORDER_IS_CLEAR)))
 }
 
 func QueryHandlerSets(c yee.Context) (err error) {
@@ -104,14 +105,14 @@ func QueryHandlerSets(c yee.Context) (err error) {
 		if !errors.Is(found, gorm.ErrRecordNotFound) {
 			model.DB().Model(model.CoreQueryOrder{}).Where("work_id =?", u.WorkId).Updates(&model.CoreQueryOrder{Status: 2, ApprovalTime: time.Now().Format("2006-01-02 15:04")})
 			lib.MessagePush(u.WorkId, 8, "")
-			return c.JSON(http.StatusOK, common.SuccessPayLoadToMessage(common.ORDER_IS_AGREE))
+			return c.JSON(http.StatusOK, common.SuccessPayLoadToMessage(i18n.DefaultLang.Load(i18n.INFO_ORDER_IS_AGREE)))
 		}
 		return c.JSON(http.StatusOK, common.ERR_REQ_FAKE)
 	case "reject":
 		if !errors.Is(found, gorm.ErrRecordNotFound) {
 			model.DB().Model(model.CoreQueryOrder{}).Where("work_id =?", u.WorkId).Updates(&model.CoreQueryOrder{Status: 4})
 			lib.MessagePush(u.WorkId, 9, "")
-			return c.JSON(http.StatusOK, common.SuccessPayLoadToMessage(common.ORDER_IS_REJECT))
+			return c.JSON(http.StatusOK, common.SuccessPayLoadToMessage(i18n.DefaultLang.Load(i18n.INFO_ORDER_IS_REJECT)))
 		}
 		return c.JSON(http.StatusOK, common.ERR_REQ_FAKE)
 	case "undo":
@@ -120,13 +121,13 @@ func QueryHandlerSets(c yee.Context) (err error) {
 		var order model.CoreQueryOrder
 		model.DB().Model(model.CoreQueryOrder{}).Select("work_id").Where("username =?", t.Username).Last(&order)
 		model.DB().Model(model.CoreQueryOrder{}).Where("work_id =?", order.WorkId).Updates(&model.CoreSqlOrder{Status: 3})
-		return c.JSON(http.StatusOK, common.SuccessPayLoadToMessage(common.ORDER_IS_END))
+		return c.JSON(http.StatusOK, common.SuccessPayLoadToMessage(i18n.DefaultLang.Load(i18n.INFO_ORDER_IS_END)))
 	case "stop":
 		model.DB().Model(model.CoreQueryOrder{}).Where("work_id =?", u.WorkId).Updates(&model.CoreSqlOrder{Status: 3})
-		return c.JSON(http.StatusOK, common.SuccessPayLoadToMessage(common.ORDER_IS_END))
+		return c.JSON(http.StatusOK, common.SuccessPayLoadToMessage(i18n.DefaultLang.Load(i18n.INFO_ORDER_IS_END)))
 	case "cancel":
 		model.DB().Model(model.CoreQueryOrder{}).Updates(&model.CoreQueryOrder{Status: 3})
-		return c.JSON(http.StatusOK, common.SuccessPayLoadToMessage(common.ORDER_IS_ALL_CANCEL))
+		return c.JSON(http.StatusOK, common.SuccessPayLoadToMessage(i18n.DefaultLang.Load(i18n.INFO_ORDER_IS_ALL_END)))
 	default:
 		return
 	}

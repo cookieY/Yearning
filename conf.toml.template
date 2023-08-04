@@ -8,6 +8,8 @@ User = "root"
 [General]
 SecretKey = "dbcjqheupqjsuwsm"
 RpcAddr = "127.0.0.1:50001"
+LogLevel = "debug"  # debug,info,warn,error
+Lang = "en-us"  # en-us,zh-cn
 
 [Oidc]
 Enable = false

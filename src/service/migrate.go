@@ -15,6 +15,7 @@ package service
 
 import (
 	"Yearning-go/src/engine"
+	"Yearning-go/src/i18n"
 	"Yearning-go/src/lib"
 	"Yearning-go/src/model"
 	"encoding/json"
@@ -79,6 +80,9 @@ func Migrate() {
 		_ = model.DB().AutoMigrate(&model.CoreRoleGroup{})
 		_ = model.DB().AutoMigrate(&model.CoreWorkflowTpl{})
 		_ = model.DB().AutoMigrate(&model.CoreWorkflowDetail{})
+		_ = model.DB().AutoMigrate(&model.CoreOrderComment{})
+		_ = model.DB().AutoMigrate(&model.CoreRules{})
+		_ = model.DB().AutoMigrate(&model.CoreTotalTickets{})
 		o := engine.AuditRole{
 			DMLInsertColumns:               false,
 			DMLMaxInsertRows:               10,
@@ -150,14 +154,14 @@ func Migrate() {
 		}
 		time.Sleep(2)
 		DataInit(&o, &other, &ldap, &message, &a)
-		fmt.Println("初始化成功!\n用户名: admin\n密码:Yearning_admin\n请通过./Yearning run 运行,默认地址:http://<host>:8000")
+		fmt.Println(i18n.DefaultLang.Load(i18n.INFO_INITIALIZATION_SUCCESS_USERNAME_PASSWORD_RUN_COMMAND))
 	} else {
-		fmt.Println("已初始化过,请不要再次执行")
+		fmt.Println(i18n.DefaultLang.Load(i18n.INFO_ALREADY_INITIALIZED))
 	}
 }
 
 func UpdateData() {
-	fmt.Println("检查更新.......")
+	fmt.Println(i18n.DefaultLang.Load(i18n.INFO_CHECKING_UPDATE))
 	_ = model.DB().AutoMigrate(&model.CoreAccount{})
 	_ = model.DB().AutoMigrate(&model.CoreDataSource{})
 	_ = model.DB().AutoMigrate(&model.CoreGlobalConfiguration{})
@@ -172,6 +176,8 @@ func UpdateData() {
 	_ = model.DB().AutoMigrate(&model.CoreWorkflowTpl{})
 	_ = model.DB().AutoMigrate(&model.CoreWorkflowDetail{})
 	_ = model.DB().AutoMigrate(&model.CoreOrderComment{})
+	_ = model.DB().AutoMigrate(&model.CoreRules{})
+	_ = model.DB().AutoMigrate(&model.CoreTotalTickets{})
 	if model.DB().Migrator().HasColumn(&model.CoreAutoTask{}, "base") {
 		_ = model.DB().Migrator().RenameColumn(&model.CoreAutoTask{}, "base", "data_base")
 	}
@@ -184,7 +190,7 @@ func UpdateData() {
 	if model.DB().Migrator().HasColumn(&model.CoreAutoTask{}, "base") {
 		_ = model.DB().Migrator().DropColumn(&model.CoreAutoTask{}, "base")
 	}
-	fmt.Println("数据已更新!")
+	fmt.Println(i18n.DefaultLang.Load(i18n.INFO_DATA_UPDATED))
 }
 
 func DelCol() {
@@ -192,7 +198,7 @@ func DelCol() {
 }
 
 func MargeRuleGroup() {
-	fmt.Println("破坏性变更修复…………")
+	fmt.Println(i18n.DefaultLang.Load(i18n.INFO_FIX_DESTRUCTIVE_CHANGE))
 	_ = model.DB().Migrator().DropColumn(&model.CoreSqlOrder{}, "rejected")
 	_ = model.DB().Migrator().DropColumn(&model.CoreGrained{}, "permissions")
 	_ = model.DB().Migrator().DropColumn(&model.CoreGrained{}, "rule")
@@ -207,5 +213,5 @@ func MargeRuleGroup() {
 	model.DB().Model(model.CoreGlobalConfiguration{}).Where("1=1").Updates(&model.CoreGlobalConfiguration{Ldap: b})
 	_ = model.DB().Exec("alter table core_sql_orders modify assigned varchar(550) not null")
 	_ = model.DB().Exec("alter table core_workflow_details modify action varchar(550) not null")
-	fmt.Println("修复成功!")
+	fmt.Println(i18n.DefaultLang.Load(i18n.INFO_FIX_SUCCESS))
 }

@@ -242,3 +242,9 @@ func AccordingToSchemaNotIn(isSchema bool, excludeDbList []string) func(db *gorm
 		return db.Where("table_schema not in (?)", excludeDbList)
 	}
 }
+
+func AccordingToSchemaIn(includeDbList string) func(db *gorm.DB) *gorm.DB {
+	return func(db *gorm.DB) *gorm.DB {
+		return db.Where("table_schema = ? ", includeDbList)
+	}
+}

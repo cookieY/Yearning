@@ -14,6 +14,7 @@
 package lib
 
 import (
+	"Yearning-go/src/engine"
 	"Yearning-go/src/model"
 	"encoding/json"
 	"fmt"
@@ -26,6 +27,8 @@ import (
 	"strings"
 	"time"
 )
+
+const None = "none" //无延迟
 
 func ResearchDel(s []string, p string) []string {
 	for in := 0; in < len(s); in++ {
@@ -86,6 +89,18 @@ func NonIntersect(o, n []string) []string {
 		}
 	}
 	return arr
+}
+
+func StringToDuration(delay string) time.Duration {
+	if delay != None {
+		now := time.Now()
+		dt, _ := time.ParseInLocation("2006-01-02 15:04 ", delay, time.Local)
+		after := dt.Sub(now)
+		if after+1 > 0 {
+			return after
+		}
+	}
+	return 0
 }
 
 func TimeDifference(t string) bool {
@@ -174,6 +189,19 @@ func (i *SourceControl) Equal() bool {
 		return mapset.NewSet[string](p.QuerySource...).Contains(i.SourceId)
 	}
 	return false
+}
+
+func CheckDataSourceRule(ruleId int) (*engine.AuditRole, error) {
+	if ruleId != 0 {
+		var r model.CoreRules
+		var rule engine.AuditRole
+		model.DB().Where("id = ?", ruleId).First(&r)
+		if err := r.AuditRole.UnmarshalToJSON(&rule); err != nil {
+			return nil, err
+		}
+		return &rule, nil
+	}
+	return &model.GloRole, nil
 }
 
 const (

@@ -2,6 +2,7 @@ package audit
 
 import (
 	"Yearning-go/src/handler/common"
+	"Yearning-go/src/i18n"
 	"Yearning-go/src/lib"
 	"Yearning-go/src/model"
 	"encoding/json"
@@ -27,7 +28,7 @@ func AuditOrderState(c yee.Context) (err error) {
 	case "undo":
 		lib.MessagePush(u.WorkId, 6, "")
 		model.DB().Model(model.CoreSqlOrder{}).Where("work_id =?", u.WorkId).Updates(&model.CoreSqlOrder{Status: 6})
-		return c.JSON(http.StatusOK, common.SuccessPayLoadToMessage(common.ORDER_IS_UNDO))
+		return c.JSON(http.StatusOK, common.SuccessPayLoadToMessage(i18n.DefaultLang.Load(i18n.INFO_ORDER_IS_UNDO)))
 	case "agree":
 		return c.JSON(http.StatusOK, MultiAuditOrder(u, user.Username))
 	case "reject":
@@ -35,6 +36,17 @@ func AuditOrderState(c yee.Context) (err error) {
 	default:
 		return c.JSON(http.StatusOK, common.ERR_REQ_FAKE)
 	}
+}
+
+func ScheduledChange(c yee.Context) (err error) {
+	u := new(Confirm)
+	if err = c.Bind(u); err != nil {
+		c.Logger().Error(err.Error())
+		return c.JSON(http.StatusOK, common.ERR_REQ_BIND)
+	}
+	lib.OrderDelayPool.Store(u.WorkId, u.Delay)
+	model.DB().Model(model.CoreSqlOrder{}).Where("work_id =?", u.WorkId).Updates(&model.CoreSqlOrder{Delay: u.Delay})
+	return c.JSON(http.StatusOK, common.SuccessPayLoadToMessage(i18n.DefaultLang.Load(i18n.INFO_ORDER_DELAY_SUCCESS)))
 }
 
 // DelayKill will stop delay order
@@ -49,7 +61,7 @@ func DelayKill(c yee.Context) (err error) {
 		WorkId:   u.WorkId,
 		Username: user.Username,
 		Time:     time.Now().Format("2006-01-02 15:04"),
-		Action:   ORDER_KILL_STATE,
+		Action:   i18n.DefaultLang.Load(i18n.ORDER_KILL_STATE),
 	})
 	return c.JSON(http.StatusOK, common.SuccessPayLoadToMessage(delayKill(u.WorkId)))
 }
@@ -85,11 +97,11 @@ func FetchAuditOrder(c yee.Context) (err error) {
 					break
 				}
 				user := token.Claims.(jwt.MapClaims)["name"].(string)
-				u.Paging().Select(QueryField).Query(common.AccordingToAllOrderState(u.Expr.Status),
+				u.Paging().OrderBy("(status = 2) DESC, date DESC").Select(QueryField).Query(common.AccordingToAllOrderState(u.Expr.Status),
 					common.AccordingToAllOrderType(u.Expr.Type),
 					common.AccordingToRelevant(user),
 					common.AccordingToText(u.Expr.Text),
-					common.AccordingToUsernameEqual(u.Expr.Username),
+					common.AccordingToUsername(u.Expr.Username),
 					common.AccordingToDate(u.Expr.Picker),
 					common.AccordingToWorkId(u.Expr.WorkId),
 				)
@@ -132,6 +144,8 @@ func AuditOrderApis(c yee.Context) (err error) {
 		return AuditOrderState(c)
 	case "kill":
 		return DelayKill(c)
+	case "scheduled":
+		return ScheduledChange(c)
 	default:
 		return c.JSON(http.StatusOK, common.ERR_REQ_FAKE)
 	}

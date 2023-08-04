@@ -17,6 +17,7 @@ import (
 	"Yearning-go/src/engine"
 	"Yearning-go/src/handler/common"
 	"Yearning-go/src/handler/manage/tpl"
+	"Yearning-go/src/i18n"
 	"Yearning-go/src/lib"
 	"Yearning-go/src/model"
 	"encoding/json"
@@ -133,7 +134,7 @@ func FetchAuditSteps(c yee.Context) (err error) {
 func FetchHighLight(c yee.Context) (err error) {
 	var s model.CoreDataSource
 	model.DB().Where("source_id =?", c.QueryParam("source_id")).First(&s)
-	return c.JSON(http.StatusOK, common.SuccessPayload(common.Highlight(&s)))
+	return c.JSON(http.StatusOK, common.SuccessPayload(common.Highlight(&s, c.QueryParam("is_field"), c.QueryParam("schema"))))
 }
 
 func FetchBase(c yee.Context) (err error) {
@@ -164,6 +165,7 @@ func FetchBase(c yee.Context) (err error) {
 				_t = append(_t, i)
 			}
 		}
+		model.DefaultLogger.Debugf("hide db list: %v ", _t)
 		result.Results = _t
 	}
 	return c.JSON(http.StatusOK, common.SuccessPayload(result.Results))
@@ -201,7 +203,7 @@ func FetchTableInfo(c yee.Context) (err error) {
 		}
 		return c.JSON(http.StatusOK, common.SuccessPayload(map[string]interface{}{"rows": u.Rows, "idx": u.Idx}))
 	}
-	return c.JSON(http.StatusOK, common.ERR_COMMON_MESSAGE(errors.New("请选择库名以及表名后再点击获取表结构信息")))
+	return c.JSON(http.StatusOK, common.ERR_COMMON_MESSAGE(errors.New(i18n.DefaultLang.Load(i18n.INFO_LIBRARY_NAME_TABLE_NAME))))
 }
 
 func FetchSQLTest(c yee.Context) (err error) {
@@ -219,6 +221,10 @@ func FetchSQLTest(c yee.Context) (err error) {
 
 	var s model.CoreDataSource
 	model.DB().Where("source_id =?", u.SourceId).First(&s)
+	rule, err := lib.CheckDataSourceRule(s.RuleId)
+	if err != nil {
+		return c.JSON(http.StatusOK, common.ERR_COMMON_MESSAGE(err))
+	}
 	var rs []engine.Record
 	if client := lib.NewRpc(); client != nil {
 		if err := client.Call("Engine.Check", engine.CheckArgs{
@@ -232,8 +238,8 @@ func FetchSQLTest(c yee.Context) (err error) {
 			Cert:     s.Cert,
 			Key:      s.KeyFile,
 			Kind:     u.Kind,
-			Lang:     "zh-cn",
-			Rule:     model.GloRole,
+			Lang:     model.C.General.Lang,
+			Rule:     *rule,
 		}, &rs); err != nil {
 			return c.JSON(http.StatusOK, common.ERR_RPC)
 		}
@@ -267,11 +273,11 @@ func FetchUndo(c yee.Context) (err error) {
 	user := new(lib.Token).JwtParse(c)
 	var undo model.CoreSqlOrder
 	if err := model.DB().Where(UNDO_EXPR, user.Username, u, 2).First(&undo).Error; errors.Is(err, gorm.ErrRecordNotFound) {
-		return c.JSON(http.StatusOK, UNDO_MESSAGE_ERROR)
+		return c.JSON(http.StatusOK, common.ERR_COMMON_TEXT_MESSAGE(i18n.DefaultLang.Load(i18n.UNDO_MESSAGE_ERROR)))
 	}
 	lib.MessagePush(undo.WorkId, 6, "")
 	model.DB().Where(UNDO_EXPR, user.Username, u, 2).Delete(&model.CoreSqlOrder{})
-	return c.JSON(http.StatusOK, common.SuccessPayLoadToMessage(UNDO_MESSAGE_SUCCESS))
+	return c.JSON(http.StatusOK, common.ERR_COMMON_TEXT_MESSAGE(i18n.DefaultLang.Load(i18n.UNDO_MESSAGE_ERROR)))
 }
 
 func FetchMergeDDL(c yee.Context) (err error) {
@@ -334,6 +340,7 @@ func FetchOrderComment(c yee.Context) (err error) {
 					}
 				}
 				if err := websocket.Message.Receive(ws, &msg); err != nil {
+					c.Logger().Debugf("receive error: %v", err)
 					break
 				}
 			}
@@ -352,14 +359,14 @@ func PostOrderComment(c yee.Context) (err error) {
 	u.Time = time.Now().Format("2006-01-02 15:04")
 	u.Username = t.Username
 	model.DB().Model(model.CoreOrderComment{}).Create(u)
-	return c.JSON(http.StatusOK, common.SuccessPayLoadToMessage(COMMENT_IS_POST))
+	return c.JSON(http.StatusOK, common.SuccessPayLoadToMessage(i18n.DefaultLang.Load(i18n.COMMENT_IS_POST)))
 }
 
 func FetchUserGroups(c yee.Context) (err error) {
 	user := new(lib.Token).JwtParse(c)
 	toUser := c.QueryParam("user")
 	if user.Username != "admin" && user.Username != toUser {
-		return c.JSON(http.StatusOK, common.ERR_COMMON_MESSAGE(errors.New("非法获取信息")))
+		return c.JSON(http.StatusOK, common.ERR_COMMON_MESSAGE(errors.New(i18n.DefaultLang.Load(i18n.ER_ILLEGAL_GET_INFO))))
 	}
 	var (
 		p      model.CoreGrained

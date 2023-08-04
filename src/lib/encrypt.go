@@ -14,6 +14,7 @@
 package lib
 
 import (
+	"Yearning-go/src/i18n"
 	"Yearning-go/src/model"
 	"bytes"
 	"crypto/aes"
@@ -105,7 +106,7 @@ func Decrypt(s, cryted string) string {
 	//// 去补全码
 	orig = PKCS7UnPadding(orig)
 	if orig == nil {
-		logger.DefaultLogger.Error("秘钥解析失败,无法解密当前密码！")
+		logger.DefaultLogger.Error(i18n.DefaultLang.Load(i18n.ER_KEY_DECRYPTION_FAILED))
 		return ""
 	}
 	return string(orig)

@@ -117,7 +117,7 @@ func AddRouter(e *yee.Core) {
 	setting := manager.Group("/setting")
 	setting.Restful("", settings.SettingsApis())
 
-	roles := manager.Group("/roles")
+	roles := manager.Group("/roles/:tp")
 	roles.Restful("", roles2.RolesApis())
 
 	autoTask := manager.Group("/task")

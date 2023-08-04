@@ -15,6 +15,7 @@ package autoTask
 
 import (
 	"Yearning-go/src/handler/common"
+	"Yearning-go/src/i18n"
 	"Yearning-go/src/model"
 	"github.com/cookieY/yee"
 	"net/http"
@@ -32,7 +33,7 @@ func SuperFetchAutoTaskList(c yee.Context) (err error) {
 func SuperDeleteAutoTask(c yee.Context) (err error) {
 	id := c.QueryParam("task_id")
 	model.DB().Where("task_id =?", id).Delete(&model.CoreAutoTask{})
-	return c.JSON(http.StatusOK, common.SuccessPayLoadToMessage(common.ORDER_IS_DELETE))
+	return c.JSON(http.StatusOK, common.SuccessPayLoadToMessage(i18n.DefaultLang.Load(i18n.INFO_DATA_IS_DELETE)))
 }
 
 func SuperAutoTaskCreateOrEdit(c yee.Context) (err error) {

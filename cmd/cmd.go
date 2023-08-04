@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"Yearning-go/src/i18n"
 	"Yearning-go/src/lib"
 	"Yearning-go/src/model"
 	"Yearning-go/src/service"
@@ -56,7 +57,7 @@ var Super = &gcli.Command{
 	Func: func(c *gcli.Command, args []string) error {
 		model.DBNew(RunOpts.config)
 		model.DB().Model(model.CoreAccount{}).Where("username =?", "admin").Updates(&model.CoreAccount{Password: lib.DjangoEncrypt("Yearning_admin", string(lib.GetRandom()))})
-		fmt.Println("admin密码已重新设置为:Yearning_admin")
+		fmt.Println(i18n.DefaultLang.Load(i18n.INFO_ADMIN_PASSWORD_RESET))
 		return nil
 	},
 }
@@ -81,7 +82,7 @@ var RunServer = &gcli.Command{
 
 func Command() {
 	app := gcli.NewApp()
-	app.Version = "3.1.5 Uranus"
+	app.Version = lib.Version
 	app.Name = "Yearning"
 	app.Logo = &gcli.Logo{Text: LOGO, Style: "info"}
 	app.Desc = "Yearning Mysql数据审核平台"

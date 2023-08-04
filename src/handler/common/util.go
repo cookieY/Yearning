@@ -78,7 +78,7 @@ func checkMeta(s, database, flag string) string {
 	return s
 }
 
-func Highlight(s *model.CoreDataSource) []map[string]string {
+func Highlight(s *model.CoreDataSource, isField string, dbName string) []map[string]string {
 	ps := lib.Decrypt(model.JWT, s.Password)
 	var list []map[string]string
 	db, err := model.NewDBSub(model.DSN{
@@ -104,26 +104,36 @@ func Highlight(s *model.CoreDataSource) []map[string]string {
 
 	excludeDbList := strings.Split(s.ExcludeDbList, ",")
 
-	schema, err := db.Table("information_schema.SCHEMATA").Select("SCHEMA_NAME").Scopes(AccordingToSchemaNotIn(true, excludeDbList)).Group("SCHEMA_NAME").Rows()
-	for schema.Next() {
-		schema.Scan(&highlight)
-		list = append(list, map[string]string{"vl": highlight, "meta": "Schema"})
-	}
-
-	tbl, err := db.Table("information_schema.tables").Select("table_name").Scopes(AccordingToSchemaNotIn(false, excludeDbList)).Group("table_name").Rows()
-	for tbl.Next() {
-		tbl.Scan(&highlight)
-		list = append(list, map[string]string{"vl": highlight, "meta": "Table"})
-	}
-	fields, err := db.Table("information_schema.Columns").Select("COLUMN_NAME").Scopes(AccordingToSchemaNotIn(false, excludeDbList)).Group("COLUMN_NAME").Rows()
-	for fields.Next() {
-		fields.Scan(&highlight)
-		list = append(list, map[string]string{"vl": highlight, "meta": "Fields"})
+	if isField == "true" {
+		tbl, err := db.Table("information_schema.tables").Select("table_name").Scopes(AccordingToSchemaIn(dbName)).Group("table_name").Rows()
+		if err != nil {
+			model.DefaultLogger.Debugf("fetch table error: %v", err)
+		}
+		for tbl.Next() {
+			tbl.Scan(&highlight)
+			list = append(list, map[string]string{"vl": highlight, "meta": "Table"})
+		}
+		fields, err := db.Table("information_schema.Columns").Select("COLUMN_NAME").Scopes(AccordingToSchemaIn(dbName)).Group("COLUMN_NAME").Rows()
+		if err != nil {
+			model.DefaultLogger.Debugf("fetch fields error: %v", err)
+		}
+		for fields.Next() {
+			fields.Scan(&highlight)
+			list = append(list, map[string]string{"vl": highlight, "meta": "Fields"})
+		}
+	} else {
+		schema, err := db.Table("information_schema.SCHEMATA").Select("SCHEMA_NAME").Scopes(AccordingToSchemaNotIn(true, excludeDbList)).Group("SCHEMA_NAME").Rows()
+		if err != nil {
+			model.DefaultLogger.Debugf("fetch schema error: %v", err)
+		}
+		for schema.Next() {
+			schema.Scan(&highlight)
+			list = append(list, map[string]string{"vl": highlight, "meta": "Schema"})
+		}
 	}
 
 	return list
 }
-
 func SuccessPayload(payload interface{}) Resp {
 	return Resp{
 		Payload: payload,

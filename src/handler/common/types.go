@@ -14,6 +14,7 @@ type PageList[T any] struct {
 	startAt  int
 	endAt    int
 	sel      string
+	Order    string
 }
 
 type PageChange struct {
@@ -88,23 +89,6 @@ type Resp struct {
 	Code    int         `json:"code"`
 	Text    string      `json:"text"`
 }
-
-const (
-	ORDER_IS_CREATE     = "工单已创建!"
-	ORDER_IS_DUP        = "工单请勿重复提交!"
-	ORDER_IS_EDIT       = "工单已编辑！"
-	ORDER_IS_DELETE     = "工单已删除！"
-	ORDER_IS_CLEAR      = "工单已清除"
-	ORDER_IS_AGREE      = "工单已同意"
-	ORDER_IS_UNDO       = "工单已撤销"
-	ORDER_IS_REJECT     = "工单已拒绝"
-	ORDER_IS_ALL_END    = "所有工单已终止"
-	ORDER_IS_END        = "工单已终止"
-	ORDER_IS_ALL_CANCEL = "所有工单已取消"
-	DATA_IS_DELETE      = "数据已删除！"
-	DATA_IS_EDIT        = "数据已编辑！"
-	DATA_IS_UPDATED     = "数据已更新"
-)
 
 const (
 	Pong = "pong"

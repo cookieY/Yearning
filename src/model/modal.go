@@ -129,6 +129,8 @@ type CoreDataSource struct {
 	CAFile           string `gorm:"type:longtext;default ''" json:"ca_file"`
 	Cert             string `gorm:"type:longtext;default ''" json:"cert"`
 	KeyFile          string `gorm:"type:longtext;default ''" json:"key_file"`
+	DBType           string `gorm:"type:int(5);not null;default 0" json:"db_type"` // 0 mysql 1 pg
+	RuleId           int    `gorm:"type:int(100);not null;default 0" json:"rule_id"`
 }
 
 type CoreGrained struct {
@@ -202,4 +204,17 @@ type CoreOrderComment struct {
 	Username string `gorm:"type:varchar(50);not null;" json:"username"`
 	Content  string `gorm:"type:longtext;" json:"content"`
 	Time     string `gorm:"type:varchar(50);not null" json:"time"`
+}
+
+type CoreRules struct {
+	ID        uint   `gorm:"primary_key;AUTO_INCREMENT" json:"id"`
+	Desc      string `gorm:"type:longtext;not null" json:"desc"`
+	AuditRole JSON   `gorm:"type:json;" json:"audit_role"`
+}
+
+type CoreTotalTickets struct {
+	ID         uint   `gorm:"primary_key;AUTO_INCREMENT" json:"id"`
+	Date       string `gorm:"type:varchar(50);not null;index:date_idx" json:"date"`
+	TotalOrder int64  `gorm:"type:int(50);not null" json:"total_order"`
+	TotalQuery int64  `gorm:"type:int(50);not null" json:"total_query"`
 }

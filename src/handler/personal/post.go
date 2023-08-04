@@ -16,6 +16,7 @@ package personal
 import (
 	"Yearning-go/src/handler/common"
 	"Yearning-go/src/handler/manage/tpl"
+	"Yearning-go/src/i18n"
 	"Yearning-go/src/lib"
 	"Yearning-go/src/model"
 	"encoding/json"
@@ -52,7 +53,7 @@ func sqlOrderPost(c yee.Context) (err error) {
 	model.DB().Create(&model.CoreWorkflowDetail{
 		WorkId:   u.WorkId,
 		Username: user.Username,
-		Action:   "已提交",
+		Action:   i18n.DefaultLang.Load(i18n.INFO_SUBMITTED),
 		Time:     time.Now().Format("2006-01-02 15:04"),
 	})
 
@@ -62,7 +63,7 @@ func sqlOrderPost(c yee.Context) (err error) {
 		CallAutoTask(u, length)
 	}
 
-	return c.JSON(http.StatusOK, common.SuccessPayLoadToMessage(ORDER_POST_SUCCESS))
+	return c.JSON(http.StatusOK, common.SuccessPayLoadToMessage(i18n.DefaultLang.Load(i18n.ORDER_POST_SUCCESS)))
 }
 
 func wrapperPostOrderInfo(order *model.CoreSqlOrder, y yee.Context) (length int, err error) {

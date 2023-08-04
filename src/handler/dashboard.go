@@ -29,14 +29,15 @@ type groupBy struct {
 }
 
 type bannerCount struct {
-	User      int64 `json:"user"`
-	Order     int64 `json:"order"`
-	Query     int64 `json:"query"`
-	Source    int64 `json:"source"`
-	SelfDDL   int64 `json:"self_ddl"`
-	SelfDML   int64 `json:"self_dml"`
-	SelfAudit int64 `json:"self_audit"`
-	SelfQuery int64 `json:"self_query"`
+	User       int64                    `json:"user"`
+	TotalOrder []model.CoreTotalTickets `json:"total_order"`
+	Order      int64                    `json:"order"`
+	Query      int64                    `json:"query"`
+	Source     int64                    `json:"source"`
+	SelfDDL    int64                    `json:"self_ddl"`
+	SelfDML    int64                    `json:"self_dml"`
+	SelfAudit  int64                    `json:"self_audit"`
+	SelfQuery  int64                    `json:"self_query"`
 }
 
 func DashBanner(c yee.Context) (err error) {
@@ -50,21 +51,18 @@ func DashBanner(c yee.Context) (err error) {
 	model.DB().Model(model.CoreSqlOrder{}).Where("username =? and `type` =?", user.Username, 1).Count(&b.SelfDML)
 	model.DB().Model(model.CoreQueryOrder{}).Where("username =?", user.Username).Count(&b.SelfQuery)
 	model.DB().Model(model.CoreSqlOrder{}).Where("status = ? and assigned like ?", 2, "%"+user.Username+"%").Count(&b.SelfAudit)
+	model.DB().Model(model.CoreTotalTickets{}).Order("date desc ").Limit(7).Find(&b.TotalOrder)
 	return c.JSON(http.StatusOK, common.SuccessPayload(b))
 }
 
 func DashUserInfo(c yee.Context) (err error) {
 	user := new(lib.Token).JwtParse(c)
 	var (
-		//u         model.CoreAccount
 		p         model.CoreGrained
 		groupList []model.CoreRoleGroup
-		//s         model.CoreGlobalConfiguration
 	)
-	//model.DB().Select("username,rule,department,real_name,email").Where("username =?", user).Find(&u)
 	model.DB().Select("`group`").Where("username =?", user).First(&p)
 	model.DB().Select("`name`").Find(&groupList)
-	//model.DB().Select("stmt").First(&s)
 	return c.JSON(http.StatusOK, common.SuccessPayload(map[string]interface{}{"p": p.Group, "g": groupList}))
 }
 

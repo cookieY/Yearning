@@ -15,18 +15,12 @@ package settings
 
 import (
 	"Yearning-go/src/handler/common"
+	"Yearning-go/src/i18n"
 	"Yearning-go/src/lib"
 	"Yearning-go/src/model"
 	"encoding/json"
 	"github.com/cookieY/yee"
 	"net/http"
-)
-
-const (
-	WEBHOOK_TEST      = "测试消息已发送！请注意查收！"
-	MAIL_TEST         = "测试邮件已发送！请注意查收！"
-	ERR_LDAP_TEST     = "ldap连接失败,请检查配置/测试用户密码！"
-	SUCCESS_LDAP_TEST = "ldap连接成功!"
 )
 
 type set struct {
@@ -68,7 +62,7 @@ func SuperSaveSetting(c yee.Context) (err error) {
 	model.GloOther = u.Other
 	model.GloLdap = u.Ldap
 	model.GloMessage = u.Message
-	return c.JSON(http.StatusOK, common.SuccessPayLoadToMessage(common.DATA_IS_EDIT))
+	return c.JSON(http.StatusOK, common.SuccessPayLoadToMessage(i18n.DefaultLang.Load(i18n.INFO_DATA_IS_EDIT)))
 }
 
 func SuperTestSetting(c yee.Context) (err error) {
@@ -83,19 +77,19 @@ func SuperTestSetting(c yee.Context) (err error) {
 	switch el {
 	case "mail":
 		go lib.SendMail(u.Message.ToUser, u.Message, lib.TemoplateTestMail)
-		return c.JSON(http.StatusOK, common.SuccessPayLoadToMessage(MAIL_TEST))
+		return c.JSON(http.StatusOK, common.SuccessPayLoadToMessage(i18n.DefaultLang.Load(i18n.MAIL_TEST)))
 	case "ding":
 		go lib.SendDingMsg(u.Message, lib.TmplTestDing)
-		return c.JSON(http.StatusOK, common.SuccessPayLoadToMessage(WEBHOOK_TEST))
+		return c.JSON(http.StatusOK, common.SuccessPayLoadToMessage(i18n.DefaultLang.Load(i18n.WEBHOOK_TEST)))
 	case "ldap":
 		ldap := model.ALdap{Ldap: u.Ldap}
 		k, err := ldap.LdapConnect("", "", true)
 		if err != nil {
 			c.Logger().Error(err)
-			return c.JSON(http.StatusOK, common.SuccessPayLoadToMessage(ERR_LDAP_TEST))
+			return c.JSON(http.StatusOK, common.SuccessPayLoadToMessage(i18n.DefaultLang.Load(i18n.ERR_LDAP_TEST)))
 		}
 		if k {
-			return c.JSON(http.StatusOK, common.SuccessPayLoadToMessage(SUCCESS_LDAP_TEST))
+			return c.JSON(http.StatusOK, common.SuccessPayLoadToMessage(i18n.DefaultLang.Load(i18n.SUCCESS_LDAP_TEST)))
 		}
 	}
 	return c.JSON(http.StatusOK, common.ERR_REQ_FAKE)
@@ -135,5 +129,5 @@ func SuperDelOrder(c yee.Context) (err error) {
 			}
 		}()
 	}
-	return c.JSON(http.StatusOK, common.SuccessPayLoadToMessage(common.ORDER_IS_DELETE))
+	return c.JSON(http.StatusOK, common.SuccessPayLoadToMessage(i18n.DefaultLang.Load(i18n.INFO_ORDER_IS_DELETE)))
 }

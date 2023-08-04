@@ -2,19 +2,13 @@ package db
 
 import (
 	"Yearning-go/src/handler/common"
+	"Yearning-go/src/i18n"
 	"Yearning-go/src/lib"
 	"Yearning-go/src/model"
 	"encoding/json"
 	"github.com/google/uuid"
 	drive "gorm.io/driver/mysql"
 	"gorm.io/gorm"
-)
-
-const (
-	CONN_TEST_SUCCESS = "数据库实例连接成功！"
-	DB_SAVE_SUCCESS   = "连接名添加成功！"
-	ERR_DB_SAVE       = "config.toml文件中SecretKey值必须为16位！"
-	DB_EDIT_SUCCESS   = "数据源信息已更新!"
 )
 
 type CommonDBPost struct {
@@ -70,6 +64,7 @@ func SuperEditSource(source *model.CoreDataSource) common.Resp {
 		"ca_file":            source.CAFile,
 		"cert":               source.Cert,
 		"key_file":           source.KeyFile,
+		"rule_id":            source.RuleId,
 	})
 	model.DB().Model(model.CoreQueryOrder{}).Where("status =? and source_id =?", 1, source.SourceId).Updates(&model.CoreQueryOrder{Assigned: source.Principal})
 	var k []model.CoreRoleGroup
@@ -89,7 +84,7 @@ func SuperEditSource(source *model.CoreDataSource) common.Resp {
 		r, _ := json.Marshal(p)
 		model.DB().Model(&model.CoreRoleGroup{}).Where("id =?", k[i].ID).Updates(model.CoreRoleGroup{Permissions: r})
 	}
-	return common.SuccessPayLoadToMessage(DB_EDIT_SUCCESS)
+	return common.SuccessPayLoadToMessage(i18n.DefaultLang.Load(i18n.DB_EDIT_SUCCESS))
 }
 
 func SuperCreateSource(source *model.CoreDataSource) common.Resp {
@@ -97,14 +92,14 @@ func SuperCreateSource(source *model.CoreDataSource) common.Resp {
 	if source.Password != "" {
 		source.SourceId = uuid.New().String()
 		model.DB().Create(source)
-		return common.SuccessPayLoadToMessage(DB_SAVE_SUCCESS)
+		return common.SuccessPayLoadToMessage(i18n.DefaultLang.Load(i18n.DB_SAVE_SUCCESS))
 	}
-	return common.SuccessPayLoadToMessage(ERR_DB_SAVE)
+	return common.SuccessPayLoadToMessage(i18n.DefaultLang.Load(i18n.ERR_DB_SAVE))
 }
 
 func SuperTestDBConnect(source *model.CoreDataSource) common.Resp {
 	if err := ConnTest(source); err != nil {
 		return common.ERR_COMMON_MESSAGE(err)
 	}
-	return common.SuccessPayLoadToMessage(CONN_TEST_SUCCESS)
+	return common.SuccessPayLoadToMessage(i18n.DefaultLang.Load(i18n.CONN_TEST_SUCCESS))
 }

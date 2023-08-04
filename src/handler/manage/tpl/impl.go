@@ -1,6 +1,7 @@
 package tpl
 
 import (
+	"Yearning-go/src/i18n"
 	"Yearning-go/src/model"
 	"encoding/json"
 	"errors"
@@ -31,7 +32,7 @@ func OrderRelation(source_id string) ([]Tpl, error) {
 	var whoIsAuditor []Tpl
 	model.DB().Model(model.CoreDataSource{}).Where("source_id = ?", source_id).First(&s)
 	if err := model.DB().Model(model.CoreWorkflowTpl{}).Where("id =?", s.FlowID).First(&tpl).Error; errors.Is(err, gorm.ErrRecordNotFound) {
-		return nil, errors.New("数据源没有添加流程!无法提交工单")
+		return nil, errors.New(i18n.DefaultLang.Load(i18n.ER_MISSING_DATA_SOURCE))
 	}
 	_ = json.Unmarshal(tpl.Steps, &whoIsAuditor)
 

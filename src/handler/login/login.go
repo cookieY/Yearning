@@ -15,6 +15,7 @@ package login
 
 import (
 	"Yearning-go/src/handler/common"
+	"Yearning-go/src/i18n"
 	"Yearning-go/src/lib"
 	"Yearning-go/src/model"
 	"encoding/json"
@@ -128,9 +129,9 @@ func UserRegister(c yee.Context) (err error) {
 				Email:      u.Email,
 			})
 			model.DB().Create(&model.CoreGrained{Username: u.Username, Group: ix})
-			return c.JSON(http.StatusOK, common.SuccessPayLoadToMessage("注册成功！"))
+			return c.JSON(http.StatusOK, common.SuccessPayLoadToMessage(i18n.DefaultLang.Load(i18n.INFO_REGISTRATION_SUCCESS)))
 		}
-		return c.JSON(http.StatusOK, common.ERR_COMMON_MESSAGE(errors.New("用户已存在请重新注册！")))
+		return c.JSON(http.StatusOK, common.ERR_COMMON_TEXT_MESSAGE(i18n.DefaultLang.Load(i18n.ER_USER_ALREADY_EXISTS)))
 	}
 	return c.JSON(http.StatusOK, common.ERR_REGISTER)
 

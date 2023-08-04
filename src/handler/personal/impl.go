@@ -2,6 +2,7 @@ package personal
 
 import (
 	"Yearning-go/src/engine"
+	"Yearning-go/src/i18n"
 	"Yearning-go/src/lib"
 	"Yearning-go/src/model"
 	"encoding/hex"
@@ -12,13 +13,8 @@ import (
 )
 
 const (
-	ORDER_POST_SUCCESS      = "工单已提交,请等待审核人审核！"
-	ER_DB_CONNENT           = "数据库实例连接失败！请检查相关配置是否正确！"
-	CUSTOM_INFO_SUCCESS     = "邮箱/真实姓名修改成功！刷新后显示最新信息!"
-	CUSTOM_PASSWORD_SUCCESS = "个人信息修改成功！"
-	ER_SQL_EMPTY            = "无查询语句！"
-	BUF                     = 1<<20 - 1
-	ER_RPC                  = "rpc调用失败"
+	BUF    = 1<<20 - 1
+	ER_RPC = "rpc调用失败"
 )
 
 type queryBind struct {
@@ -77,7 +73,7 @@ func (q *QueryDeal) PreCheck(insulateWordList string) error {
 func (m *MultiSQLRunner) Run(db *sqlx.DB, schema string) (*Query, error) {
 	query := new(Query)
 	if db == nil {
-		return nil, errors.New("数据库连接失败！")
+		return nil, errors.New(i18n.DefaultLang.Load(i18n.ER_DATABASE_CONNECTION_FAILED))
 	}
 	db.Exec(fmt.Sprintf("use `%s`", schema))
 	rows, err := db.Queryx(m.SQL)
@@ -99,7 +95,7 @@ func (m *MultiSQLRunner) Run(db *sqlx.DB, schema string) (*Query, error) {
 			switch r := results[key].(type) {
 			case []uint8:
 				if len(r) > BUF {
-					results[key] = "blob字段无法显示"
+					results[key] = i18n.DefaultLang.Load(i18n.ER_BLOB_FIELD_NOT_DISPLAYABLE)
 				} else {
 					switch hex.EncodeToString(r) {
 					case "01":
@@ -110,7 +106,7 @@ func (m *MultiSQLRunner) Run(db *sqlx.DB, schema string) (*Query, error) {
 						results[key] = string(r)
 					}
 					if m.excludeFieldContext(key) {
-						results[key] = "****脱敏字段"
+						results[key] = i18n.DefaultLang.Load(i18n.INFO_SENSITIVE_FIELD)
 					}
 				}
 			}

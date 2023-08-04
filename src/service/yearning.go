@@ -26,6 +26,7 @@ import (
 	"github.com/cookieY/yee/middleware"
 	"github.com/robfig/cron/v3"
 	"net/http"
+	"time"
 )
 
 //go:embed dist/*
@@ -50,8 +51,23 @@ func cronTabMaskQuery() {
 	crontab.Start()
 }
 
+func cronTabTotalTickets() {
+	crontab := cron.New()
+	if _, err := crontab.AddFunc("15 2 * * *", func() {
+		var totalOrder int64
+		var totalQuery int64
+		model.DB().Model(model.CoreSqlOrder{}).Where("DATE(date) = CURDATE() - INTERVAL 1 DAY").Count(&totalOrder)
+		model.DB().Model(model.CoreQueryOrder{}).Where("DATE(date) = CURDATE() - INTERVAL 1 DAY").Count(&totalQuery)
+		model.DB().Model(model.CoreTotalTickets{}).Create(&model.CoreTotalTickets{TotalOrder: totalOrder, TotalQuery: totalQuery, Date: time.Now().Format("2006-01-02")})
+	}); err != nil {
+		logger.DefaultLogger.Error(err)
+	}
+	crontab.Start()
+}
+
 func StartYearning(port string, host string) {
 	go cronTabMaskQuery()
+	go cronTabTotalTickets()
 	model.DB().First(&model.GloPer)
 	model.Host = host
 	_ = json.Unmarshal(model.GloPer.Message, &model.GloMessage)
@@ -67,7 +83,7 @@ func StartYearning(port string, host string) {
 	e.Use(middleware.GzipWithConfig(middleware.GzipConfig{
 		Level: 9,
 	}))
-	e.SetLogLevel(2)
+	e.SetLogLevel(model.TransferLogLevel())
 	e.GET("/", func(c yee.Context) error {
 		return c.HTML(http.StatusOK, html)
 	})

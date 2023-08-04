@@ -8,11 +8,7 @@ import (
 )
 
 const (
-	UNDO_EXPR            = "username =? AND work_id =? AND `status` =? "
-	UNDO_MESSAGE_ERROR   = "工单状态已更改！无法撤销"
-	UNDO_MESSAGE_SUCCESS = "工单已撤销！"
-	AUDITOR_IS_NOT_EXIST = "流程信息缺失,请检查该数据源流程配置!"
-	COMMENT_IS_POST      = "评论发送成功"
+	UNDO_EXPR = "username =? AND work_id =? AND `status` =? "
 )
 
 type referOrder struct {

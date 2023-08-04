@@ -15,6 +15,7 @@ package group
 
 import (
 	"Yearning-go/src/handler/common"
+	"Yearning-go/src/i18n"
 	"Yearning-go/src/lib"
 	"Yearning-go/src/model"
 	"encoding/json"
@@ -23,7 +24,6 @@ import (
 	"github.com/google/uuid"
 	"net/http"
 	"net/url"
-	"strings"
 )
 
 func SuperGetRuseSource(c yee.Context) (err error) {
@@ -65,7 +65,7 @@ func SuperGroupUpdate(c yee.Context) (err error) {
 		} else {
 			model.DB().Model(model.CoreRoleGroup{}).Scopes(common.AccordingToIDEqual(u.ID)).Updates(&model.CoreRoleGroup{Permissions: g, Name: u.Name})
 		}
-		return c.JSON(http.StatusOK, common.SuccessPayLoadToMessage(fmt.Sprintf(GROUP_CREATE_SUCCESS, u.Name)))
+		return c.JSON(http.StatusOK, common.SuccessPayLoadToMessage(fmt.Sprintf(i18n.DefaultLang.Load(i18n.GROUP_CREATE_SUCCESS), u.Name)))
 	}
 	return c.JSON(http.StatusOK, common.ERR_REQ_FAKE)
 }
@@ -83,14 +83,5 @@ func SuperClearUserRule(c yee.Context) (err error) {
 		go model.DB().Model(model.CoreGrained{}).Scopes(common.AccordingToUsernameEqual(i.Username)).Updates(&model.CoreGrained{Group: b})
 	}
 	model.DB().Model(model.CoreRoleGroup{}).Where("group_id = ?", scape).Delete(&model.CoreRoleGroup{})
-	return c.JSON(http.StatusOK, common.SuccessPayLoadToMessage(fmt.Sprintf(GROUP_DELETE_SUCCESS, scape)))
-}
-
-func SuperUserRuleMarge(c yee.Context) (err error) {
-	u := new(marge)
-	if err = c.Bind(u); err != nil {
-		return c.JSON(http.StatusOK, common.ERR_REQ_BIND)
-	}
-	m3 := lib.NewMultiUserRuleSet(strings.Split(u.Group, ","))
-	return c.JSON(http.StatusOK, common.SuccessPayload(m3))
+	return c.JSON(http.StatusOK, common.SuccessPayLoadToMessage(fmt.Sprintf(i18n.DefaultLang.Load(i18n.GROUP_DELETE_SUCCESS), scape)))
 }
