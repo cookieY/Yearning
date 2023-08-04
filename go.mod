@@ -11,14 +11,14 @@ require (
 	github.com/go-sql-driver/mysql v1.6.0
 	github.com/golang-jwt/jwt v3.2.2+incompatible
 	github.com/golang/protobuf v1.5.2
-	github.com/google/uuid v1.1.1
+	github.com/google/uuid v1.3.0
 	github.com/gookit/gcli/v3 v3.2.1
 	github.com/robfig/cron/v3 v3.0.1
 	github.com/stretchr/testify v1.8.0
 	github.com/vmihailenco/msgpack/v5 v5.3.5
 	golang.org/x/crypto v0.6.0
 	golang.org/x/net v0.7.0
-	google.golang.org/grpc v1.25.1
+	google.golang.org/grpc v1.53.0
 	gopkg.in/gomail.v2 v2.0.0-20160411212932-81ebce5c23df
 	gopkg.in/ldap.v3 v3.0.3
 	gorm.io/driver/mysql v1.3.4
