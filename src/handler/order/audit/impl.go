@@ -9,6 +9,7 @@ import (
 	"Yearning-go/src/model"
 	"encoding/json"
 	"fmt"
+	"github.com/cookieY/yee/logger"
 	"strings"
 	"time"
 )
@@ -58,11 +59,16 @@ func ExecuteOrder(u *Confirm, user string) common.Resp {
 	order.Assigned = user
 
 	model.DB().Model(model.CoreDataSource{}).Where("source_id =?", order.SourceId).First(&source)
+	rule, err := lib.CheckDataSourceRule(source.RuleId)
+	if err != nil {
+		logger.DefaultLogger.Error(err)
+	}
+
 	var isCall bool
 	if client := lib.NewRpc(); client != nil {
 		if err := client.Call("Engine.Exec", &ExecArgs{
 			Order:    &order,
-			Rules:    model.GloRole,
+			Rules:    *rule,
 			IP:       source.IP,
 			Port:     source.Port,
 			Username: source.Username,

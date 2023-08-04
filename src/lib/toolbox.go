@@ -28,8 +28,6 @@ import (
 	"time"
 )
 
-const None = "none" //无延迟
-
 func ResearchDel(s []string, p string) []string {
 	for in := 0; in < len(s); in++ {
 		if s[in] == p {
@@ -89,18 +87,6 @@ func NonIntersect(o, n []string) []string {
 		}
 	}
 	return arr
-}
-
-func StringToDuration(delay string) time.Duration {
-	if delay != None {
-		now := time.Now()
-		dt, _ := time.ParseInLocation("2006-01-02 15:04 ", delay, time.Local)
-		after := dt.Sub(now)
-		if after+1 > 0 {
-			return after
-		}
-	}
-	return 0
 }
 
 func TimeDifference(t string) bool {

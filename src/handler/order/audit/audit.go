@@ -44,8 +44,12 @@ func ScheduledChange(c yee.Context) (err error) {
 		c.Logger().Error(err.Error())
 		return c.JSON(http.StatusOK, common.ERR_REQ_BIND)
 	}
-	lib.OrderDelayPool.Store(u.WorkId, u.Delay)
-	model.DB().Model(model.CoreSqlOrder{}).Where("work_id =?", u.WorkId).Updates(&model.CoreSqlOrder{Delay: u.Delay})
+	var isCall string
+	if client := lib.NewRpc(); client != nil {
+		if err := client.Call("Engine.StopDelay", u, &isCall); err != nil {
+			return err
+		}
+	}
 	return c.JSON(http.StatusOK, common.SuccessPayLoadToMessage(i18n.DefaultLang.Load(i18n.INFO_ORDER_DELAY_SUCCESS)))
 }
 
