@@ -9,7 +9,7 @@ User = "root"
 SecretKey = "dbcjqheupqjsuwsm"
 RpcAddr = "127.0.0.1:50001"
 LogLevel = "debug"  # debug,info,warn,error
-Lang = "en-us"  # en-us,zh-cn
+Lang = "en_US"  # en_US,zh_CN
 
 [Oidc]
 Enable = false

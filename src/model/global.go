@@ -79,8 +79,6 @@ var DefaultLogger logger.Logger
 
 var JWT = ""
 
-var Host = ""
-
 var GloPer CoreGlobalConfiguration
 
 var GloLdap Ldap

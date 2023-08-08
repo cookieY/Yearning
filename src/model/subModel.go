@@ -7,6 +7,7 @@ type Other struct {
 	Register    bool     `json:"register"`
 	Export      bool     `json:"export"`
 	ExQueryTime int      `json:"ex_query_time"`
+	Domain      string   `json:"domain"`
 }
 
 type Message struct {

@@ -77,6 +77,7 @@ func AddRouter(e *yee.Core) {
 	e.POST("/login", login.UserGeneralLogin)
 	e.POST("/register", login.UserRegister)
 	e.GET("/fetch", login.UserReqSwitch)
+	e.GET("/lang", login.SystemLang)
 	e.POST("/ldap", login.UserLdapLogin)
 	e.GET("/oidc/_token-login", login.OidcLogin)
 	e.GET("/oidc/state", login.OidcState)

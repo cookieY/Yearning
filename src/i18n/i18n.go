@@ -1,8 +1,8 @@
 package i18n
 
 const (
-	US = "en-us"
-	CN = "zh-cn"
+	US = "en_US"
+	CN = "zh_CN"
 )
 
 const (
@@ -108,7 +108,7 @@ type lang struct {
 	kind string
 }
 
-var DefaultLang *lang = new(lang)
+var DefaultLang = new(lang)
 
 func MakeBuild(l string) {
 	if l == CN {

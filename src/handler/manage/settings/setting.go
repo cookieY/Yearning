@@ -79,7 +79,7 @@ func SuperTestSetting(c yee.Context) (err error) {
 		go lib.SendMail(u.Message.ToUser, u.Message, lib.TemoplateTestMail)
 		return c.JSON(http.StatusOK, common.SuccessPayLoadToMessage(i18n.DefaultLang.Load(i18n.MAIL_TEST)))
 	case "ding":
-		go lib.SendDingMsg(u.Message, lib.TmplTestDing)
+		go lib.SendDingMsg(u.Message, lib.Commontext)
 		return c.JSON(http.StatusOK, common.SuccessPayLoadToMessage(i18n.DefaultLang.Load(i18n.WEBHOOK_TEST)))
 	case "ldap":
 		ldap := model.ALdap{Ldap: u.Ldap}
