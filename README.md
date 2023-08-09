@@ -43,6 +43,10 @@ English | [简体中文](README.zh-CN.md)
   This allows you to restrict users' access to query work orders, auditing functions, and other sensitive operations
   based on their assigned roles.
 
+## Docs
+
+[Yearning Docs](https://next.yearning.io) only Chinese
+
 ## Install
 
 [Download](https://github.com/cookieY/Yearning/releases/latest) the latest release and extract it.
