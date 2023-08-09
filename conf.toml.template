@@ -6,8 +6,8 @@ Password = "xxxxxxx"
 User = "root"
 
 [General]
-SecretKey = "dbcjqheupqjsuwsm"
-RpcAddr = "127.0.0.1:50001"
+SecretKey = "dbcjqheupqjsuwsm" #SecretKey is the salt for token/ database password encryption/decryption. Please keep it safe. must contain 16 characters
+RpcAddr = "127.0.0.1:50001" # SQL checker rpc server address
 LogLevel = "debug"  # debug,info,warn,error
 Lang = "en_US"  # en_US,zh_CN
 
