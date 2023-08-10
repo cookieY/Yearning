@@ -9,16 +9,20 @@ jobs:
   closeInvalidFormatIssue:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v2
-      - env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          if [[ ${{ github.event.issue.title }} != "[Question]"* || ${{ github.event.issue.title }} != "[Feature]"* ]]; then
-            gh issue edit "${{ github.event.issue.number }}" --add-label "invalid-format" --body "Please follow the issue template"
-            gh issue close "${{ github.event.issue.number }}"
-          fi
-          if [[ ${{ github.event.issue.title }} == "[Question] " || ${{ github.event.issue.title }} == "[Feature] " ]]; then
-            gh issue edit "${{ github.event.issue.number }}" --add-label "invalid-format" --body "Please provide titles that are straightforward and concise.请提供简单明了的标题。例如 [Question] 如何使用"
-            gh issue close "${{ github.event.issue.number }}"
-          fi
+      - name: Check issue format
+        uses: actions/github-script@v4
+        with:
+          script: |
+            const issueTitle = context.payload.issue.title;
+            if (!issueTitle.startsWith("[Question]") || !issueTitle.startsWith("[Feature]") || issueTitle === "[Bug] " || issueTitle === "[Question] " || issueTitle === "[Feature] ") {
+              await github.issues.update({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body: `Please provide titles that are straightforward and concise. exp: [Question] How to use or [Feature] Add new feature
+            
+                  请提供简单明了的标题。例如 [Question] 如何使用 or [Feature] 添加新功能`,
+                labels: ['invalid-format']
+                state: "closed"
+              });
+            }    fi
