@@ -11,6 +11,7 @@ jobs:
     steps:
       - env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        uses: actions/checkout@v2
         run: |
           if [[ ${{ github.event.issue.title }} != "[Question]"* || ${{ github.event.issue.title }} != "[Feature]"* ]]; then
             gh issue edit "${{ github.event.issue.number }}" --add-label "invalid-format" --body "Please follow the issue template"
