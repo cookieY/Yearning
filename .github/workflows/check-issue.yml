@@ -14,7 +14,8 @@ jobs:
         with:
           script: |
             const issueTitle = context.payload.issue.title;
-            if (!issueTitle.startsWith("[Question]") && !issueTitle.startsWith("[Feature]") && issueTitle === "[Question] " && issueTitle === "[Feature] ") {
+            const regex = /^\[(Question|Feature)\]\s.+/;
+            if (!regex.test(issueTitle)) {
               await github.issues.update({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
