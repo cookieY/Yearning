@@ -8,7 +8,7 @@ require (
 	github.com/cookieY/sqlx v1.3.0
 	github.com/cookieY/yee v0.3.9
 	github.com/deckarep/golang-set/v2 v2.3.1
-	github.com/go-sql-driver/mysql v1.6.0
+	github.com/go-sql-driver/mysql v1.7.1
 	github.com/golang-jwt/jwt v3.2.2+incompatible
 	github.com/golang/protobuf v1.5.2
 	github.com/google/uuid v1.3.0
