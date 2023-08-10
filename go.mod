@@ -4,7 +4,7 @@ go 1.18
 
 require (
 	github.com/BurntSushi/toml v0.3.1
-	github.com/Jeffail/gabs/v2 v2.6.1
+	github.com/Jeffail/gabs/v2 v2.7.0
 	github.com/cookieY/sqlx v1.3.0
 	github.com/cookieY/yee v0.3.9
 	github.com/deckarep/golang-set/v2 v2.3.1
