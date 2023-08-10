@@ -1,4 +1,5 @@
 name: "Check Issue"
+
 on:
   issues:
     types:
@@ -8,14 +9,13 @@ jobs:
   closeInvalidFormatIssue:
     runs-on: ubuntu-latest
     steps:
-      - name: Check issue format
+      - env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           if [[ ${{ github.event.issue.title }} != "[Question]"* || ${{ github.event.issue.title }} != "[Feature]"* ]]; then
             gh issue edit "${{ github.event.issue.number }}" --add-label "invalid-format" --body "Please follow the issue template"
             gh issue close "${{ github.event.issue.number }}"
           fi
-      - name: Check issue format
-        run: |
           if [[ ${{ github.event.issue.title }} == "[Question] " || ${{ github.event.issue.title }} == "[Feature] " ]]; then
             gh issue edit "${{ github.event.issue.number }}" --add-label "invalid-format" --body "Please provide titles that are straightforward and concise. \n 请提供简单明了的标题。例如 [Question] 如何使用"
             gh issue close "${{ github.event.issue.number }}"
