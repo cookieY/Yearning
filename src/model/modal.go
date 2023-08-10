@@ -129,7 +129,7 @@ type CoreDataSource struct {
 	CAFile           string `gorm:"type:longtext;default ''" json:"ca_file"`
 	Cert             string `gorm:"type:longtext;default ''" json:"cert"`
 	KeyFile          string `gorm:"type:longtext;default ''" json:"key_file"`
-	DBType           int `gorm:"type:int(5);not null;default 0" json:"db_type"` // 0 mysql 1 pg
+	DBType           int    `gorm:"type:int(5);not null;default 0" json:"db_type"` // 0 mysql 1 pg
 	RuleId           int    `gorm:"type:int(100);not null;default 0" json:"rule_id"`
 }
 

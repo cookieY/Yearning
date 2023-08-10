@@ -10,13 +10,13 @@ jobs:
     steps:
       - name: Check issue format
         run: |
-          if [[ ${{ github.event.issue.title }} != "[Question]*" && ${{ github.event.issue.title }} != "[Feature]*" ]]; then
+          if [[ ${{ github.event.issue.title }} != "[Question]"* || ${{ github.event.issue.title }} != "[Feature]"* ]]; then
             gh issue edit $ISSUE_URL --add-label "invalid-format" --body "Please follow the issue template"
             gh issue close $ISSUE_URL
           fi
       - name: Check issue format
         run: |
-          if [[ ${{ github.event.issue.title }} == "[Question] " && ${{ github.event.issue.title }} == "[Feature] " ]]; then
+          if [[ ${{ github.event.issue.title }} == "[Question] " || ${{ github.event.issue.title }} == "[Feature] " ]]; then
             gh issue edit $ISSUE_URL --add-label "invalid-format" --body "Please provide titles that are straightforward and concise. \n 请提供简单明了的标题。例如 [Question] 如何使用"
             gh issue close $ISSUE_URL
           fi
