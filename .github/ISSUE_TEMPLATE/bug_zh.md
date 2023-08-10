@@ -1,7 +1,7 @@
 ---
 name: 反馈问题
 about: 请告诉我们你遇到的问题
-title: "[Bug] "
+title: "[Question] "
 labels: ''
 assignees: ''
 
