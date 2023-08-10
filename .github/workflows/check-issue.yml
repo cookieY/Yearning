@@ -20,9 +20,9 @@ jobs:
                 repo: context.repo.repo,
                 issue_number: context.issue.number,
                 body: `Please provide titles that are straightforward and concise. exp: [Question] How to use or [Feature] Add new feature
-            
+ 
                   请提供简单明了的标题。例如 [Question] 如何使用 or [Feature] 添加新功能`,
-                labels: ['invalid-format']
+                labels: ['invalid-format'],
                 state: "closed"
               });
-            }    fi
+            }
