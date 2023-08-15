@@ -17,7 +17,7 @@ require (
 	github.com/stretchr/testify v1.8.4
 	github.com/vmihailenco/msgpack/v5 v5.3.5
 	golang.org/x/crypto v0.12.0
-	golang.org/x/net v0.10.0
+	golang.org/x/net v0.14.0
 	google.golang.org/grpc v1.57.0
 	gopkg.in/gomail.v2 v2.0.0-20160411212932-81ebce5c23df
 	gopkg.in/ldap.v3 v3.0.3
