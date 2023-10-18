@@ -15,7 +15,7 @@ require (
 	github.com/gookit/gcli/v3 v3.2.3
 	github.com/robfig/cron/v3 v3.0.1
 	github.com/stretchr/testify v1.8.4
-	github.com/vmihailenco/msgpack/v5 v5.3.5
+	github.com/vmihailenco/msgpack/v5 v5.4.0
 	golang.org/x/crypto v0.14.0
 	golang.org/x/net v0.17.0
 	google.golang.org/grpc v1.57.0
