@@ -42,7 +42,7 @@ func AccordingToOrderState() func(db *gorm.DB) *gorm.DB {
 func AccordingToAllOrderState(state int) func(db *gorm.DB) *gorm.DB {
 	return func(db *gorm.DB) *gorm.DB {
 		switch state {
-		case 7:
+		case 8:
 			return db
 		default:
 			return db.Where("`status` = ?", state)

@@ -111,24 +111,32 @@ type StepInfo struct {
 
 func FetchAuditSteps(c yee.Context) (err error) {
 	u := c.QueryParam("source_id")
-	unescape, _ := url.QueryUnescape(u)
-	whoIsAuditor, err := tpl.OrderRelation(unescape)
-	if err != nil {
-		return c.JSON(http.StatusOK, common.ERR_COMMON_MESSAGE(err))
-	}
 	workId := c.QueryParam("work_id")
+	var order model.CoreSqlOrder
 	var s []model.CoreWorkflowDetail
-	model.DB().Where("work_id = ?", workId).Find(&s)
 	var steps []StepInfo
-	for _, v := range whoIsAuditor {
-		steps = append(steps, StepInfo{Tpl: v})
-	}
-	for i, v := range s {
-		steps[i].CoreWorkflowDetail = v
-	}
+	model.DB().Where("work_id = ?", workId).Find(&s)
+	model.DB().Select("status").Where("work_id = ?", c.QueryParam("work_id")).First(&order)
+	if order.Status == 2 || order.Status == 3 || order.Status == 5 || workId == "" {
+		unescape, _ := url.QueryUnescape(u)
+		whoIsAuditor, err := tpl.OrderRelation(unescape)
+		if err != nil {
+			return c.JSON(http.StatusOK, common.ERR_COMMON_MESSAGE(err))
+		}
 
+		for _, v := range whoIsAuditor {
+			steps = append(steps, StepInfo{Tpl: v})
+		}
+		for i, v := range s {
+			steps[i].CoreWorkflowDetail = v
+		}
+
+	} else {
+		for _, i := range s {
+			steps = append(steps, StepInfo{Tpl: tpl.Tpl{Desc: i.Action, Auditor: []string{i.Username}}, CoreWorkflowDetail: i})
+		}
+	}
 	return c.JSON(http.StatusOK, common.SuccessPayload(steps))
-
 }
 
 func FetchHighLight(c yee.Context) (err error) {
