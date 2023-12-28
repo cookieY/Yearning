@@ -20,9 +20,9 @@ import (
 	"fmt"
 	mapset "github.com/deckarep/golang-set/v2"
 	_ "github.com/go-sql-driver/mysql"
+	"github.com/google/uuid"
 	"github.com/vmihailenco/msgpack/v5"
 	"math"
-	"math/rand"
 	"strconv"
 	"strings"
 	"time"
@@ -52,11 +52,7 @@ func Paging(page interface{}, total int) (start int, end int) {
 }
 
 func GenWorkid() string {
-	rand.Seed(time.Now().UnixNano())
-	a := rand.Intn(1000)
-	c := strconv.Itoa(a)
-	now := time.Now()
-	return now.Format("20060102150405") + c
+	return uuid.NewString()
 }
 
 func Intersect(o, n []string) []string {
