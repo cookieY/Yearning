@@ -17,9 +17,11 @@ import (
 	"Yearning-go/src/model"
 	"crypto/tls"
 	"fmt"
-	"github.com/cookieY/yee/logger"
-	"gopkg.in/gomail.v2"
 	"strings"
+
+	"github.com/cookieY/yee/logger"
+	bot "github.com/crazykun/feishu-bot-markdown"
+	"gopkg.in/gomail.v2"
 )
 
 type UserInfo struct {
@@ -116,6 +118,10 @@ func MessagePush(workid string, t uint, reject string) {
 	var user model.CoreAccount
 	var o model.CoreSqlOrder
 	var ding, mail string
+
+	feishu := new(FeishuMsg)
+	feishu.Title = "Yearning工单消息通知"
+
 	model.DB().Select("work_id,username,text,assigned,source").Where("work_id =?", workid).First(&o)
 	model.DB().Select("email").Where("username = ?", o.Username).First(&user)
 	s := new(sendInfo)
@@ -130,47 +136,85 @@ func MessagePush(workid string, t uint, reject string) {
 			model.DB().Select("email").Where("username IN (?)", strings.Split(op.Assigned, ",")).Find(&s.ToUser)
 			ding = dingMsgTplHandler("已提交", op)
 			mail = fmt.Sprintf(TmplMail, "查询申请", op.WorkId, op.Username, model.GloOther.Domain, model.GloOther.Domain, "已提交")
+
+			feishu.Color = bot.ColorWathet
+			feishu.Status = "已提交"
 		}
 		if t == 8 {
 			ding = dingMsgTplHandler("已同意", op)
 			mail = fmt.Sprintf(TmplMail, "查询申请", op.WorkId, op.Username, model.GloOther.Domain, model.GloOther.Domain, "已同意")
+
+			feishu.Color = bot.ColorGreen
+			feishu.Status = "<font color='green'>已同意</font>"
 		}
 		if t == 9 {
 			ding = dingMsgTplHandler("已驳回", op)
 			mail = fmt.Sprintf(TmplMail, "查询申请", op.WorkId, op.Username, model.GloOther.Domain, model.GloOther.Domain, "已驳回")
+
+			feishu.Color = bot.ColorRed
+			feishu.Status = "<font color='red'>已驳回</font>"
 		}
+
+		feishu.No = op.WorkId
+		feishu.Username = op.Username
+		feishu.Assigned = op.Assigned
+		feishu.Remark = op.Text
 	} else {
 		if t == 0 {
 			ding = dingMsgTplHandler("已驳回", o)
 			mail = fmt.Sprintf(TmplRejectMail, o.WorkId, o.Username, model.GloOther.Domain, model.GloOther.Domain, reject)
+
+			feishu.Color = bot.ColorCarmine
+			feishu.Status = "<font color='red'>驳回</font>" + "   [原因：" + reject + "]"
 		}
 
 		if t == 1 {
 			ding = dingMsgTplHandler("已执行", o)
 			mail = fmt.Sprintf(TmplMail, "执行", o.WorkId, o.Username, model.GloOther.Domain, model.GloOther.Domain, "执行成功")
+
+			feishu.Color = bot.ColorGreen
+			feishu.Status = "<font color='green'>执行成功</font>"
 		}
 
 		if t == 2 {
 			model.DB().Select("email").Where("username IN (?)", strings.Split(o.Assigned, ",")).Find(&s.ToUser)
 			ding = dingMsgTplHandler("已提交", o)
 			mail = fmt.Sprintf(TmplMail, "提交", o.WorkId, o.Username, model.GloOther.Domain, model.GloOther.Domain, "已提交")
+
+			feishu.Color = bot.ColorWathet
+			feishu.Status = "已提交"
 		}
 
 		if t == 4 {
 			ding = dingMsgTplHandler("执行失败", o)
 			mail = fmt.Sprintf(TmplMail, "执行", o.WorkId, o.Username, model.GloOther.Domain, model.GloOther.Domain, "执行失败")
+
+			feishu.Color = bot.ColorRed
+			feishu.Status = "<font color='red'>执行失败</font>"
 		}
 
 		if t == 5 {
 			model.DB().Select("email").Where("username IN (?)", strings.Split(o.Assigned, ",")).Find(&s.ToUser)
 			ding = dingMsgTplHandler("已转交至下一操作人", o)
 			mail = fmt.Sprintf(Tmpl2Mail, "转交", o.WorkId, o.Username, o.Assigned, model.GloOther.Domain, model.GloOther.Domain, "已转交至下一操作人")
+
+			feishu.Color = bot.ColorTurquoise
+			feishu.Status = "已转交至下一操作人"
 		}
 
 		if t == 6 {
 			ding = dingMsgTplHandler("已撤销", o)
 			mail = fmt.Sprintf(TmplMail, "提交", o.WorkId, o.Username, model.GloOther.Domain, model.GloOther.Domain, "已撤销")
+
+			feishu.Color = bot.ColorGrey
+			feishu.Status = "<font color='grey'>已撤销</font>"
 		}
+
+		feishu.No = o.WorkId
+		feishu.Db = o.Source
+		feishu.Username = o.Username
+		feishu.Assigned = o.Assigned
+		feishu.Remark = o.Text
 	}
 
 	if model.GloMessage.Mail {
@@ -182,7 +226,13 @@ func MessagePush(workid string, t uint, reject string) {
 	}
 	if model.GloMessage.Ding {
 		if model.GloMessage.WebHook != "" {
-			go SendDingMsg(s.Message, ding)
+			if strings.Contains(model.GloMessage.WebHook, "dingtalk") {
+				go SendDingMsg(s.Message, ding)
+			} else if strings.Contains(model.GloMessage.WebHook, "weixin") {
+				go SendWechatMsg(s.Message, ding)
+			} else if strings.Contains(model.GloMessage.WebHook, "feishu") {
+				go SendFeishuMsg(s.Message, feishu)
+			}
 		}
 	}
 }

@@ -19,8 +19,10 @@ import (
 	"Yearning-go/src/lib"
 	"Yearning-go/src/model"
 	"encoding/json"
-	"github.com/cookieY/yee"
 	"net/http"
+	"strings"
+
+	"github.com/cookieY/yee"
 )
 
 type set struct {
@@ -79,7 +81,13 @@ func SuperTestSetting(c yee.Context) (err error) {
 		go lib.SendMail(u.Message.ToUser, u.Message, lib.TemoplateTestMail)
 		return c.JSON(http.StatusOK, common.SuccessPayLoadToMessage(i18n.DefaultLang.Load(i18n.MAIL_TEST)))
 	case "ding":
-		go lib.SendDingMsg(u.Message, lib.Commontext)
+		if strings.Contains(u.Message.WebHook, "dingtalk") {
+			go lib.SendDingMsg(u.Message, lib.Commontext)
+		} else if strings.Contains(u.Message.WebHook, "weixin") {
+			go lib.SendDingMsg(u.Message, lib.Commontext)
+		} else if strings.Contains(u.Message.WebHook, "feishu") {
+			go lib.SendFeishuMsg(u.Message, lib.TmplTestFeishu)
+		}
 		return c.JSON(http.StatusOK, common.SuccessPayLoadToMessage(i18n.DefaultLang.Load(i18n.WEBHOOK_TEST)))
 	case "ldap":
 		ldap := model.ALdap{Ldap: u.Ldap}
