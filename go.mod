@@ -14,7 +14,7 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/gookit/gcli/v3 v3.2.3
 	github.com/robfig/cron/v3 v3.0.1
-	github.com/stretchr/testify v1.8.4
+	github.com/stretchr/testify v1.9.0
 	github.com/vmihailenco/msgpack/v5 v5.4.1
 	golang.org/x/crypto v0.21.0
 	golang.org/x/net v0.21.0
