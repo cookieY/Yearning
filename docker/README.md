@@ -12,7 +12,7 @@ docker run -d -it \
            -e MYSQL_ADDR=10.0.0.3:3306 \
            -e MYSQL_PASSWORD=123123 \
            -e MYSQL_DB=Yearning \
-           chaiyd/yearning
+           yeelabs/yearning
 ```
 
 ### docker-compose
@@ -24,7 +24,7 @@ docker run -d -it \
   - `command: /bin/bash -c "./Yearning reset_super"`
 
 ### docker tag
-  - https://hub.docker.com/r/chaiyd/yearning/tags
+  - https://hub.docker.com/r/yeelabs/yearning/tags
 
 ### docker-compose
 ```
@@ -32,7 +32,7 @@ version: '3'
 
 services:
     yearning:
-        image: chaiyd/yearning:latest
+        image: yeelabs/yearning:latest
         environment:
            MYSQL_USER: yearning
            MYSQL_PASSWORD: ukC2ZkcG_ZTeb
