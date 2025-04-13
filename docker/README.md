@@ -16,7 +16,7 @@ docker run -d -it \
            yeelabs/yearning
 ```
 
-### docker-compose
+### docker compose
 - 第一次安装，取消下列compose 中的注释进行初始化
   - `command: /bin/bash -c "./Yearning install"`
 - 升级使用
@@ -27,10 +27,8 @@ docker run -d -it \
 ### docker tag
   - https://hub.docker.com/r/yeelabs/yearning/tags
 
-### docker-compose
+### Docker Compose V2
 ```
-version: '3'
-
 services:
     yearning:
         image: yeelabs/yearning:latest
@@ -46,11 +44,12 @@ services:
         # 首次使用请先初始化
         # command: /bin/bash -c "./Yearning install && ./Yearning run"
         depends_on:
-           - mysql
+          mysql:
+           condition: service_healthy
         restart: always
 
     mysql:
-        image: mysql:5.7
+        image: mysql:8.3.0
         environment:
            MYSQL_ROOT_PASSWORD: ukC2ZkcG_ZTeb
            MYSQL_DATABASE: yearning
@@ -59,6 +58,11 @@ services:
         command:
            - --character-set-server=utf8mb4
            - --collation-server=utf8mb4_general_ci
+        healthcheck:
+           test: ["CMD", "mysqladmin", "-uroot", "-pukC2ZkcG_ZTeb", "ping", "-h", "localhost"]
+           interval: 10s
+           timeout: 3s
+           retries: 12
         volumes:
            - ./data/mysql:/var/lib/mysql
 
