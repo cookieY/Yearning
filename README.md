@@ -1,3 +1,34 @@
+
+<div align="right">
+  <details>
+    <summary >🌐 Language</summary>
+    <div>
+      <div align="right">
+        <p><a href="https://openaitx.github.io/view.html?user=cookieY&project=Yearning&lang=en">English</a></p>
+        <p><a href="https://openaitx.github.io/view.html?user=cookieY&project=Yearning&lang=zh-CN">简体中文</a></p>
+        <p><a href="https://openaitx.github.io/view.html?user=cookieY&project=Yearning&lang=zh-TW">繁體中文</a></p>
+        <p><a href="https://openaitx.github.io/view.html?user=cookieY&project=Yearning&lang=ja">日本語</a></p>
+        <p><a href="https://openaitx.github.io/view.html?user=cookieY&project=Yearning&lang=ko">한국어</a></p>
+        <p><a href="https://openaitx.github.io/view.html?user=cookieY&project=Yearning&lang=hi">हिन्दी</a></p>
+        <p><a href="https://openaitx.github.io/view.html?user=cookieY&project=Yearning&lang=th">ไทย</a></p>
+        <p><a href="https://openaitx.github.io/view.html?user=cookieY&project=Yearning&lang=fr">Français</a></p>
+        <p><a href="https://openaitx.github.io/view.html?user=cookieY&project=Yearning&lang=de">Deutsch</a></p>
+        <p><a href="https://openaitx.github.io/view.html?user=cookieY&project=Yearning&lang=es">Español</a></p>
+        <p><a href="https://openaitx.github.io/view.html?user=cookieY&project=Yearning&lang=it">Itapano</a></p>
+        <p><a href="https://openaitx.github.io/view.html?user=cookieY&project=Yearning&lang=ru">Русский</a></p>
+        <p><a href="https://openaitx.github.io/view.html?user=cookieY&project=Yearning&lang=pt">Português</a></p>
+        <p><a href="https://openaitx.github.io/view.html?user=cookieY&project=Yearning&lang=nl">Nederlands</a></p>
+        <p><a href="https://openaitx.github.io/view.html?user=cookieY&project=Yearning&lang=pl">Polski</a></p>
+        <p><a href="https://openaitx.github.io/view.html?user=cookieY&project=Yearning&lang=ar">العربية</a></p>
+        <p><a href="https://openaitx.github.io/view.html?user=cookieY&project=Yearning&lang=fa">فارسی</a></p>
+        <p><a href="https://openaitx.github.io/view.html?user=cookieY&project=Yearning&lang=tr">Türkçe</a></p>
+        <p><a href="https://openaitx.github.io/view.html?user=cookieY&project=Yearning&lang=vi">Tiếng Việt</a></p>
+        <p><a href="https://openaitx.github.io/view.html?user=cookieY&project=Yearning&lang=id">Bahasa Indonesia</a></p>
+      </div>
+    </div>
+  </details>
+</div>
+
 <div align="center">
 
 <h1 style="border-bottom: none">
