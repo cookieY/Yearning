@@ -1,0 +1,3 @@
+[submodule "geminiX"]
+	path = geminiX
+	url = git@github.com:cookieY/gemini-next.git
