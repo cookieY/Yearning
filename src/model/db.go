@@ -143,6 +143,8 @@ func InitDSN(dsn DSN) (string, error) {
 		Loc:                  time.Local,
 		AllowNativePasswords: true,
 		ParseTime:            true,
+		// 默认走preferred模式，等效于InsecureSkipVerify = true, AllowFallbackToPlaintext = true
+		TLSConfig: "preferred",
 	}
 	if isTLS == true {
 		cfg.TLSConfig = "custom"
