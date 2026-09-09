@@ -114,18 +114,20 @@ func Close(db *gorm.DB) error {
 
 func InitDSN(dsn DSN) (string, error) {
 	isTLS := false
-	if dsn.CA != "" && dsn.Cert != "" && dsn.Key != "" {
-		isTLS = true
-		certPool := x509.NewCertPool()
-		if ok := certPool.AppendCertsFromPEM([]byte(dsn.CA)); !ok {
-			return "", fmt.Errorf("failed to append ca certs")
-		}
-		clientCert := make([]tls.Certificate, 0, 1)
+	clientCert := make([]tls.Certificate, 0, 1)
+	if dsn.Cert != "" && dsn.Key != "" {
 		certs, err := tls.X509KeyPair([]byte(dsn.Cert), []byte(dsn.Key))
 		if err != nil {
 			return "", err
 		}
 		clientCert = append(clientCert, certs)
+	}
+	if dsn.CA != "" {
+		isTLS = true
+		certPool := x509.NewCertPool()
+		if ok := certPool.AppendCertsFromPEM([]byte(dsn.CA)); !ok {
+			return "", fmt.Errorf("failed to append ca certs")
+		}
 		_ = mmsql.RegisterTLSConfig("custom", &tls.Config{
 			RootCAs:            certPool,
 			Certificates:       clientCert,
@@ -141,6 +143,8 @@ func InitDSN(dsn DSN) (string, error) {
 		Loc:                  time.Local,
 		AllowNativePasswords: true,
 		ParseTime:            true,
+		// 默认走preferred模式，等效于InsecureSkipVerify = true, AllowFallbackToPlaintext = true
+		TLSConfig: "preferred",
 	}
 	if isTLS == true {
 		cfg.TLSConfig = "custom"
