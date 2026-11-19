@@ -1,0 +1,1086 @@
+/*
+ * Theme baseline for Yearning v4 (FE-F2).
+ *
+ * Non-business visual decisions inherit the frozen Shadcn Dashboard checkout
+ * (api/contracts/ui-template-baseline.json, commit 6f99c0b04b7169f9ef12dc99946bc4faaeb40b9b):
+ * token values, radius scale, shadows, fonts, container metrics and the
+ * sidebar hover-expansion mechanism below mirror the template's audited
+ * global stylesheet so the shell remains visually traceable to the baseline.
+ * The `--risk-*`, `--exec-*`, `--state-*` and `--chart-series-*` variables at
+ * the end of :root/.dark are the Yearning business semantic exceptions
+ * (yearning-ui-design-spec.md §4); every value must keep WCAG 2.1 AA text
+ * contrast against --card in both themes, enforced by scripts/check-token-contrast.mjs.
+ */
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+/* Tooling sources are not UI. `scripts/scan-motion.mjs` talks *about* class names
+ * (regexes, report strings), and Tailwind's extractor cannot tell that from usage —
+ * it happily emits the catch-all transition utility (and its arbitrary-value
+ * spelling) for a file that only forbids them. Exclude the directory so the gate
+ * documents the rule without smuggling the utilities it bans into the bundle. */
+@source not "../../../scripts";
+/* AGENTS.md documents the motion rules and therefore *names* the utilities they
+ * forbid; documenting a rule must not emit the rule's own counter-example. */
+@source not "../../../AGENTS.md";
+
+@custom-variant dark (&:is(.dark *));
+
+@font-face {
+  font-family: "Geist";
+  src: url("/fonts/geist-sans/Geist-Variable.woff2") format("woff2");
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Geist Mono";
+  src: url("/fonts/geist-mono/GeistMono-Variable.woff2") format("woff2");
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+@theme {
+  --shadow-lg: 0 1rem 3rem rgba(0, 0, 0, 0.175);
+  --shadow-sm: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+  --shadow-md: 0 1px 4px rgba(133, 146, 173, 0.2);
+  --shadow-btn-shadow: 0 9px 17.5px rgba(0, 0, 0, 0.05);
+
+  /*
+   * Motion (FE-F11-MOTION-POLISH). Curves live here instead of component files
+   * so the shared UI layer keeps one easing vocabulary and never hard-codes
+   * cubic-bezier() literals. Both names are additive: Tailwind's built-in
+   * --ease-out (cubic-bezier(0, 0, 0.2, 1)) starts too flat at 100-200ms, and
+   * no component under src/ used it before this token existed (grep: 0 call
+   * sites). --ease-out is the general enter/exit curve; --ease-sheet is the
+   * drawer curve that leaves fast and settles slowly.
+   */
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-sheet: cubic-bezier(0.32, 0.72, 0, 1);
+  /* Data curves are deliberately flatter than --ease-out. --ease-out is an expo
+     curve: it dumps ~78% of the distance into the first 100ms, which is right
+     for a popover (the eye is watching for it to appear) and wrong for a chart
+     or a counting number (the eye needs to read the value as it travels).
+     Owner 2026-10-23, twice: "the animation is too fast... it finishes before the eye can react". */
+  --ease-data: cubic-bezier(0.25, 0.46, 0.45, 0.94);
+
+  /* Chart entrance vocabulary (owner report 2026-10-23: "charts have no animation").
+     Transform-only so the compositor owns both: bars scale from the baseline
+     and the completion arc draws itself. Keyframes live outside @theme below
+     so a future component can reuse them without re-declaring a curve.
+     --animate-bar-grow is the histogram (14 bars, ~1.1s with the stagger);
+     --animate-bar-rise is the 20-dot state strip, where a long sweep would be
+     noise rather than information. Same keyframe, different budget. */
+  --animate-bar-rise: bar-rise 400ms var(--ease-out) both;
+  --animate-bar-grow: bar-rise 900ms var(--ease-data) both;
+  --animate-ring-draw: ring-draw 900ms var(--ease-data) both;
+}
+
+@theme inline {
+  --font-sans: var(--font-geist);
+  --font-mono: var(--font-geist-mono);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-active-bg: var(--sidebar-active-bg);
+  --color-sidebar-active-fg: var(--sidebar-active-fg);
+  --color-chart-series-1: var(--chart-1);
+  --color-chart-series-2: var(--chart-2);
+  --color-chart-series-user: var(--chart-series-user);
+  /* Brand-adjacent chart accents (owner request 2026-10-23: the monochrome
+     charts read flat — hues sit beside the violet wordmark instead of the
+     template's unrelated orange/teal defaults). */
+  /* Status hues (owner request 2026-10-23: one state, one colour). Ten tones,
+     declared per theme so dark holds luminous hues on the dark surface and
+     light holds deeper ones on white — never one palette reused across both.
+     AA text contrast is enforced by scripts/check-token-contrast.mjs. */
+  --color-tone-emerald: var(--tone-emerald);
+  --color-tone-teal: var(--tone-teal);
+  --color-tone-sky: var(--tone-sky);
+  --color-tone-indigo: var(--tone-indigo);
+  --color-tone-violet: var(--tone-violet);
+  --color-tone-amber: var(--tone-amber);
+  --color-tone-orange: var(--tone-orange);
+  /* Waiting tone (owner page feedback 2026-11-04: use #F59145 for all waiting states). */
+  --color-tone-waiting: var(--tone-waiting);
+  --color-tone-rose: var(--tone-rose);
+  --color-tone-red: var(--tone-red);
+  --color-tone-stone: var(--tone-stone);
+  --color-comment-own: var(--comment-own);
+  --color-assistant-mascot: var(--assistant-mascot);
+  --color-assistant-mascot-eye: var(--assistant-mascot-eye);
+  --color-all-clear-mascot: var(--all-clear-mascot);
+  --color-shine-from: var(--shine-from);
+  --color-shine-via: var(--shine-via);
+  --color-shine-to: var(--shine-to);
+  --color-chart-brand: var(--chart-brand);
+  --color-chart-brand-soft: var(--chart-brand-soft);
+  --color-chart-sky: var(--chart-sky);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --radius-2xl: calc(var(--radius) + 8px);
+  --radius-3xl: calc(var(--radius) + 12px);
+  --radius-4xl: calc(var(--radius) + 16px);
+}
+
+:root {
+  /* Geist has no CJK glyphs, so the stack names the Chinese face explicitly:
+     without it the browser picks its own fallback per run and mixed zh/en
+     lines drift in weight and width (owner report 2026-10-23). */
+  --font-geist: "Geist", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei",
+    "Noto Sans SC", sans-serif;
+  --font-geist-mono: "Geist Mono", "SFMono-Regular", "JetBrains Mono",
+    "PingFang SC", monospace;
+  --background: oklch(0.9707 0.0027 286.35);
+  --foreground: oklch(0.2316 0.0038 286.1);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.2316 0.0038 286.1);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.2316 0.0038 286.1);
+  /* Yearning Flat Light Theme (owner ruling 2026-11-10): primary #006BDD, hover #005BC5, foreground #FFFFFF. */
+  --primary: oklch(0.5456 0.1928 256.89);
+  --primary-hover: oklch(0.4928 0.1813 257.86);
+  --primary-foreground: oklch(1 0 0);
+  --secondary: oklch(0.9729 0.0029 264.54);
+  --secondary-foreground: oklch(0.2316 0.0038 286.1);
+  --muted: oklch(0.9729 0.0029 264.54);
+  --muted-foreground: oklch(0.505 0.021 261.29);
+  --accent: oklch(0.9575 0.0205 254.91);
+  --accent-foreground: oklch(0.4848 0.1683 256.44);
+  --link: oklch(0.4848 0.1683 256.44);
+  --red-mark: oklch(0.6532 0.2328 25.74);
+  --orange-mark: oklch(0.7533 0.172 55.72);
+  --green-mark: oklch(0.7303 0.1944 147.44);
+  --blue-mark: oklch(0.6321 0.2018 254.09);
+  --destructive: oklch(0.5039 0.1761 21.92);
+  --danger-fill: oklch(0.9669 0.0162 17.44);
+  --border: oklch(0.9238 0.0063 255.48);
+  --control-outline: oklch(0.6027 0.0328 257.79);
+  --input: oklch(0.9238 0.0063 255.48);
+  --ring: oklch(0.5766 0.1974 256.08);
+  --table-header: oklch(0.9729 0.0029 264.54);
+  --table-hover: oklch(0.9762 0.0086 253.86);
+  --table-selected: oklch(0.9575 0.0205 254.91);
+  --table-divider: oklch(0.9333 0.0058 264.53);
+  --table-surface: oklch(1 0 0);
+  /* Light-theme chart series (owner ruling 2026-11-10): unified bright Apple HIG
+     5-series palette (#0088FF blue, #34C759 green, #7C3AED violet, #FF8D28 orange,
+     #FF383C red) across Workspace Home, SQL Diagnostics, AI Budget, and Login. */
+  --chart-1: oklch(0.6321 0.2018 254.09);
+  --chart-2: oklch(0.7303 0.1944 147.44);
+  --chart-3: oklch(0.605 0.215 292);
+  --chart-4: oklch(0.7533 0.172 55.72);
+  --chart-5: oklch(0.6532 0.2328 25.74);
+  --success: oklch(0.4811 0.1186 151.1);
+  --success-fill: oklch(0.9652 0.0206 156.83);
+  --warning: oklch(0.4758 0.1241 50.96);
+  --warning-fill: oklch(0.9679 0.0222 67.56);
+  --error: oklch(0.5039 0.1761 21.92);
+  --radius: 8px;
+  --sidebar: oklch(0.9789 0.0029 264.54);
+  --sidebar-foreground: oklch(0.2316 0.0038 286.1);
+  --sidebar-primary: var(--primary);
+  --sidebar-primary-foreground: var(--primary-foreground);
+  --sidebar-accent: oklch(0.9575 0.0205 254.91);
+  --sidebar-accent-foreground: oklch(0.4848 0.1683 256.44);
+  --sidebar-border: oklch(0.9238 0.0063 255.48);
+  --sidebar-ring: var(--ring);
+
+  /* Yearning business semantic tokens (spec §4 & Flat Light status/risk section).
+     Text-safe values verified against --card by scripts/check-token-contrast.mjs. */
+  --risk-critical: oklch(0.5039 0.1761 21.92);
+  --risk-high: oklch(0.4867 0.1416 42.05);
+  --risk-warning: oklch(0.4639 0.0976 75.72);
+  --risk-low: oklch(0.505 0.021 261.29);
+  --risk-safe: oklch(0.4811 0.1186 151.1);
+  --exec-failed: oklch(0.5039 0.1761 21.92);
+  --exec-partial-failed: oklch(0.4777 0.163 0.68);
+  --exec-cancelled: oklch(0.505 0.021 261.29);
+  --state-forbidden: oklch(0.4768 0.1858 291.76);
+  --state-reveal: oklch(0.4699 0.0935 232.14);
+  /* Status tones & fixed light badge backgrounds (Flat Light Theme). */
+  --tone-emerald: oklch(0.4811 0.1186 151.1);
+  --tone-teal: oklch(0.4625 0.0741 184.89);
+  --tone-sky: oklch(0.4699 0.0935 232.14);
+  --tone-indigo: oklch(0.4715 0.1441 264.44);
+  --tone-violet: oklch(0.4768 0.1858 291.76);
+  --tone-amber: oklch(0.467 0.0954 72.72);
+  --tone-orange: oklch(0.4685 0.1325 44.14);
+  --tone-waiting: oklch(0.4673 0.1119 55.66);
+  --tone-rose: oklch(0.4777 0.163 0.68);
+  --tone-red: oklch(0.5039 0.1761 21.92);
+  --tone-stone: oklch(0.505 0.021 261.29);
+  --tone-emerald-fill: #e9f8ee;
+  --tone-teal-fill: #e9f8f5;
+  --tone-sky-fill: #e9f8fe;
+  --tone-indigo-fill: #ecf1ff;
+  --tone-violet-fill: #f2edff;
+  --tone-amber-fill: #fff6df;
+  --tone-orange-fill: #fff0e6;
+  --tone-waiting-fill: #fff3e5;
+  --tone-rose-fill: #fcecf3;
+  --tone-red-fill: #fff0f0;
+  --tone-stone-fill: #f7f8fa;
+  /* Own-message chat bubble (owner page feedback 2026-11-04): #008aff
+     requested for the author's own comments, then deepened to #0070e0 the
+     same day (owner ruling) so white bubble text meets WCAG 2.1 AA (4.78:1,
+     was 3.5:1); kept identical in both themes. */
+  --comment-own: #0070e0;
+  /* AI Assistant dots-02 mascot palette (exact amber-300 body + gray-950 eyes across both themes). */
+  --assistant-mascot: oklch(0.879 0.169 91.605);
+  --assistant-mascot-eye: oklch(0.13 0.028 261.692);
+  /* All-clear review dots-03 mascot palette (exact teal-400 body across both themes). */
+  --all-clear-mascot: oklch(0.777 0.152 181.912);
+  /* shine-border-03 mouse-spotlight trio (exact Tailwind v4 blue-500 -> red-500 -> teal-400). */
+  --shine-from: oklch(0.623 0.214 259.815);
+  --shine-via: oklch(0.637 0.237 25.331);
+  --shine-to: oklch(0.777 0.152 181.912);
+  /* Brand-adjacent chart accents for the preview dashboard: bright Apple blue & aqua-cyan in light mode. */
+  --chart-brand: oklch(0.6321 0.2018 254.09);
+  --chart-brand-soft: oklch(0.72 0.155 242);
+  --chart-sky: oklch(0.73 0.135 202);
+  --chart-series-1: var(--chart-1);
+  --chart-series-2: var(--chart-2);
+  --chart-series-3: var(--chart-3);
+  --chart-series-4: var(--chart-4);
+  --chart-series-5: var(--chart-5);
+  /* Owner-ruled sparkline color for the user-count card (2026-09-02);
+     query/datasource cards reuse --chart-series-2 teal. */
+  --chart-series-user: oklch(0.6532 0.2328 25.74);
+  /* Active sidebar menu item (Flat Light Theme): #E8F2FF light-blue pill with #005BBB ink. */
+  --sidebar-active-bg: oklch(0.9575 0.0205 254.91);
+  --sidebar-active-fg: oklch(0.4848 0.1683 256.44);
+}
+
+.dark {
+  --background: oklch(0.145 0 0);
+  --foreground: oklch(0.985 0 0);
+  --card: oklch(0.205 0 0);
+  --card-foreground: oklch(0.985 0 0);
+  --popover: oklch(0.205 0 0);
+  --popover-foreground: oklch(0.985 0 0);
+  --primary: var(--chart-brand);
+  --primary-foreground: oklch(0.205 0 0);
+  --secondary: oklch(0.269 0 0);
+  --secondary-foreground: oklch(0.985 0 0);
+  --muted: oklch(0.269 0 0);
+  --muted-foreground: oklch(0.708 0 0);
+  --accent: oklch(0.269 0 0);
+  --accent-foreground: oklch(0.985 0 0);
+  --destructive: oklch(0.704 0.191 22.216);
+  --success: oklch(0.72 0.17 149.214);
+  --border: oklch(1 0 0 / 10%);
+  --input: oklch(1 0 0 / 15%);
+  --ring: var(--chart-brand);
+  /* Dark-mode counterparts of the brand chart accents (see :root). */
+  --chart-brand: oklch(0.71 0.16 298);
+  --chart-brand-soft: oklch(0.73 0.13 265);
+  --chart-sky: oklch(0.75 0.1 230);
+  /* Dark-theme series: luminous violet/blue/emerald on near-black, per the
+     dark reference screenshot. Same five slots as light, different inks. */
+  --chart-1: oklch(0.68 0.17 298);
+  --chart-2: oklch(0.7 0.14 250);
+  --chart-3: oklch(0.74 0.15 165);
+  --chart-4: oklch(0.8 0.14 85);
+  --chart-5: oklch(0.7 0.18 18);
+  --sidebar: oklch(0.205 0 0);
+  --sidebar-foreground: oklch(0.985 0 0);
+  --sidebar-primary: var(--primary);
+  --sidebar-primary-foreground: var(--primary-foreground);
+  --sidebar-accent: oklch(0.269 0 0);
+  --sidebar-accent-foreground: oklch(0.985 0 0);
+  --sidebar-border: oklch(1 0 0 / 10%);
+  --sidebar-ring: var(--ring);
+
+  /* Yearning business semantic tokens, dark-surface variants. */
+  --risk-critical: oklch(0.72 0.19 22.216);
+  --risk-high: oklch(0.75 0.14 45);
+  --risk-warning: oklch(0.78 0.13 75);
+  --risk-safe: oklch(0.75 0.17 149.214);
+  --exec-failed: oklch(0.72 0.19 22.216);
+  --exec-partial-failed: oklch(0.78 0.13 75);
+  --exec-cancelled: oklch(0.68 0.02 270);
+  --state-forbidden: oklch(0.75 0.12 300);
+  --state-reveal: oklch(0.75 0.08 230);
+  /* Status tones, dark theme: light enough to clear AA on the 12% tint. */
+  --tone-emerald: oklch(0.75 0.15 158);
+  --tone-teal: oklch(0.76 0.11 195);
+  --tone-sky: oklch(0.75 0.12 240);
+  --tone-indigo: oklch(0.74 0.13 275);
+  --tone-violet: oklch(0.76 0.14 300);
+  --tone-amber: oklch(0.82 0.14 80);
+  --tone-orange: oklch(0.78 0.14 50);
+  /* Waiting tone, dark surface (see :root — #F59145 hue 54, chroma 0.15,
+     lifted to the dark-theme luminance floor). */
+  --tone-waiting: oklch(0.8 0.15 54);
+  --tone-rose: oklch(0.75 0.15 15);
+  --tone-red: oklch(0.704 0.191 22.216);
+  --tone-stone: oklch(0.72 0.01 260);
+  /* Own-message chat bubble: see :root — same AA blue in the dark theme. */
+  --comment-own: #0070e0;
+  --assistant-mascot: oklch(0.879 0.169 91.605);
+  --assistant-mascot-eye: oklch(0.13 0.028 261.692);
+  --shine-from: oklch(0.623 0.214 259.815);
+  --shine-via: oklch(0.637 0.237 25.331);
+  --shine-to: oklch(0.777 0.152 181.912);
+  --chart-series-1: var(--chart-1);
+  --chart-series-2: var(--chart-2);
+  --chart-series-3: var(--chart-3);
+  --chart-series-4: var(--chart-4);
+  --chart-series-5: var(--chart-5);
+  /* Owner-ruled sparkline color for the user-count card (2026-09-02);
+     query/datasource cards reuse --chart-series-2 teal. */
+  --chart-series-user: oklch(0.72 0.18 18);
+  /* Active sidebar menu item: pure white pill with black text. */
+  --sidebar-active-bg: oklch(1 0 0);
+  --sidebar-active-fg: oklch(0 0 0);
+}
+
+@utility no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+@utility btn-circle-hover {
+  @apply h-9 w-9 flex justify-center items-center rounded-full hover:bg-primary/5 hover:text-primary cursor-pointer bg-transparent;
+}
+
+@utility container {
+  @apply max-w-[1367px] mx-auto;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+
+  /* Frozen-template parity: the reference app ships Tailwind's `antialiased`
+     on <html>. Without it macOS renders subpixel text that reads heavier and
+     fuzzier than the template, most visibly for white-on-dark (owner report
+     2026-10-23). */
+  html {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  body {
+    @apply bg-background text-foreground font-sans;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    @apply font-semibold;
+  }
+
+  input[type="radio"]:focus {
+    @apply !ring-primary;
+  }
+
+  input[type="radio"]:checked {
+    @apply bg-primary;
+  }
+
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]),
+  [data-slot="collapsible-trigger"]:not(:disabled),
+  [data-slot="accordion-trigger"]:not(:disabled) {
+    cursor: pointer;
+  }
+}
+
+/* Card shadow control via data attribute (template baseline: flat cards). */
+html[data-card-shadow="true"] [data-slot="card"] {
+  @apply shadow-md ring-0;
+}
+
+html[data-card-shadow="false"] [data-slot="card"] {
+  @apply border shadow-none ring-0;
+}
+
+[data-slot="input"] {
+  @apply focus-visible:border-primary focus-visible:ring-[0px];
+}
+
+[data-slot="textarea"] {
+  @apply focus-visible:border-primary focus-visible:ring-[0px];
+}
+
+[data-slot="chart"] {
+  @apply h-72 w-full outline-none;
+}
+
+[data-slot="chart"] *,
+[data-slot="chart"] *:focus,
+[data-slot="chart"] *:focus-visible {
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+/*
+ * Sidebar icon-mode hover expansion (template mechanism, enabled by
+ * <html data-sidebar-type="true">): while collapsed, the labels are removed
+ * from the icon rail and hovering the rail REALLY expands the sidebar via
+ * SidebarHoverEffects (real state change — CSS cannot beat the collapsed
+ * size utilities' !important inside Tailwind's layer). Leaving the expanded
+ * sidebar collapses it back.
+ */
+[data-sidebar-type="true"] [data-slot="sidebar"][data-collapsible="icon"] {
+  .sidebar-box .hide-menu {
+    display: none;
+  }
+}
+
+/*
+ * Login page color-shifting glow (owner ruling 2026-09-02): three large,
+ * heavily blurred color fields (coral / teal) that blend seamlessly across
+ * the panel top, bleed into the right column and radiate down onto the
+ * slogan. Coprime loop periods + one reversed layer make the combined drift
+ * read as random movement. Fully soft edges — every gradient fades to
+ * transparent well inside its bounds. Static under prefers-reduced-motion
+ * so screenshot baselines stay byte-stable.
+ */
+@keyframes auth-glow-drift {
+  0% {
+    transform: translate3d(0, 0, 0) scale(1);
+    filter: hue-rotate(0deg);
+  }
+  25% {
+    transform: translate3d(9%, 7%, 0) scale(1.14);
+    filter: hue-rotate(95deg);
+  }
+  50% {
+    transform: translate3d(-7%, 12%, 0) scale(0.94);
+    filter: hue-rotate(205deg);
+  }
+  75% {
+    transform: translate3d(6%, -5%, 0) scale(1.1);
+    filter: hue-rotate(300deg);
+  }
+  100% {
+    transform: translate3d(0, 0, 0) scale(1);
+    filter: hue-rotate(360deg);
+  }
+}
+
+.auth-glow,
+.auth-glow-accent,
+.auth-glow-veil {
+  @apply pointer-events-none absolute rounded-full blur-3xl;
+}
+
+.auth-glow {
+  @apply -top-[28svh] left-[-18vw] h-[95svh] w-[95vw] opacity-80;
+  background: radial-gradient(closest-side, var(--chart-series-user), transparent 82%);
+  animation: auth-glow-drift 19s ease-in-out infinite;
+}
+
+.auth-glow-accent {
+  @apply -top-[30svh] left-[30vw] h-[90svh] w-[80vw] opacity-70;
+  background: radial-gradient(closest-side, var(--chart-2), transparent 82%);
+  animation: auth-glow-drift 26s ease-in-out infinite reverse;
+}
+
+.auth-glow-veil {
+  @apply top-[6svh] left-[4vw] h-[75svh] w-[78vw] opacity-60;
+  background: radial-gradient(closest-side, var(--chart-series-2), transparent 84%);
+  animation: auth-glow-drift 31s ease-in-out infinite;
+  animation-delay: -9s;
+}
+
+/*
+ * Calendar flip panels (safe and controlled): each character folds around a top hinge
+ * and immediately springs back to its original state — the character never
+ * changes. Slots stagger via --flip-index. Static under reduced motion.
+ */
+/* Chart entrance (see --animate-* above). Both animate only transform/paint
+ * state at the settled value, so prefers-reduced-motion's global 0.01ms pass
+ * lands on the final frame instead of an empty chart. */
+@keyframes bar-rise {
+  from {
+    transform: scaleY(0);
+  }
+  to {
+    transform: scaleY(1);
+  }
+}
+
+@keyframes ring-draw {
+  from {
+    stroke-dashoffset: 100;
+  }
+  to {
+    stroke-dashoffset: var(--ring-offset, 0);
+  }
+}
+
+/* Accessibility + screenshot determinism: under prefers-reduced-motion every
+ * entrance animation completes instantly (final state) and infinite decorative
+ * loops stop after one instant pass (their unfilled base state). The harness
+ * captures with reducedMotion: reduce, so baselines always see settled pages
+ * instead of racing whatever animate-in frame the load allows.
+ *
+ * Colour feedback is deliberately NOT killed: only spatial properties are
+ * dropped from the transition list, so hover/press/selected affordances still
+ * arrive visibly while nothing translates, scales or animates layout. The
+ * screenshot harness additionally passes `animations: "disabled"`, so the
+ * remaining colour transitions cannot race a capture either. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-property: color, background-color, border-color, fill, stroke,
+      opacity, box-shadow !important;
+    transition-duration: 120ms !important;
+  }
+
+  /* Opting out stays possible: `.transition-none` is more specific than `*`, so
+   * a surface that must not fade at all (the footer links) keeps its opt-out
+   * instead of inheriting the 120ms colour transition above. */
+  .transition-none,
+  .transition-none::before,
+  .transition-none::after {
+    transition-property: none !important;
+  }
+}
+
+/* Sonner ships `transform 400ms, opacity 400ms, height 400ms` on its toast
+ * element (node_modules/sonner/dist/styles.css), which breaks both the
+ * enter/exit asymmetry and the no-layout-transition criteria and cannot be
+ * reached by the source scanner. The toaster-scoped selectors outrank sonner's
+ * own rules regardless of CSS order; removal is intentionally faster and the
+ * height transition is dropped entirely (layout never animates). */
+[data-sonner-toaster] [data-sonner-toast] {
+  transition:
+    transform 200ms var(--ease-out),
+    opacity 160ms var(--ease-out),
+    box-shadow 200ms var(--ease-out);
+}
+
+[data-sonner-toaster] [data-sonner-toast][data-removed="true"] {
+  transition:
+    transform 150ms var(--ease-out),
+    opacity 100ms var(--ease-out),
+    box-shadow 150ms var(--ease-out);
+}
+
+/* Sonner's own reduced-motion block sets `transition: none !important`, which
+ * also removes the opacity fade that is the only feedback left when spatial
+ * motion is off. Keep colour/opacity feedback (criterion 5) while dropping
+ * transform entirely. The toaster-scoped selector outranks sonner's. */
+@media (prefers-reduced-motion: reduce) {
+  [data-sonner-toaster] [data-sonner-toast],
+  [data-sonner-toaster] [data-sonner-toast][data-removed="true"] {
+    transition-property: opacity, box-shadow !important;
+    transition-duration: 120ms !important;
+    transition-timing-function: var(--ease-out) !important;
+  }
+}
+
+/* avatar-13 palette (owner ruling 2026-10-31): deterministic name→swatch.
+   Fixed pastel/deep pairs keep AA contrast in both themes; class names are
+   scan-safe (no raw tailwind palette utilities). */
+.avatar-swatch-orange { background: oklch(0.75 0.15 55); color: oklch(0.2 0 0); }
+.avatar-swatch-amber { background: oklch(0.82 0.15 80); color: oklch(0.2 0 0); }
+.avatar-swatch-teal { background: oklch(0.75 0.1 185); color: oklch(0.2 0 0); }
+.avatar-swatch-blue { background: oklch(0.55 0.2 262); color: oklch(0.99 0 0); }
+.avatar-swatch-sky { background: oklch(0.75 0.1 230); color: oklch(0.2 0 0); }
+
+/* collapsible-08 code-token palette (owner ruling 2026-10-31): SQL syntax
+   highlight colours taken from the block's token classes (teal strings,
+   blue keywords, sky numbers); scan-safe dedicated classes, same pattern
+   as the avatar swatches above. Comment tokens reuse the theme muted ink. */
+.code-token-string { color: #126f47; }
+.code-token-keyword { color: #005dc2; }
+.code-token-number { color: #a14417; }
+.code-token-comment { color: #576475; font-style: italic; }
+.dark .code-token-string { color: oklch(0.777 0.152 181.912); }
+.dark .code-token-keyword { color: oklch(0.623 0.214 259.815); }
+.dark .code-token-number { color: oklch(0.746 0.16 232.661); }
+.dark .code-token-comment { color: var(--muted-foreground); font-style: italic; }
+
+/* Yearning Flat Light Theme surface rules (owner ruling 2026-11-10). */
+html.light [data-slot="sidebar-inner"] {
+  background-color: var(--sidebar);
+}
+html.light :is([data-slot="sidebar-menu-button"], [data-slot="sidebar-menu-sub-button"]) {
+  border-radius: var(--radius-md);
+}
+html.light :is([data-slot="sidebar-menu-button"], [data-slot="sidebar-menu-sub-button"]):not([data-active]) svg {
+  color: #4b5565;
+}
+html.light :is([data-slot="sidebar-menu-button"], [data-slot="sidebar-menu-sub-button"]):hover:not([data-active]) {
+  background-color: #eef3f9;
+  color: var(--foreground);
+}
+html.light :is([data-slot="sidebar-menu-button"], [data-slot="sidebar-menu-sub-button"]):hover:not([data-active]) svg {
+  color: var(--primary);
+}
+html.light [data-slot="sidebar-menu-button"][data-active],
+html.light [data-slot="sidebar-menu-sub-button"][data-active] {
+  background: var(--accent) !important;
+  color: var(--accent-foreground) !important;
+  box-shadow: none !important;
+}
+html.light :is([data-slot="sidebar-menu-button"], [data-slot="sidebar-menu-sub-button"])[data-active] svg {
+  color: var(--primary) !important;
+}
+html.light [data-testid="header-command-trigger"] {
+  background-color: var(--muted);
+  border: 1px solid var(--border);
+}
+html.light [data-testid="header-command-trigger"]:hover {
+  background-color: var(--table-hover);
+  border-color: var(--control-outline);
+}
+html.light [data-testid="header-command-trigger"] kbd {
+  background-color: var(--card);
+  border-color: var(--border);
+}
+/* Strictly flat buttons across the entire platform in Light Mode (preserving keyboard :focus-visible ring) */
+html.light :is([data-slot="button"], .group\/button):not(:focus-visible) {
+  background-image: none !important;
+  box-shadow: none !important;
+}
+html.light :is([data-slot="button"], .group\/button):focus-visible {
+  background-image: none !important;
+  border-color: var(--ring);
+  box-shadow: 0 0 0 2px color-mix(in oklch, var(--ring) 28%, transparent) !important;
+}
+html.light :is([data-slot="button"], .group\/button).bg-primary:not(:disabled) {
+  background-color: var(--primary);
+  color: var(--primary-foreground);
+  border-color: transparent;
+}
+html.light :is([data-slot="button"], .group\/button).bg-primary:hover:not(:disabled) {
+  background-color: var(--primary-hover);
+}
+html.light :is([data-slot="button"], .group\/button).bg-primary:active:not(:disabled) {
+  background-color: oklch(0.455 0.176 258);
+}
+html.light :is([data-slot="button"], .group\/button).bg-primary:disabled {
+  background-color: var(--muted);
+  color: var(--muted-foreground);
+  border-color: var(--border);
+  opacity: 1;
+}
+html.light :is([data-slot="button"], .group\/button).border-border:not(.bg-primary) {
+  background-color: var(--card);
+  border-color: var(--border);
+  color: var(--foreground);
+}
+html.light :is([data-slot="button"], .group\/button).border-border:not(.bg-primary):hover:not(:disabled) {
+  background-color: var(--muted);
+  border-color: color-mix(in oklch, var(--control-outline) 45%, var(--border));
+  color: var(--foreground);
+}
+html.light :is([data-slot="button"], .group\/button).bg-secondary {
+  background-color: var(--accent);
+  color: var(--accent-foreground);
+  border-color: transparent;
+}
+html.light :is([data-slot="button"], .group\/button).bg-secondary:hover:not(:disabled) {
+  background-color: #dcebff;
+  color: var(--accent-foreground);
+}
+html.light :is([data-slot="button"], .group\/button).text-destructive {
+  background-color: var(--danger-fill);
+  border-color: color-mix(in oklch, var(--destructive) 20%, var(--danger-fill));
+  color: var(--destructive);
+}
+html.light :is([data-slot="button"], .group\/button).text-destructive:hover:not(:disabled) {
+  background-color: #ffe2e6;
+}
+/* Flat, bright icon containers (KPI cards, PageHeader, Announcement, Recent Orders, Empty states) */
+html.light :is([data-slot="page-icon"], [data-slot="empty-media"][data-variant="icon"], span:has(> svg):is([class*="bg-chart-brand/"], [class*="bg-primary/"])):not([data-slot="badge"] *) {
+  background: var(--accent);
+  color: var(--primary);
+  box-shadow: none;
+}
+html.light span:has(> svg)[class*="text-tone-violet"]:not([data-slot="badge"] *) {
+  background: var(--tone-violet-fill);
+  color: #7c3aed;
+  box-shadow: none;
+}
+html.light span:has(> svg):is([class*="text-tone-amber"], [class*="text-tone-waiting"]):not([data-slot="badge"] *) {
+  background: var(--tone-waiting-fill);
+  color: var(--orange-mark);
+  box-shadow: none;
+}
+html.light span:has(> svg):is([class*="text-tone-orange"], [class*="text-tone-red"]):not([data-slot="badge"] *) {
+  background: var(--tone-red-fill);
+  color: var(--red-mark);
+  box-shadow: none;
+}
+html.light span:has(> svg)[class*="text-tone-emerald"]:not([data-slot="badge"] *) {
+  background: var(--tone-emerald-fill);
+  color: #1db954;
+  box-shadow: none;
+}
+html.light span:has(> svg)[class*="text-tone-sky"]:not([data-slot="badge"] *) {
+  background: var(--tone-sky-fill);
+  color: var(--blue-mark);
+  box-shadow: none;
+}
+html.light span:has(> svg)[class*="text-tone-teal"]:not([data-slot="badge"] *) {
+  background: var(--tone-teal-fill);
+  color: #00b2a9;
+  box-shadow: none;
+}
+html.light span:has(> svg)[class*="text-tone-indigo"]:not([data-slot="badge"] *) {
+  background: var(--tone-indigo-fill);
+  color: #3b63fb;
+  box-shadow: none;
+}
+html.light span:has(> svg)[class*="text-tone-rose"]:not([data-slot="badge"] *) {
+  background: var(--tone-rose-fill);
+  color: #f43f7a;
+  box-shadow: none;
+}
+/* Bright, vivid signal dots, progress bar fills & chart distribution bars in Light Mode */
+html.light [data-testid="approval-progress-bar"] {
+  background-color: #e8ecf2;
+}
+html.light :is(.bg-success, .bg-tone-emerald, .bg-\[var\(--risk-safe\)\]) {
+  background-color: var(--green-mark);
+}
+html.light .bg-tone-indigo {
+  background-color: var(--blue-mark);
+}
+html.light .bg-tone-sky {
+  background-color: #32ade6;
+}
+html.light .bg-tone-teal {
+  background-color: #00c7be;
+}
+html.light .bg-tone-violet {
+  background-color: #8b5cf6;
+}
+html.light :is(.bg-tone-amber, .bg-tone-waiting, .bg-\[var\(--risk-warning\)\]) {
+  background-color: var(--orange-mark);
+}
+html.light :is(.bg-tone-orange, .bg-\[var\(--risk-high\)\]) {
+  background-color: #ff6b22;
+}
+html.light .bg-tone-rose {
+  background-color: #ff2d55;
+}
+html.light :is(.bg-destructive:not([data-slot="badge"]), .bg-tone-red, .bg-\[var\(--risk-critical\)\]) {
+  background-color: var(--red-mark);
+}
+html.light :is(.bg-tone-stone, .bg-\[var\(--risk-low\)\]) {
+  background-color: #94a3b8;
+}
+html.light :is([data-slot="input"], [data-slot="select-trigger"], [data-slot="textarea"], [data-slot="checkbox"]:not([data-checked])) {
+  border-color: color-mix(in oklch, var(--control-outline) 50%, var(--border));
+}
+html.light :is([data-slot="input"], [data-slot="select-trigger"], [data-slot="textarea"]):focus-visible {
+  border-color: var(--ring);
+  box-shadow: 0 0 0 2px color-mix(in oklch, var(--ring) 20%, transparent);
+}
+/* Flat login card control parity (owner page feedback 2026-11-11): keep ShineBorder
+   as the single 1px card frame while aligning OIDC outline button, username input,
+   and password input-group to one crisp flat hairline border and a borderless CTA. */
+html.light [data-testid="login-card"] :is([data-slot="button"].border-border:not(.bg-primary), [data-slot="input"]:not([data-slot="input-group-control"]), [data-slot="input-group"]) {
+  background-color: var(--card);
+  border-color: color-mix(in oklch, var(--control-outline) 32%, var(--border));
+}
+html.light [data-testid="login-card"] :is([data-slot="button"].border-border:not(.bg-primary):hover:not(:disabled), [data-slot="input"]:not([data-slot="input-group-control"]):hover:not(:focus-visible), [data-slot="input-group"]:hover:not(:has([data-slot="input-group-control"]:focus-visible))) {
+  border-color: color-mix(in oklch, var(--control-outline) 55%, var(--border));
+}
+html.light [data-testid="login-card"] [data-slot="input-group"]:has([data-slot="input-group-control"]:focus-visible) {
+  border-color: var(--ring);
+  box-shadow: 0 0 0 2px color-mix(in oklch, var(--ring) 20%, transparent);
+}
+html.light [data-testid="login-card"] :is([data-slot="button"], .group\/button).bg-primary:disabled {
+  background-color: var(--muted);
+  color: var(--muted-foreground);
+  border-color: transparent;
+}
+html.light [data-slot="tabs-list"] {
+  background-color: transparent;
+  border-bottom: 1px solid var(--border);
+  border-radius: 0;
+  padding: 0;
+  gap: 1rem;
+}
+html.light [data-slot="tabs-trigger"] {
+  background-color: transparent !important;
+  border: 0;
+  border-radius: 0;
+  padding-inline: 0.25rem;
+  padding-bottom: 0.375rem;
+  color: var(--muted-foreground);
+}
+html.light [data-slot="tabs-trigger"]:hover:not([data-active]) {
+  background-color: transparent !important;
+  color: var(--foreground);
+}
+html.light [data-slot="tabs-trigger"][data-active] {
+  background-color: transparent !important;
+  color: var(--accent-foreground) !important;
+  font-weight: 600;
+  box-shadow: inset 0 -2px 0 0 var(--primary);
+}
+html.light [data-slot="tabs-list"][data-variant="line"] [data-slot="tabs-trigger"][data-active]::after {
+  background-color: var(--primary);
+}
+html.light [data-slot="table"] {
+  background-color: var(--table-surface);
+}
+html.light [data-slot="table-header"] {
+  background-color: var(--table-header);
+}
+html.light :is([data-slot="table-header"] tr, [data-slot="table-row"]) {
+  border-bottom-color: var(--table-divider);
+}
+html.light [data-slot="table-body"] [data-slot="table-row"]:hover {
+  background-color: var(--table-hover);
+}
+html.light [data-slot="table-body"] [data-slot="table-row"]:is([data-state="selected"], [aria-selected="true"]) {
+  background-color: var(--table-selected);
+}
+html.light [data-slot="alert"].text-destructive {
+  background-color: var(--danger-fill);
+  border-color: color-mix(in oklch, var(--destructive) 22%, var(--border));
+}
+html.light [data-slot="badge"].bg-primary {
+  background-color: var(--accent);
+  color: var(--accent-foreground);
+  border-color: color-mix(in oklch, var(--accent-foreground) 20%, var(--accent));
+}
+html.light [data-slot="badge"].text-tone-emerald {
+  background-color: var(--tone-emerald-fill);
+  border-color: color-mix(in oklch, var(--tone-emerald) 20%, var(--tone-emerald-fill));
+}
+html.light [data-slot="badge"].text-tone-teal {
+  background-color: var(--tone-teal-fill);
+  border-color: color-mix(in oklch, var(--tone-teal) 20%, var(--tone-teal-fill));
+}
+html.light [data-slot="badge"].text-tone-sky {
+  background-color: var(--tone-sky-fill);
+  border-color: color-mix(in oklch, var(--tone-sky) 20%, var(--tone-sky-fill));
+}
+html.light [data-slot="badge"].text-tone-indigo {
+  background-color: var(--tone-indigo-fill);
+  border-color: color-mix(in oklch, var(--tone-indigo) 20%, var(--tone-indigo-fill));
+}
+html.light [data-slot="badge"].text-tone-violet {
+  background-color: var(--tone-violet-fill);
+  border-color: color-mix(in oklch, var(--tone-violet) 20%, var(--tone-violet-fill));
+}
+html.light [data-slot="badge"].text-tone-amber {
+  background-color: var(--tone-amber-fill);
+  border-color: color-mix(in oklch, var(--tone-amber) 20%, var(--tone-amber-fill));
+}
+html.light [data-slot="badge"].text-tone-orange {
+  background-color: var(--tone-orange-fill);
+  border-color: color-mix(in oklch, var(--tone-orange) 20%, var(--tone-orange-fill));
+}
+html.light [data-slot="badge"].text-tone-waiting {
+  background-color: var(--tone-waiting-fill);
+  border-color: color-mix(in oklch, var(--tone-waiting) 20%, var(--tone-waiting-fill));
+}
+html.light [data-slot="badge"].text-tone-rose {
+  background-color: var(--tone-rose-fill);
+  border-color: color-mix(in oklch, var(--tone-rose) 20%, var(--tone-rose-fill));
+}
+html.light [data-slot="badge"].text-tone-red {
+  background-color: var(--tone-red-fill);
+  border-color: color-mix(in oklch, var(--tone-red) 20%, var(--tone-red-fill));
+}
+html.light [data-slot="badge"].bg-muted.text-muted-foreground {
+  background-color: var(--tone-stone-fill);
+  color: var(--tone-stone);
+  border-color: var(--border);
+}
+
+/* Recharts Brush dark/light theme alignment */
+[data-slot="chart"] .recharts-brush > rect {
+  fill: var(--muted) !important;
+  fill-opacity: 0.35 !important;
+  stroke: var(--border) !important;
+  rx: 4px;
+}
+[data-slot="chart"] .recharts-brush-slide {
+  fill: var(--primary) !important;
+  fill-opacity: 0.16 !important;
+}
+[data-slot="chart"] .recharts-brush-traveller rect {
+  fill: var(--muted-foreground) !important;
+  stroke: var(--border) !important;
+  rx: 2px;
+}
+[data-slot="chart"] .recharts-brush-traveller line {
+  stroke: var(--background) !important;
+}
+[data-slot="chart"] .recharts-brush-texts text {
+  fill: var(--muted-foreground) !important;
+  font-size: 10px;
+}
+
+/* Precheck dialog progress bar: smooth state-gradient transitions via @property
+   plus a compositor-only flowing sheen while precheck stages are in flight. */
+@property --precheck-grad-start {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: transparent;
+}
+@property --precheck-grad-mid {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: transparent;
+}
+@property --precheck-grad-end {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: transparent;
+}
+
+@keyframes precheck-progress-sheen {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(100%);
+  }
+}
+
+.precheck-progress {
+  --precheck-grad-start: var(--tone-sky);
+  --precheck-grad-mid: var(--primary);
+  --precheck-grad-end: var(--tone-indigo);
+}
+
+.precheck-progress[data-progress-tone="starting"] {
+  --precheck-grad-start: var(--tone-sky);
+  --precheck-grad-mid: var(--primary);
+  --precheck-grad-end: var(--tone-indigo);
+}
+
+.precheck-progress[data-progress-tone="queued"] {
+  --precheck-grad-start: var(--tone-waiting);
+  --precheck-grad-mid: var(--tone-amber);
+  --precheck-grad-end: var(--tone-orange);
+}
+
+.precheck-progress[data-progress-tone="running"] {
+  --precheck-grad-start: var(--tone-sky);
+  --precheck-grad-mid: var(--primary);
+  --precheck-grad-end: var(--tone-violet);
+}
+
+.precheck-progress[data-progress-tone="finalizing"] {
+  --precheck-grad-start: var(--primary);
+  --precheck-grad-mid: var(--tone-indigo);
+  --precheck-grad-end: var(--tone-teal);
+}
+
+.precheck-progress[data-progress-tone="passed"] {
+  --precheck-grad-start: var(--tone-teal);
+  --precheck-grad-mid: var(--tone-emerald);
+  --precheck-grad-end: var(--risk-safe);
+}
+
+.precheck-progress[data-progress-tone="warning"] {
+  --precheck-grad-start: var(--tone-amber);
+  --precheck-grad-mid: var(--tone-waiting);
+  --precheck-grad-end: var(--tone-orange);
+}
+
+.precheck-progress[data-progress-tone="blocked"] {
+  --precheck-grad-start: var(--tone-orange);
+  --precheck-grad-mid: var(--tone-rose);
+  --precheck-grad-end: var(--risk-critical);
+}
+
+.precheck-progress [data-slot="progress-track"] {
+  height: 0.5rem;
+}
+
+.precheck-progress [data-slot="progress-indicator"] {
+  position: relative;
+  overflow: hidden;
+  border-radius: 9999px;
+  background-color: transparent;
+  background-image: linear-gradient(
+    90deg,
+    var(--precheck-grad-start) 0%,
+    var(--precheck-grad-mid) 52%,
+    var(--precheck-grad-end) 100%
+  );
+  transition:
+    scale 420ms var(--ease-data),
+    --precheck-grad-start 400ms var(--ease-out),
+    --precheck-grad-mid 400ms var(--ease-out),
+    --precheck-grad-end 400ms var(--ease-out);
+}
+
+.precheck-progress[data-progress-active="true"] [data-slot="progress-indicator"]::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image: linear-gradient(
+    90deg,
+    transparent 0%,
+    color-mix(in oklch, var(--primary-foreground) 42%, transparent) 50%,
+    transparent 100%
+  );
+  animation: precheck-progress-sheen 1.5s linear infinite;
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .precheck-progress[data-progress-active="true"] [data-slot="progress-indicator"]::after {
+    animation: none;
+    opacity: 0;
+  }
+}
+
+
+

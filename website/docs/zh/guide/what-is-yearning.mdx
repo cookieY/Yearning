@@ -1,0 +1,46 @@
+import { ThemeScreenshot } from '../../../components/ThemeScreenshot';
+
+# Yearning v4 概览与演进
+
+:::warning 公测版本提示（Public Beta）
+**Yearning v4.0 目前处于公测阶段（Public Beta）**，功能细节、规则与迁移工具仍在持续完善迭代中。建议优先在测试或预发环境部署体验，正式切入核心生产环境前务必做好完整数据备份；遇到问题欢迎前往 [GitHub Issues](https://github.com/cookieY/Yearning/issues) 反馈。
+:::
+
+**Yearning v4** 是基于 **AI Agentic** 架构彻底重构的新一代开源 SQL 审核与数据库变更治理平台。
+
+v4 基于单二进制 **Go 模块化单体后端**、**React 19 + TypeScript + shadcn/ui** 前端工作台与 **PostgreSQL** 元数据库构建，彻底移除旧版 RPC 服务与 MySQL 元库依赖，以自主探测表结构与执行计划的 AI Agentic 审核引擎为核心，为研发、DBA 与 AI Coding Agent 提供从写 SQL、预审到审批执行与回滚的完整闭环。
+
+<ThemeScreenshot
+  name="dashboard"
+  captionZh="Yearning v4 工作台首页：个人待办、30 日执行指标、6 组件系统健康状态与受控 AI 助手"
+/>
+
+## 产品定位与边界
+
+Yearning v4 是 **AI 赋能的数据库变更治理平台**，而不是脱离治理边界的通用聊天壳：
+
+- **AI 负责风险识别与证据综合**：基于词法解析、双指纹折叠、只读元数据探测工具与企业内部经验库识别风险并解释原因。
+- **结构化流程掌控审批与执行**：AI 不能审批、不能直接执行任何 SQL，也不能绕过提交门禁（Submission Gate）。
+- **默认零泄漏隐私保护**：在公有云 `default` 轨道下，SQL 字面值、注释与真实表列名在服务端内存完成匿名化，绝不外泄至外部大模型；内网自部署模型可启用独立的 `san` 原生轨道并严格防止跨轨道回退。
+
+## Yearning v4 vs. v3 核心变革
+
+| 维度 | Yearning v3（旧版） | Yearning v4（全新架构） |
+| :--- | :--- | :--- |
+| **系统架构** | 依赖外部或拆分 RPC 服务 | 单二进制 **Go 模块化单体**，零 RPC，Kubernetes 无状态多副本原生就绪 |
+| **前端工作台** | Vue 2/3 (`gemini-next`) | **React 19 + TypeScript + Vite + Tailwind CSS v4 + shadcn/ui** |
+| **元数据库** | MySQL + AutoMigrate | **PostgreSQL 14–18** + 显式版本化 Migration + 三角色最小权限隔离 |
+| **目标数据库引擎** | 以 MySQL 为主 | **MySQL 5.7/8.0、PostgreSQL 14–18、TiDB、OceanBase、PolarDB** |
+| **SQL 审核引擎** | 规则检查为主 | **确定性规则 + 双轨 AI 预审引擎**，支持 10 万条 / 32 MiB 批量指纹折叠与 5 项只读元数据工具 |
+| **流程与冻结边界** | 支持流转调整与 AutoTask | **提交即冻结**（1..N 阶段 · 1..10 级审批），含 `admin` 在内不可篡改或绕过；移除 AutoTask |
+| **在线改表 (OSC)** | 外部二进制工具 | **Go 进程内嵌 `gh-ost`**（18 项参数 + 实时拷贝进度），全面退役 `pt-osc` |
+| **自动回滚机制** | 依赖 MySQL Binlog 抓取 | **无 Binlog/WAL 跨引擎 AST 逆向 + 事务内前像快照**，受控派生回滚工单 |
+| **查询审计与诊断** | 基础查询与结果脱敏 | 限时 Query Grant + 只读 AST + 敏感列脱敏 + SSE 实时锁定 + **6 图 Top SQL 性能诊断** |
+| **AI Agent 集成** | 无官方协议 | 完整 **OpenAPI v4** + **SSE 事件总线** + 零依赖 **`skills/yearning`** Agent Skill |
+
+## 核心工作流一览
+
+1. **管理员初始化治理基线**：在 `/admin/datasources` 注册数据源（分离只读与执行凭据），在 `/admin/rule-sets` 编排审核规则集，在 `/admin/flows` 配置 `change_review` 与 `query_access` 流程，并通过 `/admin/permission-groups` 授权给用户。
+2. **变更工单闭环**：研发在 `/changes/new` 输入或导入 SQL，运行 **AI SQL 预审**，达到 `ready` 且零阻断项后提交；工单瞬间冻结审批链，逐阶段审批通过后由冻结执行人手动或预约执行；开启回滚保护后自动封存加密回滚证据。
+3. **只读查询闭环**：在 `/query` 申请限时 `query_access` 授权，审批通过后执行严格只读 `SELECT` 并自动应用服务端敏感列脱敏，按权限流式导出 CSV/JSONL。
+4. **性能诊断与优化闭环**：管理员在 `/admin/diagnostics` 观测 Top SQL 六图趋势，发起脱敏四段式 AI 根因诊断，将推荐索引 DDL 一键送入正式 AI 预审并提交变更工单。

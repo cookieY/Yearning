@@ -1,0 +1,23 @@
+{
+  "name": "yearning-v4-docs",
+  "version": "4.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Yearning v4 official documentation website (Rspress + React 19 + MDX for GitHub Pages)",
+  "scripts": {
+    "dev": "rspress dev --host 0.0.0.0 --port 5178",
+    "build": "rm -rf doc_build node_modules/.cache && rspress build",
+    "preview": "rspress preview --host 0.0.0.0 --port 4178"
+  },
+  "dependencies": {
+    "@rspress/core": "^2.1.3",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "typescript": "^5.8.0"
+  }
+}

@@ -1,0 +1,232 @@
+# control-plane.yaml BE-B12-HARDENING (frozen surface of kubernetes-deployment-contract.json
+# workloads.control_plane): >=2 replicas, RollingUpdate maxUnavailable=0,
+# full pod security posture, service ports, and role-separated Secret mounts.
+# SEC-0019: Manifest includes runnable args/env (serve subcommand + database/keyring env)
+# without requiring manual operator assembly; SEC-0018: environment=production is declared
+# explicitly (sslmode and session Secure fail-closed enforcement apply in production);
+# SEC-0017: Secret volumes use defaultMode 0400 + fsGroup 10001 (keyring validation accepts
+# 0400/0440 because kubelet delivers read-only Secret volumes masked with fsGroup as 0440).
+# 20261022 fix: YEARNING_RETENTION_DATABASE_DSN (dedicated retention connection under the
+# yearning_retention role; missing in production fails config loading closed) is injected
+# via a dedicated Secret; the addrguard dev bypass YEARNING_ALLOW_LOOPBACK_TARGETS is
+# forbidden in this manifest (enforced by conformance negative assertions per SEC-0009).
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: yearning-control-plane
+  labels:
+    app.kubernetes.io/name: yearning
+    app.kubernetes.io/instance: yearning-prod
+    app.kubernetes.io/version: v4.0.0
+    app.kubernetes.io/component: control-plane
+spec:
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: yearning
+      app.kubernetes.io/component: control-plane
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: yearning
+        app.kubernetes.io/instance: yearning-prod
+        app.kubernetes.io/version: v4.0.0
+        app.kubernetes.io/component: control-plane
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        # SEC-0017: fsGroup=10001 causes kubelet to deliver read-only Secret volumes
+        # with mode 0440 to runAsUser 10001 (0400 root-owned files are unreadable by
+        # non-root); ValidateKeyringFile accepts both 0400 and 0440 accordingly.
+        fsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: topology.kubernetes.io/zone
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app.kubernetes.io/name: yearning
+              app.kubernetes.io/component: control-plane
+      containers:
+        - name: yearning
+          # Image is pinned by digest during the Release pipeline (container_image_by_digest).
+          image: ghcr.io/cookiey/yearning@sha256:REPLACED_BY_RELEASE
+          # SEC-0019: Image ENTRYPOINT is /yearning, so the serve subcommand must be passed explicitly.
+          args: ["serve"]
+          ports:
+            - name: http
+              containerPort: 8080
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+            privileged: false
+          env:
+            - name: YEARNING_OBSERVABILITY_INSTANCE_ID
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: YEARNING_POD_UID
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.uid
+            # SEC-0018: Production hardening (sslmode / session Secure fail-closed) depends on
+            # environment=production and must be declared explicitly.
+            - name: YEARNING_ENVIRONMENT
+              value: production
+            # SEC-0019: Keyring filename keyring.json is rendered by the Release pipeline
+            # (payload keyring Secret key; Secret volume symlink structure is compatible with
+            # ValidateKeyringFile checks).
+            - name: YEARNING_KEY_PROVIDER_PATH
+              value: /var/run/secrets/yearning/keyring/keyring.json
+            # Database leaf values come from the yearning-metadata-database-app Secret;
+            # keys are rendered by the Release pipeline and sslmode must be verify-full
+            # (platform-postgresql.tls_required; SEC-0018 mitigation).
+            - name: YEARNING_DATABASE_HOST
+              valueFrom:
+                secretKeyRef:
+                  name: yearning-metadata-database-app
+                  key: host
+            - name: YEARNING_DATABASE_PORT
+              valueFrom:
+                secretKeyRef:
+                  name: yearning-metadata-database-app
+                  key: port
+            - name: YEARNING_DATABASE_USER
+              valueFrom:
+                secretKeyRef:
+                  name: yearning-metadata-database-app
+                  key: user
+            - name: YEARNING_DATABASE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: yearning-metadata-database-app
+                  key: password
+            - name: YEARNING_DATABASE_DBNAME
+              valueFrom:
+                secretKeyRef:
+                  name: yearning-metadata-database-app
+                  key: dbname
+            - name: YEARNING_DATABASE_SSLMODE
+              valueFrom:
+                secretKeyRef:
+                  name: yearning-metadata-database-app
+                  key: sslmode
+            # NEW-DEPLOY-15: For private CA deployments, place the CA file path in the
+            # sslrootcert key of the same Secret (value = absolute in-volume path, e.g.
+            # /var/run/secrets/yearning/metadata-db-app/ca.crt). The Secret is also mounted
+            # as a volume with the CA PEM in another key (e.g. ca.crt); when sslrootcert is
+            # absent, the env var is omitted and the system trust store is used.
+            - name: YEARNING_DATABASE_SSLROOTCERT
+              valueFrom:
+                secretKeyRef:
+                  name: yearning-metadata-database-app
+                  key: sslrootcert
+                  optional: true
+            # 20261022 fix: Dedicated retention connection string (yearning_retention role,
+            # separated from the app DB role); single-key DSN format, failing config loading
+            # closed if missing in production.
+            - name: YEARNING_RETENTION_DATABASE_DSN
+              valueFrom:
+                secretKeyRef:
+                  name: yearning-metadata-database-retention
+                  key: dsn
+          volumeMounts:
+            - name: keyring
+              mountPath: /var/run/secrets/yearning/keyring
+              readOnly: true
+            # Keep metadata-db-app volume mount: connection leaf values use env vars above,
+            # while the volume provides TLS materials (CA certificate for verify-full, etc.).
+            - name: metadata-db-app
+              mountPath: /var/run/secrets/yearning/metadata-db-app
+              readOnly: true
+            - name: tmp
+              mountPath: /tmp
+          resources:
+            requests:
+              cpu: "500m"
+              memory: "512Mi"
+            limits:
+              memory: "2Gi"
+          livenessProbe:
+            httpGet:
+              path: /api/v4/health/live
+              port: http
+            periodSeconds: 10
+            failureThreshold: 6
+          readinessProbe:
+            httpGet:
+              path: /api/v4/health/ready
+              port: http
+            periodSeconds: 5
+            failureThreshold: 3
+          startupProbe:
+            httpGet:
+              path: /api/v4/health/live
+              port: http
+            periodSeconds: 2
+            failureThreshold: 30
+          lifecycle:
+            # SEC-0051: distroless has no shell so exec hooks always fail; use K8s native
+            # sleep action (PodLifecycleSleepAction, GA since 1.32). The contracted
+            # termination.pre_stop sequence (mark draining / stop new tasks / close cursors / flush audit)
+            # is handled by in-process graceful shutdown on SIGTERM; this sleep provides the endpoint removal window.
+            preStop:
+              sleep:
+                seconds: 5
+      terminationGracePeriodSeconds: 300
+      volumes:
+        # SEC-0017: Secret volumes uniformly set defaultMode 0400 (contract file_mode_maximum;
+        # delivered as 0440 via fsGroup, both accepted by keyring validation).
+        - name: keyring
+          secret:
+            secretName: yearning-payload-keyring
+            defaultMode: 0400
+        - name: metadata-db-app
+          secret:
+            secretName: yearning-metadata-database-app
+            defaultMode: 0400
+        - name: tmp
+          emptyDir:
+            sizeLimit: 64Mi
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: yearning-control-plane
+  labels:
+    app.kubernetes.io/name: yearning
+    app.kubernetes.io/component: control-plane
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: yearning
+      app.kubernetes.io/component: control-plane
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: yearning
+  labels:
+    app.kubernetes.io/name: yearning
+    app.kubernetes.io/component: control-plane
+spec:
+  selector:
+    app.kubernetes.io/name: yearning
+    app.kubernetes.io/component: control-plane
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http
+---

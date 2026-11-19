@@ -1,0 +1,27 @@
+[
+  {
+    "text": "部署安装",
+    "link": "/guide/quick-start",
+    "activeMatch": "^/(guide/quick-start|guide/what-is-yearning|operations)/"
+  },
+  {
+    "text": "管理员配置",
+    "link": "/admin/first-time-setup",
+    "activeMatch": "^/admin/"
+  },
+  {
+    "text": "4.0 使用手册",
+    "link": "/features/ai-precheck",
+    "activeMatch": "^/features/"
+  },
+  {
+    "text": "安全与 AI 防护",
+    "link": "/guide/security-and-ai-trust",
+    "activeMatch": "^/guide/(security-and-ai-trust|architecture)"
+  },
+  {
+    "text": "API 与排障",
+    "link": "/integration/agent-skill-openapi",
+    "activeMatch": "^/(integration|reference|about)/"
+  }
+]

@@ -1,0 +1,35 @@
+name: yearning-v4-development
+
+services:
+  postgres:
+    image: postgres:18.6
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${YEARNING_DEV_POSTGRES_DB:-yearning_v4}
+      POSTGRES_USER: ${YEARNING_DEV_POSTGRES_USER:-yearning}
+      POSTGRES_PASSWORD: ${YEARNING_DEV_POSTGRES_PASSWORD:?set YEARNING_DEV_POSTGRES_PASSWORD}
+      # Explicit addrguard development bypass: this dev stack publishes the metadata DB
+      # on host loopback (localhost:54329), so host-side `serve` must start with
+      # YEARNING_ALLOW_LOOPBACK_TARGETS=1. Declared here to make the dev stack
+      # environment surface explicit (ignored by the postgres image; only local dev
+      # and CI integration stacks may set it, never production deployment manifests —
+      # the bypass only permits loopback while metadata endpoints remain blocked).
+      YEARNING_ALLOW_LOOPBACK_TARGETS: "1"
+    ports:
+      - "${YEARNING_DEV_POSTGRES_PORT:-54329}:5432"
+    volumes:
+      # In postgres:18+, PGDATA is /var/lib/postgresql/18/docker and the image declares
+      # VOLUME /var/lib/postgresql. Using the legacy /var/lib/postgresql/data path is
+      # rejected by the entrypoint script as an unused mount/volume and causes a restart loop (BLK-20260825-B1).
+      - yearning-v4-postgres:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+      start_period: 5s
+    security_opt:
+      - no-new-privileges:true
+
+volumes:
+  yearning-v4-postgres:

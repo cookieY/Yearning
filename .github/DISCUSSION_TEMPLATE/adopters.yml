@@ -1,0 +1,46 @@
+title: "[Adopter] "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Running **Yearning** in your organization? Leave a footprint here to inspire other teams and help grow the open-source community!
+        如果你的团队或企业正在使用 **Yearning**，欢迎留下脚印，让更多开发者了解 Yearning 在真实生产环境中的落地规模！
+
+  - type: input
+    id: org_name
+    attributes:
+      label: "🏢 Organization / Company Name / 企业或团队名称"
+      placeholder: "e.g. Acme Corp (https://example.com)"
+    validations:
+      required: true
+
+  - type: input
+    id: industry
+    attributes:
+      label: "🌐 Industry & Team Scale / 所属行业与规模（可选）"
+      placeholder: "e.g. FinTech · 200+ engineers · 50+ database instances"
+    validations:
+      required: false
+
+  - type: dropdown
+    id: engines
+    attributes:
+      label: "🗄️ Database Engines Governed / 纳管的数据库引擎"
+      multiple: true
+      options:
+        - "MySQL"
+        - "PostgreSQL"
+        - "TiDB"
+        - "OceanBase"
+        - "PolarDB"
+        - "Other / 其他"
+    validations:
+      required: true
+
+  - type: textarea
+    id: usage
+    attributes:
+      label: "🚀 How You Use Yearning / 使用场景与体验反馈"
+      description: "Share which Yearning features you rely on most (AI Precheck, Multi-Stage Approval, gh-ost, Rollback, Query Masking, Diagnostics) or suggestions for future releases. / 欢迎分享你们最依赖的核心功能或对未来版本的期待。"
+    validations:
+      required: true

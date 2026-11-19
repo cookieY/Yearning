@@ -1,0 +1,79 @@
+name: "✨ Feature Request / 功能建议"
+description: "Propose a new capability, adapter, or workflow enhancement for Yearning v4 / 提交 Yearning v4 新功能、数据库适配或体验优化建议"
+title: "[Feature]: "
+labels: ["enhancement", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for shaping **Yearning v4**! Please focus on the concrete DBA or engineering problem first — clear use cases and governance boundaries help us evaluate proposals faster.
+        感谢为 **Yearning v4** 提出建议！请优先阐述真实业务痛点与安全治理边界，这有助于维护团队更快评估方案。
+
+        > For open-ended brainstorming or early discussions, consider starting in [GitHub Discussions — Ideas](https://github.com/cookieY/Yearning/discussions/new?category=ideas).
+        > 如属早期发散性构想，欢迎先在 [Discussions — Ideas](https://github.com/cookieY/Yearning/discussions/new?category=ideas) 交流讨论。
+
+  - type: dropdown
+    id: category
+    attributes:
+      label: "📂 Feature Category / 建议类别"
+      options:
+        - "Database Engine Adapter (新数据库引擎 / 方言适配)"
+        - "AI SQL Review Engine & Skills (AI 审核引擎、技能与知识库)"
+        - "Change Governance, Approval & Execution (工单审批、执行与回滚)"
+        - "Governed Query Workspace & Masking (只读查询、脱敏与导出)"
+        - "SQL Performance Diagnostics (SQL 性能诊断)"
+        - "Database AI Assistant (数据库 AI 助手)"
+        - "Auth, Security & Compliance (认证、权限与审计合规)"
+        - "Notifications & Ecosystem Integrations (通知渠道与外部集成)"
+        - "OpenAPI & Agent Skill (/api/v4/* 与 Agent 技能)"
+        - "UI / UX & Internationalization (前端交互与国际化)"
+    validations:
+      required: true
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: "🎯 Problem Statement & Use Case / 业务背景与痛点"
+      description: "What real problem or workflow friction are you trying to solve? Who is affected (DBA, developer, security/compliance)? / 该需求解决什么实际痛点？面向哪些角色（DBA、研发、安全合规）？"
+      placeholder: "Describe the problem and scenario clearly..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: "💡 Proposed Solution & Governance Boundary / 建议方案与安全边界"
+      description: "Describe the desired behavior, configuration (if necessary), and any permission/audit/privacy expectations. / 请描述期望的交互或接口行为，以及相关的权限、审计与隐私边界。"
+      placeholder: "Describe your proposed design or workflow..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: "🔄 Alternatives Considered / 替代方案或现有绕行方式"
+      description: "Have you considered any workarounds (e.g., custom Prompt Skills, Knowledge rules, or `/api/v4/*` automation)? / 是否评估过现有替代方案（例如自定义审核技能、内部经验库或 API 集成）？"
+    validations:
+      required: false
+
+  - type: dropdown
+    id: contribution
+    attributes:
+      label: "🛠️ Willing to Contribute? / 是否愿意参与贡献？"
+      description: "Note: External PRs require accepting the Contributor License Agreement (CLA.md). / 注：提交 PR 需同意仓库内的 CLA 协议。"
+      options:
+        - "Yes, I am willing to submit a PR after design alignment / 愿意在方案对齐后提交 PR"
+        - "No PR, but happy to help test and review / 暂不提交代码，但愿意协助测试与反馈"
+        - "Feature suggestion only / 仅提交功能建议"
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: "✅ Pre-Submission Checklist / 提交前确认"
+      options:
+        - label: "I have searched existing [Issues](https://github.com/cookieY/Yearning/issues) and [Discussions](https://github.com/cookieY/Yearning/discussions) to confirm this is not a duplicate request. / 我已检索过已有 Issues 与 Discussions，确认非重复建议。"
+          required: true
+        - label: "I have reviewed the [official documentation](https://next.yearning.io/) to verify this capability does not already exist in Yearning v4. / 我已查阅官方文档，确认 Yearning v4 当前尚未提供该能力。"
+          required: true

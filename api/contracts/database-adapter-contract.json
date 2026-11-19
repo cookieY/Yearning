@@ -1,0 +1,309 @@
+{
+  "contract_version": 1,
+  "capability_matrix": "api/contracts/datasource-capabilities.json",
+  "package_boundary": "internal/database",
+  "interfaces": {
+    "Connector": [
+      "TestConnection",
+      "OpenPurposePool",
+      "ReadServerIdentity",
+      "Close"
+    ],
+    "MetadataReader": [
+      "ListSchemas",
+      "ListTables",
+      "ListColumns",
+      "ListIndexes",
+      "ReadSchemaSignature"
+    ],
+    "PlanReader": [
+      "ExplainWithoutExecution"
+    ],
+    "QueryRunner": [
+      "OpenSelectCursor",
+      "FetchCursorPage",
+      "CancelQuery",
+      "CloseCursor"
+    ],
+    "ChangeExecutor": [
+      "BeginDMLTransaction",
+      "ExecuteDMLStatement",
+      "CommitDMLTransaction",
+      "RollbackDMLTransaction",
+      "ExecuteDDLStatement",
+      "CancelExecution"
+    ],
+    "IdentifierQuoter": [
+      "QuoteIdentifier"
+    ]
+  },
+  "purpose_pools": {
+    "review": {
+      "credential_purpose": "review",
+      "read_only": true,
+      "session_mutation_allowlist": [
+        "statement_timeout",
+        "lock_timeout",
+        "application_name",
+        "max_execution_time",
+        "innodb_lock_wait_timeout",
+        "sql_mode"
+      ]
+    },
+    "query": {
+      "credential_purpose": "query",
+      "read_only": true,
+      "session_mutation_allowlist": [
+        "statement_timeout",
+        "application_name",
+        "max_execution_time",
+        "sql_mode"
+      ]
+    },
+    "execution": {
+      "credential_purpose": "execution",
+      "read_only": false,
+      "session_mutation_allowlist": [
+        "statement_timeout",
+        "lock_timeout",
+        "application_name",
+        "max_execution_time",
+        "innodb_lock_wait_timeout",
+        "sql_mode"
+      ]
+    }
+  },
+  "session_initialization": {
+    "mysql": {
+      "sql_mode": "ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION",
+      "charset": "utf8mb4",
+      "applies_to_targets": [
+        "mysql-5.7",
+        "mysql-8.0",
+        "tidb-mysql",
+        "oceanbase-mysql",
+        "polardb-mysql"
+      ],
+      "rationale": "Deterministic backslash-escape and double-quote semantics for every target connection; fingerprint lexing assumes the same mode. NO_BACKSLASH_ESCAPES and ANSI_QUOTES are excluded."
+    }
+  },
+  "common_invariants": [
+    "Every call accepts context cancellation and a finite adapter-level connect timeout.",
+    "Credentials and TLS material are decrypted only at connection construction and are never returned by an adapter result.",
+    "Server identity is engine-specific, stable across credential rotation and compared with the frozen datasource identity before review reuse or execution.",
+    "Identifiers are never interpolated from user text; they are resolved from metadata IDs or frozen mappings and quoted by the engine adapter.",
+    "Raw SQL is supplied only to target-database driver execution methods and never to AI providers, logs, metrics, traces or errors.",
+    "Explain never enables ANALYZE or another option that executes mutating SQL.",
+    "Driver error text is classified and sanitized before leaving the adapter.",
+    "The adapter never retries a statement, transaction commit, DDL or gh-ost process internally.",
+    "Unsupported syntax or capability fails closed and never falls back to a different dialect or direct high-risk execution."
+  ],
+  "dialects": {
+    "mysql": {
+      "targets": [
+        "mysql-5.7",
+        "mysql-8.0",
+        "tidb-mysql",
+        "oceanbase-mysql",
+        "polardb-mysql"
+      ],
+      "driver": "go-sql-driver/mysql",
+      "placeholder": "?",
+      "identifier_quote": "backtick_with_embedded_backtick_doubling",
+      "read_only_session": [
+        "SET SESSION TRANSACTION READ ONLY"
+      ],
+      "explain": "EXPLAIN without executing the statement; JSON format only when the verified target supports it",
+      "server_identity_inputs": [
+        "engine_family",
+        "server_uuid_or_vendor_cluster_identity",
+        "lower_case_table_names",
+        "version",
+        "configured_endpoint_identity"
+      ],
+      "dml_transaction": "sql.Tx covering every frozen DML statement in one datasource stage",
+      "ddl_transaction": "forbidden",
+      "cancel": "close or cancel the dedicated driver connection; cancellation confirmation does not prove transaction outcome after commit send"
+    },
+    "postgresql": {
+      "targets": [
+        "postgresql-14",
+        "postgresql-15",
+        "postgresql-16",
+        "postgresql-17",
+        "polardb-postgresql"
+      ],
+      "driver": "pgx/v5 through database/sql-compatible adapter boundary",
+      "placeholder": "$n",
+      "identifier_quote": "double_quote_with_embedded_quote_doubling",
+      "read_only_session": [
+        "SET TRANSACTION READ ONLY"
+      ],
+      "explain": "EXPLAIN (FORMAT JSON) without ANALYZE",
+      "server_identity_inputs": [
+        "engine_family",
+        "system_identifier_when_available",
+        "database_oid_and_name",
+        "server_version_num",
+        "configured_endpoint_identity"
+      ],
+      "dml_transaction": "sql.Tx covering every frozen DML statement in one datasource stage",
+      "ddl_transaction": "forbidden_by_product_even_when_the_engine_supports_transactional_DDL",
+      "cancel": "PostgreSQL cancel request plus dedicated connection close; cancellation confirmation does not prove transaction outcome after commit send"
+    }
+  },
+  "compatibility_modes": {
+    "rule": "Vendor targets reuse the MySQL or PostgreSQL SQL dialect adapter only after target-specific capability probes and golden tests pass.",
+    "native_identity_required": true,
+    "native_error_classifier_required": true,
+    "silent_native_engine_assumption": "forbidden",
+    "latest_stable_version_frozen_in_release_manifest": true
+  },
+  "query_cursor": {
+    "strategy": "target_database_cursor_on_dedicated_connection_with_pod_affinity",
+    "result_row_persistence": "forbidden",
+    "metadata_persistence": "encrypted query_cursors row only using cursor_state_ciphertext, cursor_state_nonce, cursor_state_key_id and cursor_state_algorithm under cryptographic-key-contract.json",
+    "persisted_owner_fields": [
+      "owner_instance_id",
+      "fence_token",
+      "purpose",
+      "next_page_number",
+      "expires_at",
+      "absolute_expires_at",
+      "consumed_at"
+    ],
+    "encrypted_cursor_state_fields": [
+      "random_connection_handle",
+      "driver_cursor_metadata",
+      "authorization_binding_hash"
+    ],
+    "routing": "Signed cursor-affinity cookie routes all continuation requests to the owning Pod; application-level inter-Pod RPC is forbidden.",
+    "buffering": "At most one configured page plus driver framing overhead in memory; no whole-result buffering or prefetch.",
+    "snapshot": "Pages from one live cursor observe the target database cursor snapshot/statement semantics; no cross-Pod reconstruction.",
+    "owner_loss": {
+      "result": "CURSOR_EXPIRED",
+      "http_status": 200,
+      "automatic_query_replay": false,
+      "rows_returned_as_continuation": false
+    },
+    "authorization": "Every page validates current session/grant state, frozen datasource capability and purpose; export additionally requires can_export.",
+    "security_boundary": "can_export controls the audited built-in export path but cannot prevent manual collection through authorized display pagination.",
+    "cleanup": "Owner closes the target cursor/connection on exhaustion, cancellation, session close, idle expiry or the fixed six-hour absolute lifetime; metadata deletion is handled by the retention role."
+  },
+  "result_contracts": {
+    "connection_test": [
+      "engine",
+      "compatibility_mode",
+      "server_version",
+      "server_identity_fingerprint",
+      "capabilities",
+      "latency_ms",
+      "sanitized_failure_name"
+    ],
+    "metadata_column": [
+      "schema_name",
+      "table_name",
+      "column_name",
+      "ordinal",
+      "database_type",
+      "nullable",
+      "sensitive_policy"
+    ],
+    "explain_fact": [
+      "access_method",
+      "estimated_rows",
+      "estimated_cost",
+      "index_names",
+      "warnings",
+      "raw_evidence_reference"
+    ],
+    "statement_result": [
+      "started_at",
+      "finished_at",
+      "affected_rows",
+      "engine_code_class",
+      "outcome",
+      "send_boundary",
+      "sanitized_failure_name"
+    ],
+    "query_page": [
+      "columns_with_stable_ordinals",
+      "rows",
+      "next_cursor",
+      "has_more",
+      "page_ordinal",
+      "purpose"
+    ]
+  },
+  "test_gate": {
+    "targets": "every target/version frozen in the release manifest",
+    "required_suites": [
+      "tls_connection",
+      "identity_stability",
+      "metadata",
+      "identifier_quoting",
+      "explain_non_execution",
+      "single_select",
+      "cursor_affinity_and_expiry",
+      "dml_commit_and_rollback",
+      "multi_ddl_partial_failure",
+      "cancellation",
+      "error_sanitization",
+      "context_cancellation",
+      "capability_fail_closed"
+    ],
+    "vendor_target_mock_only": "forbidden_for_formal_support",
+    "production_credentials": "forbidden"
+  },
+  "review_metadata_extension": {
+    "requirement_id": "R012",
+    "mode": "optional bounded read-only parameterized metadata capability, six canonical interfaces retained",
+    "existence": "observed base-table present/absent; visibility failure is unknown, and a same-name non-base relation is unsupported rather than absent",
+    "estimates": "metadata only, no COUNT(*) or mutation; unknown/unsupported explicit, never fabricated zero",
+    "provider_projection": "safe typed column/index facts and anonymous identifiers; no default/comment/engine free text; a custom or domain type is redacted as type_class=other with type_status=unknown and makes the column profile incomplete rather than being treated as a known type",
+    "array_types": "controlled built-in arrays retain array class, element class and dimensions; unknown element types are redacted and incomplete",
+    "index_structure": "key and INCLUDE columns remain distinct; expression counts and prefix presence/lengths are controlled facts; unprojected expressions or prefix ordering make the profile incomplete",
+    "safe_explain_boundary": "construct final SQL only after dialect token validation proves one ordinary statement head and no separators or execution prefix; no target connection is needed to reject unsafe input"
+  },
+  "policy_catalog_privacy": {
+    "interface": "optional trusted ReadPolicyCatalog capability; no Provider-facing tool",
+    "purpose": "review_read_only",
+    "scope": "exact frozen authorized physical schemas",
+    "snapshot": "single bounded catalog query; complete schema visibility proof required; no partial return",
+    "identifier_kinds": [
+      "schema",
+      "table",
+      "view",
+      "column",
+      "index",
+      "constraint"
+    ],
+    "limits": {
+      "schemas": 64,
+      "identifiers": 50000,
+      "timeout_seconds": 5
+    },
+    "failure": "unsupported_visibility_unknown_timeout_missing_schema_malformed_or_truncated_fail_closed"
+  },
+  "postgres_search_path": {
+    "requirement_id": "R012",
+    "interface": "optional_trusted_helpers_canonical_six_interfaces_retained",
+    "probe": "fixed_bounded_read_only_transaction_using_execution_purpose_credentials_and_TLS; SET_LOCAL_DEFAULT_prevents_pooled_session_state_from_masking_role_and_database_defaults",
+    "fields": [
+      "version",
+      "current_user",
+      "configured",
+      "explicit",
+      "effective",
+      "creation_schema"
+    ],
+    "binding_version": 3,
+    "binding": "complete_callables_checked_safe_path_with_catalog_signature_result_type_OID_proof_pre_batch_baseline_and_exact_statement_ordinal_relation_identity; callable_and_relation_identities_are_trusted_local_only",
+    "resolution": "parameterized_relation_lookup_across_ordered_effective_path; all_relation_kinds_shadow; no_arbitrary_SQL_or_Provider_tool; first_effective_non_temporary_schema_must_be_pg_catalog_and_all_visible_callable_signature_winners_must_be_pg_catalog",
+    "application": "typed_expanded_explicit_schema_array; quote_each_identifier; transaction_local_DML_and_connection_DDL; preserve_implicit_pg_catalog_position",
+    "inspection": "DML_reprobes_the_open_transaction_after_reapplying_the_frozen_path_before_each_statement; DDL_reprobes_the_current_role_default_then_inspects_the_dedicated_connection_before_each_statement",
+    "residual_race": "inspection_is_immediately_before_send_but_external_concurrent_catalog_DDL_is_not_locked",
+    "failure": "unavailable_drift_missing_legacy_snapshot_temporary_or_unprovable_binding_fails_closed_before_change_SQL_send",
+    "privacy": "raw_paths_user_and_relations_trusted_memory_or_encrypted_stage_snapshot_only"
+  }
+}

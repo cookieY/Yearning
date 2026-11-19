@@ -1,0 +1,1 @@
+{"id": 1, "name": "dba", "permissions": "{\"DDLSource\":[\"src-000001\"],\"DMLSource\":[\"src-000001\"],\"QuerySource\":[\"src-000002\"]}", "group_id": "grp-000001"}

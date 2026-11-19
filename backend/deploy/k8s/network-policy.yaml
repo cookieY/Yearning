@@ -1,0 +1,148 @@
+# network-policy.yaml BE-B12-HARDENING (frozen surface of contract network_policy):
+# Default deny for both ingress and egress; control-plane allows only ingress/probe sources
+# and DNS/PG/target-DB/AI/LDAP-OIDC/notification egress; cloud metadata link-local addresses
+# are rejected.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: yearning-default-deny
+  labels:
+    app.kubernetes.io/name: yearning
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: yearning
+  policyTypes: ["Ingress", "Egress"]
+  ingress: []
+  egress: []
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: yearning-control-plane-allowed
+  labels:
+    app.kubernetes.io/name: yearning
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: yearning
+      app.kubernetes.io/component: control-plane
+  policyTypes: ["Ingress", "Egress"]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: yearning-ingress
+      ports:
+        - port: 8080
+  egress:
+    # Cluster DNS.
+    - to:
+        - namespaceSelector: {}
+      ports:
+        - port: 53
+          protocol: UDP
+        - port: 53
+          protocol: TCP
+    # Metadata PostgreSQL (same namespace, selected by label).
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: yearning-postgresql
+      ports:
+        - port: 5432
+    # Target database / AI / LDAP-OIDC / notification egress: contract network_policy.control_plane_egress
+    # requires "configured_*_CIDRs". The CIDRs below are RFC 5737 TEST-NET placeholders — fail-closed by
+    # default (placeholder ranges are non-routable); operators must inject real CIDRs per
+    # kubernetes-deployment-contract (via kustomize overlay or helm values) and must never revert to
+    # 0.0.0.0/0. Cloud metadata link-local addresses (169.254.0.0/16) are excluded and denied by default.
+    # Target databases (inject real target_database_CIDRs).
+    - to:
+        - ipBlock:
+            cidr: 192.0.2.0/24 # TEST-NET-1 placeholder: replace with real target database CIDRs
+      ports:
+        - port: 3306
+        - port: 5432
+    # AI Provider or proxy (inject real AI_provider_CIDRs_or_proxy).
+    - to:
+        - ipBlock:
+            cidr: 198.51.100.0/24 # TEST-NET-2 placeholder: replace with real AI egress CIDRs
+      ports:
+        - port: 443
+    # LDAP/OIDC (inject real LDAP_OIDC_CIDRs_or_proxy).
+    - to:
+        - ipBlock:
+            cidr: 203.0.113.0/24 # TEST-NET-3 placeholder: replace with real LDAP/OIDC CIDRs
+      ports:
+        - port: 389
+        - port: 636
+        - port: 443
+    # Notification egress: SMTP 25/465/587 + webhook 443 (inject real notification
+    # CIDRs_or_proxy; shares the TEST-NET-2 placeholder range with AI and is replaced at deployment).
+    - to:
+        - ipBlock:
+            cidr: 198.51.100.0/24 # TEST-NET-2 placeholder: replace with real SMTP/webhook egress CIDRs
+      ports:
+        - port: 25
+        - port: 465
+        - port: 587
+        - port: 443
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: yearning-migration-allowed
+  labels:
+    app.kubernetes.io/name: yearning
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: yearning
+      app.kubernetes.io/component: migration-review
+  policyTypes: ["Ingress", "Egress"]
+  ingress:
+    # SEC-0019: Migration review surface listens on 9100 (manifest --listen 0.0.0.0:9100);
+    # allows only ingress namespace sources and is retired by operators after the migration window.
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: yearning-ingress
+      ports:
+        - port: 9100
+  egress:
+    - to:
+        - namespaceSelector: {}
+      ports:
+        - port: 53
+          protocol: UDP
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: yearning-postgresql
+      ports:
+        - port: 5432
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: yearning-schema-migration-allowed
+  labels:
+    app.kubernetes.io/name: yearning
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: yearning
+      app.kubernetes.io/component: schema-migration
+  policyTypes: ["Egress"]
+  egress:
+    - to:
+        - namespaceSelector: {}
+      ports:
+        - port: 53
+          protocol: UDP
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: yearning-postgresql
+      ports:
+        - port: 5432

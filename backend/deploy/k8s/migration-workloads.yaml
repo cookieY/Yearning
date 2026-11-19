@@ -1,0 +1,209 @@
+# migration-workloads.yaml BE-B12-HARDENING: Migration review Deployment (single replica,
+# workbench + keyring Secrets only, business routes return 503) and Schema migration Job
+# (singleton, backoffLimit=0, migrator Secret only, no keyring).
+# SEC-0019: Both workloads are runnable directly from repository manifests — the review surface
+# exposes --listen explicitly with probe port aligned to 9100; the schema Job provides full
+# `migrate apply` arguments and mounts migration-config (--migrations-dir/--catalog point to
+# in-image paths, see docker/release/Dockerfile).
+# SEC-0017: Secret volumes use defaultMode 0400 + fsGroup 10001 (keyring validation accepts
+# 0400/0440 because kubelet delivers read-only Secret volumes masked with fsGroup as 0440).
+# NEW-DEPLOY-01 (20261022 fix): Migration config Secrets are split by role —
+# review mounts yearning-migration-config-review (target.password file reference points to
+# the workbench credential volume path), and the schema Job mounts yearning-migration-config-schema
+# (pointing to the migrator credential volume path); the two workloads must never share the
+# same config Secret (workbench/migrator role separation per kubernetes-deployment-contract).
+# See docs/runbooks/legacy-migration-rebuild.md for rendering instructions.
+# NEW-DEPLOY-03 (20261022 fix): Adds a matching Service for migration-review (9100 -> http,
+# ClusterIP) so traffic permitted from the yearning-ingress namespace by yearning-migration-allowed
+# has an actual routing destination.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: yearning-migration-review
+  labels:
+    app.kubernetes.io/name: yearning
+    app.kubernetes.io/instance: yearning-prod
+    app.kubernetes.io/version: v4.0.0
+    app.kubernetes.io/component: migration-review
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: yearning
+      app.kubernetes.io/component: migration-review
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: yearning
+        app.kubernetes.io/instance: yearning-prod
+        app.kubernetes.io/version: v4.0.0
+        app.kubernetes.io/component: migration-review
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        # SEC-0017: fsGroup=10001 causes kubelet to deliver read-only Secret volumes
+        # with mode 0440 to runAsUser 10001 (0400 root-owned files are unreadable by
+        # non-root); ValidateKeyringFile accepts both 0400 and 0440 accordingly.
+        fsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: yearning
+          image: ghcr.io/cookiey/yearning@sha256:REPLACED_BY_RELEASE
+          # SEC-0043/SEC-0019: Migration review surface defaults to loopback 127.0.0.1:9100;
+          # kubelet probes reach it over the Pod network, so the container must pass
+          # --listen 0.0.0.0:9100 explicitly while external access is restricted by NetworkPolicy.
+          args: ["serve", "--migration-mode", "--config", "/var/run/secrets/yearning/migration-config/config.json", "--listen", "0.0.0.0:9100"]
+          ports:
+            - name: http
+              containerPort: 9100
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+            privileged: false
+          volumeMounts:
+            - name: keyring
+              mountPath: /var/run/secrets/yearning/keyring
+              readOnly: true
+            - name: metadata-db-workbench
+              mountPath: /var/run/secrets/yearning/metadata-db-workbench
+              readOnly: true
+            - name: migration-config
+              mountPath: /var/run/secrets/yearning/migration-config
+              readOnly: true
+            - name: tmp
+              mountPath: /tmp
+          # Migration mode router exposes /api/v4/health/live|ready (same probe semantics as serve),
+          # aligned to port 9100 with --listen so the Pod becomes Ready (SEC-0019).
+          livenessProbe:
+            httpGet:
+              path: /api/v4/health/live
+              port: http
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /api/v4/health/ready
+              port: http
+            periodSeconds: 5
+      terminationGracePeriodSeconds: 300
+      volumes:
+        # SEC-0017: Secret volumes uniformly set defaultMode 0400 (contract file_mode_maximum;
+        # delivered as 0440 via fsGroup, both accepted by keyring validation).
+        - name: keyring
+          secret:
+            secretName: yearning-payload-keyring
+            defaultMode: 0400
+        - name: metadata-db-workbench
+          secret:
+            secretName: yearning-metadata-database-workbench
+            defaultMode: 0400
+        # NEW-DEPLOY-01: Config Secret for the review role (target.password file reference
+        # rendered as /var/run/secrets/yearning/metadata-db-workbench/<key>).
+        - name: migration-config
+          secret:
+            secretName: yearning-migration-config-review
+            defaultMode: 0400
+        - name: tmp
+          emptyDir:
+            sizeLimit: 64Mi
+---
+# NEW-DEPLOY-03: Migration review Service — same name as the review Deployment, single port
+# 9100 -> http (matching --listen 0.0.0.0:9100), ClusterIP. Routed during the migration window
+# via Ingress in the yearning-ingress namespace or via explicit `kubectl port-forward`
+# (see docs/runbooks/legacy-migration-rebuild.md).
+apiVersion: v1
+kind: Service
+metadata:
+  name: yearning-migration-review
+  labels:
+    app.kubernetes.io/name: yearning
+    app.kubernetes.io/instance: yearning-prod
+    app.kubernetes.io/version: v4.0.0
+    app.kubernetes.io/component: migration-review
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: yearning
+    app.kubernetes.io/component: migration-review
+  ports:
+    - name: http
+      port: 9100
+      targetPort: http
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: yearning-schema-migration
+  labels:
+    app.kubernetes.io/name: yearning
+    app.kubernetes.io/version: v4.0.0
+    app.kubernetes.io/component: schema-migration
+spec:
+  parallelism: 1
+  completions: 1
+  backoffLimit: 0
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: yearning
+        app.kubernetes.io/version: v4.0.0
+        app.kubernetes.io/component: schema-migration
+    spec:
+      automountServiceAccountToken: false
+      restartPolicy: Never
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        # SEC-0017: fsGroup=10001 — migrator and migration-config Secret volumes are
+        # delivered with mode 0440 to runAsUser 10001 (0400 is unreadable by non-root).
+        fsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: yearning
+          image: ghcr.io/cookiey/yearning@sha256:REPLACED_BY_RELEASE
+          # SEC-0019: `migrate` requires a subcommand; schema apply uses migration-config
+          # JSON (SecretReference pointing to the migrator secret) rather than
+          # YEARNING_DATABASE_DSN_FILE (unused in code).
+          # --migrations-dir and --catalog point to in-image paths (docker/release/Dockerfile
+          # copies db/migrations and the column catalog contract).
+          args: ["migrate", "apply", "--config", "/var/run/secrets/yearning/migration-config/config.json", "--migrations-dir", "/usr/share/yearning/db-migrations", "--catalog", "/usr/share/yearning/contracts/postgresql-column-catalog.json"]
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+            privileged: false
+          volumeMounts:
+            - name: metadata-db-migrator
+              mountPath: /var/run/secrets/yearning/metadata-db-migrator
+              readOnly: true
+            - name: migration-config
+              mountPath: /var/run/secrets/yearning/migration-config
+              readOnly: true
+            - name: tmp
+              mountPath: /tmp
+          resources:
+            limits:
+              memory: "512Mi"
+      volumes:
+        # SEC-0017: Secret volumes uniformly set defaultMode 0400 (delivered as 0440 via fsGroup).
+        - name: metadata-db-migrator
+          secret:
+            secretName: yearning-metadata-database-migrator
+            defaultMode: 0400
+        # NEW-DEPLOY-01: Config Secret for the schema role (target.password file reference
+        # rendered as /var/run/secrets/yearning/metadata-db-migrator/<key>).
+        - name: migration-config
+          secret:
+            secretName: yearning-migration-config-schema
+            defaultMode: 0400
+        - name: tmp
+          emptyDir:
+            sizeLimit: 64Mi

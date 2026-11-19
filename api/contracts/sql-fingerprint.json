@@ -1,0 +1,209 @@
+{
+  "contract_version": 1,
+  "algorithm_version": "yearning-fingerprint-v1",
+  "supported_profiles": [
+    {
+      "engine": "mysql",
+      "mode": "mysql",
+      "versions": [
+        "5.7.x",
+        "8.0.x"
+      ]
+    },
+    {
+      "engine": "postgresql",
+      "mode": "postgresql",
+      "versions": [
+        "14.x",
+        "15.x",
+        "16.x",
+        "17.x"
+      ]
+    },
+    {
+      "engine": "tidb",
+      "mode": "mysql",
+      "versions": [
+        "latest_stable_at_release"
+      ]
+    },
+    {
+      "engine": "oceanbase",
+      "mode": "mysql",
+      "versions": [
+        "latest_stable_at_release"
+      ]
+    },
+    {
+      "engine": "polardb",
+      "mode": "mysql",
+      "versions": [
+        "latest_stable_at_release"
+      ]
+    },
+    {
+      "engine": "polardb",
+      "mode": "postgresql",
+      "versions": [
+        "latest_stable_at_release"
+      ]
+    }
+  ],
+  "outputs": {
+    "required": [
+      "algorithm_version",
+      "dialect_profile",
+      "statement_kind",
+      "fingerprint_key_id",
+      "canonical_fingerprint_hmac",
+      "dialect_fingerprint_hmac",
+      "execution_shape_hmac",
+      "anonymized_sql",
+      "literal_type_counts",
+      "tuple_count",
+      "parameter_count",
+      "quality"
+    ],
+    "quality_values": [
+      "exact",
+      "compatible_lexer"
+    ],
+    "hash_encoding": "lowercase_hex_hmac_sha256",
+    "hash_key_scope": "deployment_secret_distinct_from_encryption_keys"
+  },
+  "normalization": {
+    "remove_comments": true,
+    "preserve_optimizer_hints_as_typed_execution_features": true,
+    "literal_replacement": "typed_placeholder_without_value",
+    "identifier_replacement": "review_scoped_stable_tokens",
+    "identifier_token_kinds": [
+      "database",
+      "schema",
+      "table",
+      "column",
+      "index",
+      "constraint",
+      "alias",
+      "cte",
+      "ident"
+    ],
+    "collapse_in_list_cardinality_in_structural_fingerprint": true,
+    "collapse_values_tuple_cardinality_in_structural_fingerprint": true,
+    "record_cardinality_outside_structural_fingerprint": true,
+    "canonicalize_equivalent_surface_syntax": true,
+    "preserve_semantically_relevant_dialect_features": true
+  },
+  "privacy": {
+    "model_may_receive": [
+      "anonymized_sql",
+      "typed_shape",
+      "aggregate_counts",
+      "anonymized_evidence"
+    ],
+    "model_must_never_receive": [
+      "literal_value",
+      "database_name",
+      "schema_name",
+      "table_name",
+      "column_name",
+      "index_name",
+      "constraint_name",
+      "identifier_mapping",
+      "sql_comment",
+      "raw_sql"
+    ],
+    "identifier_mapping_storage": "encrypted_and_bound_to_review_run",
+    "identifier_mapping_lifetime": "review_and_frozen_order_retention",
+    "logs_must_never_contain": [
+      "raw_sql",
+      "anonymized_mapping",
+      "literal_value"
+    ],
+    "local_san_profile_exception": {
+      "default_and_legacy_v1_v2_v3_scope": "model_must_never_receive_strictly_enforced",
+      "san_profile_scope": "local_raw_sql_native_with_isomorphic_grouping_and_256_char_literal_truncation_never_fallback_to_default"
+    }
+  },
+  "session_semantics": {
+    "mysql": {
+      "sql_mode": "ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION",
+      "backslash_escape": true,
+      "double_quote_is_string": true,
+      "note": "Enforced by database-adapter-contract.json session_initialization; lexer performs one deterministic parse."
+    }
+  },
+  "fallback": {
+    "purpose": "accept newly introduced vendor surface syntax without weakening privacy",
+    "allowed": "dialect-aware lexer can prove statement boundaries, literal coverage, identifier coverage and comment removal",
+    "quality": "compatible_lexer",
+    "forbidden": [
+      "regex_only_redaction",
+      "sending_raw_sql_to_provider",
+      "dropping_unknown_tokens",
+      "treating_unknown_tokens_as_comments",
+      "executing_from_normalized_or_anonymized_sql"
+    ],
+    "fail_closed_when": [
+      "statement_boundary_unknown",
+      "unterminated_literal_or_comment",
+      "literal_classification_unknown",
+      "identifier_coverage_unproven",
+      "dialect_profile_unknown",
+      "encoding_invalid",
+      "normalization_nondeterministic"
+    ]
+  },
+  "grouping": {
+    "primary_key": [
+      "algorithm_version",
+      "fingerprint_key_id",
+      "dialect_profile",
+      "canonical_fingerprint_hmac"
+    ],
+    "max_statements": 100000,
+    "max_input_bytes": 33554432,
+    "max_statement_bytes": 524288,
+    "complexity_warning_unique_fingerprints": 200,
+    "max_unique_fingerprints": 1000,
+    "representative_sample_policy": [
+      "first",
+      "last",
+      "minimum_shape",
+      "maximum_shape",
+      "anomalies"
+    ],
+    "full_stream_processing_required": true,
+    "execute_only_from_encrypted_original_sql": true
+  },
+  "submission_gate": {
+    "required_coverage": 1.0,
+    "blocking_error_names": [
+      "SQL_PARSE_FAILED",
+      "SQL_FINGERPRINT_FAILED",
+      "SQL_ANONYMIZATION_FAILED"
+    ],
+    "partial_or_failed_fingerprint_blocks_submission": true
+  },
+  "metadata_object_context": {
+    "requirement_id": "R012",
+    "fields": [
+      "representative_anonymized_sql",
+      "objects",
+      "statement_ordinal",
+      "statement_ordinal_ranges"
+    ],
+    "statement_ordinal": "representative statement position for compatibility and display",
+    "statement_ordinal_ranges": "authoritative inclusive batch ranges for every occurrence of the group; interleaved fingerprints remain separate",
+    "objects": "anonymous token, kind, generic relation, optional schema_token/parent_token; statement_ordinal is first occurrence and statement_ordinal_ranges preserves all object occurrences; no original identifier or reverse mapping",
+    "stability": "shared review-scoped mapper persisted for grouping and tool evidence",
+    "qualified_names": "schema/table/column/index roles must preserve SQL associations, including aliases and cross-schema names",
+    "context_limits": {
+      "per_object_ranges": 512,
+      "per_group_objects": 512,
+      "per_group_range_memberships": 4096,
+      "per_run_objects": 4096,
+      "per_run_range_memberships": 16384,
+      "overflow": "metadata_context_complete=false; bounded prefix is never complete"
+    }
+  }
+}

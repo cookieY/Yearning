@@ -1,0 +1,417 @@
+{
+  "contract_version": 1,
+  "product_boundary": {
+    "trigger": "submitter_explicitly_starts_precheck_before_submission",
+    "automatic_review_on_draft_open_edit_or_order_view": false,
+    "reviewer_rerun": "forbidden_reuse_frozen_submitted_stage_review",
+    "chat_or_conversation": "out_of_scope",
+    "model_can_approve_execute_submit_or_change_gate": false
+  },
+  "input_privacy": {
+    "raw_SQL_to_provider": "forbidden",
+    "literal_values_to_provider": "forbidden",
+    "SQL_comments_to_provider": "forbidden",
+    "raw_identifiers_to_provider": "forbidden",
+    "identifier_representation": "review_scoped_stable_anonymous_tokens",
+    "identifier_mapping_storage": "local_AEAD_envelope_never_provider",
+    "fingerprint_group_strategy": "send_representative_anonymized_shape_plus_count_and_bounded_structural_statistics",
+    "unreliable_parse_fingerprint_or_anonymization": "fail_closed_review_incomplete_submission_forbidden",
+    "policy_text_identifier_scope": "supported_objects_in_frozen_authorized_physical_catalogs_verified_at_each_send",
+    "identifier_mapping_reveal": {
+      "roles": "draft_owner_only_same_caliber_as_raw_reveal",
+      "audit": "per_action_review_evidence_mapping_revealed",
+      "window": "review_and_frozen_order_retention",
+      "transport": "no_store",
+      "semantics": "explicit action; the default evidence view keeps anonymous tokens (normalized_fact is anonymized); plaintext mappings never enter logs, traces or the model context (model_must_never_receive: identifier_mapping)",
+      "endpoint": "POST /review-runs/{review_run_id}/identifier-mapping-reveals",
+      "error_vocabulary": "existing controlled codes only (1001/1002/2009); no new codes"
+    }
+  },
+  "provider_port": {
+    "methods": [
+      "ValidateConfiguration",
+      "ReviewStructured",
+      "Health"
+    ],
+    "transport": "public_HTTPS_only_private_RFC1918_and_addrguard_loopback_HTTP_or_HTTPS",
+    "request_fields": [
+      "request_schema_version",
+      "review_run_id",
+      "engine_profile",
+      "rule_snapshot",
+      "anonymized_statement_groups",
+      "normalized_evidence",
+      "allowed_tool_descriptors",
+      "output_schema"
+    ],
+    "response": "api/contracts/ai-review-output.schema.json",
+    "free_form_response_as_success": "forbidden",
+    "streaming_required": false,
+    "provider_request_timeout_seconds_maximum": 120,
+    "provider_response_bytes_maximum": 4194304,
+    "provider_supplied_tool_name_or_arguments": "validated_against_exact_run_allowlist_and_JSON_schema",
+    "unknown_response_field_or_schema_version": "reject_provider_result"
+  },
+  "provider_selection": {
+    "ordered_enabled_providers": true,
+    "fallback_allowed_only_when": [
+      "no_provider_response_accepted",
+      "send_boundary_known_safe",
+      "same_privacy_contract_hash",
+      "same_output_schema_hash"
+    ],
+    "privacy_contract_hash_derivation": "platform_computed_sha256_of_input_privacy_canonical_constant_never_admin_input",
+    "output_schema_hash_derivation": "platform_computed_sha256_of_compiled_output_schema_bytes_never_admin_input",
+    "fallback_after_accepted_result": false,
+    "provider_call_maximum_per_review_step": 2,
+    "model_or_provider_change_invalidates_unsubmitted_review": true,
+    "submitted_review_is_never_recomputed": true
+  },
+  "tool_runtime": {
+    "tool_kinds": [
+      "builtin_database_fact",
+      "prompt_tool"
+    ],
+    "first_release_user_defined_tool": "admin_managed_prompt_tool_with_structured_finding_output",
+    "external_custom_HTTP_tool": "out_of_scope_v1",
+    "write_database_tool": "forbidden",
+    "shell_process_or_filesystem_tool": "forbidden",
+    "MCP_marketplace": "out_of_scope",
+    "prompt_tool_output": "policy_text_or_finding_candidates_never_business_state",
+    "prompt_tool_injection": "deterministic_context_injection_every_run_not_model_discretionary_tool_call",
+    "prompt_tool_definition_fields": [
+      "knowledge_text",
+      "max_severity",
+      "version"
+    ],
+    "rule_set_config_scope": "business_audit_rules_exist_only_as_prompt_tools_rule_sets_are_pure_prompt_tool_compositions_code_executes_only_the_non_business_technical_submission_gate",
+    "database_fact_tools": [
+      "datasource_identity",
+      "schema_metadata",
+      "table_statistics",
+      "index_metadata",
+      "safe_explain"
+    ],
+    "database_fact_credential_purpose": "review",
+    "safe_explain_executes_mutation": false,
+    "tool_result_normalization": [
+      "tool_call_id",
+      "tool_kind",
+      "success",
+      "fact_schema_version",
+      "normalized_fact",
+      "evidence_ids",
+      "error_code",
+      "started_at",
+      "finished_at"
+    ],
+    "fact_schema_version_current": 2,
+    "fact_schema_version_evolution": "version 1 was the pre-R012 tool fact envelope; all newly executed tool calls emit version 2, while historical Evidence retains and is interpreted by its stored version and is never rewritten or reinterpreted as version 2",
+    "tool_result_is_untrusted_data": true,
+    "recursive_or_dynamic_tool_registration": "forbidden",
+    "builtin_skill_package": {
+      "carrier": "prompt_tools rows with is_builtin=true seeded by migration, database is the only persistent home",
+      "content": "full legacy AuditRole port minus pt-osc/gh-ost entries, judged from frozen fingerprint group statistics and read-only evidence tools",
+      "governance": "three tiers: package members cannot be deleted, definitions (name/engine/four-field definition) are system-owned and immutable on replace (definition-hash comparison), parameters are admin-tunable and persisted in the row",
+      "state_transition": "admin_can_enable_disable",
+      "parameters": {
+        "storage": "prompt_tools.parameters jsonb",
+        "injection": "knowledge_text placeholders rendered with current row values",
+        "freeze": "parameter values are covered by config_hash; tuning invalidates frozen unsubmitted runs",
+        "builtin_validation": "same key set and value types as the row, values free within bounds"
+      },
+      "definition_change": "forbidden",
+      "physical_delete": "forbidden",
+      "rules_jsonb": "constant_empty_object",
+      "engine_scoping": "engine column all|mysql|postgresql; per-stage injection filtered by the stage datasource engine"
+    },
+    "prompt_tool_finding_key": "system_derived_stable_per_row_not_user_input",
+    "prompt_tool_finding_key_injection": "derived_key_and_legacy_max_severity_compatibility_metadata_injected_with_rule_text_every_run_without_lowering_enabled_rule_hits",
+    "prompt_tool_severity_governance": "every_enabled_frozen_mandatory_rule_finding_key_exact_match_is_effective_critical_and_blocks_submission_regardless_of_model_severity_or_legacy_max_severity",
+    "safe_explain_statement_boundary": "final adapter candidate allows only one ordinary plan-able statement head after fixed non-executing EXPLAIN options; ANALYZE/ANALYSE, nested EXPLAIN, EXECUTE, execution prefixes and statement separators are rejected before pool access"
+  },
+  "mandatory_rule_scope": {
+    "prompt_tool": "prompt_tool_enabled_and_rule_set_enabled_and_bound_to_current_change_review_flow_and_engine_matches",
+    "internal_experience": "entry_enabled_and_exact_stage_scope_matches",
+    "actual_hit": "a_mandatory_rule_that_applies_without_a_reported_violation_has_no_finding_or_blocking_effect"
+  },
+  "knowledge_base": {
+    "concept": "internal_experience_entries_provide_environment_scoped_boundary_rules",
+    "source": [
+      "admin_or_auditor_manual_curation",
+      "one_click_conversion_from_historical_findings"
+    ],
+    "automatic_learning": "out_of_scope_v1",
+    "scopes": [
+      "global",
+      "datasource",
+      "table"
+    ],
+    "scope_matching": "global_matches_every_stage_datasource_and_table_match_exact_stage_datasource_database_schema_table_tuple_no_cross_stage_union",
+    "injection": "deterministic_context_injection_per_stage_not_model_discretionary_tool_call",
+    "reference_freeze": "each_stage_review_snapshot_freezes_its_actual_prompt_tool_and_knowledge_refs_via_review_tool_calls_stage_review_id",
+    "output": "structured_findings_same_schema_and_severity_semantics_as_prompt_tool",
+    "blocking": "every_actual_enabled_scope_matched_knowledge_finding_is_effective_critical_and_blocks_submission_regardless_of_model_severity_or_legacy_max_severity",
+    "governance": "prompt_tool_grade_admin_only_enable_privacy_scan_prompt_injection_check_eval_config_hash_run_snapshot_freeze_outdated_on_change_no_physical_delete_once_referenced",
+    "visibility": "snapshot_shows_entry_name_purpose_and_hash_only_never_full_content"
+  },
+  "finding_governance": {
+    "policy_finding": "enabled_rule_key_exact_match_is_mandatory_and_effective_severity_is_critical_regardless_of_model_or_legacy_max_severity",
+    "agent_observation": "unknown_finding_key_is_visible_but_effective_severity_is_capped_at_medium_and_cannot_block_submission",
+    "proven_execution_invalid": "trusted_runtime_classification_from_complete_sql_semantics_metadata_and_batch_order_is_critical; provider_assertion_alone_is_insufficient",
+    "execution_validity_unknown": "keeps_stage_partial_and_blocks_submission_without_fabricating_invalid",
+    "execution_validity_classifier": "trusted_runtime_emits_invalid_valid_or_unknown_from_anonymized_sql_statement_ordinals_object_relationships_verified_normalized_metadata_batch_order_and_engine_specific_conditional_ddl_semantics",
+    "valid_conditional_ddl": "drop_table_if_exists_missing_table_remains_valid_unless_a_separately_enabled_mandatory_rule_matches",
+    "batch_semantics": "classification_preserves_statement_ordering_so_create_then_drop_is_evaluated_from_prior_state_at_each_statement_ordinal",
+    "system_generated_finding": "proven_invalid_execution_creates_or_upgrades_the_matching_finding_with_evidence_in_the_frozen_output_locale_when_the_model_omitted_or_downgraded_it",
+    "max_severity_compatibility": "retained_in_v1_definition_openapi_and_stored_configuration_but_never_limits_or_authorizes_mandatory_rule_blocking",
+    "deterministic_injection_is_not_deterministic_recall": true,
+    "enablement_static_checks": [
+      "finding_subschema",
+      "privacy",
+      "prompt_injection",
+      "severity_consistency"
+    ],
+    "behavioral_eval": "versioned_fixture_backed_recall_and_severity_regression_required_for_enablement"
+  },
+  "evidence": {
+    "finding_must_reference_existing_evidence_or_be_model_only": true,
+    "database_fact_claim_without_evidence": "reject_finding",
+    "raw_payload_to_model_context": "forbidden",
+    "raw_payload_retention_days": 7,
+    "normalized_fact_retention": "permanent_business_fact",
+    "raw_reveal": "explicit_authorized_no_store_watermarked_and_audited"
+  },
+  "submission_gate": {
+    "authority": "deterministic_application_policy_frozen_with_change_flow",
+    "block_severities": [
+      "high",
+      "critical"
+    ],
+    "block_outcomes": [
+      "partial",
+      "failed",
+      "cancelled",
+      "timed_out",
+      "budget_exhausted",
+      "privacy_failed",
+      "schema_invalid",
+      "evidence_incomplete"
+    ],
+    "warning_requires_human_visibility": true,
+    "confidence_can_override_block": false,
+    "admin_override": false
+  },
+  "budget_and_capacity": {
+    "budget_scope": "global_daily_provider_cost_only",
+    "per_order_budget": "forbidden",
+    "reservation": "atomic_before_provider_send",
+    "actual_usage": "append_only_ledger_after_response_or_known_cost",
+    "budget_exhausted": "partial_budget_exhausted_submission_forbidden",
+    "large_DML": "stream_parse_fingerprint_and_group_before_model_calls",
+    "one_model_item_per_raw_statement": "forbidden",
+    "reference_pricing": {
+      "scope": "reference_only_never_actual_bill",
+      "standing_disclaimer": "成本计算仅作为参考，不具备准确性。最终费用以AI提供商或中转服务的实际账单为准。",
+      "currencies": [
+        "CNY",
+        "USD"
+      ],
+      "rate_source_precedence": [
+        "provider_version_window_at_send_time",
+        "global_settings_legacy_default",
+        "none"
+      ],
+      "per_http_call_binding": "each_real_http_call_including_backoff_retries_schema_repair_and_fallback_records_send_time_rate_version_window_currency_generation_params_and_reference_amount_in_an_append_only_ledger",
+      "usage_three_state": "zero_positive_or_unknown_missing_invalid_negative_or_relation_violating_detail_is_unknown_never_zero_never_refetched",
+      "failed_call_usage": "usage_reported_by_an_upstream_response_on_a_failing_call_is_preserved_never_recorded_as_free",
+      "legacy_budget_ledger": "integer_minor_unit_reservation_and_settlement_paths_unchanged_and_separately_traceable_no_history_rewrite"
+    }
+  },
+  "failure_and_retry": {
+    "automatic_retry_same_provider": "only_before_response_and_within_one_bounded_transport_attempt",
+    "automatic_whole_review_restart": "forbidden",
+    "pod_loss": "durable_task_lease_may_resume_only_unsent_or_idempotent_local_steps",
+    "provider_result_unknown": "review_incomplete_never_assume_passed",
+    "cancellation": "propagate_context_stop_new_tools_preserve_completed_evidence"
+  },
+  "test_gate": [
+    "provider_output_JSON_schema_positive_and_every_keyword_negative",
+    "raw_literal_comment_identifier_and_mapping_leakage_zero",
+    "malicious_schema_comment_and_tool_payload_cannot_change_instructions",
+    "unknown_tool_and_argument_rejected",
+    "safe_explain_never_mutates_target",
+    "fallback_requires_identical_privacy_and_output_contracts",
+    "high_critical_partial_and_incomplete_always_block_submission",
+    "every_mandatory_rule_hit_is_effective_critical",
+    "unknown_agent_observation_is_capped_at_medium",
+    "provider_cannot_self_authorize_critical_or_execution_invalidity",
+    "trusted_proven_invalid_execution_is_critical_with_evidence",
+    "conditional_and_ordered_valid_ddl_is_not_misclassified_invalid",
+    "incomplete_execution_validity_evidence_remains_partial",
+    "runtime_generated_critical_finding_uses_frozen_output_locale",
+    "legacy_max_severity_does_not_change_effective_blocking",
+    "unqualified_schema_uses_only_unique_frozen_default_and_explicit_physical_scope_is_never_rewritten",
+    "reviewer_view_causes_zero_provider_calls",
+    "100000_high_similarity_DML_uses_bounded_fingerprint_groups",
+    "budget_reservation_concurrency_never_overspends",
+    "provider_timeout_cancel_and_pod_loss_preserve_auditable_terminal_state"
+  ],
+  "output_locale": {
+    "request_header": "Accept-Language",
+    "operation_id": "runDraftReview",
+    "supported": [
+      "zh-CN",
+      "en-US"
+    ],
+    "default": "zh-CN",
+    "normalization": "HTTP language negotiation in preference order; zh and en variants map to supported locale; unsupported or malformed header falls back to zh-CN",
+    "freeze": "sql_grouping and ai_review task input at explicit start; reused for all stages, turns, retries and provider fallback",
+    "human_text_fields": [
+      "summary",
+      "findings.title",
+      "findings.message",
+      "findings.suggestion"
+    ],
+    "structured_values": "preserve keys, enums, finding keys, evidence IDs, anonymous tokens and technical identifiers",
+    "existing_results": "never automatically translate or recompute; explicitly start a new review for a different output language",
+    "prompt_safety": "fixed instructions selected by normalized locale; never interpolate raw request header",
+    "output_validation": "before accepting any model turn, exclude backtick-delimited code and require Han prose for zh-CN or Latin prose without other scripts for en-US; this conservative script guard does not prove linguistic fluency",
+    "language_correction": "one corrective model turn per stage within existing model-turn, call, time and cost budgets; invalid response text and tool requests are discarded; persistent mismatch fails closed with existing REVIEW_SCHEMA_INVALID 2009"
+  },
+  "metadata_context": {
+    "requirement_id": "R012",
+    "sql_context": "each group carries representative_anonymized_sql and anonymous object relationships; statement_ordinal identifies the representative and statement_ordinal_ranges authoritatively covers every group occurrence; stable RunMapper shared with tools",
+    "discovery": "AI chooses read-only metadata tools based on SQL and frozen skills/knowledge, no handwritten per-rule dependency catalog or keyword-specific risk decision",
+    "object_baseline": "table references require scoped observed existence/definition evidence; SQL index references with an owning table require scoped index_metadata; unsupported object kinds or unbound index/constraint/schema targets are unknown/incomplete, never silently covered",
+    "required_context": "any requested failed, unavailable, truncated or required-unknown fact keeps the stage partial; existing 2007 and gate semantics apply",
+    "pure_lexical": "statements without metadata object references need not request database fact tools; mandatory frozen-target identity checks still apply",
+    "privacy": "no raw SQL, identifiers, comments, literals, mapping or unconstrained metadata text to Provider; only stable tokens and controlled typed facts",
+    "facts": "schema_metadata requires one SQL-referenced table; no schema-wide discovery; table existence differs from empty columns/indexes; non-base relations are unsupported, never absent; row estimates are observed/unknown/unsupported; arrays preserve controlled element class and dimensions; index key/include roles and expression/prefix presence are explicit, unprojected structures make the profile incomplete",
+    "existence_visibility": "MySQL absent requires global or schema-level SELECT evidence proving INFORMATION_SCHEMA visibility; PostgreSQL table lookup uses pg_catalog and absent-in-existing-schema requires USAGE, while a missing schema itself is a complete absent observation; present rows never become empty definitions when follow-up metadata reads fail",
+    "limits": "existing model/tool call, time, byte, depth and global daily cost bounds remain enforced",
+    "business_policy": "existence/context facts do not hardcode DROP/ALTER/IF EXISTS risk severity; enabled mandatory flow rules apply separately and the trusted runtime validity classifier evaluates batch order and SQL semantics",
+    "identifier_equivalence": "column and index facts may carry sql_reference_tokens containing exact-name matching real SQL tokens only; quoted case variants, virtual scopes and other identifier kinds never become aliases",
+    "target_binding": "freeze target configuration into the run input hash and actual server/database identity into encrypted stage context; re-probe and compare before target fact reads; target drift fails closed; Provider sees only controlled engine/version/match status, never original target identity",
+    "tool_call_identity": "provider tool_call_id is stage-local correlation; storage UUID is derived from run/stage/provider ID/request signature; same ID and identical request is idempotent, conflicting request is a failed auditable call and evidence incomplete",
+    "summary_acceptance": "accept model summary only after all runtime evidence and finding-reference validation, when final runtime outcome equals model outcome; downgraded complete text is discarded",
+    "schema_mapping": {
+      "sql_qualifiers": "preserved_verbatim_and_never_rewritten_by_review_or_execution",
+      "unqualified_object": "no_flow_stage_schema_mapping_exists; PostgreSQL_uses_execution_identity_ordered_search_path_frozen_at_review; MySQL_uses_the_datasource_default_database_as_the_only_allowed_schema",
+      "explicit_qualifier": "must_resolve_to_the_actual_allowed_physical_schema_visible_in_the_sql",
+      "unknown_or_invalid_binding": "physical_schema_outside_the_frozen_scope_or_incomplete_binding_keeps_the_stage_partial_with_existing_2012_and_2007_semantics",
+      "fact_scope": "trusted_tool_reads_resolve_only_the_frozen_scope_while_normalized_facts_return_the_same_sql_visible_schema_identity_without_exposing_original_identifiers",
+      "identifier_safety": "no_qualifier_rewriting_exists; literals_comments_and_column_aliases_are_never_touched",
+      "postgres_frozen_search_path": {
+        "environment": "fixed_read_only_execution_credential_and_execution_TLS_probe_of_current_user_current_setting_search_path_current_schemas_false_true_and_current_schema",
+        "snapshot": "versioned_encrypted_stage_context_before_policy_freeze; raw_user_paths_and_bindings_never_leave_trusted_server; binding_version_3_records_complete_callables_checked_catalog_signature_OID_proof_pre_batch_baseline_and_statement_ordinal_relations",
+        "callable_safety": "complete_binding_requires_first_effective_non_temporary_schema_pg_catalog_and_checked_catalog_signature_result_type_OID_proof_for_all_unqualified_function_and_operator_names; keyword_and_implicit_comparisons_are_operators; any_non_catalog_winner_or_unprovable_reference_fails_closed_at_review_submit_begin_and_send",
+        "lookup": "first_matching_relation_in_effective_path_per_statement_ordinal; unsupported_relations_shadow_later_tables_and_remain_partial; absence_requires_complete_path_visibility; relation_binding_records_physical_schema_exact_name_kind_OID_and_created_by_ordinal_when_not_yet_in_catalog",
+        "baseline": "one_consistent_pre_batch_catalog_state_per_exact_relation_name_across_the_ordered_batch; same_name_catalog_evidence_must_share_presence_kind_and_OID_or_the_binding_is_incomplete",
+        "operators": "custom_or_unrecognized_PostgreSQL_operator_spellings_such_as_adjacent_@@_remain_partial; standard_plus_and_casts_remain_supported",
+        "creation": "current_schema_is_creation_target; never_skip_to_later_schema_for_CREATE_privilege; use_expanded_explicit_path_for_SET_preserving_implicit_catalog_semantics",
+        "ordered_batch": "apply_proven_prior_create_drop_rename_effects; ambiguous_or_unsupported_branches_remain_partial_never_proven_invalid",
+        "revalidation": "compare_execution_identity_ordered_paths_and_creation_schema_at_submit_and_before_send; inspect_the_exact_DML_transaction_or_dedicated_DDL_connection_after_typed_SET_search_path_before_each_statement; unreadable_or_changed_rejects",
+        "residual_race": "the_final_catalog_inspection_occurs_immediately_before_driver_send_but_does_not_lock_external_concurrent_catalog_changes; execution_identity_and_typed_session_path_remain_bound",
+        "legacy": "flow_stage_schema_mappings_were_removed_by_RCP_20261031; runs_frozen_before_the_hash_composition_change_fail_closed_at_recheck_and_require_a_new_review; legacy_mapping_ciphertext_columns_remain_sealed_but_are_never_consumed_as_configuration",
+        "temporary": "session_local_temp_schema_or_temp_object_dependency_not_replayable_and_partial",
+        "application": "typed_ordered_schema_array_each_member_individually_quoted; never_treat_comma_list_as_one_identifier; effective_implicit_catalog_path_not_used_as_SET_input"
+      }
+    },
+    "flow_stage_schema_mappings_removed": "RCP-20261031-REMOVE-FLOW-SCHEMA-MAPPINGS: flow stages no longer configure logical-to-physical schema mappings; object scope is always the no-mapping branch (PostgreSQL frozen execution-identity search_path, MySQL datasource default database); flow_snapshot_hash composition excludes the former schema_mapping_ciphertext component"
+  },
+  "policy_text_privacy": {
+    "authoring": "free_prose_with_typed_inline_object_references_in_existing_knowledge_text",
+    "reference_syntax": "{{ref:kind:[\"physical_schema\",\"owning_table_if_needed\",\"object_name\"]}}; schema takes one part, table/view two, column/index/constraint three; exact catalog identity only",
+    "supported_catalog_kinds": [
+      "schema",
+      "table",
+      "view",
+      "column",
+      "index",
+      "constraint"
+    ],
+    "guarantee_scope": "complete bounded catalog snapshot of frozen authorized physical schemas, including objects absent from SQL; inaccessible or unrelated catalogs are not certified",
+    "catalog_channel": "trusted read_only review credential; local memory only; never Provider tool evidence or bulk model token legend",
+    "catalog_incomplete": "zero Provider calls on missing visibility proof, missing schema, unsupported catalog reader, timeout, truncation, oversize or malformed catalog",
+    "raw_policy_identifiers": "reject raw known catalog names in administrator human text/parameters; controlled fixed structure/source IDs/enums are not administrator catalog text; the frozen generic_column_name_allowlist below exempts zero-specificity generic column names from this rejection for the policy-text catalog-word check only",
+    "generic_column_name_allowlist": {
+      "words": ["id", "name", "code", "type", "status", "value", "label", "title", "remark", "comment", "version", "created_at", "updated_at", "deleted_at", "created_by", "updated_by"],
+      "case": "case_insensitive",
+      "scope": "column-kind catalog identifiers only; exempts the policy-text catalog-word collision check only; schema/table/view/index/constraint names, the target database name, statement identifiers and the mapper-token collision check are never exempt",
+      "rationale": "generic column names exist in virtually every catalog and disclose nothing about which objects exist (zero specificity), while rule semantics legitimately reference them; admin-authored specific names remain fully rejected",
+      "extension": "frozen; extension requires an approved requirement change proposal and must update this contract, the Go mirror and scripts/contracts/validate_contracts.py in lockstep",
+      "authority": "RCP-20261031-POLICY-TEXT-GENERIC-COLUMN-ALLOWLIST"
+    },
+    "reference_resolution": "resolve typed references exactly, tokenize only declared objects, reject unresolved/malformed/ambiguous references before send; include raw text in existing config_hash and immutable policy snapshot",
+    "enablement": "validate placeholder grammar and parameter completeness; exact per-target catalog resolution occurs before send because global/engine policies lack a configured target",
+    "retry": "revalidate complete current authorized catalog before every Provider attempt/turn; stable Run tokens and frozen policy definitions remain bound; failure never invokes model"
+  },
+  "result_identifier_display": {
+    "requirement_id": "R014",
+    "mode": "automatic_after_existing_resource_authorization",
+    "fields": [
+      "summary",
+      "title",
+      "message",
+      "suggestion"
+    ],
+    "scope": "current_review_run_exact_token_single_pass_display_copy",
+    "actors": "draft_owner_or_frozen_order_submitter_reviewer_executor_no_implicit_admin",
+    "literal_restoration": false,
+    "persisted_results": "remain_anonymous_immutable",
+    "unknown_or_missing_mapping": "preserve_visible_token",
+    "corrupt_mapping_or_audit_failure": "deny_plaintext_response",
+    "audit_event": "review.identifier_displayed",
+    "audit_payload": "actor_run_surface_and_count_only_no_plaintext",
+    "transport": "existing_api_no_store",
+    "mapping_to_browser": false,
+    "provider_calls_on_read": 0
+  },
+  "generation_params": {
+    "user_keys": [
+      "reasoning_effort",
+      "max_tokens",
+      "temperature"
+    ],
+    "omission_semantics": "unconfigured_key_omitted_from_request_provider_default_applies_never_simulated_via_prompt",
+    "validation_bounds": {
+      "reasoning_effort": [
+        "low",
+        "medium",
+        "high"
+      ],
+      "max_tokens": [
+        256,
+        200000
+      ],
+      "temperature": [
+        0,
+        2
+      ]
+    },
+    "plan_identity": "canonicalized_into_effective_provider_plan_hash_fixed_key_order_empty_override_equals_omitted_map_iteration_order_independent",
+    "change_effect": "unsubmitted_review_invalidation_and_existing_drift_boundaries_unchanged",
+    "probe_and_repair_share_configuration": true,
+    "no_silent_downgrade_retry": "rejected_parameter_combinations_fail_readably_without_deleting_parameters_and_retrying",
+    "generation_params_canonical_excludes": [
+      "privacy_contract_hash",
+      "output_schema_hash",
+      "structured_output_mode"
+    ],
+    "plan_identity_note": "generation params join provider id/model/provider kind and BOTH contract hashes in the plan hash; only the generation-params canonical string itself excludes the keys listed in generation_params_canonical_excludes"
+  },
+  "local_san_profile_privacy": {
+    "profile": "san",
+    "applies_only_when": "effective_system_prompt_profile_equals_san_never_default_or_legacy_v1_v2_v3",
+    "raw_SQL_to_provider": "allowed_bounded_literals_256_chars",
+    "literal_values_to_provider": "truncated_over_256_chars",
+    "SQL_comments_to_provider": "allowed",
+    "raw_identifiers_to_provider": "allowed_within_authorized_stage_catalog",
+    "identifier_representation": "raw_sql_native_unmapped",
+    "fingerprint_group_strategy": "send_representative_raw_sql_shape_plus_count_and_bounded_structural_statistics",
+    "unreliable_parse_fingerprint_or_anonymization": "fail_closed_review_incomplete_submission_forbidden",
+    "cross_profile_fallback_raw_to_default": "forbidden",
+    "privacy_contract_hash_derivation": "platform_computed_sha256_of_san_privacy_canonical_constant_never_admin_input"
+  }
+}

@@ -1,0 +1,89 @@
+name: "Check Issue Format"
+
+on:
+  issues:
+    types:
+      - opened
+      - edited
+
+permissions:
+  issues: write
+
+jobs:
+  check-issue-format:
+    runs-on: ubuntu-latest
+    if: github.event.issue.user.type != 'Bot'
+    steps:
+      - name: Validate issue title format
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const issue = context.payload.issue;
+            const title = (issue.title || '').trim();
+            const validTitleRegex = /^\[(Bug|Feature)\]:?\s+\S+/;
+            const hasInvalidLabel = (issue.labels || []).some((l) => l.name === 'invalid-format');
+
+            if (!validTitleRegex.test(title)) {
+              if (!hasInvalidLabel) {
+                await github.rest.issues.createComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: issue.number,
+                  body: [
+                    `Hi @${issue.user.login}, thanks for reaching out!`,
+                    '',
+                    'Please use a clear title starting with `[Bug]: ` or `[Feature]: ` (for example: `[Bug]: AI precheck times out on PostgreSQL 17` or `[Feature]: Add ClickHouse dialect support`).',
+                    'For usage, deployment, or v3→v4 migration questions, please post in [GitHub Discussions (Q&A)](https://github.com/cookieY/Yearning/discussions/new?category=q-a).',
+                    '',
+                    '---',
+                    '',
+                    `你好 @${issue.user.login}，感谢反馈！`,
+                    '',
+                    '请使用规范的标题前缀 `[Bug]: ` 或 `[Feature]: ` 并补充简要描述（例如：`[Bug]: PostgreSQL 17 预审超时` 或 `[Feature]: 支持 ClickHouse 方言`）。',
+                    '如果属于部署配置、使用咨询或 v3 升级问题，请移步 [GitHub Discussions 问答区](https://github.com/cookieY/Yearning/discussions/new?category=q-a)。',
+                    '',
+                    '_Once you update the title to match the format, this issue will be reopened automatically. / 修改为规范标题后，本 Issue 将自动重新打开。_',
+                  ].join('\n'),
+                });
+              }
+
+              await github.rest.issues.addLabels({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issue.number,
+                labels: ['invalid-format'],
+              });
+
+              if (issue.state !== 'closed') {
+                await github.rest.issues.update({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: issue.number,
+                  state: 'closed',
+                  state_reason: 'not_planned',
+                });
+              }
+              return;
+            }
+
+            if (context.payload.action === 'edited' && hasInvalidLabel) {
+              try {
+                await github.rest.issues.removeLabel({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: issue.number,
+                  name: 'invalid-format',
+                });
+              } catch (err) {
+                if (err.status !== 404) throw err;
+              }
+
+              if (issue.state === 'closed') {
+                await github.rest.issues.update({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: issue.number,
+                  state: 'open',
+                });
+              }
+            }

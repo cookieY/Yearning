@@ -1,0 +1,224 @@
+{
+  "mysql_alter_add_index": {
+    "anonymized": "alter table table_1 add index index_1 ( column_1 )",
+    "canonical": "88cea70961b94c091ba60f608b60b214330083d91d598f3cda66760651775b6b",
+    "dialect": "dcf3b6486f0f9818a37017eeb73abc4ddaafc9ba96b8714fc7043b7ba7934929",
+    "shape": "1657990a8afee9449259ea2dbc89cb4b12b764a0b66a7ed99f6aac8f01b2bcf8"
+  },
+  "mysql_ddl_comment_secret": {
+    "anonymized": "alter table table_1 add column column_1 varchar ( :int ) comment :string",
+    "canonical": "f5cac955f6ce7fa5daad3c31b1b8bbff3773b317d0918d084a57ebf53e0e0f0e",
+    "dialect": "0ee0b612925d755e598dcfeecefa073847da7ab9a849982d00c7198591b4ba40",
+    "shape": "7e134f9f8e42a6ae079dbd53b72dc73c0b1f9f4c6b8917bd11523566cb941f80"
+  },
+  "mysql_insert_backtick": {
+    "anonymized": "insert into table_1 ( column_1 , column_2 ) values ( :int , :string ) [1]",
+    "canonical": "f0e6c7d9a2e64381ead1bdb417023e77423966402fb19b070db602f26231c53c",
+    "dialect": "d01e36e3bae0035b9415df9473bce20d5c44ad81730b07098cfeca73418331e2",
+    "shape": "9d97ac7fa23954673c5acc586953c888bfdba9508037e76aaf7b5e2e4d196897"
+  },
+  "mysql_insert_bare": {
+    "anonymized": "insert into table_1 ( column_1 , column_2 ) values ( :int , :string ) [1]",
+    "canonical": "f0e6c7d9a2e64381ead1bdb417023e77423966402fb19b070db602f26231c53c",
+    "dialect": "d01e36e3bae0035b9415df9473bce20d5c44ad81730b07098cfeca73418331e2",
+    "shape": "9d97ac7fa23954673c5acc586953c888bfdba9508037e76aaf7b5e2e4d196897"
+  },
+  "mysql_limit_comma": {
+    "anonymized": "select column_1 from table_1 order by column_2 limit :int , :int",
+    "canonical": "4b6deab641e75e8c8dac5a91f51342da1a3c2844ac45c30308574d00ae49f8c4",
+    "dialect": "f7cc40f921b92cd7b88127916feb7ffc6f61ea55d837b8a0f9d4702e3099b3ad",
+    "shape": "7619458ea459f44625ec65bb6fa42187da0bfb85dbd37e9fb350572138337a03"
+  },
+  "mysql_multirow_values": {
+    "anonymized": "insert into table_1 ( column_1 , column_2 ) values ( :int , :string ) [3]",
+    "canonical": "f0e6c7d9a2e64381ead1bdb417023e77423966402fb19b070db602f26231c53c",
+    "dialect": "d01e36e3bae0035b9415df9473bce20d5c44ad81730b07098cfeca73418331e2",
+    "shape": "f7390d7c4451801d07b855dcd24877e982053ebe0cef4ec11e618d8314fcc90b"
+  },
+  "mysql_on_duplicate": {
+    "anonymized": "insert into table_1 ( column_1 ) values ( :int ) [1] on duplicate key update column_1 = column_1 + :int",
+    "canonical": "96de39288ea8257adfd86fd17933c6827c4b1683ccbfa2e6a107b7c7a4d5474b",
+    "dialect": "88e1338bf999c3d64f26a2ab7f5a012862a3301b3f0967ee6b051d7b611e4b21",
+    "shape": "236dff4689ed05a046a9e2bf70c6803d24c36dd59fdcc75383650ae07fdc60a3"
+  },
+  "mysql_optimizer_hint": {
+    "anonymized": "select * from table_1",
+    "canonical": "9b8e34c3c490afd6ccac88cc2a13dd44b0d237ad712b833a7cc41d9d116edc41",
+    "dialect": "d8bc8dc3c86178055a4a1f3e71b0983e68c989e72aa4d47abc0bcdae04354165",
+    "shape": "21313e87f9ddb02db688d634a6d3fc394b11540d412353c7e87ca15e2c43c1a9"
+  },
+  "mysql_select_quoted": {
+    "anonymized": "select column_1 from table_1 where column_2 = :string",
+    "canonical": "c2b5825b4d268784c1a9cbf269d3ffeb6398545cd8873fd022749c2b486be537",
+    "dialect": "5e798676a74883060a0edeff8ac0b1f9f882a2f2bebcee2735bd12cf2cc1242c",
+    "shape": "8a879807f5907bc7ebab62c144052a39269f9a68fbc2bbc833df4b1a6b8a995a"
+  },
+  "mysql_timestamp_prefix_string_stays_string": {
+    "anonymized": "select column_1 from table_1 where column_2 = :string",
+    "canonical": "c2b5825b4d268784c1a9cbf269d3ffeb6398545cd8873fd022749c2b486be537",
+    "dialect": "5e798676a74883060a0edeff8ac0b1f9f882a2f2bebcee2735bd12cf2cc1242c",
+    "shape": "8a879807f5907bc7ebab62c144052a39269f9a68fbc2bbc833df4b1a6b8a995a"
+  },
+  "mysql_trigger_fallback": {
+    "anonymized": "create ident_1 ident_2 ident_3 insert on ident_4 for ident_5 row set ident_6 . ident_7 = ident_6 . ident_8 * :int",
+    "canonical": "e2de1e7e1b3fbcb643613e5b1e7351742a7475f6b8647a22a221c181f1c30d0e",
+    "dialect": "27200e041484b8481a894d4cd81e57bf920d95bd3698fdd81c637f4b4ff0d433",
+    "shape": "e2a3a581849dedd21f6c0b31b95ef68b6f1a827743cf350a50ab89583974e27b"
+  },
+  "mysql_update_inlist": {
+    "anonymized": "update table_1 set column_1 = :string where column_2 in ( :int[3] )",
+    "canonical": "00977347cf6f952d8cf5c0ee16667a79b14856db922cb65d99d602443f48912a",
+    "dialect": "70ba8e1785983c6a0f84363adf2ed5cffc7a14515c5d7fa401cfa89b1dbb3d61",
+    "shape": "75fd8c019008c9b7ba698843fa48ead45e496d5241fce584a9f0d26a5c020f8d"
+  },
+  "mysql_update_simple": {
+    "anonymized": "update table_1 set column_1 = :string , column_2 = :timestamp where column_3 = :int",
+    "canonical": "6ecd48de0c0c34f6a513e4766bd4f7dd4a6042c98e2023030ca959bfb286e1b9",
+    "dialect": "10bc4ffc86d01e81458d41cc1be4cb05e1c33d69e11e63e2d81685194b3992f6",
+    "shape": "96af260c66dbe1d8660aa48c5b2221785bd87c46b5caf51417141813a2381e9f"
+  },
+  "mysql_version_comment": {
+    "anonymized": "select column_1 * from table_1",
+    "canonical": "4f89bb7a171dd5627a548d4fcb99c232c93f7b13a856e9dbf3aabe35e0df2f1a",
+    "dialect": "d42381bfd9b722bf83987aba0c33f443f8d87b11dd4e7a257672f3fdb303af6f",
+    "shape": "1f067735c4bc8537e30d1408d223f3867f1f620facec15b37f14f98f89c12346"
+  },
+  "mysql_where_int": {
+    "anonymized": "select column_1 from table_1 where column_2 = :int",
+    "canonical": "1a20b55d531b63ce190a0199238f3ebf1e1b070d19016ec0f0a443bfd4847ea7",
+    "dialect": "0a152b4842b9354a68650f3fa5e28906d1097437abf71048be503663f88912ac",
+    "shape": "98a163077ef227c3d52069a661a04c0e9aa4e27609548852b48cc0a701de5d8f"
+  },
+  "mysql_where_string": {
+    "anonymized": "select column_1 from table_1 where column_2 = :string",
+    "canonical": "c2b5825b4d268784c1a9cbf269d3ffeb6398545cd8873fd022749c2b486be537",
+    "dialect": "5e798676a74883060a0edeff8ac0b1f9f882a2f2bebcee2735bd12cf2cc1242c",
+    "shape": "8a879807f5907bc7ebab62c144052a39269f9a68fbc2bbc833df4b1a6b8a995a"
+  },
+  "oceanbase_insert": {
+    "anonymized": "insert into table_1 ( column_1 , column_2 ) values ( :int , :string ) [1]",
+    "canonical": "f0e6c7d9a2e64381ead1bdb417023e77423966402fb19b070db602f26231c53c",
+    "dialect": "b452b1d8873786a6ccbb60d71e582ae0fe407d843371de4a23719392e04779bc",
+    "shape": "9d97ac7fa23954673c5acc586953c888bfdba9508037e76aaf7b5e2e4d196897"
+  },
+  "pg_cast_operator": {
+    "anonymized": "select column_1 :: numeric ( :int , :int ) from table_1 where column_2 \u0026 :int = :int",
+    "canonical": "c642cd097b9f084f548cf7a558be6b3d75a1a6c1159a296ede69aa2f259189f1",
+    "dialect": "61c2847d3ae38868a04595839f94166e3a4a7e89910031aee035e5057c024903",
+    "shape": "0cdb7e24d1b05c504871148cd209aef273af5a6665936d3e853bc11f2530cb16"
+  },
+  "pg_checkpoint_fallback": {
+    "anonymized": "ident_1",
+    "canonical": "008a7ab6dac79b421a1334c125da0448415e8be18c1e6b79d0b4e46ed3640c75",
+    "dialect": "6fd59558bf70d8f9ea2dd98da684ad26d6980e76b5d3518014da114d402985ac",
+    "shape": "8a2be39178a1546a3e9d8ebbee2c5afa30460dad92dc09633c69a00331f10f53"
+  },
+  "pg_create_index_concurrently": {
+    "anonymized": "create index concurrently index_1 on table_1 ( column_1 )",
+    "canonical": "db9b3c0154f542b46891a50690df7938607801ac93c222f5f36d3c618232f58d",
+    "dialect": "3877d609b9187bcd0ef1f76e5fb890bf67d7ba2c94fa626c499c788c8cec9fc1",
+    "shape": "8b64cc957b44b8028bb76765daaa30dcd4bc61da8070fc4b43b9339f3949428e"
+  },
+  "pg_cte_join_alias": {
+    "anonymized": "with cte_1 as ( select column_1 from table_1 where column_2 \u003e :date ) select alias_1 . column_1 from cte_1 alias_1 join table_2 alias_2 on alias_2 . column_1 = alias_1 . column_1",
+    "canonical": "a72dfab562cd9ed46f9092d05299ee1fdbc25263469df0cff6548e7b5fb8d856",
+    "dialect": "2b34af383640d6b5307514bbb6a9a7d197d3930ef9c45ca27725884b954eaabf",
+    "shape": "fc4c0e80f8b8c97d9092ce6664aab5e2f97f14a6f7ed225d9e5ab812922958ac"
+  },
+  "pg_dollar_quote_semicolon": {
+    "anonymized": "select column_1 from table_1 where column_1 = :string",
+    "canonical": "35cf831447ba8cdd3c860589dcfa952e94412a762d493691014498c676f641dd",
+    "dialect": "187b759f056a44a8f39d862b8c26382f18a015a6454498c4177311edea5d34a5",
+    "shape": "261d40c381c4c1a4a67d899236b3f7309f255f92827b50375e274bf0e1e714ac"
+  },
+  "pg_escape_string": {
+    "anonymized": "select * from table_1 where column_1 = :string",
+    "canonical": "79d3d632f783d5e7ecb7401c2df04d6e9c81a396ecc4de26f26909e623739626",
+    "dialect": "dc91bc5cef25e146791bf19aebfd6f6729b23738aedc4d46106c5a7bba623afb",
+    "shape": "bd900e4eba0bb189a932237cd3dcf98844667d802defb7389840372cf08fe7f7"
+  },
+  "pg_in_list": {
+    "anonymized": "select column_1 from table_1 where column_2 in ( :int[5] )",
+    "canonical": "2bf86be63a58d2ca8e8ba2d692c42c6a5075066636a59dee619e8a995d6a8736",
+    "dialect": "6cf9cfd0b3a83f130683e3f703de12ca4e2ef574e266de3bca74494749e5b763",
+    "shape": "a797ce89deaa0a1fa9f460ffc609f9758f5dbeff26094e0a7731c2c7c1d46e7f"
+  },
+  "pg_insert_plain": {
+    "anonymized": "insert into table_1 ( column_1 , column_2 ) values ( :int , :string ) [1]",
+    "canonical": "f0e6c7d9a2e64381ead1bdb417023e77423966402fb19b070db602f26231c53c",
+    "dialect": "0a54fdd151ca75cbb7f13f968cb16bf2fca340d9d6bbfb1f0d8099dc2f398685",
+    "shape": "9d97ac7fa23954673c5acc586953c888bfdba9508037e76aaf7b5e2e4d196897"
+  },
+  "pg_insert_returning": {
+    "anonymized": "insert into table_1 ( column_1 , column_2 ) values ( :int , :string ) [1] returning column_1",
+    "canonical": "46a6c0c5c80d49c8ff12fb32b25b0e0641f09315d4a493bd712607cae7dde6ee",
+    "dialect": "8db973e1975aa554185d0aed8b3a5f8a0e41674896bf0f24a473873d99f85c8c",
+    "shape": "cc4602847ec33f5b568dc16bf922e4e7dbcd738fe8ce9b4ecb5fa4d05eada074"
+  },
+  "pg_json_ops": {
+    "anonymized": "select column_1 -\u003e\u003e :string as alias_1 , column_1 -\u003e :string from table_1 where column_1 @\u003e :string",
+    "canonical": "3b0afdf47e5a2980528554097458635dc434d570a661718c2cdfa6011ddd0b7c",
+    "dialect": "d77cd7c8d15f95a3eacc37edbb9d06965cf5a8dce111408b86912e1a2759148f",
+    "shape": "6f0e09c7b28835debfac24fea870559f5113e7d4cc2fe479d384ebff145a6fa1"
+  },
+  "pg_json_path_op_hash": {
+    "anonymized": "select column_1 #\u003e :string as alias_1 , column_1 #- :string from table_1 where column_1 #\u003e\u003e :string is not :null",
+    "canonical": "269feff3a4b3468f81f93b9fe41f0de730db3a764e75d29ea7f7846214aca2da",
+    "dialect": "6e47f73e599cce364bf696fb112651f8e52044965a483fef546a964f5749523b",
+    "shape": "abd0dbcdd87658299fa5216ac03266db751616c33d6c47db539f0fd893723896"
+  },
+  "pg_limit_offset": {
+    "anonymized": "select column_1 from table_1 order by column_2 limit :int offset :int",
+    "canonical": "4b6deab641e75e8c8dac5a91f51342da1a3c2844ac45c30308574d00ae49f8c4",
+    "dialect": "fd9f8b7d8e4af0a5d04e0ae76df703a07abee0bae830141b34ee625c0164fb74",
+    "shape": "7619458ea459f44625ec65bb6fa42187da0bfb85dbd37e9fb350572138337a03"
+  },
+  "pg_nested_comment": {
+    "anonymized": "select column_1 from table_1",
+    "canonical": "36cc2cd721806c597ca076a2fb6e7ba407691ff5bbd91fe665b7ac872ea26bc8",
+    "dialect": "01b24fae2f5aebd6a6b0917fe84475aa67ee25e33eee6211a521608589ae9dd6",
+    "shape": "9f79d1e81f7eee7217501ea953b16ce6cd69ef1d1759636479bdd462582686e0"
+  },
+  "pg_on_conflict": {
+    "anonymized": "insert into table_1 ( column_1 ) values ( :int ) [1] on conflict ( column_1 ) do update set column_2 = :int",
+    "canonical": "40bfee91f0f16906abd30735e16f4ff10faafb1fa8dde3496119a3eb480f5f8a",
+    "dialect": "647f5c52a98133b1c3e3737251bfd06c44465f52611b9f9b868d433ca5dde6f0",
+    "shape": "0bff556e173d107be90115d6396c9bed3cf44cb940310ffbf01ceeff3b629e9f"
+  },
+  "pg_quoted_ident_embedded_quote": {
+    "anonymized": "select column_1 from table_1",
+    "canonical": "36cc2cd721806c597ca076a2fb6e7ba407691ff5bbd91fe665b7ac872ea26bc8",
+    "dialect": "01b24fae2f5aebd6a6b0917fe84475aa67ee25e33eee6211a521608589ae9dd6",
+    "shape": "9f79d1e81f7eee7217501ea953b16ce6cd69ef1d1759636479bdd462582686e0"
+  },
+  "pg_select_quoted": {
+    "anonymized": "select column_1 from table_1 where column_2 = :string",
+    "canonical": "c2b5825b4d268784c1a9cbf269d3ffeb6398545cd8873fd022749c2b486be537",
+    "dialect": "b6bf45881c94425a642e5d6712e26aff3680a22e98ee3f0c41f0e94ddb9622f6",
+    "shape": "8a879807f5907bc7ebab62c144052a39269f9a68fbc2bbc833df4b1a6b8a995a"
+  },
+  "pg_typed_literals": {
+    "anonymized": "select :int from table_1 where column_1 = :date and column_2 = :timestamp and column_3 = :uuid and column_4 = :binary",
+    "canonical": "432c49e8f45119a083a78fb87177f6af5791978175e2714160c81ce448b27bab",
+    "dialect": "2aa8a170f2279d74e8197a3bb0d0edf814246bf3e03a277c09551d3e92d23f00",
+    "shape": "5c89d8bb1cd275476f0e76f095595a43dd8a7d7667ffd0e7b13c39e853ffe649"
+  },
+  "polardb_mysql_insert": {
+    "anonymized": "insert into table_1 ( column_1 , column_2 ) values ( :int , :string ) [1]",
+    "canonical": "f0e6c7d9a2e64381ead1bdb417023e77423966402fb19b070db602f26231c53c",
+    "dialect": "ca826ef610dc96a60960f1171255eb1bb63dce7e2f1376735f9ddc6652eff82f",
+    "shape": "9d97ac7fa23954673c5acc586953c888bfdba9508037e76aaf7b5e2e4d196897"
+  },
+  "polardb_pg_insert": {
+    "anonymized": "insert into table_1 ( column_1 , column_2 ) values ( :int , :string ) [1] returning column_1",
+    "canonical": "46a6c0c5c80d49c8ff12fb32b25b0e0641f09315d4a493bd712607cae7dde6ee",
+    "dialect": "704afd4c2d75b28592124865ffa19d6bede49fd79e589bab5ef810be9be48ece",
+    "shape": "cc4602847ec33f5b568dc16bf922e4e7dbcd738fe8ce9b4ecb5fa4d05eada074"
+  },
+  "tidb_insert": {
+    "anonymized": "insert into table_1 ( column_1 , column_2 ) values ( :int , :string ) [1]",
+    "canonical": "f0e6c7d9a2e64381ead1bdb417023e77423966402fb19b070db602f26231c53c",
+    "dialect": "ee81349f9e7ee46f07551a7d927b9dc27f32578ddc1f3f611af678c0adeccfb9",
+    "shape": "9d97ac7fa23954673c5acc586953c888bfdba9508037e76aaf7b5e2e4d196897"
+  }
+}

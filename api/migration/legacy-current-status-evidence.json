@@ -1,0 +1,37 @@
+{
+  "contract_version": 1,
+  "source_commit": "e5b7e0088bcae211246665eed4a3c78e63f83ba9",
+  "scope": "Only the legacy source tree frozen by legacy-source-inventory.json. A different source release must generate and approve a different status evidence contract.",
+  "evidence_files": [
+    {"path":"src/model/modal.go","sha256":"5a8445cc8b93484f092a0ec9734f98f5f8ad2b520e45ae40da7e19ceffe6842e"},
+    {"path":"frontend:src/types/index.ts","sha256":"b8e24aacfce02a039c8f06bf7bf5d80ee0265d318c3ea6c8e552c8046f616a94"},
+    {"path":"src/handler/order/audit/impl.go","sha256":"6dd03b19539a2ab533d074ccbfd968fdac0ed38c8424fdd00fb27605d1736364"},
+    {"path":"src/handler/order/audit/audit.go","sha256":"0e5fbcbb1e23bb7bbd2018269f9bb74392f36a69891aa1a78ca66260fffa10a7"},
+    {"path":"src/handler/personal/post.go","sha256":"6352e0fbed6ef88b20825512d4f86dcd6b2ce9097f9dde778403004e27b266b3"},
+    {"path":"src/handler/order/query/query.go","sha256":"1a26ebd11e10a7f49c14b4a5951498265490449dce05bb2a59e308161f9f1205"},
+    {"path":"src/handler/personal/query.go","sha256":"7d2bf018094b5f6b96d1ccf56e1f971662e31efe626f758f8976dab063540e23"}
+  ],
+  "core_sql_orders": [
+    {"legacy_value":0,"legacy_label":"rejected","activity":"terminal","target_value":"rejected","confidence":"verified","evidence":["backend RejectOrder writes status=0","legacy frontend OrderState.REJECT=0"]},
+    {"legacy_value":1,"legacy_label":"success","activity":"terminal","target_value":"completed","confidence":"ambiguous","evidence":["legacy frontend OrderState.SUCCESS=1"],"verification_required":"For every observed row, correlate execution records and execute_time; missing Engine.Exec server source prevents source-only proof."},
+    {"legacy_value":2,"legacy_label":"approval_active","activity":"active","target_value":"BLOCK_APPLY_ACTIVE_WORK","confidence":"verified","evidence":["wrapperPostOrderInfo writes status=2","approval and execute handlers select status=2"]},
+    {"legacy_value":3,"legacy_label":"executing","activity":"active","target_value":"BLOCK_APPLY_ACTIVE_WORK","confidence":"ambiguous","evidence":["legacy frontend OrderState.PROCESS=3"],"verification_required":"Missing Engine.Exec server writer; any observed row counts as active and blocks migration."},
+    {"legacy_value":4,"legacy_label":"execution_error_or_terminated_delay","activity":"terminal","target_value":"failed","confidence":"ambiguous","evidence":["legacy frontend OrderState.ERROR=4","delayKill also writes status=4"],"verification_required":"Distinguish execution failure from cancelled delayed execution using Delay, ExecuteTime, workflow detail and SQL record evidence; map cancelled delay to cancelled, not failed."},
+    {"legacy_value":5,"legacy_label":"waiting_for_scheduled_execution","activity":"active","target_value":"BLOCK_APPLY_ACTIVE_WORK","confidence":"ambiguous","evidence":["legacy frontend OrderState.WAIT=5","ExecuteOrder accepts status=5"],"verification_required":"Any observed row counts as active and blocks migration."},
+    {"legacy_value":6,"legacy_label":"withdrawn","activity":"terminal","target_value":"withdrawn","confidence":"verified","evidence":["AuditOrderState undo writes status=6","legacy frontend OrderState.Undo=6"]},
+    {"legacy_value":7,"legacy_label":"terminated","activity":"terminal","target_value":"cancelled","confidence":"ambiguous","evidence":["legacy frontend OrderState.Terminate=7"],"verification_required":"Missing writer source; require workflow detail and execution record evidence before mapping an observed row."}
+  ],
+  "core_query_orders": [
+    {"legacy_value":1,"legacy_label":"access_pending","activity":"active","target_value":"BLOCK_APPLY_ACTIVE_WORK","confidence":"verified","evidence":["ReferQueryOrder writes status=1 when approval is enabled","approval handler selects status=1"]},
+    {"legacy_value":2,"legacy_label":"query_access_active","activity":"active","target_value":"BLOCK_APPLY_ACTIVE_WORK","confidence":"verified","evidence":["approval writes status=2","query execution requires latest status=2"]},
+    {"legacy_value":3,"legacy_label":"query_access_closed","activity":"terminal","target_value":"grant_active_then_relinquished_with_legacy_ambiguous_reason","confidence":"verified","evidence":["user stop, admin stop and expiry paths write status=3","legacy frontend QueryState.DONE=3"],"verification_required":"Preserve closure cause as ambiguous unless a workflow event proves expiry, user relinquish or admin closure."},
+    {"legacy_value":4,"legacy_label":"access_rejected","activity":"terminal","target_value":"access_rejected","confidence":"verified","evidence":["query reject handler writes status=4","legacy frontend QueryState.REJECT=4"]}
+  ],
+  "apply_gate": {
+    "observed_active_status_rows_must_equal": 0,
+    "observed_unknown_status_rows_must_equal": 0,
+    "observed_ambiguous_terminal_rows": "must_be_resolved_by_row_level_evidence_and_admin_approved_mapping; otherwise apply fails",
+    "no_default_mapping": true,
+    "history_never_reactivated": true
+  }
+}

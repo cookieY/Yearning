@@ -1,0 +1,14 @@
+blank_issues_enabled: false
+contact_links:
+  - name: "💬 Q&A & Self-Hosting Help / 使用与部署问答"
+    url: https://github.com/cookieY/Yearning/discussions/new?category=q-a
+    about: "Ask usage, Docker/Kubernetes deployment, OIDC/LDAP, or v3→v4 migration questions in GitHub Discussions. / 使用疑问、私有化部署、认证配置或 v3 升级迁移问题，请前往 Discussions 提问。"
+  - name: "💡 Ideas & Early Proposals / 想法探讨与路线图建议"
+    url: https://github.com/cookieY/Yearning/discussions/new?category=ideas
+    about: "Brainstorm early ideas, database adapter needs, or governance workflows before opening a formal feature request. / 早期构想、新数据库适配或治理流程探讨，欢迎先在 Ideas 交流。"
+  - name: "📖 Official Documentation / 官方文档"
+    url: https://next.yearning.io/
+    about: "Read installation, architecture, AI review governance, and operations guides before opening an issue. / 提问前请先查阅 Yearning v4 官方文档。"
+  - name: "🔐 Report a Security Vulnerability / 安全漏洞私密报告"
+    url: https://github.com/cookieY/Yearning/security/advisories/new
+    about: "Do NOT open a public issue for security vulnerabilities. Report privately via GitHub Security Advisories (see SECURITY.md). / 请勿公开提交安全漏洞，请通过私密安全通道报告。"

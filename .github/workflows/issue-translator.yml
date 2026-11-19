@@ -1,0 +1,23 @@
+name: "Issue Translator"
+
+on:
+  issues:
+    types: [opened]
+  issue_comment:
+    types: [created]
+
+permissions:
+  issues: write
+
+jobs:
+  translate:
+    runs-on: ubuntu-latest
+    if: >-
+      (github.event_name == 'issues' && github.event.issue.user.type != 'Bot') ||
+      (github.event_name == 'issue_comment' && github.event.comment.user.type != 'Bot' && !github.event.issue.pull_request)
+    steps:
+      - name: Translate non-English issue or comment to English
+        uses: dromara/issues-translate-action@v2.8
+        with:
+          BOT_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          IS_MODIFY_TITLE: false

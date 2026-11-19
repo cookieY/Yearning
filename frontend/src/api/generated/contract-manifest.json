@@ -1,0 +1,61 @@
+{
+  "contract_version": 1,
+  "sources": {
+    "openapi": {
+      "path": "api/openapi/yearning-v4.yaml",
+      "sha256": "ef66be5d9a5115b4c18432a76bf6703e84655999fb0d35ff948bb92c2fc5b788"
+    },
+    "error_codes": {
+      "path": "api/contracts/error-codes.json",
+      "sha256": "e0c19c9ef2b1a80dc8f0f1f8f75f49524a21de12451f11ec1447d23c6bf33f0e"
+    },
+    "operation_error_profiles": {
+      "path": "api/contracts/operation-error-profiles.json",
+      "sha256": "fce1afcab9f2f96c21a24f2e6209a06e3de10ea55ac5657ce81b631547b96417"
+    },
+    "state_machines": {
+      "path": "api/contracts/state-machines.json",
+      "sha256": "3ab08561b8dcccaa49c5d2d1133776bb2f2537d1ab3979c513cef917243f81ce"
+    }
+  },
+  "generator": {
+    "name": "orval",
+    "version": "8.27.0",
+    "version_source": "package.json",
+    "lockfile": "pnpm-lock.yaml",
+    "lockfile_sha256": "5392f4371e6f8d9650502842bbef69d600317ba516d8955b7335d87678667bc5"
+  },
+  "generation_command": "pnpm api:generate",
+  "outputs": {
+    "typescript_client": {
+      "path": "src/api/generated/client",
+      "sha256": "8ac23552f4ac005f8cf9adb5e38280b8dd1f5ba128e396510225242a1f781283"
+    },
+    "zod_runtime_schemas": {
+      "path": "src/api/generated/zod",
+      "sha256": "07cd54ca9a53c0e41433db68ab2f3478e46723ba9575d996f37a37d5915bf8ae"
+    },
+    "tanstack_query_hooks": {
+      "path": "src/api/generated/hooks",
+      "sha256": "76e0f94dbb37eed6689e48cb34253e96ec5a378eb6e3e7c078c3547e602f5453"
+    },
+    "msw_mock_handlers": {
+      "path": "src/api/generated/mocks",
+      "sha256": "7662ccc10eec7853efb94a60df72b81e35cc3439dadf63a13435903ffa30af13"
+    },
+    "business_error_catalog": {
+      "path": "src/api/generated/projections/business-error-catalog.ts",
+      "sha256": "fea69a1a5c3c0d106a8699ed89b2ac24a4cc724f53268bd1242044b58c0fe5ba"
+    },
+    "operation_error_profiles": {
+      "path": "src/api/generated/projections/operation-error-profiles.ts",
+      "sha256": "fb82ff3abd57a36ec247954c348b8359bea93643cbbcad8a70c93ecb24c8cb83"
+    },
+    "state_display_projection": {
+      "path": "src/api/generated/projections/state-display-projection.ts",
+      "sha256": "9fdf65fc9feb33cbf2d1adb0d7dfbdc57e2ff49f31da3bdef7668c1793af3059"
+    }
+  },
+  "authorization_policy_generated": false,
+  "generated_at": "2026-11-18T16:09:49.405Z"
+}

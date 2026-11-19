@@ -1,0 +1,29 @@
+# Build and runtime outputs
+bin/
+dist/
+work/
+pg-certs/
+.cache/
+
+# Go artifacts
+*.out
+*.test
+
+# Frontend artifacts
+frontend/node_modules/
+frontend/dist/
+frontend/dist-e2e/
+frontend/coverage/
+frontend/playwright-report/
+frontend/test-results/
+frontend/.pnpm-store/
+
+# OS and IDE files
+.DS_Store
+.idea/
+.vscode/
+*.swp
+
+# Ensure tracked SQL migrations and test fixtures are never masked by a developer's global gitignore
+!db/**/*.sql
+!testdata/**/*.sql

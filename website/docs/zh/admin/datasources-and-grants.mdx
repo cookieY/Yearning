@@ -1,0 +1,94 @@
+import { ThemeScreenshot } from '../../../components/ThemeScreenshot';
+
+# 数据源接入与目标库建权 SQL
+
+Yearning v4 严格分离 **只读凭据（审核/查询/性能诊断）** 与 **执行凭据（变更落库）**。在后台 `/admin/datasources` 添加数据库前，请先在目标数据库实例上按最小权限原则创建专用账号。
+
+<ThemeScreenshot
+  name="admin"
+  captionZh="数据源管理（/admin/datasources）：支持五类数据库引擎、只读与执行凭据分离、TLS 证书与连接测试"
+/>
+
+## 1. MySQL 5.7 / 8.0（含 TiDB / OceanBase / PolarDB MySQL）建权 SQL
+
+以目标库管理员登录，分别创建 **只读账号 `yearning_ro`** 与 **执行账号 `yearning_exec`**（将 `<app_db>` 与 `<yearning_ip>` 替换为实际业务库名与 Yearning 服务器网段）：
+
+```sql
+-- =====================================================================
+-- 1) 只读账号：用于 AI 预审元数据探测、safe_explain、只读查询工作台
+-- =====================================================================
+CREATE USER 'yearning_ro'@'10.0.%' IDENTIFIED BY 'STRONG_RO_PASSWORD';
+GRANT SELECT, SHOW VIEW ON `<app_db>`.* TO 'yearning_ro'@'10.0.%';
+
+-- 如需启用「SQL 性能诊断（/admin/diagnostics）」，追加 performance_schema 只读权：
+GRANT SELECT ON performance_schema.events_statements_summary_by_digest TO 'yearning_ro'@'10.0.%';
+
+-- =====================================================================
+-- 2) 执行账号：仅在变更工单审批通过后由冻结执行人触发落库
+-- =====================================================================
+CREATE USER 'yearning_exec'@'10.0.%' IDENTIFIED BY 'STRONG_EXEC_PASSWORD';
+GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, ALTER, DROP, INDEX, REFERENCES, CREATE VIEW, SHOW VIEW
+  ON `<app_db>`.* TO 'yearning_exec'@'10.0.%';
+
+-- 如需在原生 MySQL 5.7/8.0 上使用「进程内 gh-ost 在线改表」，执行账号需额外具备：
+GRANT REPLICATION CLIENT, REPLICATION SLAVE ON *.* TO 'yearning_exec'@'10.0.%';
+GRANT SUPER, TRIGGER, LOCK TABLES ON *.* TO 'yearning_exec'@'10.0.%';
+-- 说明：MySQL 8.0 若不给 SUPER，可按实际版本授予 BINLOG_ADMIN / CONNECTION_ADMIN / SYSTEM_VARIABLES_ADMIN
+
+FLUSH PRIVILEGES;
+```
+
+:::tip 仅使用 DML/普通 DDL 自动回滚不需要 Binlog 权限
+Yearning v4 的跨引擎自动回滚采用**事务内前像采样**，完全不读取 Binlog，因此无需为了回滚去给 `REPLICATION SLAVE`（仅在需要启用原生 MySQL 进程内 `gh-ost` 在线改表时才需要复制流权限）。
+:::
+
+## 2. PostgreSQL 14–18（含 PolarDB PG）建权 SQL
+
+在目标 PostgreSQL 业务库中执行以下语句，分别建立只读与执行角色（以 `public` / `<app_schema>` 为例）：
+
+```sql
+-- =====================================================================
+-- 1) 只读账号：用于 AI 预审元数据探测、只读查询工作台与性能诊断
+-- =====================================================================
+CREATE ROLE yearning_ro LOGIN PASSWORD 'STRONG_RO_PASSWORD';
+GRANT CONNECT ON DATABASE app_db TO yearning_ro;
+GRANT USAGE ON SCHEMA public TO yearning_ro;
+GRANT SELECT ON ALL TABLES IN SCHEMA public TO yearning_ro;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON TABLES TO yearning_ro;
+
+-- 如需启用「SQL 性能诊断（/admin/diagnostics）」，授予 pg_stat_statements 读取角色：
+GRANT pg_read_all_stats TO yearning_ro;
+
+-- =====================================================================
+-- 2) 执行账号：用于审批通过后的 DML/DDL 变更落库
+-- =====================================================================
+CREATE ROLE yearning_exec LOGIN PASSWORD 'STRONG_EXEC_PASSWORD';
+GRANT CONNECT ON DATABASE app_db TO yearning_exec;
+GRANT USAGE, CREATE ON SCHEMA public TO yearning_exec;
+GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO yearning_exec;
+GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO yearning_exec;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public
+  GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO yearning_exec;
+```
+
+:::warning PostgreSQL `search_path` 要求
+如果目标 PostgreSQL 流程阶段未限定 Schema 映射，Yearning 会使用执行凭据探测真实 `search_path` 并要求 `pg_catalog` 位于用户自定义 Schema 之前（默认即满足）；如人为把用户 Schema 排在 `pg_catalog` 之前，预审将保持 `partial` 失败关闭以防范对象劫持。
+:::
+
+## 3. 在 `/admin/datasources` 填写表单的注意事项
+
+| 字段 | 填写规范与常见避坑 |
+| :--- | :--- |
+| **引擎与兼容模式** | `engine` 与 `vendor` 分离填写（例如 TiDB 选 MySQL 兼容模式 + Vendor `tidb`），不要误选原生 MySQL |
+| **版本约束（`version_constraint`）** | **必填**，采用 SemVer 区间语法，如 `>=8.0,<9.0` 或 `>=14.0,<19.0`。出于安全策略，编辑数据源时该字段不回显，每次保存须确认填写，缺失会报 `1001 VALIDATION_FAILED` |
+| **只读凭据（`review` & `query`）** | 录入一次后自动同步给 AI 预审与查询工作台复用；密码写回加密存储，编辑时**留空表示保持原密码不变** |
+| **执行凭据（`execution`）** | 仅变更执行阶段使用，绝不用于查询或诊断；同样支持编辑时留空保持原密码 |
+| **TLS 证书材料（三态语义）** | 编辑保存时：**不传/未改动** = 保持已有证书；**上传新证书** = 必须包含 `ca_pem`（如用 mTLS 客户端证书则 cert 与 key 必须成对）；**清空移除** = 显式降级为明文连接（系统会弹出强警示） |
+| **数据库身份指纹** | 首次连接测试会记录不可伪造的 `identity_fingerprint`；后续**轮换密码或证书不使在途工单失效**，但若把 Host 偷偷改指向另一台实例，执行前预检会立刻拦截 |
+
+## 4. 禁用、删除与故障恢复边界
+
+- **从未被任何流程/工单/查询引用过的数据源**：可直接物理删除。
+- **已被流程模板、历史工单或查询记录引用过的数据源**：禁止物理删除（返回 `1107 DATASOURCE_REFERENCED`），只能切换为 **禁用**。
+- **存在执行中任务的数据源**：若仍有 `executing` 或 `result_unknown` 工单，禁止禁用，必须先等待任务终结或完成人工核验。
+- **临时维护恢复**：数据源设为禁用后，已审批待执行的工单阶段会进入 `blocked/datasource_unavailable`；维护完毕重新启用**同一数据库身份**后工单自动解除阻断，无需重新审批。

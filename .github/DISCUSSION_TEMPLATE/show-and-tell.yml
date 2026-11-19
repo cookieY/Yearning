@@ -1,0 +1,36 @@
+title: "[Showcase] "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Show off what you've built with **Yearning v4**! Share reusable **AI Review Prompt Skills**, **Internal Experience rules**, **CI/CD & Agent Skill pipelines**, or production deployment stories.
+        欢迎分享你基于 **Yearning v4** 打造的实践成果！包括可复用的 **AI 审核技能（Prompt Skills）**、**内部经验库规范**、**CI/CD 或 Agent Skill 集成方案** 与生产落地经验。
+
+  - type: dropdown
+    id: showcase_type
+    attributes:
+      label: "✨ Showcase Type / 分享类型"
+      options:
+        - "AI Review Prompt Skill / 自定义 AI 审核技能"
+        - "Internal Experience Knowledge Rule / 内部经验库最佳实践"
+        - "CI/CD or AI Agent Integration (/api/v4/* & SKILL.md 集成)"
+        - "Kubernetes / Enterprise Architecture Story / 生产部署架构实践"
+        - "Other / 其他分享"
+    validations:
+      required: true
+
+  - type: textarea
+    id: overview
+    attributes:
+      label: "📝 Overview / 实践简介"
+      description: "What problem does it solve and how does your team use it? / 它解决了什么问题？团队中如何使用？"
+    validations:
+      required: true
+
+  - type: textarea
+    id: details
+    attributes:
+      label: "🧩 Details, Skill Config or Architecture / 详细配置或架构说明"
+      description: "Paste sanitized Prompt Skill definitions, workflow diagrams, scripts, or screenshots. / 可附上脱敏后的技能配置、架构图、脚本片段或截图。"
+    validations:
+      required: false

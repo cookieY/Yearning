@@ -1,0 +1,27 @@
+[
+  {
+    "text": "Deploy",
+    "link": "/en/guide/quick-start",
+    "activeMatch": "^/en/(guide/quick-start|guide/what-is-yearning|operations)/"
+  },
+  {
+    "text": "Admin Setup",
+    "link": "/en/admin/first-time-setup",
+    "activeMatch": "^/en/admin/"
+  },
+  {
+    "text": "4.0 Guides",
+    "link": "/en/features/ai-precheck",
+    "activeMatch": "^/en/features/"
+  },
+  {
+    "text": "Security & AI",
+    "link": "/en/guide/security-and-ai-trust",
+    "activeMatch": "^/en/guide/(security-and-ai-trust|architecture)"
+  },
+  {
+    "text": "API & Errors",
+    "link": "/en/integration/agent-skill-openapi",
+    "activeMatch": "^/en/(integration|reference|about)/"
+  }
+]

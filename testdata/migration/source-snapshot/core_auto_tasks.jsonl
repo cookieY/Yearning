@@ -1,0 +1,1 @@
+{"id": 1, "task_id": "T3001", "name": "nightly cleanup", "source": "mysql-prod", "source_id": "src-000001", "data_base": "db1", "table": "t1", "tp": 0, "affectrow": 100, "status": 2, "idc": "Aliyun"}

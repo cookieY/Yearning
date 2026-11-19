@@ -1,0 +1,63 @@
+{
+  "$comment": "FE-F2 brand asset manifest. Every file records its frozen source coordinate and SHA-256; scripts/check-assets.mjs verifies the working tree still matches. Legacy sources: Yearning@e5b7e00 (backend), gemini-next@c00ed5d (frontend), shadcndashboard@6f99c0b (template). The legacy repositories are reference-only; no runtime or build path points into them.",
+  "dedupe_decision": "Two encodings of the Yearning logo exist in the legacy sources: backend img/logo.jpeg (sha256 46f583ab638f86fc995776d8422f78de58edca7319638440c5d4212594c92168, 27562 B) and frontend login page src/assets/login/logo.jpeg (b2bf2217db473abddd45a2e11995ef99b5c3c5e6ec8b72e678572d7365acb719, 30129 B). Per the FE-F0 asset inventory the frontend login-page set is the one users actually saw; exactly one set is carried and the backend encoding is recorded here only to document the dedupe decision. No other duplicate-by-content files exist between public/ and src/assets/.",
+  "assets": [
+    {
+      "path": "public/favicon.ico",
+      "role": "browser favicon",
+      "source": "gemini-next@c00ed5d public/favicon.ico",
+      "sha256": "db74ab0b78338c1f778f8398c45f4103c99aea0e845a3118a7750b4eeafd3445",
+      "bytes": 4286,
+      "license": "Yearning project brand asset (AGPL-3.0-or-later repository, owner Henry Yee)"
+    },
+    {
+      "path": "public/icon.png",
+      "role": "application icon",
+      "source": "gemini-next@c00ed5d public/icon.png",
+      "sha256": "f93b94d1283dbc80709e82227435cefb9ceaaa9f1640e11f7c8b13621f7a7df5",
+      "bytes": 6986,
+      "license": "Yearning project brand asset (AGPL-3.0-or-later repository, owner Henry Yee)"
+    },
+    {
+      "path": "src/assets/brand/logo-on-light.jpeg",
+      "role": "wordmark for light surfaces (pink cube + gray Yearning wordmark on white)",
+      "source": "gemini-next@c00ed5d src/assets/login/logo.jpeg",
+      "sha256": "b2bf2217db473abddd45a2e11995ef99b5c3c5e6ec8b72e678572d7365acb719",
+      "bytes": 30129,
+      "license": "Yearning project brand asset (AGPL-3.0-or-later repository, owner Henry Yee)"
+    },
+    {
+      "path": "src/assets/brand/logo-on-dark.png",
+      "role": "wordmark for dark surfaces (pink cube + white Yearning wordmark on black)",
+      "source": "gemini-next@c00ed5d src/assets/login/logo.png",
+      "sha256": "c4f26e9fb27c1c97e8a431b8a95e549b05a06b09620e7da93f842124c72749c9",
+      "bytes": 39019,
+      "license": "Yearning project brand asset (AGPL-3.0-or-later repository, owner Henry Yee)"
+    },
+    {
+      "path": "public/fonts/geist-sans/Geist-Variable.woff2",
+      "role": "sans typeface (UI typography baseline)",
+      "source": "shadcndashboard@6f99c0b public/fonts/geist-sans/Geist-Variable.woff2",
+      "sha256": "affce75284deca6a9b57e425ee2cf3550e512982310473ec7ad6ce5083ea0a47",
+      "license": "Geist by Vercel, MIT (https://github.com/vercel/geist-font)"
+    },
+    {
+      "path": "public/fonts/geist-mono/GeistMono-Variable.woff2",
+      "role": "monospace typeface (SQL, code and identifiers)",
+      "source": "shadcndashboard@6f99c0b public/fonts/geist-mono/GeistMono-Variable.woff2",
+      "sha256": "f2da1b1b4ebdc63fdf5ca847e8ed1b7c66eced0142e624d558af86cc26f53d5f",
+      "license": "Geist by Vercel, MIT (https://github.com/vercel/geist-font)"
+    }
+  ],
+  "review": {
+    "excluded": [
+      "gemini-next src/assets/login/1.mp4 (login background video, decorative media conflicting with the Blank Layout baseline)",
+      "gemini-next src/assets/comment/*.svg (decorative comment-section artwork)",
+      "backend img/chat.png, img/text2sql.jpg, img/oidclogin.gif (retired chat/Text2SQL/OIDC marketing media)",
+      "backend img/login.png, dash.png, audit.png, query.png, record.png (baseline evidence only, kept under YearningX artifacts/ui-baseline/screenshots/legacy/, never shipped)"
+    ],
+    "security": "All carried files are raster images or woff2 fonts; none contain scripts, active content or external references. favicon.ico and icon.png were re-verified as single-purpose image containers.",
+    "accessibility": "Both wordmark variants carry decorative-image treatment (alt text + adjacent product name text) so the logo is never the sole carrier of the product name.",
+    "reviewed_at": "2026-08-28"
+  }
+}

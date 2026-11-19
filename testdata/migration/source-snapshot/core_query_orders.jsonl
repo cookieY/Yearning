@@ -1,0 +1,2 @@
+{"id": 1, "work_id": "Q2001", "username": "alice", "real_name": "Alice", "status": 3, "source_id": "src-000002", "export": 0, "text": "monthly report", "assigned": "admin", "date": "2026-08-21 09:00:00", "approval_time": "2026-08-21 09:30:00"}
+{"id": 2, "work_id": "Q2002", "username": "bob", "real_name": "Bob", "status": 4, "source_id": "src-000002", "export": 1, "text": "adhoc", "assigned": "admin", "date": "2026-08-21 10:00:00", "approval_time": "0000-00-00 00:00:00"}

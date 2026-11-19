@@ -1,0 +1,518 @@
+{
+ "core_accounts": [
+  {
+   "name": "id",
+   "type": "bigint"
+  },
+  {
+   "name": "username",
+   "type": "varchar(64)"
+  },
+  {
+   "name": "password",
+   "type": "varchar(128)"
+  },
+  {
+   "name": "real_name",
+   "type": "varchar(64)"
+  },
+  {
+   "name": "department",
+   "type": "varchar(64)"
+  },
+  {
+   "name": "email",
+   "type": "varchar(64)"
+  },
+  {
+   "name": "is_recorder",
+   "type": "int"
+  }
+ ],
+ "core_global_configurations": [
+  {
+   "name": "id",
+   "type": "bigint"
+  },
+  {
+   "name": "authorization",
+   "type": "varchar(32)"
+  },
+  {
+   "name": "other",
+   "type": "json"
+  },
+  {
+   "name": "audit_role",
+   "type": "json"
+  },
+  {
+   "name": "message",
+   "type": "json"
+  },
+  {
+   "name": "ldap",
+   "type": "json"
+  },
+  {
+   "name": "ai",
+   "type": "json"
+  },
+  {
+   "name": "board",
+   "type": "text"
+  }
+ ],
+ "core_data_sources": [
+  {
+   "name": "id",
+   "type": "bigint"
+  },
+  {
+   "name": "source_id",
+   "type": "varchar(36)"
+  },
+  {
+   "name": "source",
+   "type": "varchar(64)"
+  },
+  {
+   "name": "ip",
+   "type": "varchar(64)"
+  },
+  {
+   "name": "port",
+   "type": "int"
+  },
+  {
+   "name": "db_type",
+   "type": "int"
+  },
+  {
+   "name": "username",
+   "type": "varchar(64)"
+  },
+  {
+   "name": "password",
+   "type": "varchar(256)"
+  },
+  {
+   "name": "ca_file",
+   "type": "text"
+  },
+  {
+   "name": "cert",
+   "type": "text"
+  },
+  {
+   "name": "key_file",
+   "type": "text"
+  },
+  {
+   "name": "is_query",
+   "type": "int"
+  },
+  {
+   "name": "flow_id",
+   "type": "varchar(36)"
+  },
+  {
+   "name": "rule_id",
+   "type": "varchar(36)"
+  },
+  {
+   "name": "idc",
+   "type": "varchar(64)"
+  },
+  {
+   "name": "exclude_db_list",
+   "type": "text"
+  },
+  {
+   "name": "insulate_word_list",
+   "type": "text"
+  },
+  {
+   "name": "principal",
+   "type": "varchar(64)"
+  }
+ ],
+ "core_role_groups": [
+  {
+   "name": "id",
+   "type": "bigint"
+  },
+  {
+   "name": "name",
+   "type": "varchar(64)"
+  },
+  {
+   "name": "permissions",
+   "type": "json"
+  },
+  {
+   "name": "group_id",
+   "type": "varchar(36)"
+  }
+ ],
+ "core_graineds": [
+  {
+   "name": "id",
+   "type": "bigint"
+  },
+  {
+   "name": "username",
+   "type": "varchar(64)"
+  },
+  {
+   "name": "group",
+   "type": "json"
+  }
+ ],
+ "core_workflow_tpls": [
+  {
+   "name": "id",
+   "type": "bigint"
+  },
+  {
+   "name": "source",
+   "type": "varchar(36)"
+  },
+  {
+   "name": "steps",
+   "type": "json"
+  }
+ ],
+ "core_rules": [
+  {
+   "name": "id",
+   "type": "bigint"
+  },
+  {
+   "name": "desc",
+   "type": "varchar(128)"
+  },
+  {
+   "name": "audit_role",
+   "type": "json"
+  }
+ ],
+ "core_sql_orders": [
+  {
+   "name": "id",
+   "type": "bigint"
+  },
+  {
+   "name": "work_id",
+   "type": "varchar(36)"
+  },
+  {
+   "name": "username",
+   "type": "varchar(64)"
+  },
+  {
+   "name": "real_name",
+   "type": "varchar(64)"
+  },
+  {
+   "name": "status",
+   "type": "int"
+  },
+  {
+   "name": "type",
+   "type": "int"
+  },
+  {
+   "name": "sql",
+   "type": "longtext"
+  },
+  {
+   "name": "source_id",
+   "type": "varchar(36)"
+  },
+  {
+   "name": "source",
+   "type": "varchar(64)"
+  },
+  {
+   "name": "idc",
+   "type": "varchar(64)"
+  },
+  {
+   "name": "data_base",
+   "type": "varchar(64)"
+  },
+  {
+   "name": "table",
+   "type": "varchar(128)"
+  },
+  {
+   "name": "date",
+   "type": "datetime"
+  },
+  {
+   "name": "execute_time",
+   "type": "datetime"
+  },
+  {
+   "name": "delay",
+   "type": "int"
+  },
+  {
+   "name": "text",
+   "type": "text"
+  },
+  {
+   "name": "assigned",
+   "type": "text"
+  },
+  {
+   "name": "current_step",
+   "type": "int"
+  },
+  {
+   "name": "relevant",
+   "type": "text"
+  },
+  {
+   "name": "backup",
+   "type": "text"
+  },
+  {
+   "name": "osc_info",
+   "type": "text"
+  },
+  {
+   "name": "file",
+   "type": "varchar(128)"
+  }
+ ],
+ "core_sql_records": [
+  {
+   "name": "id",
+   "type": "bigint"
+  },
+  {
+   "name": "work_id",
+   "type": "varchar(36)"
+  },
+  {
+   "name": "state",
+   "type": "int"
+  },
+  {
+   "name": "sql",
+   "type": "longtext"
+  },
+  {
+   "name": "affectrow",
+   "type": "bigint"
+  },
+  {
+   "name": "time",
+   "type": "datetime"
+  },
+  {
+   "name": "error",
+   "type": "text"
+  }
+ ],
+ "core_rollbacks": [
+  {
+   "name": "id",
+   "type": "bigint"
+  },
+  {
+   "name": "work_id",
+   "type": "varchar(36)"
+  },
+  {
+   "name": "sql",
+   "type": "longtext"
+  }
+ ],
+ "core_workflow_details": [
+  {
+   "name": "id",
+   "type": "bigint"
+  },
+  {
+   "name": "work_id",
+   "type": "varchar(36)"
+  },
+  {
+   "name": "username",
+   "type": "varchar(64)"
+  },
+  {
+   "name": "time",
+   "type": "datetime"
+  },
+  {
+   "name": "action",
+   "type": "varchar(128)"
+  }
+ ],
+ "core_order_comments": [
+  {
+   "name": "id",
+   "type": "bigint"
+  },
+  {
+   "name": "work_id",
+   "type": "varchar(36)"
+  },
+  {
+   "name": "username",
+   "type": "varchar(64)"
+  },
+  {
+   "name": "content",
+   "type": "text"
+  },
+  {
+   "name": "time",
+   "type": "datetime"
+  }
+ ],
+ "core_query_orders": [
+  {
+   "name": "id",
+   "type": "bigint"
+  },
+  {
+   "name": "work_id",
+   "type": "varchar(36)"
+  },
+  {
+   "name": "username",
+   "type": "varchar(64)"
+  },
+  {
+   "name": "real_name",
+   "type": "varchar(64)"
+  },
+  {
+   "name": "status",
+   "type": "int"
+  },
+  {
+   "name": "source_id",
+   "type": "varchar(36)"
+  },
+  {
+   "name": "export",
+   "type": "int"
+  },
+  {
+   "name": "text",
+   "type": "text"
+  },
+  {
+   "name": "assigned",
+   "type": "text"
+  },
+  {
+   "name": "date",
+   "type": "datetime"
+  },
+  {
+   "name": "approval_time",
+   "type": "datetime"
+  }
+ ],
+ "core_query_records": [
+  {
+   "name": "id",
+   "type": "bigint"
+  },
+  {
+   "name": "work_id",
+   "type": "varchar(36)"
+  },
+  {
+   "name": "username",
+   "type": "varchar(64)"
+  },
+  {
+   "name": "sql",
+   "type": "longtext"
+  },
+  {
+   "name": "ex_time",
+   "type": "int"
+  },
+  {
+   "name": "time",
+   "type": "datetime"
+  },
+  {
+   "name": "source_id",
+   "type": "varchar(36)"
+  }
+ ],
+ "core_auto_tasks": [
+  {
+   "name": "id",
+   "type": "bigint"
+  },
+  {
+   "name": "task_id",
+   "type": "varchar(36)"
+  },
+  {
+   "name": "name",
+   "type": "varchar(64)"
+  },
+  {
+   "name": "source",
+   "type": "varchar(64)"
+  },
+  {
+   "name": "source_id",
+   "type": "varchar(36)"
+  },
+  {
+   "name": "data_base",
+   "type": "varchar(64)"
+  },
+  {
+   "name": "table",
+   "type": "varchar(128)"
+  },
+  {
+   "name": "tp",
+   "type": "int"
+  },
+  {
+   "name": "affectrow",
+   "type": "bigint"
+  },
+  {
+   "name": "status",
+   "type": "int"
+  },
+  {
+   "name": "idc",
+   "type": "varchar(64)"
+  }
+ ],
+ "core_total_tickets": [
+  {
+   "name": "id",
+   "type": "bigint"
+  },
+  {
+   "name": "date",
+   "type": "varchar(16)"
+  },
+  {
+   "name": "total_order",
+   "type": "int"
+  },
+  {
+   "name": "total_query",
+   "type": "int"
+  }
+ ]
+}

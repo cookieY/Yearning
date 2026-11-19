@@ -1,0 +1,14 @@
+# FE-F13: Pinned release image build context (context = repo root, Dockerfile at
+# docker/release/Dockerfile). The allowlist sends only backend Go source and the
+# locked frontend/dist static assets produced by frontend-release-assets; frontend
+# source/dependencies, legacy references, artifacts, .git, etc. are excluded.
+# SEC-0019: Schema migration Job runs inside the image — db/migrations and the frozen
+# column catalog contract are distributed with the image (copied in the final stage).
+**
+!backend/go.mod
+!backend/go.sum
+!backend/cmd/**
+!backend/internal/**
+!frontend/dist/**
+!db/migrations/**
+!api/contracts/postgresql-column-catalog.json

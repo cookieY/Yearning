@@ -1,0 +1,12 @@
+* text=auto eol=lf
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.woff binary
+*.woff2 binary
+*.xlsx binary
+*.docx binary
+frontend/src/api/generated/** linguist-generated=true
+api/contracts/postgresql-column-catalog.json linguist-generated=true

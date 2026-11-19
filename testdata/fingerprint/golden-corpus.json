@@ -1,0 +1,586 @@
+{
+  "contract_version": 1,
+  "algorithm_version": "yearning-fingerprint-v1",
+  "notes": "全部语句为合成样本，不含生产数据。expected_canonical/dialect/shape为固定测试密钥下的冻结HMAC（hex小写），同版本必须逐字节可复现。",
+  "test_key_id": "golden-key-1",
+  "equivalence_groups": {
+    "insert_basic": [
+      "mysql_insert_backtick",
+      "mysql_insert_bare",
+      "pg_insert_plain",
+      "tidb_insert",
+      "oceanbase_insert",
+      "polardb_mysql_insert"
+    ],
+    "limit_fold": [
+      "mysql_limit_comma",
+      "pg_limit_offset"
+    ],
+    "quoting_surface": [
+      "mysql_select_quoted",
+      "pg_select_quoted"
+    ]
+  },
+  "difference_pairs": [
+    [
+      "mysql_insert_backtick",
+      "pg_insert_returning"
+    ],
+    [
+      "mysql_insert_backtick",
+      "tidb_insert"
+    ],
+    [
+      "mysql_update_simple",
+      "mysql_update_inlist"
+    ],
+    [
+      "mysql_where_int",
+      "mysql_where_string"
+    ]
+  ],
+  "cases": [
+    {
+      "id": "mysql_insert_backtick",
+      "profile": "mysql/mysql",
+      "sql": "INSERT INTO `orders` (`id`,`status`) VALUES (1,'new')",
+      "expect": {
+        "kind": "insert",
+        "quality": "exact",
+        "literal_types": {
+          "int": 1,
+          "string": 1
+        },
+        "parameter_count": 2,
+        "tuple_count": 1,
+        "anonymized_contains": [
+          "table_1",
+          "column_1",
+          ":int",
+          ":string"
+        ],
+        "anonymized_absent": [
+          "orders",
+          "status",
+          "new"
+        ]
+      }
+    },
+    {
+      "id": "mysql_insert_bare",
+      "profile": "mysql/mysql",
+      "sql": "INSERT INTO orders (id,status) VALUES (2,'done')",
+      "expect": {
+        "kind": "insert",
+        "quality": "exact"
+      }
+    },
+    {
+      "id": "pg_insert_plain",
+      "profile": "postgresql/postgresql",
+      "sql": "INSERT INTO orders (id,status) VALUES (1,'new')",
+      "expect": {
+        "kind": "insert",
+        "quality": "exact"
+      }
+    },
+    {
+      "id": "pg_insert_returning",
+      "profile": "postgresql/postgresql",
+      "sql": "INSERT INTO orders (id,status) VALUES (1,'new') RETURNING id",
+      "expect": {
+        "kind": "insert",
+        "quality": "exact",
+        "features_include": [
+          "returning"
+        ]
+      }
+    },
+    {
+      "id": "tidb_insert",
+      "profile": "tidb/mysql",
+      "sql": "INSERT INTO orders (id,status) VALUES (1,'new')",
+      "expect": {
+        "kind": "insert",
+        "quality": "exact"
+      }
+    },
+    {
+      "id": "oceanbase_insert",
+      "profile": "oceanbase/mysql",
+      "sql": "INSERT INTO orders (id,status) VALUES (1,'new')",
+      "expect": {
+        "kind": "insert",
+        "quality": "exact"
+      }
+    },
+    {
+      "id": "polardb_mysql_insert",
+      "profile": "polardb/mysql",
+      "sql": "INSERT INTO orders (id,status) VALUES (1,'new')",
+      "expect": {
+        "kind": "insert",
+        "quality": "exact"
+      }
+    },
+    {
+      "id": "polardb_pg_insert",
+      "profile": "polardb/postgresql",
+      "sql": "INSERT INTO orders (id,status) VALUES (1,'new') RETURNING id",
+      "expect": {
+        "kind": "insert",
+        "quality": "exact",
+        "features_include": [
+          "returning"
+        ]
+      }
+    },
+    {
+      "id": "mysql_alter_add_index",
+      "profile": "mysql/mysql",
+      "sql": "ALTER TABLE `orders` ADD INDEX `idx_status` (`status`)",
+      "expect": {
+        "kind": "alter",
+        "quality": "exact",
+        "anonymized_contains": [
+          "table_1",
+          "index_1"
+        ],
+        "anonymized_absent": [
+          "idx_status"
+        ]
+      }
+    },
+    {
+      "id": "pg_create_index_concurrently",
+      "profile": "postgresql/postgresql",
+      "sql": "CREATE INDEX CONCURRENTLY idx_orders_status ON orders (status)",
+      "expect": {
+        "kind": "create",
+        "quality": "exact",
+        "features_include": [
+          "concurrently"
+        ],
+        "anonymized_contains": [
+          "index_1",
+          "table_1"
+        ],
+        "anonymized_absent": [
+          "idx_orders_status",
+          "orders"
+        ]
+      }
+    },
+    {
+      "id": "mysql_update_simple",
+      "profile": "mysql/mysql",
+      "sql": "UPDATE orders SET status = 'processed', updated_at = '2026-08-25 00:00:00' WHERE id = 42",
+      "expect": {
+        "kind": "update",
+        "quality": "exact",
+        "literal_types": {
+          "string": 1,
+          "timestamp": 1,
+          "int": 1
+        },
+        "parameter_count": 3,
+        "anonymized_absent": [
+          "processed",
+          "orders",
+          "42"
+        ]
+      }
+    },
+    {
+      "id": "mysql_update_inlist",
+      "profile": "mysql/mysql",
+      "sql": "UPDATE orders SET status = 'processed' WHERE id IN (1,2,3)",
+      "expect": {
+        "kind": "update",
+        "quality": "exact",
+        "in_list_sizes": [
+          3
+        ],
+        "anonymized_contains": [
+          ":int[3]"
+        ],
+        "anonymized_absent": [
+          "processed"
+        ]
+      }
+    },
+    {
+      "id": "pg_dollar_quote_semicolon",
+      "profile": "postgresql/postgresql",
+      "sql": "SELECT body FROM docs WHERE body = $tag$hello; world$tag$",
+      "expect": {
+        "kind": "select",
+        "quality": "exact",
+        "anonymized_absent": [
+          "hello; world",
+          "docs"
+        ]
+      }
+    },
+    {
+      "id": "pg_escape_string",
+      "profile": "postgresql/postgresql",
+      "sql": "SELECT * FROM t WHERE a = E'x\\'y'",
+      "expect": {
+        "kind": "select",
+        "quality": "exact",
+        "anonymized_absent": [
+          "x\\'y",
+          "x'y"
+        ]
+      }
+    },
+    {
+      "id": "mysql_version_comment",
+      "profile": "mysql/mysql",
+      "sql": "SELECT /*!40001 SQL_NO_CACHE */ * FROM orders",
+      "expect": {
+        "kind": "select",
+        "quality": "exact",
+        "features_include": [
+          "version_comment"
+        ],
+        "anonymized_absent": [
+          "SQL_NO_CACHE"
+        ]
+      }
+    },
+    {
+      "id": "mysql_optimizer_hint",
+      "profile": "mysql/mysql",
+      "sql": "SELECT /*+ MAX_EXECUTION_TIME(1000) */ * FROM orders",
+      "expect": {
+        "kind": "select",
+        "quality": "exact",
+        "hints_include": [
+          "max_execution_time"
+        ],
+        "anonymized_absent": [
+          "1000",
+          "MAX_EXECUTION_TIME"
+        ]
+      }
+    },
+    {
+      "id": "pg_nested_comment",
+      "profile": "postgresql/postgresql",
+      "sql": "SELECT /* outer /* inner */ still */ col FROM t",
+      "expect": {
+        "kind": "select",
+        "quality": "exact",
+        "anonymized_absent": [
+          "outer",
+          "inner",
+          "still"
+        ]
+      }
+    },
+    {
+      "id": "mysql_multirow_values",
+      "profile": "mysql/mysql",
+      "sql": "INSERT INTO t (a,b) VALUES (1,'x'),(2,'y'),(3,'z')",
+      "expect": {
+        "kind": "insert",
+        "quality": "exact",
+        "tuple_count": 3,
+        "parameter_count": 6,
+        "anonymized_contains": [
+          "[3]"
+        ]
+      }
+    },
+    {
+      "id": "pg_in_list",
+      "profile": "postgresql/postgresql",
+      "sql": "SELECT c FROM t WHERE k IN (1,2,3,4,5)",
+      "expect": {
+        "kind": "select",
+        "quality": "exact",
+        "in_list_sizes": [
+          5
+        ],
+        "anonymized_contains": [
+          ":int[5]"
+        ]
+      }
+    },
+    {
+      "id": "pg_cte_join_alias",
+      "profile": "postgresql/postgresql",
+      "sql": "WITH recent AS (SELECT id FROM events WHERE ts > '2026-01-01') SELECT r.id FROM recent r JOIN orders o ON o.id = r.id",
+      "expect": {
+        "kind": "select",
+        "quality": "exact",
+        "anonymized_contains": [
+          "alias_1",
+          "table_1"
+        ],
+        "anonymized_absent": [
+          "recent",
+          "events",
+          "orders"
+        ]
+      }
+    },
+    {
+      "id": "mysql_limit_comma",
+      "profile": "mysql/mysql",
+      "sql": "SELECT a FROM t ORDER BY b LIMIT 5, 10",
+      "expect": {
+        "kind": "select",
+        "quality": "exact"
+      }
+    },
+    {
+      "id": "pg_limit_offset",
+      "profile": "postgresql/postgresql",
+      "sql": "SELECT a FROM t ORDER BY b LIMIT 10 OFFSET 5",
+      "expect": {
+        "kind": "select",
+        "quality": "exact"
+      }
+    },
+    {
+      "id": "mysql_select_quoted",
+      "profile": "mysql/mysql",
+      "sql": "SELECT `id` FROM `orders` WHERE `name` = 'abc'",
+      "expect": {
+        "kind": "select",
+        "quality": "exact"
+      }
+    },
+    {
+      "id": "pg_select_quoted",
+      "profile": "postgresql/postgresql",
+      "sql": "SELECT \"id\" FROM \"orders\" WHERE \"name\" = 'abc'",
+      "expect": {
+        "kind": "select",
+        "quality": "exact"
+      }
+    },
+    {
+      "id": "mysql_where_int",
+      "profile": "mysql/mysql",
+      "sql": "SELECT a FROM t WHERE k = 1",
+      "expect": {
+        "kind": "select",
+        "quality": "exact",
+        "literal_types": {
+          "int": 1
+        }
+      }
+    },
+    {
+      "id": "mysql_where_string",
+      "profile": "mysql/mysql",
+      "sql": "SELECT a FROM t WHERE k = 'x'",
+      "expect": {
+        "kind": "select",
+        "quality": "exact",
+        "literal_types": {
+          "string": 1
+        }
+      }
+    },
+    {
+      "id": "pg_typed_literals",
+      "profile": "postgresql/postgresql",
+      "sql": "SELECT 1 FROM t WHERE d = '2026-08-25' AND ts = '2026-08-25 10:00:00' AND u = '550e8400-e29b-41d4-a716-446655440000' AND h = X'1F'",
+      "expect": {
+        "kind": "select",
+        "quality": "exact",
+        "literal_types": {
+          "int": 1,
+          "date": 1,
+          "timestamp": 1,
+          "uuid": 1,
+          "binary": 1
+        }
+      }
+    },
+    {
+      "id": "pg_json_ops",
+      "profile": "postgresql/postgresql",
+      "sql": "SELECT data->>'k' AS v, data->'x' FROM jtbl WHERE data @> '{\"a\":1}'",
+      "expect": {
+        "kind": "select",
+        "quality": "exact",
+        "anonymized_absent": [
+          "jtbl"
+        ]
+      }
+    },
+    {
+      "id": "pg_json_path_op_hash",
+      "profile": "postgresql/postgresql",
+      "sql": "SELECT data #> '{a,b}' AS v, data #- '{c}' FROM jtbl WHERE data #>> '{d}' IS NOT NULL",
+      "expect": {
+        "kind": "select",
+        "quality": "exact",
+        "anonymized_contains": [
+          ":string"
+        ],
+        "anonymized_absent": [
+          "jtbl",
+          "{a,b}"
+        ]
+      }
+    },
+    {
+      "id": "mysql_on_duplicate",
+      "profile": "mysql/mysql",
+      "sql": "INSERT INTO t (a) VALUES (1) ON DUPLICATE KEY UPDATE a = a + 1",
+      "expect": {
+        "kind": "insert",
+        "quality": "exact",
+        "features_include": [
+          "on_duplicate_key_update"
+        ]
+      }
+    },
+    {
+      "id": "pg_on_conflict",
+      "profile": "postgresql/postgresql",
+      "sql": "INSERT INTO t (a) VALUES (1) ON CONFLICT (a) DO UPDATE SET b = 2",
+      "expect": {
+        "kind": "insert",
+        "quality": "exact",
+        "features_include": [
+          "on_conflict"
+        ]
+      }
+    },
+    {
+      "id": "pg_cast_operator",
+      "profile": "postgresql/postgresql",
+      "sql": "SELECT price::numeric(10,2) FROM products WHERE flags & 1 = 1",
+      "expect": {
+        "kind": "select",
+        "quality": "exact",
+        "anonymized_absent": [
+          "products",
+          "price"
+        ]
+      }
+    },
+    {
+      "id": "mysql_trigger_fallback",
+      "profile": "mysql/mysql",
+      "sql": "CREATE TRIGGER trg_after AFTER INSERT ON orders FOR EACH ROW SET NEW.total = NEW.qty * 2",
+      "expect": {
+        "kind": "create",
+        "quality": "compatible_lexer",
+        "anonymized_absent": [
+          "orders",
+          "trg_after",
+          "NEW"
+        ]
+      }
+    },
+    {
+      "id": "pg_checkpoint_fallback",
+      "profile": "postgresql/postgresql",
+      "sql": "CHECKPOINT",
+      "expect": {
+        "kind": "other",
+        "quality": "compatible_lexer",
+        "anonymized_absent": [
+          "CHECKPOINT",
+          "checkpoint"
+        ]
+      }
+    },
+    {
+      "id": "pg_quoted_ident_embedded_quote",
+      "profile": "postgresql/postgresql",
+      "sql": "SELECT \"weird\"\"name\" FROM \"MyTable\"",
+      "expect": {
+        "kind": "select",
+        "quality": "exact",
+        "anonymized_absent": [
+          "MyTable",
+          "weird\"name"
+        ]
+      }
+    },
+    {
+      "id": "mysql_ddl_comment_secret",
+      "profile": "mysql/mysql",
+      "sql": "ALTER TABLE orders ADD COLUMN secret_note VARCHAR(200) COMMENT 'internal payroll value'",
+      "expect": {
+        "kind": "alter",
+        "quality": "exact",
+        "anonymized_absent": [
+          "payroll",
+          "internal payroll value",
+          "secret_note"
+        ]
+      }
+    },
+    {
+      "id": "mysql_timestamp_prefix_string_stays_string",
+      "profile": "mysql/mysql",
+      "sql": "SELECT id FROM orders WHERE note = '2026-01-01 10:00:00 shipped'",
+      "expect": {
+        "kind": "select",
+        "quality": "exact",
+        "literal_types": {
+          "string": 1
+        },
+        "anonymized_absent": [
+          "shipped",
+          "2026-01-01"
+        ]
+      }
+    }
+  ],
+  "fail_closed": [
+    {
+      "id": "unterminated_string",
+      "profile": "mysql/mysql",
+      "sql_hex": "53454c454354206162632066726f6d207420776865726520613d2778",
+      "error": "SQL_PARSE_FAILED"
+    },
+    {
+      "id": "unterminated_block_comment",
+      "profile": "mysql/mysql",
+      "sql": "SELECT 1 /* never closed",
+      "error": "SQL_PARSE_FAILED"
+    },
+    {
+      "id": "unterminated_dollar_quote",
+      "profile": "postgresql/postgresql",
+      "sql": "SELECT $a$open ended",
+      "error": "SQL_PARSE_FAILED"
+    },
+    {
+      "id": "invalid_utf8",
+      "profile": "mysql/mysql",
+      "sql_hex": "53454c4543542027ffc327",
+      "error": "SQL_PARSE_FAILED"
+    },
+    {
+      "id": "unknown_profile",
+      "profile": "oracle/mysql",
+      "sql": "SELECT 1",
+      "error": "SQL_PARSE_FAILED"
+    },
+    {
+      "id": "unknown_profile_pg_mode",
+      "profile": "mysql/postgresql",
+      "sql": "SELECT 1",
+      "error": "SQL_PARSE_FAILED"
+    },
+    {
+      "id": "malformed_hex_literal",
+      "profile": "mysql/mysql",
+      "sql": "SELECT 0x FROM t",
+      "error": "SQL_PARSE_FAILED"
+    }
+  ]
+}

@@ -1,0 +1,29 @@
+{
+  "contract_version": 1,
+  "purpose": "MySQL与PostgreSQL统一Adapter Suite共享语句集（BE-B4-ADAPTER验收门禁：同一Suite跑两种引擎）。占位符由测试注入；cancel_select按引擎选择。",
+  "statements": {
+    "create_items": "CREATE TABLE items (id INT PRIMARY KEY, name VARCHAR(64) NOT NULL, note VARCHAR(64) NULL, secret_note VARCHAR(64) NULL)",
+    "insert_item": "INSERT INTO items (id, name, note, secret_note) VALUES ({id}, '{name}', '{note}', '{secret}')",
+    "select_items": "SELECT id, name, note, secret_note FROM items ORDER BY id",
+    "explain_select": "SELECT id, name FROM items WHERE id = {id}",
+    "explain_update": "UPDATE items SET name = 'EXPLAIN_MUST_NOT_EXECUTE' WHERE id = {id}",
+    "dml_insert": "INSERT INTO items (id, name, note, secret_note) VALUES ({id}, '{name}', NULL, NULL)",
+    "dml_update": "UPDATE items SET note = 'tx-note' WHERE id = {id}",
+    "dml_unique_conflict": "INSERT INTO items (id, name, note, secret_note) VALUES ({id}, 'dup', NULL, NULL)",
+    "ddl_create_ok": "CREATE TABLE suite_ddl_ok (id INT PRIMARY KEY)",
+    "ddl_create_conflict": "CREATE TABLE items (id INT PRIMARY KEY)",
+    "ddl_create_third": "CREATE TABLE suite_ddl_third (id INT PRIMARY KEY)",
+    "syntax_error_stmt": "SELEKT broken syntax",
+    "missing_table_select": "SELECT id FROM missing_table_xyz"
+  },
+  "cancel_select": {
+    "mysql": "SELECT SLEEP(2)",
+    "postgresql": "SELECT pg_sleep(2)"
+  },
+  "cancel_select_long": {
+    "mysql": "SELECT SLEEP(5)",
+    "postgresql": "SELECT pg_sleep(5)"
+  },
+  "row_count": 25,
+  "marker_id": 99
+}

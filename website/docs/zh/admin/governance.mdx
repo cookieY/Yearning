@@ -1,0 +1,100 @@
+import { ThemeScreenshot } from '../../../components/ThemeScreenshot';
+
+# 流程编排、权限组、LDAP/OIDC SSO 与通知中心
+
+本指南覆盖团队协作上线所需的四大配置：审批与查询流程编排、企业级单点登录（Active Directory / OpenLDAP / OIDC）、执行窗口与系统设置，以及四渠道自定义通知模板。
+
+## 1. 编排变更流程与查询流程（`/admin/flows`）
+
+### 变更流程（`change_review`）配置要点
+
+1. **绑定规则集**：选择已在 `/admin/rule-sets` 创建的规则集（整条流程所有阶段共用同一规则基线）。
+2. **添加 `1..N` 个串行阶段**：例如配置两阶段发版链路：
+   - **阶段 1（预发验证）**：绑定 `staging-mysql`，设置 1 级研发负责人审批（`any_one`）+ 测试/研发执行人。
+   - **阶段 2（生产发布）**：绑定 `prod-mysql`，设置第 1 级 Team Lead 审批（`any_one`）→ 第 2 级 DBA 审批（`all_must_approve`）+ DBA 执行人。
+   - 注意：多阶段流程绑定的数据源**必须属于同一种数据库引擎兼容模式**。
+3. **保存后授权**：到 `/admin/permission-groups` 把该流程勾选给对应的业务研发权限组。
+
+### 查询流程（`query_access`）配置要点
+
+1. 勾选允许检索的 `1..N` 个已启用数据源，逐数据源开关 **导出权限（`can_export`）**。
+2. 按需配置 **敏感列脱敏规则**（指定库名/表名/列名及脱敏方式，数据离开服务端前自动掩码）。
+3. 配置 `1..10` 级访问审批人（审批的是**数据源访问资格和有效期**，不审批每条 SELECT）；若在 `/admin/settings/query` 关闭了「查询审批开关」，研发进入 `/query` 时将直接建立受控会话。
+
+## 2. 对接企业级 LDAP 与 OIDC 单点登录
+
+配置入口：**系统设置 → 常规设置（`/admin/settings/general` 页面底部）** 或直达 `/admin/identity-providers`。
+
+### LDAP 配置模板（单例，强制加密传输）
+
+Yearning v4 严禁明文 LDAP 和跳过证书校验，仅支持 **`ldaps`（636）** 或 **`starttls`（389）**。对照下表填写后点击 **测试连接**（会依次验证 `tcp_connect -> tls_handshake -> service_bind -> base_dn_check`）：
+
+| 字段 | Active Directory (AD) 示例 | OpenLDAP 示例 |
+| :--- | :--- | :--- |
+| **传输安全** | `ldaps`（端口 `636`）或 `starttls`（`389`） | `ldaps`（`636`）或 `starttls`（`389`） |
+| **TLS Server Name** | `ad.corp.example.com`（须匹配证书 SAN） | `ldap.corp.example.com` |
+| **Service Bind DN** | `CN=svc-yearning,OU=ServiceAccounts,DC=corp,DC=example,DC=com` | `cn=readonly,dc=example,dc=com` |
+| **Base DN** | `OU=Engineering,DC=corp,DC=example,DC=com` | `ou=people,dc=example,dc=com` |
+| **User Filter（必含 `{username}`）** | `(&(objectClass=user)(sAMAccountName={username}))` | `(&(objectClass=inetOrgPerson)(uid={username}))` |
+| **属性映射（用户名 / 显示名 / 邮箱）** | `sAMAccountName` / `displayName` / `mail` | `uid` / `cn` / `mail` |
+
+### OIDC SSO 配置模板（支持多实例，强制 PKCE `S256`）
+
+适用于 Keycloak、Okta、GitLab、Authing、飞书/钉钉 OIDC 等标准 Provider：
+
+1. 先确认 `/admin/settings/general` 中的 **`public_base_url`** 已填为正式域名（如 `https://yearning.example.com`）。
+2. 新建 OIDC Provider，填入：
+   - **Provider Key**（不可变 slug，如 `corp-keycloak`）
+   - **Issuer URL**（强制 `https://`，如 `https://sso.example.com/realms/prod`）
+   - **Client ID** 与 **Client Secret**
+   - **Scopes**：`openid profile email`（必须包含 `openid`）
+   - **Claims 映射**：`preferred_username` / `name` / `email`
+3. 将页面自动生成的 **回调地址（Redirect URI）** 复制填入你的 IdP 应用配置中：
+   ```text
+   https://yearning.example.com/api/v4/auth/oidc/corp-keycloak/callback
+   ```
+4. 点击 **测试连接** 验证 `issuer_discovery -> jwks_fetch -> endpoint_validation` 全部通过后启用。首次通过 SSO/LDAP 登录的成员会自动以 `user` 角色建号，管理员将其加入对应权限组即可使用。
+
+## 3. 配置通知中心与自定义消息模板（`/admin/settings/notifications`）
+
+### 第 1 步：添加通知渠道并测试
+
+支持同时配置多个 **Email (SMTP)**、**钉钉自定义机器人**、**飞书自定义机器人**、**Slack Incoming Webhook** 渠道；所有 Webhook 与密码经 AES-256-GCM 加密，添加后点击 **测试渠道** 验证投递成功。
+
+### 第 2 步：配置确定性通知规则与自定义模板
+
+每条规则绑定 **流程范围（留空=全部流程）+ 触发事件 + 接收目标 + 目标渠道**。留空模板则使用内置默认文案，也可自定义模板（`<= 2000` 字符）并点击 **预览** 检查渲染结果。
+
+**生产推荐的飞书/钉钉「待审批提醒」自定义模板示例**：
+
+```text
+[Yearning 待审批] {{order_display_number}} · {{order_title}}
+提交人：{{submitter}}（{{submitted_at}}）
+变更流程：{{flow_name}} / 第 {{stage_position}} 阶段（{{datasource_name}} · {{datasource_engine}}）
+待审批人：{{approvers}}
+处理链接：{{order_url}}
+```
+
+### 全部允许的白名单占位符（使用未知变量或包含 SQL 模式会被 `1001` 拦截）
+
+| 分类 | 可用占位符 |
+| :--- | :--- |
+| **工单基础信息** | `{{order_display_number}}`、`{{order_no}}`、`{{order_id}}`、`{{order_title}}`、`{{order_state}}`、`{{order_url}}` |
+| **事件与流程** | `{{event_type}}`、`{{event_label}}`、`{{occurred_at}}`、`{{flow_name}}`、`{{stage_position}}`、`{{stage_name}}`、`{{datasource_name}}`、`{{datasource_engine}}`、`{{reason_code}}` |
+| **提交与审批** | `{{submitter}}`、`{{submitter_username}}`、`{{submitted_at}}`、`{{approvers}}`、`{{approved_by}}`、`{{reviewer}}`、`{{approval_decision}}`、`{{approved_at}}`、`{{reviewed_at}}` |
+| **执行信息** | `{{executors}}`、`{{executed_by}}`、`{{executor}}`、`{{execution_started_at}}`、`{{executed_at}}`、`{{execution_finished_at}}` |
+| **查询授权撤销** | `{{grant_flow_name}}`、`{{grant_datasources}}`、`{{revoked_by}}`、`{{revoked_at}}` |
+
+:::warning 通知防泄漏与重试机制
+- 通知正文**结构上严禁输出原始 SQL、查询结果行与审批自由文本**；AI 预审内部阻断（`review.blocked`）也不会触发外发推送。
+- 群机器人（钉钉/飞书/Slack）按 `(domain_event_id, channel_id)` 自动去重，同一事件在同一个群最多发 1 条。
+- 投递失败自动按指数退避重试最多 **5 次**，最终失败进入 `dead_letter`（保留 90 天，可在 **投递日志** 标签排查原因）。
+:::
+
+## 4. 系统设置五大标签与合规审计（`/admin/settings` & `/records`）
+
+- **常规设置（`general`）**：自助注册开关、时区、默认语言、`public_base_url`、LDAP & OIDC。
+- **查询设置（`query`）**：查询审批开关、默认超时（`1..300,000 ms`）、最大批准时长、在线最大行数（`1..100,000`）。
+- **执行设置（`execution`）**：每周允许执行时段限制、在线改表工具（`none` / 进程内 `gh-ost`）及 18 项默认限流参数。
+- **品牌设置（`branding`）**：自定义平台名称与 Logo。
+- **审计日志（`/records`）**：追加写保存 90 天全链路操作记录（登录、预审、对象名还原、水印 SQL Reveal、审批、执行、回滚、查询、导出与后台修改），工单与执行事实永久保留。

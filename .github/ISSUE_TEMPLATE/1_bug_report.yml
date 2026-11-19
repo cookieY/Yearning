@@ -1,0 +1,141 @@
+name: "🐛 Bug Report / 问题反馈"
+description: "Report a reproducible bug in Yearning v4 / 报告可复现的 Yearning v4 缺陷或异常"
+title: "[Bug]: "
+labels: ["bug", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for helping improve **Yearning v4**! Please fill out the details below so maintainers can diagnose and reproduce the issue quickly.
+        感谢反馈 **Yearning v4** 的问题！请如实填写以下信息，以便维护者快速定位与复现。
+
+        > **Security Notice / 安全提示**: Never paste real database passwords, API keys, TLS private keys, cookies, or sensitive production data. Please redact credentials and PII before submitting.
+        > 切勿粘贴真实数据库密码、AI API Key、TLS 私钥、Cookie 或生产敏感业务数据，提交前请务必脱敏。
+
+  - type: input
+    id: version
+    attributes:
+      label: "📌 Yearning Version / Yearning 版本"
+      description: "Image tag or `yearning version` output (e.g., `v4.0.0-rc.3`, commit SHA). / 请填写镜像 Tag 或 `yearning version` 输出。"
+      placeholder: "e.g. v4.0.0-rc.3"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: deployment
+    attributes:
+      label: "📦 Deployment Method / 部署方式"
+      description: "How is Yearning deployed? / 您当前的部署方式？"
+      options:
+        - "Docker Compose (docker-compose.yml)"
+        - "Kubernetes (backend/deploy/k8s)"
+        - "Standalone Binary / Source Build"
+        - "Local Development (Vite + Go)"
+        - "Other / 其他"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: module
+    attributes:
+      label: "🧩 Affected Module / 涉及模块"
+      description: "Select one or more modules related to this issue. / 请选择一个或多个相关功能模块。"
+      multiple: true
+      options:
+        - "AI SQL Precheck & Review Engine (AI 预审引擎)"
+        - "Change Orders & Multi-Stage Approval (变更工单与审批流)"
+        - "Execution, Scheduling & Built-in gh-ost (执行、预约与在线改表)"
+        - "Automatic SQL Rollback (自动 SQL 回滚)"
+        - "Governed Read-Only Query & Masking (只读查询与脱敏导出)"
+        - "SQL Performance Diagnostics (SQL 性能诊断)"
+        - "Database AI Assistant (数据库 AI 助手)"
+        - "Auth, RBAC, LDAP & OIDC SSO (认证、权限组与单点登录)"
+        - "Notification Center & Audit Logs (通知中心与审计日志)"
+        - "v3 → v4 Migration CLI (旧版升级迁移)"
+        - "Web UI / Frontend (前端界面)"
+        - "HTTP API / Agent Skill (/api/v4/*)"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: target_engine
+    attributes:
+      label: "🗄️ Target Database Engine / 目标数据库引擎"
+      description: "Select the target datasource engine if applicable. / 如涉及目标数据源，请选择对应引擎。"
+      multiple: true
+      options:
+        - "MySQL 8.0"
+        - "MySQL 5.7"
+        - "PostgreSQL 14–18"
+        - "TiDB (MySQL Mode)"
+        - "OceanBase (MySQL Mode)"
+        - "PolarDB (MySQL Mode)"
+        - "PolarDB (PostgreSQL Mode)"
+        - "Platform Metadata PostgreSQL Only / 仅元数据库"
+        - "Not Applicable / 不涉及"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: ai_profile
+    attributes:
+      label: "🤖 AI Provider & Privacy Track / AI 模型轨道（如涉及 AI 功能）"
+      description: "Only required when reporting AI Precheck, AI Assistant, or AI Diagnostics issues. / 仅在反馈 AI 预审、助手或诊断问题时选择。"
+      options:
+        - "Not Applicable / 不涉及 AI"
+        - "default — Public / Cloud OpenAI-Compatible API (Anonymized)"
+        - "san — Local Self-Hosted Model via vLLM / Ollama (Raw-SQL Native)"
+        - "Other OpenAI-Compatible Self-Hosted Model"
+    validations:
+      required: false
+
+  - type: textarea
+    id: description
+    attributes:
+      label: "🐛 What Happened? / 问题描述"
+      description: "Describe the unexpected behavior clearly. Include any API `err_code` (e.g., `2008`, `3002`), HTTP status, or `trace_id` if visible. / 请清晰描述异常现象，如有接口 `err_code`、HTTP 状态码或 `trace_id` 请一并附上。"
+      placeholder: "Describe what went wrong..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: "🔁 Steps to Reproduce / 复现步骤"
+      description: "Provide minimal step-by-step instructions and a sanitized minimal SQL snippet (if applicable). / 请提供最小化复现步骤及脱敏后的 SQL 示例。"
+      placeholder: |
+        1. Create a change_review flow bound to MySQL 8.0...
+        2. Run AI Precheck with SQL: `ALTER TABLE ...`
+        3. Click Submit / Execute...
+        4. Observe error...
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: "🎯 Expected Behavior / 期望结果"
+      description: "What did you expect to happen instead? / 您期望的正常表现是什么？"
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: "📋 Sanitized Logs, Browser Console or Screenshots / 脱敏日志与截图"
+      description: "Paste relevant backend logs, browser console errors, or drag-and-drop screenshots here. / 请粘贴已脱敏的后端日志、浏览器控制台报错或直接拖入截图。"
+      render: text
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: "✅ Pre-Submission Checklist / 提交前确认"
+      options:
+        - label: "I have checked the [official docs](https://next.yearning.io/) and searched existing [Issues](https://github.com/cookieY/Yearning/issues) & [Discussions](https://github.com/cookieY/Yearning/discussions) to avoid duplicates. / 我已查阅官方文档并检索过已有 Issues 与 Discussions，确认非重复问题。"
+          required: true
+        - label: "I confirm this is a concrete Yearning v4 bug rather than a general usage or deployment question (Q&A belongs in Discussions). / 我确认这是 Yearning v4 的具体缺陷，而非使用或部署咨询。"
+          required: true
+        - label: "I have redacted all passwords, API keys, tokens, private hostnames, and production PII from SQL, logs, and screenshots. / 我已对所有密码、密钥、敏感主机名与生产数据完成脱敏。"
+          required: true

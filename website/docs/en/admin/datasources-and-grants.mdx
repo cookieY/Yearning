@@ -1,0 +1,56 @@
+import { ThemeScreenshot } from '../../../components/ThemeScreenshot';
+
+# Datasources & Target Database Grant SQL
+
+Yearning v4 separates **Read-Only (`review` & `query`)** credentials from **Execution (`execution`)** credentials. Provision dedicated accounts on target databases before registering them in `/admin/datasources`.
+
+<ThemeScreenshot
+  name="admin"
+  captionZh="数据源管理"
+  captionEn="Datasource registry (/admin/datasources) with separated read-only/execution credentials, TLS verification, and live probes"
+/>
+
+## 1. MySQL 5.7 / 8.0 (TiDB / OceanBase / PolarDB MySQL) Grant SQL
+
+```sql
+-- 1) Read-only account for AI Precheck probes, Query Workspace, and SQL Diagnostics
+CREATE USER 'yearning_ro'@'10.0.%' IDENTIFIED BY 'STRONG_RO_PASSWORD';
+GRANT SELECT, SHOW VIEW ON `<app_db>`.* TO 'yearning_ro'@'10.0.%';
+-- Optional: required only when enabling SQL Performance Diagnostics
+GRANT SELECT ON performance_schema.events_statements_summary_by_digest TO 'yearning_ro'@'10.0.%';
+
+-- 2) Execution account for approved change orders
+CREATE USER 'yearning_exec'@'10.0.%' IDENTIFIED BY 'STRONG_EXEC_PASSWORD';
+GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, ALTER, DROP, INDEX, REFERENCES, CREATE VIEW, SHOW VIEW
+  ON `<app_db>`.* TO 'yearning_exec'@'10.0.%';
+
+-- Optional: required only for native MySQL in-process gh-ost online DDL
+GRANT REPLICATION CLIENT, REPLICATION SLAVE ON *.* TO 'yearning_exec'@'10.0.%';
+GRANT SUPER, TRIGGER, LOCK TABLES ON *.* TO 'yearning_exec'@'10.0.%';
+FLUSH PRIVILEGES;
+```
+
+## 2. PostgreSQL 14–18 (PolarDB PG) Grant SQL
+
+```sql
+-- 1) Read-only account
+CREATE ROLE yearning_ro LOGIN PASSWORD 'STRONG_RO_PASSWORD';
+GRANT CONNECT ON DATABASE app_db TO yearning_ro;
+GRANT USAGE ON SCHEMA public TO yearning_ro;
+GRANT SELECT ON ALL TABLES IN SCHEMA public TO yearning_ro;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON TABLES TO yearning_ro;
+-- Optional: required for pg_stat_statements SQL Performance Diagnostics
+GRANT pg_read_all_stats TO yearning_ro;
+
+-- 2) Execution account
+CREATE ROLE yearning_exec LOGIN PASSWORD 'STRONG_EXEC_PASSWORD';
+GRANT CONNECT ON DATABASE app_db TO yearning_exec;
+GRANT USAGE, CREATE ON SCHEMA public TO yearning_exec;
+GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO yearning_exec;
+GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO yearning_exec;
+```
+
+## 3. Form Field Rules
+
+- **`version_constraint`** (required, e.g. `>=8.0,<9.0` or `>=14.0,<19.0`): Not echoed on edit for safety; re-confirm on every save (`1001` if omitted).
+- **Passwords & TLS Materials**: Write-only AES-256-GCM encrypted. Leave passwords blank on edit to preserve existing secrets; omitting TLS keeps existing certificates, uploading replaces (`ca_pem` required), and explicit removal downgrades to plaintext with a warning.

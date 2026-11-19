@@ -1,0 +1,285 @@
+# Yearning v4 Public Beta — All-in-One Docker Compose
+#
+# Quick Start:
+#   1. Save this file as docker-compose.yml in an empty directory (or run from repo root)
+#   2. Run: docker compose up -d
+#   3. Open: http://<your-host-ip>:8080
+#   4. Default login:
+#        Username: admin
+#        Password: Yearning@2026!   (override before first boot via YEARNING_ADMIN_PASSWORD, min 12 chars)
+#
+# Note:
+#   This compose file is pre-tuned for HTTP evaluation / public beta testing
+#   (YEARNING_ENVIRONMENT=development, YEARNING_SESSION_SECURE=false) so browsers
+#   can log in over plain http://<ip>:8080 without an HTTPS reverse proxy.
+#   Do NOT run `docker compose down -v` during upgrades: deleting `yearning_app_secrets`
+#   destroys the AEAD keyring protecting stored datasource and AI provider credentials.
+#   For production deployments, place Yearning behind TLS, set YEARNING_SESSION_SECURE=true,
+#   and follow the production 3-role PostgreSQL deployment guide.
+
+name: yearning-beta
+
+services:
+  # 1. One-shot secret & certificate initializer (idempotent & atomic across restarts)
+  bootstrap:
+    image: postgres:18
+    user: "0:0"
+    restart: "no"
+    security_opt:
+      - no-new-privileges:true
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-yearning}
+      POSTGRES_DB: ${POSTGRES_DB:-yearning}
+      YEARNING_ADMIN_PASSWORD: ${YEARNING_ADMIN_PASSWORD:-Yearning@2026!}
+    volumes:
+      - yearning_pg_tls:/secrets/pg-tls
+      - yearning_migrate_secrets:/secrets/migrate
+      - yearning_app_secrets:/secrets/app
+    entrypoint:
+      - /bin/sh
+      - -euc
+      - |
+        umask 077
+        case "$${POSTGRES_DB}" in
+          *[!A-Za-z0-9_-]*|"")
+            echo "ERROR: POSTGRES_DB must match [A-Za-z0-9_-]+" >&2
+            exit 1
+            ;;
+        esac
+        case "$${POSTGRES_USER}" in
+          *[!A-Za-z0-9_-]*|"")
+            echo "ERROR: POSTGRES_USER must match [A-Za-z0-9_-]+" >&2
+            exit 1
+            ;;
+        esac
+
+        mkdir -p /secrets/pg-tls /secrets/migrate /secrets/app/keyring /secrets/app/admin /secrets/app/tls
+        chmod 0755 /secrets/pg-tls /secrets/migrate /secrets/app /secrets/app/tls
+        chown 65532:65532 /secrets/migrate /secrets/app/keyring /secrets/app/admin
+        chmod 0700 /secrets/migrate /secrets/app/keyring /secrets/app/admin
+
+        # Generate internal PostgreSQL TLS CA & server certificate atomically once
+        if [ ! -s /secrets/pg-tls/server.crt ] || [ ! -s /secrets/pg-tls/server.key ] || [ ! -s /secrets/app/tls/ca.pem ] || [ ! -s /secrets/migrate/ca.pem ]; then
+          TLS_TMP="$$(mktemp -d)"
+          openssl req -new -x509 -days 3650 -nodes \
+            -subj "/CN=yearning-pg-ca" \
+            -keyout "$${TLS_TMP}/ca.key" \
+            -out "$${TLS_TMP}/ca.pem" >/dev/null 2>&1
+          openssl req -new -nodes \
+            -subj "/CN=postgres" \
+            -keyout "$${TLS_TMP}/server.key" \
+            -out "$${TLS_TMP}/server.csr" >/dev/null 2>&1
+          printf "subjectAltName=DNS:postgres,DNS:localhost,IP:127.0.0.1\n" > "$${TLS_TMP}/san.ext"
+          openssl x509 -req -days 3650 \
+            -in "$${TLS_TMP}/server.csr" \
+            -CA "$${TLS_TMP}/ca.pem" \
+            -CAkey "$${TLS_TMP}/ca.key" \
+            -CAcreateserial \
+            -out "$${TLS_TMP}/server.crt" \
+            -extfile "$${TLS_TMP}/san.ext" >/dev/null 2>&1
+
+          cp "$${TLS_TMP}/ca.pem" /secrets/app/tls/ca.pem.tmp
+          chmod 0644 /secrets/app/tls/ca.pem.tmp
+          mv -f /secrets/app/tls/ca.pem.tmp /secrets/app/tls/ca.pem
+
+          cp "$${TLS_TMP}/ca.pem" /secrets/migrate/ca.pem.tmp
+          chown 65532:65532 /secrets/migrate/ca.pem.tmp
+          chmod 0400 /secrets/migrate/ca.pem.tmp
+          mv -f /secrets/migrate/ca.pem.tmp /secrets/migrate/ca.pem
+
+          cp "$${TLS_TMP}/server.key" /secrets/pg-tls/server.key.tmp
+          chown 999:999 /secrets/pg-tls/server.key.tmp
+          chmod 0600 /secrets/pg-tls/server.key.tmp
+          mv -f /secrets/pg-tls/server.key.tmp /secrets/pg-tls/server.key
+
+          cp "$${TLS_TMP}/server.crt" /secrets/pg-tls/server.crt.tmp
+          chown 999:999 /secrets/pg-tls/server.crt.tmp
+          chmod 0644 /secrets/pg-tls/server.crt.tmp
+          mv -f /secrets/pg-tls/server.crt.tmp /secrets/pg-tls/server.crt
+
+          rm -rf "$${TLS_TMP}"
+        fi
+        chown 999:999 /secrets/pg-tls/server.key /secrets/pg-tls/server.crt
+        chmod 0600 /secrets/pg-tls/server.key
+        chmod 0644 /secrets/pg-tls/server.crt /secrets/app/tls/ca.pem
+        chown 65532:65532 /secrets/migrate/ca.pem
+        chmod 0400 /secrets/migrate/ca.pem
+
+        # Generate AEAD & HMAC keyring atomically once (never overwrite existing keys)
+        if [ ! -s /secrets/app/keyring/keyring.json ]; then
+          NOW="$$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          gen_key() { head -c 32 /dev/urandom | base64 | tr -d '\n'; }
+          rm -f /secrets/app/keyring/keyring.json.tmp
+          cat > /secrets/app/keyring/keyring.json.tmp <<EOF
+        {
+          "contract_version": 1,
+          "deployment_id": "yearning-beta",
+          "keys": [
+            {"key_id": "beta-key-payload",  "purpose": "payload",               "status": "encrypt_decrypt", "created_at": "$${NOW}", "key_base64": "$$(gen_key)"},
+            {"key_id": "beta-key-sql-fp",   "purpose": "sql_fingerprint",       "status": "encrypt_decrypt", "created_at": "$${NOW}", "key_base64": "$$(gen_key)"},
+            {"key_id": "beta-key-identity", "purpose": "identifier_token",      "status": "encrypt_decrypt", "created_at": "$${NOW}", "key_base64": "$$(gen_key)"},
+            {"key_id": "beta-key-settings", "purpose": "settings_impact_token", "status": "encrypt_decrypt", "created_at": "$${NOW}", "key_base64": "$$(gen_key)"},
+            {"key_id": "beta-key-oidc",     "purpose": "oidc_state",            "status": "encrypt_decrypt", "created_at": "$${NOW}", "key_base64": "$$(gen_key)"},
+            {"key_id": "beta-key-affinity", "purpose": "cursor_affinity",       "status": "encrypt_decrypt", "created_at": "$${NOW}", "key_base64": "$$(gen_key)"}
+          ]
+        }
+        EOF
+          chown 65532:65532 /secrets/app/keyring/keyring.json.tmp
+          chmod 0400 /secrets/app/keyring/keyring.json.tmp
+          mv -f /secrets/app/keyring/keyring.json.tmp /secrets/app/keyring/keyring.json
+        fi
+        chown 65532:65532 /secrets/app/keyring/keyring.json
+        chmod 0400 /secrets/app/keyring/keyring.json
+
+        # Write initial built-in admin password file atomically once
+        if [ ! -s /secrets/app/admin/admin-password ]; then
+          if [ "$${#YEARNING_ADMIN_PASSWORD}" -lt 12 ]; then
+            echo "ERROR: YEARNING_ADMIN_PASSWORD must be at least 12 characters" >&2
+            exit 1
+          fi
+          rm -f /secrets/app/admin/admin-password.tmp
+          printf "%s\n" "$${YEARNING_ADMIN_PASSWORD}" > /secrets/app/admin/admin-password.tmp
+          chown 65532:65532 /secrets/app/admin/admin-password.tmp
+          chmod 0400 /secrets/app/admin/admin-password.tmp
+          mv -f /secrets/app/admin/admin-password.tmp /secrets/app/admin/admin-password
+        fi
+        chown 65532:65532 /secrets/app/admin/admin-password
+        chmod 0400 /secrets/app/admin/admin-password
+
+        # Render schema migration config atomically into isolated migrate volume
+        rm -f /secrets/migrate/migrate-config.json.tmp
+        cat > /secrets/migrate/migrate-config.json.tmp <<EOF
+        {
+          "source": {
+            "host": "legacy.invalid",
+            "port": 3306,
+            "database": "Yearning",
+            "username": "legacy",
+            "password": {"environment": "YEARNING_MIGRATE_DB_PASSWORD"},
+            "tls": {"mode": "verify_full", "server_name": "legacy.invalid"}
+          },
+          "target": {
+            "host": "postgres",
+            "port": 5432,
+            "database": "$${POSTGRES_DB}",
+            "username": "$${POSTGRES_USER}",
+            "password": {"environment": "YEARNING_MIGRATE_DB_PASSWORD"},
+            "tls": {
+              "mode": "verify_full",
+              "server_name": "postgres",
+              "ca_file": "/secrets/ca.pem"
+            }
+          },
+          "encryption": {
+            "key_id": "beta-key-payload",
+            "key": {"environment": "YEARNING_MIGRATE_DUMMY_KEY"},
+            "deployment_id": "yearning-beta"
+          },
+          "source_timezone": "UTC",
+          "batch_rows": 1000
+        }
+        EOF
+        chown 65532:65532 /secrets/migrate/migrate-config.json.tmp
+        chmod 0400 /secrets/migrate/migrate-config.json.tmp
+        mv -f /secrets/migrate/migrate-config.json.tmp /secrets/migrate/migrate-config.json
+
+  # 2. Metadata PostgreSQL 18 (mounts only TLS server cert/key; zero keyring access)
+  postgres:
+    image: postgres:18
+    restart: unless-stopped
+    depends_on:
+      bootstrap:
+        condition: service_completed_successfully
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-yearning}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-YearningPG_2026!}
+      POSTGRES_DB: ${POSTGRES_DB:-yearning}
+    volumes:
+      - yearning_pgdata:/var/lib/postgresql
+      - yearning_pg_tls:/secrets/pg-tls:ro
+    command:
+      - postgres
+      - -c
+      - ssl=on
+      - -c
+      - ssl_cert_file=/secrets/pg-tls/server.crt
+      - -c
+      - ssl_key_file=/secrets/pg-tls/server.key
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  # 3. One-shot Schema Migration Job (mounts only CA & migrate config; zero keyring access)
+  migrate:
+    image: ${YEARNING_IMAGE:-ghcr.io/cookiey/yearning:v4.0.0-rc.5}
+    restart: "no"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      YEARNING_MIGRATE_DB_PASSWORD: ${POSTGRES_PASSWORD:-YearningPG_2026!}
+      YEARNING_MIGRATE_DUMMY_KEY: unused-by-schema-apply
+    volumes:
+      - yearning_migrate_secrets:/secrets:ro
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=16m,mode=1777
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    command:
+      - migrate
+      - apply
+      - --config
+      - /secrets/migrate-config.json
+      - --migrations-dir
+      - /usr/share/yearning/db-migrations
+      - --catalog
+      - /usr/share/yearning/contracts/postgresql-column-catalog.json
+
+  # 4. Yearning v4 All-in-One Control Plane + Embedded Web UI
+  yearning:
+    image: ${YEARNING_IMAGE:-ghcr.io/cookiey/yearning:v4.0.0-rc.5}
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    ports:
+      - "${YEARNING_LISTEN_IP:-0.0.0.0}:${YEARNING_PORT:-8080}:8080"
+    environment:
+      YEARNING_ENVIRONMENT: development
+      YEARNING_SERVER_LISTEN_ADDRESS: 0.0.0.0:8080
+      YEARNING_DATABASE_HOST: postgres
+      YEARNING_DATABASE_PORT: "5432"
+      YEARNING_DATABASE_USER: ${POSTGRES_USER:-yearning}
+      YEARNING_DATABASE_PASSWORD: ${POSTGRES_PASSWORD:-YearningPG_2026!}
+      YEARNING_DATABASE_DBNAME: ${POSTGRES_DB:-yearning}
+      YEARNING_DATABASE_SSLMODE: verify-full
+      YEARNING_DATABASE_SSLROOTCERT: /secrets/tls/ca.pem
+      YEARNING_SESSION_SECURE: ${YEARNING_SESSION_SECURE:-false}
+      YEARNING_KEY_PROVIDER_KIND: file
+      YEARNING_KEY_PROVIDER_PATH: /secrets/keyring/keyring.json
+    volumes:
+      - yearning_app_secrets:/secrets:ro
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=64m,mode=1777
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    command:
+      - serve
+      - --bootstrap-admin-password-file
+      - /secrets/admin/admin-password
+
+volumes:
+  yearning_pgdata:
+  yearning_pg_tls:
+  yearning_migrate_secrets:
+  yearning_app_secrets:

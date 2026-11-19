@@ -1,0 +1,38 @@
+title: "[Idea] "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Share early feature ideas, governance patterns, or database engine requests with the Yearning community! Well-discussed ideas can graduate into formal Feature Request Issues.
+        欢迎在此分享早期产品构想、数据库治理场景或新引擎适配需求！经社区充分讨论后可沉淀为正式 Feature Request Issue。
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: "📂 Area / 相关领域"
+      options:
+        - "Database Adapters (数据库引擎适配)"
+        - "AI SQL Review & Privacy (AI 预审与隐私架构)"
+        - "Change Order & Execution Safety (变更工单与执行安全)"
+        - "Query Workspace & Data Governance (只读查询与脱敏)"
+        - "SQL Diagnostics & Observability (性能诊断与可观测)"
+        - "Agent Skill, OpenAPI & DevOps Ecosystem (Agent 与 CI/CD 生态)"
+        - "UI / UX & Developer Experience (界面与交互体验)"
+    validations:
+      required: true
+
+  - type: textarea
+    id: context
+    attributes:
+      label: "🎯 Background & Motivation / 背景与动机"
+      description: "What workflow or team pain point sparked this idea? / 是什么真实场景或团队痛点触发了这个想法？"
+    validations:
+      required: true
+
+  - type: textarea
+    id: idea
+    attributes:
+      label: "💡 Your Idea / 初步构想"
+      description: "Outline how you envision it working (mockups, SQL examples, or diagrams are welcome). / 请描述你设想的实现方式或使用体验（欢迎附示例或流程图）。"
+    validations:
+      required: true

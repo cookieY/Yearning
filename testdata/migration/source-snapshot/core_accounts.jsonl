@@ -1,0 +1,3 @@
+{"id": 1, "username": "admin", "password": "pbkdf2_sha256$600000$c2FsdHNhbHRzYWx0$h1111111111111111111111111111111111111111", "real_name": "Administrator", "department": "DBA", "email": "", "is_recorder": 0}
+{"id": 2, "username": "alice", "password": "pbkdf2_sha256$600000$c2FsdHNhbHRzYWx0$h1111111111111111111111111111111111111111", "real_name": "Alice", "department": "App", "email": "alice@example.test", "is_recorder": 0}
+{"id": 3, "username": "bob", "password": "pbkdf2_sha256$1000$weak$deadbeef", "real_name": "Bob", "department": "", "email": "", "is_recorder": 1}

@@ -1,0 +1,14 @@
+{
+  "contract_version": 1,
+  "openapi_source": "api/openapi/yearning-v4.yaml",
+  "scenarios": [
+    {"id":"success_ready","kind":"success","description":"预审完成且确定性Gate允许提交。","expectation":{"http_status":200,"err_code":0,"state":"ready"}},
+    {"id":"business_blocked","kind":"business_error","description":"High Finding或Review不完整时以业务错误阻止提交。","expectation":{"http_status":200,"err_code_nonzero":true,"state":"blocked"}},
+    {"id":"provider_unavailable","kind":"transport_error","description":"Provider不可用不得伪装为Review成功。","expectation":{"http_status":503,"submission_allowed":false}},
+    {"id":"review_running","kind":"state_progression","description":"运行中Review只允许向终态前进。","expectation":{"sequence":["queued","running","ready"]}},
+    {"id":"out_of_order_event","kind":"event_disorder","description":"旧sequence事件不能使UI或投影状态回退。","expectation":{"discard_stale_sequence":true}},
+    {"id":"authorization_denied","kind":"authorization_denial","description":"无流程能力用户不能访问受保护业务。","expectation":{"http_status":200,"err_code_nonzero":true,"state_mutated":false}},
+    {"id":"execution_unknown","kind":"state_progression","description":"发送边界后连接丢失必须进入result_unknown且禁止自动重放。","expectation":{"state":"result_unknown","automatic_retry":false}},
+    {"id":"ddl_partial_failed","kind":"state_progression","description":"多DDL首错后停止并保留前序成功事实。","expectation":{"state":"partial_failed","continue_after_failure":false}}
+  ]
+}

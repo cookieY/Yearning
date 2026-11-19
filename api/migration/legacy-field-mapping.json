@@ -1,0 +1,194 @@
+{
+  "contract_version": 1,
+  "source_code": "src/model/modal.go",
+  "source_orm": "gorm_v2_default_plural_snake_case",
+  "rules": {
+    "all_source_fields_exactly_once": true,
+    "unknown_source_column": "fail_dry_run",
+    "missing_required_source_column": "fail_dry_run",
+    "unknown_json_key": "quarantine_and_fail_apply",
+    "unmapped_value": "quarantine_and_fail_apply",
+    "plaintext_sensitive_report": "forbidden",
+    "target_write_api": "gorm_with_explicit_table_and_column_mapping",
+    "target_schema_creation": "versioned_sql_migrations_only"
+  },
+  "models": [
+    {
+      "model": "CoreAccount", "source_table": "core_accounts",
+      "legacy_fields":["ID","Username","Password","RealName","Email","Department","IsRecorder"],
+      "mappings": [
+        {"source_fields":["ID"],"target":"migration_lineage.source_key","transform":"unsigned_decimal_string"},
+        {"source_fields":["Username"],"target":"users.username","transform":"trim_and_case_insensitive_uniqueness_check"},
+        {"source_fields":["Password"],"target":"users.password_hash","transform":"accept_only_allowlisted_hash_parameters_else_require_reset"},
+        {"source_fields":["RealName"],"target":"users.display_name","transform":"trim_or_username_fallback"},
+        {"source_fields":["Email"],"target":"users.email","transform":"trim_empty_to_null_validate_length"},
+        {"source_fields":["Department"],"target":"migration_report.user_legacy_metadata","transform":"preserve_non_authoritative"},
+        {"source_fields":["IsRecorder"],"target":"migration_report.user_role_observation","transform":"never_grant_admin_or_workflow_authority"}
+      ]
+    },
+    {
+      "model": "CoreGlobalConfiguration", "source_table": "core_global_configurations",
+      "legacy_fields":["ID","Ldap","Message","Other","AI","Board","Authorization","Stmt","AuditRole"],
+      "mappings": [
+        {"source_fields":["ID"],"target":"migration_lineage.source_key","transform":"unsigned_decimal_string"},
+        {"source_fields":["Ldap"],"target":"identity_providers","transform":"typed_ldap_configuration_secret_reencryption_disabled_until_admin_test"},
+        {"source_fields":["Message"],"target":"notification_channels","transform":"split_email_and_dingtalk_validate_and_reencrypt_secrets"},
+        {"source_fields":["Other"],"target":"system_settings","transform":"field_allowlist_mapping_unknown_key_is_error"},
+        {"source_fields":["AI"],"target":"ai_providers","transform":"provider_candidate_secret_reencryption_disabled_until_admin_test"},
+        {"source_fields":["Board"],"target":"announcement_revisions","transform":"treat_as_untrusted_text_sanitize_with_current_policy"},
+        {"source_fields":["Authorization","Stmt","AuditRole"],"target":"migration_report.legacy_configuration","transform":"preserve_for_admin_mapping_no_direct_authority"}
+      ]
+    },
+    {
+      "model": "CoreSqlRecord", "source_table": "core_sql_records",
+      "legacy_fields":["ID","WorkId","SQL","State","Affectrow","Time","Error"],
+      "mappings": [
+        {"source_fields":["ID"],"target":"migration_lineage.source_key","transform":"unsigned_decimal_string"},
+        {"source_fields":["WorkId"],"target":"execution_attempts.order_id","transform":"resolve_legacy_work_id_or_fail"},
+        {"source_fields":["SQL"],"target":"execution_statements.ordinal_and_order_sql_payloads","transform":"encrypt_sql_and_match_ordered_statement"},
+        {"source_fields":["State"],"target":"execution_statements.state","transform":"manifest_verified_string_state_mapping"},
+        {"source_fields":["Affectrow"],"target":"execution_statements.affected_row_count","transform":"unsigned_to_int64"},
+        {"source_fields":["Time"],"target":"execution_statements.finished_at","transform":"strict_source_timezone_parse"},
+        {"source_fields":["Error"],"target":"execution_statements.error_detail_ciphertext","transform":"encrypt_empty_to_null"}
+      ]
+    },
+    {
+      "model": "CoreSqlOrder", "source_table": "core_sql_orders",
+      "legacy_fields":["ID","WorkId","Username","RealName","Status","Type","SQL","SourceId","Source","IDC","DataBase","Table","Date","ExecuteTime","Delay","Text","Assigned","CurrentStep","Relevant","Backup","OSCInfo","File"],
+      "mappings": [
+        {"source_fields":["ID","WorkId"],"target":"migration_lineage_and_change_orders.display_number","transform":"preserve_work_id_as_legacy_display_alias_with_collision_check"},
+        {"source_fields":["Username","RealName"],"target":"change_orders.submitter_user_id_snapshot_and_username_snapshot","transform":"resolve_user_and_freeze_display_identity"},
+        {"source_fields":["Status"],"target":"change_orders.state","transform":"release_specific_manifest_mapping_unknown_is_fatal"},
+        {"source_fields":["Type"],"target":"execution_attempts.execution_kind","transform":"zero_ddl_one_dml_other_fatal"},
+        {"source_fields":["SQL"],"target":"order_sql_payloads","transform":"encrypt_original_and_compute_hmac"},
+        {"source_fields":["SourceId","Source","IDC"],"target":"order_stages.datasource_id_and_order_flow_snapshots.legacy_metadata","transform":"resolve_source_id_then_preserve_labels"},
+        {"source_fields":["DataBase","Table"],"target":"order_flow_snapshots.legacy_metadata","transform":"encrypt_as_historical_scope_not_current_authority"},
+        {"source_fields":["Date","ExecuteTime","Delay"],"target":"change_orders.submitted_at_execution_attempts.finished_at_execution_schedules","transform":"strict_timezone_parse_and_release_specific_delay_mapping"},
+        {"source_fields":["Text","Assigned","CurrentStep","Relevant"],"target":"order_flow_snapshots.legacy_metadata","transform":"encrypt_and_mark_snapshot_completeness"},
+        {"source_fields":["Backup","OSCInfo","File"],"target":"order_flow_snapshots.legacy_metadata","transform":"preserve_encrypted_without_creating_v4_rollback_or_file_execution_capability"}
+      ]
+    },
+    {
+      "model": "CoreRollback", "source_table": "core_rollbacks",
+      "legacy_fields":["ID","WorkId","SQL"],
+      "mappings": [
+        {"source_fields":["ID"],"target":"migration_lineage.source_key","transform":"unsigned_decimal_string"},
+        {"source_fields":["WorkId"],"target":"order_flow_snapshots.order_id","transform":"resolve_legacy_work_id_or_fail"},
+        {"source_fields":["SQL"],"target":"order_flow_snapshots.legacy_metadata.rollback_bundle","transform":"ordered_encrypted_archive_never_executable"}
+      ]
+    },
+    {
+      "model": "CoreDataSource", "source_table": "core_data_sources",
+      "legacy_fields":["ID","SourceId","Source","IP","Port","DBType","Username","Password","CAFile","Cert","KeyFile","IsQuery","FlowID","RuleId","IDC","ExcludeDbList","InsulateWordList","Principal"],
+      "mappings": [
+        {"source_fields":["ID","SourceId"],"target":"migration_lineage_and_datasources.id","transform":"source_id_uuid_if_valid_else_uuidv7_with_lineage"},
+        {"source_fields":["Source"],"target":"datasources.name","transform":"trim_unique_or_require_admin_mapping"},
+        {"source_fields":["IP","Port"],"target":"datasources.host_and_port","transform":"validate_endpoint"},
+        {"source_fields":["DBType"],"target":"datasources.engine_and_compatibility_mode","transform":"zero_mysql_one_postgresql_other_fatal"},
+        {"source_fields":["Username","Password"],"target":"datasource_credentials","transform":"create_required_purpose_candidates_and_reencrypt_password"},
+        {"source_fields":["CAFile","Cert","KeyFile"],"target":"datasource_tls_materials","transform":"validate_complete_bundle_and_reencrypt"},
+        {"source_fields":["IsQuery"],"target":"migration_candidates.flow_query_capabilities","transform":"zero_write_one_read_two_read_write_else_fatal"},
+        {"source_fields":["FlowID","RuleId"],"target":"migration_candidates.flows_and_rule_sets","transform":"candidate_only_admin_confirmation_required"},
+        {"source_fields":["IDC","ExcludeDbList","InsulateWordList","Principal"],"target":"migration_report.datasource_legacy_metadata","transform":"preserve_and_require_admin_review_for_unmapped_policy"}
+      ]
+    },
+    {
+      "model": "CoreGrained", "source_table": "core_graineds",
+      "legacy_fields":["ID","Username","Group"],
+      "mappings": [
+        {"source_fields":["ID"],"target":"migration_lineage.source_key","transform":"unsigned_decimal_string"},
+        {"source_fields":["Username"],"target":"permission_group_members.user_id","transform":"resolve_unique_user_or_fail"},
+        {"source_fields":["Group"],"target":"permission_group_members.permission_group_id","transform":"parse_array_resolve_groups_unknown_key_or_id_fatal"}
+      ]
+    },
+    {
+      "model": "CoreRoleGroup", "source_table": "core_role_groups",
+      "legacy_fields":["ID","GroupId","Name","Permissions"],
+      "mappings": [
+        {"source_fields":["ID","GroupId"],"target":"migration_lineage_and_permission_groups.id","transform":"preserve_group_id_if_uuid_else_uuidv7_with_lineage"},
+        {"source_fields":["Name"],"target":"permission_groups.name","transform":"trim_unique_or_require_admin_mapping"},
+        {"source_fields":["Permissions"],"target":"migration_candidates.permission_group_flow_grants","transform":"parse_ddl_dml_query_source_lists_compare_flow_coverage_admin_confirmation_required"}
+      ]
+    },
+    {
+      "model": "CoreQueryOrder", "source_table": "core_query_orders",
+      "legacy_fields":["ID","WorkId","Username","RealName","Date","ApprovalTime","Status","SourceId","Export","Text","Assigned"],
+      "mappings": [
+        {"source_fields":["ID","WorkId"],"target":"migration_lineage_and_query_access_requests","transform":"preserve_legacy_work_id_alias_and_collision_check"},
+        {"source_fields":["Username","RealName"],"target":"query_access_requests.requester_snapshots","transform":"resolve_user_and_freeze_identity"},
+        {"source_fields":["Date","ApprovalTime"],"target":"query_access_requests.created_at_and_decided_at","transform":"strict_source_timezone_parse"},
+        {"source_fields":["Status"],"target":"query_access_requests.state_and_query_grants.state","transform":"release_specific_manifest_mapping_never_create_active_grant"},
+        {"source_fields":["SourceId"],"target":"query_access_request_datasources.datasource_id","transform":"resolve_datasource_or_fail"},
+        {"source_fields":["Export"],"target":"query_access_request_datasources.can_export","transform":"zero_false_one_true_other_fatal"},
+        {"source_fields":["Text","Assigned"],"target":"query_access_requests.flow_snapshot_ciphertext","transform":"encrypted_legacy_snapshot_metadata"}
+      ]
+    },
+    {
+      "model": "CoreQueryRecord", "source_table": "core_query_records",
+      "legacy_fields":["ID","WorkId","SQL","ExTime","Time","Source","Schema"],
+      "mappings": [
+        {"source_fields":["ID"],"target":"migration_lineage.source_key","transform":"unsigned_decimal_string"},
+        {"source_fields":["WorkId"],"target":"query_executions.session_id","transform":"resolve_synthetic_closed_legacy_session_or_fail"},
+        {"source_fields":["SQL"],"target":"query_executions.query_payload_ciphertext_sql_hmac_fingerprint_hmac","transform":"encrypt_and_privacy_fingerprint"},
+        {"source_fields":["ExTime"],"target":"query_executions.elapsed_ms","transform":"legacy_seconds_to_milliseconds_checked"},
+        {"source_fields":["Time"],"target":"query_executions.finished_at","transform":"strict_source_timezone_parse"},
+        {"source_fields":["Source","Schema"],"target":"query_executions.datasource_id_and_encrypted_legacy_context","transform":"resolve_datasource_and_encrypt_schema_label"}
+      ]
+    },
+    {
+      "model": "CoreAutoTask", "source_table": "core_auto_tasks",
+      "legacy_fields":["ID","TaskId","Name","Source","SourceId","DataBase","Table","Tp","Affectrow","Status","IDC"],
+      "mappings": [
+        {"source_fields":["ID","TaskId"],"target":"migration_report.autotask_archive.identifiers","transform":"preserve_as_non_executable_archive"},
+        {"source_fields":["Name","Source","SourceId","DataBase","Table","Tp","Affectrow","Status","IDC"],"target":"migration_report.autotask_archive.metadata","transform":"preserve_redacted_archive_no_v4_runtime_resource"}
+      ]
+    },
+    {
+      "model": "CoreWorkflowTpl", "source_table": "core_workflow_tpls",
+      "legacy_fields":["ID","Source","Steps"],
+      "mappings": [
+        {"source_fields":["ID"],"target":"migration_lineage.source_key","transform":"unsigned_decimal_string"},
+        {"source_fields":["Source"],"target":"migration_candidates.flows.datasource","transform":"resolve_datasource_or_fail"},
+        {"source_fields":["Steps"],"target":"migration_candidates.flow_approval_steps_and_actors","transform":"strict_json_parse_user_resolution_admin_confirmation_required"}
+      ]
+    },
+    {
+      "model": "CoreWorkflowDetail", "source_table": "core_workflow_details",
+      "legacy_fields":["ID","WorkId","Username","Time","Action"],
+      "mappings": [
+        {"source_fields":["ID"],"target":"migration_lineage.source_key","transform":"unsigned_decimal_string"},
+        {"source_fields":["WorkId"],"target":"approval_decisions.order_id_or_domain_events.subject","transform":"resolve_legacy_order_or_fail"},
+        {"source_fields":["Username"],"target":"approval_decisions.reviewer_snapshot_or_domain_events.actor","transform":"resolve_or_preserve_identity_snapshot"},
+        {"source_fields":["Time"],"target":"approval_decisions.occurred_at_or_domain_events.occurred_at","transform":"strict_source_timezone_parse"},
+        {"source_fields":["Action"],"target":"approval_decisions_or_domain_events.event_data","transform":"parse_only_release_verified_action_patterns_else_preserve_unstructured_legacy_event"}
+      ]
+    },
+    {
+      "model": "CoreOrderComment", "source_table": "core_order_comments",
+      "legacy_fields":["ID","WorkId","Username","Content","Time"],
+      "mappings": [
+        {"source_fields":["ID"],"target":"migration_lineage.source_key","transform":"unsigned_decimal_string"},
+        {"source_fields":["WorkId"],"target":"order_comments.order_id","transform":"resolve_legacy_work_id_or_fail"},
+        {"source_fields":["Username"],"target":"order_comments.author_snapshots","transform":"resolve_or_preserve_deleted_identity"},
+        {"source_fields":["Content"],"target":"order_comments.content","transform":"preserve_plain_text_validate_length_oversize_to_encrypted_legacy_snapshot"},
+        {"source_fields":["Time"],"target":"order_comments.occurred_at","transform":"strict_source_timezone_parse"}
+      ]
+    },
+    {
+      "model": "CoreRules", "source_table": "core_rules",
+      "legacy_fields":["ID","Desc","AuditRole"],
+      "mappings": [
+        {"source_fields":["ID"],"target":"migration_lineage.source_key_and_rule_sets.id","transform":"uuidv7_with_lineage"},
+        {"source_fields":["Desc"],"target":"rule_sets.name_and_migration_report.legacy_description","transform":"derive_unique_name_preserve_description"},
+        {"source_fields":["AuditRole"],"target":"migration_candidates.rule_sets_and_prompt_tools","transform":"strict_json_parse_candidate_only_admin_review_required"}
+      ]
+    },
+    {
+      "model": "CoreTotalTickets", "source_table": "core_total_tickets",
+      "legacy_fields":["ID","Date","TotalOrder","TotalQuery"],
+      "mappings": [
+        {"source_fields":["ID","Date","TotalOrder","TotalQuery"],"target":"migration_report.legacy_ticket_aggregates","transform":"preserve_for_reconciliation_only_never_seed_dashboard_facts"}
+      ]
+    }
+  ]
+}

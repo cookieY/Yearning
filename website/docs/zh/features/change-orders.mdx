@@ -1,0 +1,76 @@
+import { ThemeScreenshot } from '../../../components/ThemeScreenshot';
+
+# 审批、执行、`gh-ost` 调优与 `result_unknown` 核验
+
+本手册面向审批人（Team Lead / DBA）与执行人，详细说明工单审批、水印查看 SQL、手动/预约执行、MySQL 进程内 `gh-ost` 18 项参数调优以及断网异常的人工核验流程。
+
+<ThemeScreenshot
+  name="detail"
+  captionZh="冻结工单详情页：多阶段审批轨迹、带水印 SQL Reveal、进程内 gh-ost 执行控制与回滚入口"
+/>
+
+## 1. 审批人日常操作（`/approvals/changes`）
+
+1. 在左侧点击 **工单审批（`/approvals/changes`）**，页面通过 SSE 实时刷新待你处理的工单，并提供 **我已审批（是/否）** 过滤列。
+2. 点击工单行进入 **`/approvals/orders/:id`**（审批上下文视图，避免一人同时是提交人和审批人时误点撤回）。
+3. **查看 SQL 明文（带水印 Reveal）**：
+   - 默认页面只展示元数据与冻结的 AI 预审发现（`has_sql: true`）。
+   - 点击 **查看 SQL 原文** 后触发带审计记录的 Reveal，SQL 展示区会自动叠加 `你的用户名 + 时间戳 + Trace ID` 水印。
+4. 核对 AI 预审建议与冻结阶段信息后，提交三种决策之一：
+   - **通过（`approve`）**：当前级按 `any_one`（任一通过）或 `all_must_approve`（全员通过）流转到下一级；全部通过后工单进入 `approved`（待执行）。
+   - **退回修改（`request_changes`）**：写明修改意见，研发可在原工单直接改 SQL 重跑预审后再提交。
+   - **拒绝（`reject`）**：终态驳回，整单关闭。
+
+:::warning 为什么管理员也改不了已提交工单的审批人？
+Yearning v4 实行**提交即冻结**：审批链、数据源身份、执行人与预审快照在提交瞬间全部锁定。任何角色（含内置 `admin`）都无法转交、加签、跳级或代执行。如原审批人离职或休假，请提交人撤回原单，待管理员更新流程模板后重新提交。
+:::
+
+## 2. 执行人操作：立即执行 vs. 预约执行
+
+审批全部通过后，**系统绝不会自动落库**。仅当前阶段的冻结执行人打开工单详情页可操作：
+
+- **立即执行**：点击 **执行**，系统立刻获取目标数据源的**单库排他执行租约**（同一时刻同数据源仅允许 1 笔工单运行，避免并发锁冲突返回 `3001`）并开始执行。
+- **预约执行**：选择未来的执行时间（需落在 `/admin/settings/execution` 配置的每周允许执行时段内）。到点后调度器在 **15 分钟宽限窗口** 内自动复核前置条件并执行一次；错过窗口（`3009`）或数据源不可用时不补跑，须执行人重新确认。
+
+## 3. MySQL 大表在线改表：进程内 `gh-ost` 18 项参数调优
+
+当系统设置 `execution.osc.tool = gh-ost` 且目标库为原生 **MySQL 5.7 / 8.0**、工单为 `ALTER TABLE` 时，点击 **执行** 弹窗会出现 **`ddl_execution_mode`** 选择框：
+
+- **`online_ddl`**：直接走 MySQL 原生 `ALTER TABLE`（适合小表或瞬间完成的 `ALGORITHM=INSTANT` 加列）。
+- **`gh_ost`**：调用 Go 进程内嵌的 `gh-ost` 无锁改表引擎（无需安装外部二进制，`pt-osc` 已彻底退役），页面实时显示拷贝百分比与 ETA。
+
+### 生产大表推荐调优参数（支持在 `/admin/settings/execution` 配默认值，执行时按单覆写）
+
+| 参数分组 | 参数名 | 生产推荐起步值 | 调优说明 |
+| :--- | :--- | :--- | :--- |
+| **负载保护** | `max_load` | `Threads_running=25` | 超过该负载阈值自动限流暂停拷贝 |
+| | `critical_load` | `Threads_running=80` | 超过临界负载立即中止迁移保护线上主库 |
+| | `critical_load_interval_millis` | `1000` | 临界负载连续观测间隔（毫秒） |
+| | `critical_load_hibernate_seconds` | `60` | 触发临界负载后先休眠等待恢复的秒数（设为 `0` 则直接退出） |
+| **拷贝与复制限流** | `chunk_size` | `1000` | 每批拷贝行数；大行宽表建议降至 `500` |
+| | `dml_batch_size` | `100` | 增量 Binlog 事件合并写入批次大小 |
+| | `max_lag` | `1500`（ms） | 主从复制延迟超过 1.5 秒自动减速限流 |
+| | `nice_ratio` | `0.5` | 每批拷贝后休眠比例（`0.5` 表示多让出 IO/CPU 给线上业务） |
+| **切换与重试** | `cut_over_lock_timeout_seconds` | `3` | 原子表名切换（`RENAME`）等待 MDL 锁的超时秒数 |
+| | `retries` | `60` | 切换或瞬时错误最大重试次数 |
+| | `heartbeat_interval_millis` | `500` | 复制延迟心跳检测间隔 |
+| | `exponential_backoff_max_interval` | `64` | 切换退避最大间隔秒数 |
+| **行为开关** | `attempt_instant_ddl` | `true`（MySQL 8.0） | 优先检测是否可走 `INSTANT`，不可行自动走 `gh-ost` |
+| | `exact_rowcount` / `concurrent_rowcount` | `false` / `true` | 千万级大表关闭精确全表 `COUNT(*)`，改用估算或并发计数 |
+| | `ok_to_drop_table` | `false`（保守）或 `true` | 切换完成后是否自动删除 `_<tbl>_del` 旧表；保守团队可先留着手工观察后清理 |
+| | `timestamp_old_table` | `true` | 旧表名附加时间戳防冲突 |
+| | `cut_over_exponential_backoff` | `true` | 切表遇长查询阻塞时指数退避重试，避免打满连接 |
+
+## 4. 遇网络闪断出现 `result_unknown` 怎么处理？（DBA 标准 SOP）
+
+如果在数据库 `COMMIT` 瞬间发生网络断开、数据库切换或 Pod 重启，Yearning v4 **严禁自动重试**（防止重复更新/插入数据），而是将工单置为 **`result_unknown`**（`3005 EXECUTION_RESULT_UNKNOWN`）。
+
+冻结执行人必须按以下 3 步人工核验：
+
+1. **只读核查目标库真实状态**：通过只读查询或 DBA 终端核对表结构（`SHOW CREATE TABLE` / `\d`）或受影响数据行，确认上次提交究竟是已落盘还是已回滚。
+2. **在工单详情页点击「核验执行结果」**：
+   - 填写必填的 **核验证据说明**（例如 `已核查 prod-mysql 表 core.orders，字段 risk_score 已存在且与目标定义一致`；留空会报 `3012`）。
+   - 选择 **确认成功（`confirm_succeeded`）** 或 **确认失败（`confirm_failed`）**。
+3. **收敛后续动作**：
+   - 选「确认成功」：状态变为 `succeeded`（永久保留「人工核验」审计标识），多阶段工单自动激活下一阶段。
+   - 选「确认失败」：状态变为 `failed`，点击 **复制为新草稿** 重新走预审与审批后执行。

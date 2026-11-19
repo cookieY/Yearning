@@ -1,0 +1,2 @@
+{"id": 1, "work_id": "W1002", "state": 1, "sql": "insert into t1 values (1);", "affectrow": 1, "time": "2026-08-21 10:05:01", "error": ""}
+{"id": 2, "work_id": "W1004", "state": 2, "sql": "drop table t2;", "affectrow": 0, "time": "2026-08-22 10:10:02", "error": "syntax error near t2"}

@@ -1,0 +1,32 @@
+import { ThemeScreenshot } from '../../../components/ThemeScreenshot';
+
+# Governed Read-Only Query Workspace
+
+The Yearning v4 Query Workspace (`/query`) delivers audited, read-only database access without distributing plaintext database credentials.
+
+<ThemeScreenshot
+  name="query"
+  captionZh="受控只读查询工作台"
+  captionEn="Governed Read-Only Query Workspace with schema browser, Monaco autocomplete, server-side PII masking, and cursor pagination"
+/>
+
+## Access Grants & Realtime Revocation
+
+- **Grant-Based Access**: Query approvals authorize datasource scope, validity duration (up to 525,600 minutes), and optional export capability (`can_export`), rather than approving individual SELECT queries. When query approval is disabled in `/admin/settings/query`, authorized users open governed sessions directly.
+- **Instant SSE Revocation**: Any frozen approver or admin can revoke an active Query Grant at any time; `GET /api/v4/events/stream` pushes the state change immediately to lock the frontend workspace and display the revocation reason, actor, and timestamp.
+
+## Strict Read-Only AST & Exact Quotas
+
+- **Allowed**: `SELECT`, read-only `WITH ... SELECT`, `SHOW`, `DESCRIBE` / `DESC`, `EXPLAIN`.
+- **Rejected (`4007` / `4011`)**: Locking reads (`SELECT ... FOR UPDATE`), DML/DDL statements, and unsafe multi-statement injections.
+
+| Setting | Default | Bounds / Notes |
+| :--- | :--- | :--- |
+| Rows per page (`page_size`) | User choice | **`1` – `5,000` rows/page** |
+| Max online rows (`max_result_rows`) | **`1,000` rows** | Configurable `1` – `100,000` in `/admin/settings/query` |
+| Statement timeout | **`5,000 ms` / `30,000 ms`** | Configurable `1` – `300,000 ms` (`4009 QUERY_TIMEOUT`) |
+| Pagination cursor TTL | **`6 hours` (`21,600 s`)** | User-bound HMAC-signed cursor (`4010` on mismatch) |
+
+## Server-Side Masking & Controlled Export
+
+Configured sensitive columns are masked **on the server before rows leave the backend**, keeping raw PII out of browser responses. When `can_export = true` is granted for a datasource, users can stream **CSV**, **JSONL**, or browser-incremental **XLSX** exports with per-page authorization checks and full audit trails (no export files are stored on the server).

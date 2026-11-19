@@ -1,0 +1,48 @@
+import { ThemeScreenshot } from '../../../components/ThemeScreenshot';
+
+# Zero-Leak AI SQL Precheck & Submission Gate
+
+Every DDL or DML change order in Yearning v4 must pass a two-stage **Deterministic AST/Rule Check + AI Review Inspection** before submission. Only runs that reach `ready` status with zero blocking findings pass the Submission Gate.
+
+<ThemeScreenshot
+  name="precheck"
+  captionZh="AI SQL 预审弹窗"
+  captionEn="AI SQL Precheck modal showing stage progress, fingerprint group counts, findings, and restored identifiers"
+/>
+
+## Batch Dual-Fingerprint Deduplication
+
+| Limit / Threshold | Exact Value |
+| :--- | :--- |
+| Max SQL payload per order | **32 MiB** (`33,554,432 bytes`) |
+| Max statements per order | **100,000 statements** |
+| Max single statement size | **512 KiB** (`524,288 bytes`) |
+| Virtualized bulk editor threshold | `> 512 KiB` or `> 1,000` statements |
+| Soft warning threshold | **200** distinct structural fingerprint groups |
+| Hard group limit | **1,000** distinct fingerprint groups (`2006 TOO_MANY_FINGERPRINTS`) |
+| Precheck snapshot TTL | **30 minutes** (`1,800 s`; returns `2001 REVIEW_OUTDATED` on expiry) |
+
+Every statement is parsed with **TiDB SQL Parser** or **`pg_query_go/v6`** into versioned **Canonical** and **Dialect** fingerprints. Homologous batches (e.g., 50,000 `UPDATE` statements differing only in values) collapse into **1 fingerprint group** so deterministic rules inspect all statements while the AI Review Agent inspects **1 representative statement per group**.
+
+## Dual-Track AI Privacy Isolation (`default` vs. `san`)
+
+- **`default` Track (Cloud OpenAI-Compatible APIs & Legacy `v3.1`)**: Strips all literals and comments, replaces schema/table/column identifiers with per-run tokens (`schema_1`, `table_1`, `column_1`), enforces `AssertZeroLeak` (fail-closed `2005`), and automatically restores real identifiers in the UI exclusively for authorized viewers (`review.identifier_displayed` audit log).
+- **`san` Track (Internal Self-Hosted vLLM / Ollama for `SAN-2B` / `SAN-4B` / `SQL-Audit-Nano`)**: Uses versionless compact Raw-SQL Native prompts on RFC1918 LANs protected by `addrguard` SSRF checks, truncates literals over 256 chars, binds `PrivacyContractHashSAN`, and strictly blocks raw payloads from falling back to cloud `default` endpoints.
+
+## 5 Read-Only Metadata Tools
+
+1. `check_syntax`: Dialect syntax and object resolution verification.
+2. `describe_table`: Live column types, nullability, defaults, and column comments.
+3. `list_indexes`: Primary keys, unique keys, and composite index column ordering.
+4. `table_stats`: Table size, row estimates, and index selectivity.
+5. `safe_explain`: Read-only execution plan inspection for full-table scans and lock risks.
+
+## Deterministic Critical Blocking
+
+| Category | Effective Severity | Blocks Submission | Behavior |
+| :--- | :--- | :--- | :--- |
+| `policy_finding` | Mandatory **`critical`** | **Yes** (`2008`) | Any hit on an enabled flow-bound Prompt Skill or scope-matched Knowledge entry always blocks |
+| `proven_invalid_execution` | Mandatory **`critical`** | **Yes** (`2008`) | Statements proven unexecutable against complete catalog metadata (e.g., dropping a non-existent table without `IF EXISTS`) |
+| `agent_observation` | Capped at **`medium`** | **No** | Advisory LLM observations never block valid releases on their own |
+
+Missing or truncated metadata keeps the stage in **`partial`** status and blocks submission fail-closed until resolved.

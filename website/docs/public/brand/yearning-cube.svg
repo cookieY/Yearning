@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <defs>
+    <linearGradient id="ynCubeGrad" x1="8" y1="8" x2="56" y2="56" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#E11D74" />
+      <stop offset="58%" stop-color="#BE185D" />
+      <stop offset="100%" stop-color="#8B249D" />
+    </linearGradient>
+  </defs>
+  <polygon points="32,5 56,18.5 56,45.5 32,59 8,45.5 8,18.5" stroke="url(#ynCubeGrad)" stroke-width="3.6" stroke-linejoin="round" />
+  <polyline points="8,18.5 29,24.5 29,43.5 8,45.5" stroke="url(#ynCubeGrad)" stroke-width="3.4" stroke-linejoin="round" />
+  <line x1="29" y1="24.5" x2="46" y2="13" stroke="url(#ynCubeGrad)" stroke-width="3.4" stroke-linecap="round" />
+  <line x1="29" y1="43.5" x2="46" y2="51.2" stroke="url(#ynCubeGrad)" stroke-width="3.4" stroke-linecap="round" />
+</svg>

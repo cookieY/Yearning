@@ -1,0 +1,33 @@
+import { ThemeScreenshot } from '../../../components/ThemeScreenshot';
+
+# Datasources, SSO, AI Budget & Notifications
+
+Platform administrators (`builtin_admin` and `role = 'admin'`) govern all `/admin/*` configuration modules while remaining strictly barred from overriding frozen business orders (`admin_is_not_business_override = true`).
+
+<ThemeScreenshot
+  name="admin"
+  captionZh="Yearning v4 多引擎数据源管理"
+  captionEn="Yearning v4 Admin Plane: multi-engine datasource registry, separated credentials, and live connection probes"
+/>
+
+## 1. Multi-Engine Datasource Registry (`/admin/datasources`)
+
+- Register **MySQL 5.7/8.0**, **PostgreSQL 14–18**, **TiDB**, **OceanBase**, and **PolarDB** instances with mandatory `version_constraint` checks and verified `identity_fingerprint`.
+- Strictly separate **Read-Only (`review` & `query`)** credentials from **Execution (`execution`)** credentials; all passwords and TLS PEM blocks are AES-256-GCM encrypted and write-only.
+
+## 2. Enterprise SSO: LDAP & OIDC (`/admin/settings/general`)
+
+- **LDAP (Singleton)**: Enforces **`ldaps`** or **`starttls`** with verified TLS `server_name` (plaintext LDAP and `insecure_skip_verify` are forbidden), `{username}` filter validation, and a 4-stage live connection test (`tcp_connect -> tls_handshake -> service_bind -> base_dn_check`).
+- **OIDC (Multi-Instance)**: Enforces HTTPS `issuer_url`, **Authorization Code + PKCE (`S256`)**, `state`, and `nonce` verification, server-generated callback URLs (`<origin>/api/v4/auth/oidc/<provider_key>/callback`), and 3-stage connection probes.
+- **JIT Provisioning**: First-time LDAP/OIDC users are provisioned automatically with standard `user` role and authorized through **Permission Groups**.
+
+## 3. AI Providers, Reference Pricing & Global Daily Budget
+
+- Configure OpenAI-compatible endpoints in `/admin/review-engine/providers` with `temperature`, `max_tokens`, `reasoning_effort`, and `system_prompt_profile` (`default` | `san` | auto-detect), plus timezone-aware `CNY` / `USD` per-1M-token reference pricing windows (explicitly marked as reference estimates, never official invoices).
+- Configure the **Global Daily AI Cost Budget** and alert threshold in `/admin/review-engine/ai-budget`. High-impact toggles require two-step impact confirmation (`Assess -> impact_token`, `1011`).
+
+## 4. Notification Center & 90-Day Audit Trail
+
+- **4 Channels (`/admin/settings/notifications`)**: **Email (SMTP)**, **DingTalk**, **Feishu**, and **Slack**, with encrypted secrets, deterministic flow/event routing rules, allowlisted `{{placeholder}}` templates, non-sending preview, group deduplication, and transactional Outbox delivery (up to **5 exponential-backoff retries**; 90-day `dead_letter` retention).
+- **Zero-Leak Notifications**: Internal `review.blocked` events are excluded; outbound messages never contain raw SQL, literals, query results, or free-text approval comments.
+- **Immutable Audit Logs (`/records`)**: 90-day append-only audit trail covering auth, prechecks, identifier restoration, watermarked SQL reveals, approvals, execution, rollbacks, queries, exports, and admin changes; orders and execution facts are retained permanently.

@@ -1,0 +1,46 @@
+import { ThemeScreenshot } from '../../../components/ThemeScreenshot';
+
+# Scoped Database AI Assistant (4.0 Core Feature)
+
+The **Database AI Assistant** is a flagship Yearning v4.0 capability built directly into the authenticated workspace (bottom-right `dots-02` floating trigger and `/assistant` view). It focuses strictly on three database workflows: **platform usage guidance**, **metadata-grounded natural-language SQL generation**, and **SQL analysis & optimization**.
+
+Unlike general-purpose chat shells, the assistant enforces four architectural guardrails: **per-turn in-memory zero-leak anonymization**, **dialect AST structured restoration**, **zero direct SQL execution**, and a **mandatory two-stage bridge into formal AI Precheck and multi-stage Approval**.
+
+<ThemeScreenshot
+  name="dashboard"
+  captionZh="工作台右下角数据库 AI 助手入口"
+  captionEn="Click the bottom-right floating launcher on the workspace to open the scoped Database AI Assistant"
+/>
+
+## 1. Three Scoped Capabilities
+
+### 1) Role-Aware Platform Help (`platform_help`)
+
+Backed by a version-aligned help corpus with strict role filtering (normal users receive workspace guides; administrators also receive `/admin/*` governance guides), returning actionable steps, citations, and clickable in-app route links.
+
+### 2) Natural-Language SQL Generation + Two-Stage Order Submission (`sql_generate`)
+
+1. **Permission Check First**: Query-only grants permit `SELECT` generation; `change_review` flow grants unlock controlled DML (`INSERT`/`UPDATE`/`DELETE`) and reversible DDL (`CREATE TABLE`/`ALTER TABLE`/`CREATE INDEX`/`DROP INDEX`). Unauthorized targets return `6002` without leaking existence.
+2. **Read-Only Metadata Probing & Clarification**: Controlled read-only metadata tools inspect real columns, data types, nullability, default/auto-increment behavior, and indexes. If required `NOT NULL` columns without defaults are missing from your description, the assistant asks for clarification instead of guessing values.
+3. **Zero-Leak Anonymization & AST Restoration**: On cloud `default` providers, identifiers map via `RunMapper` (`table_1`, `column_1`) and business literals map via typed `TurnValueMapper` placeholders (`:val_str_1`, `:val_int_1`) exclusively in per-request memory. Returned SQL is parsed by the dialect lexer/AST, checked against authorized objects, and restored safely with dialect-aware quoting (`6004` fail-closed on mismatch).
+4. **Two-Stage Order Bridge**: Clicking **Run Formal AI Precheck** invokes `StartEphemeralRun` bound to `draft_id`, `revision`, and `sql_hmac`. Only after precheck reaches `ready` can you click **Confirm & Submit Order** (`SubmitOrderV2` with `Idempotency-Key`). Any edit invalidates the binding (`6005`).
+
+### 3) Metadata-Grounded SQL Optimization (`sql_optimize`)
+
+Paste slow SQL (plus optional user-supplied `EXPLAIN` output) and pick a datasource to receive AST-validated rewrites, index advice, explicit semantic-difference warnings, and verification steps. The assistant never executes `EXPLAIN` or queries production rows and never fabricates unmeasured benchmark claims.
+
+## 2. Encrypted Persistence, Context Compression & Guardrails
+
+- **Encrypted History**: Messages, restored SQL drafts, and compressed context summaries are encrypted at rest with **AES-256-GCM** (30-day default retention, max **50 active sessions** per user, max **100 turns** per session). Deleting a session immediately erases its encrypted records.
+- **Automatic Desensitized Context Compression**: When long sessions approach the model token budget, earlier turns are compressed through a desensitized call into `ai_assistant_context_summaries` while preserving full history for viewing.
+- **Strict Prohibitions**: Refuses non-database chatter (`6001`), never executes any SQL (including `SELECT` and `EXPLAIN`), never reads table rows, blocks `TRUNCATE`/`DROP DATABASE`/`GRANT`, and never bypasses formal AI Precheck or Approvals.
+
+| Error Code | Identifier | Resolution |
+| :--- | :--- | :--- |
+| `6001` | `ASSISTANT_OUT_OF_SCOPE` | Request is outside database/Yearning scope or asks for forbidden destructive DDL |
+| `6002` | `ASSISTANT_DATASOURCE_FORBIDDEN` | Missing datasource grant or DML/DDL requested on a query-only datasource |
+| `6003` | `ASSISTANT_ANONYMIZATION_FAILED` | Input contains raw credentials/secrets (`password=`, `sk-`, DSN); remove and retry |
+| `6004` | `ASSISTANT_SQL_RESTORATION_INVALID` | Model SQL failed dialect AST validation, object bounds, or placeholder checks |
+| `6005` | `ASSISTANT_DRAFT_REVISION_STALE` | Draft changed or has not reached `ready` formal precheck; click **Run Formal AI Precheck** |
+| `6006` | `ASSISTANT_CONTEXT_BUDGET_EXCEEDED` | Input exceeded single-turn context budget; trim input or start a fresh session |
+| `6007` | `ASSISTANT_STREAM_IN_PROGRESS` | Wait for the active reply stream to finish or click **Stop** |

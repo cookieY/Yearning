@@ -1,0 +1,40 @@
+import { ThemeScreenshot } from '../../../components/ThemeScreenshot';
+
+# Overview & What Changed in Yearning v4
+
+:::warning Public Beta Notice
+**Yearning v4.0 is currently in Public Beta.** Core workflows, AI rules, and migration tooling are actively evolving. Please evaluate in staging or test environments first, maintain full backups before production cutover, and report feedback via [GitHub Issues](https://github.com/cookieY/Yearning/issues).
+:::
+
+**Yearning v4** is a ground-up rebuild of the open-source Yearning platform as an **AI Agentic SQL Review & Database Governance Platform**.
+
+Built as a single-binary **Go modular monolith** paired with a **React 19 + TypeScript + shadcn/ui** web workspace and a **PostgreSQL** metadata plane, Yearning v4 retires legacy RPC services and MySQL metadata storage while putting an **autonomous metadata-probing AI Agentic SQL Review Engine** and a **Database AI Assistant** at the heart of frozen multi-stage governance, in-process `gh-ost` online DDL, binlog-free cross-engine rollback, governed read-only queries, and Top-SQL performance diagnostics.
+
+<ThemeScreenshot
+  name="dashboard"
+  captionZh="Yearning v4 工作台首页"
+  captionEn="Yearning v4 Workbench: personal queues, 30-day execution metrics, 6-component health dots, and the scoped Database AI Assistant"
+/>
+
+## Product Positioning
+
+Yearning v4 is an **AI-powered database change governance platform**, never an unbounded chat shell:
+
+- **AI analyzes risk and synthesizes evidence**: combining dialect AST parsing, dual-fingerprint deduplication, 5 read-only metadata probes, custom prompt skills, and enterprise DBA knowledge rules.
+- **Structured governance controls approvals and execution**: AI never approves orders, never directly executes SQL, and never bypasses the Submission Gate.
+- **Privacy by architecture**: cloud LLM traffic (`default` track) strips literals and comments and anonymizes every identifier in memory before dispatch; self-hosted internal models (`san` track) run on isolated RFC1918 LAN contracts with zero cloud fallback leakage.
+
+## Yearning v4 vs. v3 Architecture Comparison
+
+| Capability | Yearning v3 (Legacy) | Yearning v4 (Rebuilt) |
+| :--- | :--- | :--- |
+| **Control Plane** | Legacy RPC coupling | Single-binary **Go modular monolith**, zero RPC, stateless multi-replica Kubernetes ready |
+| **Frontend Workspace** | Vue (`gemini-next`) | **React 19 + TypeScript + Vite + Tailwind CSS v4 + shadcn/ui** |
+| **Metadata Store** | MySQL + AutoMigrate | **PostgreSQL 14–18** + explicit versioned migrations + 3-role least privilege |
+| **Target Engines** | Primarily MySQL | **MySQL 5.7/8.0, PostgreSQL 14–18, TiDB, OceanBase, PolarDB** |
+| **SQL Review Engine** | Static rules | **Deterministic rules + Dual-Track AI Precheck** (up to 100k statements / 32 MiB, 5 metadata tools) |
+| **Workflow & Freezing** | Mutable routing & AutoTask | **Frozen at submission** (1..N stages, 1..10 steps); no `admin` override; AutoTask retired |
+| **Online Schema Change** | External binaries | **In-process Go `gh-ost`** (18 typed parameters, live progress); `pt-osc` retired |
+| **Automatic Rollback** | MySQL Binlog scraping | **Binlog/WAL-free AST inverse + in-transaction before-images** across MySQL & PostgreSQL |
+| **Query & Diagnostics** | Basic query & masking | Time-bounded Query Grants, read-only AST, PII masking, SSE lock, **6-chart Top-SQL diagnostics** |
+| **AI Agent Integration** | None | Full **OpenAPI v4** + **SSE event stream** + zero-dependency **`skills/yearning`** Agent Skill |

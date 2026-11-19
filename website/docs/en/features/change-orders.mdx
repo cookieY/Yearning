@@ -1,0 +1,29 @@
+import { ThemeScreenshot } from '../../../components/ThemeScreenshot';
+
+# Frozen Approvals & In-Process `gh-ost` Execution
+
+Yearning v4 enforces **Freeze at Submission** across every multi-stage change order so SQL payloads, review evidence, approvers, and executors cannot be tampered with or bypassed.
+
+<ThemeScreenshot
+  name="detail"
+  captionZh="冻结工单详情与执行控制台"
+  captionEn="Frozen Order Detail & Execution Console with watermarked SQL Reveal, in-process gh-ost progress, and rollback derivation"
+/>
+
+## Frozen Multi-Stage Approvals
+
+- **Shared Rule Set**: Each `change_review` flow binds one `rule_set_id` applied across all stages.
+- **`1..N` Serial Datasource Stages**: Promote the exact same SQL across environments (e.g., staging -> production) within the same engine family. Every stage must pass AI Precheck before submission.
+- **`1..10` Serial Approval Steps per Stage**: Configure `any_one` or `all_must_approve` voting per step; any single rejection terminates the order.
+- **Immutable Snapshot**: Once submitted, even built-in `admin` cannot edit the workflow, reassign actors, skip levels, or execute on behalf of frozen executors.
+
+### Watermarked Audited SQL Reveal
+
+Order SQL is encrypted at rest with **AES-256-GCM**. Default list and detail responses return metadata only (`has_sql: true`). Authorized actors invoke `POST /api/v4/change-orders/{id}/sql-reveals` to inspect plaintext SQL, logging an audit event and rendering a traceable viewer watermark (`username + timestamp + trace_id`).
+
+## Execution Control & In-Process `gh-ost`
+
+- **No Auto-Execution on Approval**: Legacy AutoTask is retired. Only frozen stage executors can click **Execute** or schedule execution (executed once inside a **15-minute** grace window, subject to weekly execution windows configured in `/admin/settings/execution`).
+- **Single-Datasource Exclusive Lease**: Only 1 change order executes per target datasource at a time.
+- **In-Process Go `gh-ost` (`pt-osc` Retired)**: For native MySQL 5.7/8.0 large-table `ALTER TABLE`, Yearning embeds `github.com/github/gh-ost/go/logic` directly inside the Go process with **18 typed overridable parameters** (load protection, chunk/lag throttling, cut-over timeouts, behavior switches) and streams live copy progress via SSE.
+- **`result_unknown` Manual Verification (`3005`)**: On commit-time network drops, Yearning never auto-replays SQL. Frozen executors verify database state and submit audited `confirm_succeeded` or `confirm_failed` decisions with required evidence notes.

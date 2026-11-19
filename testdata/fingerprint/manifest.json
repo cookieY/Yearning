@@ -1,0 +1,13 @@
+{
+  "contract_version": 1,
+  "source": "testdata/development/fixture-spec.json",
+  "files": [
+    {
+      "path": "bulk-high-similarity.sql",
+      "sha256": "b48b553a076516c13534ab46d32680548aece06ebb81203fbae5b42e33c63101",
+      "bytes": 9288842,
+      "statement_count": 100000,
+      "anomaly_statement_index": 54321
+    }
+  ]
+}

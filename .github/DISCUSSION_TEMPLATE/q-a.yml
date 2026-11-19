@@ -1,0 +1,52 @@
+title: "[Q&A] "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Welcome to **Yearning Q&A**! Ask anything about deployment, configuration, AI review setup, SSO, or upgrading from v3 to v4.
+        欢迎来到 **Yearning 问答区**！关于部署配置、AI 审核接入、OIDC/LDAP 或 v3 升级迁移的任何疑问，都可以在此提问。
+
+        > **Tip / 提示**: Found a reproducible software bug? Please use [Bug Report](https://github.com/cookieY/Yearning/issues/new?template=1_bug_report.yml) instead. Redact passwords, API keys, and sensitive data before posting.
+        > 如确认是可复现的程序 Bug，请直接提交 [Bug Report](https://github.com/cookieY/Yearning/issues/new?template=1_bug_report.yml)；发帖前请务必脱敏密码、密钥与敏感数据。
+
+  - type: dropdown
+    id: topic
+    attributes:
+      label: "🏷️ Question Topic / 问题分类"
+      options:
+        - "Docker Compose / Self-Hosting (容器化与私有化部署)"
+        - "Kubernetes Production Deployment (K8s 多副本部署)"
+        - "AI Provider, Prompt Skills & Knowledge Base (AI 审核与规则配置)"
+        - "Flows, Approvals, Execution & gh-ost (流程、审批、执行与在线改表)"
+        - "Query Workspace & Column Masking (只读查询与脱敏)"
+        - "SQL Performance Diagnostics (SQL 性能诊断)"
+        - "LDAP / OIDC SSO & Permissions (认证与权限组)"
+        - "v3 → v4 Migration (旧版升级迁移)"
+        - "OpenAPI & Agent Skill (/api/v4/* 集成)"
+        - "Other / 其他"
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: "📌 Yearning Version & Deployment / 版本与部署方式"
+      placeholder: "e.g. v4.0.0-rc.3 via Docker Compose on Ubuntu 24.04"
+    validations:
+      required: true
+
+  - type: textarea
+    id: question
+    attributes:
+      label: "❓ Your Question / 问题描述"
+      description: "Explain what you are trying to achieve, where you got stuck, and any relevant target database engine. / 请清晰说明你的目标、遇到的卡点以及涉及的数据库引擎。"
+    validations:
+      required: true
+
+  - type: textarea
+    id: tried
+    attributes:
+      label: "🔍 What Have You Tried? / 已尝试的排查步骤"
+      description: "Share docs pages read, sanitized config snippets, or error messages you already checked. / 可贴出查阅过的文档、脱敏配置片段或报错信息。"
+    validations:
+      required: false
