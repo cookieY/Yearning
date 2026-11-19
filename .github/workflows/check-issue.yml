@@ -14,15 +14,113 @@ jobs:
     runs-on: ubuntu-latest
     if: github.event.issue.user.type != 'Bot'
     steps:
-      - name: Validate issue title format
+      - name: Validate v4 version requirement and issue title format
         uses: actions/github-script@v7
         with:
           script: |
             const issue = context.payload.issue;
             const title = (issue.title || '').trim();
-            const validTitleRegex = /^\[(Bug|Feature)\]:?\s+\S+/;
-            const hasInvalidLabel = (issue.labels || []).some((l) => l.name === 'invalid-format');
+            const body = issue.body || '';
+            const labelNames = (issue.labels || []).map((l) => l.name);
+            const hasInvalidLabel = labelNames.includes('invalid-format');
+            const hasV3EolLabel = labelNames.includes('v3-eol');
+            const hasV4Label = labelNames.includes('v4');
 
+            // Extract section text from GitHub Issue Form markdown headings
+            const getSection = (headingPattern) => {
+              const re = new RegExp(`###\\s+[^\\n]*${headingPattern}[^\\n]*\\r?\\n+([\\s\\S]*?)(?=\\r?\\n###\\s+|$)`, 'i');
+              const m = body.match(re);
+              return m ? m[1].trim() : '';
+            };
+
+            const majorVersionVal = getSection('Major Version|Target Version|主版本|目标版本');
+            const exactVersionVal = getSection('Exact Yearning v4 Version|Yearning Version|具体 v4 版本号|Yearning 版本');
+
+            const isLegacyVersionSelected =
+              /v3\s+or\s+earlier|EOL\s*-\s*Not\s+Maintained|已停止维护/i.test(majorVersionVal) ||
+              (!majorVersionVal && /(?:^|\s)v?[123]\.\d+/i.test(exactVersionVal)) ||
+              (/(?:^|\s)v?[123]\.\d+/i.test(exactVersionVal) && !/v?4\./i.test(exactVersionVal));
+
+            const isMissingV4Selection =
+              majorVersionVal !== '' && !/^v4\b/i.test(majorVersionVal);
+
+            // 1. Enforce Yearning v4 only (auto-close legacy v3 or earlier issues)
+            if (isLegacyVersionSelected || isMissingV4Selection) {
+              if (!hasV3EolLabel) {
+                await github.rest.issues.createComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: issue.number,
+                  body: [
+                    `Hi @${issue.user.login}, thanks for reaching out!`,
+                    '',
+                    '**Yearning v3 and earlier versions are End-of-Life and are no longer maintained.** This repository only accepts issues for **Yearning v4 (`v4.x`)**.',
+                    '- 📖 Official v4 Documentation: https://v4.yearning.io',
+                    '- 🔄 v3 → v4 Migration Guide: https://v4.yearning.io/en/operations/migration-v3-to-v4',
+                    '- 🚀 Latest v4 Release: https://github.com/cookieY/Yearning/releases',
+                    '',
+                    '---',
+                    '',
+                    `你好 @${issue.user.login}，感谢反馈！`,
+                    '',
+                    '**Yearning v3 及更早版本已停止维护，不再受理 v3 相关 Issue。** 本仓库仅维护并受理 **Yearning v4（`v4.x`）** 的问题与建议。',
+                    '- 📖 Yearning v4 官方文档：https://v4.yearning.io',
+                    '- 🔄 v3 → v4 升级迁移指南：https://v4.yearning.io/operations/migration-v3-to-v4',
+                    '- 🚀 最新 v4 版本发布：https://github.com/cookieY/Yearning/releases',
+                    '',
+                    '_If you selected the wrong version by mistake and are running Yearning v4, please update the version fields in this issue to `v4` and it will be reopened automatically. / 如果您误选了版本且实际运行的是 Yearning v4，请修改本 Issue 中的版本信息为 `v4`，系统将自动重新打开。_',
+                  ].join('\n'),
+                });
+              }
+
+              await github.rest.issues.addLabels({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issue.number,
+                labels: ['v3-eol'],
+              });
+
+              if (hasV4Label) {
+                try {
+                  await github.rest.issues.removeLabel({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    issue_number: issue.number,
+                    name: 'v4',
+                  });
+                } catch (err) {
+                  if (err.status !== 404) throw err;
+                }
+              }
+
+              if (issue.state !== 'closed') {
+                await github.rest.issues.update({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: issue.number,
+                  state: 'closed',
+                  state_reason: 'not_planned',
+                });
+              }
+              return;
+            }
+
+            // If previously closed as v3-eol and edited to v4, clean up v3-eol label
+            if (context.payload.action === 'edited' && hasV3EolLabel) {
+              try {
+                await github.rest.issues.removeLabel({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: issue.number,
+                  name: 'v3-eol',
+                });
+              } catch (err) {
+                if (err.status !== 404) throw err;
+              }
+            }
+
+            // 2. Enforce [Bug]: / [Feature]: title format
+            const validTitleRegex = /^\[(Bug|Feature)\]:?\s+\S+/;
             if (!validTitleRegex.test(title)) {
               if (!hasInvalidLabel) {
                 await github.rest.issues.createComment({
@@ -66,16 +164,28 @@ jobs:
               return;
             }
 
-            if (context.payload.action === 'edited' && hasInvalidLabel) {
-              try {
-                await github.rest.issues.removeLabel({
-                  owner: context.repo.owner,
-                  repo: context.repo.repo,
-                  issue_number: issue.number,
-                  name: 'invalid-format',
-                });
-              } catch (err) {
-                if (err.status !== 404) throw err;
+            // 3. Valid v4 issue: ensure `v4` label is present and reopen if previously closed by this bot
+            if (!hasV4Label) {
+              await github.rest.issues.addLabels({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issue.number,
+                labels: ['v4'],
+              });
+            }
+
+            if (context.payload.action === 'edited' && (hasInvalidLabel || hasV3EolLabel)) {
+              if (hasInvalidLabel) {
+                try {
+                  await github.rest.issues.removeLabel({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    issue_number: issue.number,
+                    name: 'invalid-format',
+                  });
+                } catch (err) {
+                  if (err.status !== 404) throw err;
+                }
               }
 
               if (issue.state === 'closed') {

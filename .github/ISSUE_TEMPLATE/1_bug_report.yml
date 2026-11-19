@@ -1,23 +1,36 @@
-name: "🐛 Bug Report / 问题反馈"
-description: "Report a reproducible bug in Yearning v4 / 报告可复现的 Yearning v4 缺陷或异常"
+name: "🐛 Bug Report / 问题反馈 (v4 Only)"
+description: "Report a reproducible bug in Yearning v4 (v3 is no longer maintained) / 报告可复现的 Yearning v4 缺陷（v3 已停止维护）"
 title: "[Bug]: "
-labels: ["bug", "triage"]
+labels: ["v4", "bug", "triage"]
 body:
   - type: markdown
     attributes:
       value: |
-        Thank you for helping improve **Yearning v4**! Please fill out the details below so maintainers can diagnose and reproduce the issue quickly.
-        感谢反馈 **Yearning v4** 的问题！请如实填写以下信息，以便维护者快速定位与复现。
+        > **⚠️ Version Policy / 版本支持声明**
+        > **Yearning v3 and earlier versions are End-of-Life and are no longer maintained.** Issues are accepted for **Yearning v4 (`v4.x`) only**; issues targeting v3 will be automatically closed. Legacy v3 users please refer to the [v3 → v4 Migration Guide](https://v4.yearning.io/en/operations/migration-v3-to-v4).
+        >
+        > **Yearning v3 及更早版本已停止维护，不再受理 v3 相关 Issue。** 本仓库仅受理 **Yearning v4（`v4.x`）** 问题反馈，涉及 v3 的 Issue 将被自动关闭。旧版用户请参考 [v3 → v4 升级迁移指南](https://v4.yearning.io/operations/migration-v3-to-v4)。
 
         > **Security Notice / 安全提示**: Never paste real database passwords, API keys, TLS private keys, cookies, or sensitive production data. Please redact credentials and PII before submitting.
         > 切勿粘贴真实数据库密码、AI API Key、TLS 私钥、Cookie 或生产敏感业务数据，提交前请务必脱敏。
 
+  - type: dropdown
+    id: major_version
+    attributes:
+      label: "🏷️ Major Version / 主版本（必须为 v4）"
+      description: "Only Yearning v4 is maintained. Selecting v3 or earlier will automatically close this issue. / 仅维护 Yearning v4，选择 v3 及更早版本将被自动关闭。"
+      options:
+        - "v4 (v4.x / Public Beta)"
+        - "v3 or earlier (EOL - Not Maintained / 已停止维护，不受理)"
+    validations:
+      required: true
+
   - type: input
     id: version
     attributes:
-      label: "📌 Yearning Version / Yearning 版本"
-      description: "Image tag or `yearning version` output (e.g., `v4.0.0-rc.3`, commit SHA). / 请填写镜像 Tag 或 `yearning version` 输出。"
-      placeholder: "e.g. v4.0.0-rc.3"
+      label: "📌 Exact Yearning v4 Version / 具体 v4 版本号"
+      description: "Image tag or `yearning version` output (must start with `v4`, e.g., `v4.0.0-rc.5` or commit SHA). / 请填写 v4 镜像 Tag 或 `yearning version` 输出（如 `v4.0.0-rc.5`）。"
+      placeholder: "e.g. v4.0.0-rc.5"
     validations:
       required: true
 
@@ -43,12 +56,12 @@ body:
       multiple: true
       options:
         - "AI SQL Precheck & Review Engine (AI 预审引擎)"
+        - "Database AI Assistant (数据库 AI 助手)"
         - "Change Orders & Multi-Stage Approval (变更工单与审批流)"
         - "Execution, Scheduling & Built-in gh-ost (执行、预约与在线改表)"
         - "Automatic SQL Rollback (自动 SQL 回滚)"
         - "Governed Read-Only Query & Masking (只读查询与脱敏导出)"
         - "SQL Performance Diagnostics (SQL 性能诊断)"
-        - "Database AI Assistant (数据库 AI 助手)"
         - "Auth, RBAC, LDAP & OIDC SSO (认证、权限组与单点登录)"
         - "Notification Center & Audit Logs (通知中心与审计日志)"
         - "v3 → v4 Migration CLI (旧版升级迁移)"
@@ -133,7 +146,9 @@ body:
     attributes:
       label: "✅ Pre-Submission Checklist / 提交前确认"
       options:
-        - label: "I have checked the [official docs](https://next.yearning.io/) and searched existing [Issues](https://github.com/cookieY/Yearning/issues) & [Discussions](https://github.com/cookieY/Yearning/discussions) to avoid duplicates. / 我已查阅官方文档并检索过已有 Issues 与 Discussions，确认非重复问题。"
+        - label: "I confirm this issue applies to **Yearning v4** (I understand Yearning v3 and earlier are no longer maintained). / 我确认本问题发生在 **Yearning v4**（已知悉 v3 及更早版本已停止维护）。"
+          required: true
+        - label: "I have checked the [official docs](https://v4.yearning.io) and searched existing [Issues](https://github.com/cookieY/Yearning/issues) & [Discussions](https://github.com/cookieY/Yearning/discussions) to avoid duplicates. / 我已查阅官方文档并检索过已有 Issues 与 Discussions，确认非重复问题。"
           required: true
         - label: "I confirm this is a concrete Yearning v4 bug rather than a general usage or deployment question (Q&A belongs in Discussions). / 我确认这是 Yearning v4 的具体缺陷，而非使用或部署咨询。"
           required: true

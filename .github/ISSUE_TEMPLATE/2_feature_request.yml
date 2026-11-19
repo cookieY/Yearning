@@ -1,16 +1,29 @@
-name: "✨ Feature Request / 功能建议"
-description: "Propose a new capability, adapter, or workflow enhancement for Yearning v4 / 提交 Yearning v4 新功能、数据库适配或体验优化建议"
+name: "✨ Feature Request / 功能建议 (v4 Only)"
+description: "Propose a new capability, adapter, or workflow enhancement for Yearning v4 (v3 is no longer maintained) / 提交 Yearning v4 新功能或优化建议（v3 已停止维护）"
 title: "[Feature]: "
-labels: ["enhancement", "triage"]
+labels: ["v4", "enhancement", "triage"]
 body:
   - type: markdown
     attributes:
       value: |
-        Thank you for shaping **Yearning v4**! Please focus on the concrete DBA or engineering problem first — clear use cases and governance boundaries help us evaluate proposals faster.
-        感谢为 **Yearning v4** 提出建议！请优先阐述真实业务痛点与安全治理边界，这有助于维护团队更快评估方案。
+        > **⚠️ Version Policy / 版本支持声明**
+        > **Yearning v3 and earlier versions are End-of-Life and are no longer maintained.** Feature requests are accepted for **Yearning v4 (`v4.x`) only**.
+        >
+        > **Yearning v3 及更早版本已停止维护，不再受理 v3 功能需求。** 本仓库仅受理面向 **Yearning v4（`v4.x`）** 的新功能与优化建议。
 
         > For open-ended brainstorming or early discussions, consider starting in [GitHub Discussions — Ideas](https://github.com/cookieY/Yearning/discussions/new?category=ideas).
         > 如属早期发散性构想，欢迎先在 [Discussions — Ideas](https://github.com/cookieY/Yearning/discussions/new?category=ideas) 交流讨论。
+
+  - type: dropdown
+    id: major_version
+    attributes:
+      label: "🏷️ Target Version / 目标版本（必须为 v4）"
+      description: "Only Yearning v4 is actively developed. Requests targeting v3 will be automatically closed. / 仅 Yearning v4 处于活跃开发，针对 v3 的建议将被自动关闭。"
+      options:
+        - "v4 (v4.x / Public Beta)"
+        - "v3 or earlier (EOL - Not Maintained / 已停止维护，不受理)"
+    validations:
+      required: true
 
   - type: dropdown
     id: category
@@ -19,10 +32,10 @@ body:
       options:
         - "Database Engine Adapter (新数据库引擎 / 方言适配)"
         - "AI SQL Review Engine & Skills (AI 审核引擎、技能与知识库)"
+        - "Database AI Assistant (数据库 AI 助手)"
         - "Change Governance, Approval & Execution (工单审批、执行与回滚)"
         - "Governed Query Workspace & Masking (只读查询、脱敏与导出)"
         - "SQL Performance Diagnostics (SQL 性能诊断)"
-        - "Database AI Assistant (数据库 AI 助手)"
         - "Auth, Security & Compliance (认证、权限与审计合规)"
         - "Notifications & Ecosystem Integrations (通知渠道与外部集成)"
         - "OpenAPI & Agent Skill (/api/v4/* 与 Agent 技能)"
@@ -73,7 +86,9 @@ body:
     attributes:
       label: "✅ Pre-Submission Checklist / 提交前确认"
       options:
+        - label: "I confirm this feature request targets **Yearning v4** (I understand Yearning v3 and earlier are no longer maintained). / 我确认本功能建议面向 **Yearning v4**（已知悉 v3 及更早版本已停止维护）。"
+          required: true
         - label: "I have searched existing [Issues](https://github.com/cookieY/Yearning/issues) and [Discussions](https://github.com/cookieY/Yearning/discussions) to confirm this is not a duplicate request. / 我已检索过已有 Issues 与 Discussions，确认非重复建议。"
           required: true
-        - label: "I have reviewed the [official documentation](https://next.yearning.io/) to verify this capability does not already exist in Yearning v4. / 我已查阅官方文档，确认 Yearning v4 当前尚未提供该能力。"
+        - label: "I have reviewed the [official documentation](https://v4.yearning.io) to verify this capability does not already exist in Yearning v4. / 我已查阅官方文档，确认 Yearning v4 当前尚未提供该能力。"
           required: true
