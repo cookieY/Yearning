@@ -4,6 +4,8 @@ import { defineConfig } from '@rspress/core';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const base = process.env.DOCS_BASE || '/';
+const normalizedBase = base.endsWith('/') ? base : `${base}/`;
+const autoLocaleScript = `(function(){try{if(/bot|crawler|spider|slurp|bingpreview|googlebot|baiduspider/i.test(navigator.userAgent||''))return;var k='yearning_docs_lang_auto_v1';if(localStorage.getItem(k))return;var b=${JSON.stringify(normalizedBase)};var p=window.location.pathname||'/';var r=p.indexOf(b)===0?p.slice(b.length):p.replace(/^\\/+/, '');if(r==='en'||r.indexOf('en/')===0){localStorage.setItem(k,'en');return;}var ls=(navigator.languages&&navigator.languages.length?navigator.languages:[navigator.language||'']).filter(Boolean);var lang=String(ls[0]||'').toLowerCase();if(!lang)return;localStorage.setItem(k,lang.indexOf('zh')===0?'zh':'en');if(lang.indexOf('zh')!==0){window.location.replace(b+'en/'+r.replace(/^\\/+/, '')+window.location.search+window.location.hash);}}catch(e){}})();`;
 
 const zhSidebar = [
   {
@@ -122,6 +124,7 @@ export default defineConfig({
   ],
   head: [
     ['meta', { name: 'theme-color', content: '#07080D' }],
+    `<script>${autoLocaleScript}</script>`,
     ['link', { rel: 'preconnect', href: 'https://fonts.googleapis.com' }],
     ['link', { rel: 'preconnect', href: 'https://fonts.gstatic.com', crossorigin: '' }],
     [
