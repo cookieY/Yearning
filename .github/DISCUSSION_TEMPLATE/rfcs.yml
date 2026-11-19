@@ -1,0 +1,31 @@
+title: "[RFC] "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Propose major architectural evolutions, new database governance workflows, protocol changes, or adapter contracts for **Yearning v4+**.
+        用于讨论 **Yearning v4+** 的重大架构演进、新治理机制、协议变更或数据库引擎适配规范。
+
+  - type: textarea
+    id: summary
+    attributes:
+      label: "📌 Summary & Motivation / 提案摘要与动机"
+      description: "What architectural gap or high-impact user problem does this RFC solve? / 本 RFC 旨在解决什么核心架构或业务痛点？"
+    validations:
+      required: true
+
+  - type: textarea
+    id: design
+    attributes:
+      label: "🏗️ Detailed Design / 详细设计"
+      description: "Describe the proposed APIs, state transitions, data model, or UX flow. / 请描述建议的接口、状态机、数据模型或交互设计。"
+    validations:
+      required: true
+
+  - type: textarea
+    id: security_impact
+    attributes:
+      label: "🔐 Security, Privacy & Compatibility Impact / 安全、隐私与兼容性影响"
+      description: "Analyze permission boundaries, AI zero-leak guarantees, backward compatibility, and operational complexity. / 请分析权限边界、AI 零泄漏约束、向后兼容性与运维复杂度。"
+    validations:
+      required: true

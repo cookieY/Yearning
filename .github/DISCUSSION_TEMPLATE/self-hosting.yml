@@ -1,0 +1,50 @@
+title: "[Self-Hosting] "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Welcome to **Yearning v4 Self Hosting**! Ask anything about Docker Compose, Kubernetes, standalone binary deployment, Nginx HTTPS/SSE reverse proxy, PostgreSQL 3-role setup, LDAP/OIDC SSO, or v3 → v4 migration.
+        欢迎来到 **Yearning v4 私有化部署专区**！关于 Docker Compose、Kubernetes、单二进制、Nginx HTTPS/SSE 反代、独立 PG 三角色授权、SSO 单点登录或 v3 升级迁移的问题，都可以在此发帖交流。
+
+        > **Before posting / 提问前建议先看文档**：
+        > - 📖 [Docker Compose & Nginx 反代](https://v4.yearning.io/guide/quick-start) · [二进制与独立 PG](https://v4.yearning.io/operations/binary-deploy) · [Kubernetes 多副本](https://v4.yearning.io/operations/kubernetes) · [v3 → v4 升级迁移](https://v4.yearning.io/operations/migration-v3-to-v4)
+        > - 🔒 **Security Notice / 安全提示**：发帖前请务必脱敏密码、密钥环 `keyring.json`、TLS 私钥与敏感内网域名。
+
+  - type: dropdown
+    id: deploy_mode
+    attributes:
+      label: "📦 Deployment Mode / 部署方式"
+      options:
+        - "Docker Compose (docker-compose.yml)"
+        - "Kubernetes (backend/deploy/k8s)"
+        - "Standalone Binary + Standalone PostgreSQL"
+        - "Nginx / Reverse Proxy / HTTPS & SSE"
+        - "v3 → v4 Migration CLI"
+        - "Other / 其他"
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: "📌 Yearning v4 Version & OS / 版本与系统环境"
+      placeholder: "e.g. v4.0.0-rc.5 · Ubuntu 24.04 · Docker 27 / PostgreSQL 18"
+    validations:
+      required: true
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: "❓ Deployment Question or Error / 部署疑问或报错"
+      description: "Describe your deployment topology, reverse proxy setup (if any), and the exact symptom or startup error. / 请说明部署拓扑、是否使用反向代理及具体报错现象。"
+    validations:
+      required: true
+
+  - type: textarea
+    id: config_logs
+    attributes:
+      label: "📋 Sanitized Config & Startup Logs / 脱敏配置与启动日志（可选）"
+      description: "Paste sanitized docker-compose / config.yaml / Nginx snippets or container logs. / 可粘贴脱敏后的编排配置或容器日志。"
+      render: text
+    validations:
+      required: false

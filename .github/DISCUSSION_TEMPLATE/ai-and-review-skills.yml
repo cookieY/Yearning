@@ -1,0 +1,39 @@
+title: "[AI & Skills] "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Share and discuss **AI SQL Precheck**, **Database AI Assistant**, **Custom Prompt Skills**, **Team Knowledge Rules**, **Model Tuning (`default` Cloud vs. `san` Local vLLM/Ollama)**, and **External Agent Skill (`skills/yearning`)** workflows!
+        欢迎在此交流 **AI Agentic SQL 预审**、**数据库 AI 助手**、**自定义 Prompt 审核技能**、**团队内部经验库规则**、**公有云 `default` 与内网 vLLM/Ollama `san` 模型调优**，以及 **Claude Code / Codex Agent Skill** 实战经验！
+
+        > 📖 参考手册：[AI Provider 与 48 条规则配置](https://v4.yearning.io/admin/review-engine) · [数据库 AI 助手指南](https://v4.yearning.io/features/ai-assistant) · [安全与 AI 零泄漏架构](https://v4.yearning.io/guide/security-and-ai-trust)
+
+  - type: dropdown
+    id: ai_topic
+    attributes:
+      label: "🧠 Topic / 讨论主题"
+      options:
+        - "Custom Prompt Skill Sharing (自定义审核技能分享)"
+        - "Team Experience / Knowledge Rules (内部经验库与 {{ref:...}} 实践)"
+        - "Model Selection & Tuning — default Cloud API (公有云模型选型与调优)"
+        - "Local Self-Hosted Models — san Track / vLLM / Ollama (内网本地模型部署调优)"
+        - "Database AI Assistant Workflows (数据库 AI 助手写 SQL 与优化体验)"
+        - "External Coding Agent Integration (Claude Code / Codex / OpenAPI 集成)"
+    validations:
+      required: true
+
+  - type: input
+    id: model_info
+    attributes:
+      label: "🤖 Model & Privacy Track / 模型与隐私轨道（可选）"
+      placeholder: "e.g. default track (GPT-4.1 / DeepSeek / Qwen) or san track (vLLM local model)"
+    validations:
+      required: false
+
+  - type: textarea
+    id: content
+    attributes:
+      label: "💡 Experience, Prompt Skill or Question / 实践分享或讨论内容"
+      description: "Share your prompt skill text, benchmark observations, or tuning questions (please redact real table names/credentials if sensitive). / 请分享你的技能规则、实测体验或调优问题（注意脱敏）。"
+    validations:
+      required: true

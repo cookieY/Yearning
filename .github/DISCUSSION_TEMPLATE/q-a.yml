@@ -3,25 +3,26 @@ body:
   - type: markdown
     attributes:
       value: |
-        Welcome to **Yearning Q&A**! Ask anything about deployment, configuration, AI review setup, SSO, or upgrading from v3 to v4.
-        欢迎来到 **Yearning 问答区**！关于部署配置、AI 审核接入、OIDC/LDAP 或 v3 升级迁移的任何疑问，都可以在此提问。
+        Welcome to **Yearning v4 Q&A**! Ask anything about using AI SQL Precheck, Database AI Assistant, approvals, `gh-ost`, rollback, read-only queries, or diagnostics.
+        欢迎来到 **Yearning v4 使用问答区**！关于 AI 预审、数据库 AI 助手、审批流、在线改表、自动回滚、只读查询与性能诊断的任何使用疑问，都可以在此提问。
 
-        > **Tip / 提示**: Found a reproducible software bug? Please use [Bug Report](https://github.com/cookieY/Yearning/issues/new?template=1_bug_report.yml) instead. Redact passwords, API keys, and sensitive data before posting.
-        > 如确认是可复现的程序 Bug，请直接提交 [Bug Report](https://github.com/cookieY/Yearning/issues/new?template=1_bug_report.yml)；发帖前请务必脱敏密码、密钥与敏感数据。
+        > **Note / 提示**：
+        > - 🚢 私有化部署、Nginx 反代、K8s 与 v3 升级问题建议发在 **[Self Hosting](https://github.com/cookieY/Yearning/discussions/new?category=self-hosting)**；
+        > - 📖 提问前建议先查官方文档：https://v4.yearning.io （注：**Yearning v3 及更早版本已停止维护**）；
+        > - 🐛 确认是可复现的 v4 程序 Bug 请提交 **[Bug Report](https://github.com/cookieY/Yearning/issues/new?template=1_bug_report.yml)**；发帖前请务必脱敏密码与密钥。
 
   - type: dropdown
     id: topic
     attributes:
       label: "🏷️ Question Topic / 问题分类"
       options:
-        - "Docker Compose / Self-Hosting (容器化与私有化部署)"
-        - "Kubernetes Production Deployment (K8s 多副本部署)"
-        - "AI Provider, Prompt Skills & Knowledge Base (AI 审核与规则配置)"
+        - "AI SQL Precheck, 48 Rules & Skills (AI 预审、内置规则与技能)"
+        - "Database AI Assistant (数据库 AI 助手)"
         - "Flows, Approvals, Execution & gh-ost (流程、审批、执行与在线改表)"
-        - "Query Workspace & Column Masking (只读查询与脱敏)"
-        - "SQL Performance Diagnostics (SQL 性能诊断)"
+        - "Automatic SQL Rollback (无 Binlog/WAL 自动回滚)"
+        - "Query Workspace & Column Masking (只读查询与敏感脱敏)"
+        - "SQL Performance Diagnostics (6 图 Top SQL 诊断)"
         - "LDAP / OIDC SSO & Permissions (认证与权限组)"
-        - "v3 → v4 Migration (旧版升级迁移)"
         - "OpenAPI & Agent Skill (/api/v4/* 集成)"
         - "Other / 其他"
     validations:
@@ -30,8 +31,8 @@ body:
   - type: input
     id: version
     attributes:
-      label: "📌 Yearning Version & Deployment / 版本与部署方式"
-      placeholder: "e.g. v4.0.0-rc.3 via Docker Compose on Ubuntu 24.04"
+      label: "📌 Yearning v4 Version / 版本号"
+      placeholder: "e.g. v4.0.0-rc.5 via Docker Compose"
     validations:
       required: true
 
