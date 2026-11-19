@@ -35,7 +35,19 @@ export function mockSuperSession(): boolean {
   const value = localStorage.getItem(SUPER_STORAGE_KEY);
   if (value === "0") return false;
   if (value === "1") return true;
-  return import.meta.env.MODE === "development";
+  return import.meta.env.MODE === "development" || import.meta.env.VITE_DEMO_MODE === "true";
+}
+
+/** Toggle the mock super-session override in browser storage (used by Demo Mode role switcher). */
+export function setMockSuperSession(enabled: boolean): void {
+  if (typeof window === "undefined") return;
+  localStorage.setItem(SUPER_STORAGE_KEY, enabled ? "1" : "0");
+}
+
+/** Clear the explicit super-session override back to the mode default. */
+export function clearMockSuperSession(): void {
+  if (typeof window === "undefined") return;
+  localStorage.removeItem(SUPER_STORAGE_KEY);
 }
 
 /**

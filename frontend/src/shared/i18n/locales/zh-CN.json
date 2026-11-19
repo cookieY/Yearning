@@ -2701,5 +2701,17 @@
       "copyFailed": "复制失败，请使用 {{shortcut}} 复制",
       "pasteShortcutHint": "浏览器限制非安全上下文通过菜单读取剪贴板，请按 {{shortcut}} 粘贴"
     }
+  },
+  "demo": {
+    "badge": "在线演示",
+    "notice": "纯前端浏览器沙箱 —— 所有操作仅保存在当前浏览器，刷新即重置。",
+    "roleLabel": "体验视角",
+    "roleAll": "全权限体验",
+    "roleSubmitter": "研发提交",
+    "roleReviewer": "审批人",
+    "roleExecutor": "执行人",
+    "reset": "重置演示",
+    "docs": "v4 文档",
+    "roleSwitched": "已切换演示视角：{{role}}"
   }
 }

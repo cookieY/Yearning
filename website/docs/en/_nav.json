@@ -23,5 +23,9 @@
     "text": "API & Errors",
     "link": "/en/integration/agent-skill-openapi",
     "activeMatch": "^/en/(integration|reference|about)/"
+  },
+  {
+    "text": "Live Demo",
+    "link": "https://demo.yearning.io"
   }
 ]

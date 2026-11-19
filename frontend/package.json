@@ -11,7 +11,9 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
+    "build:demo": "VITE_ENABLE_MOCK=true VITE_DEMO_MODE=true VITE_BUILD_OUT_DIR=dist-demo VITE_DOCS_URL=https://v4.yearning.io/ vite build",
     "preview": "vite preview",
+    "preview:demo": "VITE_BUILD_OUT_DIR=dist-demo vite preview --host 0.0.0.0 --port 4179",
     "typecheck": "tsc -b --noEmit",
     "lint": "eslint .",
     "test": "vitest run",

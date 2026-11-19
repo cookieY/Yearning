@@ -83,6 +83,7 @@ out
 dist
 dist-e2e
 dist-real
+dist-demo
 .output
 
 # Gatsby files

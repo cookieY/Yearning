@@ -66,6 +66,21 @@ function mswWorkerPlugin(): Plugin {
           source: readFileSync(MSW_WORKER_SOURCE, "utf8"),
         });
       }
+      if (process.env.VITE_DEMO_MODE === "true") {
+        // Cloudflare Workers Static Assets caching headers for the public
+        // pure-frontend interactive demo build (SPA fallback is handled by
+        // wrangler.jsonc `not_found_handling: "single-page-application"`, so
+        // emitting `_redirects` with `/* /index.html 200` would trigger
+        // Cloudflare Workers code 100324). Never emitted in release dist.
+        this.emitFile({
+          type: "asset",
+          fileName: "_headers",
+          source:
+            "/mockServiceWorker.js\n" +
+            "  Cache-Control: no-cache\n" +
+            "  Service-Worker-Allowed: /\n",
+        });
+      }
     },
   };
 }

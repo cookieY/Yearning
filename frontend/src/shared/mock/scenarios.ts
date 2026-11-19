@@ -20,6 +20,8 @@ import { type MockScenario } from "@/shared/mock/scenario-store";
 import { authMockHandlers } from "@/shared/mock/auth-handlers";
 import { reviewFixtureHandlers } from "@/shared/mock/review-fixture";
 import { adminFixtureHandlers, siteFixtureHandlers } from "@/shared/mock/admin-fixture";
+import { assistantFixtureHandlers } from "@/shared/mock/assistant-fixture";
+import { diagnosticsFixtureHandlers } from "@/shared/mock/diagnostics-fixture";
 import { queryFixtureHandlers } from "@/shared/mock/query-fixture";
 import { sseMockHandlers } from "@/shared/mock/sse-mock";
 
@@ -258,6 +260,8 @@ export function baseHandlers() {
     ...authMockHandlers(),
     ...reviewFixtureHandlers(),
     ...adminFixtureHandlers(),
+    ...assistantFixtureHandlers(),
+    ...diagnosticsFixtureHandlers(),
     ...queryFixtureHandlers(),
     ...siteFixtureHandlers(),
     ...sseMockHandlers(),

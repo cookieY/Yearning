@@ -137,14 +137,19 @@ export function YearningHome() {
             </p>
 
             <div className="yn-hero-actions">
-              <a href={withBase(`${prefix}/guide/quick-start`)} className="yn-btn-primary">
-                {isEn ? 'Try Public Beta' : '3 分钟体验公测版'}
+              <a
+                href="https://demo.yearning.io"
+                target="_blank"
+                rel="noreferrer"
+                className="yn-btn-primary"
+              >
+                {isEn ? 'Live Demo ↗' : '在线演示 ↗'}
               </a>
-              <a href={withBase(`${prefix}/features/ai-precheck`)} className="yn-btn-secondary">
+              <a href={withBase(`${prefix}/guide/quick-start`)} className="yn-btn-secondary">
+                {isEn ? 'Deploy Public Beta' : '3 分钟部署公测版'}
+              </a>
+              <a href={withBase(`${prefix}/features/ai-precheck`)} className="yn-btn-ghost">
                 {isEn ? 'AI Agentic Precheck' : 'AI Agentic 预审'}
-              </a>
-              <a href={withBase(`${prefix}/features/ai-assistant`)} className="yn-btn-ghost">
-                {isEn ? 'Database AI Assistant' : '数据库 AI 助手'}
               </a>
             </div>
 
@@ -815,19 +820,19 @@ export function YearningHome() {
 
             <div className="yn-deploy-footer">
               <div className="yn-deploy-actions">
-                <a href={withBase(`${prefix}/guide/quick-start`)} className="yn-btn-primary">
-                  {isEn ? 'Deployment Guide' : '查看部署手册'}
-                </a>
-                <a href={withBase(`${prefix}/operations/migration-v3-to-v4`)} className="yn-btn-secondary">
-                  {isEn ? 'Upgrade from v3' : '从 v3 升级迁移'}
-                </a>
                 <a
-                  href="https://github.com/cookieY/Yearning/issues"
+                  href="https://demo.yearning.io"
                   target="_blank"
                   rel="noreferrer"
-                  className="yn-btn-ghost"
+                  className="yn-btn-primary"
                 >
-                  {isEn ? 'Report Beta Feedback' : '提交公测反馈'}
+                  {isEn ? 'Live Demo ↗' : '在线演示 ↗'}
+                </a>
+                <a href={withBase(`${prefix}/guide/quick-start`)} className="yn-btn-secondary">
+                  {isEn ? 'Deployment Guide' : '查看部署手册'}
+                </a>
+                <a href={withBase(`${prefix}/operations/migration-v3-to-v4`)} className="yn-btn-ghost">
+                  {isEn ? 'Upgrade from v3' : '从 v3 升级迁移'}
                 </a>
               </div>
               <p className="yn-legal-note">

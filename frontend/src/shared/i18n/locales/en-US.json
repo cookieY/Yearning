@@ -2701,5 +2701,17 @@
       "copyFailed": "Copy failed; press {{shortcut}} to copy.",
       "pasteShortcutHint": "Browser restricts menu clipboard reads in this context; press {{shortcut}} to paste."
     }
+  },
+  "demo": {
+    "badge": "Live Demo",
+    "notice": "Pure browser sandbox — all actions stay local to your browser.",
+    "roleLabel": "Persona",
+    "roleAll": "Full Access",
+    "roleSubmitter": "Developer",
+    "roleReviewer": "Approver",
+    "roleExecutor": "Executor",
+    "reset": "Reset",
+    "docs": "v4 Docs",
+    "roleSwitched": "Switched demo persona to {{role}}"
   }
 }

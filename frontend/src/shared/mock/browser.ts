@@ -9,7 +9,10 @@ import { readStoredScenario } from "@/shared/mock/scenario-store";
  */
 export async function startMockWorker(): Promise<void> {
   const worker = setupWorker(...baseHandlers());
-  await worker.start({ onUnhandledRequest: "bypass", quiet: false });
+  await worker.start({
+    onUnhandledRequest: "bypass",
+    quiet: import.meta.env.VITE_DEMO_MODE === "true",
+  });
   applyScenarioToWorker(worker, readStoredScenario());
   window.addEventListener("yearning:mock-scenario", () => {
     applyScenarioToWorker(worker, readStoredScenario());

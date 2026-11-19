@@ -23,5 +23,9 @@
     "text": "API 与排障",
     "link": "/integration/agent-skill-openapi",
     "activeMatch": "^/(integration|reference|about)/"
+  },
+  {
+    "text": "在线演示",
+    "link": "https://demo.yearning.io"
   }
 ]

@@ -14,7 +14,11 @@
 Every SQL change, safely under control.<br/>
 From zero-leak AI precheck and frozen multi-stage approvals to in-process `gh-ost` online DDL, cross-engine rollback, governed queries, and SQL performance diagnostics.
 
-**English** · [简体中文](./README.zh-CN.md) · [Documentation][docs-link] · [Releases][github-release-link] · [Discussions][github-discussions-link] · [Feedback][github-issues-link] · [Sponsor][sponsor-link]
+**English** · [简体中文](./README.zh-CN.md) · [Live Demo][demo-link] · [Documentation][docs-link] · [Releases][github-release-link] · [Discussions][github-discussions-link] · [Feedback][github-issues-link] · [Sponsor][sponsor-link]
+
+<br/>
+
+[![][demo-shield-badge]][demo-link] [![][docs-shield-badge]][docs-link]
 
 <!-- SHIELD GROUP -->
 
@@ -90,6 +94,7 @@ Whether you are a DBA safeguarding production databases, a platform team standar
 
 | Channel | Description |
 | :-- | :-- |
+| [![][demo-shield-badge]][demo-link] | Interactive pure-browser v4 sandbox (AI SQL Review, AI Assistant, SQL Diagnostics, and role switcher) at **demo.yearning.io**. |
 | [![][docs-shield-badge]][docs-link] | Official installation, governance architecture, security model, and operations guides at **v4.yearning.io**. |
 | [![][discussions-shield-badge]][github-discussions-link] | Ask questions, share review skills, and discuss v4 architecture with maintainers and the community. |
 | [![][issues-shield-badge]][github-issues-link] | Report bugs, request database adapters, or propose enhancements on GitHub Issues. |
@@ -511,6 +516,8 @@ This project is [AGPL-3.0-or-later](./LICENSE) licensed.
 <!-- LINK GROUP -->
 
 [back-to-top]: https://img.shields.io/badge/-BACK_TO_TOP-151515?style=flat-square
+[demo-link]: https://demo.yearning.io
+[demo-shield-badge]: https://img.shields.io/badge/🚀_Live_Demo-demo.yearning.io-a855f7?labelColor=black&style=for-the-badge
 [discussions-shield-badge]: https://img.shields.io/badge/💬_GitHub_Discussions-181717?style=for-the-badge&logo=github&logoColor=white
 [docker-ghcr-link]: https://github.com/cookieY/Yearning/pkgs/container/yearning
 [docker-ghcr-shield]: https://img.shields.io/badge/ghcr.io-yearning%3Av4-369eff?labelColor=black&logo=docker&logoColor=white&style=flat-square

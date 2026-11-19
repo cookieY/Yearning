@@ -1,3 +1,4 @@
+import { lazy, Suspense } from "react";
 import type * as React from "react";
 import { Outlet, useLocation, useOutlet } from "react-router";
 import { AnimatePresence, motion } from "motion/react";
@@ -8,6 +9,17 @@ import { AppHeader } from "@/app/shell/app-header";
 import { AppFooter } from "@/app/shell/app-footer";
 import { AssistantWidget } from "@/features/assistant/assistant-widget";
 import { GlobalEventBridge } from "@/shared/events/sse-event-bus";
+
+// Statically dead-code-eliminated in release builds (VITE_DEMO_MODE !== "true")
+// so the demo banner and mock identity store never enter dist/.
+const DemoBanner =
+  import.meta.env.VITE_DEMO_MODE === "true"
+    ? lazy(() =>
+        import("@/app/shell/demo-banner").then((module) => ({
+          default: module.DemoBanner,
+        })),
+      )
+    : null;
 
 /**
  * Logged-in shell, independently written against the frozen template's
@@ -33,6 +45,11 @@ export function FullLayout() {
           floating canvas (8px margin, rounded corners, hairline outline) is
           gone, so the header bar and the sidebar meet the page edges. */}
       <SidebarInset className="bg-background h-svh overflow-hidden md:peer-data-[variant=inset]:m-0!">
+        {DemoBanner !== null ? (
+          <Suspense fallback={null}>
+            <DemoBanner />
+          </Suspense>
+        ) : null}
         <AppHeader />
         {/* Fill chain (owner ruling 2026-10-20): the column below the nav is
             a definite-height scroll container, so min-h-full resolves exactly

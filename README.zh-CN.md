@@ -14,7 +14,11 @@
 让每一条 SQL 变更都安全可控。<br/>
 从零泄漏 AI 预审与冻结式多阶段审批，到进程内 `gh-ost` 在线 DDL、跨引擎自动回滚、受控只读查询与 SQL 性能诊断，全面守护生产数据库生命周期。
 
-[English](./README.md) · **简体中文** · [官方文档][docs-link] · [版本发布][github-release-link] · [社区讨论][github-discussions-link] · [问题反馈][github-issues-link] · [赞助支持][sponsor-link]
+[English](./README.md) · **简体中文** · [在线演示][demo-link] · [官方文档][docs-link] · [版本发布][github-release-link] · [社区讨论][github-discussions-link] · [问题反馈][github-issues-link] · [赞助支持][sponsor-link]
+
+<br/>
+
+[![][demo-shield-badge]][demo-link] [![][docs-shield-badge]][docs-link]
 
 <!-- SHIELD GROUP -->
 
@@ -90,6 +94,7 @@
 
 | 社区渠道 | 说明 |
 | :-- | :-- |
+| [![][demo-shield-badge]][demo-link] | 免部署浏览器端在线演示站（含 AI SQL 预审、数据库 AI 助手、SQL 性能诊断与多角色视角切换）：**demo.yearning.io**。 |
 | [![][docs-shield-badge]][docs-link] | 官方安装指南、架构说明、安全模型与运维文档：**v4.yearning.io**。 |
 | [![][discussions-shield-badge]][github-discussions-link] | 在 GitHub Discussions 交流部署经验、自定义审核技能与架构实践。 |
 | [![][issues-shield-badge]][github-issues-link] | 提交缺陷反馈、数据库引擎适配建议或新需求。 |
@@ -511,6 +516,8 @@ Copyright © 2017–2026 [Henry Yee][profile-link]. <br />
 <!-- LINK GROUP -->
 
 [back-to-top]: https://img.shields.io/badge/-BACK_TO_TOP-151515?style=flat-square
+[demo-link]: https://demo.yearning.io
+[demo-shield-badge]: https://img.shields.io/badge/🚀_在线演示-demo.yearning.io-a855f7?labelColor=black&style=for-the-badge
 [discussions-shield-badge]: https://img.shields.io/badge/💬_GitHub_Discussions-181717?style=for-the-badge&logo=github&logoColor=white
 [docker-ghcr-link]: https://github.com/cookieY/Yearning/pkgs/container/yearning
 [docker-ghcr-shield]: https://img.shields.io/badge/ghcr.io-yearning%3Av4-369eff?labelColor=black&logo=docker&logoColor=white&style=flat-square

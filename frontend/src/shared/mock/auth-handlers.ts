@@ -65,10 +65,23 @@ function clearedSessionCookieHeaders(): Headers {
   return headers;
 }
 
+// Demo-mode in-memory session flag: public static demos (VITE_DEMO_MODE=true)
+// start pre-authenticated so visitors enter the workspace immediately even when
+// browsers ignore HttpOnly Set-Cookie headers synthesized by a Service Worker.
+// Normal mock dev, Vitest and Playwright E2E leave VITE_DEMO_MODE unset.
+let demoSessionActive = import.meta.env.VITE_DEMO_MODE === "true";
+
+export function setDemoSessionActive(active: boolean): void {
+  demoSessionActive = active;
+}
+
 // Reads the parsed request cookies — msw populates these from the Cookie
 // header in Node and from the service-worker request in the browser, where
 // the raw header is not always observable.
 function hasSession(cookies: Record<string, string>): boolean {
+  if (import.meta.env.VITE_DEMO_MODE === "true" && demoSessionActive) {
+    return true;
+  }
   return typeof cookies[SESSION_COOKIE] === "string" && cookies[SESSION_COOKIE] !== "";
 }
 
@@ -145,6 +158,9 @@ export function authMockHandlers(): HttpHandler[] {
       if (!ok) {
         return HttpResponse.json(businessError(1101, "invalid credentials"));
       }
+      if (import.meta.env.VITE_DEMO_MODE === "true") {
+        demoSessionActive = true;
+      }
       return HttpResponse.json(successEnvelope(null), { headers: sessionCookieHeaders() });
     }),
 
@@ -160,12 +176,18 @@ export function authMockHandlers(): HttpHandler[] {
       if (!ok) {
         return HttpResponse.json(businessError(1101, "invalid credentials"));
       }
+      if (import.meta.env.VITE_DEMO_MODE === "true") {
+        demoSessionActive = true;
+      }
       return HttpResponse.json(successEnvelope(null), { headers: sessionCookieHeaders() });
     }),
 
-    http.post("*/auth/logout", () =>
-      HttpResponse.json(successEnvelope(null), { headers: clearedSessionCookieHeaders() }),
-    ),
+    http.post("*/auth/logout", () => {
+      if (import.meta.env.VITE_DEMO_MODE === "true") {
+        demoSessionActive = false;
+      }
+      return HttpResponse.json(successEnvelope(null), { headers: clearedSessionCookieHeaders() });
+    }),
 
     // Open registration. The mock answers with the contract's success face
     // (an active user with zero workflow permissions); the real serve stack
@@ -214,6 +236,9 @@ export function authMockHandlers(): HttpHandler[] {
           { status: 401 },
         );
       }
+      if (import.meta.env.VITE_DEMO_MODE === "true") {
+        demoSessionActive = true;
+      }
       return HttpResponse.json(successEnvelope(null), { headers: sessionCookieHeaders() });
     }),
 
@@ -238,6 +263,9 @@ export function authMockHandlers(): HttpHandler[] {
         body.new_password.length < MIN_NEW_PASSWORD_LENGTH
       ) {
         return HttpResponse.json(businessError(1001, "validation failed"));
+      }
+      if (import.meta.env.VITE_DEMO_MODE === "true") {
+        demoSessionActive = false;
       }
       return HttpResponse.json(successEnvelope(null), { headers: clearedSessionCookieHeaders() });
     }),
