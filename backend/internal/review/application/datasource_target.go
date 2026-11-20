@@ -343,7 +343,7 @@ func withFrozenDatasourceTarget(
 	if err != nil {
 		return nil, err
 	}
-	out := make(map[string]any, len(value)+1)
+	out := make(map[string]any)
 	for key, item := range value {
 		out[key] = item
 	}

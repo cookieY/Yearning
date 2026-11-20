@@ -477,6 +477,7 @@ describe("frozen review and comments on the order detail page", () => {
     const user = userEvent.setup();
     seedFixtureOrder(approvalOrder());
     renderDetail("ad6f1a2b-0000-4000-8000-00000000f701");
+    await user.click(await screen.findByTestId("order-activity-tab-comments"));
     await screen.findByTestId("order-comments");
     await user.type(screen.getByTestId("order-comment-input"), "\u8bf7\u8865\u5145\u56de\u6eda\u8bf4\u660e");
     await user.click(screen.getByTestId("order-comment-submit"));
@@ -508,6 +509,7 @@ describe("frozen review and comments on the order detail page", () => {
     const user = userEvent.setup();
     seedFixtureOrder(approvalOrder());
     renderDetail("ad6f1a2b-0000-4000-8000-00000000f701");
+    await user.click(await screen.findByTestId("order-activity-tab-comments"));
     await screen.findByTestId("order-comments");
 
     // Enter submits the draft instead of inserting a newline (composer ruling

@@ -5,7 +5,17 @@ import { defineConfig } from '@rspress/core';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const base = process.env.DOCS_BASE || '/';
 const normalizedBase = base.endsWith('/') ? base : `${base}/`;
-const autoLocaleScript = `(function(){try{if(/bot|crawler|spider|slurp|bingpreview|googlebot|baiduspider/i.test(navigator.userAgent||''))return;var k='yearning_docs_lang_auto_v1';if(localStorage.getItem(k))return;var b=${JSON.stringify(normalizedBase)};var p=window.location.pathname||'/';var r=p.indexOf(b)===0?p.slice(b.length):p.replace(/^\\/+/, '');if(r==='en'||r.indexOf('en/')===0){localStorage.setItem(k,'en');return;}var ls=(navigator.languages&&navigator.languages.length?navigator.languages:[navigator.language||'']).filter(Boolean);var lang=String(ls[0]||'').toLowerCase();if(!lang)return;localStorage.setItem(k,lang.indexOf('zh')===0?'zh':'en');if(lang.indexOf('zh')!==0){window.location.replace(b+'en/'+r.replace(/^\\/+/, '')+window.location.search+window.location.hash);}}catch(e){}})();`;
+if (
+  !/^\/(?:[A-Za-z0-9._-]+\/)*$/.test(normalizedBase) ||
+  normalizedBase.split('/').includes('..')
+) {
+  throw new Error(`Invalid DOCS_BASE path: ${normalizedBase}`);
+}
+const escapedBaseLiteral = JSON.stringify(normalizedBase).replace(
+  /[<>/\u2028\u2029]/g,
+  (ch) => `\\u${ch.charCodeAt(0).toString(16).padStart(4, '0')}`,
+);
+const autoLocaleScript = `(function(){try{if(/bot|crawler|spider|slurp|bingpreview|googlebot|baiduspider/i.test(navigator.userAgent||''))return;var k='yearning_docs_lang_auto_v1';if(localStorage.getItem(k))return;var b=${escapedBaseLiteral};var p=window.location.pathname||'/';var r=p.indexOf(b)===0?p.slice(b.length):p.replace(/^\\/+/, '');if(r==='en'||r.indexOf('en/')===0){localStorage.setItem(k,'en');return;}var ls=(navigator.languages&&navigator.languages.length?navigator.languages:[navigator.language||'']).filter(Boolean);var lang=String(ls[0]||'').toLowerCase();if(!lang)return;localStorage.setItem(k,lang.indexOf('zh')===0?'zh':'en');if(lang.indexOf('zh')!==0){window.location.replace(b+'en/'+r.replace(/^\\/+/, '')+window.location.search+window.location.hash);}}catch(e){}})();`;
 
 const zhSidebar = [
   {

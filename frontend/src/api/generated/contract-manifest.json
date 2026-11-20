@@ -23,7 +23,7 @@
     "version": "8.27.0",
     "version_source": "package.json",
     "lockfile": "pnpm-lock.yaml",
-    "lockfile_sha256": "5392f4371e6f8d9650502842bbef69d600317ba516d8955b7335d87678667bc5"
+    "lockfile_sha256": "4d6530c5d87d8410d204a12c22696dc9bf88834bc8ef7c5a45f269d4a6eedaf5"
   },
   "generation_command": "pnpm api:generate",
   "outputs": {
@@ -57,5 +57,5 @@
     }
   },
   "authorization_policy_generated": false,
-  "generated_at": "2026-11-18T16:09:49.405Z"
+  "generated_at": "2026-11-20T13:16:26.956Z"
 }

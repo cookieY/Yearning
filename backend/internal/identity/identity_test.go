@@ -33,6 +33,20 @@ func TestArgon2HashAndVerify(t *testing.T) {
 	if ok || err == nil {
 		t.Fatal("malformed hash must fail")
 	}
+	// Malformed Argon2id parameter/version/digest edge cases must be rejected without panicking.
+	for _, bad := range []string{
+		"$argon2id$v=19$m=65536,t=3,p=257$c2FsdHNhbHRzYWx0$aGFzaGhhc2hoYXNo",
+		"$argon2id$v=18$m=65536,t=3,p=2$c2FsdHNhbHRzYWx0$aGFzaGhhc2hoYXNo",
+		"$argon2id$v=19$m=65536,t=3,p=2,p=1$c2FsdHNhbHRzYWx0$aGFzaGhhc2hoYXNo",
+		"$argon2id$v=19$m=65536,t=3,p=2,x=1$c2FsdHNhbHRzYWx0$aGFzaGhhc2hoYXNo",
+		"$argon2id$v=19$m=65536,t=3,p=2$$aGFzaGhhc2hoYXNo",
+		"$argon2id$v=19$m=65536,t=3,p=2$c2FsdHNhbHRzYWx0$",
+	} {
+		ok, _, err = VerifyPassword("x", bad)
+		if ok || err == nil {
+			t.Fatalf("malformed argon2id hash %q must be rejected", bad)
+		}
+	}
 }
 
 func TestDjangoPBKDF2VerifyAndUpgrade(t *testing.T) {

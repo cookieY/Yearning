@@ -60,38 +60,61 @@ func VerifyPassword(password, stored string) (ok bool, needsUpgrade bool, err er
 func verifyArgon2id(password, stored string) (bool, error) {
 	parts := strings.Split(stored, "$")
 	// ["", "argon2id", "v=19", "m=..,t=..,p=..", salt, hash]
-	if len(parts) != 6 || parts[1] != "argon2id" {
+	if len(parts) != 6 || parts[1] != "argon2id" || parts[2] != "v=19" {
 		return false, fmt.Errorf("identity: malformed argon2id hash")
 	}
 	var m, t uint32
 	var p uint8
+	var seenM, seenT, seenP bool
 	for _, kv := range strings.Split(parts[3], ",") {
 		fields := strings.SplitN(kv, "=", 2)
 		if len(fields) != 2 {
 			return false, fmt.Errorf("identity: malformed argon2id parameters")
 		}
-		n, err := strconv.ParseUint(fields[1], 10, 32)
-		if err != nil {
-			return false, fmt.Errorf("identity: malformed argon2id parameters")
-		}
 		switch fields[0] {
 		case "m":
+			if seenM {
+				return false, fmt.Errorf("identity: malformed argon2id parameters")
+			}
+			n, err := strconv.ParseUint(fields[1], 10, 32)
+			if err != nil {
+				return false, fmt.Errorf("identity: malformed argon2id parameters")
+			}
 			m = uint32(n)
+			seenM = true
 		case "t":
+			if seenT {
+				return false, fmt.Errorf("identity: malformed argon2id parameters")
+			}
+			n, err := strconv.ParseUint(fields[1], 10, 32)
+			if err != nil {
+				return false, fmt.Errorf("identity: malformed argon2id parameters")
+			}
 			t = uint32(n)
+			seenT = true
 		case "p":
+			if seenP {
+				return false, fmt.Errorf("identity: malformed argon2id parameters")
+			}
+			n, err := strconv.ParseUint(fields[1], 10, 8)
+			if err != nil {
+				return false, fmt.Errorf("identity: malformed argon2id parameters")
+			}
 			p = uint8(n)
+			seenP = true
+		default:
+			return false, fmt.Errorf("identity: malformed argon2id parameters")
 		}
 	}
 	if m == 0 || t == 0 || p == 0 {
 		return false, fmt.Errorf("identity: malformed argon2id parameters")
 	}
 	salt, err := base64.RawStdEncoding.DecodeString(parts[4])
-	if err != nil {
+	if err != nil || len(salt) == 0 {
 		return false, fmt.Errorf("identity: malformed argon2id salt")
 	}
 	want, err := base64.RawStdEncoding.DecodeString(parts[5])
-	if err != nil {
+	if err != nil || len(want) == 0 || len(want) > 1024 {
 		return false, fmt.Errorf("identity: malformed argon2id digest")
 	}
 	got := argon2.IDKey([]byte(password), salt, t, m, p, uint32(len(want)))

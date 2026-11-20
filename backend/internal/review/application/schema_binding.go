@@ -204,11 +204,12 @@ func buildTokenLegend(mapper *privacy.RunMapper, binding *stageSchemaBinding, to
 		out = append(out, agent.TokenLegendEntry{Token: tok, Kind: string(kind)})
 	}
 	if binding != nil {
-		schemas := make([]string, 0, len(binding.schemas)+len(binding.allPostgresSchemas()))
+		pgSchemas := binding.allPostgresSchemas()
+		var schemas []string
 		for s := range binding.schemas {
 			schemas = append(schemas, s)
 		}
-		schemas = append(schemas, binding.allPostgresSchemas()...)
+		schemas = append(schemas, pgSchemas...)
 		sort.Strings(schemas) // Deterministic legend order (map iteration is unordered)
 		for _, s := range schemas {
 			add(privacy.KindSchema, s)

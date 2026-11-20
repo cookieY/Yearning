@@ -1060,17 +1060,40 @@ func (s *Service) TestAndCapabilities(ctx context.Context, id, purpose string) (
 		return nil, &task, err
 	}
 	// Persist fingerprint and detected version (remains stable when database identity is unchanged).
+	metadataBytes, err := json.Marshal(struct {
+		DetectedVersion  string `json:"detected_version"`
+		CapabilityTarget string `json:"capability_target"`
+	}{
+		DetectedVersion:  probe.ServerVersion,
+		CapabilityTarget: target,
+	})
+	if err != nil {
+		return nil, &task, err
+	}
 	if err := s.db.WithContext(ctx).Model(&DatasourceModel{}).
 		Where("id = ?", id).
 		Updates(map[string]any{
 			"identity_fingerprint": fingerprint,
-			"metadata":             []byte(`{"detected_version":` + jsonString(probe.ServerVersion) + `,"capability_target":` + jsonString(target) + `}`),
+			"metadata":             metadataBytes,
 			"updated_at":           time.Now().UTC(),
 		}).Error; err != nil {
 		return nil, &task, err
 	}
-	resultRef := fmt.Sprintf(`{"stages":["dial","authenticate","probe"],"duration_ms":%d,"detected_version":%s,"capability_target":%s}`,
-		probe.DurationMS, jsonString(probe.ServerVersion), jsonString(target))
+	resultRefBytes, err := json.Marshal(struct {
+		Stages           []string `json:"stages"`
+		DurationMS       int64    `json:"duration_ms"`
+		DetectedVersion  string   `json:"detected_version"`
+		CapabilityTarget string   `json:"capability_target"`
+	}{
+		Stages:           []string{"dial", "authenticate", "probe"},
+		DurationMS:       probe.DurationMS,
+		DetectedVersion:  probe.ServerVersion,
+		CapabilityTarget: target,
+	})
+	if err != nil {
+		return nil, &task, err
+	}
+	resultRef := string(resultRefBytes)
 	finish("succeeded", nil, nil, strPtr(resultRef))
 	view := CapabilitiesView{
 		DatasourceID: id, DetectedVersion: probe.ServerVersion,
@@ -1138,11 +1161,6 @@ func strPtr(s string) *string {
 }
 
 func intPtr(i int) *int { return &i }
-
-func jsonString(s string) string {
-	b, _ := json.Marshal(s)
-	return string(b)
-}
 
 func isUniqueErr(err error) bool {
 	if err == nil {
