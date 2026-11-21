@@ -13,7 +13,6 @@ import {
   type OrderListFilters,
   type OrderListScope,
 } from "@/features/orders/use-orders";
-import { startReviewEvents, stopReviewEvents } from "@/features/review/review-events";
 import { OrderStateBadge } from "@/features/orders/order-state-badge";
 import { QueryOrdersTab } from "@/routes/changes/query-orders-tab";
 import { ErrorState } from "@/shared/components/status/status-components";
@@ -218,12 +217,6 @@ export default function MinePage() {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const [draftsOpen, setDraftsOpen] = useState(false);
-  // Live order-state updates ride the shared event feed; without it the list
-  // would only refresh on navigation.
-  useEffect(() => {
-    void startReviewEvents();
-    return () => { stopReviewEvents(); };
-  }, []);
 
   const [filters, setFilters] = useState<FilterState>(INITIAL_FILTERS);
 

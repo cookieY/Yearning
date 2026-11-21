@@ -538,8 +538,19 @@ func (s *TurnPrivacySession) anonymizeIdentifierContextualLocked(ident string, t
 //  3. Replaces registered database/schema/table/column/index names appearing in text with their corresponding schema_N/table_N/column_N tokens;
 //  4. Asserts zero leakage.
 func (s *TurnPrivacySession) AnonymizeNaturalLanguage(text string) (string, error) {
+	return s.anonymizeText(text, "credential_detected_in_prompt", true)
+}
+
+// AnonymizeAssistantHistory anonymizes an assistant-authored history turn by rejecting credential leaks,
+// replacing UUIDs, timestamps, and numbers, and scrubbing all registered database object identifiers and
+// bound user literals without registering assistant Markdown prose quotes as new forbidden database literals.
+func (s *TurnPrivacySession) AnonymizeAssistantHistory(text string) (string, error) {
+	return s.anonymizeText(text, "credential_detected_in_history", false)
+}
+
+func (s *TurnPrivacySession) anonymizeText(text, credReason string, includeQuotesAndKV bool) (string, error) {
 	if credentialLeakRe.MatchString(text) {
-		return "", domain.ErrAnonymizationFailed("credential_detected_in_prompt")
+		return "", domain.ErrAnonymizationFailed(credReason)
 	}
 	s.mu.Lock()
 	if s.released {
@@ -565,86 +576,88 @@ func (s *TurnPrivacySession) AnonymizeNaturalLanguage(text string) (string, erro
 		return ph
 	})
 
-	// 2. Single-quoted and double-quoted business values (mapped to object tokens if matching a registered object name, otherwise :val_str_n)
-	replaceQuoted := func(inner string) string {
-		trimmed := strings.TrimSpace(inner)
-		if trimmed == "" {
-			return inner
-		}
-		lowTrimmed := strings.ToLower(trimmed)
-		if isAlreadyAnonTokenOrPlaceholder(lowTrimmed) || strings.Contains(lowTrimmed, ":val_") || isTrivialBooleanOrKeyword(lowTrimmed) {
-			return trimmed
-		}
-		if tok := s.lookupRegisteredObjectTokenLocked(trimmed); tok != "" {
-			return tok
-		}
-		ph, err := s.registerValueLocked(ValString, trimmed)
-		if err != nil {
-			return inner
-		}
-		return ph
-	}
-	out = quotedSingleRe.ReplaceAllStringFunc(out, func(m string) string {
-		sub := quotedSingleRe.FindStringSubmatch(m)
-		if len(sub) < 2 {
-			return m
-		}
-		return replaceQuoted(sub[1])
-	})
-	out = quotedDoubleRe.ReplaceAllStringFunc(out, func(m string) string {
-		sub := quotedDoubleRe.FindStringSubmatch(m)
-		if len(sub) < 2 {
-			return m
-		}
-		return replaceQuoted(sub[1])
-	})
-	out = quotedChineseRe.ReplaceAllStringFunc(out, func(m string) string {
-		sub := quotedChineseRe.FindStringSubmatch(m)
-		if len(sub) < 2 {
-			return m
-		}
-		trimmed := strings.TrimSpace(sub[1])
-		if tok := s.lookupRegisteredObjectTokenLocked(trimmed); tok != "" {
-			return tok
-		}
-		if ph, ok := s.valByKey[string(ValString)+"\x00"+trimmed]; ok {
+	if includeQuotesAndKV {
+		// 2. Single-quoted and double-quoted business values (mapped to object tokens if matching a registered object name, otherwise :val_str_n)
+		replaceQuoted := func(inner string) string {
+			trimmed := strings.TrimSpace(inner)
+			if trimmed == "" {
+				return inner
+			}
+			lowTrimmed := strings.ToLower(trimmed)
+			if isAlreadyAnonTokenOrPlaceholder(lowTrimmed) || strings.Contains(lowTrimmed, ":val_") || isTrivialBooleanOrKeyword(lowTrimmed) {
+				return trimmed
+			}
+			if tok := s.lookupRegisteredObjectTokenLocked(trimmed); tok != "" {
+				return tok
+			}
+			ph, err := s.registerValueLocked(ValString, trimmed)
+			if err != nil {
+				return inner
+			}
 			return ph
 		}
-		return m
-	})
+		out = quotedSingleRe.ReplaceAllStringFunc(out, func(m string) string {
+			sub := quotedSingleRe.FindStringSubmatch(m)
+			if len(sub) < 2 {
+				return m
+			}
+			return replaceQuoted(sub[1])
+		})
+		out = quotedDoubleRe.ReplaceAllStringFunc(out, func(m string) string {
+			sub := quotedDoubleRe.FindStringSubmatch(m)
+			if len(sub) < 2 {
+				return m
+			}
+			return replaceQuoted(sub[1])
+		})
+		out = quotedChineseRe.ReplaceAllStringFunc(out, func(m string) string {
+			sub := quotedChineseRe.FindStringSubmatch(m)
+			if len(sub) < 2 {
+				return m
+			}
+			trimmed := strings.TrimSpace(sub[1])
+			if tok := s.lookupRegisteredObjectTokenLocked(trimmed); tok != "" {
+				return tok
+			}
+			if ph, ok := s.valByKey[string(ValString)+"\x00"+trimmed]; ok {
+				return ph
+			}
+			return m
+		})
 
-	// 3. key=value patterns in natural language
-	out = kvValueRe.ReplaceAllStringFunc(out, func(m string) string {
-		sub := kvValueRe.FindStringSubmatch(m)
-		if len(sub) < 3 {
-			return m
-		}
-		lhs, rhs := sub[1], sub[2]
-		lowLhs := strings.ToLower(lhs)
-		lowRhs := strings.ToLower(rhs)
-		if isAlreadyAnonTokenOrPlaceholder(lowLhs) || strings.HasPrefix(lowLhs, "val_") {
-			return m
-		}
-		if isAlreadyAnonTokenOrPlaceholder(lowRhs) || strings.HasPrefix(lowRhs, "val_") || isTrivialBooleanOrKeyword(lowRhs) {
-			return m
-		}
-		if tok := s.lookupRegisteredObjectTokenLocked(rhs); tok != "" {
-			return strings.Replace(m, rhs, tok, 1)
-		}
-		vk := ValString
-		if classifyNumberValueKind(rhs) == ValInt && isDigitsOnly(rhs) {
-			vk = ValInt
-		}
-		ph, err := s.registerValueLocked(vk, rhs)
-		if err != nil {
-			return m
-		}
-		lhsAnon := lhs
-		if tok := s.lookupRegisteredObjectTokenLocked(lhs); tok != "" {
-			lhsAnon = tok
-		}
-		return lhsAnon + " = " + ph
-	})
+		// 3. key=value patterns in natural language
+		out = kvValueRe.ReplaceAllStringFunc(out, func(m string) string {
+			sub := kvValueRe.FindStringSubmatch(m)
+			if len(sub) < 3 {
+				return m
+			}
+			lhs, rhs := sub[1], sub[2]
+			lowLhs := strings.ToLower(lhs)
+			lowRhs := strings.ToLower(rhs)
+			if isAlreadyAnonTokenOrPlaceholder(lowLhs) || strings.HasPrefix(lowLhs, "val_") {
+				return m
+			}
+			if isAlreadyAnonTokenOrPlaceholder(lowRhs) || strings.HasPrefix(lowRhs, "val_") || isTrivialBooleanOrKeyword(lowRhs) {
+				return m
+			}
+			if tok := s.lookupRegisteredObjectTokenLocked(rhs); tok != "" {
+				return strings.Replace(m, rhs, tok, 1)
+			}
+			vk := ValString
+			if classifyNumberValueKind(rhs) == ValInt && isDigitsOnly(rhs) {
+				vk = ValInt
+			}
+			ph, err := s.registerValueLocked(vk, rhs)
+			if err != nil {
+				return m
+			}
+			lhsAnon := lhs
+			if tok := s.lookupRegisteredObjectTokenLocked(lhs); tok != "" {
+				lhsAnon = tok
+			}
+			return lhsAnon + " = " + ph
+		})
+	}
 
 	// 4. Standalone multi-digit numbers (preserve public platform numbers and error codes when no database tables are registered)
 	noTablesRegistered := len(s.authTables) == 0 && len(s.authSchemas) == 0
@@ -661,55 +674,6 @@ func (s *TurnPrivacySession) AnonymizeNaturalLanguage(text string) (string, erro
 	})
 
 	// 5. Replace registered Schema / Table / Column / Index names and bound literals appearing in natural language.
-	out = s.scrubRegisteredLocked(out)
-	s.mu.Unlock()
-
-	if err := s.AssertZeroLeak(out); err != nil {
-		return "", err
-	}
-	return out, nil
-}
-
-// AnonymizeAssistantHistory anonymizes an assistant-authored history turn by rejecting credential leaks,
-// replacing UUIDs, timestamps, and numbers, and scrubbing all registered database object identifiers and
-// bound user literals without registering assistant Markdown prose quotes as new forbidden database literals.
-func (s *TurnPrivacySession) AnonymizeAssistantHistory(text string) (string, error) {
-	if credentialLeakRe.MatchString(text) {
-		return "", domain.ErrAnonymizationFailed("credential_detected_in_history")
-	}
-	s.mu.Lock()
-	if s.released {
-		s.mu.Unlock()
-		return "", domain.ErrAnonymizationFailed("session_released")
-	}
-
-	out := text
-	out = uuidLiteralRe.ReplaceAllStringFunc(out, func(m string) string {
-		ph, err := s.registerValueLocked(ValUUID, m)
-		if err != nil {
-			return m
-		}
-		return ph
-	})
-	out = timestampLiteralRe.ReplaceAllStringFunc(out, func(m string) string {
-		ph, err := s.registerValueLocked(ValTimestamp, m)
-		if err != nil {
-			return m
-		}
-		return ph
-	})
-	noTablesRegistered := len(s.authTables) == 0 && len(s.authSchemas) == 0
-	out = standaloneNumRe.ReplaceAllStringFunc(out, func(m string) string {
-		if isPublicPlatformCapOrCode(m) || (noTablesRegistered && len(m) <= 6) {
-			return m
-		}
-		vk := classifyNumberValueKind(m)
-		ph, err := s.registerValueLocked(vk, m)
-		if err != nil {
-			return m
-		}
-		return ph
-	})
 	out = s.scrubRegisteredLocked(out)
 	s.mu.Unlock()
 
@@ -928,7 +892,7 @@ func isPublicPlatformCapOrCode(s string) bool {
 	return false
 }
 
-var anonTokenOrPhRe = regexp.MustCompile(`^(?:(?:database|schema|table|column|index|constraint|alias|cte|ident)_[0-9]+|:val_[a-z]+_[0-9]+)$`)
+var anonTokenOrPhRe = regexp.MustCompile(`^(?:` + revprivacy.AnonTokenBodyPattern + `|:val_[a-z]+_[0-9]+)$`)
 
 func isAlreadyAnonTokenOrPlaceholder(w string) bool {
 	return anonTokenOrPhRe.MatchString(w)
@@ -966,7 +930,7 @@ func isIdentBoundaryRune(r rune) bool {
 	return r == '_' || r == ':' || (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') && unicode.IsPrint(r)
 }
 
-var textRestoreTokenRe = regexp.MustCompile(`:val_(?:str|int|num|bool|ts|uuid|json|hex)_[0-9]+|\b(?:database|schema|table|column|index|constraint|alias|cte|ident)_[0-9]+\b`)
+var textRestoreTokenRe = regexp.MustCompile(`(?i):val_(?:str|int|num|bool|ts|uuid|json|hex)_[0-9]+|\b` + revprivacy.AnonTokenBodyPattern + `\b`)
 
 // RestoreTextTokens restores per-turn anonymous object tokens and value placeholders in natural-language/Markdown prose back to their original identifiers and literals.
 // Note: SQL drafts themselves must always be structurally restored via ValidateAndRestoreSQL along lexical/syntactic boundaries.

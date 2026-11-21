@@ -61,8 +61,7 @@ func TestTimelineProjectsRejectedDecisionComment(t *testing.T) {
 	})
 	fx.seedGrant(t, submitter, flowID)
 	draftID := fx.seedReadyDraft(t, flowID, submitter)
-	fx.seedReadyRun(t, draftID, flowID)
-	view, err := fx.submitAs(t, draftID, submitter, "tl-sub")
+	view, err := fx.submitReadyDraftAs(t, draftID, flowID, submitter, "tl-sub")
 	if err != nil {
 		t.Fatalf("submit: %v", err)
 	}
@@ -100,8 +99,7 @@ func TestTimelineProjectsApprovedDecisionComment(t *testing.T) {
 	})
 	fx.seedGrant(t, submitter, flowID)
 	draftID := fx.seedReadyDraft(t, flowID, submitter)
-	fx.seedReadyRun(t, draftID, flowID)
-	view, err := fx.submitAs(t, draftID, submitter, "tl-sub2")
+	view, err := fx.submitReadyDraftAs(t, draftID, flowID, submitter, "tl-sub2")
 	if err != nil {
 		t.Fatalf("submit: %v", err)
 	}

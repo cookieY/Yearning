@@ -5,23 +5,15 @@ import (
 	"crypto/subtle"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"sort"
 
 	"gorm.io/gorm"
 
-	"github.com/cookieY/YearningX/backend/internal/crypto"
 	"github.com/cookieY/YearningX/backend/internal/review/domain"
 	"github.com/cookieY/YearningX/backend/internal/review/knowledge"
 )
 
 const reviewPolicySnapshotSchemaVersion = "review-policy-v1"
-
-// PolicySnapshotPurpose binds a sealed policy snapshot to its consumer role.
-// Both the grouping and review tasks consume the one Run-level snapshot.
-type PolicySnapshotPurpose string
-
-const PolicySnapshotPurposeReview PolicySnapshotPurpose = "review"
 
 // ErrPolicySnapshotInvalid covers missing, malformed, tampered, unsupported
 // or mismatched snapshots. Callers should fail closed and mark the Run
@@ -73,114 +65,6 @@ type FrozenKnowledgeEntry struct {
 	ConfigHash   string               `json:"config_hash"`
 	FindingKey   string               `json:"finding_key"`
 	Version      int64                `json:"version"`
-}
-
-// policySnapshotAAD binds ciphertext to the Run and consumer role. Task IDs are
-// deliberately absent because the grouped task copies the same envelope.
-func policySnapshotAAD(
-	c *crypto.Crypter,
-	runID string,
-	purpose PolicySnapshotPurpose,
-) crypto.AAD {
-	return crypto.AAD{
-		DeploymentID: c.DeploymentID(),
-		Table:        "async_tasks",
-		PrimaryKey:   runID + "#policy-snapshot#" + string(purpose),
-		Column:       "input",
-		Purpose:      crypto.PurposePayload,
-	}
-}
-
-// sealReviewPolicySnapshot canonicalizes, seals and binds the policy snapshot.
-func sealReviewPolicySnapshot(
-	c *crypto.Crypter,
-	runID string,
-	purpose PolicySnapshotPurpose,
-	policy FrozenReviewPolicy,
-) (TaskInput, error) {
-	if c == nil || runID == "" || purpose != PolicySnapshotPurposeReview {
-		return TaskInput{}, ErrPolicySnapshotInvalid
-	}
-	policyHash, canonical, err := canonicalReviewPolicyIdentity(policy)
-	if err != nil {
-		return TaskInput{}, err
-	}
-	env, err := c.Seal(
-		crypto.PurposePayload,
-		canonical,
-		policySnapshotAAD(c, runID, purpose),
-	)
-	if err != nil {
-		return TaskInput{}, err
-	}
-	_, flowHash, ruleHash, toolHash, err := policyIdentityParts(policy)
-	if err != nil {
-		return TaskInput{}, err
-	}
-	return TaskInput{
-		ReviewRunID:              runID,
-		FlowSnapshotHash:         flowHash,
-		RuleConfigHash:           ruleHash,
-		ToolConfigHash:           toolHash,
-		PolicySnapshotCiphertext: env.Ciphertext,
-		PolicySnapshotNonce:      env.Nonce,
-		PolicySnapshotKeyID:      env.KeyID,
-		PolicySnapshotAlgorithm:  env.Algorithm,
-		PolicySnapshotHash:       policyHash,
-	}, nil
-}
-
-// VerifyAndDecodePolicySnapshot authenticates and verifies the Run's sealed
-// policy. It never falls back to currently persisted tool or knowledge rows.
-func (s *Services) VerifyAndDecodePolicySnapshot(
-	_ context.Context,
-	_ *gorm.DB,
-	input TaskInput,
-	purpose PolicySnapshotPurpose,
-) (*FrozenReviewPolicy, error) {
-	if s == nil || s.Crypter == nil ||
-		input.ReviewRunID == "" ||
-		purpose != PolicySnapshotPurposeReview ||
-		len(input.PolicySnapshotCiphertext) == 0 ||
-		len(input.PolicySnapshotNonce) == 0 ||
-		input.PolicySnapshotKeyID == "" ||
-		input.PolicySnapshotAlgorithm == "" ||
-		input.PolicySnapshotHash == "" {
-		return nil, ErrPolicySnapshotInvalid
-	}
-	plain, err := s.Crypter.Open(
-		crypto.PurposePayload,
-		crypto.Envelope{
-			Ciphertext: input.PolicySnapshotCiphertext,
-			Nonce:      input.PolicySnapshotNonce,
-			KeyID:      input.PolicySnapshotKeyID,
-			Algorithm:  input.PolicySnapshotAlgorithm,
-		},
-		policySnapshotAAD(s.Crypter, input.ReviewRunID, purpose),
-	)
-	if err != nil {
-		return nil, fmt.Errorf("%w: authentication failed", ErrPolicySnapshotInvalid)
-	}
-	var policy FrozenReviewPolicy
-	if err := json.Unmarshal(plain, &policy); err != nil {
-		return nil, fmt.Errorf("%w: decode failed", ErrPolicySnapshotInvalid)
-	}
-	policyHash, canonical, err := canonicalReviewPolicyIdentity(policy)
-	if err != nil {
-		return nil, fmt.Errorf("%w: %v", ErrPolicySnapshotInvalid, err)
-	}
-	_, flowHash, ruleHash, toolHash, err := policyIdentityParts(policy)
-	if err != nil {
-		return nil, fmt.Errorf("%w: %v", ErrPolicySnapshotInvalid, err)
-	}
-	if !sameDigest(policyHash, input.PolicySnapshotHash) ||
-		!sameDigest(sha256Hex(canonical), input.PolicySnapshotHash) ||
-		!sameDigest(flowHash, input.FlowSnapshotHash) ||
-		!sameDigest(ruleHash, input.RuleConfigHash) ||
-		!sameDigest(toolHash, input.ToolConfigHash) {
-		return nil, fmt.Errorf("%w: frozen identity mismatch", ErrPolicySnapshotInvalid)
-	}
-	return &policy, nil
 }
 
 // canonicalReviewPolicyIdentity returns the canonical snapshot hash and bytes.

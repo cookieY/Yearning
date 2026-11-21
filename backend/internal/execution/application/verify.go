@@ -9,7 +9,6 @@ package application
 import (
 	"context"
 	"encoding/json"
-	"errors"
 
 	"gorm.io/gorm"
 
@@ -66,10 +65,7 @@ func (s *Services) Verify(ctx context.Context, in VerifyInput) (orderID string, 
 		return nil
 	})
 	if txErr != nil {
-		var de *domain.Error
-		if errors.As(txErr, &de) {
-			_ = s.idemRelease(ctx, in.Actor.UserID, route, in.AttemptID, in.IdempotencyKey)
-		}
+		_ = s.idemRelease(ctx, in.Actor.UserID, route, in.AttemptID, in.IdempotencyKey)
 		return "", false, txErr
 	}
 	if cerr := s.idemComplete(ctx, in.Actor.UserID, route, in.AttemptID, in.IdempotencyKey, out); cerr != nil {

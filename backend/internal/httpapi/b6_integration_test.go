@@ -172,10 +172,6 @@ func newB6Fixture(t *testing.T) *b6Fixture {
 	// Keep its identity deterministic; production factory coverage uses a real probe.
 	installB9DatasourceIdentityProbe(t, reviewSvc)
 	b6Deps := &B6Deps{Review: reviewSvc, Sessions: sessions, DB: db}
-	// This fixture drives the two review tasks with its deterministic FakeRunner
-	// in drainTasks. Disable the router's real Agent worker so it cannot race the
-	// fixture and leave the grouping task running when the assertions start.
-	b6Deps.workerOnce.Do(func() {})
 	fx := &b6Fixture{db: db, svc: reviewSvc, deps: b6Deps}
 	// RCP-20261101 ephemeral precheck: claim agentOnce BEFORE NewServeRouter (which calls b6.AgentRunner()
 	// when wiring assistant/diagnostics routes) and inject closure Dial -- responder is switched

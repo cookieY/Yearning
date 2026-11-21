@@ -133,6 +133,59 @@ func (fakeB13HTTPCatalog) ListIndexes(_ context.Context, _ assistanttool.Datasou
 	}, nil
 }
 
+type fakeB13HTTPTestSynthesizer struct{}
+
+func (fakeB13HTTPTestSynthesizer) Synthesize(ctx context.Context, in assistantapp.SynthesizeInput) (*assistantapp.SynthesizeOutput, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	if strings.Contains(strings.ToLower(in.AnonymizedPrompt), "poem") {
+		return &assistantapp.SynthesizeOutput{
+			OutOfScope:         true,
+			ResolvedCapability: string(assistantdomain.CapabilityOutOfScope),
+			AssistantReply:     "Non-database requests are out of scope.",
+		}, nil
+	}
+	if len(in.AnonymizedMetadata) == 0 {
+		return &assistantapp.SynthesizeOutput{
+			AssistantReply: "Please select a target datasource.",
+			NeedsClarify:   true,
+		}, nil
+	}
+	tbl := in.AnonymizedMetadata[0]
+	qualTable := tbl.TableToken
+	if tbl.SchemaToken != "" {
+		qualTable = tbl.SchemaToken + "." + tbl.TableToken
+	}
+	var cols, vals []string
+	idx := 0
+	for _, c := range tbl.Columns {
+		if c.DefaultBehavior == assistanttool.DefaultAutoIncrement || idx >= len(in.BoundPlaceholders) {
+			continue
+		}
+		cols = append(cols, c.ColumnToken)
+		vals = append(vals, in.BoundPlaceholders[idx])
+		idx++
+	}
+	anonSQL := fmt.Sprintf("INSERT INTO %s (%s) VALUES (%s)", qualTable, strings.Join(cols, ", "), strings.Join(vals, ", "))
+	reply := "Generated INSERT draft for " + qualTable + "."
+	if in.OnDelta != nil {
+		in.OnDelta("delta", reply)
+	}
+	return &assistantapp.SynthesizeOutput{
+		AssistantReply: reply,
+		AnonymizedSQL:  anonSQL,
+		Assumptions:    []string{"Auto-increment id omitted."},
+		NextSteps:      []string{"Run AI precheck before submitting."},
+		InputTokens:    32,
+		OutputTokens:   48,
+	}, nil
+}
+
+func (fakeB13HTTPTestSynthesizer) Summarize(_ context.Context, _ []assistantapp.AnonymizedTurn) (string, int64, int64, error) {
+	return "summary", 8, 4, nil
+}
+
 func makeB13Key32(seed byte) string {
 	b := make([]byte, 32)
 	for i := range b {
@@ -226,6 +279,7 @@ func newB13HTTPRouter(t *testing.T, db *gorm.DB) (*gin.Engine, string, string, s
 	if err != nil {
 		t.Fatalf("NewServices: %v", err)
 	}
+	svc.Synthesizer = fakeB13HTTPTestSynthesizer{}
 	svc.Authorizer.Catalog = fakeB13HTTPCatalog{}
 	svc.PrecheckRunner = func(_ context.Context, _ assistantdomain.Actor, _ string, _ []byte, _, idemKey string) (string, string, error) {
 		return uuid.NewSHA1(uuid.NameSpaceOID, []byte("http-precheck:"+idemKey)).String(), "ready", nil

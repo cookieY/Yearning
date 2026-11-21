@@ -128,7 +128,6 @@ import type {
   PrecheckDiagnosticOptimizationDraft200,
   PrecheckDiagnosticOptimizationDraftRequest,
   PreviewNotificationRule200,
-  ProblemResponse,
   PromptToolWrite,
   PublishAnnouncementRequest,
   ReplaceAiProvider200,
@@ -163,25 +162,6 @@ import type {
 
 import { customInstance } from '../../../../shared/api/mutator';
 
-export type listUsersResponse200 = {
-  data: ListUsers200
-  status: 200
-}
-
-export type listUsersResponse403 = {
-  data: ProblemResponse
-  status: 403
-}
-
-export type listUsersResponseSuccess = (listUsersResponse200) & {
-  headers: Headers;
-};
-export type listUsersResponseError = (listUsersResponse403) & {
-  headers: Headers;
-};
-
-export type listUsersResponse = (listUsersResponseSuccess | listUsersResponseError)
-
 export const getListUsersUrl = (params?: ListUsersParams,) => {
   const normalizedParams = new URLSearchParams();
 
@@ -197,9 +177,9 @@ export const getListUsersUrl = (params?: ListUsersParams,) => {
   return stringifiedParams.length > 0 ? `/api/v4/admin/users?${stringifiedParams}` : `/api/v4/admin/users`
 }
 
-export const listUsers = async (params?: ListUsersParams, options?: Parameters<typeof customInstance>[1]): Promise<listUsersResponse> => {
+export const listUsers = async (params?: ListUsersParams, options?: Parameters<typeof customInstance>[1]): Promise<ListUsers200> => {
 
-  return customInstance<listUsersResponse>(getListUsersUrl(params),
+  return customInstance<ListUsers200>(getListUsersUrl(params),
   {
     ...options,
     method: 'GET'
@@ -209,25 +189,6 @@ export const listUsers = async (params?: ListUsersParams, options?: Parameters<t
 );}
 
 
-export type createUserResponse200 = {
-  data: CreateUser200
-  status: 200
-}
-
-export type createUserResponse403 = {
-  data: ProblemResponse
-  status: 403
-}
-
-export type createUserResponseSuccess = (createUserResponse200) & {
-  headers: Headers;
-};
-export type createUserResponseError = (createUserResponse403) & {
-  headers: Headers;
-};
-
-export type createUserResponse = (createUserResponseSuccess | createUserResponseError)
-
 export const getCreateUserUrl = () => {
 
 
@@ -236,7 +197,7 @@ export const getCreateUserUrl = () => {
   return `/api/v4/admin/users`
 }
 
-export const createUser = async (createUserRequest: CreateUserRequest, options?: Parameters<typeof customInstance>[1]): Promise<createUserResponse> => {
+export const createUser = async (createUserRequest: CreateUserRequest, options?: Parameters<typeof customInstance>[1]): Promise<CreateUser200> => {
 
     const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
@@ -244,7 +205,7 @@ export const createUser = async (createUserRequest: CreateUserRequest, options?:
     if (Array.isArray(h)) return Object.fromEntries(h);
     return h;
   };
-return customInstance<createUserResponse>(getCreateUserUrl(),
+return customInstance<CreateUser200>(getCreateUserUrl(),
   {
     ...options,
     method: 'POST',
@@ -253,18 +214,6 @@ return customInstance<createUserResponse>(getCreateUserUrl(),
   }
 );}
 
-
-export type updateUserResponse200 = {
-  data: UpdateUser200
-  status: 200
-}
-
-export type updateUserResponseSuccess = (updateUserResponse200) & {
-  headers: Headers;
-};
-;
-
-export type updateUserResponse = (updateUserResponseSuccess)
 
 export const getUpdateUserUrl = (userId: string,) => {
 
@@ -275,7 +224,7 @@ export const getUpdateUserUrl = (userId: string,) => {
 }
 
 export const updateUser = async (userId: string,
-    updateUserRequest: UpdateUserRequest, options?: Parameters<typeof customInstance>[1]): Promise<updateUserResponse> => {
+    updateUserRequest: UpdateUserRequest, options?: Parameters<typeof customInstance>[1]): Promise<UpdateUser200> => {
 
     const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
@@ -283,7 +232,7 @@ export const updateUser = async (userId: string,
     if (Array.isArray(h)) return Object.fromEntries(h);
     return h;
   };
-return customInstance<updateUserResponse>(getUpdateUserUrl(userId),
+return customInstance<UpdateUser200>(getUpdateUserUrl(userId),
   {
     ...options,
     method: 'PATCH',
@@ -293,18 +242,6 @@ return customInstance<updateUserResponse>(getUpdateUserUrl(userId),
 );}
 
 
-export type deleteUserResponse200 = {
-  data: DeleteUser200
-  status: 200
-}
-
-export type deleteUserResponseSuccess = (deleteUserResponse200) & {
-  headers: Headers;
-};
-;
-
-export type deleteUserResponse = (deleteUserResponseSuccess)
-
 export const getDeleteUserUrl = (userId: string,) => {
 
 
@@ -313,9 +250,9 @@ export const getDeleteUserUrl = (userId: string,) => {
   return `/api/v4/admin/users/${userId}`
 }
 
-export const deleteUser = async (userId: string, options?: Parameters<typeof customInstance>[1]): Promise<deleteUserResponse> => {
+export const deleteUser = async (userId: string, options?: Parameters<typeof customInstance>[1]): Promise<DeleteUser200> => {
 
-  return customInstance<deleteUserResponse>(getDeleteUserUrl(userId),
+  return customInstance<DeleteUser200>(getDeleteUserUrl(userId),
   {
     ...options,
     method: 'DELETE'
@@ -325,18 +262,6 @@ export const deleteUser = async (userId: string, options?: Parameters<typeof cus
 );}
 
 
-export type getUserDeletionImpactResponse200 = {
-  data: GetUserDeletionImpact200
-  status: 200
-}
-
-export type getUserDeletionImpactResponseSuccess = (getUserDeletionImpactResponse200) & {
-  headers: Headers;
-};
-;
-
-export type getUserDeletionImpactResponse = (getUserDeletionImpactResponseSuccess)
-
 export const getGetUserDeletionImpactUrl = (userId: string,) => {
 
 
@@ -345,9 +270,9 @@ export const getGetUserDeletionImpactUrl = (userId: string,) => {
   return `/api/v4/admin/users/${userId}/deletion-impact`
 }
 
-export const getUserDeletionImpact = async (userId: string, options?: Parameters<typeof customInstance>[1]): Promise<getUserDeletionImpactResponse> => {
+export const getUserDeletionImpact = async (userId: string, options?: Parameters<typeof customInstance>[1]): Promise<GetUserDeletionImpact200> => {
 
-  return customInstance<getUserDeletionImpactResponse>(getGetUserDeletionImpactUrl(userId),
+  return customInstance<GetUserDeletionImpact200>(getGetUserDeletionImpactUrl(userId),
   {
     ...options,
     method: 'GET'
@@ -356,18 +281,6 @@ export const getUserDeletionImpact = async (userId: string, options?: Parameters
   }
 );}
 
-
-export type listFlowsResponse200 = {
-  data: ListFlows200
-  status: 200
-}
-
-export type listFlowsResponseSuccess = (listFlowsResponse200) & {
-  headers: Headers;
-};
-;
-
-export type listFlowsResponse = (listFlowsResponseSuccess)
 
 export const getListFlowsUrl = (params?: ListFlowsParams,) => {
   const normalizedParams = new URLSearchParams();
@@ -384,9 +297,9 @@ export const getListFlowsUrl = (params?: ListFlowsParams,) => {
   return stringifiedParams.length > 0 ? `/api/v4/admin/flows?${stringifiedParams}` : `/api/v4/admin/flows`
 }
 
-export const listFlows = async (params?: ListFlowsParams, options?: Parameters<typeof customInstance>[1]): Promise<listFlowsResponse> => {
+export const listFlows = async (params?: ListFlowsParams, options?: Parameters<typeof customInstance>[1]): Promise<ListFlows200> => {
 
-  return customInstance<listFlowsResponse>(getListFlowsUrl(params),
+  return customInstance<ListFlows200>(getListFlowsUrl(params),
   {
     ...options,
     method: 'GET'
@@ -395,18 +308,6 @@ export const listFlows = async (params?: ListFlowsParams, options?: Parameters<t
   }
 );}
 
-
-export type createFlowResponse200 = {
-  data: CreateFlow200
-  status: 200
-}
-
-export type createFlowResponseSuccess = (createFlowResponse200) & {
-  headers: Headers;
-};
-;
-
-export type createFlowResponse = (createFlowResponseSuccess)
 
 export const getCreateFlowUrl = () => {
 
@@ -416,7 +317,7 @@ export const getCreateFlowUrl = () => {
   return `/api/v4/admin/flows`
 }
 
-export const createFlow = async (flowWrite: FlowWrite, options?: Parameters<typeof customInstance>[1]): Promise<createFlowResponse> => {
+export const createFlow = async (flowWrite: FlowWrite, options?: Parameters<typeof customInstance>[1]): Promise<CreateFlow200> => {
 
     const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
@@ -424,7 +325,7 @@ export const createFlow = async (flowWrite: FlowWrite, options?: Parameters<type
     if (Array.isArray(h)) return Object.fromEntries(h);
     return h;
   };
-return customInstance<createFlowResponse>(getCreateFlowUrl(),
+return customInstance<CreateFlow200>(getCreateFlowUrl(),
   {
     ...options,
     method: 'POST',
@@ -434,18 +335,6 @@ return customInstance<createFlowResponse>(getCreateFlowUrl(),
 );}
 
 
-export type getFlowResponse200 = {
-  data: GetFlow200
-  status: 200
-}
-
-export type getFlowResponseSuccess = (getFlowResponse200) & {
-  headers: Headers;
-};
-;
-
-export type getFlowResponse = (getFlowResponseSuccess)
-
 export const getGetFlowUrl = (flowId: string,) => {
 
 
@@ -454,9 +343,9 @@ export const getGetFlowUrl = (flowId: string,) => {
   return `/api/v4/admin/flows/${flowId}`
 }
 
-export const getFlow = async (flowId: string, options?: Parameters<typeof customInstance>[1]): Promise<getFlowResponse> => {
+export const getFlow = async (flowId: string, options?: Parameters<typeof customInstance>[1]): Promise<GetFlow200> => {
 
-  return customInstance<getFlowResponse>(getGetFlowUrl(flowId),
+  return customInstance<GetFlow200>(getGetFlowUrl(flowId),
   {
     ...options,
     method: 'GET'
@@ -465,18 +354,6 @@ export const getFlow = async (flowId: string, options?: Parameters<typeof custom
   }
 );}
 
-
-export type replaceFlowResponse200 = {
-  data: ReplaceFlow200
-  status: 200
-}
-
-export type replaceFlowResponseSuccess = (replaceFlowResponse200) & {
-  headers: Headers;
-};
-;
-
-export type replaceFlowResponse = (replaceFlowResponseSuccess)
 
 export const getReplaceFlowUrl = (flowId: string,) => {
 
@@ -487,7 +364,7 @@ export const getReplaceFlowUrl = (flowId: string,) => {
 }
 
 export const replaceFlow = async (flowId: string,
-    flowWrite: FlowWrite, options?: Parameters<typeof customInstance>[1]): Promise<replaceFlowResponse> => {
+    flowWrite: FlowWrite, options?: Parameters<typeof customInstance>[1]): Promise<ReplaceFlow200> => {
 
     const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
@@ -495,7 +372,7 @@ export const replaceFlow = async (flowId: string,
     if (Array.isArray(h)) return Object.fromEntries(h);
     return h;
   };
-return customInstance<replaceFlowResponse>(getReplaceFlowUrl(flowId),
+return customInstance<ReplaceFlow200>(getReplaceFlowUrl(flowId),
   {
     ...options,
     method: 'PUT',
@@ -505,18 +382,6 @@ return customInstance<replaceFlowResponse>(getReplaceFlowUrl(flowId),
 );}
 
 
-export type deleteFlowResponse200 = {
-  data: DeleteFlow200
-  status: 200
-}
-
-export type deleteFlowResponseSuccess = (deleteFlowResponse200) & {
-  headers: Headers;
-};
-;
-
-export type deleteFlowResponse = (deleteFlowResponseSuccess)
-
 export const getDeleteFlowUrl = (flowId: string,) => {
 
 
@@ -525,9 +390,9 @@ export const getDeleteFlowUrl = (flowId: string,) => {
   return `/api/v4/admin/flows/${flowId}`
 }
 
-export const deleteFlow = async (flowId: string, options?: Parameters<typeof customInstance>[1]): Promise<deleteFlowResponse> => {
+export const deleteFlow = async (flowId: string, options?: Parameters<typeof customInstance>[1]): Promise<DeleteFlow200> => {
 
-  return customInstance<deleteFlowResponse>(getDeleteFlowUrl(flowId),
+  return customInstance<DeleteFlow200>(getDeleteFlowUrl(flowId),
   {
     ...options,
     method: 'DELETE'
@@ -537,25 +402,6 @@ export const deleteFlow = async (flowId: string, options?: Parameters<typeof cus
 );}
 
 
-export type listFlowMaskingRulesResponse200 = {
-  data: ListFlowMaskingRules200
-  status: 200
-}
-
-export type listFlowMaskingRulesResponse403 = {
-  data: ProblemResponse
-  status: 403
-}
-
-export type listFlowMaskingRulesResponseSuccess = (listFlowMaskingRulesResponse200) & {
-  headers: Headers;
-};
-export type listFlowMaskingRulesResponseError = (listFlowMaskingRulesResponse403) & {
-  headers: Headers;
-};
-
-export type listFlowMaskingRulesResponse = (listFlowMaskingRulesResponseSuccess | listFlowMaskingRulesResponseError)
-
 export const getListFlowMaskingRulesUrl = (flowId: string,) => {
 
 
@@ -564,9 +410,9 @@ export const getListFlowMaskingRulesUrl = (flowId: string,) => {
   return `/api/v4/admin/flows/${flowId}/masking-rules`
 }
 
-export const listFlowMaskingRules = async (flowId: string, options?: Parameters<typeof customInstance>[1]): Promise<listFlowMaskingRulesResponse> => {
+export const listFlowMaskingRules = async (flowId: string, options?: Parameters<typeof customInstance>[1]): Promise<ListFlowMaskingRules200> => {
 
-  return customInstance<listFlowMaskingRulesResponse>(getListFlowMaskingRulesUrl(flowId),
+  return customInstance<ListFlowMaskingRules200>(getListFlowMaskingRulesUrl(flowId),
   {
     ...options,
     method: 'GET'
@@ -575,25 +421,6 @@ export const listFlowMaskingRules = async (flowId: string, options?: Parameters<
   }
 );}
 
-
-export type replaceFlowMaskingRuleResponse200 = {
-  data: ReplaceFlowMaskingRule200
-  status: 200
-}
-
-export type replaceFlowMaskingRuleResponse403 = {
-  data: ProblemResponse
-  status: 403
-}
-
-export type replaceFlowMaskingRuleResponseSuccess = (replaceFlowMaskingRuleResponse200) & {
-  headers: Headers;
-};
-export type replaceFlowMaskingRuleResponseError = (replaceFlowMaskingRuleResponse403) & {
-  headers: Headers;
-};
-
-export type replaceFlowMaskingRuleResponse = (replaceFlowMaskingRuleResponseSuccess | replaceFlowMaskingRuleResponseError)
 
 export const getReplaceFlowMaskingRuleUrl = (flowId: string,
     datasourceId: string,) => {
@@ -606,7 +433,7 @@ export const getReplaceFlowMaskingRuleUrl = (flowId: string,
 
 export const replaceFlowMaskingRule = async (flowId: string,
     datasourceId: string,
-    flowMaskingRuleWrite: FlowMaskingRuleWrite, options?: Parameters<typeof customInstance>[1]): Promise<replaceFlowMaskingRuleResponse> => {
+    flowMaskingRuleWrite: FlowMaskingRuleWrite, options?: Parameters<typeof customInstance>[1]): Promise<ReplaceFlowMaskingRule200> => {
 
     const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
@@ -614,7 +441,7 @@ export const replaceFlowMaskingRule = async (flowId: string,
     if (Array.isArray(h)) return Object.fromEntries(h);
     return h;
   };
-return customInstance<replaceFlowMaskingRuleResponse>(getReplaceFlowMaskingRuleUrl(flowId,datasourceId),
+return customInstance<ReplaceFlowMaskingRule200>(getReplaceFlowMaskingRuleUrl(flowId,datasourceId),
   {
     ...options,
     method: 'PUT',
@@ -623,18 +450,6 @@ return customInstance<replaceFlowMaskingRuleResponse>(getReplaceFlowMaskingRuleU
   }
 );}
 
-
-export type listLegacyMigrationRunsResponse200 = {
-  data: LegacyMigrationRunPageResultResponse
-  status: 200
-}
-
-export type listLegacyMigrationRunsResponseSuccess = (listLegacyMigrationRunsResponse200) & {
-  headers: Headers;
-};
-;
-
-export type listLegacyMigrationRunsResponse = (listLegacyMigrationRunsResponseSuccess)
 
 export const getListLegacyMigrationRunsUrl = (params?: ListLegacyMigrationRunsParams,) => {
   const normalizedParams = new URLSearchParams();
@@ -654,9 +469,9 @@ export const getListLegacyMigrationRunsUrl = (params?: ListLegacyMigrationRunsPa
 /**
  * Available only while the server is explicitly started in migration mode.
  */
-export const listLegacyMigrationRuns = async (params?: ListLegacyMigrationRunsParams, options?: Parameters<typeof customInstance>[1]): Promise<listLegacyMigrationRunsResponse> => {
+export const listLegacyMigrationRuns = async (params?: ListLegacyMigrationRunsParams, options?: Parameters<typeof customInstance>[1]): Promise<LegacyMigrationRunPageResultResponse> => {
 
-  return customInstance<listLegacyMigrationRunsResponse>(getListLegacyMigrationRunsUrl(params),
+  return customInstance<LegacyMigrationRunPageResultResponse>(getListLegacyMigrationRunsUrl(params),
   {
     ...options,
     method: 'GET'
@@ -665,18 +480,6 @@ export const listLegacyMigrationRuns = async (params?: ListLegacyMigrationRunsPa
   }
 );}
 
-
-export type getLegacyMigrationRunResponse200 = {
-  data: LegacyMigrationRunResultResponse
-  status: 200
-}
-
-export type getLegacyMigrationRunResponseSuccess = (getLegacyMigrationRunResponse200) & {
-  headers: Headers;
-};
-;
-
-export type getLegacyMigrationRunResponse = (getLegacyMigrationRunResponseSuccess)
 
 export const getGetLegacyMigrationRunUrl = (migrationRunId: string,) => {
 
@@ -689,9 +492,9 @@ export const getGetLegacyMigrationRunUrl = (migrationRunId: string,) => {
 /**
  * Returns the redacted reconciliation report and candidate mappings; never returns SQL, credentials, TLS material or raw schema mappings.
  */
-export const getLegacyMigrationRun = async (migrationRunId: string, options?: Parameters<typeof customInstance>[1]): Promise<getLegacyMigrationRunResponse> => {
+export const getLegacyMigrationRun = async (migrationRunId: string, options?: Parameters<typeof customInstance>[1]): Promise<LegacyMigrationRunResultResponse> => {
 
-  return customInstance<getLegacyMigrationRunResponse>(getGetLegacyMigrationRunUrl(migrationRunId),
+  return customInstance<LegacyMigrationRunResultResponse>(getGetLegacyMigrationRunUrl(migrationRunId),
   {
     ...options,
     method: 'GET'
@@ -700,18 +503,6 @@ export const getLegacyMigrationRun = async (migrationRunId: string, options?: Pa
   }
 );}
 
-
-export type confirmLegacyMigrationCandidateResponse200 = {
-  data: LegacyMigrationRunResultResponse
-  status: 200
-}
-
-export type confirmLegacyMigrationCandidateResponseSuccess = (confirmLegacyMigrationCandidateResponse200) & {
-  headers: Headers;
-};
-;
-
-export type confirmLegacyMigrationCandidateResponse = (confirmLegacyMigrationCandidateResponseSuccess)
 
 export const getConfirmLegacyMigrationCandidateUrl = (migrationRunId: string,
     candidateId: string,) => {
@@ -724,7 +515,7 @@ export const getConfirmLegacyMigrationCandidateUrl = (migrationRunId: string,
 
 export const confirmLegacyMigrationCandidate = async (migrationRunId: string,
     candidateId: string,
-    confirmLegacyMigrationCandidateRequest: ConfirmLegacyMigrationCandidateRequest, options?: Parameters<typeof customInstance>[1]): Promise<confirmLegacyMigrationCandidateResponse> => {
+    confirmLegacyMigrationCandidateRequest: ConfirmLegacyMigrationCandidateRequest, options?: Parameters<typeof customInstance>[1]): Promise<LegacyMigrationRunResultResponse> => {
 
     const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
@@ -732,7 +523,7 @@ export const confirmLegacyMigrationCandidate = async (migrationRunId: string,
     if (Array.isArray(h)) return Object.fromEntries(h);
     return h;
   };
-return customInstance<confirmLegacyMigrationCandidateResponse>(getConfirmLegacyMigrationCandidateUrl(migrationRunId,candidateId),
+return customInstance<LegacyMigrationRunResultResponse>(getConfirmLegacyMigrationCandidateUrl(migrationRunId,candidateId),
   {
     ...options,
     method: 'PUT',
@@ -741,18 +532,6 @@ return customInstance<confirmLegacyMigrationCandidateResponse>(getConfirmLegacyM
   }
 );}
 
-
-export type approveLegacyMigrationRunResponse200 = {
-  data: LegacyMigrationRunResultResponse
-  status: 200
-}
-
-export type approveLegacyMigrationRunResponseSuccess = (approveLegacyMigrationRunResponse200) & {
-  headers: Headers;
-};
-;
-
-export type approveLegacyMigrationRunResponse = (approveLegacyMigrationRunResponseSuccess)
 
 export const getApproveLegacyMigrationRunUrl = (migrationRunId: string,) => {
 
@@ -766,7 +545,7 @@ export const getApproveLegacyMigrationRunUrl = (migrationRunId: string,) => {
  * Approves exactly one canonical manifest after every candidate is confirmed. Approval does not start Apply; only the offline migration command may do so.
  */
 export const approveLegacyMigrationRun = async (migrationRunId: string,
-    approveLegacyMigrationRunRequest: ApproveLegacyMigrationRunRequest, options?: Parameters<typeof customInstance>[1]): Promise<approveLegacyMigrationRunResponse> => {
+    approveLegacyMigrationRunRequest: ApproveLegacyMigrationRunRequest, options?: Parameters<typeof customInstance>[1]): Promise<LegacyMigrationRunResultResponse> => {
 
     const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
@@ -774,7 +553,7 @@ export const approveLegacyMigrationRun = async (migrationRunId: string,
     if (Array.isArray(h)) return Object.fromEntries(h);
     return h;
   };
-return customInstance<approveLegacyMigrationRunResponse>(getApproveLegacyMigrationRunUrl(migrationRunId),
+return customInstance<LegacyMigrationRunResultResponse>(getApproveLegacyMigrationRunUrl(migrationRunId),
   {
     ...options,
     method: 'POST',
@@ -783,18 +562,6 @@ return customInstance<approveLegacyMigrationRunResponse>(getApproveLegacyMigrati
   }
 );}
 
-
-export type listIdentityProvidersResponse200 = {
-  data: IdentityProviderPageResultResponse
-  status: 200
-}
-
-export type listIdentityProvidersResponseSuccess = (listIdentityProvidersResponse200) & {
-  headers: Headers;
-};
-;
-
-export type listIdentityProvidersResponse = (listIdentityProvidersResponseSuccess)
 
 export const getListIdentityProvidersUrl = (params?: ListIdentityProvidersParams,) => {
   const normalizedParams = new URLSearchParams();
@@ -811,9 +578,9 @@ export const getListIdentityProvidersUrl = (params?: ListIdentityProvidersParams
   return stringifiedParams.length > 0 ? `/api/v4/admin/identity-providers?${stringifiedParams}` : `/api/v4/admin/identity-providers`
 }
 
-export const listIdentityProviders = async (params?: ListIdentityProvidersParams, options?: Parameters<typeof customInstance>[1]): Promise<listIdentityProvidersResponse> => {
+export const listIdentityProviders = async (params?: ListIdentityProvidersParams, options?: Parameters<typeof customInstance>[1]): Promise<IdentityProviderPageResultResponse> => {
 
-  return customInstance<listIdentityProvidersResponse>(getListIdentityProvidersUrl(params),
+  return customInstance<IdentityProviderPageResultResponse>(getListIdentityProvidersUrl(params),
   {
     ...options,
     method: 'GET'
@@ -822,18 +589,6 @@ export const listIdentityProviders = async (params?: ListIdentityProvidersParams
   }
 );}
 
-
-export type createIdentityProviderResponse200 = {
-  data: IdentityProviderResultResponse
-  status: 200
-}
-
-export type createIdentityProviderResponseSuccess = (createIdentityProviderResponse200) & {
-  headers: Headers;
-};
-;
-
-export type createIdentityProviderResponse = (createIdentityProviderResponseSuccess)
 
 export const getCreateIdentityProviderUrl = () => {
 
@@ -843,7 +598,7 @@ export const getCreateIdentityProviderUrl = () => {
   return `/api/v4/admin/identity-providers`
 }
 
-export const createIdentityProvider = async (createIdentityProviderRequest: CreateIdentityProviderRequest, options?: Parameters<typeof customInstance>[1]): Promise<createIdentityProviderResponse> => {
+export const createIdentityProvider = async (createIdentityProviderRequest: CreateIdentityProviderRequest, options?: Parameters<typeof customInstance>[1]): Promise<IdentityProviderResultResponse> => {
 
     const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
@@ -851,7 +606,7 @@ export const createIdentityProvider = async (createIdentityProviderRequest: Crea
     if (Array.isArray(h)) return Object.fromEntries(h);
     return h;
   };
-return customInstance<createIdentityProviderResponse>(getCreateIdentityProviderUrl(),
+return customInstance<IdentityProviderResultResponse>(getCreateIdentityProviderUrl(),
   {
     ...options,
     method: 'POST',
@@ -861,18 +616,6 @@ return customInstance<createIdentityProviderResponse>(getCreateIdentityProviderU
 );}
 
 
-export type getIdentityProviderResponse200 = {
-  data: IdentityProviderResultResponse
-  status: 200
-}
-
-export type getIdentityProviderResponseSuccess = (getIdentityProviderResponse200) & {
-  headers: Headers;
-};
-;
-
-export type getIdentityProviderResponse = (getIdentityProviderResponseSuccess)
-
 export const getGetIdentityProviderUrl = (identityProviderId: string,) => {
 
 
@@ -881,9 +624,9 @@ export const getGetIdentityProviderUrl = (identityProviderId: string,) => {
   return `/api/v4/admin/identity-providers/${identityProviderId}`
 }
 
-export const getIdentityProvider = async (identityProviderId: string, options?: Parameters<typeof customInstance>[1]): Promise<getIdentityProviderResponse> => {
+export const getIdentityProvider = async (identityProviderId: string, options?: Parameters<typeof customInstance>[1]): Promise<IdentityProviderResultResponse> => {
 
-  return customInstance<getIdentityProviderResponse>(getGetIdentityProviderUrl(identityProviderId),
+  return customInstance<IdentityProviderResultResponse>(getGetIdentityProviderUrl(identityProviderId),
   {
     ...options,
     method: 'GET'
@@ -892,18 +635,6 @@ export const getIdentityProvider = async (identityProviderId: string, options?: 
   }
 );}
 
-
-export type replaceIdentityProviderResponse200 = {
-  data: IdentityProviderResultResponse
-  status: 200
-}
-
-export type replaceIdentityProviderResponseSuccess = (replaceIdentityProviderResponse200) & {
-  headers: Headers;
-};
-;
-
-export type replaceIdentityProviderResponse = (replaceIdentityProviderResponseSuccess)
 
 export const getReplaceIdentityProviderUrl = (identityProviderId: string,) => {
 
@@ -914,7 +645,7 @@ export const getReplaceIdentityProviderUrl = (identityProviderId: string,) => {
 }
 
 export const replaceIdentityProvider = async (identityProviderId: string,
-    replaceIdentityProviderRequest: ReplaceIdentityProviderRequest, options?: Parameters<typeof customInstance>[1]): Promise<replaceIdentityProviderResponse> => {
+    replaceIdentityProviderRequest: ReplaceIdentityProviderRequest, options?: Parameters<typeof customInstance>[1]): Promise<IdentityProviderResultResponse> => {
 
     const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
@@ -922,7 +653,7 @@ export const replaceIdentityProvider = async (identityProviderId: string,
     if (Array.isArray(h)) return Object.fromEntries(h);
     return h;
   };
-return customInstance<replaceIdentityProviderResponse>(getReplaceIdentityProviderUrl(identityProviderId),
+return customInstance<IdentityProviderResultResponse>(getReplaceIdentityProviderUrl(identityProviderId),
   {
     ...options,
     method: 'PUT',
@@ -932,18 +663,6 @@ return customInstance<replaceIdentityProviderResponse>(getReplaceIdentityProvide
 );}
 
 
-export type deleteIdentityProviderResponse200 = {
-  data: NullBusinessResultResponse
-  status: 200
-}
-
-export type deleteIdentityProviderResponseSuccess = (deleteIdentityProviderResponse200) & {
-  headers: Headers;
-};
-;
-
-export type deleteIdentityProviderResponse = (deleteIdentityProviderResponseSuccess)
-
 export const getDeleteIdentityProviderUrl = (identityProviderId: string,) => {
 
 
@@ -952,9 +671,9 @@ export const getDeleteIdentityProviderUrl = (identityProviderId: string,) => {
   return `/api/v4/admin/identity-providers/${identityProviderId}`
 }
 
-export const deleteIdentityProvider = async (identityProviderId: string, options?: Parameters<typeof customInstance>[1]): Promise<deleteIdentityProviderResponse> => {
+export const deleteIdentityProvider = async (identityProviderId: string, options?: Parameters<typeof customInstance>[1]): Promise<NullBusinessResultResponse> => {
 
-  return customInstance<deleteIdentityProviderResponse>(getDeleteIdentityProviderUrl(identityProviderId),
+  return customInstance<NullBusinessResultResponse>(getDeleteIdentityProviderUrl(identityProviderId),
   {
     ...options,
     method: 'DELETE'
@@ -963,25 +682,6 @@ export const deleteIdentityProvider = async (identityProviderId: string, options
   }
 );}
 
-
-export type testIdentityProviderConnectionResponse200 = {
-  data: TaskBusinessResultResponse
-  status: 200
-}
-
-export type testIdentityProviderConnectionResponse429 = {
-  data: ProblemResponse
-  status: 429
-}
-
-export type testIdentityProviderConnectionResponseSuccess = (testIdentityProviderConnectionResponse200) & {
-  headers: Headers;
-};
-export type testIdentityProviderConnectionResponseError = (testIdentityProviderConnectionResponse429) & {
-  headers: Headers;
-};
-
-export type testIdentityProviderConnectionResponse = (testIdentityProviderConnectionResponseSuccess | testIdentityProviderConnectionResponseError)
 
 export const getTestIdentityProviderConnectionUrl = (identityProviderId: string,) => {
 
@@ -994,9 +694,9 @@ export const getTestIdentityProviderConnectionUrl = (identityProviderId: string,
 /**
  * Tests the saved provider configuration and secret. The task result is privacy-safe and never returns bind credentials, client secrets, LDAP test passwords, tokens or claims containing unapproved attributes.
  */
-export const testIdentityProviderConnection = async (identityProviderId: string, options?: Parameters<typeof customInstance>[1]): Promise<testIdentityProviderConnectionResponse> => {
+export const testIdentityProviderConnection = async (identityProviderId: string, options?: Parameters<typeof customInstance>[1]): Promise<TaskBusinessResultResponse> => {
 
-  return customInstance<testIdentityProviderConnectionResponse>(getTestIdentityProviderConnectionUrl(identityProviderId),
+  return customInstance<TaskBusinessResultResponse>(getTestIdentityProviderConnectionUrl(identityProviderId),
   {
     ...options,
     method: 'POST'
@@ -1005,18 +705,6 @@ export const testIdentityProviderConnection = async (identityProviderId: string,
   }
 );}
 
-
-export type listDatasourcesResponse200 = {
-  data: ListDatasources200
-  status: 200
-}
-
-export type listDatasourcesResponseSuccess = (listDatasourcesResponse200) & {
-  headers: Headers;
-};
-;
-
-export type listDatasourcesResponse = (listDatasourcesResponseSuccess)
 
 export const getListDatasourcesUrl = (params?: ListDatasourcesParams,) => {
   const normalizedParams = new URLSearchParams();
@@ -1033,9 +721,9 @@ export const getListDatasourcesUrl = (params?: ListDatasourcesParams,) => {
   return stringifiedParams.length > 0 ? `/api/v4/admin/datasources?${stringifiedParams}` : `/api/v4/admin/datasources`
 }
 
-export const listDatasources = async (params?: ListDatasourcesParams, options?: Parameters<typeof customInstance>[1]): Promise<listDatasourcesResponse> => {
+export const listDatasources = async (params?: ListDatasourcesParams, options?: Parameters<typeof customInstance>[1]): Promise<ListDatasources200> => {
 
-  return customInstance<listDatasourcesResponse>(getListDatasourcesUrl(params),
+  return customInstance<ListDatasources200>(getListDatasourcesUrl(params),
   {
     ...options,
     method: 'GET'
@@ -1044,18 +732,6 @@ export const listDatasources = async (params?: ListDatasourcesParams, options?: 
   }
 );}
 
-
-export type createDatasourceResponse200 = {
-  data: CreateDatasource200
-  status: 200
-}
-
-export type createDatasourceResponseSuccess = (createDatasourceResponse200) & {
-  headers: Headers;
-};
-;
-
-export type createDatasourceResponse = (createDatasourceResponseSuccess)
 
 export const getCreateDatasourceUrl = () => {
 
@@ -1065,7 +741,7 @@ export const getCreateDatasourceUrl = () => {
   return `/api/v4/admin/datasources`
 }
 
-export const createDatasource = async (datasourceWrite: DatasourceWrite, options?: Parameters<typeof customInstance>[1]): Promise<createDatasourceResponse> => {
+export const createDatasource = async (datasourceWrite: DatasourceWrite, options?: Parameters<typeof customInstance>[1]): Promise<CreateDatasource200> => {
 
     const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
@@ -1073,7 +749,7 @@ export const createDatasource = async (datasourceWrite: DatasourceWrite, options
     if (Array.isArray(h)) return Object.fromEntries(h);
     return h;
   };
-return customInstance<createDatasourceResponse>(getCreateDatasourceUrl(),
+return customInstance<CreateDatasource200>(getCreateDatasourceUrl(),
   {
     ...options,
     method: 'POST',
@@ -1083,18 +759,6 @@ return customInstance<createDatasourceResponse>(getCreateDatasourceUrl(),
 );}
 
 
-export type getDatasourceResponse200 = {
-  data: GetDatasource200
-  status: 200
-}
-
-export type getDatasourceResponseSuccess = (getDatasourceResponse200) & {
-  headers: Headers;
-};
-;
-
-export type getDatasourceResponse = (getDatasourceResponseSuccess)
-
 export const getGetDatasourceUrl = (datasourceId: string,) => {
 
 
@@ -1103,9 +767,9 @@ export const getGetDatasourceUrl = (datasourceId: string,) => {
   return `/api/v4/admin/datasources/${datasourceId}`
 }
 
-export const getDatasource = async (datasourceId: string, options?: Parameters<typeof customInstance>[1]): Promise<getDatasourceResponse> => {
+export const getDatasource = async (datasourceId: string, options?: Parameters<typeof customInstance>[1]): Promise<GetDatasource200> => {
 
-  return customInstance<getDatasourceResponse>(getGetDatasourceUrl(datasourceId),
+  return customInstance<GetDatasource200>(getGetDatasourceUrl(datasourceId),
   {
     ...options,
     method: 'GET'
@@ -1114,18 +778,6 @@ export const getDatasource = async (datasourceId: string, options?: Parameters<t
   }
 );}
 
-
-export type replaceDatasourceResponse200 = {
-  data: ReplaceDatasource200
-  status: 200
-}
-
-export type replaceDatasourceResponseSuccess = (replaceDatasourceResponse200) & {
-  headers: Headers;
-};
-;
-
-export type replaceDatasourceResponse = (replaceDatasourceResponseSuccess)
 
 export const getReplaceDatasourceUrl = (datasourceId: string,) => {
 
@@ -1136,7 +788,7 @@ export const getReplaceDatasourceUrl = (datasourceId: string,) => {
 }
 
 export const replaceDatasource = async (datasourceId: string,
-    datasourceWrite: DatasourceWrite, options?: Parameters<typeof customInstance>[1]): Promise<replaceDatasourceResponse> => {
+    datasourceWrite: DatasourceWrite, options?: Parameters<typeof customInstance>[1]): Promise<ReplaceDatasource200> => {
 
     const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
@@ -1144,7 +796,7 @@ export const replaceDatasource = async (datasourceId: string,
     if (Array.isArray(h)) return Object.fromEntries(h);
     return h;
   };
-return customInstance<replaceDatasourceResponse>(getReplaceDatasourceUrl(datasourceId),
+return customInstance<ReplaceDatasource200>(getReplaceDatasourceUrl(datasourceId),
   {
     ...options,
     method: 'PUT',
@@ -1154,18 +806,6 @@ return customInstance<replaceDatasourceResponse>(getReplaceDatasourceUrl(datasou
 );}
 
 
-export type deleteDatasourceResponse200 = {
-  data: DeleteDatasource200
-  status: 200
-}
-
-export type deleteDatasourceResponseSuccess = (deleteDatasourceResponse200) & {
-  headers: Headers;
-};
-;
-
-export type deleteDatasourceResponse = (deleteDatasourceResponseSuccess)
-
 export const getDeleteDatasourceUrl = (datasourceId: string,) => {
 
 
@@ -1174,9 +814,9 @@ export const getDeleteDatasourceUrl = (datasourceId: string,) => {
   return `/api/v4/admin/datasources/${datasourceId}`
 }
 
-export const deleteDatasource = async (datasourceId: string, options?: Parameters<typeof customInstance>[1]): Promise<deleteDatasourceResponse> => {
+export const deleteDatasource = async (datasourceId: string, options?: Parameters<typeof customInstance>[1]): Promise<DeleteDatasource200> => {
 
-  return customInstance<deleteDatasourceResponse>(getDeleteDatasourceUrl(datasourceId),
+  return customInstance<DeleteDatasource200>(getDeleteDatasourceUrl(datasourceId),
   {
     ...options,
     method: 'DELETE'
@@ -1185,25 +825,6 @@ export const deleteDatasource = async (datasourceId: string, options?: Parameter
   }
 );}
 
-
-export type testDatasourceConnectionResponse200 = {
-  data: TestDatasourceConnection200
-  status: 200
-}
-
-export type testDatasourceConnectionResponse429 = {
-  data: ProblemResponse
-  status: 429
-}
-
-export type testDatasourceConnectionResponseSuccess = (testDatasourceConnectionResponse200) & {
-  headers: Headers;
-};
-export type testDatasourceConnectionResponseError = (testDatasourceConnectionResponse429) & {
-  headers: Headers;
-};
-
-export type testDatasourceConnectionResponse = (testDatasourceConnectionResponseSuccess | testDatasourceConnectionResponseError)
 
 export const getTestDatasourceConnectionUrl = (datasourceId: string,) => {
 
@@ -1214,7 +835,7 @@ export const getTestDatasourceConnectionUrl = (datasourceId: string,) => {
 }
 
 export const testDatasourceConnection = async (datasourceId: string,
-    testDatasourceConnectionBody: TestDatasourceConnectionBody, options?: Parameters<typeof customInstance>[1]): Promise<testDatasourceConnectionResponse> => {
+    testDatasourceConnectionBody: TestDatasourceConnectionBody, options?: Parameters<typeof customInstance>[1]): Promise<TestDatasourceConnection200> => {
 
     const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
@@ -1222,7 +843,7 @@ export const testDatasourceConnection = async (datasourceId: string,
     if (Array.isArray(h)) return Object.fromEntries(h);
     return h;
   };
-return customInstance<testDatasourceConnectionResponse>(getTestDatasourceConnectionUrl(datasourceId),
+return customInstance<TestDatasourceConnection200>(getTestDatasourceConnectionUrl(datasourceId),
   {
     ...options,
     method: 'POST',
@@ -1232,18 +853,6 @@ return customInstance<testDatasourceConnectionResponse>(getTestDatasourceConnect
 );}
 
 
-export type getDatasourceCapabilitiesResponse200 = {
-  data: GetDatasourceCapabilities200
-  status: 200
-}
-
-export type getDatasourceCapabilitiesResponseSuccess = (getDatasourceCapabilitiesResponse200) & {
-  headers: Headers;
-};
-;
-
-export type getDatasourceCapabilitiesResponse = (getDatasourceCapabilitiesResponseSuccess)
-
 export const getGetDatasourceCapabilitiesUrl = (datasourceId: string,) => {
 
 
@@ -1252,9 +861,9 @@ export const getGetDatasourceCapabilitiesUrl = (datasourceId: string,) => {
   return `/api/v4/admin/datasources/${datasourceId}/capabilities`
 }
 
-export const getDatasourceCapabilities = async (datasourceId: string, options?: Parameters<typeof customInstance>[1]): Promise<getDatasourceCapabilitiesResponse> => {
+export const getDatasourceCapabilities = async (datasourceId: string, options?: Parameters<typeof customInstance>[1]): Promise<GetDatasourceCapabilities200> => {
 
-  return customInstance<getDatasourceCapabilitiesResponse>(getGetDatasourceCapabilitiesUrl(datasourceId),
+  return customInstance<GetDatasourceCapabilities200>(getGetDatasourceCapabilitiesUrl(datasourceId),
   {
     ...options,
     method: 'GET'
@@ -1263,18 +872,6 @@ export const getDatasourceCapabilities = async (datasourceId: string, options?: 
   }
 );}
 
-
-export type listPermissionGroupsResponse200 = {
-  data: ListPermissionGroups200
-  status: 200
-}
-
-export type listPermissionGroupsResponseSuccess = (listPermissionGroupsResponse200) & {
-  headers: Headers;
-};
-;
-
-export type listPermissionGroupsResponse = (listPermissionGroupsResponseSuccess)
 
 export const getListPermissionGroupsUrl = (params?: ListPermissionGroupsParams,) => {
   const normalizedParams = new URLSearchParams();
@@ -1291,9 +888,9 @@ export const getListPermissionGroupsUrl = (params?: ListPermissionGroupsParams,)
   return stringifiedParams.length > 0 ? `/api/v4/admin/permission-groups?${stringifiedParams}` : `/api/v4/admin/permission-groups`
 }
 
-export const listPermissionGroups = async (params?: ListPermissionGroupsParams, options?: Parameters<typeof customInstance>[1]): Promise<listPermissionGroupsResponse> => {
+export const listPermissionGroups = async (params?: ListPermissionGroupsParams, options?: Parameters<typeof customInstance>[1]): Promise<ListPermissionGroups200> => {
 
-  return customInstance<listPermissionGroupsResponse>(getListPermissionGroupsUrl(params),
+  return customInstance<ListPermissionGroups200>(getListPermissionGroupsUrl(params),
   {
     ...options,
     method: 'GET'
@@ -1302,18 +899,6 @@ export const listPermissionGroups = async (params?: ListPermissionGroupsParams, 
   }
 );}
 
-
-export type createPermissionGroupResponse200 = {
-  data: CreatePermissionGroup200
-  status: 200
-}
-
-export type createPermissionGroupResponseSuccess = (createPermissionGroupResponse200) & {
-  headers: Headers;
-};
-;
-
-export type createPermissionGroupResponse = (createPermissionGroupResponseSuccess)
 
 export const getCreatePermissionGroupUrl = () => {
 
@@ -1323,7 +908,7 @@ export const getCreatePermissionGroupUrl = () => {
   return `/api/v4/admin/permission-groups`
 }
 
-export const createPermissionGroup = async (permissionGroupWrite: PermissionGroupWrite, options?: Parameters<typeof customInstance>[1]): Promise<createPermissionGroupResponse> => {
+export const createPermissionGroup = async (permissionGroupWrite: PermissionGroupWrite, options?: Parameters<typeof customInstance>[1]): Promise<CreatePermissionGroup200> => {
 
     const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
@@ -1331,7 +916,7 @@ export const createPermissionGroup = async (permissionGroupWrite: PermissionGrou
     if (Array.isArray(h)) return Object.fromEntries(h);
     return h;
   };
-return customInstance<createPermissionGroupResponse>(getCreatePermissionGroupUrl(),
+return customInstance<CreatePermissionGroup200>(getCreatePermissionGroupUrl(),
   {
     ...options,
     method: 'POST',
@@ -1341,18 +926,6 @@ return customInstance<createPermissionGroupResponse>(getCreatePermissionGroupUrl
 );}
 
 
-export type getPermissionGroupResponse200 = {
-  data: GetPermissionGroup200
-  status: 200
-}
-
-export type getPermissionGroupResponseSuccess = (getPermissionGroupResponse200) & {
-  headers: Headers;
-};
-;
-
-export type getPermissionGroupResponse = (getPermissionGroupResponseSuccess)
-
 export const getGetPermissionGroupUrl = (groupId: string,) => {
 
 
@@ -1361,9 +934,9 @@ export const getGetPermissionGroupUrl = (groupId: string,) => {
   return `/api/v4/admin/permission-groups/${groupId}`
 }
 
-export const getPermissionGroup = async (groupId: string, options?: Parameters<typeof customInstance>[1]): Promise<getPermissionGroupResponse> => {
+export const getPermissionGroup = async (groupId: string, options?: Parameters<typeof customInstance>[1]): Promise<GetPermissionGroup200> => {
 
-  return customInstance<getPermissionGroupResponse>(getGetPermissionGroupUrl(groupId),
+  return customInstance<GetPermissionGroup200>(getGetPermissionGroupUrl(groupId),
   {
     ...options,
     method: 'GET'
@@ -1372,18 +945,6 @@ export const getPermissionGroup = async (groupId: string, options?: Parameters<t
   }
 );}
 
-
-export type replacePermissionGroupResponse200 = {
-  data: ReplacePermissionGroup200
-  status: 200
-}
-
-export type replacePermissionGroupResponseSuccess = (replacePermissionGroupResponse200) & {
-  headers: Headers;
-};
-;
-
-export type replacePermissionGroupResponse = (replacePermissionGroupResponseSuccess)
 
 export const getReplacePermissionGroupUrl = (groupId: string,) => {
 
@@ -1394,7 +955,7 @@ export const getReplacePermissionGroupUrl = (groupId: string,) => {
 }
 
 export const replacePermissionGroup = async (groupId: string,
-    permissionGroupWrite: PermissionGroupWrite, options?: Parameters<typeof customInstance>[1]): Promise<replacePermissionGroupResponse> => {
+    permissionGroupWrite: PermissionGroupWrite, options?: Parameters<typeof customInstance>[1]): Promise<ReplacePermissionGroup200> => {
 
     const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
@@ -1402,7 +963,7 @@ export const replacePermissionGroup = async (groupId: string,
     if (Array.isArray(h)) return Object.fromEntries(h);
     return h;
   };
-return customInstance<replacePermissionGroupResponse>(getReplacePermissionGroupUrl(groupId),
+return customInstance<ReplacePermissionGroup200>(getReplacePermissionGroupUrl(groupId),
   {
     ...options,
     method: 'PUT',
@@ -1412,18 +973,6 @@ return customInstance<replacePermissionGroupResponse>(getReplacePermissionGroupU
 );}
 
 
-export type deletePermissionGroupResponse200 = {
-  data: DeletePermissionGroup200
-  status: 200
-}
-
-export type deletePermissionGroupResponseSuccess = (deletePermissionGroupResponse200) & {
-  headers: Headers;
-};
-;
-
-export type deletePermissionGroupResponse = (deletePermissionGroupResponseSuccess)
-
 export const getDeletePermissionGroupUrl = (groupId: string,) => {
 
 
@@ -1432,9 +981,9 @@ export const getDeletePermissionGroupUrl = (groupId: string,) => {
   return `/api/v4/admin/permission-groups/${groupId}`
 }
 
-export const deletePermissionGroup = async (groupId: string, options?: Parameters<typeof customInstance>[1]): Promise<deletePermissionGroupResponse> => {
+export const deletePermissionGroup = async (groupId: string, options?: Parameters<typeof customInstance>[1]): Promise<DeletePermissionGroup200> => {
 
-  return customInstance<deletePermissionGroupResponse>(getDeletePermissionGroupUrl(groupId),
+  return customInstance<DeletePermissionGroup200>(getDeletePermissionGroupUrl(groupId),
   {
     ...options,
     method: 'DELETE'
@@ -1443,18 +992,6 @@ export const deletePermissionGroup = async (groupId: string, options?: Parameter
   }
 );}
 
-
-export type listRuleSetsResponse200 = {
-  data: ListRuleSets200
-  status: 200
-}
-
-export type listRuleSetsResponseSuccess = (listRuleSetsResponse200) & {
-  headers: Headers;
-};
-;
-
-export type listRuleSetsResponse = (listRuleSetsResponseSuccess)
 
 export const getListRuleSetsUrl = (params?: ListRuleSetsParams,) => {
   const normalizedParams = new URLSearchParams();
@@ -1471,9 +1008,9 @@ export const getListRuleSetsUrl = (params?: ListRuleSetsParams,) => {
   return stringifiedParams.length > 0 ? `/api/v4/admin/rule-sets?${stringifiedParams}` : `/api/v4/admin/rule-sets`
 }
 
-export const listRuleSets = async (params?: ListRuleSetsParams, options?: Parameters<typeof customInstance>[1]): Promise<listRuleSetsResponse> => {
+export const listRuleSets = async (params?: ListRuleSetsParams, options?: Parameters<typeof customInstance>[1]): Promise<ListRuleSets200> => {
 
-  return customInstance<listRuleSetsResponse>(getListRuleSetsUrl(params),
+  return customInstance<ListRuleSets200>(getListRuleSetsUrl(params),
   {
     ...options,
     method: 'GET'
@@ -1482,18 +1019,6 @@ export const listRuleSets = async (params?: ListRuleSetsParams, options?: Parame
   }
 );}
 
-
-export type createRuleSetResponse200 = {
-  data: CreateRuleSet200
-  status: 200
-}
-
-export type createRuleSetResponseSuccess = (createRuleSetResponse200) & {
-  headers: Headers;
-};
-;
-
-export type createRuleSetResponse = (createRuleSetResponseSuccess)
 
 export const getCreateRuleSetUrl = () => {
 
@@ -1503,7 +1028,7 @@ export const getCreateRuleSetUrl = () => {
   return `/api/v4/admin/rule-sets`
 }
 
-export const createRuleSet = async (ruleSetWrite: RuleSetWrite, options?: Parameters<typeof customInstance>[1]): Promise<createRuleSetResponse> => {
+export const createRuleSet = async (ruleSetWrite: RuleSetWrite, options?: Parameters<typeof customInstance>[1]): Promise<CreateRuleSet200> => {
 
     const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
@@ -1511,7 +1036,7 @@ export const createRuleSet = async (ruleSetWrite: RuleSetWrite, options?: Parame
     if (Array.isArray(h)) return Object.fromEntries(h);
     return h;
   };
-return customInstance<createRuleSetResponse>(getCreateRuleSetUrl(),
+return customInstance<CreateRuleSet200>(getCreateRuleSetUrl(),
   {
     ...options,
     method: 'POST',
@@ -1521,18 +1046,6 @@ return customInstance<createRuleSetResponse>(getCreateRuleSetUrl(),
 );}
 
 
-export type getRuleSetResponse200 = {
-  data: GetRuleSet200
-  status: 200
-}
-
-export type getRuleSetResponseSuccess = (getRuleSetResponse200) & {
-  headers: Headers;
-};
-;
-
-export type getRuleSetResponse = (getRuleSetResponseSuccess)
-
 export const getGetRuleSetUrl = (ruleSetId: string,) => {
 
 
@@ -1541,9 +1054,9 @@ export const getGetRuleSetUrl = (ruleSetId: string,) => {
   return `/api/v4/admin/rule-sets/${ruleSetId}`
 }
 
-export const getRuleSet = async (ruleSetId: string, options?: Parameters<typeof customInstance>[1]): Promise<getRuleSetResponse> => {
+export const getRuleSet = async (ruleSetId: string, options?: Parameters<typeof customInstance>[1]): Promise<GetRuleSet200> => {
 
-  return customInstance<getRuleSetResponse>(getGetRuleSetUrl(ruleSetId),
+  return customInstance<GetRuleSet200>(getGetRuleSetUrl(ruleSetId),
   {
     ...options,
     method: 'GET'
@@ -1552,18 +1065,6 @@ export const getRuleSet = async (ruleSetId: string, options?: Parameters<typeof 
   }
 );}
 
-
-export type replaceRuleSetResponse200 = {
-  data: ReplaceRuleSet200
-  status: 200
-}
-
-export type replaceRuleSetResponseSuccess = (replaceRuleSetResponse200) & {
-  headers: Headers;
-};
-;
-
-export type replaceRuleSetResponse = (replaceRuleSetResponseSuccess)
 
 export const getReplaceRuleSetUrl = (ruleSetId: string,) => {
 
@@ -1574,7 +1075,7 @@ export const getReplaceRuleSetUrl = (ruleSetId: string,) => {
 }
 
 export const replaceRuleSet = async (ruleSetId: string,
-    ruleSetWrite: RuleSetWrite, options?: Parameters<typeof customInstance>[1]): Promise<replaceRuleSetResponse> => {
+    ruleSetWrite: RuleSetWrite, options?: Parameters<typeof customInstance>[1]): Promise<ReplaceRuleSet200> => {
 
     const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
@@ -1582,7 +1083,7 @@ export const replaceRuleSet = async (ruleSetId: string,
     if (Array.isArray(h)) return Object.fromEntries(h);
     return h;
   };
-return customInstance<replaceRuleSetResponse>(getReplaceRuleSetUrl(ruleSetId),
+return customInstance<ReplaceRuleSet200>(getReplaceRuleSetUrl(ruleSetId),
   {
     ...options,
     method: 'PUT',
@@ -1592,18 +1093,6 @@ return customInstance<replaceRuleSetResponse>(getReplaceRuleSetUrl(ruleSetId),
 );}
 
 
-export type deleteRuleSetResponse200 = {
-  data: DeleteRuleSet200
-  status: 200
-}
-
-export type deleteRuleSetResponseSuccess = (deleteRuleSetResponse200) & {
-  headers: Headers;
-};
-;
-
-export type deleteRuleSetResponse = (deleteRuleSetResponseSuccess)
-
 export const getDeleteRuleSetUrl = (ruleSetId: string,) => {
 
 
@@ -1612,9 +1101,9 @@ export const getDeleteRuleSetUrl = (ruleSetId: string,) => {
   return `/api/v4/admin/rule-sets/${ruleSetId}`
 }
 
-export const deleteRuleSet = async (ruleSetId: string, options?: Parameters<typeof customInstance>[1]): Promise<deleteRuleSetResponse> => {
+export const deleteRuleSet = async (ruleSetId: string, options?: Parameters<typeof customInstance>[1]): Promise<DeleteRuleSet200> => {
 
-  return customInstance<deleteRuleSetResponse>(getDeleteRuleSetUrl(ruleSetId),
+  return customInstance<DeleteRuleSet200>(getDeleteRuleSetUrl(ruleSetId),
   {
     ...options,
     method: 'DELETE'
@@ -1623,18 +1112,6 @@ export const deleteRuleSet = async (ruleSetId: string, options?: Parameters<type
   }
 );}
 
-
-export type listPromptToolsResponse200 = {
-  data: ListPromptTools200
-  status: 200
-}
-
-export type listPromptToolsResponseSuccess = (listPromptToolsResponse200) & {
-  headers: Headers;
-};
-;
-
-export type listPromptToolsResponse = (listPromptToolsResponseSuccess)
 
 export const getListPromptToolsUrl = (params?: ListPromptToolsParams,) => {
   const normalizedParams = new URLSearchParams();
@@ -1651,9 +1128,9 @@ export const getListPromptToolsUrl = (params?: ListPromptToolsParams,) => {
   return stringifiedParams.length > 0 ? `/api/v4/admin/prompt-tools?${stringifiedParams}` : `/api/v4/admin/prompt-tools`
 }
 
-export const listPromptTools = async (params?: ListPromptToolsParams, options?: Parameters<typeof customInstance>[1]): Promise<listPromptToolsResponse> => {
+export const listPromptTools = async (params?: ListPromptToolsParams, options?: Parameters<typeof customInstance>[1]): Promise<ListPromptTools200> => {
 
-  return customInstance<listPromptToolsResponse>(getListPromptToolsUrl(params),
+  return customInstance<ListPromptTools200>(getListPromptToolsUrl(params),
   {
     ...options,
     method: 'GET'
@@ -1662,18 +1139,6 @@ export const listPromptTools = async (params?: ListPromptToolsParams, options?: 
   }
 );}
 
-
-export type createPromptToolResponse200 = {
-  data: CreatePromptTool200
-  status: 200
-}
-
-export type createPromptToolResponseSuccess = (createPromptToolResponse200) & {
-  headers: Headers;
-};
-;
-
-export type createPromptToolResponse = (createPromptToolResponseSuccess)
 
 export const getCreatePromptToolUrl = () => {
 
@@ -1683,7 +1148,7 @@ export const getCreatePromptToolUrl = () => {
   return `/api/v4/admin/prompt-tools`
 }
 
-export const createPromptTool = async (promptToolWrite: PromptToolWrite, options?: Parameters<typeof customInstance>[1]): Promise<createPromptToolResponse> => {
+export const createPromptTool = async (promptToolWrite: PromptToolWrite, options?: Parameters<typeof customInstance>[1]): Promise<CreatePromptTool200> => {
 
     const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
@@ -1691,7 +1156,7 @@ export const createPromptTool = async (promptToolWrite: PromptToolWrite, options
     if (Array.isArray(h)) return Object.fromEntries(h);
     return h;
   };
-return customInstance<createPromptToolResponse>(getCreatePromptToolUrl(),
+return customInstance<CreatePromptTool200>(getCreatePromptToolUrl(),
   {
     ...options,
     method: 'POST',
@@ -1701,18 +1166,6 @@ return customInstance<createPromptToolResponse>(getCreatePromptToolUrl(),
 );}
 
 
-export type optimizePromptToolPromptResponse200 = {
-  data: OptimizePromptToolPrompt200
-  status: 200
-}
-
-export type optimizePromptToolPromptResponseSuccess = (optimizePromptToolPromptResponse200) & {
-  headers: Headers;
-};
-;
-
-export type optimizePromptToolPromptResponse = (optimizePromptToolPromptResponseSuccess)
-
 export const getOptimizePromptToolPromptUrl = () => {
 
 
@@ -1721,7 +1174,7 @@ export const getOptimizePromptToolPromptUrl = () => {
   return `/api/v4/admin/prompt-tools/prompt-optimizations`
 }
 
-export const optimizePromptToolPrompt = async (optimizePromptToolPromptRequest: OptimizePromptToolPromptRequest, options?: Parameters<typeof customInstance>[1]): Promise<optimizePromptToolPromptResponse> => {
+export const optimizePromptToolPrompt = async (optimizePromptToolPromptRequest: OptimizePromptToolPromptRequest, options?: Parameters<typeof customInstance>[1]): Promise<OptimizePromptToolPrompt200> => {
 
     const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
@@ -1729,7 +1182,7 @@ export const optimizePromptToolPrompt = async (optimizePromptToolPromptRequest: 
     if (Array.isArray(h)) return Object.fromEntries(h);
     return h;
   };
-return customInstance<optimizePromptToolPromptResponse>(getOptimizePromptToolPromptUrl(),
+return customInstance<OptimizePromptToolPrompt200>(getOptimizePromptToolPromptUrl(),
   {
     ...options,
     method: 'POST',
@@ -1739,18 +1192,6 @@ return customInstance<optimizePromptToolPromptResponse>(getOptimizePromptToolPro
 );}
 
 
-export type generatePromptToolTestCasesResponse200 = {
-  data: GeneratePromptToolTestCases200
-  status: 200
-}
-
-export type generatePromptToolTestCasesResponseSuccess = (generatePromptToolTestCasesResponse200) & {
-  headers: Headers;
-};
-;
-
-export type generatePromptToolTestCasesResponse = (generatePromptToolTestCasesResponseSuccess)
-
 export const getGeneratePromptToolTestCasesUrl = () => {
 
 
@@ -1759,7 +1200,7 @@ export const getGeneratePromptToolTestCasesUrl = () => {
   return `/api/v4/admin/prompt-tools/test-cases`
 }
 
-export const generatePromptToolTestCases = async (generatePromptToolTestCasesRequest: GeneratePromptToolTestCasesRequest, options?: Parameters<typeof customInstance>[1]): Promise<generatePromptToolTestCasesResponse> => {
+export const generatePromptToolTestCases = async (generatePromptToolTestCasesRequest: GeneratePromptToolTestCasesRequest, options?: Parameters<typeof customInstance>[1]): Promise<GeneratePromptToolTestCases200> => {
 
     const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
@@ -1767,7 +1208,7 @@ export const generatePromptToolTestCases = async (generatePromptToolTestCasesReq
     if (Array.isArray(h)) return Object.fromEntries(h);
     return h;
   };
-return customInstance<generatePromptToolTestCasesResponse>(getGeneratePromptToolTestCasesUrl(),
+return customInstance<GeneratePromptToolTestCases200>(getGeneratePromptToolTestCasesUrl(),
   {
     ...options,
     method: 'POST',
@@ -1777,18 +1218,6 @@ return customInstance<generatePromptToolTestCasesResponse>(getGeneratePromptTool
 );}
 
 
-export type runPromptToolTestResponse200 = {
-  data: RunPromptToolTest200
-  status: 200
-}
-
-export type runPromptToolTestResponseSuccess = (runPromptToolTestResponse200) & {
-  headers: Headers;
-};
-;
-
-export type runPromptToolTestResponse = (runPromptToolTestResponseSuccess)
-
 export const getRunPromptToolTestUrl = () => {
 
 
@@ -1797,7 +1226,7 @@ export const getRunPromptToolTestUrl = () => {
   return `/api/v4/admin/prompt-tools/test-runs`
 }
 
-export const runPromptToolTest = async (runPromptToolTestRequest: RunPromptToolTestRequest, options?: Parameters<typeof customInstance>[1]): Promise<runPromptToolTestResponse> => {
+export const runPromptToolTest = async (runPromptToolTestRequest: RunPromptToolTestRequest, options?: Parameters<typeof customInstance>[1]): Promise<RunPromptToolTest200> => {
 
     const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
@@ -1805,7 +1234,7 @@ export const runPromptToolTest = async (runPromptToolTestRequest: RunPromptToolT
     if (Array.isArray(h)) return Object.fromEntries(h);
     return h;
   };
-return customInstance<runPromptToolTestResponse>(getRunPromptToolTestUrl(),
+return customInstance<RunPromptToolTest200>(getRunPromptToolTestUrl(),
   {
     ...options,
     method: 'POST',
@@ -1815,18 +1244,6 @@ return customInstance<runPromptToolTestResponse>(getRunPromptToolTestUrl(),
 );}
 
 
-export type getPromptToolResponse200 = {
-  data: GetPromptTool200
-  status: 200
-}
-
-export type getPromptToolResponseSuccess = (getPromptToolResponse200) & {
-  headers: Headers;
-};
-;
-
-export type getPromptToolResponse = (getPromptToolResponseSuccess)
-
 export const getGetPromptToolUrl = (promptToolId: string,) => {
 
 
@@ -1835,9 +1252,9 @@ export const getGetPromptToolUrl = (promptToolId: string,) => {
   return `/api/v4/admin/prompt-tools/${promptToolId}`
 }
 
-export const getPromptTool = async (promptToolId: string, options?: Parameters<typeof customInstance>[1]): Promise<getPromptToolResponse> => {
+export const getPromptTool = async (promptToolId: string, options?: Parameters<typeof customInstance>[1]): Promise<GetPromptTool200> => {
 
-  return customInstance<getPromptToolResponse>(getGetPromptToolUrl(promptToolId),
+  return customInstance<GetPromptTool200>(getGetPromptToolUrl(promptToolId),
   {
     ...options,
     method: 'GET'
@@ -1846,18 +1263,6 @@ export const getPromptTool = async (promptToolId: string, options?: Parameters<t
   }
 );}
 
-
-export type replacePromptToolResponse200 = {
-  data: ReplacePromptTool200
-  status: 200
-}
-
-export type replacePromptToolResponseSuccess = (replacePromptToolResponse200) & {
-  headers: Headers;
-};
-;
-
-export type replacePromptToolResponse = (replacePromptToolResponseSuccess)
 
 export const getReplacePromptToolUrl = (promptToolId: string,) => {
 
@@ -1868,7 +1273,7 @@ export const getReplacePromptToolUrl = (promptToolId: string,) => {
 }
 
 export const replacePromptTool = async (promptToolId: string,
-    promptToolWrite: PromptToolWrite, options?: Parameters<typeof customInstance>[1]): Promise<replacePromptToolResponse> => {
+    promptToolWrite: PromptToolWrite, options?: Parameters<typeof customInstance>[1]): Promise<ReplacePromptTool200> => {
 
     const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
@@ -1876,7 +1281,7 @@ export const replacePromptTool = async (promptToolId: string,
     if (Array.isArray(h)) return Object.fromEntries(h);
     return h;
   };
-return customInstance<replacePromptToolResponse>(getReplacePromptToolUrl(promptToolId),
+return customInstance<ReplacePromptTool200>(getReplacePromptToolUrl(promptToolId),
   {
     ...options,
     method: 'PUT',
@@ -1886,18 +1291,6 @@ return customInstance<replacePromptToolResponse>(getReplacePromptToolUrl(promptT
 );}
 
 
-export type deletePromptToolResponse200 = {
-  data: DeletePromptTool200
-  status: 200
-}
-
-export type deletePromptToolResponseSuccess = (deletePromptToolResponse200) & {
-  headers: Headers;
-};
-;
-
-export type deletePromptToolResponse = (deletePromptToolResponseSuccess)
-
 export const getDeletePromptToolUrl = (promptToolId: string,) => {
 
 
@@ -1906,9 +1299,9 @@ export const getDeletePromptToolUrl = (promptToolId: string,) => {
   return `/api/v4/admin/prompt-tools/${promptToolId}`
 }
 
-export const deletePromptTool = async (promptToolId: string, options?: Parameters<typeof customInstance>[1]): Promise<deletePromptToolResponse> => {
+export const deletePromptTool = async (promptToolId: string, options?: Parameters<typeof customInstance>[1]): Promise<DeletePromptTool200> => {
 
-  return customInstance<deletePromptToolResponse>(getDeletePromptToolUrl(promptToolId),
+  return customInstance<DeletePromptTool200>(getDeletePromptToolUrl(promptToolId),
   {
     ...options,
     method: 'DELETE'
@@ -1917,18 +1310,6 @@ export const deletePromptTool = async (promptToolId: string, options?: Parameter
   }
 );}
 
-
-export type listKnowledgeEntriesResponse200 = {
-  data: ListKnowledgeEntries200
-  status: 200
-}
-
-export type listKnowledgeEntriesResponseSuccess = (listKnowledgeEntriesResponse200) & {
-  headers: Headers;
-};
-;
-
-export type listKnowledgeEntriesResponse = (listKnowledgeEntriesResponseSuccess)
 
 export const getListKnowledgeEntriesUrl = (params?: ListKnowledgeEntriesParams,) => {
   const normalizedParams = new URLSearchParams();
@@ -1945,9 +1326,9 @@ export const getListKnowledgeEntriesUrl = (params?: ListKnowledgeEntriesParams,)
   return stringifiedParams.length > 0 ? `/api/v4/admin/knowledge-entries?${stringifiedParams}` : `/api/v4/admin/knowledge-entries`
 }
 
-export const listKnowledgeEntries = async (params?: ListKnowledgeEntriesParams, options?: Parameters<typeof customInstance>[1]): Promise<listKnowledgeEntriesResponse> => {
+export const listKnowledgeEntries = async (params?: ListKnowledgeEntriesParams, options?: Parameters<typeof customInstance>[1]): Promise<ListKnowledgeEntries200> => {
 
-  return customInstance<listKnowledgeEntriesResponse>(getListKnowledgeEntriesUrl(params),
+  return customInstance<ListKnowledgeEntries200>(getListKnowledgeEntriesUrl(params),
   {
     ...options,
     method: 'GET'
@@ -1956,18 +1337,6 @@ export const listKnowledgeEntries = async (params?: ListKnowledgeEntriesParams, 
   }
 );}
 
-
-export type createKnowledgeEntryResponse200 = {
-  data: CreateKnowledgeEntry200
-  status: 200
-}
-
-export type createKnowledgeEntryResponseSuccess = (createKnowledgeEntryResponse200) & {
-  headers: Headers;
-};
-;
-
-export type createKnowledgeEntryResponse = (createKnowledgeEntryResponseSuccess)
 
 export const getCreateKnowledgeEntryUrl = () => {
 
@@ -1977,7 +1346,7 @@ export const getCreateKnowledgeEntryUrl = () => {
   return `/api/v4/admin/knowledge-entries`
 }
 
-export const createKnowledgeEntry = async (knowledgeEntryWrite: KnowledgeEntryWrite, options?: Parameters<typeof customInstance>[1]): Promise<createKnowledgeEntryResponse> => {
+export const createKnowledgeEntry = async (knowledgeEntryWrite: KnowledgeEntryWrite, options?: Parameters<typeof customInstance>[1]): Promise<CreateKnowledgeEntry200> => {
 
     const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
@@ -1985,7 +1354,7 @@ export const createKnowledgeEntry = async (knowledgeEntryWrite: KnowledgeEntryWr
     if (Array.isArray(h)) return Object.fromEntries(h);
     return h;
   };
-return customInstance<createKnowledgeEntryResponse>(getCreateKnowledgeEntryUrl(),
+return customInstance<CreateKnowledgeEntry200>(getCreateKnowledgeEntryUrl(),
   {
     ...options,
     method: 'POST',
@@ -1995,18 +1364,6 @@ return customInstance<createKnowledgeEntryResponse>(getCreateKnowledgeEntryUrl()
 );}
 
 
-export type getKnowledgeEntryResponse200 = {
-  data: GetKnowledgeEntry200
-  status: 200
-}
-
-export type getKnowledgeEntryResponseSuccess = (getKnowledgeEntryResponse200) & {
-  headers: Headers;
-};
-;
-
-export type getKnowledgeEntryResponse = (getKnowledgeEntryResponseSuccess)
-
 export const getGetKnowledgeEntryUrl = (knowledgeEntryId: string,) => {
 
 
@@ -2015,9 +1372,9 @@ export const getGetKnowledgeEntryUrl = (knowledgeEntryId: string,) => {
   return `/api/v4/admin/knowledge-entries/${knowledgeEntryId}`
 }
 
-export const getKnowledgeEntry = async (knowledgeEntryId: string, options?: Parameters<typeof customInstance>[1]): Promise<getKnowledgeEntryResponse> => {
+export const getKnowledgeEntry = async (knowledgeEntryId: string, options?: Parameters<typeof customInstance>[1]): Promise<GetKnowledgeEntry200> => {
 
-  return customInstance<getKnowledgeEntryResponse>(getGetKnowledgeEntryUrl(knowledgeEntryId),
+  return customInstance<GetKnowledgeEntry200>(getGetKnowledgeEntryUrl(knowledgeEntryId),
   {
     ...options,
     method: 'GET'
@@ -2026,18 +1383,6 @@ export const getKnowledgeEntry = async (knowledgeEntryId: string, options?: Para
   }
 );}
 
-
-export type replaceKnowledgeEntryResponse200 = {
-  data: ReplaceKnowledgeEntry200
-  status: 200
-}
-
-export type replaceKnowledgeEntryResponseSuccess = (replaceKnowledgeEntryResponse200) & {
-  headers: Headers;
-};
-;
-
-export type replaceKnowledgeEntryResponse = (replaceKnowledgeEntryResponseSuccess)
 
 export const getReplaceKnowledgeEntryUrl = (knowledgeEntryId: string,) => {
 
@@ -2048,7 +1393,7 @@ export const getReplaceKnowledgeEntryUrl = (knowledgeEntryId: string,) => {
 }
 
 export const replaceKnowledgeEntry = async (knowledgeEntryId: string,
-    knowledgeEntryWrite: KnowledgeEntryWrite, options?: Parameters<typeof customInstance>[1]): Promise<replaceKnowledgeEntryResponse> => {
+    knowledgeEntryWrite: KnowledgeEntryWrite, options?: Parameters<typeof customInstance>[1]): Promise<ReplaceKnowledgeEntry200> => {
 
     const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
@@ -2056,7 +1401,7 @@ export const replaceKnowledgeEntry = async (knowledgeEntryId: string,
     if (Array.isArray(h)) return Object.fromEntries(h);
     return h;
   };
-return customInstance<replaceKnowledgeEntryResponse>(getReplaceKnowledgeEntryUrl(knowledgeEntryId),
+return customInstance<ReplaceKnowledgeEntry200>(getReplaceKnowledgeEntryUrl(knowledgeEntryId),
   {
     ...options,
     method: 'PUT',
@@ -2066,18 +1411,6 @@ return customInstance<replaceKnowledgeEntryResponse>(getReplaceKnowledgeEntryUrl
 );}
 
 
-export type deleteKnowledgeEntryResponse200 = {
-  data: DeleteKnowledgeEntry200
-  status: 200
-}
-
-export type deleteKnowledgeEntryResponseSuccess = (deleteKnowledgeEntryResponse200) & {
-  headers: Headers;
-};
-;
-
-export type deleteKnowledgeEntryResponse = (deleteKnowledgeEntryResponseSuccess)
-
 export const getDeleteKnowledgeEntryUrl = (knowledgeEntryId: string,) => {
 
 
@@ -2086,9 +1419,9 @@ export const getDeleteKnowledgeEntryUrl = (knowledgeEntryId: string,) => {
   return `/api/v4/admin/knowledge-entries/${knowledgeEntryId}`
 }
 
-export const deleteKnowledgeEntry = async (knowledgeEntryId: string, options?: Parameters<typeof customInstance>[1]): Promise<deleteKnowledgeEntryResponse> => {
+export const deleteKnowledgeEntry = async (knowledgeEntryId: string, options?: Parameters<typeof customInstance>[1]): Promise<DeleteKnowledgeEntry200> => {
 
-  return customInstance<deleteKnowledgeEntryResponse>(getDeleteKnowledgeEntryUrl(knowledgeEntryId),
+  return customInstance<DeleteKnowledgeEntry200>(getDeleteKnowledgeEntryUrl(knowledgeEntryId),
   {
     ...options,
     method: 'DELETE'
@@ -2098,18 +1431,6 @@ export const deleteKnowledgeEntry = async (knowledgeEntryId: string, options?: P
 );}
 
 
-export type evaluateKnowledgeEntryResponse200 = {
-  data: EvaluateKnowledgeEntry200
-  status: 200
-}
-
-export type evaluateKnowledgeEntryResponseSuccess = (evaluateKnowledgeEntryResponse200) & {
-  headers: Headers;
-};
-;
-
-export type evaluateKnowledgeEntryResponse = (evaluateKnowledgeEntryResponseSuccess)
-
 export const getEvaluateKnowledgeEntryUrl = (knowledgeEntryId: string,) => {
 
 
@@ -2118,9 +1439,9 @@ export const getEvaluateKnowledgeEntryUrl = (knowledgeEntryId: string,) => {
   return `/api/v4/admin/knowledge-entries/${knowledgeEntryId}/evaluations`
 }
 
-export const evaluateKnowledgeEntry = async (knowledgeEntryId: string, options?: Parameters<typeof customInstance>[1]): Promise<evaluateKnowledgeEntryResponse> => {
+export const evaluateKnowledgeEntry = async (knowledgeEntryId: string, options?: Parameters<typeof customInstance>[1]): Promise<EvaluateKnowledgeEntry200> => {
 
-  return customInstance<evaluateKnowledgeEntryResponse>(getEvaluateKnowledgeEntryUrl(knowledgeEntryId),
+  return customInstance<EvaluateKnowledgeEntry200>(getEvaluateKnowledgeEntryUrl(knowledgeEntryId),
   {
     ...options,
     method: 'POST'
@@ -2129,18 +1450,6 @@ export const evaluateKnowledgeEntry = async (knowledgeEntryId: string, options?:
   }
 );}
 
-
-export type listAiProvidersResponse200 = {
-  data: ListAiProviders200
-  status: 200
-}
-
-export type listAiProvidersResponseSuccess = (listAiProvidersResponse200) & {
-  headers: Headers;
-};
-;
-
-export type listAiProvidersResponse = (listAiProvidersResponseSuccess)
 
 export const getListAiProvidersUrl = (params?: ListAiProvidersParams,) => {
   const normalizedParams = new URLSearchParams();
@@ -2157,9 +1466,9 @@ export const getListAiProvidersUrl = (params?: ListAiProvidersParams,) => {
   return stringifiedParams.length > 0 ? `/api/v4/admin/ai-providers?${stringifiedParams}` : `/api/v4/admin/ai-providers`
 }
 
-export const listAiProviders = async (params?: ListAiProvidersParams, options?: Parameters<typeof customInstance>[1]): Promise<listAiProvidersResponse> => {
+export const listAiProviders = async (params?: ListAiProvidersParams, options?: Parameters<typeof customInstance>[1]): Promise<ListAiProviders200> => {
 
-  return customInstance<listAiProvidersResponse>(getListAiProvidersUrl(params),
+  return customInstance<ListAiProviders200>(getListAiProvidersUrl(params),
   {
     ...options,
     method: 'GET'
@@ -2168,18 +1477,6 @@ export const listAiProviders = async (params?: ListAiProvidersParams, options?: 
   }
 );}
 
-
-export type createAiProviderResponse200 = {
-  data: CreateAiProvider200
-  status: 200
-}
-
-export type createAiProviderResponseSuccess = (createAiProviderResponse200) & {
-  headers: Headers;
-};
-;
-
-export type createAiProviderResponse = (createAiProviderResponseSuccess)
 
 export const getCreateAiProviderUrl = () => {
 
@@ -2189,7 +1486,7 @@ export const getCreateAiProviderUrl = () => {
   return `/api/v4/admin/ai-providers`
 }
 
-export const createAiProvider = async (createAiProviderRequest: CreateAiProviderRequest, options?: Parameters<typeof customInstance>[1]): Promise<createAiProviderResponse> => {
+export const createAiProvider = async (createAiProviderRequest: CreateAiProviderRequest, options?: Parameters<typeof customInstance>[1]): Promise<CreateAiProvider200> => {
 
     const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
@@ -2197,7 +1494,7 @@ export const createAiProvider = async (createAiProviderRequest: CreateAiProvider
     if (Array.isArray(h)) return Object.fromEntries(h);
     return h;
   };
-return customInstance<createAiProviderResponse>(getCreateAiProviderUrl(),
+return customInstance<CreateAiProvider200>(getCreateAiProviderUrl(),
   {
     ...options,
     method: 'POST',
@@ -2207,18 +1504,6 @@ return customInstance<createAiProviderResponse>(getCreateAiProviderUrl(),
 );}
 
 
-export type getAiProviderResponse200 = {
-  data: GetAiProvider200
-  status: 200
-}
-
-export type getAiProviderResponseSuccess = (getAiProviderResponse200) & {
-  headers: Headers;
-};
-;
-
-export type getAiProviderResponse = (getAiProviderResponseSuccess)
-
 export const getGetAiProviderUrl = (providerId: string,) => {
 
 
@@ -2227,9 +1512,9 @@ export const getGetAiProviderUrl = (providerId: string,) => {
   return `/api/v4/admin/ai-providers/${providerId}`
 }
 
-export const getAiProvider = async (providerId: string, options?: Parameters<typeof customInstance>[1]): Promise<getAiProviderResponse> => {
+export const getAiProvider = async (providerId: string, options?: Parameters<typeof customInstance>[1]): Promise<GetAiProvider200> => {
 
-  return customInstance<getAiProviderResponse>(getGetAiProviderUrl(providerId),
+  return customInstance<GetAiProvider200>(getGetAiProviderUrl(providerId),
   {
     ...options,
     method: 'GET'
@@ -2238,18 +1523,6 @@ export const getAiProvider = async (providerId: string, options?: Parameters<typ
   }
 );}
 
-
-export type replaceAiProviderResponse200 = {
-  data: ReplaceAiProvider200
-  status: 200
-}
-
-export type replaceAiProviderResponseSuccess = (replaceAiProviderResponse200) & {
-  headers: Headers;
-};
-;
-
-export type replaceAiProviderResponse = (replaceAiProviderResponseSuccess)
 
 export const getReplaceAiProviderUrl = (providerId: string,) => {
 
@@ -2260,7 +1533,7 @@ export const getReplaceAiProviderUrl = (providerId: string,) => {
 }
 
 export const replaceAiProvider = async (providerId: string,
-    aiProviderWrite: AiProviderWrite, options?: Parameters<typeof customInstance>[1]): Promise<replaceAiProviderResponse> => {
+    aiProviderWrite: AiProviderWrite, options?: Parameters<typeof customInstance>[1]): Promise<ReplaceAiProvider200> => {
 
     const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
@@ -2268,7 +1541,7 @@ export const replaceAiProvider = async (providerId: string,
     if (Array.isArray(h)) return Object.fromEntries(h);
     return h;
   };
-return customInstance<replaceAiProviderResponse>(getReplaceAiProviderUrl(providerId),
+return customInstance<ReplaceAiProvider200>(getReplaceAiProviderUrl(providerId),
   {
     ...options,
     method: 'PUT',
@@ -2278,18 +1551,6 @@ return customInstance<replaceAiProviderResponse>(getReplaceAiProviderUrl(provide
 );}
 
 
-export type deleteAiProviderResponse200 = {
-  data: DeleteAiProvider200
-  status: 200
-}
-
-export type deleteAiProviderResponseSuccess = (deleteAiProviderResponse200) & {
-  headers: Headers;
-};
-;
-
-export type deleteAiProviderResponse = (deleteAiProviderResponseSuccess)
-
 export const getDeleteAiProviderUrl = (providerId: string,) => {
 
 
@@ -2298,9 +1559,9 @@ export const getDeleteAiProviderUrl = (providerId: string,) => {
   return `/api/v4/admin/ai-providers/${providerId}`
 }
 
-export const deleteAiProvider = async (providerId: string, options?: Parameters<typeof customInstance>[1]): Promise<deleteAiProviderResponse> => {
+export const deleteAiProvider = async (providerId: string, options?: Parameters<typeof customInstance>[1]): Promise<DeleteAiProvider200> => {
 
-  return customInstance<deleteAiProviderResponse>(getDeleteAiProviderUrl(providerId),
+  return customInstance<DeleteAiProvider200>(getDeleteAiProviderUrl(providerId),
   {
     ...options,
     method: 'DELETE'
@@ -2310,25 +1571,6 @@ export const deleteAiProvider = async (providerId: string, options?: Parameters<
 );}
 
 
-export type testAiProviderConnectionResponse200 = {
-  data: TestAiProviderConnection200
-  status: 200
-}
-
-export type testAiProviderConnectionResponse429 = {
-  data: ProblemResponse
-  status: 429
-}
-
-export type testAiProviderConnectionResponseSuccess = (testAiProviderConnectionResponse200) & {
-  headers: Headers;
-};
-export type testAiProviderConnectionResponseError = (testAiProviderConnectionResponse429) & {
-  headers: Headers;
-};
-
-export type testAiProviderConnectionResponse = (testAiProviderConnectionResponseSuccess | testAiProviderConnectionResponseError)
-
 export const getTestAiProviderConnectionUrl = (providerId: string,) => {
 
 
@@ -2337,9 +1579,9 @@ export const getTestAiProviderConnectionUrl = (providerId: string,) => {
   return `/api/v4/admin/ai-providers/${providerId}/connection-tests`
 }
 
-export const testAiProviderConnection = async (providerId: string, options?: Parameters<typeof customInstance>[1]): Promise<testAiProviderConnectionResponse> => {
+export const testAiProviderConnection = async (providerId: string, options?: Parameters<typeof customInstance>[1]): Promise<TestAiProviderConnection200> => {
 
-  return customInstance<testAiProviderConnectionResponse>(getTestAiProviderConnectionUrl(providerId),
+  return customInstance<TestAiProviderConnection200>(getTestAiProviderConnectionUrl(providerId),
   {
     ...options,
     method: 'POST'
@@ -2348,25 +1590,6 @@ export const testAiProviderConnection = async (providerId: string, options?: Par
   }
 );}
 
-
-export type listAiProviderModelsResponse200 = {
-  data: ListAiProviderModels200
-  status: 200
-}
-
-export type listAiProviderModelsResponse429 = {
-  data: ProblemResponse
-  status: 429
-}
-
-export type listAiProviderModelsResponseSuccess = (listAiProviderModelsResponse200) & {
-  headers: Headers;
-};
-export type listAiProviderModelsResponseError = (listAiProviderModelsResponse429) & {
-  headers: Headers;
-};
-
-export type listAiProviderModelsResponse = (listAiProviderModelsResponseSuccess | listAiProviderModelsResponseError)
 
 export const getListAiProviderModelsUrl = () => {
 
@@ -2379,7 +1602,7 @@ export const getListAiProviderModelsUrl = () => {
 /**
  * Fetch the upstream OpenAI-compatible model catalog for form suggestions. POST (not GET) because api_key rides the body and must never enter URLs or access logs; the upstream failure reason is surfaced via the business-error member detail.
  */
-export const listAiProviderModels = async (listAiProviderModelsRequest: ListAiProviderModelsRequest, options?: Parameters<typeof customInstance>[1]): Promise<listAiProviderModelsResponse> => {
+export const listAiProviderModels = async (listAiProviderModelsRequest: ListAiProviderModelsRequest, options?: Parameters<typeof customInstance>[1]): Promise<ListAiProviderModels200> => {
 
     const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
@@ -2387,7 +1610,7 @@ export const listAiProviderModels = async (listAiProviderModelsRequest: ListAiPr
     if (Array.isArray(h)) return Object.fromEntries(h);
     return h;
   };
-return customInstance<listAiProviderModelsResponse>(getListAiProviderModelsUrl(),
+return customInstance<ListAiProviderModels200>(getListAiProviderModelsUrl(),
   {
     ...options,
     method: 'POST',
@@ -2397,18 +1620,6 @@ return customInstance<listAiProviderModelsResponse>(getListAiProviderModelsUrl()
 );}
 
 
-export type listAiProviderRateVersionsResponse200 = {
-  data: ListAiProviderRateVersions200
-  status: 200
-}
-
-export type listAiProviderRateVersionsResponseSuccess = (listAiProviderRateVersionsResponse200) & {
-  headers: Headers;
-};
-;
-
-export type listAiProviderRateVersionsResponse = (listAiProviderRateVersionsResponseSuccess)
-
 export const getListAiProviderRateVersionsUrl = (providerId: string,) => {
 
 
@@ -2417,9 +1628,9 @@ export const getListAiProviderRateVersionsUrl = (providerId: string,) => {
   return `/api/v4/admin/ai-providers/${providerId}/rate-versions`
 }
 
-export const listAiProviderRateVersions = async (providerId: string, options?: Parameters<typeof customInstance>[1]): Promise<listAiProviderRateVersionsResponse> => {
+export const listAiProviderRateVersions = async (providerId: string, options?: Parameters<typeof customInstance>[1]): Promise<ListAiProviderRateVersions200> => {
 
-  return customInstance<listAiProviderRateVersionsResponse>(getListAiProviderRateVersionsUrl(providerId),
+  return customInstance<ListAiProviderRateVersions200>(getListAiProviderRateVersionsUrl(providerId),
   {
     ...options,
     method: 'GET'
@@ -2428,18 +1639,6 @@ export const listAiProviderRateVersions = async (providerId: string, options?: P
   }
 );}
 
-
-export type createAiProviderRateVersionResponse200 = {
-  data: CreateAiProviderRateVersion200
-  status: 200
-}
-
-export type createAiProviderRateVersionResponseSuccess = (createAiProviderRateVersionResponse200) & {
-  headers: Headers;
-};
-;
-
-export type createAiProviderRateVersionResponse = (createAiProviderRateVersionResponseSuccess)
 
 export const getCreateAiProviderRateVersionUrl = (providerId: string,) => {
 
@@ -2450,7 +1649,7 @@ export const getCreateAiProviderRateVersionUrl = (providerId: string,) => {
 }
 
 export const createAiProviderRateVersion = async (providerId: string,
-    createAiProviderRateVersionRequest: CreateAiProviderRateVersionRequest, options?: Parameters<typeof customInstance>[1]): Promise<createAiProviderRateVersionResponse> => {
+    createAiProviderRateVersionRequest: CreateAiProviderRateVersionRequest, options?: Parameters<typeof customInstance>[1]): Promise<CreateAiProviderRateVersion200> => {
 
     const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
@@ -2458,7 +1657,7 @@ export const createAiProviderRateVersion = async (providerId: string,
     if (Array.isArray(h)) return Object.fromEntries(h);
     return h;
   };
-return customInstance<createAiProviderRateVersionResponse>(getCreateAiProviderRateVersionUrl(providerId),
+return customInstance<CreateAiProviderRateVersion200>(getCreateAiProviderRateVersionUrl(providerId),
   {
     ...options,
     method: 'POST',
@@ -2467,18 +1666,6 @@ return customInstance<createAiProviderRateVersionResponse>(getCreateAiProviderRa
   }
 );}
 
-
-export type listAiUsageCallsResponse200 = {
-  data: ListAiUsageCalls200
-  status: 200
-}
-
-export type listAiUsageCallsResponseSuccess = (listAiUsageCallsResponse200) & {
-  headers: Headers;
-};
-;
-
-export type listAiUsageCallsResponse = (listAiUsageCallsResponseSuccess)
 
 export const getListAiUsageCallsUrl = (params?: ListAiUsageCallsParams,) => {
   const normalizedParams = new URLSearchParams();
@@ -2495,9 +1682,9 @@ export const getListAiUsageCallsUrl = (params?: ListAiUsageCallsParams,) => {
   return stringifiedParams.length > 0 ? `/api/v4/admin/ai-usage/calls?${stringifiedParams}` : `/api/v4/admin/ai-usage/calls`
 }
 
-export const listAiUsageCalls = async (params?: ListAiUsageCallsParams, options?: Parameters<typeof customInstance>[1]): Promise<listAiUsageCallsResponse> => {
+export const listAiUsageCalls = async (params?: ListAiUsageCallsParams, options?: Parameters<typeof customInstance>[1]): Promise<ListAiUsageCalls200> => {
 
-  return customInstance<listAiUsageCallsResponse>(getListAiUsageCallsUrl(params),
+  return customInstance<ListAiUsageCalls200>(getListAiUsageCallsUrl(params),
   {
     ...options,
     method: 'GET'
@@ -2506,18 +1693,6 @@ export const listAiUsageCalls = async (params?: ListAiUsageCallsParams, options?
   }
 );}
 
-
-export type listAiUsageSummaryResponse200 = {
-  data: ListAiUsageSummary200
-  status: 200
-}
-
-export type listAiUsageSummaryResponseSuccess = (listAiUsageSummaryResponse200) & {
-  headers: Headers;
-};
-;
-
-export type listAiUsageSummaryResponse = (listAiUsageSummaryResponseSuccess)
 
 export const getListAiUsageSummaryUrl = (params?: ListAiUsageSummaryParams,) => {
   const normalizedParams = new URLSearchParams();
@@ -2534,9 +1709,9 @@ export const getListAiUsageSummaryUrl = (params?: ListAiUsageSummaryParams,) => 
   return stringifiedParams.length > 0 ? `/api/v4/admin/ai-usage/summary?${stringifiedParams}` : `/api/v4/admin/ai-usage/summary`
 }
 
-export const listAiUsageSummary = async (params?: ListAiUsageSummaryParams, options?: Parameters<typeof customInstance>[1]): Promise<listAiUsageSummaryResponse> => {
+export const listAiUsageSummary = async (params?: ListAiUsageSummaryParams, options?: Parameters<typeof customInstance>[1]): Promise<ListAiUsageSummary200> => {
 
-  return customInstance<listAiUsageSummaryResponse>(getListAiUsageSummaryUrl(params),
+  return customInstance<ListAiUsageSummary200>(getListAiUsageSummaryUrl(params),
   {
     ...options,
     method: 'GET'
@@ -2545,18 +1720,6 @@ export const listAiUsageSummary = async (params?: ListAiUsageSummaryParams, opti
   }
 );}
 
-
-export type getSettingsNamespaceResponse200 = {
-  data: GetSettingsNamespace200
-  status: 200
-}
-
-export type getSettingsNamespaceResponseSuccess = (getSettingsNamespaceResponse200) & {
-  headers: Headers;
-};
-;
-
-export type getSettingsNamespaceResponse = (getSettingsNamespaceResponseSuccess)
 
 export const getGetSettingsNamespaceUrl = (namespace: 'general' | 'query' | 'execution' | 'ai-budget' | 'branding',) => {
 
@@ -2566,9 +1729,9 @@ export const getGetSettingsNamespaceUrl = (namespace: 'general' | 'query' | 'exe
   return `/api/v4/admin/settings/${namespace}`
 }
 
-export const getSettingsNamespace = async (namespace: 'general' | 'query' | 'execution' | 'ai-budget' | 'branding', options?: Parameters<typeof customInstance>[1]): Promise<getSettingsNamespaceResponse> => {
+export const getSettingsNamespace = async (namespace: 'general' | 'query' | 'execution' | 'ai-budget' | 'branding', options?: Parameters<typeof customInstance>[1]): Promise<GetSettingsNamespace200> => {
 
-  return customInstance<getSettingsNamespaceResponse>(getGetSettingsNamespaceUrl(namespace),
+  return customInstance<GetSettingsNamespace200>(getGetSettingsNamespaceUrl(namespace),
   {
     ...options,
     method: 'GET'
@@ -2577,18 +1740,6 @@ export const getSettingsNamespace = async (namespace: 'general' | 'query' | 'exe
   }
 );}
 
-
-export type replaceSettingsNamespaceResponse200 = {
-  data: ReplaceSettingsNamespace200
-  status: 200
-}
-
-export type replaceSettingsNamespaceResponseSuccess = (replaceSettingsNamespaceResponse200) & {
-  headers: Headers;
-};
-;
-
-export type replaceSettingsNamespaceResponse = (replaceSettingsNamespaceResponseSuccess)
 
 export const getReplaceSettingsNamespaceUrl = (namespace: 'general' | 'query' | 'execution' | 'ai-budget' | 'branding',) => {
 
@@ -2599,7 +1750,7 @@ export const getReplaceSettingsNamespaceUrl = (namespace: 'general' | 'query' | 
 }
 
 export const replaceSettingsNamespace = async (namespace: 'general' | 'query' | 'execution' | 'ai-budget' | 'branding',
-    replaceSettingsNamespaceRequest: ReplaceSettingsNamespaceRequest, options?: Parameters<typeof customInstance>[1]): Promise<replaceSettingsNamespaceResponse> => {
+    replaceSettingsNamespaceRequest: ReplaceSettingsNamespaceRequest, options?: Parameters<typeof customInstance>[1]): Promise<ReplaceSettingsNamespace200> => {
 
     const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
@@ -2607,7 +1758,7 @@ export const replaceSettingsNamespace = async (namespace: 'general' | 'query' | 
     if (Array.isArray(h)) return Object.fromEntries(h);
     return h;
   };
-return customInstance<replaceSettingsNamespaceResponse>(getReplaceSettingsNamespaceUrl(namespace),
+return customInstance<ReplaceSettingsNamespace200>(getReplaceSettingsNamespaceUrl(namespace),
   {
     ...options,
     method: 'PUT',
@@ -2616,18 +1767,6 @@ return customInstance<replaceSettingsNamespaceResponse>(getReplaceSettingsNamesp
   }
 );}
 
-
-export type assessSettingsImpactResponse200 = {
-  data: AssessSettingsImpact200
-  status: 200
-}
-
-export type assessSettingsImpactResponseSuccess = (assessSettingsImpactResponse200) & {
-  headers: Headers;
-};
-;
-
-export type assessSettingsImpactResponse = (assessSettingsImpactResponseSuccess)
 
 export const getAssessSettingsImpactUrl = (namespace: 'general' | 'query' | 'execution' | 'ai-budget' | 'branding',) => {
 
@@ -2641,7 +1780,7 @@ export const getAssessSettingsImpactUrl = (namespace: 'general' | 'query' | 'exe
  * Computes the impact of an exact proposed replacement. The returned token is bound to the namespace, current version, canonical proposed settings hash and admin session; it is single-use and expires after 300 seconds.
  */
 export const assessSettingsImpact = async (namespace: 'general' | 'query' | 'execution' | 'ai-budget' | 'branding',
-    assessSettingsImpactRequest: AssessSettingsImpactRequest, options?: Parameters<typeof customInstance>[1]): Promise<assessSettingsImpactResponse> => {
+    assessSettingsImpactRequest: AssessSettingsImpactRequest, options?: Parameters<typeof customInstance>[1]): Promise<AssessSettingsImpact200> => {
 
     const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
@@ -2649,7 +1788,7 @@ export const assessSettingsImpact = async (namespace: 'general' | 'query' | 'exe
     if (Array.isArray(h)) return Object.fromEntries(h);
     return h;
   };
-return customInstance<assessSettingsImpactResponse>(getAssessSettingsImpactUrl(namespace),
+return customInstance<AssessSettingsImpact200>(getAssessSettingsImpactUrl(namespace),
   {
     ...options,
     method: 'POST',
@@ -2659,18 +1798,6 @@ return customInstance<assessSettingsImpactResponse>(getAssessSettingsImpactUrl(n
 );}
 
 
-export type getSettingsSchemaResponse200 = {
-  data: GetSettingsSchema200
-  status: 200
-}
-
-export type getSettingsSchemaResponseSuccess = (getSettingsSchemaResponse200) & {
-  headers: Headers;
-};
-;
-
-export type getSettingsSchemaResponse = (getSettingsSchemaResponseSuccess)
-
 export const getGetSettingsSchemaUrl = (namespace: 'general' | 'query' | 'execution' | 'ai-budget' | 'branding',) => {
 
 
@@ -2679,9 +1806,9 @@ export const getGetSettingsSchemaUrl = (namespace: 'general' | 'query' | 'execut
   return `/api/v4/admin/settings/${namespace}/schema`
 }
 
-export const getSettingsSchema = async (namespace: 'general' | 'query' | 'execution' | 'ai-budget' | 'branding', options?: Parameters<typeof customInstance>[1]): Promise<getSettingsSchemaResponse> => {
+export const getSettingsSchema = async (namespace: 'general' | 'query' | 'execution' | 'ai-budget' | 'branding', options?: Parameters<typeof customInstance>[1]): Promise<GetSettingsSchema200> => {
 
-  return customInstance<getSettingsSchemaResponse>(getGetSettingsSchemaUrl(namespace),
+  return customInstance<GetSettingsSchema200>(getGetSettingsSchemaUrl(namespace),
   {
     ...options,
     method: 'GET'
@@ -2690,18 +1817,6 @@ export const getSettingsSchema = async (namespace: 'general' | 'query' | 'execut
   }
 );}
 
-
-export type listSettingsRevisionsResponse200 = {
-  data: ListSettingsRevisions200
-  status: 200
-}
-
-export type listSettingsRevisionsResponseSuccess = (listSettingsRevisionsResponse200) & {
-  headers: Headers;
-};
-;
-
-export type listSettingsRevisionsResponse = (listSettingsRevisionsResponseSuccess)
 
 export const getListSettingsRevisionsUrl = (namespace: 'general' | 'query' | 'execution' | 'ai-budget' | 'branding',
     params?: ListSettingsRevisionsParams,) => {
@@ -2720,9 +1835,9 @@ export const getListSettingsRevisionsUrl = (namespace: 'general' | 'query' | 'ex
 }
 
 export const listSettingsRevisions = async (namespace: 'general' | 'query' | 'execution' | 'ai-budget' | 'branding',
-    params?: ListSettingsRevisionsParams, options?: Parameters<typeof customInstance>[1]): Promise<listSettingsRevisionsResponse> => {
+    params?: ListSettingsRevisionsParams, options?: Parameters<typeof customInstance>[1]): Promise<ListSettingsRevisions200> => {
 
-  return customInstance<listSettingsRevisionsResponse>(getListSettingsRevisionsUrl(namespace,params),
+  return customInstance<ListSettingsRevisions200>(getListSettingsRevisionsUrl(namespace,params),
   {
     ...options,
     method: 'GET'
@@ -2731,18 +1846,6 @@ export const listSettingsRevisions = async (namespace: 'general' | 'query' | 'ex
   }
 );}
 
-
-export type listNotificationChannelsResponse200 = {
-  data: ListNotificationChannels200
-  status: 200
-}
-
-export type listNotificationChannelsResponseSuccess = (listNotificationChannelsResponse200) & {
-  headers: Headers;
-};
-;
-
-export type listNotificationChannelsResponse = (listNotificationChannelsResponseSuccess)
 
 export const getListNotificationChannelsUrl = (params?: ListNotificationChannelsParams,) => {
   const normalizedParams = new URLSearchParams();
@@ -2759,9 +1862,9 @@ export const getListNotificationChannelsUrl = (params?: ListNotificationChannels
   return stringifiedParams.length > 0 ? `/api/v4/admin/notification-channels?${stringifiedParams}` : `/api/v4/admin/notification-channels`
 }
 
-export const listNotificationChannels = async (params?: ListNotificationChannelsParams, options?: Parameters<typeof customInstance>[1]): Promise<listNotificationChannelsResponse> => {
+export const listNotificationChannels = async (params?: ListNotificationChannelsParams, options?: Parameters<typeof customInstance>[1]): Promise<ListNotificationChannels200> => {
 
-  return customInstance<listNotificationChannelsResponse>(getListNotificationChannelsUrl(params),
+  return customInstance<ListNotificationChannels200>(getListNotificationChannelsUrl(params),
   {
     ...options,
     method: 'GET'
@@ -2770,18 +1873,6 @@ export const listNotificationChannels = async (params?: ListNotificationChannels
   }
 );}
 
-
-export type createNotificationChannelResponse200 = {
-  data: CreateNotificationChannel200
-  status: 200
-}
-
-export type createNotificationChannelResponseSuccess = (createNotificationChannelResponse200) & {
-  headers: Headers;
-};
-;
-
-export type createNotificationChannelResponse = (createNotificationChannelResponseSuccess)
 
 export const getCreateNotificationChannelUrl = () => {
 
@@ -2791,7 +1882,7 @@ export const getCreateNotificationChannelUrl = () => {
   return `/api/v4/admin/notification-channels`
 }
 
-export const createNotificationChannel = async (createNotificationChannelRequest: CreateNotificationChannelRequest, options?: Parameters<typeof customInstance>[1]): Promise<createNotificationChannelResponse> => {
+export const createNotificationChannel = async (createNotificationChannelRequest: CreateNotificationChannelRequest, options?: Parameters<typeof customInstance>[1]): Promise<CreateNotificationChannel200> => {
 
     const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
@@ -2799,7 +1890,7 @@ export const createNotificationChannel = async (createNotificationChannelRequest
     if (Array.isArray(h)) return Object.fromEntries(h);
     return h;
   };
-return customInstance<createNotificationChannelResponse>(getCreateNotificationChannelUrl(),
+return customInstance<CreateNotificationChannel200>(getCreateNotificationChannelUrl(),
   {
     ...options,
     method: 'POST',
@@ -2809,18 +1900,6 @@ return customInstance<createNotificationChannelResponse>(getCreateNotificationCh
 );}
 
 
-export type getNotificationChannelResponse200 = {
-  data: GetNotificationChannel200
-  status: 200
-}
-
-export type getNotificationChannelResponseSuccess = (getNotificationChannelResponse200) & {
-  headers: Headers;
-};
-;
-
-export type getNotificationChannelResponse = (getNotificationChannelResponseSuccess)
-
 export const getGetNotificationChannelUrl = (channelId: string,) => {
 
 
@@ -2829,9 +1908,9 @@ export const getGetNotificationChannelUrl = (channelId: string,) => {
   return `/api/v4/admin/notification-channels/${channelId}`
 }
 
-export const getNotificationChannel = async (channelId: string, options?: Parameters<typeof customInstance>[1]): Promise<getNotificationChannelResponse> => {
+export const getNotificationChannel = async (channelId: string, options?: Parameters<typeof customInstance>[1]): Promise<GetNotificationChannel200> => {
 
-  return customInstance<getNotificationChannelResponse>(getGetNotificationChannelUrl(channelId),
+  return customInstance<GetNotificationChannel200>(getGetNotificationChannelUrl(channelId),
   {
     ...options,
     method: 'GET'
@@ -2840,18 +1919,6 @@ export const getNotificationChannel = async (channelId: string, options?: Parame
   }
 );}
 
-
-export type replaceNotificationChannelResponse200 = {
-  data: ReplaceNotificationChannel200
-  status: 200
-}
-
-export type replaceNotificationChannelResponseSuccess = (replaceNotificationChannelResponse200) & {
-  headers: Headers;
-};
-;
-
-export type replaceNotificationChannelResponse = (replaceNotificationChannelResponseSuccess)
 
 export const getReplaceNotificationChannelUrl = (channelId: string,) => {
 
@@ -2862,7 +1929,7 @@ export const getReplaceNotificationChannelUrl = (channelId: string,) => {
 }
 
 export const replaceNotificationChannel = async (channelId: string,
-    notificationChannelWrite: NotificationChannelWrite, options?: Parameters<typeof customInstance>[1]): Promise<replaceNotificationChannelResponse> => {
+    notificationChannelWrite: NotificationChannelWrite, options?: Parameters<typeof customInstance>[1]): Promise<ReplaceNotificationChannel200> => {
 
     const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
@@ -2870,7 +1937,7 @@ export const replaceNotificationChannel = async (channelId: string,
     if (Array.isArray(h)) return Object.fromEntries(h);
     return h;
   };
-return customInstance<replaceNotificationChannelResponse>(getReplaceNotificationChannelUrl(channelId),
+return customInstance<ReplaceNotificationChannel200>(getReplaceNotificationChannelUrl(channelId),
   {
     ...options,
     method: 'PUT',
@@ -2880,18 +1947,6 @@ return customInstance<replaceNotificationChannelResponse>(getReplaceNotification
 );}
 
 
-export type deleteNotificationChannelResponse200 = {
-  data: DeleteNotificationChannel200
-  status: 200
-}
-
-export type deleteNotificationChannelResponseSuccess = (deleteNotificationChannelResponse200) & {
-  headers: Headers;
-};
-;
-
-export type deleteNotificationChannelResponse = (deleteNotificationChannelResponseSuccess)
-
 export const getDeleteNotificationChannelUrl = (channelId: string,) => {
 
 
@@ -2900,9 +1955,9 @@ export const getDeleteNotificationChannelUrl = (channelId: string,) => {
   return `/api/v4/admin/notification-channels/${channelId}`
 }
 
-export const deleteNotificationChannel = async (channelId: string, options?: Parameters<typeof customInstance>[1]): Promise<deleteNotificationChannelResponse> => {
+export const deleteNotificationChannel = async (channelId: string, options?: Parameters<typeof customInstance>[1]): Promise<DeleteNotificationChannel200> => {
 
-  return customInstance<deleteNotificationChannelResponse>(getDeleteNotificationChannelUrl(channelId),
+  return customInstance<DeleteNotificationChannel200>(getDeleteNotificationChannelUrl(channelId),
   {
     ...options,
     method: 'DELETE'
@@ -2911,25 +1966,6 @@ export const deleteNotificationChannel = async (channelId: string, options?: Par
   }
 );}
 
-
-export type createNotificationTestDeliveryResponse200 = {
-  data: CreateNotificationTestDelivery200
-  status: 200
-}
-
-export type createNotificationTestDeliveryResponse429 = {
-  data: ProblemResponse
-  status: 429
-}
-
-export type createNotificationTestDeliveryResponseSuccess = (createNotificationTestDeliveryResponse200) & {
-  headers: Headers;
-};
-export type createNotificationTestDeliveryResponseError = (createNotificationTestDeliveryResponse429) & {
-  headers: Headers;
-};
-
-export type createNotificationTestDeliveryResponse = (createNotificationTestDeliveryResponseSuccess | createNotificationTestDeliveryResponseError)
 
 export const getCreateNotificationTestDeliveryUrl = (channelId: string,) => {
 
@@ -2940,7 +1976,7 @@ export const getCreateNotificationTestDeliveryUrl = (channelId: string,) => {
 }
 
 export const createNotificationTestDelivery = async (channelId: string,
-    notificationTestRequest: NotificationTestRequest, options?: Parameters<typeof customInstance>[1]): Promise<createNotificationTestDeliveryResponse> => {
+    notificationTestRequest: NotificationTestRequest, options?: Parameters<typeof customInstance>[1]): Promise<CreateNotificationTestDelivery200> => {
 
     const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
@@ -2948,7 +1984,7 @@ export const createNotificationTestDelivery = async (channelId: string,
     if (Array.isArray(h)) return Object.fromEntries(h);
     return h;
   };
-return customInstance<createNotificationTestDeliveryResponse>(getCreateNotificationTestDeliveryUrl(channelId),
+return customInstance<CreateNotificationTestDelivery200>(getCreateNotificationTestDeliveryUrl(channelId),
   {
     ...options,
     method: 'POST',
@@ -2957,18 +1993,6 @@ return customInstance<createNotificationTestDeliveryResponse>(getCreateNotificat
   }
 );}
 
-
-export type listNotificationRulesResponse200 = {
-  data: ListNotificationRules200
-  status: 200
-}
-
-export type listNotificationRulesResponseSuccess = (listNotificationRulesResponse200) & {
-  headers: Headers;
-};
-;
-
-export type listNotificationRulesResponse = (listNotificationRulesResponseSuccess)
 
 export const getListNotificationRulesUrl = (params?: ListNotificationRulesParams,) => {
   const normalizedParams = new URLSearchParams();
@@ -2985,9 +2009,9 @@ export const getListNotificationRulesUrl = (params?: ListNotificationRulesParams
   return stringifiedParams.length > 0 ? `/api/v4/admin/notification-rules?${stringifiedParams}` : `/api/v4/admin/notification-rules`
 }
 
-export const listNotificationRules = async (params?: ListNotificationRulesParams, options?: Parameters<typeof customInstance>[1]): Promise<listNotificationRulesResponse> => {
+export const listNotificationRules = async (params?: ListNotificationRulesParams, options?: Parameters<typeof customInstance>[1]): Promise<ListNotificationRules200> => {
 
-  return customInstance<listNotificationRulesResponse>(getListNotificationRulesUrl(params),
+  return customInstance<ListNotificationRules200>(getListNotificationRulesUrl(params),
   {
     ...options,
     method: 'GET'
@@ -2997,18 +2021,6 @@ export const listNotificationRules = async (params?: ListNotificationRulesParams
 );}
 
 
-export type createNotificationRuleResponse200 = {
-  data: CreateNotificationRule200
-  status: 200
-}
-
-export type createNotificationRuleResponseSuccess = (createNotificationRuleResponse200) & {
-  headers: Headers;
-};
-;
-
-export type createNotificationRuleResponse = (createNotificationRuleResponseSuccess)
-
 export const getCreateNotificationRuleUrl = () => {
 
 
@@ -3017,7 +2029,7 @@ export const getCreateNotificationRuleUrl = () => {
   return `/api/v4/admin/notification-rules`
 }
 
-export const createNotificationRule = async (notificationRuleWrite: NotificationRuleWrite, options?: Parameters<typeof customInstance>[1]): Promise<createNotificationRuleResponse> => {
+export const createNotificationRule = async (notificationRuleWrite: NotificationRuleWrite, options?: Parameters<typeof customInstance>[1]): Promise<CreateNotificationRule200> => {
 
     const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
@@ -3025,7 +2037,7 @@ export const createNotificationRule = async (notificationRuleWrite: Notification
     if (Array.isArray(h)) return Object.fromEntries(h);
     return h;
   };
-return customInstance<createNotificationRuleResponse>(getCreateNotificationRuleUrl(),
+return customInstance<CreateNotificationRule200>(getCreateNotificationRuleUrl(),
   {
     ...options,
     method: 'POST',
@@ -3034,18 +2046,6 @@ return customInstance<createNotificationRuleResponse>(getCreateNotificationRuleU
   }
 );}
 
-
-export type previewNotificationRuleResponse200 = {
-  data: PreviewNotificationRule200
-  status: 200
-}
-
-export type previewNotificationRuleResponseSuccess = (previewNotificationRuleResponse200) & {
-  headers: Headers;
-};
-;
-
-export type previewNotificationRuleResponse = (previewNotificationRuleResponseSuccess)
 
 export const getPreviewNotificationRuleUrl = () => {
 
@@ -3058,7 +2058,7 @@ export const getPreviewNotificationRuleUrl = () => {
 /**
  * Resolve targets and render the message preview for a rule draft (S007). Never sends anything, never produces domain events and never mutates state. Email addresses are masked in the response.
  */
-export const previewNotificationRule = async (notificationRulePreviewRequest: NotificationRulePreviewRequest, options?: Parameters<typeof customInstance>[1]): Promise<previewNotificationRuleResponse> => {
+export const previewNotificationRule = async (notificationRulePreviewRequest: NotificationRulePreviewRequest, options?: Parameters<typeof customInstance>[1]): Promise<PreviewNotificationRule200> => {
 
     const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
@@ -3066,7 +2066,7 @@ export const previewNotificationRule = async (notificationRulePreviewRequest: No
     if (Array.isArray(h)) return Object.fromEntries(h);
     return h;
   };
-return customInstance<previewNotificationRuleResponse>(getPreviewNotificationRuleUrl(),
+return customInstance<PreviewNotificationRule200>(getPreviewNotificationRuleUrl(),
   {
     ...options,
     method: 'POST',
@@ -3076,18 +2076,6 @@ return customInstance<previewNotificationRuleResponse>(getPreviewNotificationRul
 );}
 
 
-export type getNotificationRuleResponse200 = {
-  data: GetNotificationRule200
-  status: 200
-}
-
-export type getNotificationRuleResponseSuccess = (getNotificationRuleResponse200) & {
-  headers: Headers;
-};
-;
-
-export type getNotificationRuleResponse = (getNotificationRuleResponseSuccess)
-
 export const getGetNotificationRuleUrl = (ruleId: string,) => {
 
 
@@ -3096,9 +2084,9 @@ export const getGetNotificationRuleUrl = (ruleId: string,) => {
   return `/api/v4/admin/notification-rules/${ruleId}`
 }
 
-export const getNotificationRule = async (ruleId: string, options?: Parameters<typeof customInstance>[1]): Promise<getNotificationRuleResponse> => {
+export const getNotificationRule = async (ruleId: string, options?: Parameters<typeof customInstance>[1]): Promise<GetNotificationRule200> => {
 
-  return customInstance<getNotificationRuleResponse>(getGetNotificationRuleUrl(ruleId),
+  return customInstance<GetNotificationRule200>(getGetNotificationRuleUrl(ruleId),
   {
     ...options,
     method: 'GET'
@@ -3107,18 +2095,6 @@ export const getNotificationRule = async (ruleId: string, options?: Parameters<t
   }
 );}
 
-
-export type replaceNotificationRuleResponse200 = {
-  data: ReplaceNotificationRule200
-  status: 200
-}
-
-export type replaceNotificationRuleResponseSuccess = (replaceNotificationRuleResponse200) & {
-  headers: Headers;
-};
-;
-
-export type replaceNotificationRuleResponse = (replaceNotificationRuleResponseSuccess)
 
 export const getReplaceNotificationRuleUrl = (ruleId: string,) => {
 
@@ -3129,7 +2105,7 @@ export const getReplaceNotificationRuleUrl = (ruleId: string,) => {
 }
 
 export const replaceNotificationRule = async (ruleId: string,
-    notificationRuleWrite: NotificationRuleWrite, options?: Parameters<typeof customInstance>[1]): Promise<replaceNotificationRuleResponse> => {
+    notificationRuleWrite: NotificationRuleWrite, options?: Parameters<typeof customInstance>[1]): Promise<ReplaceNotificationRule200> => {
 
     const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
@@ -3137,7 +2113,7 @@ export const replaceNotificationRule = async (ruleId: string,
     if (Array.isArray(h)) return Object.fromEntries(h);
     return h;
   };
-return customInstance<replaceNotificationRuleResponse>(getReplaceNotificationRuleUrl(ruleId),
+return customInstance<ReplaceNotificationRule200>(getReplaceNotificationRuleUrl(ruleId),
   {
     ...options,
     method: 'PUT',
@@ -3147,18 +2123,6 @@ return customInstance<replaceNotificationRuleResponse>(getReplaceNotificationRul
 );}
 
 
-export type deleteNotificationRuleResponse200 = {
-  data: DeleteNotificationRule200
-  status: 200
-}
-
-export type deleteNotificationRuleResponseSuccess = (deleteNotificationRuleResponse200) & {
-  headers: Headers;
-};
-;
-
-export type deleteNotificationRuleResponse = (deleteNotificationRuleResponseSuccess)
-
 export const getDeleteNotificationRuleUrl = (ruleId: string,) => {
 
 
@@ -3167,9 +2131,9 @@ export const getDeleteNotificationRuleUrl = (ruleId: string,) => {
   return `/api/v4/admin/notification-rules/${ruleId}`
 }
 
-export const deleteNotificationRule = async (ruleId: string, options?: Parameters<typeof customInstance>[1]): Promise<deleteNotificationRuleResponse> => {
+export const deleteNotificationRule = async (ruleId: string, options?: Parameters<typeof customInstance>[1]): Promise<DeleteNotificationRule200> => {
 
-  return customInstance<deleteNotificationRuleResponse>(getDeleteNotificationRuleUrl(ruleId),
+  return customInstance<DeleteNotificationRule200>(getDeleteNotificationRuleUrl(ruleId),
   {
     ...options,
     method: 'DELETE'
@@ -3178,18 +2142,6 @@ export const deleteNotificationRule = async (ruleId: string, options?: Parameter
   }
 );}
 
-
-export type listNotificationDeliveriesResponse200 = {
-  data: ListNotificationDeliveries200
-  status: 200
-}
-
-export type listNotificationDeliveriesResponseSuccess = (listNotificationDeliveriesResponse200) & {
-  headers: Headers;
-};
-;
-
-export type listNotificationDeliveriesResponse = (listNotificationDeliveriesResponseSuccess)
 
 export const getListNotificationDeliveriesUrl = (params?: ListNotificationDeliveriesParams,) => {
   const normalizedParams = new URLSearchParams();
@@ -3206,9 +2158,9 @@ export const getListNotificationDeliveriesUrl = (params?: ListNotificationDelive
   return stringifiedParams.length > 0 ? `/api/v4/admin/notification-deliveries?${stringifiedParams}` : `/api/v4/admin/notification-deliveries`
 }
 
-export const listNotificationDeliveries = async (params?: ListNotificationDeliveriesParams, options?: Parameters<typeof customInstance>[1]): Promise<listNotificationDeliveriesResponse> => {
+export const listNotificationDeliveries = async (params?: ListNotificationDeliveriesParams, options?: Parameters<typeof customInstance>[1]): Promise<ListNotificationDeliveries200> => {
 
-  return customInstance<listNotificationDeliveriesResponse>(getListNotificationDeliveriesUrl(params),
+  return customInstance<ListNotificationDeliveries200>(getListNotificationDeliveriesUrl(params),
   {
     ...options,
     method: 'GET'
@@ -3217,18 +2169,6 @@ export const listNotificationDeliveries = async (params?: ListNotificationDelive
   }
 );}
 
-
-export type listAuditEventsResponse200 = {
-  data: ListAuditEvents200
-  status: 200
-}
-
-export type listAuditEventsResponseSuccess = (listAuditEventsResponse200) & {
-  headers: Headers;
-};
-;
-
-export type listAuditEventsResponse = (listAuditEventsResponseSuccess)
 
 export const getListAuditEventsUrl = (params?: ListAuditEventsParams,) => {
   const normalizedParams = new URLSearchParams();
@@ -3245,9 +2185,9 @@ export const getListAuditEventsUrl = (params?: ListAuditEventsParams,) => {
   return stringifiedParams.length > 0 ? `/api/v4/admin/audit-events?${stringifiedParams}` : `/api/v4/admin/audit-events`
 }
 
-export const listAuditEvents = async (params?: ListAuditEventsParams, options?: Parameters<typeof customInstance>[1]): Promise<listAuditEventsResponse> => {
+export const listAuditEvents = async (params?: ListAuditEventsParams, options?: Parameters<typeof customInstance>[1]): Promise<ListAuditEvents200> => {
 
-  return customInstance<listAuditEventsResponse>(getListAuditEventsUrl(params),
+  return customInstance<ListAuditEvents200>(getListAuditEventsUrl(params),
   {
     ...options,
     method: 'GET'
@@ -3256,25 +2196,6 @@ export const listAuditEvents = async (params?: ListAuditEventsParams, options?: 
   }
 );}
 
-
-export type getOperationsDashboardResponse200 = {
-  data: OperationsDashboardResultResponse
-  status: 200
-}
-
-export type getOperationsDashboardResponse403 = {
-  data: ProblemResponse
-  status: 403
-}
-
-export type getOperationsDashboardResponseSuccess = (getOperationsDashboardResponse200) & {
-  headers: Headers;
-};
-export type getOperationsDashboardResponseError = (getOperationsDashboardResponse403) & {
-  headers: Headers;
-};
-
-export type getOperationsDashboardResponse = (getOperationsDashboardResponseSuccess | getOperationsDashboardResponseError)
 
 export const getGetOperationsDashboardUrl = (params?: GetOperationsDashboardParams,) => {
   const normalizedParams = new URLSearchParams();
@@ -3295,9 +2216,9 @@ export const getGetOperationsDashboardUrl = (params?: GetOperationsDashboardPara
  * 平台运营统计。按 owner 2026-10-16 指令（§18.71），该读面对全部已登录会话开放，
  * 路径与 tag 保留 admin 语义不做迁移。
  */
-export const getOperationsDashboard = async (params?: GetOperationsDashboardParams, options?: Parameters<typeof customInstance>[1]): Promise<getOperationsDashboardResponse> => {
+export const getOperationsDashboard = async (params?: GetOperationsDashboardParams, options?: Parameters<typeof customInstance>[1]): Promise<OperationsDashboardResultResponse> => {
 
-  return customInstance<getOperationsDashboardResponse>(getGetOperationsDashboardUrl(params),
+  return customInstance<OperationsDashboardResultResponse>(getGetOperationsDashboardUrl(params),
   {
     ...options,
     method: 'GET'
@@ -3306,25 +2227,6 @@ export const getOperationsDashboard = async (params?: GetOperationsDashboardPara
   }
 );}
 
-
-export type getSystemHealthDashboardResponse200 = {
-  data: SystemHealthDashboardResultResponse
-  status: 200
-}
-
-export type getSystemHealthDashboardResponse403 = {
-  data: ProblemResponse
-  status: 403
-}
-
-export type getSystemHealthDashboardResponseSuccess = (getSystemHealthDashboardResponse200) & {
-  headers: Headers;
-};
-export type getSystemHealthDashboardResponseError = (getSystemHealthDashboardResponse403) & {
-  headers: Headers;
-};
-
-export type getSystemHealthDashboardResponse = (getSystemHealthDashboardResponseSuccess | getSystemHealthDashboardResponseError)
 
 export const getGetSystemHealthDashboardUrl = () => {
 
@@ -3339,9 +2241,9 @@ export const getGetSystemHealthDashboardUrl = () => {
  * （authorization-policy authenticated-session 规则），供首页公告卡的健康点使用；
  * 路径与 tag 保留 admin 语义不做迁移。
  */
-export const getSystemHealthDashboard = async ( options?: Parameters<typeof customInstance>[1]): Promise<getSystemHealthDashboardResponse> => {
+export const getSystemHealthDashboard = async ( options?: Parameters<typeof customInstance>[1]): Promise<SystemHealthDashboardResultResponse> => {
 
-  return customInstance<getSystemHealthDashboardResponse>(getGetSystemHealthDashboardUrl(),
+  return customInstance<SystemHealthDashboardResultResponse>(getGetSystemHealthDashboardUrl(),
   {
     ...options,
     method: 'GET'
@@ -3350,25 +2252,6 @@ export const getSystemHealthDashboard = async ( options?: Parameters<typeof cust
   }
 );}
 
-
-export type listAnnouncementRevisionsResponse200 = {
-  data: AnnouncementRevisionPageResultResponse
-  status: 200
-}
-
-export type listAnnouncementRevisionsResponse403 = {
-  data: ProblemResponse
-  status: 403
-}
-
-export type listAnnouncementRevisionsResponseSuccess = (listAnnouncementRevisionsResponse200) & {
-  headers: Headers;
-};
-export type listAnnouncementRevisionsResponseError = (listAnnouncementRevisionsResponse403) & {
-  headers: Headers;
-};
-
-export type listAnnouncementRevisionsResponse = (listAnnouncementRevisionsResponseSuccess | listAnnouncementRevisionsResponseError)
 
 export const getListAnnouncementRevisionsUrl = (params?: ListAnnouncementRevisionsParams,) => {
   const normalizedParams = new URLSearchParams();
@@ -3385,9 +2268,9 @@ export const getListAnnouncementRevisionsUrl = (params?: ListAnnouncementRevisio
   return stringifiedParams.length > 0 ? `/api/v4/admin/announcement-revisions?${stringifiedParams}` : `/api/v4/admin/announcement-revisions`
 }
 
-export const listAnnouncementRevisions = async (params?: ListAnnouncementRevisionsParams, options?: Parameters<typeof customInstance>[1]): Promise<listAnnouncementRevisionsResponse> => {
+export const listAnnouncementRevisions = async (params?: ListAnnouncementRevisionsParams, options?: Parameters<typeof customInstance>[1]): Promise<AnnouncementRevisionPageResultResponse> => {
 
-  return customInstance<listAnnouncementRevisionsResponse>(getListAnnouncementRevisionsUrl(params),
+  return customInstance<AnnouncementRevisionPageResultResponse>(getListAnnouncementRevisionsUrl(params),
   {
     ...options,
     method: 'GET'
@@ -3396,25 +2279,6 @@ export const listAnnouncementRevisions = async (params?: ListAnnouncementRevisio
   }
 );}
 
-
-export type createAnnouncementRevisionResponse200 = {
-  data: AnnouncementRevisionResultResponse
-  status: 200
-}
-
-export type createAnnouncementRevisionResponse403 = {
-  data: ProblemResponse
-  status: 403
-}
-
-export type createAnnouncementRevisionResponseSuccess = (createAnnouncementRevisionResponse200) & {
-  headers: Headers;
-};
-export type createAnnouncementRevisionResponseError = (createAnnouncementRevisionResponse403) & {
-  headers: Headers;
-};
-
-export type createAnnouncementRevisionResponse = (createAnnouncementRevisionResponseSuccess | createAnnouncementRevisionResponseError)
 
 export const getCreateAnnouncementRevisionUrl = () => {
 
@@ -3424,7 +2288,7 @@ export const getCreateAnnouncementRevisionUrl = () => {
   return `/api/v4/admin/announcement-revisions`
 }
 
-export const createAnnouncementRevision = async (createAnnouncementRevisionRequest: CreateAnnouncementRevisionRequest, options?: Parameters<typeof customInstance>[1]): Promise<createAnnouncementRevisionResponse> => {
+export const createAnnouncementRevision = async (createAnnouncementRevisionRequest: CreateAnnouncementRevisionRequest, options?: Parameters<typeof customInstance>[1]): Promise<AnnouncementRevisionResultResponse> => {
 
     const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
@@ -3432,7 +2296,7 @@ export const createAnnouncementRevision = async (createAnnouncementRevisionReque
     if (Array.isArray(h)) return Object.fromEntries(h);
     return h;
   };
-return customInstance<createAnnouncementRevisionResponse>(getCreateAnnouncementRevisionUrl(),
+return customInstance<AnnouncementRevisionResultResponse>(getCreateAnnouncementRevisionUrl(),
   {
     ...options,
     method: 'POST',
@@ -3442,25 +2306,6 @@ return customInstance<createAnnouncementRevisionResponse>(getCreateAnnouncementR
 );}
 
 
-export type publishAnnouncementRevisionResponse200 = {
-  data: AnnouncementPublicationResultResponse
-  status: 200
-}
-
-export type publishAnnouncementRevisionResponse403 = {
-  data: ProblemResponse
-  status: 403
-}
-
-export type publishAnnouncementRevisionResponseSuccess = (publishAnnouncementRevisionResponse200) & {
-  headers: Headers;
-};
-export type publishAnnouncementRevisionResponseError = (publishAnnouncementRevisionResponse403) & {
-  headers: Headers;
-};
-
-export type publishAnnouncementRevisionResponse = (publishAnnouncementRevisionResponseSuccess | publishAnnouncementRevisionResponseError)
-
 export const getPublishAnnouncementRevisionUrl = () => {
 
 
@@ -3469,7 +2314,7 @@ export const getPublishAnnouncementRevisionUrl = () => {
   return `/api/v4/admin/announcement-publication`
 }
 
-export const publishAnnouncementRevision = async (publishAnnouncementRequest: PublishAnnouncementRequest, options?: Parameters<typeof customInstance>[1]): Promise<publishAnnouncementRevisionResponse> => {
+export const publishAnnouncementRevision = async (publishAnnouncementRequest: PublishAnnouncementRequest, options?: Parameters<typeof customInstance>[1]): Promise<AnnouncementPublicationResultResponse> => {
 
     const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
@@ -3477,7 +2322,7 @@ export const publishAnnouncementRevision = async (publishAnnouncementRequest: Pu
     if (Array.isArray(h)) return Object.fromEntries(h);
     return h;
   };
-return customInstance<publishAnnouncementRevisionResponse>(getPublishAnnouncementRevisionUrl(),
+return customInstance<AnnouncementPublicationResultResponse>(getPublishAnnouncementRevisionUrl(),
   {
     ...options,
     method: 'PUT',
@@ -3487,18 +2332,6 @@ return customInstance<publishAnnouncementRevisionResponse>(getPublishAnnouncemen
 );}
 
 
-export type getDatasourceDiagnosticsConfigResponse200 = {
-  data: GetDatasourceDiagnosticsConfig200
-  status: 200
-}
-
-export type getDatasourceDiagnosticsConfigResponseSuccess = (getDatasourceDiagnosticsConfigResponse200) & {
-  headers: Headers;
-};
-;
-
-export type getDatasourceDiagnosticsConfigResponse = (getDatasourceDiagnosticsConfigResponseSuccess)
-
 export const getGetDatasourceDiagnosticsConfigUrl = (datasourceId: string,) => {
 
 
@@ -3507,9 +2340,9 @@ export const getGetDatasourceDiagnosticsConfigUrl = (datasourceId: string,) => {
   return `/api/v4/admin/datasources/${datasourceId}/diagnostics-config`
 }
 
-export const getDatasourceDiagnosticsConfig = async (datasourceId: string, options?: Parameters<typeof customInstance>[1]): Promise<getDatasourceDiagnosticsConfigResponse> => {
+export const getDatasourceDiagnosticsConfig = async (datasourceId: string, options?: Parameters<typeof customInstance>[1]): Promise<GetDatasourceDiagnosticsConfig200> => {
 
-  return customInstance<getDatasourceDiagnosticsConfigResponse>(getGetDatasourceDiagnosticsConfigUrl(datasourceId),
+  return customInstance<GetDatasourceDiagnosticsConfig200>(getGetDatasourceDiagnosticsConfigUrl(datasourceId),
   {
     ...options,
     method: 'GET'
@@ -3518,18 +2351,6 @@ export const getDatasourceDiagnosticsConfig = async (datasourceId: string, optio
   }
 );}
 
-
-export type updateDatasourceDiagnosticsConfigResponse200 = {
-  data: UpdateDatasourceDiagnosticsConfig200
-  status: 200
-}
-
-export type updateDatasourceDiagnosticsConfigResponseSuccess = (updateDatasourceDiagnosticsConfigResponse200) & {
-  headers: Headers;
-};
-;
-
-export type updateDatasourceDiagnosticsConfigResponse = (updateDatasourceDiagnosticsConfigResponseSuccess)
 
 export const getUpdateDatasourceDiagnosticsConfigUrl = (datasourceId: string,) => {
 
@@ -3540,7 +2361,7 @@ export const getUpdateDatasourceDiagnosticsConfigUrl = (datasourceId: string,) =
 }
 
 export const updateDatasourceDiagnosticsConfig = async (datasourceId: string,
-    updateDatasourceDiagnosticsConfigRequest: UpdateDatasourceDiagnosticsConfigRequest, options?: Parameters<typeof customInstance>[1]): Promise<updateDatasourceDiagnosticsConfigResponse> => {
+    updateDatasourceDiagnosticsConfigRequest: UpdateDatasourceDiagnosticsConfigRequest, options?: Parameters<typeof customInstance>[1]): Promise<UpdateDatasourceDiagnosticsConfig200> => {
 
     const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
@@ -3548,7 +2369,7 @@ export const updateDatasourceDiagnosticsConfig = async (datasourceId: string,
     if (Array.isArray(h)) return Object.fromEntries(h);
     return h;
   };
-return customInstance<updateDatasourceDiagnosticsConfigResponse>(getUpdateDatasourceDiagnosticsConfigUrl(datasourceId),
+return customInstance<UpdateDatasourceDiagnosticsConfig200>(getUpdateDatasourceDiagnosticsConfigUrl(datasourceId),
   {
     ...options,
     method: 'PUT',
@@ -3558,18 +2379,6 @@ return customInstance<updateDatasourceDiagnosticsConfigResponse>(getUpdateDataso
 );}
 
 
-export type listDiagnosticDatasourcesResponse200 = {
-  data: ListDiagnosticDatasources200
-  status: 200
-}
-
-export type listDiagnosticDatasourcesResponseSuccess = (listDiagnosticDatasourcesResponse200) & {
-  headers: Headers;
-};
-;
-
-export type listDiagnosticDatasourcesResponse = (listDiagnosticDatasourcesResponseSuccess)
-
 export const getListDiagnosticDatasourcesUrl = () => {
 
 
@@ -3578,9 +2387,9 @@ export const getListDiagnosticDatasourcesUrl = () => {
   return `/api/v4/admin/diagnostics/datasources`
 }
 
-export const listDiagnosticDatasources = async ( options?: Parameters<typeof customInstance>[1]): Promise<listDiagnosticDatasourcesResponse> => {
+export const listDiagnosticDatasources = async ( options?: Parameters<typeof customInstance>[1]): Promise<ListDiagnosticDatasources200> => {
 
-  return customInstance<listDiagnosticDatasourcesResponse>(getListDiagnosticDatasourcesUrl(),
+  return customInstance<ListDiagnosticDatasources200>(getListDiagnosticDatasourcesUrl(),
   {
     ...options,
     method: 'GET'
@@ -3589,18 +2398,6 @@ export const listDiagnosticDatasources = async ( options?: Parameters<typeof cus
   }
 );}
 
-
-export type getDiagnosticsOverviewResponse200 = {
-  data: GetDiagnosticsOverview200
-  status: 200
-}
-
-export type getDiagnosticsOverviewResponseSuccess = (getDiagnosticsOverviewResponse200) & {
-  headers: Headers;
-};
-;
-
-export type getDiagnosticsOverviewResponse = (getDiagnosticsOverviewResponseSuccess)
 
 export const getGetDiagnosticsOverviewUrl = (datasourceId: string,
     params?: GetDiagnosticsOverviewParams,) => {
@@ -3619,9 +2416,9 @@ export const getGetDiagnosticsOverviewUrl = (datasourceId: string,
 }
 
 export const getDiagnosticsOverview = async (datasourceId: string,
-    params?: GetDiagnosticsOverviewParams, options?: Parameters<typeof customInstance>[1]): Promise<getDiagnosticsOverviewResponse> => {
+    params?: GetDiagnosticsOverviewParams, options?: Parameters<typeof customInstance>[1]): Promise<GetDiagnosticsOverview200> => {
 
-  return customInstance<getDiagnosticsOverviewResponse>(getGetDiagnosticsOverviewUrl(datasourceId,params),
+  return customInstance<GetDiagnosticsOverview200>(getGetDiagnosticsOverviewUrl(datasourceId,params),
   {
     ...options,
     method: 'GET'
@@ -3631,18 +2428,6 @@ export const getDiagnosticsOverview = async (datasourceId: string,
 );}
 
 
-export type triggerManualDiagnosticsSnapshotResponse200 = {
-  data: TriggerManualDiagnosticsSnapshot200
-  status: 200
-}
-
-export type triggerManualDiagnosticsSnapshotResponseSuccess = (triggerManualDiagnosticsSnapshotResponse200) & {
-  headers: Headers;
-};
-;
-
-export type triggerManualDiagnosticsSnapshotResponse = (triggerManualDiagnosticsSnapshotResponseSuccess)
-
 export const getTriggerManualDiagnosticsSnapshotUrl = (datasourceId: string,) => {
 
 
@@ -3651,9 +2436,9 @@ export const getTriggerManualDiagnosticsSnapshotUrl = (datasourceId: string,) =>
   return `/api/v4/admin/diagnostics/datasources/${datasourceId}/snapshots`
 }
 
-export const triggerManualDiagnosticsSnapshot = async (datasourceId: string, options?: Parameters<typeof customInstance>[1]): Promise<triggerManualDiagnosticsSnapshotResponse> => {
+export const triggerManualDiagnosticsSnapshot = async (datasourceId: string, options?: Parameters<typeof customInstance>[1]): Promise<TriggerManualDiagnosticsSnapshot200> => {
 
-  return customInstance<triggerManualDiagnosticsSnapshotResponse>(getTriggerManualDiagnosticsSnapshotUrl(datasourceId),
+  return customInstance<TriggerManualDiagnosticsSnapshot200>(getTriggerManualDiagnosticsSnapshotUrl(datasourceId),
   {
     ...options,
     method: 'POST'
@@ -3662,18 +2447,6 @@ export const triggerManualDiagnosticsSnapshot = async (datasourceId: string, opt
   }
 );}
 
-
-export type getDiagnosticStatementDetailResponse200 = {
-  data: GetDiagnosticStatementDetail200
-  status: 200
-}
-
-export type getDiagnosticStatementDetailResponseSuccess = (getDiagnosticStatementDetailResponse200) & {
-  headers: Headers;
-};
-;
-
-export type getDiagnosticStatementDetailResponse = (getDiagnosticStatementDetailResponseSuccess)
 
 export const getGetDiagnosticStatementDetailUrl = (datasourceId: string,
     statementId: string,
@@ -3694,9 +2467,9 @@ export const getGetDiagnosticStatementDetailUrl = (datasourceId: string,
 
 export const getDiagnosticStatementDetail = async (datasourceId: string,
     statementId: string,
-    params?: GetDiagnosticStatementDetailParams, options?: Parameters<typeof customInstance>[1]): Promise<getDiagnosticStatementDetailResponse> => {
+    params?: GetDiagnosticStatementDetailParams, options?: Parameters<typeof customInstance>[1]): Promise<GetDiagnosticStatementDetail200> => {
 
-  return customInstance<getDiagnosticStatementDetailResponse>(getGetDiagnosticStatementDetailUrl(datasourceId,statementId,params),
+  return customInstance<GetDiagnosticStatementDetail200>(getGetDiagnosticStatementDetailUrl(datasourceId,statementId,params),
   {
     ...options,
     method: 'GET'
@@ -3705,18 +2478,6 @@ export const getDiagnosticStatementDetail = async (datasourceId: string,
   }
 );}
 
-
-export type confirmDiagnosticOrderLinkResponse200 = {
-  data: ConfirmDiagnosticOrderLink200
-  status: 200
-}
-
-export type confirmDiagnosticOrderLinkResponseSuccess = (confirmDiagnosticOrderLinkResponse200) & {
-  headers: Headers;
-};
-;
-
-export type confirmDiagnosticOrderLinkResponse = (confirmDiagnosticOrderLinkResponseSuccess)
 
 export const getConfirmDiagnosticOrderLinkUrl = (datasourceId: string,
     statementId: string,) => {
@@ -3729,7 +2490,7 @@ export const getConfirmDiagnosticOrderLinkUrl = (datasourceId: string,
 
 export const confirmDiagnosticOrderLink = async (datasourceId: string,
     statementId: string,
-    confirmDiagnosticOrderLinkRequest: ConfirmDiagnosticOrderLinkRequest, options?: Parameters<typeof customInstance>[1]): Promise<confirmDiagnosticOrderLinkResponse> => {
+    confirmDiagnosticOrderLinkRequest: ConfirmDiagnosticOrderLinkRequest, options?: Parameters<typeof customInstance>[1]): Promise<ConfirmDiagnosticOrderLink200> => {
 
     const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
@@ -3737,7 +2498,7 @@ export const confirmDiagnosticOrderLink = async (datasourceId: string,
     if (Array.isArray(h)) return Object.fromEntries(h);
     return h;
   };
-return customInstance<confirmDiagnosticOrderLinkResponse>(getConfirmDiagnosticOrderLinkUrl(datasourceId,statementId),
+return customInstance<ConfirmDiagnosticOrderLink200>(getConfirmDiagnosticOrderLinkUrl(datasourceId,statementId),
   {
     ...options,
     method: 'POST',
@@ -3746,18 +2507,6 @@ return customInstance<confirmDiagnosticOrderLinkResponse>(getConfirmDiagnosticOr
   }
 );}
 
-
-export type diagnoseStatementWithAiResponse200 = {
-  data: DiagnoseStatementWithAi200
-  status: 200
-}
-
-export type diagnoseStatementWithAiResponseSuccess = (diagnoseStatementWithAiResponse200) & {
-  headers: Headers;
-};
-;
-
-export type diagnoseStatementWithAiResponse = (diagnoseStatementWithAiResponseSuccess)
 
 export const getDiagnoseStatementWithAiUrl = (datasourceId: string,
     statementId: string,) => {
@@ -3770,7 +2519,7 @@ export const getDiagnoseStatementWithAiUrl = (datasourceId: string,
 
 export const diagnoseStatementWithAi = async (datasourceId: string,
     statementId: string,
-    diagnoseStatementWithAiRequest?: DiagnoseStatementWithAiRequest, options?: Parameters<typeof customInstance>[1]): Promise<diagnoseStatementWithAiResponse> => {
+    diagnoseStatementWithAiRequest?: DiagnoseStatementWithAiRequest, options?: Parameters<typeof customInstance>[1]): Promise<DiagnoseStatementWithAi200> => {
 
     const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
@@ -3778,7 +2527,7 @@ export const diagnoseStatementWithAi = async (datasourceId: string,
     if (Array.isArray(h)) return Object.fromEntries(h);
     return h;
   };
-return customInstance<diagnoseStatementWithAiResponse>(getDiagnoseStatementWithAiUrl(datasourceId,statementId),
+return customInstance<DiagnoseStatementWithAi200>(getDiagnoseStatementWithAiUrl(datasourceId,statementId),
   {
     ...options,
     method: 'POST',
@@ -3787,18 +2536,6 @@ return customInstance<diagnoseStatementWithAiResponse>(getDiagnoseStatementWithA
   }
 );}
 
-
-export type precheckDiagnosticOptimizationDraftResponse200 = {
-  data: PrecheckDiagnosticOptimizationDraft200
-  status: 200
-}
-
-export type precheckDiagnosticOptimizationDraftResponseSuccess = (precheckDiagnosticOptimizationDraftResponse200) & {
-  headers: Headers;
-};
-;
-
-export type precheckDiagnosticOptimizationDraftResponse = (precheckDiagnosticOptimizationDraftResponseSuccess)
 
 export const getPrecheckDiagnosticOptimizationDraftUrl = (datasourceId: string,
     reportId: string,) => {
@@ -3811,7 +2548,7 @@ export const getPrecheckDiagnosticOptimizationDraftUrl = (datasourceId: string,
 
 export const precheckDiagnosticOptimizationDraft = async (datasourceId: string,
     reportId: string,
-    precheckDiagnosticOptimizationDraftRequest: PrecheckDiagnosticOptimizationDraftRequest, options?: Parameters<typeof customInstance>[1]): Promise<precheckDiagnosticOptimizationDraftResponse> => {
+    precheckDiagnosticOptimizationDraftRequest: PrecheckDiagnosticOptimizationDraftRequest, options?: Parameters<typeof customInstance>[1]): Promise<PrecheckDiagnosticOptimizationDraft200> => {
 
     const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
@@ -3819,7 +2556,7 @@ export const precheckDiagnosticOptimizationDraft = async (datasourceId: string,
     if (Array.isArray(h)) return Object.fromEntries(h);
     return h;
   };
-return customInstance<precheckDiagnosticOptimizationDraftResponse>(getPrecheckDiagnosticOptimizationDraftUrl(datasourceId,reportId),
+return customInstance<PrecheckDiagnosticOptimizationDraft200>(getPrecheckDiagnosticOptimizationDraftUrl(datasourceId,reportId),
   {
     ...options,
     method: 'POST',
@@ -3828,18 +2565,6 @@ return customInstance<precheckDiagnosticOptimizationDraftResponse>(getPrecheckDi
   }
 );}
 
-
-export type submitDiagnosticOptimizationOrderResponse200 = {
-  data: SubmitDiagnosticOptimizationOrder200
-  status: 200
-}
-
-export type submitDiagnosticOptimizationOrderResponseSuccess = (submitDiagnosticOptimizationOrderResponse200) & {
-  headers: Headers;
-};
-;
-
-export type submitDiagnosticOptimizationOrderResponse = (submitDiagnosticOptimizationOrderResponseSuccess)
 
 export const getSubmitDiagnosticOptimizationOrderUrl = (datasourceId: string,
     reportId: string,) => {
@@ -3852,7 +2577,7 @@ export const getSubmitDiagnosticOptimizationOrderUrl = (datasourceId: string,
 
 export const submitDiagnosticOptimizationOrder = async (datasourceId: string,
     reportId: string,
-    submitDiagnosticOptimizationOrderRequest: SubmitDiagnosticOptimizationOrderRequest, options?: Parameters<typeof customInstance>[1]): Promise<submitDiagnosticOptimizationOrderResponse> => {
+    submitDiagnosticOptimizationOrderRequest: SubmitDiagnosticOptimizationOrderRequest, options?: Parameters<typeof customInstance>[1]): Promise<SubmitDiagnosticOptimizationOrder200> => {
 
     const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
@@ -3860,7 +2585,7 @@ export const submitDiagnosticOptimizationOrder = async (datasourceId: string,
     if (Array.isArray(h)) return Object.fromEntries(h);
     return h;
   };
-return customInstance<submitDiagnosticOptimizationOrderResponse>(getSubmitDiagnosticOptimizationOrderUrl(datasourceId,reportId),
+return customInstance<SubmitDiagnosticOptimizationOrder200>(getSubmitDiagnosticOptimizationOrderUrl(datasourceId,reportId),
   {
     ...options,
     method: 'POST',

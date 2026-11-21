@@ -12,7 +12,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"go.uber.org/zap"
 	"golang.org/x/sync/singleflight"
 	"gorm.io/gorm"
 
@@ -692,30 +691,9 @@ func (st *stageEvidenceStore) executeSingleAgainstSource(
 		return entry, nil
 	}
 
-	res := st.runner.registry.Execute(ctx, factSrc, storedID, toolName, resolved)
-	if res.Success {
-		if perr := projectToolFactSchema(res.NormalizedFact, tokenArgs, st.mapper, st.binding); perr != nil {
-			res.Success = false
-			res.NormalizedFact = nil
-			res.ErrorCode = factErrCodePtr(2012)
-		}
-	}
-	if res.Success && !factMatchesRequestedScope(toolName, res.NormalizedFact, modelArgs) {
-		res.Success = false
-		res.NormalizedFact = nil
-		res.ErrorCode = factErrCodePtr(2012)
-	}
-	var sanFact map[string]any
-	if res.Success {
-		sanFact = copyNormalizedFactForSAN(res.NormalizedFact, res.FactSchemaVersion)
-	}
-	if res.Success {
-		if terr := tokenizeToolFactWithBindings(res.NormalizedFact, st.mapper, tokenArgs); terr != nil {
-			res.Success = false
-			res.NormalizedFact = nil
-			res.ErrorCode = factErrCodePtr(2012)
-		}
-	}
+	execOut, execErr := st.runner.executeValidatedToolCall(
+		ctx, factSrc, storedID, toolName, resolved, tokenArgs, modelArgs, st.mapper, st.binding,
+	)
 
 	st.mu.Lock()
 	defer st.mu.Unlock()
@@ -724,52 +702,39 @@ func (st *stageEvidenceStore) executeSingleAgainstSource(
 		st.seenStoredCalls[storedID] = true
 		st.toolCallCount++
 		st.toolCalls = append(st.toolCalls, persistence.ReviewToolCallModel{
-			ID: res.ToolCallID, ReviewRunID: st.runID, StageReviewID: &st.snap.ID,
-			ToolKind: string(res.ToolKind), ToolName: res.ToolName,
-			Success: res.Success, ErrorCode: res.ErrorCode,
-			StartedAt: res.StartedAt, FinishedAt: res.FinishedAt,
+			ID: execOut.res.ToolCallID, ReviewRunID: st.runID, StageReviewID: &st.snap.ID,
+			ToolKind: string(execOut.res.ToolKind), ToolName: execOut.res.ToolName,
+			Success: execOut.res.Success, ErrorCode: execOut.res.ErrorCode,
+			StartedAt: execOut.res.StartedAt, FinishedAt: execOut.res.FinishedAt,
 		})
 	}
-	if !res.Success {
+	if !execOut.res.Success {
 		st.evidenceIncomplete = true
 		entry := cachedEvidenceEntry{success: false}
 		st.bySig[sig] = entry
 		return entry, nil
 	}
-
-	res.NormalizedFact = cloneValidityFact(res.NormalizedFact)
-	res.NormalizedFact["fact_schema_version"] = res.FactSchemaVersion
-	if !metadataFactComplete(res.NormalizedFact) {
+	if execErr != nil {
+		return cachedEvidenceEntry{}, execErr
+	}
+	if execOut.metadataIncomplete {
 		st.evidenceIncomplete = true
 	}
-	factID := newID()
-	factJSON, err := json.Marshal(res.NormalizedFact)
-	if err != nil {
-		return cachedEvidenceEntry{}, err
-	}
-	env, mac, err := sealPayload(st.runner.svc.Crypter, "evidence_facts", factID, "normalized_fact_ciphertext", factJSON)
-	if err != nil {
-		return cachedEvidenceEntry{}, err
-	}
-	if priorFactID, ok := st.factByHash[mac]; ok {
+	if priorFactID, ok := st.factByHash[execOut.mac]; ok {
 		entry := cachedEvidenceEntry{
 			success: true,
-			ref:     provider.NormalizedEvidenceRef{EvidenceID: priorFactID, FactKind: res.ToolName, Fact: res.NormalizedFact},
-			sanRef:  provider.NormalizedEvidenceRef{EvidenceID: priorFactID, FactKind: res.ToolName, Fact: sanFact},
+			ref:     provider.NormalizedEvidenceRef{EvidenceID: priorFactID, FactKind: execOut.res.ToolName, Fact: execOut.res.NormalizedFact},
+			sanRef:  provider.NormalizedEvidenceRef{EvidenceID: priorFactID, FactKind: execOut.res.ToolName, Fact: execOut.sanFact},
 		}
 		st.bySig[sig] = entry
 		return entry, nil
 	}
-	st.factByHash[mac] = factID
-	raw := res.RawFact
-	if raw == nil {
-		raw = factJSON
-	}
+	st.factByHash[execOut.mac] = execOut.factID
 	st.evidence = append(st.evidence, evidenceDraft{
-		factID: factID, source: "tool_call/" + res.ToolCallID, env: env, mac: mac, raw: raw,
+		factID: execOut.factID, source: "tool_call/" + execOut.res.ToolCallID, env: execOut.env, mac: execOut.mac, raw: execOut.rawFact,
 	})
-	ref := provider.NormalizedEvidenceRef{EvidenceID: factID, FactKind: res.ToolName, Fact: res.NormalizedFact}
-	sanRef := provider.NormalizedEvidenceRef{EvidenceID: factID, FactKind: res.ToolName, Fact: sanFact}
+	ref := provider.NormalizedEvidenceRef{EvidenceID: execOut.factID, FactKind: execOut.res.ToolName, Fact: execOut.res.NormalizedFact}
+	sanRef := provider.NormalizedEvidenceRef{EvidenceID: execOut.factID, FactKind: execOut.res.ToolName, Fact: execOut.sanFact}
 	st.evidenceRefs = append(st.evidenceRefs, ref)
 	st.sanEvidenceRefs = append(st.sanEvidenceRefs, sanRef)
 	entry := cachedEvidenceEntry{success: true, ref: ref, sanRef: sanRef}
@@ -1058,9 +1023,6 @@ func (r *AgentRunner) executeSingleRuleBatch(
 	batch ruleBatch,
 	modelCallSeq *atomic.Int64,
 ) ruleBatchResult {
-	s := r.svc
-	moneyCtx := context.WithoutCancel(ctx)
-
 	batchEvidence, batchSANEvidence := in.store.initialEvidenceSnapshot()
 	seenEvidence := make(map[string]bool, len(batchEvidence))
 	for _, ref := range batchEvidence {
@@ -1095,124 +1057,72 @@ func (r *AgentRunner) executeSingleRuleBatch(
 		}
 
 		buildReqForEndpoint := func(reqCtx context.Context, ep provider.Endpoint) (provider.Request, error) {
-			return r.buildStageEndpointRequest(
-				reqCtx, in.db, in.run, in.target, in.targetContext,
-				in.groups, in.policyObjects,
-				batch.rawSkills, batch.compiledSkills,
-				batch.rawKnowledge, batch.compiledKnowledge,
-				batchEvidence, batchSANEvidence,
-				in.runMapper, in.stageLegend, in.outputLocale,
-				res.evidenceIncomplete, localePending, schemaPending,
-				&localSANGroups, ep,
-			)
+			return r.buildStageEndpointRequest(reqCtx, stagePromptRequest{
+				db:                 in.db,
+				runID:              in.run.ID,
+				ruleConfigHash:     []byte(in.run.RuleConfigHash),
+				target:             in.target,
+				targetContext:      in.targetContext,
+				groups:             in.groups,
+				policyObjects:      in.policyObjects,
+				rawSkills:          batch.rawSkills,
+				compiledSkills:     batch.compiledSkills,
+				rawKnowledge:       batch.rawKnowledge,
+				compiledKnowledge:  batch.compiledKnowledge,
+				evidence:           batchEvidence,
+				sanEvidence:        batchSANEvidence,
+				runMapper:          in.runMapper,
+				stageLegend:        in.stageLegend,
+				outputLocale:       in.outputLocale,
+				evidenceIncomplete: res.evidenceIncomplete,
+				localePending:      localePending,
+				schemaPending:      schemaPending,
+				cachedSANGroups:    &localSANGroups,
+			}, ep)
 		}
 
-		day := s.budgetDay(nowUTC())
-		if err := s.Reserve(moneyCtx, in.db, day, in.budgetSettings.Currency, in.budgetSettings, r.budget.PerStageEstimateMinor); err != nil {
-			if errors.Is(err, ErrBudgetExhausted) {
-				res.err = ErrBudgetExhausted
-				return res
-			}
-			res.err = err
-			return res
-		}
-		batchCalls++
-		callSeq := int(modelCallSeq.Add(1))
-		callCtx, cancelCall := context.WithTimeout(ctx, time.Duration(in.rb.PerModelTimeout)*time.Second)
-		result, cerr := in.chain.ReviewStructuredPerEndpoint(callCtx, buildReqForEndpoint, func(sendCtx context.Context) error {
-			if len(batch.rawSkills) == 0 && len(batch.rawKnowledge) == 0 {
+		canRetry := turn+1 < in.rb.MaxModelTurns && batchCalls+1 < in.rb.MaxModelCalls && time.Now().Before(in.deadline)
+		turnOut := r.invokeStageModelTurn(ctx, stageModelTurnInput{
+			db:               in.db,
+			runID:            in.run.ID,
+			stagePosition:    in.snap.StagePosition,
+			chain:            in.chain,
+			budgetSettings:   in.budgetSettings,
+			perModelTimeout:  in.rb.PerModelTimeout,
+			outputLocale:     in.outputLocale,
+			canRetry:         canRetry,
+			localeFailures:   &localeFailures,
+			schemaRetries:    &schemaRetries,
+			preserveCanceled: true,
+			nextCallSeq: func() int {
+				batchCalls++
+				return int(modelCallSeq.Add(1))
+			},
+			buildReq: buildReqForEndpoint,
+			sendGuard: func(context.Context) error {
+				if len(batch.rawSkills) == 0 && len(batch.rawKnowledge) == 0 {
+					return nil
+				}
+				if _, err := compilePolicy(batch.rawSkills, batch.rawKnowledge, in.runMapper, in.binding, in.stageCatalog, in.target.DatabaseName, in.objectScope); err != nil {
+					return ErrPolicyPrivacy
+				}
 				return nil
-			}
-			if _, err := compilePolicy(batch.rawSkills, batch.rawKnowledge, in.runMapper, in.binding, in.stageCatalog, in.target.DatabaseName, in.objectScope); err != nil {
-				return ErrPolicyPrivacy
-			}
-			return nil
+			},
 		})
-		cancelCall()
-
-		var localeErr error
-		if cerr == nil {
-			localeErr = agent.ValidateOutputLocale(result.Response, in.outputLocale)
-			if localeErr != nil {
-				cerr = localeErr
-				localeFailures++
-			}
-		}
-		if errors.Is(cerr, ErrPolicyPrivacy) || errors.Is(cerr, domain.ErrCoverageIncomplete) {
-			if _, _, _, attempted := provider.ChainErrorInfo(cerr); !attempted {
-				if err := s.Release(moneyCtx, in.db, day, in.budgetSettings.Currency, r.budget.PerStageEstimateMinor); err != nil {
-					res.err = err
-					return res
-				}
-				res.err = domain.ErrCoverageIncomplete
-				return res
-			}
-		}
-
-		lid, lmodel, usage := ledgerUsageOf(result, in.chain, cerr)
-		settleAmount := tokenBasedAmount(usage.InputTokens, usage.OutputTokens,
-			in.budgetSettings.InputPricePerMillionMinor, in.budgetSettings.OutputPricePerMillionMinor,
-			r.budget.PerStageEstimateMinor)
-		if lerr := s.Settle(moneyCtx, in.db, in.run.ID, lid, lmodel,
-			int16(minInt(callSeq, 3)), usage.InputTokens, usage.OutputTokens, settleAmount,
-			in.budgetSettings.Currency, day, ledgerOutcome(cerr)); lerr != nil {
-			res.err = lerr
+		if turnOut.err != nil {
+			res.err = turnOut.err
 			return res
 		}
-		refCalls := provider.ChainErrorCalls(cerr)
-		if result != nil {
-			refCalls = result.Calls
+		if turnOut.retry == modelTurnRetryLocale {
+			localePending = true
+			continue
 		}
-		for i, cr := range refCalls {
-			if rerr := s.RecordCallUsage(moneyCtx, in.db, in.run.ID, in.snap.StagePosition,
-				callSeq, i+1, cr); rerr != nil {
-				res.err = rerr
-				return res
-			}
+		if turnOut.retry == modelTurnRetrySchema {
+			schemaPending = true
+			continue
 		}
 
-		if cerr != nil {
-			if rem := unreleasedReserveMinor(r.budget.PerStageEstimateMinor, settleAmount); rem > 0 {
-				if rerr := s.Release(moneyCtx, in.db, day, in.budgetSettings.Currency, rem); rerr != nil {
-					res.err = rerr
-					return res
-				}
-			}
-			if errors.Is(cerr, ErrPolicyPrivacy) || errors.Is(cerr, domain.ErrCoverageIncomplete) {
-				zap.L().Error("policy_compile_failed",
-					zap.String("review_run_id", in.run.ID),
-					zap.Int64("stage_position", int64(in.snap.StagePosition)),
-					zap.String("error", cerr.Error()))
-				res.err = domain.ErrCoverageIncomplete
-				return res
-			}
-			if ctx.Err() != nil && errors.Is(cerr, context.Canceled) {
-				// Preserve sibling cancellation so executeRuleBatches surfaces the
-				// failing batch's root-cause error rather than masking it as 2011.
-				res.err = ctx.Err()
-				return res
-			}
-			if errors.Is(cerr, provider.ErrSchemaInvalid) {
-				if localeErr != nil && localeFailures == 1 && turn+1 < in.rb.MaxModelTurns && batchCalls < in.rb.MaxModelCalls && time.Now().Before(in.deadline) {
-					localePending = true
-					continue
-				}
-				if schemaRetries < 2 && turn+1 < in.rb.MaxModelTurns && batchCalls < in.rb.MaxModelCalls && time.Now().Before(in.deadline) {
-					schemaRetries++
-					schemaPending = true
-					continue
-				}
-				res.err = &domain.Error{Code: 2009, Name: "REVIEW_SCHEMA_INVALID"}
-				return res
-			}
-			zap.L().Error("ai_provider_call_failed",
-				zap.String("review_run_id", in.run.ID),
-				zap.Int64("stage_position", int64(in.snap.StagePosition)),
-				zap.String("provider_error", cerr.Error()))
-			res.err = &domain.Error{Code: 2011, Name: "AI_PROVIDER_FAILED"}
-			return res
-		}
-
+		result := turnOut.result
 		res.lastResp = result.Response
 		res.lastResult = result
 		localePending = false

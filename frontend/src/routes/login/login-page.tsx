@@ -9,6 +9,7 @@ import {
 } from "@/api/generated/client/authentication/authentication";
 import type { LoginRequest } from "@/api/generated/client/yearningV4HTTPAPI.schemas";
 import { businessErrCodeByName, describeError } from "@/shared/api/error-display";
+import { unwrapApi } from "@/shared/api/mutator";
 import { ErrorState } from "@/shared/components/status/status-components";
 import { LoadingState } from "@/shared/components/status/loading-state";
 import { Alert, AlertDescription, AlertTitle } from "@/shared/components/ui/alert";
@@ -50,12 +51,6 @@ type LoginMode = "local" | "ldap";
 
 const ADMIN_LOCKED_CODE = businessErrCodeByName("ADMIN_PASSWORD_LOCKED");
 
-interface AuthenticationProviders {
-  local: boolean;
-  ldap: boolean;
-  oidc: { key: string; label: string; start_url: string }[];
-}
-
 /** Only server-issued http(s) targets may become redirect targets (no javascript: URLs). */
 function isSafeStartUrl(url: string): boolean {
   try {
@@ -76,10 +71,7 @@ export default function LoginPage() {
 
   const providersQuery = useQuery({
     queryKey: ["auth", "providers"],
-    queryFn: async () => {
-      // The unified mutator unwraps err_code=0 to the envelope's `data`.
-      return (await listAuthenticationProviders()) as unknown as AuthenticationProviders;
-    },
+    queryFn: () => unwrapApi(listAuthenticationProviders()),
     retry: false,
   });
 

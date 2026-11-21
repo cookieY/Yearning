@@ -20,6 +20,7 @@ import (
 	"github.com/cookieY/YearningX/backend/internal/authorization/bizerr"
 	"github.com/cookieY/YearningX/backend/internal/crypto"
 	"github.com/cookieY/YearningX/backend/internal/platform/addrguard"
+	"github.com/cookieY/YearningX/backend/internal/platform/txutil"
 )
 
 // View is the API response view; credential_status expresses only Presence and never contains secrets.
@@ -978,7 +979,9 @@ func (s *Service) TestAndCapabilities(ctx context.Context, id, purpose string) (
 	if err := s.db.WithContext(ctx).Create(&task).Error; err != nil {
 		return nil, nil, err
 	}
+	finished := false
 	finish := func(state string, code *int, failure *string, resultRef *string) {
+		finished = true
 		now := time.Now().UTC()
 		task.State = state
 		task.BusinessErrCode = code
@@ -987,7 +990,7 @@ func (s *Service) TestAndCapabilities(ctx context.Context, id, purpose string) (
 		task.FinishedAt = &now
 		task.UpdatedAt = now
 		task.ProgressCompleted = 1
-		_ = s.db.WithContext(ctx).Model(&AsyncTaskModel{}).
+		_ = s.db.WithContext(context.WithoutCancel(ctx)).Model(&AsyncTaskModel{}).
 			Where("id = ?", task.ID).
 			Updates(map[string]any{
 				"state": state, "business_err_code": code, "failure_name": failure,
@@ -995,6 +998,11 @@ func (s *Service) TestAndCapabilities(ctx context.Context, id, purpose string) (
 				"progress_completed": 1,
 			}).Error
 	}
+	defer func() {
+		if !finished {
+			finish("failed", intPtr(3010), strPtr("internal_error"), nil)
+		}
+	}()
 
 	var ds DatasourceModel
 	if err := s.db.WithContext(ctx).Where("id = ?", id).First(&ds).Error; err != nil {
@@ -1162,12 +1170,4 @@ func strPtr(s string) *string {
 
 func intPtr(i int) *int { return &i }
 
-func isUniqueErr(err error) bool {
-	if err == nil {
-		return false
-	}
-	if errors.Is(err, gorm.ErrDuplicatedKey) {
-		return true
-	}
-	return strings.Contains(err.Error(), "23505")
-}
+func isUniqueErr(err error) bool { return txutil.IsUniqueViolation(err) }

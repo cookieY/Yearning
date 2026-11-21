@@ -3,7 +3,6 @@ package application
 import (
 	"context"
 	"encoding/base64"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -20,70 +19,6 @@ import (
 	"github.com/cookieY/YearningX/backend/internal/execution/domain"
 	reviewapp "github.com/cookieY/YearningX/backend/internal/review/application"
 )
-
-func TestDecodeFrozenPostgresSearchPathContext(t *testing.T) {
-	t.Parallel()
-	value := map[string]any{
-		"accepted_summary": "existing context",
-		frozenPostgresSearchPathContextKey: map[string]any{
-			"version":         1,
-			"current_user":    "writer",
-			"configured":      "app, public",
-			"explicit":        []string{"app", "public"},
-			"effective":       []string{"pg_catalog", "app", "public"},
-			"creation_schema": "app",
-		},
-	}
-	raw, err := json.Marshal(value)
-	if err != nil {
-		t.Fatal(err)
-	}
-	path, ok := decodeFrozenPostgresSearchPathContext(raw)
-	if !ok {
-		t.Fatal("valid frozen search_path was rejected")
-	}
-	if path.CurrentUser != "writer" || path.CreationSchema != "app" ||
-		len(path.Explicit) != 2 || len(path.Effective) != 3 {
-		t.Fatalf("unexpected decoded path: %+v", path)
-	}
-}
-
-func TestDecodeFrozenPostgresSearchPathContextFailsClosed(t *testing.T) {
-	t.Parallel()
-	tests := map[string][]byte{
-		"missing":   []byte(`{"accepted_summary":"x"}`),
-		"malformed": []byte(`{"postgres_search_path":{"version":1}}`),
-		"unknown": []byte(`{"postgres_search_path":{"version":1,"current_user":"writer",` +
-			`"configured":"public","explicit":["public"],"effective":["pg_catalog","public"],` +
-			`"creation_schema":"public","extra":true}}`),
-	}
-	for name, raw := range tests {
-		t.Run(name, func(t *testing.T) {
-			t.Parallel()
-			if _, ok := decodeFrozenPostgresSearchPathContext(raw); ok {
-				t.Fatal("invalid context was accepted")
-			}
-		})
-	}
-}
-
-func TestEqualFrozenPostgresSearchPath(t *testing.T) {
-	t.Parallel()
-	base := reviewapp.FrozenPostgresSearchPath{
-		Version: 1, CurrentUser: "writer", Configured: "app, public",
-		Explicit:  []string{"app", "public"},
-		Effective: []string{"pg_catalog", "app", "public"}, CreationSchema: "app",
-	}
-	changed := base
-	changed.Explicit = []string{"public", "app"}
-	changed.Effective = []string{"pg_catalog", "public", "app"}
-	if !equalFrozenPostgresSearchPath(base, base) {
-		t.Fatal("identical paths differ")
-	}
-	if equalFrozenPostgresSearchPath(base, changed) {
-		t.Fatal("reordered path was accepted")
-	}
-}
 
 func TestStageSchemaResolutionForDatasource(t *testing.T) {
 	t.Parallel()
@@ -247,9 +182,9 @@ func TestVerifyPostgresSearchPathRejectsTemporarySchemaBeforeProbe(t *testing.T)
 	}
 }
 
-func TestLoadFrozenPostgresSearchPathRequiresSnapshotID(t *testing.T) {
+func TestLoadFrozenPostgresReviewContextRequiresSnapshotID(t *testing.T) {
 	t.Parallel()
-	_, err := (&Services{}).loadFrozenPostgresSearchPath(
+	_, err := (&Services{}).loadFrozenPostgresReviewContext(
 		context.Background(), nil, nil)
 	var de *domain.Error
 	if !errors.As(err, &de) || de.Code != domain.CodePreflightFailed {
@@ -341,7 +276,7 @@ func TestOpenFrozenPostgresSearchPathDecryptsStrictContext(t *testing.T) {
 		t.Fatal(err)
 	}
 	svc := &Services{Crypter: crypter}
-	got, err := svc.openFrozenPostgresSearchPath(frozenStageReviewRow{
+	gotCtx, err := svc.openFrozenPostgresReviewContext(frozenStageReviewRow{
 		ReviewRunID: runID, StagePosition: 2,
 		DatasourceID:        "00000000-0000-0000-0000-000000000101",
 		IdentityFingerprint: strings.Repeat("a", 64),
@@ -353,6 +288,7 @@ func TestOpenFrozenPostgresSearchPathDecryptsStrictContext(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	got := gotCtx.Path
 	if got.CurrentUser != "writer" || got.CreationSchema != "app" ||
 		!reflect.DeepEqual(got.Explicit, []string{"app", "public"}) {
 		t.Fatalf("unexpected decrypted path: %+v", got)
@@ -368,19 +304,19 @@ func TestOpenFrozenPostgresSearchPathDecryptsStrictContext(t *testing.T) {
 		KeyID: env.KeyID, Algorithm: env.Algorithm,
 	}
 	row.StagePosition = 3
-	if _, err := svc.openFrozenPostgresSearchPath(row); err == nil {
+	if _, err := svc.openFrozenPostgresReviewContext(row); err == nil {
 		t.Fatal("AAD-bound stage mismatch was accepted")
 	}
 }
 
-func TestFrozenPostgresSearchPathValidationFailures(t *testing.T) {
+func TestFrozenPostgresReviewContextValidationFailures(t *testing.T) {
 	t.Parallel()
 	for name, raw := range map[string][]byte{
 		"malformed root": []byte(`{`),
 		"missing key":    []byte(`{"accepted_summary":"existing"}`),
 		"nil key":        []byte(`{"postgres_search_path":null}`),
 	} {
-		if _, ok := decodeFrozenPostgresSearchPathContext(raw); ok {
+		if _, ok := decodeFrozenPostgresReviewContext(raw); ok {
 			t.Fatalf("%s was accepted", name)
 		}
 	}
@@ -421,8 +357,8 @@ func TestFrozenPostgresSearchPathValidationFailures(t *testing.T) {
 		},
 	} {
 		t.Run(name, func(t *testing.T) {
-			err := ProbeFrozenPostgresSearchPath(
-				context.Background(), args.db, args.crypter, args.ds, args.path,
+			err := ProbeFrozenPostgresReviewContext(
+				context.Background(), args.db, args.crypter, args.ds, args.path, nil, 0,
 			)
 			var de *domain.Error
 			if !errors.As(err, &de) || de.Code != domain.CodePreflightFailed {

@@ -2,9 +2,16 @@ package datasource
 
 import (
 	"context"
+	"database/sql"
+	"database/sql/driver"
 	"errors"
+	"strings"
 	"testing"
 	"time"
+
+	gormpostgres "gorm.io/driver/postgres"
+	"gorm.io/gorm"
+	gormlogger "gorm.io/gorm/logger"
 
 	"github.com/cookieY/YearningX/backend/internal/authorization/bizerr"
 )
@@ -181,5 +188,62 @@ func TestCapabilitiesServesFreshCachedProbeWithinRateLimitWindow(t *testing.T) {
 	}
 	if _, err := svc.Capabilities(context.Background(), dsID, "invalid"); !errors.Is(err, bizerr.ErrValidationFailed) {
 		t.Fatalf("invalid purpose error = %v, want ErrValidationFailed", err)
+	}
+}
+
+type asyncTaskFailFx struct {
+	execQueries []string
+	execArgs    [][]driver.NamedValue
+	queryErr    error
+}
+
+func (f *asyncTaskFailFx) Connect(context.Context) (driver.Conn, error) { return f, nil }
+func (f *asyncTaskFailFx) Driver() driver.Driver                        { return asyncTaskFailDriver{} }
+
+type asyncTaskFailDriver struct{}
+
+func (asyncTaskFailDriver) Open(string) (driver.Conn, error) {
+	return nil, errors.New("unused open")
+}
+func (f *asyncTaskFailFx) Prepare(string) (driver.Stmt, error) {
+	return nil, errors.New("unused prepare")
+}
+func (f *asyncTaskFailFx) Close() error              { return nil }
+func (f *asyncTaskFailFx) Begin() (driver.Tx, error) { return nil, errors.New("unused begin") }
+func (f *asyncTaskFailFx) ExecContext(_ context.Context, query string, args []driver.NamedValue) (driver.Result, error) {
+	f.execQueries = append(f.execQueries, query)
+	f.execArgs = append(f.execArgs, args)
+	return driver.RowsAffected(1), nil
+}
+func (f *asyncTaskFailFx) QueryContext(_ context.Context, _ string, _ []driver.NamedValue) (driver.Rows, error) {
+	return nil, f.queryErr
+}
+
+func TestTestAndCapabilitiesFinishesAsyncTaskFailedOnEarlyError(t *testing.T) {
+	queryBoom := errors.New("transient metadata db query failure")
+	fx := &asyncTaskFailFx{queryErr: queryBoom}
+	sqlDB := sql.OpenDB(fx)
+	t.Cleanup(func() { _ = sqlDB.Close() })
+	db, err := gorm.Open(gormpostgres.New(gormpostgres.Config{
+		Conn:             sqlDB,
+		WithoutReturning: true,
+	}), &gorm.Config{Logger: gormlogger.Discard, SkipDefaultTransaction: true})
+	if err != nil {
+		t.Fatalf("gorm open: %v", err)
+	}
+
+	svc := &Service{db: db}
+	_, task, err := svc.TestAndCapabilities(context.Background(), "0198d9cc-0000-7000-8000-000000000123", "review")
+	if !errors.Is(err, queryBoom) {
+		t.Fatalf("expected original query error, got %v", err)
+	}
+	if task == nil || task.State != "failed" || task.FinishedAt == nil {
+		t.Fatalf("expected failed task with non-nil finished_at, got %+v", task)
+	}
+	if task.BusinessErrCode == nil || *task.BusinessErrCode != 3010 || task.FailureName == nil || *task.FailureName != "internal_error" {
+		t.Fatalf("expected business_err_code=3010 failure_name=internal_error, got %+v", task)
+	}
+	if len(fx.execQueries) < 2 || !strings.Contains(strings.ToLower(fx.execQueries[1]), `update "async_tasks" set`) {
+		t.Fatalf("expected deferred UPDATE on async_tasks, got %v", fx.execQueries)
 	}
 }

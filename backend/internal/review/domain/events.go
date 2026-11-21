@@ -1,27 +1,26 @@
-// TestSEC0038DuplicateKeyAttackChangesSemantics adversarial semantics: duplicate-key last-wins
-// would overwrite an already-validated field — strict parsing must reject before the value takes effect.
+// events.go constructs Review domain event names and payloads (api/events/domain-event.schema.json)
+// following repository-event-routing.json: change_draft.revised / change_draft.precheck_completed ->
+// io.yearning.v4.change_draft.state_changed; review_run.completed -> review.completed | review.blocked.
 package domain
 
-// First outcome=complete, second outcome=partial: lenient last-wins decoding would take partial
-// and potentially bypass coverage checks; strict parsing rejects immediately.
+// Internal domain event names recorded in audit/outbox streams.
 const (
 	EventDraftRevised          = "change_draft.revised"
 	EventDraftPrecheckComplete = "change_draft.precheck_completed"
 	EventReviewRunCompleted    = "review_run.completed"
 )
 
-// openai_test.go H2/C1: production OpenAI Adapter verified via httptest.Server
-// for unknown-field rejection and SystemPrompt channel.
+// External CloudEvent type identifiers emitted to SSE/notification subscribers.
 const (
 	ExternalDraftStateChanged = "io.yearning.v4.change_draft.state_changed"
 	ExternalReviewCompleted   = "io.yearning.v4.review.completed"
 	ExternalReviewBlocked     = "io.yearning.v4.review.blocked"
 )
 
-// TestOpenAIAdapterRetriesThenSucceeds M2: succeeds after 5xx backoff retry.
+// EventSubject builds a canonical CloudEvent subject string (`<kind>/<id>`).
 func EventSubject(kind string, id string) string { return kind + "/" + id }
 
-// TestOpenAIAdapterNoRetryOnAuth M2: authentication failure is not retried.
+// DraftStateChangedData is the payload emitted when a change_draft transitions state.
 type DraftStateChangedData struct {
 	AggregateID      string  `json:"aggregate_id"`
 	From             *string `json:"from"`
@@ -30,7 +29,7 @@ type DraftStateChangedData struct {
 	AggregateVersion int64   `json:"aggregate_version"`
 }
 
-// TestOpenAIAdapterSchemaRepairOnce M2: invalid Schema triggers at most one repair request.
+// StageResultData summarizes a single stage outcome within a Review Run event.
 type StageResultData struct {
 	StagePosition   int    `json:"stage_position"`
 	State           string `json:"state"`
@@ -40,8 +39,7 @@ type StageResultData struct {
 	SnapshotHash    string `json:"snapshot_hash"`
 }
 
-// TestValidateConfigurationUsesRealSchema probe uses the real output Schema:
-// endpoints returning free-form text must not pass health check.
+// ReviewEventData is the payload for io.yearning.v4.review.completed and review.blocked events.
 type ReviewEventData struct {
 	ReviewRunID           string            `json:"review_run_id"`
 	DraftID               string            `json:"draft_id"`
@@ -54,13 +52,13 @@ type ReviewEventData struct {
 	AggregateVersion      int64             `json:"aggregate_version"`
 }
 
-// Free-form text (typical behavior of compatible endpoints that do not support structured output).
+// GatePayload embeds the deterministic submission gate result inside ReviewEventData.
 type GatePayload struct {
 	Passed      bool     `json:"passed"`
 	ReasonCodes []string `json:"reason_codes"`
 }
 
-// TestValidateConfigurationPassesConformantVendor conformant endpoint passes probe.
+// Reason codes explaining why a draft transitioned or a review completed in a non-ready state.
 const (
 	ReasonDraftRevised        = "revised"
 	ReasonPrecheckPassed      = "precheck_passed"

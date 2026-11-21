@@ -1,10 +1,12 @@
 package changeset
 
 import (
+	"bytes"
 	"context"
 	"crypto/hmac"
 	"crypto/sha256"
 	"fmt"
+	"io"
 	"strings"
 	"testing"
 
@@ -385,5 +387,90 @@ func TestStreamExtremeSampleSlotUpdates(t *testing.T) {
 	}
 	if bulk.MinParams == bulk.MaxParams {
 		t.Fatalf("min/max must differ after extreme statement")
+	}
+}
+
+type oneStmtPerReadReader struct {
+	chunks [][]byte
+	idx    int
+}
+
+func (r *oneStmtPerReadReader) Read(p []byte) (int, error) {
+	if r.idx >= len(r.chunks) {
+		return 0, io.EOF
+	}
+	n := copy(p, r.chunks[r.idx])
+	r.idx++
+	return n, nil
+}
+
+func TestSplitterReusesReadBufferAndMatchesShortReads(t *testing.T) {
+	const count = 1000
+	var full bytes.Buffer
+	chunks := make([][]byte, 0, count)
+	for i := 1; i <= count; i++ {
+		stmt := fmt.Sprintf("UPDATE orders SET status = 'PAID' WHERE id = %d;\n", i)
+		full.WriteString(stmt)
+		chunks = append(chunks, []byte(stmt))
+	}
+	raw := full.Bytes()
+	prof := fingerprint.Profile{Engine: "mysql", Mode: "mysql"}
+
+	collect := func(r io.Reader) ([]string, []int64) {
+		s := NewSplitter(r, prof, 0)
+		sqls := make([]string, 0, count)
+		offs := make([]int64, 0, count)
+		for {
+			st, done, err := s.Next()
+			if err != nil {
+				t.Fatalf("splitter Next failed: %v", err)
+			}
+			if done {
+				break
+			}
+			sqls = append(sqls, string(st.SQL))
+			offs = append(offs, st.Offset)
+			if st.Index != len(sqls) {
+				t.Fatalf("ordinal mismatch: got %d want %d", st.Index, len(sqls))
+			}
+		}
+		return sqls, offs
+	}
+
+	chunkedSQLs, chunkedOffs := collect(bytes.NewReader(raw))
+	shortSQLs, shortOffs := collect(&oneStmtPerReadReader{chunks: chunks})
+	if len(chunkedSQLs) != count || len(shortSQLs) != count {
+		t.Fatalf("counts mismatch: chunked=%d short=%d want %d", len(chunkedSQLs), len(shortSQLs), count)
+	}
+	for i := 0; i < count; i++ {
+		if chunkedSQLs[i] != shortSQLs[i] || chunkedOffs[i] != shortOffs[i] {
+			t.Fatalf("mismatch at %d: (%q,%d) vs (%q,%d)", i, chunkedSQLs[i], chunkedOffs[i], shortSQLs[i], shortOffs[i])
+		}
+	}
+
+	if !raceEnabled {
+		// Reusing Splitter.readBuf avoids allocating a fresh 64 KiB read slice on each of the 1,000 short fills
+		// (~64 MiB previously). Compare total bytes allocated via Benchmark.
+		br := testing.Benchmark(func(b *testing.B) {
+			reader := oneStmtPerReadReader{chunks: chunks}
+			for i := 0; i < b.N; i++ {
+				reader.idx = 0
+				s := NewSplitter(&reader, prof, 0)
+				for {
+					_, done, err := s.Next()
+					if err != nil {
+						b.Fatalf("splitter Next failed: %v", err)
+					}
+					if done {
+						break
+					}
+				}
+			}
+		})
+		allocBytes := br.AllocedBytesPerOp()
+		// 1,000 short reads previously allocated >64 MiB just for chunk buffers; with reuse total is only a few MiB.
+		if allocBytes > 8*1024*1024 {
+			t.Fatalf("expected < 8 MiB allocated for 1000 short reads with readBuf reuse, got %d bytes", allocBytes)
+		}
 	}
 }

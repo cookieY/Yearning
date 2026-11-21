@@ -16,11 +16,11 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5/pgconn"
 	"go.uber.org/zap"
 	"gorm.io/gorm"
 
 	"github.com/cookieY/YearningX/backend/internal/crypto"
+	"github.com/cookieY/YearningX/backend/internal/platform/txutil"
 	"github.com/cookieY/YearningX/backend/internal/realtime"
 )
 
@@ -565,19 +565,7 @@ func extractEventState(data map[string]any) string {
 	return ""
 }
 
-func isUniqueViolation(err error) bool {
-	if err == nil {
-		return false
-	}
-	if errors.Is(err, gorm.ErrDuplicatedKey) {
-		return true
-	}
-	var pgErr *pgconn.PgError
-	if errors.As(err, &pgErr) {
-		return pgErr.Code == "23505"
-	}
-	return false
-}
+func isUniqueViolation(err error) bool { return txutil.IsUniqueViolation(err) }
 
 // HMACFingerprint computes a hex HMAC over arbitrary bytes using the payload purpose (for non-sensitive integrity checks).
 func HMACFingerprint(c *crypto.Crypter, purpose string, data []byte) (string, error) {

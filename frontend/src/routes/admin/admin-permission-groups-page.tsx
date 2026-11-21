@@ -1,4 +1,3 @@
-import i18next from "@/shared/i18n";
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { appToast as toast } from "@/shared/components/shadcn-dashboard/sonner/sonner-08";
@@ -6,7 +5,7 @@ import { Pencil, Plus, ShieldCheck, Trash2, X } from "lucide-react";
 import { Checkbox } from "@/shared/components/ui/checkbox";
 import type { Flow, PermissionGroup, User } from "@/api/generated/client/yearningV4HTTPAPI.schemas";
 import { useSession } from "@/features/auth/session-provider";
-import { describeError } from "@/shared/api/error-display";
+import { describeError, describeErrorText } from "@/shared/api/error-display";
 import { ErrorState } from "@/shared/components/status/status-components";
 import { LoadingState } from "@/shared/components/status/loading-state";
 import { EmptyState } from "@/shared/components/status/empty-state";
@@ -53,12 +52,6 @@ import { PendingButton } from "@/shared/components/pending-button";
  * the groups' server facts client-side (member ∪ granted flows). There is
  * deliberately no reviewer/executor authorization entry here.
  */
-
-function describeErrorText(display: { messageKey: string; requestId: string | null }): string {
-  // Translated through the shared i18n bundle so users never see raw keys.
-  const text = i18next.t(display.messageKey);
-  return display.requestId === null ? text : `${text} (${display.requestId})`;
-}
 
 interface GroupFormState {
   name: string;
@@ -353,20 +346,24 @@ export default function AdminPermissionGroupsPage() {
         </CardContent>
       </Card>
 
-      <GroupFormDialog
-        open={createOpen}
-        editing={null}
-        users={users}
-        flows={flows}
-        onClose={() => { setCreateOpen(false); }}
-      />
-      <GroupFormDialog
-        open={editing !== null}
-        editing={editing}
-        users={users}
-        flows={flows}
-        onClose={() => { setEditing(null); }}
-      />
+      {createOpen ? (
+        <GroupFormDialog
+          key="create"
+          editing={null}
+          users={users}
+          flows={flows}
+          onClose={() => { setCreateOpen(false); }}
+        />
+      ) : null}
+      {editing !== null ? (
+        <GroupFormDialog
+          key={editing.id}
+          editing={editing}
+          users={users}
+          flows={flows}
+          onClose={() => { setEditing(null); }}
+        />
+      ) : null}
     </PageLayout>
   );
 }
@@ -471,13 +468,11 @@ function GroupRow({
 }
 
 function GroupFormDialog({
-  open,
   editing,
   users,
   flows,
   onClose,
 }: {
-  open: boolean;
   editing: PermissionGroup | null;
   users: User[];
   flows: Flow[];
@@ -486,25 +481,19 @@ function GroupFormDialog({
   const { t } = useTranslation();
   const createGroup = useCreatePermissionGroup();
   const replaceGroup = useReplacePermissionGroup();
-  const [form, setForm] = useState<GroupFormState>({ name: "", enabled: true, memberIds: [], flowIds: [] });
-  const [openFor, setOpenFor] = useState<string | null>(null);
+  const [form, setForm] = useState<GroupFormState>(() =>
+    editing === null
+      ? { name: "", enabled: true, memberIds: [], flowIds: [] }
+      : {
+          name: editing.name,
+          enabled: editing.enabled,
+          memberIds: [...editing.member_user_ids],
+          flowIds: [...editing.granted_flow_ids],
+        },
+  );
   const [errorText, setErrorText] = useState<string | null>(null);
   const [memberSearch, setMemberSearch] = useState("");
   const [flowSearch, setFlowSearch] = useState("");
-
-  const formKey = editing?.id ?? "create";
-  if (open && openFor !== formKey) {
-    setOpenFor(formKey);
-    setForm(
-      editing === null
-        ? { name: "", enabled: true, memberIds: [], flowIds: [] }
-        : { name: editing.name, enabled: editing.enabled, memberIds: [...editing.member_user_ids], flowIds: [...editing.granted_flow_ids] },
-    );
-    setErrorText(null);
-    setMemberSearch("");
-    setFlowSearch("");
-  }
-  if (!open && openFor !== null) setOpenFor(null);
 
   const toggle = (list: "memberIds" | "flowIds", id: string) => {
     setForm((current) => ({
@@ -569,7 +558,7 @@ function GroupFormDialog({
   };
 
   return (
-    <Dialog open={open} onOpenChange={(next) => { if (!next) onClose(); }}>
+    <Dialog open onOpenChange={(next) => { if (!next) onClose(); }}>
       <DialogContent className="sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle>{editing === null ? t("adminGroups.createTitle") : t("adminGroups.editTitle", { name: editing.name })}</DialogTitle>

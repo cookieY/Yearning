@@ -6,7 +6,10 @@ import { MemoryRouter, Route, Routes } from "react-router";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { HttpResponse, http } from "msw";
 import { server } from "@/test/msw/server";
-import { getReviewEventClient } from "@/shared/events/review-event-client";
+import {
+  publishSseEvent,
+  resetSseEventBusForTest,
+} from "@/shared/events/sse-event-bus";
 import "@/shared/i18n";
 import {
   FIXTURE_FLOW_ID,
@@ -298,17 +301,10 @@ describe("MinePage", () => {  it("renders draft and order sections separated, or
         }),
       ),
     );
-    getReviewEventClient().ingest({
-      specversion: "1.0",
+    publishSseEvent({
       id: "0198d9cc-e65d-7b9d-a8aa-3c81945f9f01",
       type: "io.yearning.v4.change_order.state_changed",
-      source: "yearning://control-plane",
       subject: "change-orders/9b6f1a2b-0000-4000-8000-00000000cd01",
-      time: "2026-08-30T10:05:00Z",
-      datacontenttype: "application/json",
-      sequence: 2,
-      causation_id: null,
-      actor: { kind: "user", user_id: FIXTURE_OWNER_ID },
       data: {
         aggregate_id: "9b6f1a2b-0000-4000-8000-00000000cd01",
         from: "submitted",
@@ -324,18 +320,11 @@ describe("MinePage", () => {  it("renders draft and order sections separated, or
       expect(screen.getByTestId("mine-orders-table").textContent).toContain("\u5df2\u64a4\u56de");
     });
     // The exact same event redelivered (at-least-once) must be a no-op:
-    // the client dedups by event.id and reports it undelivered.
+    // the SSE bus dedups by event.id and reports it undelivered.
     const duplicateEvent = {
-      specversion: "1.0",
       id: "0198d9cc-e65d-7b9d-a8aa-3c81945f9f01",
       type: "io.yearning.v4.change_order.state_changed",
-      source: "yearning://control-plane",
       subject: "change-orders/9b6f1a2b-0000-4000-8000-00000000cd01",
-      time: "2026-08-30T10:05:00Z",
-      datacontenttype: "application/json",
-      sequence: 2,
-      causation_id: null,
-      actor: { kind: "user", user_id: FIXTURE_OWNER_ID },
       data: {
         aggregate_id: "9b6f1a2b-0000-4000-8000-00000000cd01",
         from: "submitted",
@@ -344,7 +333,8 @@ describe("MinePage", () => {  it("renders draft and order sections separated, or
         aggregate_version: 2,
       },
     };
-    expect(getReviewEventClient().ingest(duplicateEvent)).toBe(false);
+    expect(publishSseEvent(duplicateEvent)).toBe(false);
+    resetSseEventBusForTest();
     await new Promise((resolve) => setTimeout(resolve, 100));
     expect(screen.getAllByTestId("mine-order-row")).toHaveLength(1);
   });

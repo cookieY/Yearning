@@ -23,10 +23,7 @@ type RestorationResult struct {
 	SemanticWarnings []string
 }
 
-var (
-	anonObjectTokenRe = regexp.MustCompile(`^(?:database|schema|table|column|index|constraint|alias|cte|ident)_[0-9]+$`)
-	valPlaceholderRe  = regexp.MustCompile(`^val_(?:str|int|num|bool|ts|uuid|json|hex)_[0-9]+$`)
-)
+var valPlaceholderRe = regexp.MustCompile(`^val_(?:str|int|num|bool|ts|uuid|json|hex)_[0-9]+$`)
 
 // ValidateAndRestoreSQL parses the model-returned anonymized SQL according to the target dialect,
 // verifies single-statement boundaries, allowed v1 statement kinds, authorized object token mappings,
@@ -39,35 +36,7 @@ func ValidateAndRestoreSQL(
 	if session == nil || session.IsReleased() {
 		return nil, domain.ErrSQLRestorationInvalid("privacy_session_unavailable")
 	}
-	if err := profile.Validate(); err != nil {
-		return nil, domain.ErrSQLRestorationInvalid("unsupported_dialect_profile")
-	}
-	trimmed := strings.TrimSpace(anonymizedSQL)
-	if trimmed == "" {
-		return nil, domain.ErrSQLRestorationInvalid("empty_sql_draft")
-	}
-
-	lex, err := fingerprint.Tokenize([]byte(trimmed), profile.Flags())
-	if err != nil || len(lex.Tokens) == 0 {
-		return nil, domain.ErrSQLRestorationInvalid("sql_parse_failed")
-	}
-
-	// 1. Single-statement boundary check: forbid multi-statement stacking (';' is only allowed at the end).
-	toks := lex.Tokens
-	for i, t := range toks {
-		if t.IsPunct(";") && i != len(toks)-1 {
-			return nil, domain.ErrSQLRestorationInvalid("multi_statement_forbidden")
-		}
-	}
-	if toks[len(toks)-1].IsPunct(";") {
-		toks = toks[:len(toks)-1]
-	}
-	if len(toks) == 0 {
-		return nil, domain.ErrSQLRestorationInvalid("empty_sql_draft")
-	}
-
-	// 2. Statement classification and allowed v1 statement scope check (PRD §5.1 A2).
-	stmtKind, riskCat, err := classifyAllowedStatement(toks)
+	toks, stmtKind, riskCat, err := parseSingleAllowedStatement(anonymizedSQL, profile)
 	if err != nil {
 		return nil, err
 	}
@@ -160,7 +129,7 @@ func ValidateAndRestoreSQL(
 
 		case fingerprint.TokQuotedIdent:
 			low := strings.ToLower(t.Text)
-			if anonObjectTokenRe.MatchString(low) {
+			if revprivacy.AnonTokenPattern.MatchString(low) {
 				kind, orig, ok := session.LookupIdentifier(low)
 				if !ok {
 					return nil, domain.ErrSQLRestorationInvalid("unknown_or_unauthorized_object_token:" + low)
@@ -175,7 +144,7 @@ func ValidateAndRestoreSQL(
 
 		case fingerprint.TokWord:
 			low := strings.ToLower(t.Text)
-			if anonObjectTokenRe.MatchString(low) {
+			if revprivacy.AnonTokenPattern.MatchString(low) {
 				kind, orig, ok := session.LookupIdentifier(low)
 				if !ok {
 					return nil, domain.ErrSQLRestorationInvalid("unknown_or_unauthorized_object_token:" + low)
@@ -405,7 +374,7 @@ func ValidateRawAssistantSQL(rawSQL string, profile fingerprint.Profile, scope R
 			}
 		case fingerprint.TokWord:
 			low := strings.ToLower(t.Text)
-			if anonObjectTokenRe.MatchString(low) {
+			if revprivacy.AnonTokenPattern.MatchString(low) {
 				return nil, domain.ErrSQLRestorationInvalid("unreplaced_anonymized_token:" + low)
 			}
 		case fingerprint.TokQuotedIdent, fingerprint.TokString, fingerprint.TokDollarString, fingerprint.TokNumber:
@@ -1038,22 +1007,6 @@ func parseSingleAllowedStatement(rawSQL string, profile fingerprint.Profile) ([]
 		return nil, "", "", err
 	}
 	return toks, stmtKind, riskCat, nil
-}
-
-func extractRawTableReference(toks []fingerprint.Token, idx int) (string, bool) {
-	first, ok := rawIdentName(toks[idx])
-	if !ok {
-		return "", false
-	}
-	if toks[idx].Kind == fingerprint.TokWord && isSQLKeywordOrGeneric(first) {
-		return "", false
-	}
-	if idx+2 < len(toks) && toks[idx+1].IsPunct(".") {
-		if second, ok2 := rawIdentName(toks[idx+2]); ok2 {
-			return first + "." + second, true
-		}
-	}
-	return first, true
 }
 
 func rawIdentName(tok fingerprint.Token) (string, bool) {

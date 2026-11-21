@@ -3,12 +3,16 @@ package httpapi
 
 import (
 	"errors"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 
 	"github.com/cookieY/YearningX/backend/internal/authorization/bizerr"
 	"github.com/cookieY/YearningX/backend/internal/datasource"
 	"github.com/cookieY/YearningX/backend/internal/identity"
+	reviewapp "github.com/cookieY/YearningX/backend/internal/review/application"
+	reviewdomain "github.com/cookieY/YearningX/backend/internal/review/domain"
+	"github.com/cookieY/YearningX/backend/internal/review/knowledge"
 )
 
 // writeBizError maps domain errors uniformly; unrecognized errors are handled as internal errors (without leaking details).
@@ -143,4 +147,73 @@ func writeDomainError(c *gin.Context, err error, refCode int) bool {
 		return true
 	}
 	return writeBizError(c, err)
+}
+
+func splitColonReason(name string) (baseName, reason string, ok bool) {
+	if i := strings.Index(name, ":"); i >= 0 {
+		return name[:i], name[i+1:], true
+	}
+	return name, "", false
+}
+
+func writeDomainCodedError(c *gin.Context, code int, name, message string, meta map[string]any) bool {
+	if message == "" {
+		message = "Business operation failed"
+	}
+	WriteBusinessError(c, &BusinessError{
+		Code:    code,
+		Name:    name,
+		Message: message,
+		Meta:    meta,
+	})
+	return true
+}
+
+// MapReviewError maps B6/B7 review and knowledge domain errors to BusinessError without altering semantics.
+// domain.Error.Detail (upstream rejection reason snapshot, S18.75-A) passes through meta.detail;
+// Fields (field-level rejection reasons, RCP-20261102-S008) passes through meta.fields.
+func MapReviewError(err error) *BusinessError {
+	var de *reviewdomain.Error
+	switch {
+	case err == nil:
+		return nil
+	case errors.As(err, &de):
+		be := &BusinessError{Code: de.Code, Name: de.Name, Message: de.Name}
+		var meta map[string]any
+		if de.Detail != "" {
+			meta = map[string]any{"detail": de.Detail}
+		}
+		if len(de.Fields) > 0 {
+			if meta == nil {
+				meta = map[string]any{}
+			}
+			meta["fields"] = de.Fields
+		}
+		if de.Code == 1012 {
+			be.Retryable = true
+			if meta == nil {
+				meta = map[string]any{}
+			}
+			meta["retry_after_ms"] = 1000
+		}
+		if len(meta) > 0 {
+			be.Meta = meta
+		}
+		return be
+	case errors.Is(err, reviewapp.ErrNotFound), errors.Is(err, knowledge.ErrNotFound):
+		return &BusinessError{Code: bizerr.CodeResourceNotFound, Name: "NOT_FOUND", Message: "Resource not found"}
+	case errors.Is(err, reviewapp.ErrVersionConflict), errors.Is(err, knowledge.ErrVersionConflict):
+		return &BusinessError{Code: bizerr.CodeVersionConflict, Name: "VERSION_CONFLICT", Message: "Resource version conflict; please refresh and retry"}
+	case errors.Is(err, reviewapp.ErrConcurrent), errors.Is(err, knowledge.ErrConcurrent):
+		return &BusinessError{Code: bizerr.CodeConcurrentModification, Name: "CONCURRENT_MODIFICATION", Message: "Concurrent modification conflict; please retry"}
+	case errors.Is(err, reviewapp.ErrValidation), errors.Is(err, knowledge.ErrValidation):
+		return &BusinessError{Code: bizerr.CodeValidationFailed, Name: "VALIDATION_FAILED", Message: "Invalid request parameters"}
+	case errors.Is(err, reviewapp.ErrReferenced), errors.Is(err, reviewapp.ErrReferencedTool),
+		errors.Is(err, reviewapp.ErrRuleSetReferenced), errors.Is(err, knowledge.ErrReferenced):
+		return &BusinessError{Code: bizerr.CodeResourceReferenced, Name: "REFERENCED", Message: "Resource is referenced and cannot be deleted"}
+	case errors.Is(err, reviewdomain.ErrIllegalTransition), errors.Is(err, reviewdomain.ErrTerminalState):
+		return &BusinessError{Code: bizerr.CodeInvalidStateTransition, Name: "INVALID_STATE_TRANSITION", Message: "Operation is not allowed in the current state"}
+	default:
+		return nil
+	}
 }

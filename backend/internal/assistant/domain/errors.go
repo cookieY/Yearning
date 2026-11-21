@@ -10,7 +10,7 @@ const (
 	CodeVersionConflict        = 1003
 	CodeConcurrentModification = 1004
 	CodeInvalidStateTransition = 1010
-	CodeIdempotencyConflict    = 1011
+	CodeIdempotencyConflict    = 1007
 	CodeSystemCapacity         = 1012
 
 	CodeAIBudgetExhausted = 2010

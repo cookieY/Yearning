@@ -18,10 +18,10 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
-	reviewapp "github.com/cookieY/YearningX/backend/internal/review/application"
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"gorm.io/driver/postgres"
@@ -30,6 +30,8 @@ import (
 
 	"github.com/cookieY/YearningX/backend/internal/authorization/auditlog"
 	"github.com/cookieY/YearningX/backend/internal/crypto"
+	reviewapp "github.com/cookieY/YearningX/backend/internal/review/application"
+	reviewpersist "github.com/cookieY/YearningX/backend/internal/review/persistence"
 )
 
 // subFx test fixture for self-Actor submission tests.
@@ -246,10 +248,9 @@ func (fx *subFx) seedReadyDraft(t *testing.T, flowID, ownerID string) string {
 	return draftID
 }
 
-// seedReadyRun creates a state=ready Run: frozen hashes are reproduced from template facts
-// using the same package-internal functions as submitOnce (byte-identical), SQL binding is pinned
-// to the draft payload HMAC, and one passed snapshot is persisted per stage.
-func (fx *subFx) seedReadyRun(t *testing.T, draftID, flowID string) {
+// seedReadyRun seeds an ephemeral state=ready Run with frozen hashes reproduced from template
+// facts (byte-identical to submitOnce) and one passed snapshot per stage for SubmitOrderV2.
+func (fx *subFx) seedReadyRun(t *testing.T, reviewSvc *reviewapp.Services, submitterID, flowID string) string {
 	t.Helper()
 	ctx := context.Background()
 	stages, err := fx.svc.loadFlowStageFacts(ctx, fx.db, flowID)
@@ -279,43 +280,57 @@ func (fx *subFx) seedReadyRun(t *testing.T, draftID, flowID string) {
 		t.Fatal(err)
 	}
 	runID := uuid.NewString()
-	if err := fx.db.Exec(`
-		insert into review_runs (id, draft_id, draft_revision, state, flow_snapshot_hash,
-			rule_config_hash, tool_config_hash, provider_plan_hash,
-			fingerprint_algorithm_version, anonymization_algorithm_version,
-			statement_count, fingerprint_group_count, budget_day, finished_at, version, created_at)
-		values (?, ?, 1, 'ready', ?, ?, ?, ?, 'v1', 'v1', 1, 1, current_date, now(), 1, now())`,
-		runID, draftID, flowHash, ruleHash, toolHash, repeatHex64("33")).Error; err != nil {
-		t.Fatal(err)
-	}
-	if err := fx.db.Exec(`
-		insert into review_run_sql_bindings (review_run_id, sql_payload_hmac, created_at)
-		values (?, ?, now())`,
-		runID, repeatHex64("ab")).Error; err != nil {
-		t.Fatal(err)
-	}
+	now := time.Now().UTC()
+	snapshots := make([]reviewpersist.StageReviewSnapshotModel, 0, len(stages))
 	for _, st := range stages {
-		if err := fx.db.Exec(`
-			insert into stage_review_snapshots (id, review_run_id, stage_position, datasource_id,
-				datasource_identity_fingerprint, state, highest_severity, gate_passed,
-				normalized_context_ciphertext, normalized_context_nonce,
-				normalized_context_key_id, normalized_context_algorithm, snapshot_hash,
-				created_at, finished_at)
-			values (?, ?, ?, ?, ?, 'passed', 'none', true, ?, ?, 'k1', 'aes-256-gcm', ?, now(), now())`,
-			uuid.NewString(), runID, st.Position, st.DatasourceID, repeatHex64("22"),
-			[]byte{3}, []byte{4}, repeatHex64("44")).Error; err != nil {
-			t.Fatal(err)
-		}
+		snapshots = append(snapshots, reviewpersist.StageReviewSnapshotModel{
+			ID:                            uuid.NewString(),
+			ReviewRunID:                   runID,
+			StagePosition:                 int32(st.Position),
+			DatasourceID:                  st.DatasourceID,
+			DatasourceIdentityFingerprint: repeatHex64("22"),
+			State:                         "passed",
+			HighestSeverity:               "none",
+			GatePassed:                    true,
+			GateReasonCodes:               reviewpersist.EncodeTextArray(nil),
+			NormalizedContextCiphertext:   []byte{3},
+			NormalizedContextNonce:        []byte{4},
+			NormalizedContextKeyID:        "k1",
+			NormalizedContextAlgorithm:    "aes-256-gcm",
+			SnapshotHash:                  repeatHex64("44"),
+			CreatedAt:                     now,
+			FinishedAt:                    &now,
+		})
 	}
+	if _, err := reviewSvc.SeedSubmitReadyEphemeralRunForTest(
+		runID, submitterID, flowID, 1,
+		flowHash, ruleHash, toolHash, repeatHex64("33"),
+		[]byte("select 1 from t4e"), snapshots,
+	); err != nil {
+		t.Fatal(err)
+	}
+	return runID
 }
 
-// submitAs submits a ready draft as the specified submitter.
-func (fx *subFx) submitAs(t *testing.T, draftID, submitterID, username string) (*OrderView, error) {
+// submitAs submits a ready draft and ephemeral Run via SubmitOrderV2 as the specified submitter.
+func (fx *subFx) submitAs(t *testing.T, reviewSvc *reviewapp.Services, draftID, flowID, runID, submitterID, username string) (*OrderView, error) {
 	t.Helper()
-	view, _, err := fx.svc.Submit(context.Background(), Actor{UserID: submitterID, Username: username},
-		RequestMeta{}, SubmitInput{DraftID: draftID, ExpectVersion: 1,
-			IdempotencyKey: "t4e-" + uuid.NewString()[:8]})
+	view, _, err := fx.svc.SubmitOrderV2(context.Background(), Actor{UserID: submitterID, Username: username},
+		reviewSvc, SubmitOrderV2Input{
+			FlowID:         flowID,
+			DraftID:        draftID,
+			SQL:            []byte("select 1 from t4e"),
+			RunID:          runID,
+			IdempotencyKey: "t4e-" + uuid.NewString()[:8],
+		})
 	return view, err
+}
+
+func (fx *subFx) submitReadyDraftAs(t *testing.T, draftID, flowID, submitterID, username string) (*OrderView, error) {
+	t.Helper()
+	reviewSvc := fx.reviewServices(t)
+	runID := fx.seedReadyRun(t, reviewSvc, submitterID, flowID)
+	return fx.submitAs(t, reviewSvc, draftID, flowID, runID, submitterID, username)
 }
 
 // assertSelfFrozen asserts that the submitter actually appears in the work order's frozen surface
@@ -358,8 +373,9 @@ func TestSubmitSelfApproverAllowed(t *testing.T) {
 	})
 	fx.seedGrant(t, submitter, flowID)
 	draftID := fx.seedReadyDraft(t, flowID, submitter)
-	fx.seedReadyRun(t, draftID, flowID)
-	view, err := fx.submitAs(t, draftID, submitter, "t4e-self")
+	reviewSvc := fx.reviewServices(t)
+	runID := fx.seedReadyRun(t, reviewSvc, submitter, flowID)
+	view, err := fx.submitAs(t, reviewSvc, draftID, flowID, runID, submitter, "t4e-self")
 	if err != nil {
 		t.Fatalf("self-approver submitter must pass: %v", err)
 	}
@@ -388,8 +404,9 @@ func TestSubmitSelfExecutorAllowed(t *testing.T) {
 	})
 	fx.seedGrant(t, submitter, flowID)
 	draftID := fx.seedReadyDraft(t, flowID, submitter)
-	fx.seedReadyRun(t, draftID, flowID)
-	view, err := fx.submitAs(t, draftID, submitter, "t4e-self")
+	reviewSvc := fx.reviewServices(t)
+	runID := fx.seedReadyRun(t, reviewSvc, submitter, flowID)
+	view, err := fx.submitAs(t, reviewSvc, draftID, flowID, runID, submitter, "t4e-self")
 	if err != nil {
 		t.Fatalf("self-executor submitter must pass: %v", err)
 	}
@@ -416,8 +433,9 @@ func TestSubmitIndependentSubmitterPasses(t *testing.T) {
 	})
 	fx.seedGrant(t, submitter, flowID)
 	draftID := fx.seedReadyDraft(t, flowID, submitter)
-	fx.seedReadyRun(t, draftID, flowID)
-	view, err := fx.submitAs(t, draftID, submitter, "t4e-owner")
+	reviewSvc := fx.reviewServices(t)
+	runID := fx.seedReadyRun(t, reviewSvc, submitter, flowID)
+	view, err := fx.submitAs(t, reviewSvc, draftID, flowID, runID, submitter, "t4e-owner")
 	if err != nil {
 		t.Fatalf("independent submitter must pass: %v", err)
 	}
@@ -477,8 +495,9 @@ func TestSubmitSelfLaterStageApproverAllowed(t *testing.T) {
 	})
 	fx.seedGrant(t, submitter, flowID)
 	draftID := fx.seedReadyDraft(t, flowID, submitter)
-	fx.seedReadyRun(t, draftID, flowID)
-	view, err := fx.submitAs(t, draftID, submitter, "t4e-self")
+	reviewSvc := fx.reviewServices(t)
+	runID := fx.seedReadyRun(t, reviewSvc, submitter, flowID)
+	view, err := fx.submitAs(t, reviewSvc, draftID, flowID, runID, submitter, "t4e-self")
 	if err != nil {
 		t.Fatalf("later-stage self-approver submitter must pass: %v", err)
 	}

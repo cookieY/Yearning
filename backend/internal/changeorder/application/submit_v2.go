@@ -9,6 +9,7 @@
 package application
 
 import (
+	"bytes"
 	"context"
 	"encoding/hex"
 	"encoding/json"
@@ -105,11 +106,11 @@ func (s *Services) submitV2Tx(ctx context.Context, actor Actor, reviewSvc *revie
 			return domain.ErrReviewOutdated()
 		}
 		// Materialize Run (Submit = sole persistence point for review artifacts).
-		if merr := reviewSvc.MaterializeEphemeralRunTx(ctx, tx, er, draftID, draftRevision); merr != nil {
+		if merr := reviewSvc.MaterializeEphemeralRunTxWithSQL(ctx, tx, er, draftID, draftRevision, in.SQL); merr != nil {
 			return merr
 		}
 		// Reuse existing submit command body (gate re-verification / freeze / events).
-		v, serr := s.submitOnce(ctx, tx, actor, SubmitInput{
+		v, serr := s.submitOnce(ctx, tx, actor, submitOnceInput{
 			DraftID:        draftID,
 			ExpectVersion:  expectVersion,
 			IdempotencyKey: in.IdempotencyKey,
@@ -178,7 +179,7 @@ func (s *Services) ensureDraftForSubmitV2(ctx context.Context, tx *gorm.DB, acto
 				}
 				matched := strings.EqualFold(expectedHMAC, hex.EncodeToString(rawMAC))
 				if !matched {
-					trimmedMAC, terr := s.Crypter.HMAC("sql_fingerprint", []byte(strings.TrimSpace(string(in.SQL))))
+					trimmedMAC, terr := s.Crypter.HMAC("sql_fingerprint", bytes.TrimSpace(in.SQL))
 					if terr != nil {
 						return "", 0, 0, terr
 					}

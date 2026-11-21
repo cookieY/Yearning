@@ -166,6 +166,32 @@ describe("export controller", () => {
     );
     expect(done).not.toHaveBeenCalled();
   });
+
+  it("suppresses completion and download when cancelled while the final page fetch is in flight", async () => {
+    let cancelled = false;
+    let resolvePage!: (value: QueryResultPage) => void;
+    const pendingPage = new Promise<QueryResultPage>((resolve) => {
+      resolvePage = resolve;
+    });
+    const done = vi.fn();
+    const failure = vi.fn();
+    const run = exportExecutionToXlsx(
+      pageOf([[1, "a"]], true, "next"),
+      () => pendingPage,
+      {
+        onProgress: () => {},
+        onDone: done,
+        onFailure: failure,
+      },
+      () => cancelled,
+    );
+    await Promise.resolve();
+    cancelled = true;
+    resolvePage(pageOf([[2, "b"]], false, null));
+    await run;
+    expect(done).not.toHaveBeenCalled();
+    expect(failure).toHaveBeenCalledWith("cancelled", 1);
+  });
 });
 
 describe("downloadXlsx", () => {

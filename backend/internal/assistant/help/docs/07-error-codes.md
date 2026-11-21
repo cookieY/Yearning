@@ -49,7 +49,7 @@ summary: YearningX uses canonical 4-digit business error codes across 10xx (comm
   - `2007 REVIEW_COVERAGE_INCOMPLETE`: AI Review Precheck has not completed all fingerprint groups yet; wait for the run to reach `ready` or re-run precheck.
   - `2008 REVIEW_BLOCKED_BY_RISK`: AI Review Precheck produced one or more blocking `critical`/`high` risk findings; revise the SQL according to the suggestions and re-run precheck.
   - `2009 REVIEW_SCHEMA_INVALID`: AI Provider returned output that did not conform to the structured review JSON schema; retry precheck or verify the provider model in `/admin/review-engine/providers`.
-  - `2010 AI_DAILY_BUDGET_EXHAUSTED`: Global daily AI cost budget (`ai_daily_budget_usage`) is exhausted when enforcement is enabled; an administrator can adjust the daily budget in `/admin/review-engine/ai-budget`.
+  - `2010 AI_DAILY_BUDGET_EXHAUSTED`: Global daily AI cost budget (`ai_daily_budget_usage`, shared across AI Review Precheck, Database AI Assistant, and SQL Performance AI Diagnostics) is exhausted when enforcement is enabled; an administrator can adjust the daily budget in `/admin/review-engine/ai-budget`.
   - `2011 AI_PROVIDER_FAILED`: No active AI Provider is configured/enabled, or all configured AI Providers failed/timed out. An administrator must add, test, and enable an HTTPS OpenAI-compatible AI Provider in `/admin/review-engine/providers`.
   - `2012 REVIEW_TOOL_FAILED`: Controlled read-only metadata/EXPLAIN inspection against the target datasource failed during precheck; verify the datasource `review` credential and network connectivity in `/admin/datasources`.
   - `2013 SUBMISSION_GATE_FAILED`: Order submission blocked because the bound precheck run is missing, not `ready`, or failed submission gate invariants.

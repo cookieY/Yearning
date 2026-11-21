@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Link, useLocation, useParams } from "react-router";
 import { useTranslation } from "react-i18next";
 import { OrderStateBadge, StageStateBadge } from "@/features/orders/order-state-badge";
@@ -16,7 +16,6 @@ import {
   useVoidOrder,
   useWithdrawOrder,
 } from "@/features/orders/use-orders";
-import { startReviewEvents, stopReviewEvents } from "@/features/review/review-events";
 import { useSession } from "@/features/auth/session-provider";
 import { appToast } from "@/shared/components/shadcn-dashboard/sonner/sonner-08";
 import { describeError } from "@/shared/api/error-display";
@@ -80,14 +79,6 @@ export default function OrderDetailPage() {
     order !== null && activeApprovalStepFor(order, session.user?.id) !== null;
   const showSubmitterActions = isSubmitter && !(approvalEntry && isActiveApprover);
   const showApprovalCard = !(!approvalEntry && isSubmitter && isActiveApprover);
-
-  // The shared event feed keeps state-driven surfaces live (withdrawals and
-  // peer decisions from another tab, stage progress); the client's resume
-  // point survives across pages exactly as in the draft workspace.
-  useEffect(() => {
-    void startReviewEvents();
-    return () => { stopReviewEvents(); };
-  }, []);
 
   const [dialog, setDialog] = useState<"withdraw" | "void" | null>(null);
   const [reason, setReason] = useState("");

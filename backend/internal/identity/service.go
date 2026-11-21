@@ -18,6 +18,7 @@ import (
 	"github.com/cookieY/YearningX/backend/internal/authorization/auditlog"
 	"github.com/cookieY/YearningX/backend/internal/authorization/bizerr"
 	"github.com/cookieY/YearningX/backend/internal/crypto"
+	"github.com/cookieY/YearningX/backend/internal/platform/txutil"
 )
 
 // ErrExternalAdminForbidden indicates an external identity attempted to claim the admin identity.
@@ -681,12 +682,4 @@ func ifEmpty(v, fallback string) string {
 	return v
 }
 
-func isUniqueErr(err error) bool {
-	if err == nil {
-		return false
-	}
-	if errors.Is(err, gorm.ErrDuplicatedKey) {
-		return true
-	}
-	return strings.Contains(err.Error(), "23505")
-}
+func isUniqueErr(err error) bool { return txutil.IsUniqueViolation(err) }

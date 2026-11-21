@@ -24,23 +24,10 @@ import type {
   ListQuerySessionTablesParams,
   ListQuerySessions200,
   ListQuerySessionsParams,
-  ProblemResponse,
   ReasonRequest
 } from '../yearningV4HTTPAPI.schemas';
 
 import { customInstance } from '../../../../shared/api/mutator';
-
-export type listQuerySessionsResponse200 = {
-  data: ListQuerySessions200
-  status: 200
-}
-
-export type listQuerySessionsResponseSuccess = (listQuerySessionsResponse200) & {
-  headers: Headers;
-};
-;
-
-export type listQuerySessionsResponse = (listQuerySessionsResponseSuccess)
 
 export const getListQuerySessionsUrl = (params?: ListQuerySessionsParams,) => {
   const normalizedParams = new URLSearchParams();
@@ -57,9 +44,9 @@ export const getListQuerySessionsUrl = (params?: ListQuerySessionsParams,) => {
   return stringifiedParams.length > 0 ? `/api/v4/query-sessions?${stringifiedParams}` : `/api/v4/query-sessions`
 }
 
-export const listQuerySessions = async (params?: ListQuerySessionsParams, options?: Parameters<typeof customInstance>[1]): Promise<listQuerySessionsResponse> => {
+export const listQuerySessions = async (params?: ListQuerySessionsParams, options?: Parameters<typeof customInstance>[1]): Promise<ListQuerySessions200> => {
 
-  return customInstance<listQuerySessionsResponse>(getListQuerySessionsUrl(params),
+  return customInstance<ListQuerySessions200>(getListQuerySessionsUrl(params),
   {
     ...options,
     method: 'GET'
@@ -68,25 +55,6 @@ export const listQuerySessions = async (params?: ListQuerySessionsParams, option
   }
 );}
 
-
-export type createQuerySessionResponse200 = {
-  data: CreateQuerySession200
-  status: 200
-}
-
-export type createQuerySessionResponse403 = {
-  data: ProblemResponse
-  status: 403
-}
-
-export type createQuerySessionResponseSuccess = (createQuerySessionResponse200) & {
-  headers: Headers;
-};
-export type createQuerySessionResponseError = (createQuerySessionResponse403) & {
-  headers: Headers;
-};
-
-export type createQuerySessionResponse = (createQuerySessionResponseSuccess | createQuerySessionResponseError)
 
 export const getCreateQuerySessionUrl = () => {
 
@@ -96,7 +64,7 @@ export const getCreateQuerySessionUrl = () => {
   return `/api/v4/query-sessions`
 }
 
-export const createQuerySession = async (createQuerySessionBody: CreateQuerySession, options?: Parameters<typeof customInstance>[1]): Promise<createQuerySessionResponse> => {
+export const createQuerySession = async (createQuerySessionBody: CreateQuerySession, options?: Parameters<typeof customInstance>[1]): Promise<CreateQuerySession200> => {
 
     const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
@@ -104,7 +72,7 @@ export const createQuerySession = async (createQuerySessionBody: CreateQuerySess
     if (Array.isArray(h)) return Object.fromEntries(h);
     return h;
   };
-return customInstance<createQuerySessionResponse>(getCreateQuerySessionUrl(),
+return customInstance<CreateQuerySession200>(getCreateQuerySessionUrl(),
   {
     ...options,
     method: 'POST',
@@ -114,18 +82,6 @@ return customInstance<createQuerySessionResponse>(getCreateQuerySessionUrl(),
 );}
 
 
-export type getQuerySessionResponse200 = {
-  data: GetQuerySession200
-  status: 200
-}
-
-export type getQuerySessionResponseSuccess = (getQuerySessionResponse200) & {
-  headers: Headers;
-};
-;
-
-export type getQuerySessionResponse = (getQuerySessionResponseSuccess)
-
 export const getGetQuerySessionUrl = (sessionId: string,) => {
 
 
@@ -134,9 +90,9 @@ export const getGetQuerySessionUrl = (sessionId: string,) => {
   return `/api/v4/query-sessions/${sessionId}`
 }
 
-export const getQuerySession = async (sessionId: string, options?: Parameters<typeof customInstance>[1]): Promise<getQuerySessionResponse> => {
+export const getQuerySession = async (sessionId: string, options?: Parameters<typeof customInstance>[1]): Promise<GetQuerySession200> => {
 
-  return customInstance<getQuerySessionResponse>(getGetQuerySessionUrl(sessionId),
+  return customInstance<GetQuerySession200>(getGetQuerySessionUrl(sessionId),
   {
     ...options,
     method: 'GET'
@@ -145,18 +101,6 @@ export const getQuerySession = async (sessionId: string, options?: Parameters<ty
   }
 );}
 
-
-export type closeQuerySessionResponse200 = {
-  data: CloseQuerySession200
-  status: 200
-}
-
-export type closeQuerySessionResponseSuccess = (closeQuerySessionResponse200) & {
-  headers: Headers;
-};
-;
-
-export type closeQuerySessionResponse = (closeQuerySessionResponseSuccess)
 
 export const getCloseQuerySessionUrl = (sessionId: string,) => {
 
@@ -167,7 +111,7 @@ export const getCloseQuerySessionUrl = (sessionId: string,) => {
 }
 
 export const closeQuerySession = async (sessionId: string,
-    reasonRequest: ReasonRequest, options?: Parameters<typeof customInstance>[1]): Promise<closeQuerySessionResponse> => {
+    reasonRequest: ReasonRequest, options?: Parameters<typeof customInstance>[1]): Promise<CloseQuerySession200> => {
 
     const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
@@ -175,7 +119,7 @@ export const closeQuerySession = async (sessionId: string,
     if (Array.isArray(h)) return Object.fromEntries(h);
     return h;
   };
-return customInstance<closeQuerySessionResponse>(getCloseQuerySessionUrl(sessionId),
+return customInstance<CloseQuerySession200>(getCloseQuerySessionUrl(sessionId),
   {
     ...options,
     method: 'POST',
@@ -184,25 +128,6 @@ return customInstance<closeQuerySessionResponse>(getCloseQuerySessionUrl(session
   }
 );}
 
-
-export type listQuerySessionSchemasResponse200 = {
-  data: ListQuerySessionSchemas200
-  status: 200
-}
-
-export type listQuerySessionSchemasResponse403 = {
-  data: ProblemResponse
-  status: 403
-}
-
-export type listQuerySessionSchemasResponseSuccess = (listQuerySessionSchemasResponse200) & {
-  headers: Headers;
-};
-export type listQuerySessionSchemasResponseError = (listQuerySessionSchemasResponse403) & {
-  headers: Headers;
-};
-
-export type listQuerySessionSchemasResponse = (listQuerySessionSchemasResponseSuccess | listQuerySessionSchemasResponseError)
 
 export const getListQuerySessionSchemasUrl = (sessionId: string,
     params: ListQuerySessionSchemasParams,) => {
@@ -221,9 +146,9 @@ export const getListQuerySessionSchemasUrl = (sessionId: string,
 }
 
 export const listQuerySessionSchemas = async (sessionId: string,
-    params: ListQuerySessionSchemasParams, options?: Parameters<typeof customInstance>[1]): Promise<listQuerySessionSchemasResponse> => {
+    params: ListQuerySessionSchemasParams, options?: Parameters<typeof customInstance>[1]): Promise<ListQuerySessionSchemas200> => {
 
-  return customInstance<listQuerySessionSchemasResponse>(getListQuerySessionSchemasUrl(sessionId,params),
+  return customInstance<ListQuerySessionSchemas200>(getListQuerySessionSchemasUrl(sessionId,params),
   {
     ...options,
     method: 'GET'
@@ -232,25 +157,6 @@ export const listQuerySessionSchemas = async (sessionId: string,
   }
 );}
 
-
-export type listQuerySessionTablesResponse200 = {
-  data: ListQuerySessionTables200
-  status: 200
-}
-
-export type listQuerySessionTablesResponse403 = {
-  data: ProblemResponse
-  status: 403
-}
-
-export type listQuerySessionTablesResponseSuccess = (listQuerySessionTablesResponse200) & {
-  headers: Headers;
-};
-export type listQuerySessionTablesResponseError = (listQuerySessionTablesResponse403) & {
-  headers: Headers;
-};
-
-export type listQuerySessionTablesResponse = (listQuerySessionTablesResponseSuccess | listQuerySessionTablesResponseError)
 
 export const getListQuerySessionTablesUrl = (sessionId: string,
     params: ListQuerySessionTablesParams,) => {
@@ -269,9 +175,9 @@ export const getListQuerySessionTablesUrl = (sessionId: string,
 }
 
 export const listQuerySessionTables = async (sessionId: string,
-    params: ListQuerySessionTablesParams, options?: Parameters<typeof customInstance>[1]): Promise<listQuerySessionTablesResponse> => {
+    params: ListQuerySessionTablesParams, options?: Parameters<typeof customInstance>[1]): Promise<ListQuerySessionTables200> => {
 
-  return customInstance<listQuerySessionTablesResponse>(getListQuerySessionTablesUrl(sessionId,params),
+  return customInstance<ListQuerySessionTables200>(getListQuerySessionTablesUrl(sessionId,params),
   {
     ...options,
     method: 'GET'
@@ -280,25 +186,6 @@ export const listQuerySessionTables = async (sessionId: string,
   }
 );}
 
-
-export type listQuerySessionColumnsResponse200 = {
-  data: ListQuerySessionColumns200
-  status: 200
-}
-
-export type listQuerySessionColumnsResponse403 = {
-  data: ProblemResponse
-  status: 403
-}
-
-export type listQuerySessionColumnsResponseSuccess = (listQuerySessionColumnsResponse200) & {
-  headers: Headers;
-};
-export type listQuerySessionColumnsResponseError = (listQuerySessionColumnsResponse403) & {
-  headers: Headers;
-};
-
-export type listQuerySessionColumnsResponse = (listQuerySessionColumnsResponseSuccess | listQuerySessionColumnsResponseError)
 
 export const getListQuerySessionColumnsUrl = (sessionId: string,
     params: ListQuerySessionColumnsParams,) => {
@@ -317,9 +204,9 @@ export const getListQuerySessionColumnsUrl = (sessionId: string,
 }
 
 export const listQuerySessionColumns = async (sessionId: string,
-    params: ListQuerySessionColumnsParams, options?: Parameters<typeof customInstance>[1]): Promise<listQuerySessionColumnsResponse> => {
+    params: ListQuerySessionColumnsParams, options?: Parameters<typeof customInstance>[1]): Promise<ListQuerySessionColumns200> => {
 
-  return customInstance<listQuerySessionColumnsResponse>(getListQuerySessionColumnsUrl(sessionId,params),
+  return customInstance<ListQuerySessionColumns200>(getListQuerySessionColumnsUrl(sessionId,params),
   {
     ...options,
     method: 'GET'
@@ -328,25 +215,6 @@ export const listQuerySessionColumns = async (sessionId: string,
   }
 );}
 
-
-export type executeSelectResponse200 = {
-  data: ExecuteSelect200
-  status: 200
-}
-
-export type executeSelectResponse403 = {
-  data: ProblemResponse
-  status: 403
-}
-
-export type executeSelectResponseSuccess = (executeSelectResponse200) & {
-  headers: Headers;
-};
-export type executeSelectResponseError = (executeSelectResponse403) & {
-  headers: Headers;
-};
-
-export type executeSelectResponse = (executeSelectResponseSuccess | executeSelectResponseError)
 
 export const getExecuteSelectUrl = (sessionId: string,) => {
 
@@ -357,7 +225,7 @@ export const getExecuteSelectUrl = (sessionId: string,) => {
 }
 
 export const executeSelect = async (sessionId: string,
-    executeQueryRequest: ExecuteQueryRequest, options?: Parameters<typeof customInstance>[1]): Promise<executeSelectResponse> => {
+    executeQueryRequest: ExecuteQueryRequest, options?: Parameters<typeof customInstance>[1]): Promise<ExecuteSelect200> => {
 
     const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
@@ -365,7 +233,7 @@ export const executeSelect = async (sessionId: string,
     if (Array.isArray(h)) return Object.fromEntries(h);
     return h;
   };
-return customInstance<executeSelectResponse>(getExecuteSelectUrl(sessionId),
+return customInstance<ExecuteSelect200>(getExecuteSelectUrl(sessionId),
   {
     ...options,
     method: 'POST',
@@ -374,18 +242,6 @@ return customInstance<executeSelectResponse>(getExecuteSelectUrl(sessionId),
   }
 );}
 
-
-export type fetchQueryResultPageResponse200 = {
-  data: FetchQueryResultPage200
-  status: 200
-}
-
-export type fetchQueryResultPageResponseSuccess = (fetchQueryResultPageResponse200) & {
-  headers: Headers;
-};
-;
-
-export type fetchQueryResultPageResponse = (fetchQueryResultPageResponseSuccess)
 
 export const getFetchQueryResultPageUrl = (executionId: string,
     params: FetchQueryResultPageParams,) => {
@@ -404,9 +260,9 @@ export const getFetchQueryResultPageUrl = (executionId: string,
 }
 
 export const fetchQueryResultPage = async (executionId: string,
-    params: FetchQueryResultPageParams, options?: Parameters<typeof customInstance>[1]): Promise<fetchQueryResultPageResponse> => {
+    params: FetchQueryResultPageParams, options?: Parameters<typeof customInstance>[1]): Promise<FetchQueryResultPage200> => {
 
-  return customInstance<fetchQueryResultPageResponse>(getFetchQueryResultPageUrl(executionId,params),
+  return customInstance<FetchQueryResultPage200>(getFetchQueryResultPageUrl(executionId,params),
   {
     ...options,
     method: 'GET'

@@ -78,34 +78,34 @@ func TestCollector_HelpersAndLiveBackend(t *testing.T) {
 	if maxInt(10, 5) != 10 || maxInt(2, 8) != 8 {
 		t.Fatal("unexpected maxInt")
 	}
-	if diffOptionalInt64(nil, nil) != nil {
-		t.Fatal("expected nil for nil cur in diffOptionalInt64")
+	if diffOptionalMetric[int64](nil, nil, maxInt64) != nil {
+		t.Fatal("expected nil for nil cur in diffOptionalMetric[int64]")
 	}
 	v10 := int64(10)
 	v25 := int64(25)
-	if d := diffOptionalInt64(&v10, nil); d == nil || *d != 10 {
-		t.Fatalf("unexpected diffOptionalInt64 with nil prev: %v", d)
+	if d := diffOptionalMetric(&v10, nil, maxInt64); d == nil || *d != 10 {
+		t.Fatalf("unexpected diffOptionalMetric[int64] with nil prev: %v", d)
 	}
-	if d := diffOptionalInt64(&v10, &v25); d == nil || *d != 10 {
-		t.Fatalf("unexpected diffOptionalInt64 on counter decrease: %v", d)
+	if d := diffOptionalMetric(&v10, &v25, maxInt64); d == nil || *d != 10 {
+		t.Fatalf("unexpected diffOptionalMetric[int64] on counter decrease: %v", d)
 	}
-	if d := diffOptionalInt64(&v25, &v10); d == nil || *d != 15 {
-		t.Fatalf("unexpected diffOptionalInt64 delta: %v", d)
+	if d := diffOptionalMetric(&v25, &v10, maxInt64); d == nil || *d != 15 {
+		t.Fatalf("unexpected diffOptionalMetric[int64] delta: %v", d)
 	}
 
 	f10 := 10.0
 	f25 := 25.0
-	if diffOptionalFloat64(nil, nil) != nil {
-		t.Fatal("expected nil for nil cur in diffOptionalFloat64")
+	if diffOptionalMetric[float64](nil, nil, maxFloat64) != nil {
+		t.Fatal("expected nil for nil cur in diffOptionalMetric[float64]")
 	}
-	if d := diffOptionalFloat64(&f10, nil); d == nil || *d != 10.0 {
-		t.Fatalf("unexpected diffOptionalFloat64 with nil prev: %v", d)
+	if d := diffOptionalMetric(&f10, nil, maxFloat64); d == nil || *d != 10.0 {
+		t.Fatalf("unexpected diffOptionalMetric[float64] with nil prev: %v", d)
 	}
-	if d := diffOptionalFloat64(&f10, &f25); d == nil || *d != 10.0 {
-		t.Fatalf("unexpected diffOptionalFloat64 on counter decrease: %v", d)
+	if d := diffOptionalMetric(&f10, &f25, maxFloat64); d == nil || *d != 10.0 {
+		t.Fatalf("unexpected diffOptionalMetric[float64] on counter decrease: %v", d)
 	}
-	if d := diffOptionalFloat64(&f25, &f10); d == nil || *d != 15.0 {
-		t.Fatalf("unexpected diffOptionalFloat64 delta: %v", d)
+	if d := diffOptionalMetric(&f25, &f10, maxFloat64); d == nil || *d != 15.0 {
+		t.Fatalf("unexpected diffOptionalMetric[float64] delta: %v", d)
 	}
 
 	db := openDiagnosticsTestDB(t)
@@ -767,7 +767,7 @@ func TestAIDiagnose_EnglishPostgresLLMAndSubmissionBranches(t *testing.T) {
 	}
 
 	// 2. Helper unit tests.
-	if restoreAnonymizedTokensInText(nil, "table_1") != "table_1" {
+	if (*privacy.TurnPrivacySession)(nil).RestoreTextTokens("table_1") != "table_1" {
 		t.Fatal("expected unchanged text when privacy session is nil")
 	}
 	if classifyCandidateStatementKind("UPDATE orders SET status = 'paid' WHERE id = 1") != "dml" {
@@ -922,10 +922,10 @@ func TestAIDiagnose_EnglishPostgresLLMAndSubmissionBranches(t *testing.T) {
 	}))
 	defer llmServer.Close()
 
-	// Also exercise restoreAnonymizedTokensInText with registered and unregistered tokens.
+	// Also exercise RestoreTextTokens with registered and unregistered tokens.
 	privRestore := privacy.NewTurnPrivacySession()
 	_, _ = privRestore.RegisterTable("public", "orders")
-	restoredText := restoreAnonymizedTokensInText(privRestore, "Scan on table_1 and table_99")
+	restoredText := privRestore.RestoreTextTokens("Scan on table_1 and table_99")
 	if !strings.Contains(restoredText, "orders") || !strings.Contains(restoredText, "table_99") {
 		t.Fatalf("unexpected restored text: %q", restoredText)
 	}

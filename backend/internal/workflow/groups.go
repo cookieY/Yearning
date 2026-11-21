@@ -4,7 +4,6 @@ package workflow
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"time"
 
@@ -14,6 +13,7 @@ import (
 
 	"github.com/cookieY/YearningX/backend/internal/authorization/auditlog"
 	"github.com/cookieY/YearningX/backend/internal/authorization/bizerr"
+	"github.com/cookieY/YearningX/backend/internal/platform/txutil"
 )
 
 // GroupWrite corresponds to the OpenAPI PermissionGroupWrite schema.
@@ -90,7 +90,7 @@ func (s *Service) ReplaceGroup(ctx context.Context, actor AdminActor, groupID st
 	if err := validateIDSet(w.GrantedFlowIDs); err != nil {
 		return nil, err
 	}
-	err := s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+	err := txutil.Serializable(ctx, s.db, func(tx *gorm.DB) error {
 		var row PermissionGroupModel
 		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
 			Where("id = ?", groupID).First(&row).Error; err != nil {
@@ -142,7 +142,7 @@ func (s *Service) ReplaceGroup(ctx context.Context, actor AdminActor, groupID st
 			auditlog.Actor{Kind: "user", UserID: actor.UserID, Username: actor.Username},
 			allMembers, true)
 		return nil
-	}, &sql.TxOptions{Isolation: sql.LevelSerializable})
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -153,7 +153,7 @@ func (s *Service) ReplaceGroup(ctx context.Context, actor AdminActor, groupID st
 // DeleteGroup deletes a permission group: members and flow grants are removed via cascade; submitted tickets are unaffected.
 // Callers display the impact scope via GetGroup and require secondary confirmation before calling DeleteGroup.
 func (s *Service) DeleteGroup(ctx context.Context, actor AdminActor, groupID string, expectVersion int64, meta RequestMeta) error {
-	err := s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+	err := txutil.Serializable(ctx, s.db, func(tx *gorm.DB) error {
 		var row PermissionGroupModel
 		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
 			Where("id = ?", groupID).First(&row).Error; err != nil {

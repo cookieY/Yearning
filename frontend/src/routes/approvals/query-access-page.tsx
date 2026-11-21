@@ -1,18 +1,16 @@
 import { StatusBadge } from "@/shared/components/status/status-badge";
 import { QUERY_GRANT_TONE, QUERY_REQUEST_TONE } from "@/features/query/query-state-tone";
-import i18next from "@/shared/i18n";
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { useNavigate } from "react-router";
 import { Ban, Check, ShieldOff, Stamp, X } from "lucide-react";
 import type { QueryAccessRequest, QueryGrant } from "@/api/generated/client/yearningV4HTTPAPI.schemas";
 import { useSession } from "@/features/auth/session-provider";
-import { describeError } from "@/shared/api/error-display";
+import { describeError, describeErrorText } from "@/shared/api/error-display";
 import { appToast } from "@/shared/components/shadcn-dashboard/sonner/sonner-08";
 import { ErrorState } from "@/shared/components/status/status-components";
 import { LoadingState } from "@/shared/components/status/loading-state";
 import { EmptyState } from "@/shared/components/status/empty-state";
-import { ListToolbar, PageHeader, PageLayout } from "@/shared/components/page-layout";
+import { ListToolbar } from "@/shared/components/page-layout";
 import {
   GlobalSearchBar,
   filterBySearchTerms,
@@ -25,7 +23,6 @@ import { Button } from "@/shared/components/ui/button";
 import { Card, CardContent, CardTitle } from "@/shared/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/shared/components/ui/dialog";
 import { Label } from "@/shared/components/ui/label";
-import { Tabs, TabsList, TabsTrigger } from "@/shared/components/ui/tabs";
 import { Textarea } from "@/shared/components/ui/textarea";
 import { useCursorPage } from "@/shared/lib/cursor-page";
 import { formatTimestamp } from "@/shared/lib/timezones";
@@ -62,12 +59,6 @@ import {
  * terminating access, never reading it.
  */
 
-function describeErrorText(display: { messageKey: string; requestId: string | null }): string {
-  // Translated through the shared i18n bundle so users never see raw keys.
-  const text = i18next.t(display.messageKey);
-  return display.requestId === null ? text : `${text} (${display.requestId})`;
-}
-
 export function ApprovalTabBadge({ count, testId }: { count: number; testId: string }) {
   if (count <= 0) return null;
   return (
@@ -77,43 +68,6 @@ export function ApprovalTabBadge({ count, testId }: { count: number; testId: str
     >
       {count > 99 ? "99+" : String(count)}
     </span>
-  );
-}
-
-export default function QueryAccessApprovalsPage() {
-  const { t } = useTranslation();
-  const navigate = useNavigate();
-  const session = useSession();
-  const authenticated = session.status === "authenticated";
-  const requestsQuery = useMyAccessRequests(authenticated, { limit: 20, after: "" });
-  const pendingQueryAccessCount = useMemo(
-    () => requestsQuery.data.items.filter((item) => item.state === "access_pending").length,
-    [requestsQuery.data.items],
-  );
-
-  return (
-    <PageLayout data-testid="query-access-approvals">
-      <PageHeader
-        icon={Stamp}
-        title={t("approvals.queryAccess.title")}
-      />
-      <Tabs value="query-access">
-        <TabsList className="flex w-full justify-start overflow-x-auto overflow-y-hidden">
-          <TabsTrigger
-            value="orders"
-            onClick={() => { void navigate("/approvals/changes"); }}
-            data-testid="approvals-tab-orders"
-          >
-            {t("approvals.queryAccess.ordersTab")}
-          </TabsTrigger>
-          <TabsTrigger value="query-access" data-testid="approvals-tab-query">
-            {t("approvals.queryAccess.queryTab")}
-            <ApprovalTabBadge count={pendingQueryAccessCount} testId="approvals-tab-query-badge" />
-          </TabsTrigger>
-        </TabsList>
-      </Tabs>
-      <QueryAccessApprovalsContent />
-    </PageLayout>
   );
 }
 

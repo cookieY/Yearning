@@ -36,7 +36,6 @@ import (
 	"github.com/cookieY/YearningX/backend/internal/review/privacy"
 	"github.com/cookieY/YearningX/backend/internal/review/provider"
 	"github.com/cookieY/YearningX/backend/internal/review/tool"
-	"github.com/cookieY/YearningX/backend/internal/tasks"
 )
 
 func TestFakeRunnerPureHelpers_CoverageBoost(t *testing.T) {
@@ -157,23 +156,7 @@ func TestFakeRunnerPureHelpers_CoverageBoost(t *testing.T) {
 		t.Fatalf("expected incomplete when run object budget exhausted")
 	}
 
-	// reasonCodesOf, draftTriggerOf, draftReasonOf, terminalStageOf, failureNameOf
-	if codes := reasonCodesOf(domain.StageStatePassed, domain.SeverityNone); len(codes) != 0 {
-		t.Fatalf("expected empty codes for passed, got %v", codes)
-	}
-	if codes := reasonCodesOf(domain.StageStateFailed, domain.SeverityNone); len(codes) == 0 {
-		t.Fatalf("expected non-empty codes for failed, got %v", codes)
-	}
-	if codes := reasonCodesOf(domain.StageStatePartial, domain.SeverityNone); len(codes) == 0 {
-		t.Fatalf("expected non-empty codes for partial, got %v", codes)
-	}
-	if codes := reasonCodesOf(domain.StageStateBlocked, domain.SeverityHigh); len(codes) == 0 {
-		t.Fatalf("expected non-empty codes for high, got %v", codes)
-	}
-	if codes := reasonCodesOf(domain.StageStateBlocked, domain.SeverityCritical); len(codes) == 0 {
-		t.Fatalf("expected non-empty codes for critical, got %v", codes)
-	}
-
+	// terminalStageOf, failureNameOf
 	for _, rs := range []domain.RunState{
 		domain.RunStateReady,
 		domain.RunStateBlocked,
@@ -181,8 +164,6 @@ func TestFakeRunnerPureHelpers_CoverageBoost(t *testing.T) {
 		domain.RunStateFailed,
 		domain.RunStateOutdated,
 	} {
-		_ = draftTriggerOf(rs)
-		_ = draftReasonOf(rs)
 		_ = terminalStageOf(rs)
 	}
 	if got := failureNameOf(&domain.Error{Code: 2005, Name: "SQL_PARSE_FAILED"}); got != "SQL_PARSE_FAILED" {
@@ -284,227 +265,6 @@ func TestAgentRunnerPureHelpers_CoverageBoost(t *testing.T) {
 	_ = providerUniqueConflictDetail(pgErr, 1)
 	_ = providerUniqueConflictDetail(&pgconn.PgError{Code: "23505", ConstraintName: "ai_providers_selection_priority_key"}, 2)
 	_ = providerUniqueConflictDetail(errors.New("other"), 3)
-}
-
-func allowLegacyDraftReviewStates(t *testing.T, db *gorm.DB) {
-	t.Helper()
-	if err := db.Exec(`alter table change_drafts drop constraint if exists change_drafts_state_check`).Error; err != nil {
-		t.Fatalf("drop change_drafts_state_check: %v", err)
-	}
-	t.Cleanup(func() {
-		if err := db.Exec(`update change_drafts set state = 'draft' where state not in ('draft', 'submitted', 'cancelled')`).Error; err != nil {
-			t.Errorf("restore change_drafts legacy states before constraint re-add: %v", err)
-		}
-		if err := db.Exec(`alter table change_drafts add constraint change_drafts_state_check check (state in ('draft', 'submitted', 'cancelled'))`).Error; err != nil {
-			t.Errorf("restore change_drafts_state_check constraint: %v", err)
-		}
-	})
-}
-
-func TestStartRun_FakeRunner_And_CancelReviewTask_Integration(t *testing.T) {
-	b := newB7Fixture(t)
-	allowLegacyDraftReviewStates(t, b.db)
-	ctx := context.Background()
-
-	// 1. StartRun validation & error paths
-	draftEmpty, err := b.svc.CreateDraft(ctx, b.owner, CreateDraftInput{
-		FlowID: b.flowID, Title: "no-sql", Description: "desc",
-	})
-	if err != nil {
-		t.Fatalf("create draft: %v", err)
-	}
-	// Non-owner StartRun -> ErrNotFound
-	if _, err := b.svc.StartRun(ctx, Actor{UserID: uuid.NewString(), Username: "other"}, StartRunInput{
-		DraftID: draftEmpty.ID, ExpectVersion: draftEmpty.Version, IdempotencyKey: "k-non-owner",
-	}); !errors.Is(err, ErrNotFound) {
-		t.Fatalf("expected ErrNotFound for non-owner StartRun, got %v", err)
-	}
-	// Missing SQL -> 1001 VALIDATION_FAILED
-	if _, err := b.svc.StartRun(ctx, b.owner, StartRunInput{
-		DraftID: draftEmpty.ID, ExpectVersion: draftEmpty.Version, IdempotencyKey: "k-no-sql", OutputLocale: "en-US",
-	}); !domain.IsCode(err, 1001) {
-		t.Fatalf("expected 1001 when SQL not saved, got %v", err)
-	}
-
-	// Save SQL and test StartRun + Idempotency replay + Idempotency conflict
-	sqlText := "UPDATE orders SET amount = amount + 1 WHERE id = 1;\nINSERT INTO orders (id, amount) VALUES (2, 10);\n"
-	draft1 := b.createDraftWithSQL(t, sqlText)
-	res1, err := b.svc.StartRun(ctx, b.owner, StartRunInput{
-		DraftID: draft1.ID, ExpectVersion: draft1.Version, IdempotencyKey: "idem-1", OutputLocale: "en-US",
-	})
-	if err != nil {
-		t.Fatalf("StartRun failed: %v", err)
-	}
-	// Replay with same key and same payload -> returns cached result
-	resReplay, err := b.svc.StartRun(ctx, b.owner, StartRunInput{
-		DraftID: draft1.ID, ExpectVersion: draft1.Version, IdempotencyKey: "idem-1", OutputLocale: "en-US",
-	})
-	if err != nil || resReplay.RunID != res1.RunID || resReplay.TaskID != res1.TaskID {
-		t.Fatalf("idempotency replay mismatch: got %+v, err=%v", resReplay, err)
-	}
-	// Replay with same key but different version -> 1007 IDEMPOTENCY_KEY_REUSED
-	if _, err := b.svc.StartRun(ctx, b.owner, StartRunInput{
-		DraftID: draft1.ID, ExpectVersion: draft1.Version + 99, IdempotencyKey: "idem-1", OutputLocale: "en-US",
-	}); !domain.IsCode(err, 1007) {
-		t.Fatalf("expected 1007 for reused idempotency key with different hash, got %v", err)
-	}
-
-	// Drain with NewReviewWorker (FakeRunner: sql_grouping -> ai_review -> ready)
-	hooksCalled := 0
-	fakeRunner := NewFakeRunner(b.svc, &RunnerHooks{
-		AfterGrouping: func(runID string) { hooksCalled++ },
-		AfterStage:    func(runID string, pos int) { hooksCalled++ },
-	})
-	worker := b.svc.NewReviewWorker("worker-fake-1", fakeRunner, 5*time.Second)
-	// Step 1: sql_grouping
-	if err := worker.RunOnce(ctx); err != nil {
-		t.Fatalf("worker RunOnce (grouping) failed: %v", err)
-	}
-	// Step 2: ai_review
-	if err := worker.RunOnce(ctx); err != nil {
-		t.Fatalf("worker RunOnce (ai_review) failed: %v", err)
-	}
-	if hooksCalled != 2 {
-		t.Fatalf("expected both RunnerHooks to fire, got %d", hooksCalled)
-	}
-	runView, err := b.svc.GetRunOwned(ctx, b.owner, res1.RunID)
-	if err != nil {
-		t.Fatalf("GetRunOwned failed: %v", err)
-	}
-	if runView.State != string(domain.RunStateReady) {
-		t.Fatalf("expected FakeRunner run to reach ready, got %s", runView.State)
-	}
-
-	// CancelReviewTask on already terminal task -> no-op
-	if err := b.svc.CancelReviewTask(ctx, b.owner, res1.TaskID); err != nil {
-		t.Fatalf("CancelReviewTask on completed task should be nil, got %v", err)
-	}
-
-	// 2. CancelReviewTask BEFORE grouping (no run row exists yet -> draftReviewIncomplete)
-	draftCancelPre := b.createDraftWithSQL(t, "SELECT id FROM orders WHERE id = 1;")
-	resCancelPre, err := b.svc.StartRun(ctx, b.owner, StartRunInput{
-		DraftID: draftCancelPre.ID, ExpectVersion: draftCancelPre.Version, IdempotencyKey: "idem-cancel-pre",
-	})
-	if err != nil {
-		t.Fatalf("StartRun for pre-grouping cancel failed: %v", err)
-	}
-	if err := b.svc.CancelReviewTask(ctx, b.owner, resCancelPre.TaskID); err != nil {
-		t.Fatalf("CancelReviewTask pre-grouping failed: %v", err)
-	}
-	afterCancelPre, err := b.svc.GetDraft(ctx, b.owner, draftCancelPre.ID)
-	if err != nil || afterCancelPre.State != string(domain.DraftStatePartial) {
-		t.Fatalf("expected draft state partial after pre-grouping cancel, got %+v, err=%v", afterCancelPre, err)
-	}
-
-	// 3. CancelReviewTask AFTER grouping (run row exists -> runner.finishCancelled)
-	draftCancelPost := b.createDraftWithSQL(t, "UPDATE orders SET amount = 5 WHERE id = 1;")
-	resCancelPost, err := b.svc.StartRun(ctx, b.owner, StartRunInput{
-		DraftID: draftCancelPost.ID, ExpectVersion: draftCancelPost.Version, IdempotencyKey: "idem-cancel-post",
-	})
-	if err != nil {
-		t.Fatalf("StartRun for post-grouping cancel failed: %v", err)
-	}
-	// Run only grouping step
-	if err := worker.RunOnce(ctx); err != nil {
-		t.Fatalf("worker grouping step failed: %v", err)
-	}
-	// Find the chained ai_review task
-	var aiTaskID string
-	if err := b.db.Raw(`select id::text from async_tasks where aggregate_id = ? and kind = 'ai_review'`, resCancelPost.RunID).Scan(&aiTaskID).Error; err != nil || aiTaskID == "" {
-		t.Fatalf("locate chained ai_review task failed: %v", err)
-	}
-	if err := b.svc.CancelReviewTask(ctx, b.owner, aiTaskID); err != nil {
-		t.Fatalf("CancelReviewTask post-grouping failed: %v", err)
-	}
-	runAfterCancel, err := b.svc.GetRunOwned(ctx, b.owner, resCancelPost.RunID)
-	if err != nil || runAfterCancel.State != string(domain.RunStatePartial) {
-		t.Fatalf("expected run state partial after post-grouping cancel, got %+v, err=%v", runAfterCancel, err)
-	}
-}
-
-func TestStartRun_AgentRunnerWorker_And_DriftCoverage_Integration(t *testing.T) {
-	b := newB7Fixture(t)
-	allowLegacyDraftReviewStates(t, b.db)
-	ctx := context.Background()
-
-	deps := b.fakeDial(func(req provider.Request) ([]byte, int, error) {
-		if len(req.AnonymizedStatementGroups) == 0 {
-			return nil, 500, fmt.Errorf("no groups")
-		}
-		withTool := len(req.NormalizedEvidence) == 0
-		return b.validProviderBody(req.AnonymizedStatementGroups[0].GroupID, withTool)(req)
-	})
-	deps.RuntimeBudget = &RuntimeBudgetConfig{
-		PerStageEstimateMinor: 50,
-		MaxModelTurns:         4,
-		MaxModelCalls:         4,
-		MaxToolCalls:          8,
-		MaxDurationSec:        30,
-		PerModelTimeout:       15,
-		PerToolTimeout:        10,
-	}
-
-	draft := b.createDraftWithSQL(t, "UPDATE orders SET amount = amount + 1 WHERE id = 1;\n")
-	res, err := b.svc.StartRun(ctx, b.owner, StartRunInput{
-		DraftID: draft.ID, ExpectVersion: draft.Version, IdempotencyKey: "agent-worker-1",
-	})
-	if err != nil {
-		t.Fatalf("StartRun failed: %v", err)
-	}
-
-	agentWorker, _ := b.svc.NewAgentReviewWorker("agent-w1", deps, 5*time.Second)
-	// Step 1: sql_grouping via AgentRunner delegating to FakeRunner
-	if err := agentWorker.RunOnce(ctx); err != nil {
-		t.Fatalf("agentWorker grouping failed: %v", err)
-	}
-	// Step 2: ai_review via AgentRunner.Execute -> review -> freezeInjections -> reviewStage -> commitStage -> finishRun
-	if err := agentWorker.RunOnce(ctx); err != nil {
-		t.Fatalf("agentWorker ai_review failed: %v", err)
-	}
-
-	runView, err := b.svc.GetRunOwned(ctx, b.owner, res.RunID)
-	if err != nil {
-		t.Fatalf("GetRunOwned failed: %v", err)
-	}
-	if runView.State != string(domain.RunStateBlocked) {
-		t.Fatalf("expected blocked run from AgentRunner worker, got %s", runView.State)
-	}
-
-	// Exercise ListRunFindings & ListFindingEvidence & RevealRawEvidence on the DB-persisted run
-	findings, nextCursor, err := b.svc.ListRunFindings(ctx, b.owner, res.RunID, 1, "")
-	if err != nil || len(findings) != 1 {
-		t.Fatalf("ListRunFindings failed: len=%d next=%v err=%v", len(findings), nextCursor, err)
-	}
-	if nextCursor != nil {
-		_, _, _ = b.svc.ListRunFindings(ctx, b.owner, res.RunID, 10, *nextCursor)
-	}
-	if _, _, err := b.svc.ListRunFindings(ctx, b.owner, res.RunID, 10, "invalid-cursor"); !errors.Is(err, ErrValidation) {
-		t.Fatalf("expected ErrValidation for invalid cursor, got %v", err)
-	}
-
-	// Test verifyFrozenInputs drift and verifyRunCoverage mismatch via direct FakeRunner / AgentRunner execution
-	draftDrift := b.createDraftWithSQL(t, "UPDATE orders SET amount = 10 WHERE id = 1;\n")
-	resDrift, err := b.svc.StartRun(ctx, b.owner, StartRunInput{
-		DraftID: draftDrift.ID, ExpectVersion: draftDrift.Version, IdempotencyKey: "agent-drift-1",
-	})
-	if err != nil {
-		t.Fatalf("StartRun drift failed: %v", err)
-	}
-	// Run grouping only
-	if err := agentWorker.RunOnce(ctx); err != nil {
-		t.Fatalf("grouping for drift failed: %v", err)
-	}
-	// Mutate draft_sql_payloads plaintext_hmac to trigger errInputsDrift in verifyFrozenInputs
-	if err := b.db.Exec(`update draft_sql_payloads set plaintext_hmac = repeat('9', 64) where draft_id = ?`, draftDrift.ID).Error; err != nil {
-		t.Fatal(err)
-	}
-	if err := agentWorker.RunOnce(ctx); err != nil {
-		t.Fatalf("ai_review with SQL drift failed: %v", err)
-	}
-	driftRun, err := b.svc.GetRun(ctx, b.db, resDrift.RunID)
-	if err != nil || driftRun.State != string(domain.RunStateOutdated) {
-		t.Fatalf("expected outdated run on SQL HMAC drift, got %+v, err=%v", driftRun, err)
-	}
 }
 
 func TestDraft_And_Ephemeral_Lifecycle_CoverageBoost(t *testing.T) {
@@ -1186,13 +946,9 @@ func TestFactSource_And_PolicySnapshot_CoverageBoost(t *testing.T) {
 			},
 		},
 	}
-	sealedInput, err := sealReviewPolicySnapshot(b.svc.Crypter, "run-snap-1", PolicySnapshotPurposeReview, validPolicy)
-	if err != nil {
-		t.Fatalf("sealReviewPolicySnapshot failed: %v", err)
-	}
-	decodedPolicy, err := b.svc.VerifyAndDecodePolicySnapshot(ctx, b.db, sealedInput, PolicySnapshotPurposeReview)
-	if err != nil || len(decodedPolicy.KnowledgeEntries) != 3 {
-		t.Fatalf("VerifyAndDecodePolicySnapshot failed: %+v, err=%v", decodedPolicy, err)
+	policyHash, _, err := canonicalReviewPolicyIdentity(validPolicy)
+	if err != nil || policyHash == "" {
+		t.Fatalf("canonicalReviewPolicyIdentity failed: hash=%q err=%v", policyHash, err)
 	}
 	// Error branches in canonicalReviewPolicy
 	for _, mut := range []func(*FrozenReviewPolicy){
@@ -1307,29 +1063,15 @@ func TestStmtShape_And_ServiceHelpers_CoverageBoost(t *testing.T) {
 
 func TestEvidence_And_IdentifierMappingReveal_DB_CoverageBoost(t *testing.T) {
 	b := newB7Fixture(t)
-	allowLegacyDraftReviewStates(t, b.db)
 	ctx := context.Background()
 
 	deps := b.fakeDial(func(req provider.Request) ([]byte, int, error) {
 		withTool := len(req.NormalizedEvidence) == 0
 		return b.validProviderBody(req.AnonymizedStatementGroups[0].GroupID, withTool)(req)
 	})
-	draft := b.createDraftWithSQL(t, "UPDATE orders SET amount = amount + 1 WHERE id = 1;\n")
-	res, err := b.svc.StartRun(ctx, b.owner, StartRunInput{
-		DraftID: draft.ID, ExpectVersion: draft.Version, IdempotencyKey: "ev-map-run-1",
-	})
-	if err != nil {
-		t.Fatalf("StartRun failed: %v", err)
-	}
-	agentWorker, _ := b.svc.NewAgentReviewWorker("agent-ev-1", deps, 5*time.Second)
-	if err := agentWorker.RunOnce(ctx); err != nil {
-		t.Fatalf("grouping failed: %v", err)
-	}
-	if err := agentWorker.RunOnce(ctx); err != nil {
-		t.Fatalf("ai_review failed: %v", err)
-	}
+	_, runID := runEphemeralAndWait(t, b, NewAgentRunner(b.svc, deps), "UPDATE orders SET amount = amount + 1 WHERE id = 1;\n", true)
 
-	findings, _, err := b.svc.ListRunFindings(ctx, b.owner, res.RunID, 10, "")
+	findings, _, err := b.svc.ListRunFindings(ctx, b.owner, runID, 10, "")
 	if err != nil || len(findings) == 0 {
 		t.Fatalf("ListRunFindings failed: len=%d err=%v", len(findings), err)
 	}
@@ -1340,7 +1082,7 @@ func TestEvidence_And_IdentifierMappingReveal_DB_CoverageBoost(t *testing.T) {
 	if err := b.db.Raw(`
 		select ef.id::text from evidence_facts ef
 		join stage_review_snapshots s on s.id = ef.stage_review_id
-		where s.review_run_id = ? limit 1`, res.RunID).Scan(&factID).Error; err != nil || factID == "" {
+		where s.review_run_id = ? limit 1`, runID).Scan(&factID).Error; err != nil || factID == "" {
 		t.Fatalf("locate evidence_fact failed: %v", err)
 	}
 	_ = b.db.Exec(`insert into review_finding_evidence (finding_id, evidence_fact_id) values (?, ?) on conflict do nothing`, findingID, factID).Error
@@ -1380,12 +1122,12 @@ func TestEvidence_And_IdentifierMappingReveal_DB_CoverageBoost(t *testing.T) {
 	}
 
 	// RevealIdentifierMapping (all=true and tokens=[...])
-	mapAll, err := b.svc.RevealIdentifierMapping(ctx, b.owner, RequestMeta{RequestID: uuid.NewString()}, res.RunID, nil, true)
+	mapAll, err := b.svc.RevealIdentifierMapping(ctx, b.owner, RequestMeta{RequestID: uuid.NewString()}, runID, nil, true)
 	if err != nil || len(mapAll.Mappings) == 0 {
 		t.Fatalf("RevealIdentifierMapping all=true failed: %+v, err=%v", mapAll, err)
 	}
 	firstTok := mapAll.Mappings[0].Token
-	mapSome, err := b.svc.RevealIdentifierMapping(ctx, b.owner, RequestMeta{RequestID: uuid.NewString()}, res.RunID, []string{firstTok}, false)
+	mapSome, err := b.svc.RevealIdentifierMapping(ctx, b.owner, RequestMeta{RequestID: uuid.NewString()}, runID, []string{firstTok}, false)
 	if err != nil || len(mapSome.Mappings) != 1 || mapSome.Mappings[0].Token != firstTok {
 		t.Fatalf("RevealIdentifierMapping tokens=[%s] failed: %+v, err=%v", firstTok, mapSome, err)
 	}
@@ -1393,24 +1135,23 @@ func TestEvidence_And_IdentifierMappingReveal_DB_CoverageBoost(t *testing.T) {
 	if _, err := b.svc.RevealIdentifierMapping(ctx, b.owner, RequestMeta{}, uuid.NewString(), nil, true); !errors.Is(err, ErrNotFound) {
 		t.Fatalf("expected ErrNotFound for unknown runID, got %v", err)
 	}
-	if _, err := b.svc.RevealIdentifierMapping(ctx, Actor{UserID: uuid.NewString()}, RequestMeta{}, res.RunID, nil, true); !errors.Is(err, ErrNotFound) {
+	if _, err := b.svc.RevealIdentifierMapping(ctx, Actor{UserID: uuid.NewString()}, RequestMeta{}, runID, nil, true); !errors.Is(err, ErrNotFound) {
 		t.Fatalf("expected ErrNotFound for non-owner RevealIdentifierMapping, got %v", err)
 	}
-	if _, err := b.svc.RevealIdentifierMapping(ctx, b.owner, RequestMeta{}, res.RunID, nil, false); !domain.IsCode(err, 1001) {
+	if _, err := b.svc.RevealIdentifierMapping(ctx, b.owner, RequestMeta{}, runID, nil, false); !domain.IsCode(err, 1001) {
 		t.Fatalf("expected 1001 for empty tokens when all=false, got %v", err)
 	}
 	tooMany := make([]string, identifierMappingRevealMaxTokens+1)
-	if _, err := b.svc.RevealIdentifierMapping(ctx, b.owner, RequestMeta{}, res.RunID, tooMany, false); !domain.IsCode(err, 1001) {
+	if _, err := b.svc.RevealIdentifierMapping(ctx, b.owner, RequestMeta{}, runID, tooMany, false); !domain.IsCode(err, 1001) {
 		t.Fatalf("expected 1001 for too many tokens, got %v", err)
 	}
-	if _, err := b.svc.RevealIdentifierMapping(ctx, b.owner, RequestMeta{}, res.RunID, []string{"unknown_token_xyz"}, false); !errors.Is(err, ErrNotFound) {
+	if _, err := b.svc.RevealIdentifierMapping(ctx, b.owner, RequestMeta{}, runID, []string{"unknown_token_xyz"}, false); !errors.Is(err, ErrNotFound) {
 		t.Fatalf("expected ErrNotFound for unknown token in RevealIdentifierMapping, got %v", err)
 	}
 }
 
-func TestDraft_Delete_FlowChange_ReadyTransition_And_FakeRunnerEdges_CoverageBoost(t *testing.T) {
+func TestDraft_Delete_And_FlowChange_CoverageBoost(t *testing.T) {
 	b := newB7Fixture(t)
-	allowLegacyDraftReviewStates(t, b.db)
 	ctx := context.Background()
 
 	// Seed a second granted flow so we can test flowChanged on UpdateDraft
@@ -1435,93 +1176,20 @@ func TestDraft_Delete_FlowChange_ReadyTransition_And_FakeRunnerEdges_CoverageBoo
 		t.Fatal(err)
 	}
 
-	// Create draft, run StartRun + FakeRunner to reach ready
 	draft := b.createDraftWithSQL(t, "SELECT 1;")
-	res, err := b.svc.StartRun(ctx, b.owner, StartRunInput{
-		DraftID: draft.ID, ExpectVersion: draft.Version, IdempotencyKey: "ready-flow-1",
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	fakeRunner := NewFakeRunner(b.svc, nil)
-	worker := b.svc.NewReviewWorker("w-edges", fakeRunner, 5*time.Second)
-	if err := worker.RunOnce(ctx); err != nil {
-		t.Fatal(err)
-	}
-	// Replay groupingPhase when run row already exists -> covers ensureReviewTask & createReviewTask (n > 0)
-	var taskInputJSON string
-	_ = b.db.Raw(`select input::text from async_tasks where id = ?`, res.TaskID).Scan(&taskInputJSON).Error
-	var taskIn TaskInput
-	_ = json.Unmarshal([]byte(taskInputJSON), &taskIn)
-	if err := fakeRunner.groupingPhase(ctx, b.db, taskIn, nil); err != nil {
-		t.Fatalf("idempotent groupingPhase replay failed: %v", err)
-	}
-	// Run ai_review step -> draft & run become ready
-	if err := worker.RunOnce(ctx); err != nil {
-		t.Fatal(err)
-	}
-	// Replay Execute when run is already terminal -> returns nil
-	if err := fakeRunner.Execute(ctx, b.db, taskIn, nil, nil); err != nil {
-		t.Fatalf("idempotent Execute replay on terminal run failed: %v", err)
-	}
-
-	// Now draft is in state 'ready'! Test UpdateDraft with flowChanged (flow2ID) -> transitions ready -> outdated
-	readyDraft, err := b.svc.GetDraft(ctx, b.owner, draft.ID)
-	if err != nil || readyDraft.State != string(domain.DraftStateReady) {
-		t.Fatalf("expected ready draft, got %+v, err=%v", readyDraft, err)
-	}
 	schedFuture := time.Now().UTC().Add(3 * time.Hour)
 	schedPtr := &schedFuture
 	updatedFlow, err := b.svc.UpdateDraft(ctx, b.owner, draft.ID, UpdateDraftInput{
 		FlowID:                &flow2ID,
 		RequestedScheduledFor: &schedPtr,
-		ExpectVersion:         readyDraft.Version,
+		ExpectVersion:         draft.Version,
 	})
 	if err != nil || updatedFlow.FlowID != flow2ID {
 		t.Fatalf("UpdateDraft flowChanged failed: %+v, err=%v", updatedFlow, err)
 	}
-
-	// Set draft back to 'ready' to test ReplaceSQL from 'ready' -> 'outdated'
-	_ = b.db.Exec(`update change_drafts set state = 'ready' where id = ?`, draft.ID).Error
 	replacedSQLDraft, err := b.svc.ReplaceSQL(ctx, b.owner, draft.ID, []byte("SELECT 2;"), updatedFlow.Version)
-	if err != nil || replacedSQLDraft.State != string(domain.DraftStateOutdated) {
-		t.Fatalf("ReplaceSQL from ready failed: %+v, err=%v", replacedSQLDraft, err)
-	}
-
-	// Test FakeRunner failDraftNoRun (flow version drift before groupingPhase)
-	draftFailGroup := b.createDraftWithSQL(t, "SELECT 3;")
-	_, err = b.svc.StartRun(ctx, b.owner, StartRunInput{
-		DraftID: draftFailGroup.ID, ExpectVersion: draftFailGroup.Version, IdempotencyKey: "fail-group-1",
-	})
 	if err != nil {
-		t.Fatal(err)
-	}
-	// Mutate plaintext_hmac in draft_sql_payloads to trigger verifyHMAC failure -> failDraftNoRun
-	_ = b.db.Exec(`update draft_sql_payloads set plaintext_hmac = repeat('f', 64) where draft_id = ?`, draftFailGroup.ID).Error
-	_ = worker.RunOnce(ctx)
-	failedDraft, err := b.svc.GetDraft(ctx, b.owner, draftFailGroup.ID)
-	if err != nil || failedDraft.State != string(domain.DraftStateFailed) {
-		t.Fatalf("expected draft state failed after failDraftNoRun, got %+v, err=%v", failedDraft, err)
-	}
-
-	// Test FakeRunner verifyRunCoverage mismatch (statement count mismatch at end of reviewPhases)
-	draftCovMismatch := b.createDraftWithSQL(t, "SELECT 4;")
-	resCov, err := b.svc.StartRun(ctx, b.owner, StartRunInput{
-		DraftID: draftCovMismatch.ID, ExpectVersion: draftCovMismatch.Version, IdempotencyKey: "cov-mismatch-1",
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := worker.RunOnce(ctx); err != nil {
-		t.Fatal(err)
-	}
-	_ = b.db.Exec(`update review_runs set statement_count = 99 where id = ?`, resCov.RunID).Error
-	if err := worker.RunOnce(ctx); err != nil {
-		t.Fatal(err)
-	}
-	covRun, err := b.svc.GetRun(ctx, b.db, resCov.RunID)
-	if err != nil || covRun.State != string(domain.RunStatePartial) {
-		t.Fatalf("expected partial run on coverage mismatch, got %+v, err=%v", covRun, err)
+		t.Fatalf("ReplaceSQL failed: %v", err)
 	}
 
 	// Test DeleteDraft error branches and success
@@ -1676,7 +1344,6 @@ func TestPreconditionEval_And_ValidityFactIndex_CoverageBoost(t *testing.T) {
 
 func TestBuiltinPromptTools_RuleSetInvalidation_And_AgentToolEdges_CoverageBoost(t *testing.T) {
 	b := newB7Fixture(t)
-	allowLegacyDraftReviewStates(t, b.db)
 	ctx := context.Background()
 
 	// 1. Seed a built-in prompt tool and test three-part governance in ReplacePromptToolForEngine & DeletePromptTool
@@ -1720,17 +1387,10 @@ func TestBuiltinPromptTools_RuleSetInvalidation_And_AgentToolEdges_CoverageBoost
 	}
 
 	// 2. Test invalidateRunsForRuleSet & InvalidateRunsForFlow & invalidateAllUnsubmittedRuns
-	draft1 := b.createDraftWithSQL(t, "SELECT 1;")
-	res1, err := b.svc.StartRun(ctx, b.owner, StartRunInput{
-		DraftID: draft1.ID, ExpectVersion: draft1.Version, IdempotencyKey: "inv-rs-1",
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	fakeRunner := NewFakeRunner(b.svc, nil)
-	worker := b.svc.NewReviewWorker("w-inv", fakeRunner, 5*time.Second)
-	_ = worker.RunOnce(ctx)
-	_ = worker.RunOnce(ctx)
+	readyRunner := NewAgentRunner(b.svc, b.fakeDial(func(req provider.Request) ([]byte, int, error) {
+		return []byte(`{"schema_version":1,"review_run_id":"` + req.ReviewRunID + `","outcome":"complete","summary":"ok","findings":[],"tool_requests":[]}`), 200, nil
+	}))
+	_, run1ID := runEphemeralAndWait(t, b, readyRunner, "SELECT 1;", true)
 
 	var rsID string
 	_ = b.db.Raw(`select rule_set_id::text from flows where id = ?`, b.flowID).Scan(&rsID).Error
@@ -1740,27 +1400,56 @@ func TestBuiltinPromptTools_RuleSetInvalidation_And_AgentToolEdges_CoverageBoost
 	if err != nil {
 		t.Fatalf("invalidateRunsForRuleSet failed: %v", err)
 	}
-	r1After, _ := b.svc.GetRun(ctx, b.db, res1.RunID)
-	d1After, _ := b.svc.GetDraft(ctx, b.owner, draft1.ID)
-	if r1After.State != string(domain.RunStateOutdated) || d1After.State != string(domain.DraftStateOutdated) {
-		t.Fatalf("expected outdated run and draft after invalidateRunsForRuleSet, got run=%s draft=%s", r1After.State, d1After.State)
+	r1After, _ := b.svc.GetRun(ctx, b.db, run1ID)
+	if r1After.State != string(domain.RunStateOutdated) {
+		t.Fatalf("expected outdated run after invalidateRunsForRuleSet, got %s", r1After.State)
 	}
 
-	// Test InvalidateRunsForFlow and invalidateAllUnsubmittedRuns
-	_ = b.db.Exec(`update review_runs set state = 'ready' where id = ?`, res1.RunID).Error
-	_ = b.db.Exec(`update change_drafts set state = 'ready' where id = ?`, draft1.ID).Error
+	// Test InvalidateRunsForFlow and invalidateAllUnsubmittedRuns (review_runs -> outdated, clearing failure fields, while ephemeral draft stays draft)
+	var draft1ID string
+	if err := b.db.Raw(`select draft_id::text from review_runs where id = ?`, run1ID).Scan(&draft1ID).Error; err != nil || draft1ID == "" {
+		t.Fatalf("load draft_id for run %s: %v", run1ID, err)
+	}
+	if err := b.db.Exec(`update review_runs set state = 'ready' where id = ?`, run1ID).Error; err != nil {
+		t.Fatalf("reset run1 to ready: %v", err)
+	}
 	err = b.db.Transaction(func(tx *gorm.DB) error {
 		return InvalidateRunsForFlow(ctx, tx, b.flowID)
 	})
 	if err != nil {
 		t.Fatalf("InvalidateRunsForFlow failed: %v", err)
 	}
-	_ = b.db.Exec(`update review_runs set state = 'ready' where id = ?`, res1.RunID).Error
+	r1AfterFlow, _ := b.svc.GetRun(ctx, b.db, run1ID)
+	if r1AfterFlow.State != string(domain.RunStateOutdated) {
+		t.Fatalf("expected outdated run after InvalidateRunsForFlow, got %s", r1AfterFlow.State)
+	}
+	if err := b.db.Exec(`update review_runs set state = 'failed', business_err_code = 2011, failure_name = 'ai_provider_failed' where id = ?`, run1ID).Error; err != nil {
+		t.Fatalf("reset run1 to failed: %v", err)
+	}
 	err = b.db.Transaction(func(tx *gorm.DB) error {
 		return invalidateAllUnsubmittedRuns(ctx, tx)
 	})
 	if err != nil {
 		t.Fatalf("invalidateAllUnsubmittedRuns failed: %v", err)
+	}
+	r1AfterAll, _ := b.svc.GetRun(ctx, b.db, run1ID)
+	if r1AfterAll.State != string(domain.RunStateOutdated) {
+		t.Fatalf("expected outdated run after invalidateAllUnsubmittedRuns, got %s", r1AfterAll.State)
+	}
+	var failureFields struct {
+		BusinessErrCode *int
+		FailureName     *string
+	}
+	if err := b.db.Raw(`select business_err_code, failure_name from review_runs where id = ?`, run1ID).Scan(&failureFields).Error; err != nil {
+		t.Fatal(err)
+	}
+	if failureFields.BusinessErrCode != nil || failureFields.FailureName != nil {
+		t.Fatalf("expected failure fields cleared on outdated run, got code=%v name=%v", failureFields.BusinessErrCode, failureFields.FailureName)
+	}
+	var draftStateAfterAll string
+	_ = b.db.Raw(`select state from change_drafts where id = ?`, draft1ID).Scan(&draftStateAfterAll).Error
+	if draftStateAfterAll != string(domain.DraftStateDraft) {
+		t.Fatalf("expected change_drafts.state = draft per 000023_ephemeral_precheck, got %s", draftStateAfterAll)
 	}
 
 	// 3. Test AgentRunner tool call edge cases (duplicate tool call ID with different args, out-of-scope args, FactSourceFor error, invalid finding evidence/group IDs)
@@ -1868,19 +1557,9 @@ func TestBuiltinPromptTools_RuleSetInvalidation_And_AgentToolEdges_CoverageBoost
 		PerModelTimeout:       15,
 		PerToolTimeout:        10,
 	}
-	draftEdge := b.createDraftWithSQL(t, "UPDATE orders SET amount = amount + 1 WHERE id = 1;\n")
-	resEdge, err := b.svc.StartRun(ctx, b.owner, StartRunInput{
-		DraftID: draftEdge.ID, ExpectVersion: draftEdge.Version, IdempotencyKey: "agent-edge-1", OutputLocale: "en-US",
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	edgeWorker, _ := b.svc.NewAgentReviewWorker("w-edge-agent", deps, 5*time.Second)
-	_ = edgeWorker.RunOnce(ctx)
-	_ = edgeWorker.RunOnce(ctx)
-	edgeRun, err := b.svc.GetRun(ctx, b.db, resEdge.RunID)
-	if err != nil || edgeRun.State != string(domain.RunStatePartial) {
-		t.Fatalf("expected partial run when FactSourceFor fails and tool args mismatch, got %+v, err=%v", edgeRun, err)
+	erEdge, _ := runEphemeralAndWait(t, b, NewAgentRunner(b.svc, deps), "UPDATE orders SET amount = amount + 1 WHERE id = 1;\n", false)
+	if erEdge.State() != domain.RunStatePartial {
+		t.Fatalf("expected partial run when FactSourceFor fails and tool args mismatch, got %s", erEdge.State())
 	}
 }
 
@@ -2575,91 +2254,10 @@ func TestPolicySnapshotAndPostgresSearchPath_CoverageBoost(t *testing.T) {
 	}
 }
 
-func TestFakeRunnerAndAgentRunnerErrorBranches_Integration(t *testing.T) {
+func TestAgentRunnerSchemaRetryThen502Fails_Integration(t *testing.T) {
 	b := newB7Fixture(t)
-	ctx := context.Background()
-	allowLegacyDraftReviewStates(t, b.db)
 
-	// 1. FakeRunner groupingPhase and reviewPhases edge cases:
-	draft := b.createDraftWithSQL(t, "SELECT 1;\n")
-	res, err := b.svc.StartRun(ctx, b.owner, StartRunInput{
-		DraftID:        draft.ID,
-		ExpectVersion:  draft.Version,
-		IdempotencyKey: "fake-edge-1",
-		OutputLocale:   "en-US",
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	runner := NewFakeRunner(b.svc, nil)
-
-	// Execute with wrong DraftRevision in TaskInput -> groupingPhase fails and transitions draft out of reviewing
-	err = runner.Execute(ctx, b.db, TaskInput{
-		ReviewRunID:   res.RunID,
-		DraftID:       draft.ID,
-		DraftRevision: 999,
-	}, func() error { return nil }, func(int64, int64) {})
-	if err != nil {
-		t.Fatalf("expected FakeRunner.Execute to converge failed draft and return nil, got %v", err)
-	}
-
-	// 2. FakeRunner with tampered PolicySnapshot in task input -> fails run with RunStateOutdated
-	draft2 := b.createDraftWithSQL(t, "SELECT 1;\n")
-	res2, err := b.svc.StartRun(ctx, b.owner, StartRunInput{
-		DraftID:        draft2.ID,
-		ExpectVersion:  draft2.Version,
-		IdempotencyKey: "fake-edge-2",
-		OutputLocale:   "en-US",
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	fakeWorker := b.svc.NewReviewWorker("w-fake-phase1", runner, 5*time.Second)
-	// Drain res.RunID task and run phase 1 (grouping) for res2.RunID so its review_runs row is created
-	_ = fakeWorker.RunOnce(ctx)
-	_ = fakeWorker.RunOnce(ctx)
-	// First test fenceGuard returning tasks.ErrFenceLost -> abandons terminal write and returns tasks.ErrFenceLost
-	if err := runner.Execute(ctx, b.db, TaskInput{
-		ReviewRunID:   res2.RunID,
-		DraftID:       draft2.ID,
-		DraftRevision: draft2.Revision,
-	}, func() error { return tasks.ErrFenceLost }, func(int64, int64) {}); !errors.Is(err, tasks.ErrFenceLost) {
-		t.Fatalf("expected tasks.ErrFenceLost, got %v", err)
-	}
-	// Now call FakeRunner.Execute directly for phase 2 with an invalid PolicySnapshot in TaskInput -> triggers VerifyAndDecodePolicySnapshot failure -> RunEventInputsChanged (outdated)
-	if err := runner.Execute(ctx, b.db, TaskInput{
-		ReviewRunID:   res2.RunID,
-		DraftID:       draft2.ID,
-		DraftRevision: draft2.Revision,
-	}, func() error { return nil }, func(int64, int64) {}); err != nil {
-		t.Fatalf("expected FakeRunner.Execute with invalid policy snapshot to finish run as outdated, got %v", err)
-	}
-	run2After, err := b.svc.GetRun(ctx, b.db, res2.RunID)
-	if err != nil || run2After.State != string(domain.RunStateOutdated) {
-		t.Fatalf("expected outdated run after tampered policy snapshot, got %+v, err=%v", run2After, err)
-	}
-	// Calling FakeRunner.Execute again on terminal run returns nil immediately
-	if err := runner.Execute(ctx, b.db, TaskInput{
-		ReviewRunID:   res2.RunID,
-		DraftID:       draft2.ID,
-		DraftRevision: draft2.Revision,
-	}, func() error { return nil }, func(int64, int64) {}); err != nil {
-		t.Fatalf("expected idempotent nil on terminal run, got %v", err)
-	}
-	// Drain any remaining phase 2 task for res2 before starting draft4
-	_ = fakeWorker.RunOnce(ctx)
-
-	// 3. AgentReviewRunner with provider.ErrSchemaInvalid retry followed by 502 error -> partial run
-	draft4 := b.createDraftWithSQL(t, "UPDATE orders SET amount = 1 WHERE id = 1;\n")
-	res4, err := b.svc.StartRun(ctx, b.owner, StartRunInput{
-		DraftID:        draft4.ID,
-		ExpectVersion:  draft4.Version,
-		IdempotencyKey: "agent-schema-retry",
-		OutputLocale:   "en-US",
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
+	// AgentRunner with provider.ErrSchemaInvalid retry followed by 502 error -> failed run
 	callSeq := 0
 	depsSchemaRetry := b.fakeDial(func(req provider.Request) ([]byte, int, error) {
 		callSeq++
@@ -2669,13 +2267,9 @@ func TestFakeRunnerAndAgentRunnerErrorBranches_Integration(t *testing.T) {
 		}
 		return []byte(`{"error":"upstream failure"}`), 502, nil
 	})
-	wSchemaRetry, _ := b.svc.NewAgentReviewWorker("w-schema-retry", depsSchemaRetry, 5*time.Second)
-	for i := 0; i < 4; i++ {
-		_ = wSchemaRetry.RunOnce(ctx)
-	}
-	partialRun4, err := b.svc.GetRun(ctx, b.db, res4.RunID)
-	if err != nil || partialRun4.State != string(domain.RunStateFailed) {
-		t.Fatalf("expected failed run after schema retry + 502 error, got %+v, err=%v", partialRun4, err)
+	er, _ := runEphemeralAndWait(t, b, NewAgentRunner(b.svc, depsSchemaRetry), "UPDATE orders SET amount = 1 WHERE id = 1;\n", false)
+	if er.State() != domain.RunStateFailed {
+		t.Fatalf("expected failed run after schema retry + 502 error, got %s", er.State())
 	}
 }
 
@@ -3164,7 +2758,6 @@ func TestFakeRunnerHelpersAndFactSourceUnit_CoverageBoost(t *testing.T) {
 func TestServicesCRUDAndRunnerDeepBranches_Integration(t *testing.T) {
 	b := newB7Fixture(t)
 	ctx := context.Background()
-	allowLegacyDraftReviewStates(t, b.db)
 	otherActor := Actor{UserID: "99999999-9999-4999-8999-999999999999", Username: "other"}
 
 	// 0. analyzeRunStatements with IN list sizes & expectedCount mismatch
@@ -3248,22 +2841,28 @@ func TestServicesCRUDAndRunnerDeepBranches_Integration(t *testing.T) {
 	if _, err := b.svc.UpdateDraft(ctx, otherActor, d1.ID, UpdateDraftInput{ExpectVersion: d1.Version}); !errors.Is(err, ErrNotFound) {
 		t.Fatalf("expected ErrNotFound for wrong owner on UpdateDraft, got %v", err)
 	}
-	// UpdateDraft flow re-confirmation when draft is in 'ready' state and flow version increased
-	if err := b.db.Exec(`UPDATE change_drafts SET state = 'ready' WHERE id = ?`, d2.ID).Error; err != nil {
+	// UpdateDraft flow re-confirmation when draft is in 'draft' state and flow version increased
+	var initialFlowVerSeen int64
+	if err := b.db.Raw(`SELECT flow_version_seen FROM change_drafts WHERE id = ?`, d2.ID).Scan(&initialFlowVerSeen).Error; err != nil {
 		t.Fatal(err)
 	}
 	if err := b.db.Exec(`UPDATE flows SET version = version + 1 WHERE id = ?`, b.flowID).Error; err != nil {
 		t.Fatal(err)
 	}
 	flowIDCopy := b.flowID
-	if _, err := b.svc.UpdateDraft(ctx, b.owner, d2.ID, UpdateDraftInput{
+	updatedD2, err := b.svc.UpdateDraft(ctx, b.owner, d2.ID, UpdateDraftInput{
 		FlowID:        &flowIDCopy,
 		ExpectVersion: d2.Version,
-	}); err != nil {
+	})
+	if err != nil {
 		t.Fatalf("expected UpdateDraft flow re-confirmation to succeed, got %v", err)
 	}
-	if reloadedD2, err := b.svc.GetDraft(ctx, b.owner, d2.ID); err != nil || reloadedD2.State != string(domain.DraftStateOutdated) {
-		t.Fatalf("expected ready draft to transition to outdated in DB on flow re-confirmation, got %+v err=%v", reloadedD2, err)
+	var updatedFlowVerSeen int64
+	if err := b.db.Raw(`SELECT flow_version_seen FROM change_drafts WHERE id = ?`, d2.ID).Scan(&updatedFlowVerSeen).Error; err != nil {
+		t.Fatal(err)
+	}
+	if updatedD2.State != string(domain.DraftStateDraft) || updatedFlowVerSeen <= initialFlowVerSeen {
+		t.Fatalf("expected UpdateDraft flow re-confirmation to update flow_version_seen in draft state, got state=%s ver=%d (was %d)", updatedD2.State, updatedFlowVerSeen, initialFlowVerSeen)
 	}
 	// Reset flow version for subsequent tests
 	var curFlowVer int64
@@ -3387,104 +2986,6 @@ func TestServicesCRUDAndRunnerDeepBranches_Integration(t *testing.T) {
 	if _, err := b.svc.StartEphemeralRun(ctx, otherActor, agentRunner, EphemeralStartInput{FlowID: b.flowID, DraftID: d1.ID, SQL: []byte("SELECT 1;")}); err == nil {
 		t.Fatal("expected error for wrong owner in StartEphemeralRun")
 	}
-
-	// 5. CancelReviewTask & claimIdempotency expired takeover
-	if err := b.svc.CancelReviewTask(ctx, b.owner, "99999999-9999-4999-8999-999999999999"); !errors.Is(err, ErrNotFound) {
-		t.Fatalf("expected ErrNotFound for nonexistent task in CancelReviewTask, got %v", err)
-	}
-	// Insert an expired in_progress idempotency record and verify claimIdempotency takes it over
-	route := "POST /change-drafts/{draft_id}/review-runs"
-	idemKey := "expired-idem-key"
-	reqHash := strings.Repeat("a", 64)
-	if err := b.db.Exec(`
-		INSERT INTO idempotency_records (id, requesting_user_id, route_template, aggregate_id, idempotency_key, request_hash, state, created_at, expires_at)
-		VALUES (?, ?, ?, ?, ?, ?, 'in_progress', now() - interval '25 hours', now() - interval '1 hour')`,
-		newID(), b.owner.UserID, route, d1.ID, idemKey, reqHash).Error; err != nil {
-		t.Fatal(err)
-	}
-	if claimed, existing, err := b.svc.claimIdempotency(ctx, b.owner.UserID, route, d1.ID, idemKey, reqHash); err != nil || claimed == nil || existing != nil {
-		t.Fatalf("expected expired in_progress idempotency record to be taken over, got claimed=%v existing=%v err=%v", claimed, existing, err)
-	}
-	// Calling claimIdempotency again while non-expired in_progress returns 1008 IDEMPOTENCY_IN_PROGRESS
-	if _, _, err := b.svc.claimIdempotency(ctx, b.owner.UserID, route, d1.ID, idemKey, reqHash); err == nil {
-		t.Fatal("expected 1008 IDEMPOTENCY_IN_PROGRESS when non-expired in_progress record exists")
-	}
-
-	// 6. FakeRunner groupingPhase & reviewPhases drift/HMAC/cancelled/gate branches
-	fakeRunner := NewFakeRunner(b.svc, nil)
-	d3 := b.createDraftWithSQL(t, "UPDATE orders SET amount = 1 WHERE id = 1;\n")
-	// Put d3 into 'reviewing' state so failDraftNoRun transitions it to 'failed'
-	_ = b.db.Exec(`UPDATE change_drafts SET state = 'reviewing' WHERE id = ?`, d3.ID)
-	policySnap, _, _, _, err := b.svc.freezeReviewPolicy(ctx, b.db, b.flowID, flowRow{
-		ID: b.flowID, FlowType: "change_review", Status: "enabled", RuleSetID: &ruleSetID, Version: curFlowVer,
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	run3ID := newID()
-	in3, err := sealReviewPolicySnapshot(b.svc.Crypter, run3ID, PolicySnapshotPurposeReview, *policySnap)
-	if err != nil {
-		t.Fatal(err)
-	}
-	in3.DraftID = d3.ID
-	in3.DraftRevision = d3.Revision
-	in3.SQLHMAC = strings.Repeat("b", 64)
-	// 6a. Tampered FlowSnapshotHash vs sealed policy snapshot -> ErrReviewOutdated
-	inTampered := in3
-	inTampered.FlowSnapshotHash = strings.Repeat("c", 64)
-	if err := fakeRunner.Execute(ctx, b.db, inTampered, nil, nil); !errors.Is(err, domain.ErrReviewOutdated) {
-		t.Fatalf("expected ErrReviewOutdated on tampered policy snapshot hash in groupingPhase, got %v", err)
-	}
-	// 6b. Reset d3 to 'reviewing' and test wrong SQLHMAC -> CodeSQLFingerprintFailed
-	_ = b.db.Exec(`UPDATE change_drafts SET state = 'reviewing' WHERE id = ?`, d3.ID)
-	if err := fakeRunner.Execute(ctx, b.db, in3, nil, nil); err == nil {
-		t.Fatal("expected SQL_FINGERPRINT_FAILED error on wrong SQLHMAC in groupingPhase")
-	}
-	// 6c. Bump flows.version in DB so verifyFrozenHashesForDraft sees errInputsDrift -> ErrCoverageIncomplete
-	_ = b.db.Exec(`UPDATE change_drafts SET state = 'reviewing' WHERE id = ?`, d3.ID)
-	_ = b.db.Exec(`UPDATE flows SET version = version + 1 WHERE id = ?`, b.flowID)
-	if err := fakeRunner.Execute(ctx, b.db, in3, nil, nil); !errors.Is(err, domain.ErrCoverageIncomplete) {
-		t.Fatalf("expected ErrCoverageIncomplete on drifted live flow hash in groupingPhase, got %v", err)
-	}
-
-	// Now create a real Run via StartRun + phase 1 grouping, then exercise reviewPhases branches directly!
-	d4 := b.createDraftWithSQL(t, "UPDATE orders SET amount = 1 WHERE id = 1;\n")
-	res4, err := b.svc.StartRun(ctx, b.owner, StartRunInput{
-		DraftID:        d4.ID,
-		ExpectVersion:  d4.Version,
-		IdempotencyKey: "fake-deep-run4",
-		OutputLocale:   "en-US",
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	fakeWorker := b.svc.NewReviewWorker("w-fake-deep", fakeRunner, 5*time.Second)
-	_ = fakeWorker.RunOnce(ctx) // runs phase 1 grouping for res4.RunID
-
-	var run4Model persistence.ReviewRunModel
-	if err := b.db.Where("id = ?", res4.RunID).First(&run4Model).Error; err != nil {
-		t.Fatal(err)
-	}
-	// Test ensureReviewTask when ai_review task already exists (n > 0)
-	_ = fakeRunner.ensureReviewTask(ctx, b.db, TaskInput{DraftID: d4.ID, ReviewRunID: res4.RunID})
-
-	// Test reviewPhases with fenceGuard returning ErrFenceLost
-	if err := fakeRunner.reviewPhases(ctx, b.db, &run4Model, func() error { return tasks.ErrFenceLost }, nil); !errors.Is(err, tasks.ErrFenceLost) {
-		t.Fatalf("expected ErrFenceLost from reviewPhases, got %v", err)
-	}
-	// Test reviewPhases when stage snapshot is already terminal with HighestSeverity='high' and GatePassed=false -> RunEventRiskBlocked!
-	if err := b.db.Exec(`UPDATE stage_review_snapshots SET state = 'blocked', highest_severity = 'high', gate_passed = false, finished_at = now() WHERE review_run_id = ?`, res4.RunID).Error; err != nil {
-		t.Fatal(err)
-	}
-	if err := fakeRunner.reviewPhases(ctx, b.db, &run4Model, nil, nil); err != nil {
-		t.Fatalf("expected reviewPhases with blocked stage to converge to risk_blocked, got %v", err)
-	}
-	r4View, err := b.svc.GetRun(ctx, b.db, res4.RunID)
-	if err != nil || r4View.State != string(domain.RunStateBlocked) {
-		t.Fatalf("expected blocked run state, got %+v err=%v", r4View, err)
-	}
-	// Drain queued ai_review task for res4
-	_ = fakeWorker.RunOnce(ctx)
 }
 
 type fakeProbeClient struct {
@@ -3502,7 +3003,6 @@ func (f *fakeProbeClient) Health(ctx context.Context) error { return f.healthErr
 
 func TestDeepEdgeBranchesPhase2_CoverageBoost(t *testing.T) {
 	b := newB7Fixture(t)
-	allowLegacyDraftReviewStates(t, b.db)
 	ctx := context.Background()
 
 	// 1. PreconditionEvaluator, executionValidityFinding, evaluateValidityProgram & bindValidityProgram
@@ -4031,14 +3531,12 @@ func TestDeepEdgeBranchesPhase2_CoverageBoost(t *testing.T) {
 	}); !errors.Is(err, domain.ErrReviewOutdated) {
 		t.Fatalf("expected ErrReviewOutdated when flow_version_seen drifted in StartEphemeralRun, got %v", err)
 	}
-	// Restore flow_version_seen and call StartRun so dEph enters 'reviewing' state, then StartEphemeralRun rejects non-draft state
+	// Restore flow_version_seen and mark dEph as submitted so StartEphemeralRun rejects non-draft state
 	var curFlowVer int64
-	_ = b.db.Raw(`SELECT version FROM flows WHERE id = ?`, b.flowID).Scan(&curFlowVer).Error
-	_ = b.db.Exec(`UPDATE change_drafts SET flow_version_seen = ? WHERE id = ?`, curFlowVer, dEph.ID)
-	resEphRun, err := b.svc.StartRun(ctx, b.owner, StartRunInput{
-		DraftID: dEph.ID, ExpectVersion: dEph.Version, IdempotencyKey: "k-eph-reviewing",
-	})
-	if err != nil {
+	if err := b.db.Raw(`SELECT version FROM flows WHERE id = ?`, b.flowID).Scan(&curFlowVer).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := b.db.Exec(`UPDATE change_drafts SET flow_version_seen = ?, state = 'submitted' WHERE id = ?`, curFlowVer, dEph.ID).Error; err != nil {
 		t.Fatal(err)
 	}
 	if _, err := b.svc.StartEphemeralRun(ctx, b.owner, agentRunner, EphemeralStartInput{
@@ -4046,7 +3544,6 @@ func TestDeepEdgeBranchesPhase2_CoverageBoost(t *testing.T) {
 	}); !errors.Is(err, domain.ErrIllegalTransition) {
 		t.Fatalf("expected ErrIllegalTransition when draft state != draft in StartEphemeralRun, got %v", err)
 	}
-	_ = b.svc.CancelReviewTask(ctx, b.owner, resEphRun.TaskID)
 
 	// Ephemeral read & evidence surface
 	if _, err := b.svc.GetEphemeralRunOwned(ctx, b.owner, "99999999-9999-4999-8999-999999999999"); !errors.Is(err, ErrNotFound) {
@@ -4057,78 +3554,6 @@ func TestDeepEdgeBranchesPhase2_CoverageBoost(t *testing.T) {
 	}
 	if _, err := b.svc.ListEphemeralFindingEvidence(ctx, b.owner, "99999999-9999-4999-8999-999999999999"); !errors.Is(err, ErrNotFound) {
 		t.Fatalf("expected ErrNotFound from ListEphemeralFindingEvidence, got %v", err)
-	}
-
-	// 6. StartRun & CancelReviewTask & RuleEval & Evidence error branches
-	dNoSQL, err := b.svc.CreateDraft(ctx, b.owner, CreateDraftInput{FlowID: b.flowID, Title: "no-sql"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err := b.svc.StartRun(ctx, otherActor, StartRunInput{DraftID: dNoSQL.ID, ExpectVersion: dNoSQL.Version, IdempotencyKey: "k-wrong-owner"}); !errors.Is(err, ErrNotFound) {
-		t.Fatalf("expected ErrNotFound for wrong owner in StartRun, got %v", err)
-	}
-	if _, err := b.svc.StartRun(ctx, b.owner, StartRunInput{DraftID: dNoSQL.ID, ExpectVersion: dNoSQL.Version, IdempotencyKey: "k-no-sql"}); err == nil {
-		t.Fatal("expected error when draft has no SQL in StartRun")
-	}
-	_ = b.db.Exec(`UPDATE change_drafts SET flow_version_seen = 99999 WHERE id = ?`, dNoSQL.ID)
-	if _, err := b.svc.StartRun(ctx, b.owner, StartRunInput{DraftID: dNoSQL.ID, ExpectVersion: dNoSQL.Version, IdempotencyKey: "k-outdated"}); !errors.Is(err, domain.ErrReviewOutdated) {
-		t.Fatalf("expected ErrReviewOutdated when flow_version_seen drifted in StartRun, got %v", err)
-	}
-
-	// CancelReviewTask before grouping (run == nil -> draftReviewIncomplete)
-	dCancel := b.createDraftWithSQL(t, "UPDATE orders SET amount = 1 WHERE id = 1;\n")
-	resCancel, err := b.svc.StartRun(ctx, b.owner, StartRunInput{
-		DraftID: dCancel.ID, ExpectVersion: dCancel.Version, IdempotencyKey: "k-cancel-pre",
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := b.svc.CancelReviewTask(ctx, otherActor, resCancel.TaskID); !errors.Is(err, ErrNotFound) {
-		t.Fatalf("expected ErrNotFound for wrong owner in CancelReviewTask, got %v", err)
-	}
-	if err := b.svc.CancelReviewTask(ctx, b.owner, resCancel.TaskID); err != nil {
-		t.Fatalf("expected CancelReviewTask before grouping to succeed, got %v", err)
-	}
-	// Calling CancelReviewTask again on already-cancelled task is a no-op
-	if err := b.svc.CancelReviewTask(ctx, b.owner, resCancel.TaskID); err != nil {
-		t.Fatalf("expected idempotent CancelReviewTask on cancelled task, got %v", err)
-	}
-
-	// CancelReviewTask after grouping (run != nil -> finishCancelled)
-	dCancel2 := b.createDraftWithSQL(t, "UPDATE orders SET amount = 2 WHERE id = 1;\n")
-	resCancel2, err := b.svc.StartRun(ctx, b.owner, StartRunInput{
-		DraftID: dCancel2.ID, ExpectVersion: dCancel2.Version, IdempotencyKey: "k-cancel-post",
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	fakeRunner := NewFakeRunner(b.svc, nil)
-	fakeWorker := b.svc.NewReviewWorker("w-cancel-post", fakeRunner, 5*time.Second)
-	_ = fakeWorker.RunOnce(ctx) // completes sql_grouping and enqueues ai_review
-	var aiTaskID string
-	if err := b.db.Raw(`SELECT id::text FROM async_tasks WHERE kind = 'ai_review' AND aggregate_id = ?`, resCancel2.RunID).Scan(&aiTaskID).Error; err != nil || aiTaskID == "" {
-		t.Fatalf("expected ai_review task for %s, got id=%q err=%v", resCancel2.RunID, aiTaskID, err)
-	}
-	if err := b.svc.CancelReviewTask(ctx, b.owner, aiTaskID); err != nil {
-		t.Fatalf("expected CancelReviewTask after grouping to succeed, got %v", err)
-	}
-
-	// RuleEval branches on runModel
-	var cancel2Run persistence.ReviewRunModel
-	if err := b.db.Where("id = ?", resCancel2.RunID).First(&cancel2Run).Error; err != nil {
-		t.Fatal(err)
-	}
-	// verifyRunCoverage when StatementCount mismatches
-	badCountRun := cancel2Run
-	badCountRun.StatementCount = 999
-	if err := b.svc.verifyRunCoverage(ctx, b.db, &badCountRun); err == nil {
-		t.Fatal("expected error from verifyRunCoverage when StatementCount mismatches")
-	}
-	// verifyRuleSetHash when RuleConfigHash mismatches
-	badHashRun := cancel2Run
-	badHashRun.RuleConfigHash = strings.Repeat("f", 64)
-	if err := b.svc.verifyRuleSetHash(ctx, b.db, &badHashRun); !errors.Is(err, errInputsDrift) {
-		t.Fatalf("expected errInputsDrift from verifyRuleSetHash, got %v", err)
 	}
 
 	// Rollback draft HMAC check in StartEphemeralRun
@@ -4142,20 +3567,21 @@ func TestDeepEdgeBranchesPhase2_CoverageBoost(t *testing.T) {
 	}
 
 	// RunRead & Evidence pagination + error branches
-	if _, err := b.svc.GetRunOwned(ctx, otherActor, resCancel2.RunID); !errors.Is(err, ErrNotFound) {
+	_, run2ID := runEphemeralAndWait(t, b, agentRunner, "UPDATE orders SET amount = 2 WHERE id = 1;\n", true)
+	if _, err := b.svc.GetRunOwned(ctx, otherActor, run2ID); !errors.Is(err, ErrNotFound) {
 		t.Fatalf("expected ErrNotFound for wrong owner in GetRunOwned, got %v", err)
 	}
-	if _, _, err := b.svc.ListRunFindings(ctx, otherActor, resCancel2.RunID, 10, ""); !errors.Is(err, ErrNotFound) {
+	if _, _, err := b.svc.ListRunFindings(ctx, otherActor, run2ID, 10, ""); !errors.Is(err, ErrNotFound) {
 		t.Fatalf("expected ErrNotFound for wrong owner in ListRunFindings, got %v", err)
 	}
-	if _, _, err := b.svc.ListRunFindings(ctx, b.owner, resCancel2.RunID, 0, "invalid-cursor"); !errors.Is(err, ErrValidation) {
+	if _, _, err := b.svc.ListRunFindings(ctx, b.owner, run2ID, 0, "invalid-cursor"); !errors.Is(err, ErrValidation) {
 		t.Fatalf("expected ErrValidation for invalid cursor in ListRunFindings, got %v", err)
 	}
 
-	// Seed 2 findings + 1 evidence fact + 1 raw payload on resCancel2's stage snapshot to exercise pagination & reveal/copy branches
+	// Seed 2 findings + 1 evidence fact + 1 raw payload on run2ID's stage snapshot to exercise pagination & reveal/copy branches
 	var snap2ID, grp2ID string
-	_ = b.db.Raw(`SELECT id::text FROM stage_review_snapshots WHERE review_run_id = ? LIMIT 1`, resCancel2.RunID).Scan(&snap2ID)
-	_ = b.db.Raw(`SELECT id::text FROM sql_fingerprint_groups WHERE review_run_id = ? LIMIT 1`, resCancel2.RunID).Scan(&grp2ID)
+	_ = b.db.Raw(`SELECT id::text FROM stage_review_snapshots WHERE review_run_id = ? LIMIT 1`, run2ID).Scan(&snap2ID)
+	_ = b.db.Raw(`SELECT id::text FROM sql_fingerprint_groups WHERE review_run_id = ? LIMIT 1`, run2ID).Scan(&grp2ID)
 	fID1, fID2, factID := newID(), newID(), newID()
 	factBytes := []byte(`{"schema":"schema_1","table":"table_1"}`)
 	fEnv, fMac, err := sealPayload(b.svc.Crypter, "evidence_facts", factID, "normalized_fact_ciphertext", factBytes)
@@ -4176,10 +3602,10 @@ func TestDeepEdgeBranchesPhase2_CoverageBoost(t *testing.T) {
 		fID2, snap2ID, grp2ID)
 	_ = b.db.Exec(`INSERT INTO review_finding_evidence (finding_id, evidence_fact_id) VALUES (?, ?)`, fID1, factID)
 
-	if fPage1, fNext, err := b.svc.ListRunFindings(ctx, b.owner, resCancel2.RunID, 1, ""); err != nil || len(fPage1) != 1 || fNext == nil {
+	if fPage1, fNext, err := b.svc.ListRunFindings(ctx, b.owner, run2ID, 1, ""); err != nil || len(fPage1) != 1 || fNext == nil {
 		t.Fatalf("expected ListRunFindings page1 with next cursor, got len=%d next=%v err=%v", len(fPage1), fNext, err)
 	} else {
-		_, _, _ = b.svc.ListRunFindings(ctx, b.owner, resCancel2.RunID, 10, *fNext)
+		_, _, _ = b.svc.ListRunFindings(ctx, b.owner, run2ID, 10, *fNext)
 	}
 	if _, err := b.svc.ListFindingEvidence(ctx, otherActor, fID1); !errors.Is(err, ErrNotFound) {
 		t.Fatalf("expected ErrNotFound for wrong owner in ListFindingEvidence, got %v", err)

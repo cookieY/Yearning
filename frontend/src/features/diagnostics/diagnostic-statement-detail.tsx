@@ -1,4 +1,3 @@
-import i18next from "@/shared/i18n";
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router";
@@ -16,7 +15,7 @@ import type {
   DiagnosticStatementDetail,
   Flow,
 } from "@/api/generated/client/yearningV4HTTPAPI.schemas";
-import { describeError } from "@/shared/api/error-display";
+import { describeError, describeErrorText } from "@/shared/api/error-display";
 import { formatTimestamp } from "@/shared/lib/timezones";
 import { appToast } from "@/shared/components/shadcn-dashboard/sonner/sonner-08";
 import { LoadingState } from "@/shared/components/status/loading-state";
@@ -74,18 +73,6 @@ import {
   useSubmitDiagnosticOptimizationOrder,
 } from "./use-diagnostics";
 import { formatReadableSqlLabel, formatShortTime } from "./diagnostics-overview-charts";
-
-function describeErrorText(display: {
-  messageKey: string;
-  requestId: string | null;
-  detail?: string | null;
-}): string {
-  const base = i18next.t(display.messageKey);
-  const withDetail = display.detail ? `${base}: ${display.detail}` : base;
-  return display.requestId === null
-    ? withDetail
-    : `${withDetail} (${display.requestId})`;
-}
 
 export interface DiagnosticStatementDetailPanelProps {
   detail: DiagnosticStatementDetail;

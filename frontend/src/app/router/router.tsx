@@ -1,5 +1,6 @@
 import { lazy } from "react";
-import { createBrowserRouter, Navigate } from "react-router";
+import { createBrowserRouter, Navigate, Outlet } from "react-router";
+import { ROUTE_ALIAS_MAP } from "@/shared/lib/route-aliases";
 import { BlankLayout } from "@/app/layouts/blank-layout";
 import { FullLayout } from "@/app/layouts/full-layout";
 import {
@@ -111,61 +112,8 @@ export const appRouter = createBrowserRouter([
         element: Loadable(QueryWorkspacePage),
       },
       {
-        // Admin surfaces exist only behind the server-declared
-        // `can_access_admin` capability (GET /users/me) — the guard is a
-        // presentation boundary, the backend stays the authorization decision.
-        path: "admin/users",
-        element: (
-          <RequireAdminCapability>{Loadable(AdminUsersPage)}</RequireAdminCapability>
-        ),
-      },
-      {
-        path: "admin/datasources",
-        element: (
-          <RequireAdminCapability>{Loadable(AdminDatasourcesPage)}</RequireAdminCapability>
-        ),
-      },
-      {
-        path: "admin/diagnostics",
-        element: (
-          <RequireAdminCapability>{Loadable(AdminDiagnosticsPage)}</RequireAdminCapability>
-        ),
-      },
-      {
         path: "diagnostics",
         element: <Navigate to="/admin/diagnostics" replace />,
-      },
-      {
-        path: "admin/review-engine/skills",
-        element: (
-          <RequireAdminCapability>{Loadable(AdminReviewSkillsPage)}</RequireAdminCapability>
-        ),
-      },
-      {
-        path: "admin/review-engine/knowledge",
-        element: (
-          <RequireAdminCapability>{Loadable(AdminReviewKnowledgePage)}</RequireAdminCapability>
-        ),
-      },
-      {
-        path: "admin/review-engine/providers",
-        element: (
-          <RequireAdminCapability>{Loadable(AdminProvidersPage)}</RequireAdminCapability>
-        ),
-      },
-      {
-        // AI Budget moved to Review Engine group (owner 2026-10-31: awkward to operate under System Settings);
-        // backend settings namespace API is unchanged, only the page route moved.
-        path: "admin/review-engine/ai-budget",
-        element: (
-          <RequireAdminCapability>{Loadable(AdminAiBudgetPage)}</RequireAdminCapability>
-        ),
-      },
-      {
-        path: "admin/rule-sets",
-        element: (
-          <RequireAdminCapability>{Loadable(AdminRuleSetsPage)}</RequireAdminCapability>
-        ),
       },
       {
         // The settings family splits per namespace (migration contract §2).
@@ -178,94 +126,38 @@ export const appRouter = createBrowserRouter([
         element: <Navigate to="/admin/review-engine/ai-budget" replace />,
       },
       {
-        path: "admin/settings/:namespace",
+        // Admin surfaces exist only behind the server-declared
+        // `can_access_admin` capability (GET /users/me) — the guard is a
+        // presentation boundary, the backend stays the authorization decision.
         element: (
-          <RequireAdminCapability>{Loadable(AdminSettingsNamespacePage)}</RequireAdminCapability>
+          <RequireAdminCapability>
+            <Outlet />
+          </RequireAdminCapability>
         ),
-      },
-      {
-        path: "admin/permission-groups",
-        element: (
-          <RequireAdminCapability>{Loadable(AdminPermissionGroupsPage)}</RequireAdminCapability>
-        ),
-      },
-      {
-        path: "admin/flows",
-        element: (
-          <RequireAdminCapability>{Loadable(AdminFlowsPage)}</RequireAdminCapability>
-        ),
-      },
-      {
-        path: "admin/announcements",
-        element: (
-          <RequireAdminCapability>{Loadable(AdminAnnouncementsPage)}</RequireAdminCapability>
-        ),
-      },
-      {
-        // Legacy LDAP/OIDC settings rebuilt as the identity provider
-        // surface (migration contract §2).
-        path: "admin/identity-providers",
-        element: (
-          <RequireAdminCapability>{Loadable(AdminIdentityProvidersPage)}</RequireAdminCapability>
-        ),
+        children: [
+          { path: "admin/users", element: Loadable(AdminUsersPage) },
+          { path: "admin/datasources", element: Loadable(AdminDatasourcesPage) },
+          { path: "admin/diagnostics", element: Loadable(AdminDiagnosticsPage) },
+          { path: "admin/review-engine/skills", element: Loadable(AdminReviewSkillsPage) },
+          { path: "admin/review-engine/knowledge", element: Loadable(AdminReviewKnowledgePage) },
+          { path: "admin/review-engine/providers", element: Loadable(AdminProvidersPage) },
+          // AI Budget moved to Review Engine group (owner 2026-10-31: awkward to operate under System Settings);
+          // backend settings namespace API is unchanged, only the page route moved.
+          { path: "admin/review-engine/ai-budget", element: Loadable(AdminAiBudgetPage) },
+          { path: "admin/rule-sets", element: Loadable(AdminRuleSetsPage) },
+          { path: "admin/settings/:namespace", element: Loadable(AdminSettingsNamespacePage) },
+          { path: "admin/permission-groups", element: Loadable(AdminPermissionGroupsPage) },
+          { path: "admin/flows", element: Loadable(AdminFlowsPage) },
+          { path: "admin/announcements", element: Loadable(AdminAnnouncementsPage) },
+          // Legacy LDAP/OIDC settings rebuilt as the identity provider surface (migration contract §2).
+          { path: "admin/identity-providers", element: Loadable(AdminIdentityProvidersPage) },
+        ],
       },
       // Alias redirects for contract/help knowledge-base routes so links never 404.
-      {
-        path: "dashboard",
-        element: <Navigate to="/workspace" replace />,
-      },
-      {
-        path: "orders/new",
-        element: <Navigate to="/changes/new" replace />,
-      },
-      {
-        path: "orders",
-        element: <Navigate to="/changes/mine" replace />,
-      },
-      {
-        path: "changes/orders",
-        element: <Navigate to="/changes/mine" replace />,
-      },
-      {
-        path: "approvals",
-        element: <Navigate to="/approvals/changes" replace />,
-      },
-      {
-        path: "approvals/queries",
-        element: <Navigate to="/approvals/query" replace />,
-      },
-      {
-        path: "query/access-requests",
-        element: <Navigate to="/query/requests" replace />,
-      },
-      {
-        path: "query/grants",
-        element: <Navigate to="/query/requests" replace />,
-      },
-      {
-        path: "admin/review-engine",
-        element: <Navigate to="/admin/review-engine/skills" replace />,
-      },
-      {
-        path: "admin/review-engine/rules",
-        element: <Navigate to="/admin/review-engine/skills" replace />,
-      },
-      {
-        path: "admin/review-engine/rule-sets",
-        element: <Navigate to="/admin/rule-sets" replace />,
-      },
-      {
-        path: "admin/audit",
-        element: <Navigate to="/records" replace />,
-      },
-      {
-        path: "admin/audit-logs",
-        element: <Navigate to="/records" replace />,
-      },
-      {
-        path: "admin/notifications",
-        element: <Navigate to="/admin/settings/notifications" replace />,
-      },
+      ...Object.entries(ROUTE_ALIAS_MAP).map(([alias, target]) => ({
+        path: alias.slice(1),
+        element: <Navigate to={target} replace />,
+      })),
     ],
   },
   { path: "/403", element: Loadable(ForbiddenPage) },

@@ -1,5 +1,5 @@
-// TestContractHashesDerivedNotConfigured both contract fingerprints must be system-derived
-// platform constants: hex64, deterministic, with OutputSchemaHash directly tracking the compiled artifact.
+// service.go implements internal knowledge entry lifecycle management: create, optimistic-lock replace,
+// enablement evaluation gate (schema, privacy scan, injection check, severity), and reference invalidation.
 package knowledge
 
 import (
@@ -16,21 +16,19 @@ import (
 	"github.com/google/uuid"
 )
 
-// Determinism: recomputing on the same input produces identical output.
+// Invalidator marks unsubmitted Reviews stale when an enabled entry is modified or disabled.
 type Invalidator func(ctx context.Context, tx *gorm.DB, toolKind string, inputRefID, oldHash string) error
 
-// fake.go Fake Provider Adapter (deliverable "Fake and Real Provider Adapter interface";
-// test facility). Responses are determined by the constructor callback and must still pass ValidateOutput —
-// when testing negative cases like invalid JSON, unknown fields, or out-of-range enums, the callback returns the raw byte path.
+// KindName identifies knowledge entries in review_tool_calls.tool_kind.
 const KindName = "knowledge_entry"
 
-// FakeAdapter simulates a Provider via httptest.Server or a direct callback.
+// Service executes knowledge entry application workflows and enablement gates.
 type Service struct {
 	Repo       *Repository
-	Invalidate Invalidator // Respond returns response body bytes and status code (nil body = network error).
+	Invalidate Invalidator // Optional in unit tests; invalidates unsubmitted Reviews on hash change.
 }
 
-// NewLocalFakeAdapter constructs a direct in-memory Fake (bypassing HTTP).
+// EvalReport summarizes the four validation checks executed before enabling a knowledge entry.
 type EvalReport struct {
 	Pass           bool     `json:"pass"`
 	SchemaSubsetOK bool     `json:"schema_subset_ok"`
@@ -41,8 +39,7 @@ type EvalReport struct {
 	CheckedAt      string   `json:"checked_at"`
 }
 
-// ValidateConfiguration runs the exact same real probe path as production
-// (free-form text or out-of-bounds responses fail at configuration time, matching OpenAIAdapter semantics).
+// CreateInput holds parameters for creating a new knowledge entry.
 type CreateInput struct {
 	Name            string
 	Purpose         string
@@ -91,8 +88,7 @@ func prepareNewEntry(actorUserID string, in CreateInput) (*Entry, error) {
 	return e, nil
 }
 
-// Create validates and inserts a knowledge entry. When State is omitted it defaults
-// to draft; creating directly in enabled state runs the same Eval Gate as Replace.
+// Create validates and inserts a knowledge entry (running RunEval when created directly in enabled state).
 func (s *Service) Create(ctx context.Context, actorUserID string, in CreateInput) (*Entry, error) {
 	e, err := prepareNewEntry(actorUserID, in)
 	if err != nil {
@@ -104,8 +100,7 @@ func (s *Service) Create(ctx context.Context, actorUserID string, in CreateInput
 	return e, nil
 }
 
-// NegotiateOutputMode Fake reuses the same probe path as ValidateConfiguration
-// (negotiation fails when a negative-case callback fails), and the negotiated mode is always strict.
+// ReplaceInput holds optimistic-lock replacement fields for updating a knowledge entry.
 type ReplaceInput struct {
 	ExpectVersion int64
 	Name          string
@@ -118,8 +113,8 @@ type ReplaceInput struct {
 	Definition    Definition
 }
 
-// ReviewStructured invokes the callback and enforces the same response constraints as the real Adapter
-// (4 MiB cap + Schema validation), ensuring test and production paths stay consistent.
+// Replace atomically updates an entry under optimistic locking, enforces RunEval on enablement,
+// and triggers Invalidator if an enabled entry's config_hash or active state changed.
 func (s *Service) Replace(ctx context.Context, id string, in ReplaceInput) (*Entry, error) {
 	var out *Entry
 	err := s.Repo.DB.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
@@ -150,9 +145,7 @@ func (s *Service) Replace(ctx context.Context, id string, in ReplaceInput) (*Ent
 		if err != nil {
 			return err
 		}
-		// models.go OpenAI-Compatible GET /models model catalog fetch (section 18.76-B,
-		// Provider form autocomplete). Shares the same constraint family as the review channel: HTTPS-only, 4 MiB
-		// response cap, and upstream rejection snapshot surfacing; the catalog extracts only model IDs, sorted deterministically.
+		// Run enablement gate when enabling or updating an already-enabled entry's content.
 		if in.State == StateEnabled && (oldState != StateEnabled || hash != oldHash) {
 			report := RunEval(e)
 			if !report.Pass {
@@ -180,7 +173,7 @@ func (s *Service) Replace(ctx context.Context, id string, in ReplaceInput) (*Ent
 		}); err != nil {
 			return err
 		}
-		// modelsHTTPClient is the catalog fetch client (package-level variable: tests inject httptest.Client).
+		// Invalidate unsubmitted Reviews if an enabled entry's config hash changed or was disabled.
 		if s.Invalidate != nil && shouldInvalidateOldReferences(oldState, in.State, oldHash, hash) {
 			if err := s.Invalidate(ctx, tx, KindName, e.ID, oldHash); err != nil {
 				return err
@@ -199,42 +192,23 @@ func shouldInvalidateOldReferences(oldState, newState State, oldHash, newHash st
 	return oldState == StateEnabled && (newState != StateEnabled || oldHash != newHash)
 }
 
-// ListModels fetches {base_url}/models and returns a deduplicated, sorted list of model IDs.
-// Authentication failures return ErrRejected (401/403 with snapshot); other non-2xx responses return statusError.
+// Delete removes an unreferenced knowledge entry guarded by optimistic version matching.
 func (s *Service) Delete(ctx context.Context, id string, expectVersion int64) error {
 	return s.Repo.DB.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		return s.Repo.DeleteReferencedGuarded(ctx, tx, id, expectVersion)
 	})
 }
 
-// openai.go OpenAI-Compatible Chat Completions Adapter (initial v1 support per PRD 9.2).
-//
-// Output contract: defaults to response_format=json_schema (strict); endpoints that do not support
-// strict are negotiated to json_object during probing by NegotiateOutputMode and persisted
-// (section 18.76-A), and runtime sends requests using the persisted mode.
-// Tool calls: v1 does not expose free-form tool scheduling to the model (deterministic injection handles hard rules);
-// the tool_requests field remains part of the Schema while built-in tools are executed and backfilled by the Agent loop
-// as requested by the model (see package agent); this layer is responsible for a single structured request.
-
-// OpenAIAdapter is the production Provider Adapter.
+// Credential and secret patterns rejected from knowledge rule bodies before prompt injection.
 var privacyPatterns = []*regexp.Regexp{
 	regexp.MustCompile(`(?i)\b[a-z0-9._%+-]+:[^@\s]{4,}@[a-z0-9.-]+\.[a-z]{2,}`), // user:pass@host
-	regexp.MustCompile(`\bsk-[A-Za-z0-9_-]{16,}`),                                // Structured output mode (section 18.76-A): json_schema strict is the default contract; OpenAI-Compatible
-	// endpoints that do not support strict (e.g. official DeepSeek/Kimi APIs that only accept json_object)
-	// are negotiated at probe time and persisted (configuration.structured_output_mode, system-managed key),
-	// and runtime sends requests using the persisted mode — runtime never performs 400 fallback guessing;
-	// mode drift surfaces AI_PROVIDER_FAILED as-is for the operator to re-save the Provider and re-negotiate.
-	regexp.MustCompile(`\beyJ[A-Za-z0-9_-]{20,}\.`), // jsonObjectPromptSuffix In json_object mode there is no server-side schema enforcement, so the output
-	// contract is carried via prompt injection: schema text + the "json" keyword (DeepSeek and others require
-	// the word "json" in the prompt to enter JSON mode).
+	regexp.MustCompile(`\bsk-[A-Za-z0-9_-]{16,}`),                                // API key prefix
+	regexp.MustCompile(`\beyJ[A-Za-z0-9_-]{20,}\.`),                              // JWT token header
 	regexp.MustCompile(`(?i)\b(password|passwd|secret|api[_-]?key|token)\s*[:=]\s*\S{8,}`),
-	regexp.MustCompile(`\b[0-9a-f]{32,}\b`), // NewOpenAIAdapter constructs an adapter; endpoint must have already passed Validate.
+	regexp.MustCompile(`\b[0-9a-f]{32,}\b`), // long hex credential/hash string
 }
 
-// chatRequest is the OpenAI chat.completions request body (structured output mode only).
-// S008: ReasoningEffort is sent when explicitly configured (omitempty = key is omitted completely when
-// unconfigured, never fabricating a vendor default); probe, production call, schema repair, and retry
-// share the exact same Endpoint configuration without auto-stripping parameters on rejection.
+// Prompt-injection patterns rejected from knowledge rule bodies.
 var injectionPatterns = []*regexp.Regexp{
 	regexp.MustCompile(`(?i)ignore\s+(all\s+)?(previous|prior|above)\s+(instructions|rules|prompts)`),
 	regexp.MustCompile(`(?i)disregard\s+(the\s+)?(previous|above|system)`),
@@ -245,9 +219,7 @@ var injectionPatterns = []*regexp.Regexp{
 	regexp.MustCompile("(?i)</?(system|assistant|instruction|prompt)>"),
 }
 
-// S008: usage is passed as raw bytes to parseUsageDetail for per-field tri-state parsing —
-// a type error on an individual detail field marks only that field as unknown instead of failing
-// the entire response decode (Cache-04: distinguish 0 from unknown).
+// RunEval evaluates schema subset validity, privacy leak checks, injection patterns, and severity bounds.
 func RunEval(e *Entry) EvalReport {
 	report := EvalReport{CheckedAt: time.Now().UTC().Format(time.RFC3339)}
 	if err := e.Definition.Validate(); err == nil {
@@ -278,7 +250,7 @@ func RunEval(e *Entry) EvalReport {
 	if !strings.Contains(strings.Join(report.Findings, ";"), "injection:") {
 		report.InjectionOK = true
 	}
-	// Usage is the Token usage of a single call (budget ledger input).
+	// Severity must belong to the controlled severity enum.
 	switch e.Definition.MaxSeverity {
 	case "info", "low", "medium", "high", "critical":
 		report.SeverityOK = true
@@ -289,9 +261,7 @@ func RunEval(e *Entry) EvalReport {
 	return report
 }
 
-// ValidateConfiguration probes using the exact same output Schema and decode path as production
-// (ProbeRequest; including unknown-field rejection and repair turn). Endpoints that do not support
-// structured output or behave incompatibly are caught at configuration time rather than on the first review.
+// RenderInjection renders e wrapped in <knowledge-entry> data delimiter tags for prompt assembly.
 func RenderInjection(e *Entry) string {
 	var b strings.Builder
 	b.WriteString("<knowledge-entry id=\"")
@@ -320,14 +290,11 @@ func escapeAttr(s string) string {
 	return s
 }
 
-// Health is equivalent to ValidateConfiguration (same probe channel in v1).
 func jsonMarshal(v any) ([]byte, error) { return json.Marshal(v) }
 
 func jsonUnmarshal(raw []byte, v any) error { return json.Unmarshal(raw, v) }
 
-// ReviewStructured sends a structured review request with a 4 MiB response byte cap
-// and validates against the output schema (via the caller-injected Validate callback).
-// The output mode is read from Endpoint.Configuration (persisted probe negotiation value; defaults to strict).
+// escapeBody neutralizes embedded <knowledge-entry> tags inside experience text.
 func escapeBody(s string) string {
 	s = strings.ReplaceAll(s, "</knowledge-entry", "&lt;/knowledge-entry")
 	s = strings.ReplaceAll(s, "<knowledge-entry", "&lt;knowledge-entry")

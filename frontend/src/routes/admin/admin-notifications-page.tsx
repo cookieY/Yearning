@@ -1,4 +1,3 @@
-import i18next from "@/shared/i18n";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { AlertTriangle, Bell, CheckCircle2, FlaskConical, Pencil, Plus, Trash2 } from "lucide-react";
@@ -12,12 +11,10 @@ import type {
   NotificationDelivery,
 } from "@/api/generated/client/yearningV4HTTPAPI.schemas";
 import { useSession } from "@/features/auth/session-provider";
-import { SettingsNavTabs } from "@/routes/admin/settings-tabs";
 import { RulesView } from "@/routes/admin/admin-notification-rules-view";
 import { useNotificationRules } from "@/features/admin/use-admin";
-import { describeError } from "@/shared/api/error-display";
+import { describeError, describeErrorText } from "@/shared/api/error-display";
 import { appToast } from "@/shared/components/shadcn-dashboard/sonner/sonner-08";
-import { PageHeader, PageLayout } from "@/shared/components/page-layout";
 import { PendingButton } from "@/shared/components/pending-button";
 import { ErrorState } from "@/shared/components/status/status-components";
 import { LoadingState } from "@/shared/components/status/loading-state";
@@ -81,12 +78,6 @@ function deliveryStateTone(state: NotificationDelivery["state"]): StatusTone {
   }
 }
 
-function describeErrorText(display: { messageKey: string; requestId: string | null }): string {
-  // Translated through the shared i18n bundle so users never see raw keys.
-  const text = i18next.t(display.messageKey);
-  return display.requestId === null ? text : `${text} (${display.requestId})`;
-}
-
 interface ChannelDraft {
   kind: NotificationChannelKind;
   name: string;
@@ -135,22 +126,6 @@ function dingTalkSecretValue(token: string, signSecret: string): string {
   const sign = signSecret.trim();
   if (sign === "") return token;
   return JSON.stringify({ access_token: token, sign_secret: sign });
-}
-
-export default function AdminNotificationsPage() {
-  const { t } = useTranslation();
-
-  return (
-    <PageLayout data-testid="admin-notifications-page">
-      <PageHeader
-        title={t("adminNotifications.title")}
-        description={t("adminNotifications.description")}
-        icon={Bell}
-      />
-      <SettingsNavTabs current="notifications" />
-      <AdminNotificationsContent />
-    </PageLayout>
-  );
 }
 
 export function AdminNotificationsContent() {
@@ -367,8 +342,12 @@ export function AdminNotificationsContent() {
         </div>
       </TransitionPanel>
 
-      <ChannelFormDialog open={createOpen && view === "channels"} editing={null} onClose={() => { setCreateOpen(false); }} />
-      <ChannelFormDialog open={editing !== null} editing={editing} onClose={() => { setEditing(null); }} />
+      {createOpen && view === "channels" ? (
+        <ChannelFormDialog key="create" editing={null} onClose={() => { setCreateOpen(false); }} />
+      ) : null}
+      {editing !== null ? (
+        <ChannelFormDialog key={editing.id} editing={editing} onClose={() => { setEditing(null); }} />
+      ) : null}
     </div>
   );
 }
@@ -530,45 +509,35 @@ function ChannelRow({ channel, onEdit }: { channel: NotificationChannel; onEdit:
   );
 }
 
+function initialChannelDraft(editing: NotificationChannel | null): ChannelDraft {
+  if (editing === null) return EMPTY_CHANNEL;
+  const rawConfig = editing.kind === "email" ? editing.configuration : null;
+  return {
+    kind: editing.kind,
+    name: editing.name,
+    enabled: editing.enabled,
+    host: rawConfig !== null && "host" in rawConfig && typeof rawConfig.host === "string" ? rawConfig.host : "",
+    port: rawConfig !== null && "port" in rawConfig && typeof rawConfig.port === "number" ? rawConfig.port : 465,
+    tlsMode: rawConfig !== null && "tls_mode" in rawConfig && rawConfig.tls_mode === "starttls" ? "starttls" : "required",
+    username: rawConfig !== null && "username" in rawConfig && typeof rawConfig.username === "string" ? rawConfig.username : "",
+    fromAddress: rawConfig !== null && "from_address" in rawConfig && typeof rawConfig.from_address === "string" ? rawConfig.from_address : "",
+    secret: "",
+    signSecret: "",
+  };
+}
+
 function ChannelFormDialog({
-  open,
   editing,
   onClose,
 }: {
-  open: boolean;
   editing: NotificationChannel | null;
   onClose: () => void;
 }) {
   const { t } = useTranslation();
   const createChannel = useCreateNotificationChannel();
   const replaceChannel = useReplaceNotificationChannel();
-  const [draft, setDraft] = useState<ChannelDraft>(EMPTY_CHANNEL);
-  const [openFor, setOpenFor] = useState<string | null>(null);
+  const [draft, setDraft] = useState<ChannelDraft>(() => initialChannelDraft(editing));
   const [errorText, setErrorText] = useState<string | null>(null);
-
-  const formKey = editing?.id ?? "create";
-  if (open && openFor !== formKey) {
-    setOpenFor(formKey);
-    setErrorText(null);
-    if (editing === null) {
-      setDraft(EMPTY_CHANNEL);
-    } else {
-      const configuration = editing.configuration as unknown as Record<string, string | number>;
-      setDraft({
-        kind: editing.kind,
-        name: editing.name,
-        enabled: editing.enabled,
-        host: String(configuration.host ?? ""),
-        port: Number(configuration.port ?? 465),
-        tlsMode: configuration.tls_mode as "required" | "starttls",
-        username: String(configuration.username ?? ""),
-        fromAddress: String(configuration.from_address ?? ""),
-        secret: "",
-        signSecret: "",
-      });
-    }
-  }
-  if (!open && openFor !== null) setOpenFor(null);
 
   const submit = async () => {
     setErrorText(null);
@@ -634,7 +603,7 @@ function ChannelFormDialog({
   };
 
   return (
-    <Dialog open={open} onOpenChange={(next) => { if (!next) onClose(); }}>
+    <Dialog open onOpenChange={(next) => { if (!next) onClose(); }}>
       <DialogContent>
         <DialogHeader>
           <DialogTitle>{editing === null ? t("adminNotifications.createTitle") : t("adminNotifications.editTitle", { name: editing.name })}</DialogTitle>

@@ -22,22 +22,89 @@ const (
 	syntaxCheckMaxUniqueShapes = 500
 )
 
+type statementSyntaxValidator struct {
+	profile       fingerprint.Profile
+	rawSQL        []byte
+	isMySQLFamily bool
+	isPGFamily    bool
+	mysqlParser   *parser.Parser
+	seenShapes    map[string]struct{}
+}
+
+func newStatementSyntaxValidator(sql []byte, profile fingerprint.Profile) *statementSyntaxValidator {
+	isMySQL := strings.EqualFold(profile.Mode, "mysql")
+	isPG := strings.EqualFold(profile.Mode, "postgresql")
+	var mysqlParser *parser.Parser
+	if isMySQL {
+		mysqlParser = parser.New()
+	}
+	return &statementSyntaxValidator{
+		profile:       profile,
+		rawSQL:        sql,
+		isMySQLFamily: isMySQL,
+		isPGFamily:    isPG,
+		mysqlParser:   mysqlParser,
+	}
+}
+
+func (v *statementSyntaxValidator) ValidateStatement(ordinal int, st changeset.Statement) error {
+	if !v.isMySQLFamily && !v.isPGFamily {
+		return nil
+	}
+	stmtText := strings.TrimSpace(string(st.SQL))
+	if stmtText == "" {
+		return nil
+	}
+	shouldValidate := ordinal <= syntaxCheckDirectLimit
+	if !shouldValidate {
+		if v.seenShapes == nil {
+			v.seenShapes = make(map[string]struct{}, 64)
+		}
+		if len(v.seenShapes) < syntaxCheckMaxUniqueShapes {
+			shape, ok := quickSyntaxShape(st.SQL, v.profile.Flags())
+			if !ok {
+				shouldValidate = true
+			} else if _, exists := v.seenShapes[shape]; !exists {
+				v.seenShapes[shape] = struct{}{}
+				shouldValidate = true
+			}
+		}
+	} else if ordinal == syntaxCheckDirectLimit {
+		// Seed shape map once crossing into bulk mode so subsequent duplicate rows skip redundant parses.
+		if shape, ok := quickSyntaxShape(st.SQL, v.profile.Flags()); ok {
+			v.seenShapes = map[string]struct{}{shape: {}}
+		}
+	}
+	if !shouldValidate {
+		return nil
+	}
+	var parseErr error
+	if v.isMySQLFamily {
+		parseErr = validateMySQLStatementSyntax(v.mysqlParser, stmtText)
+	} else {
+		parseErr = validatePostgresStatementSyntax(stmtText)
+	}
+	if parseErr != nil {
+		line, col := byteOffsetToLineCol(v.rawSQL, st.Offset)
+		detail := fmt.Sprintf("line %d, col %d (offset %d, statement #%d, dialect %s): %s",
+			line, col, st.Offset, ordinal, v.profile.String(), strings.TrimSpace(parseErr.Error()))
+		return &domain.Error{
+			Code:   domain.CodeSQLParseFailed,
+			Name:   domain.ErrParseFailed.Name,
+			Detail: detail,
+		}
+	}
+	return nil
+}
+
 // countAndValidateStatements splits SQL by dialect profile, enforces batch statement count bounds,
 // and validates statement syntax using the dialect-native AST parser (TiDB parser for MySQL-family
 // dialects and official libpg_query for PostgreSQL-family dialects). Any syntax error fails fast
 // with 2003 SQL_PARSE_FAILED before invoking AI review providers.
 func (s *Services) countAndValidateStatements(sql []byte, profile fingerprint.Profile) (int, error) {
 	split := changeset.NewSplitter(bytes.NewReader(sql), profile, 0)
+	validator := newStatementSyntaxValidator(sql, profile)
 	count := 0
-	validatedCount := 0
-	var seenShapes map[string]struct{}
-	var mysqlParser *parser.Parser
-	isMySQLFamily := strings.EqualFold(profile.Mode, "mysql")
-	isPGFamily := strings.EqualFold(profile.Mode, "postgresql")
-	if isMySQLFamily {
-		mysqlParser = parser.New()
-	}
-
 	for {
 		st, done, err := split.Next()
 		if err != nil {
@@ -54,53 +121,8 @@ func (s *Services) countAndValidateStatements(sql []byte, profile fingerprint.Pr
 		if count > 100000 {
 			return 0, domain.ErrBatchTooLarge
 		}
-
-		if !isMySQLFamily && !isPGFamily {
-			continue
-		}
-
-		stmtText := strings.TrimSpace(string(st.SQL))
-		if stmtText == "" {
-			continue
-		}
-
-		shouldValidate := count <= syntaxCheckDirectLimit
-		if !shouldValidate {
-			if seenShapes == nil {
-				seenShapes = make(map[string]struct{}, 64)
-			}
-			if validatedCount < syntaxCheckMaxUniqueShapes {
-				shape := quickSyntaxShape(stmtText)
-				if _, exists := seenShapes[shape]; !exists {
-					seenShapes[shape] = struct{}{}
-					shouldValidate = true
-				}
-			}
-		} else if count == syntaxCheckDirectLimit {
-			// Seed shape map once crossing into bulk mode so subsequent duplicate rows skip redundant parses.
-			seenShapes = map[string]struct{}{quickSyntaxShape(stmtText): {}}
-		}
-
-		if !shouldValidate {
-			continue
-		}
-		validatedCount++
-
-		var parseErr error
-		if isMySQLFamily {
-			parseErr = validateMySQLStatementSyntax(mysqlParser, stmtText)
-		} else {
-			parseErr = validatePostgresStatementSyntax(stmtText)
-		}
-		if parseErr != nil {
-			line, col := byteOffsetToLineCol(sql, st.Offset)
-			detail := fmt.Sprintf("line %d, col %d (offset %d, statement #%d, dialect %s): %s",
-				line, col, st.Offset, count, profile.String(), strings.TrimSpace(parseErr.Error()))
-			return 0, &domain.Error{
-				Code:   domain.CodeSQLParseFailed,
-				Name:   domain.ErrParseFailed.Name,
-				Detail: detail,
-			}
+		if err := validator.ValidateStatement(count, st); err != nil {
+			return 0, err
 		}
 	}
 	return count, nil
@@ -140,67 +162,37 @@ func validatePostgresStatementSyntax(stmtText string) error {
 	return nil
 }
 
-// quickSyntaxShape normalizes string literals and numeric constants so huge homogeneous bulk
-// batches (e.g. 50,000 identical INSERT rows) skip redundant AST parses while still catching
-// any structurally distinct malformed statement later in the batch.
-func quickSyntaxShape(stmt string) string {
+// quickSyntaxShape tokenizes the statement using dialect-accurate lexical flags and normalizes
+// literals and numbers so huge homogeneous bulk batches (e.g. 50,000 identical INSERT rows) skip
+// redundant AST parses while still catching structurally distinct malformed SQL or lexing errors.
+func quickSyntaxShape(stmt []byte, flags fingerprint.DialectFlags) (string, bool) {
+	lex, err := fingerprint.Tokenize(stmt, flags)
+	if err != nil {
+		return "", false
+	}
 	var b strings.Builder
 	b.Grow(len(stmt))
-	var lastByte byte
-	writeByte := func(c byte) {
-		b.WriteByte(c)
-		lastByte = c
-	}
-	inSingle := false
-	inDouble := false
-	for i := 0; i < len(stmt); i++ {
-		ch := stmt[i]
-		if inSingle {
-			if ch == '\\' && i+1 < len(stmt) {
-				i++
-				continue
-			}
-			if ch == '\'' {
-				if i+1 < len(stmt) && stmt[i+1] == '\'' {
-					i++
-					continue
-				}
-				inSingle = false
-			}
-			continue
+	for i, tok := range lex.Tokens {
+		if i > 0 {
+			b.WriteByte(' ')
 		}
-		if inDouble {
-			if ch == '"' {
-				if i+1 < len(stmt) && stmt[i+1] == '"' {
-					i++
-					continue
-				}
-				inDouble = false
+		switch tok.Kind {
+		case fingerprint.TokString, fingerprint.TokDollarString:
+			if tok.Prefix != 0 {
+				b.WriteByte(tok.Prefix)
 			}
-			continue
-		}
-		switch {
-		case ch == '\'':
-			inSingle = true
-			writeByte('?')
-		case ch == '"':
-			inDouble = true
-			writeByte('"')
-		case ch >= '0' && ch <= '9':
-			if lastByte != '#' {
-				writeByte('#')
-			}
-		case ch == ' ' || ch == '\t' || ch == '\r' || ch == '\n':
-			if lastByte != 0 && lastByte != ' ' {
-				writeByte(' ')
-			}
+			b.WriteString("?s")
+		case fingerprint.TokNumber:
+			b.WriteByte('#')
+		case fingerprint.TokParam:
+			b.WriteString("$?")
+		case fingerprint.TokQuotedIdent:
+			b.WriteByte('"')
+			b.WriteString(tok.Text)
+			b.WriteByte('"')
 		default:
-			if ch >= 'a' && ch <= 'z' {
-				writeByte(ch - ('a' - 'A'))
-			} else {
-				writeByte(ch)
-			}
+			b.WriteString(tok.Text)
 		}
 	}
-	return b.String()
+	return b.String(), true
 }

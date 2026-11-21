@@ -1,10 +1,9 @@
-// TestConfigurationMaxTokensPlumbed max_tokens/temperature flow from configuration into the request.
+// gate.go implements pure SubmissionGate evaluation: deterministically applies policy independently
+// of AI narrative conclusions. High/critical findings or incomplete stage reviews always block
+// submission (fail closed; model confidence cannot override the gate).
 package domain
 
-// planhash_genparams_test.go S008 Param-06: the three generation parameters are canonicalized into plan
-// identity — omission and equivalent empty override share identity, float64 has a unique representation
-// (1e0 and 1 share identity), map iteration order does not affect identity, parameter changes alter
-// identity, and system keys do not affect identity.
+// Machine reason codes surfaced when the submission gate blocks draft promotion.
 const (
 	ReasonHighSeverityFinding     = "high_severity_finding"
 	ReasonCriticalSeverityFinding = "critical_severity_finding"
@@ -14,28 +13,20 @@ const (
 	ReasonStageMissing            = "stage_review_missing"
 )
 
-// Two iterations over the same map may differ in order; two separately constructed equal maps must share identity.
+// GateInput represents the terminal outcome and highest finding severity for one stage.
 type GateInput struct {
 	StagePosition int
 	State         StageReviewState
-	HighestFound  Severity // After JSON decoding, 1e0 and 1 are both float64(1) — equivalent representations share identity.
+	HighestFound  Severity // Normalized severity rank used to detect high/critical blockers.
 }
 
-// Package provider implements the structured model Provider Port
-// (api/contracts/ai-review-runtime-contract.json provider_port).
-//
-// Security invariants:
-//   - Requests carry only anonymized statement groups and normalized evidence, never raw SQL, literals, comments, or identifier mappings.
-//   - Responses must pass output schema validation; free-form text responses never count as success.
-//   - At most 2 Provider calls per Run step; fallback is permitted only when privacy contract and output Schema hashes match.
-//   - Timeout <= 120s, response <= 4 MiB; authentication failures and deterministic rejections are not retried.
+// GateResult holds the deterministic submission gate verdict and deduplicated blocking reasons.
 type GateResult struct {
 	Passed      bool
 	ReasonCodes []string
 }
 
-// Request is the ReviewStructured input (provider_port.request_fields).
-// Field order defines serialization order and participates in the request fingerprint.
+// EvaluateGate computes the submission gate verdict across all frozen stage review outcomes.
 func EvaluateGate(stages []GateInput) GateResult {
 	result := GateResult{Passed: true, ReasonCodes: []string{}}
 	seen := map[string]bool{}
@@ -67,16 +58,14 @@ func EvaluateGate(stages []GateInput) GateResult {
 		}
 	}
 	if len(stages) == 0 {
-		// SystemPrompt carries the complete deterministically injected system prompt (skills + internal knowledge +
-		// hard rule framework, rendered by agent.SystemPrompt).
+		// An empty stage list fails closed rather than implicitly allowing submission.
 		add(ReasonStageMissing)
 	}
 	result.Passed = len(seen) == 0
 	return result
 }
 
-// AnonymizedGroup is the anonymized representation of a fingerprint group
-// (representative shape + counts + bounded structural statistics, without raw SQL or literals).
+// HighestSeverityOf returns the maximum severity across a slice of finding severities.
 func HighestSeverityOf(severities []Severity) Severity {
 	out := SeverityNone
 	for _, s := range severities {

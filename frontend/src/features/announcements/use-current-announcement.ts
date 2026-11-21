@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { getCurrentAnnouncement } from "@/api/generated/client/announcements/announcements";
-import type { AnnouncementPublication } from "@/api/generated/client/yearningV4HTTPAPI.schemas";
+import { unwrapApi } from "@/shared/api/mutator";
 
 /**
  * The published system announcement, or null when none is live (announcement
@@ -10,8 +10,7 @@ import type { AnnouncementPublication } from "@/api/generated/client/yearningV4H
 export function useCurrentAnnouncementQuery(enabled: boolean) {
   return useQuery({
     queryKey: ["announcements", "current"],
-    queryFn: async () =>
-      (await getCurrentAnnouncement()) as unknown as AnnouncementPublication | null,
+    queryFn: () => unwrapApi(getCurrentAnnouncement()),
     enabled,
     staleTime: 60_000,
   });

@@ -70,34 +70,26 @@ func TestPreviewMessageFixedCopy(t *testing.T) {
 }
 
 // TestVocabularyTemplateCoverage C1 pin: every event in the subscribable vocabulary must have a
-// rendering path — full templateKey coverage (except query_grant.revoked which uses a dedicated renderer)
-// with complete bilingual entries. Missing templates previously caused false-positive delivery success (R1 Critical-1).
+// templateKey entry (bilingual DefaultPlaceholderTemplate rendering is verified in
+// TestDefaultPlaceholderTemplateCoverage below).
 func TestVocabularyTemplateCoverage(t *testing.T) {
 	for _, event := range EventVocabulary {
 		key, ok := templateKey[event]
-		if !ok {
+		if !ok || key == "" {
 			t.Fatalf("vocabulary event %s has no template key", event)
-		}
-		if key == "grant_revoked" {
-			continue // dedicated renderer grantRevokedBody
-		}
-		for locale, texts := range localeText {
-			if texts[key] == "" {
-				t.Fatalf("template %s missing in %s (event %s)", key, locale, event)
-			}
 		}
 	}
 }
 
-// TestRenderEventCancelFamilyCancellation C1 follow-up: cancellation-family messages must not
-// render as failure (partial_cancelled previously reused the partial-failed template).
-func TestRenderEventCancelFamilyCancellation(t *testing.T) {
-	cancelled := RenderEvent("execution.cancelled", "zh-CN", "YR-1", "")
-	partial := RenderEvent("execution.partial_cancelled", "zh-CN", "YR-1", "")
+// TestCancelFamilyDistinctDefaultTemplates C1 follow-up: cancellation-family messages must not
+// reuse the partial-failed default template.
+func TestCancelFamilyDistinctDefaultTemplates(t *testing.T) {
+	cancelled := DefaultPlaceholderTemplate("execution.cancelled", "zh-CN")
+	partial := DefaultPlaceholderTemplate("execution.partial_cancelled", "zh-CN")
 	if cancelled == "" || partial == "" {
 		t.Fatalf("cancel templates render empty: %q / %q", cancelled, partial)
 	}
-	if partial == RenderEvent("execution.partial_failed", "zh-CN", "YR-1", "FAILED") {
+	if partial == DefaultPlaceholderTemplate("execution.partial_failed", "zh-CN") {
 		t.Fatal("partial_cancelled must not reuse the partial-failed template")
 	}
 }

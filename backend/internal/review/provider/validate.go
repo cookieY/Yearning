@@ -1,4 +1,5 @@
-// ChangeDraftModel corresponds to change_drafts (mutable_aggregate).
+// validate.go performs Go-side schema validation of structured AI review outputs against
+// ai-review-output.schema.json (free-form responses are never accepted as review success).
 package provider
 
 import (
@@ -8,8 +9,7 @@ import (
 	"github.com/google/uuid"
 )
 
-// Submitter requested execution time (section 18.56 Option B): purely advisory, frozen onto the order
-// upon submission, and pre-filled when the executor schedules execution; does not participate in any hash.
+// Controlled output vocabularies matching ai-review-output.schema.json enums.
 var (
 	severitySet = map[string]bool{"info": true, "low": true, "medium": true, "high": true, "critical": true}
 	categorySet = map[string]bool{
@@ -19,7 +19,7 @@ var (
 	factBasisSet = map[string]bool{"evidence": true, "model_only": true}
 )
 
-// DraftSQLPayloadModel corresponds to draft_sql_payloads (mutable_aggregate).
+// ValidateOutput verifies all required fields, bounds, unique keys, and fact_basis invariants on r.
 func ValidateOutput(r *Response, expectRunID string) error {
 	if r.SchemaVersion != 1 {
 		return fmt.Errorf("schema_version must be 1, got %d", r.SchemaVersion)
@@ -95,7 +95,7 @@ func ValidateOutput(r *Response, expectRunID string) error {
 	return nil
 }
 
-// ReviewRunModel corresponds to review_runs (mutable_aggregate; immutable once terminal).
+// validToolName checks lowercase identifier syntax (<= 128 bytes) for requested tool names.
 func validToolName(n string) bool {
 	if len(n) == 0 || len(n) > 128 {
 		return false

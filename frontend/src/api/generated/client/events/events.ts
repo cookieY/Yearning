@@ -8,40 +8,10 @@
  * OpenAPI spec version: 4.0.0-draft.1
  */
 import type {
-  ProblemResponse,
   StreamDomainEvents200One
 } from '../yearningV4HTTPAPI.schemas';
 
 import { customInstance } from '../../../../shared/api/mutator';
-
-export type streamDomainEventsResponse200ApplicationJson = {
-  data: StreamDomainEvents200One
-  status: 200
-}
-
-export type streamDomainEventsResponse200TextEventStream = {
-  data: string
-  status: 200
-}
-
-export type streamDomainEventsResponse401 = {
-  data: ProblemResponse
-  status: 401
-}
-
-export type streamDomainEventsResponse403 = {
-  data: ProblemResponse
-  status: 403
-}
-
-export type streamDomainEventsResponseSuccess = (streamDomainEventsResponse200ApplicationJson | streamDomainEventsResponse200TextEventStream) & {
-  headers: Headers;
-};
-export type streamDomainEventsResponseError = (streamDomainEventsResponse401 | streamDomainEventsResponse403) & {
-  headers: Headers;
-};
-
-export type streamDomainEventsResponse = (streamDomainEventsResponseSuccess | streamDomainEventsResponseError)
 
 export const getStreamDomainEventsUrl = () => {
 
@@ -51,9 +21,9 @@ export const getStreamDomainEventsUrl = () => {
   return `/api/v4/events/stream`
 }
 
-export const streamDomainEvents = async ( options?: Parameters<typeof customInstance>[1]): Promise<streamDomainEventsResponse> => {
+export const streamDomainEvents = async ( options?: Parameters<typeof customInstance>[1]): Promise<StreamDomainEvents200One | string> => {
 
-  return customInstance<streamDomainEventsResponse>(getStreamDomainEventsUrl(),
+  return customInstance<StreamDomainEvents200One | string>(getStreamDomainEventsUrl(),
   {
     ...options,
     method: 'GET'

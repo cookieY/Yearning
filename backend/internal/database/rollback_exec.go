@@ -515,18 +515,32 @@ func InspectTableRollbackMetadata(
 	defer func() { _ = conn.Close() }()
 	if pool.engine == "postgresql" {
 		if sp := rollbackSearchPathFromContext(ctx); len(sp) > 0 {
-			if reset, err := applyConnRollbackSearchPath(qctx, conn, sp); err == nil {
-				defer reset()
+			reset, err := applyConnRollbackSearchPath(qctx, conn, sp)
+			if err != nil {
+				return nil, err
 			}
-		} else if schemaName != "" && ValidateIdentifier(schemaName) == nil {
-			if reset, err := applyConnRollbackSchema(qctx, pool.engine, conn, schemaName); err == nil {
-				defer reset()
+			defer reset()
+		} else if schemaName != "" {
+			if err := ValidateIdentifier(schemaName); err != nil {
+				return nil, err
 			}
+			reset, err := applyConnRollbackSchema(qctx, pool.engine, conn, schemaName)
+			if err != nil {
+				return nil, err
+			}
+			defer reset()
 		}
 		return inspectPostgresTableRollbackMetadata(qctx, conn, schemaName, tableName, allowFallback)
 	}
-	if schemaName != "" && ValidateIdentifier(schemaName) == nil {
-		_ = applySchemaContext(qctx, pool.engine, conn, schemaName)
+	if schemaName != "" {
+		if err := ValidateIdentifier(schemaName); err != nil {
+			return nil, err
+		}
+		reset, err := applyConnRollbackSchema(qctx, pool.engine, conn, schemaName)
+		if err != nil {
+			return nil, err
+		}
+		defer reset()
 	}
 	return inspectMySQLTableRollbackMetadata(qctx, conn, schemaName, tableName)
 }

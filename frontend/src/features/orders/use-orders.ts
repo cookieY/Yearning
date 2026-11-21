@@ -1,23 +1,25 @@
 import { useEffect } from "react";
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type {
-  ChangeDraft,
   ChangeOrder,
   ChangeOrderState,
-  ChangeOrderTimelineEntry,
 } from "@/api/generated/client/yearningV4HTTPAPI.schemas";
-import {
-  getChangeOrder,
-  listChangeOrders,
-} from "@/api/generated/client/change-orders/change-orders";
+import { listChangeDrafts } from "@/api/generated/client/change-drafts/change-drafts";
 import {
   copyChangeOrderToDraft,
   createRollbackDraft,
+  getChangeOrder,
   listChangeOrderTimeline,
+  listChangeOrders,
   voidChangeOrder,
   withdrawChangeOrder,
 } from "@/api/generated/client/change-orders/change-orders";
-import { getReviewEventClient, useDomainEvent } from "@/shared/events/review-event-client";
+import { ifMatchHeader, unwrapApi } from "@/shared/api/mutator";
+import {
+  matchesEntitySubject,
+  subscribeSseEvent,
+  useSseEvent,
+} from "@/shared/events/sse-event-bus";
 import { useSession } from "@/features/auth/session-provider";
 import { holdsSessionSlot } from "@/shared/dev/mock-super";
 import { randomUUID } from "@/shared/lib/uuid";
@@ -98,15 +100,19 @@ export function useMyChangeOrders(
       // by the approval queue on the same read). The My Orders tab is
       // submitter-scoped per UI-spec §5.2: a presentation filter on this
       // shared read, never an authorization boundary.
-      const readPage = async (after?: string) =>
-        (await listChangeOrders({
-          limit: paging?.limit ?? 50,
-          after: after || undefined,
-          ...effective,
-        })) as unknown as {
-          items: ChangeOrder[];
-          page: { has_more: boolean; next_cursor: string | null };
+      const readPage = async (after?: string) => {
+        const page = await unwrapApi(
+          listChangeOrders({
+            limit: paging?.limit ?? 50,
+            after: after || undefined,
+            ...effective,
+          }),
+        );
+        return {
+          items: page.items,
+          page: page.page,
         };
+      };
       if (me === undefined) return { items: [], page: { has_more: false, next_cursor: null } };
       if (scope === "execution") {
         // Review R1 M1: filtering AFTER cursor paging breaks the KPI→list
@@ -150,21 +156,19 @@ export function useMyChangeOrders(
   // invalidation on navigation — the submission flow lands on the detail
   // page and back-navigation remounts this query.
   const orders = query.data?.items ?? [];
-  const subscriptionKey = orders
-    .map((order) => `${order.id}:${String(order.version)}`)
-    .join("|");
+  const subscriptionKey = orders.map((order) => order.id).join("|");
   useEffect(() => {
     if (subscriptionKey === "") return;
-    const client = getReviewEventClient();
-    const unsubscribes = orders.map((order) =>
-      client.subscribe(`change-orders/${order.id}`, () => {
-        void queryClient.invalidateQueries({ queryKey: ["change-orders", "mine"] });
-      }),
-    );
-    return () => {
-      for (const unsubscribe of unsubscribes) unsubscribe();
-    };
-  }, [subscriptionKey, orders, queryClient]);
+    const targets = new Set(subscriptionKey.split("|"));
+    return subscribeSseEvent("*", (event) => {
+      for (const orderId of targets) {
+        if (matchesEntitySubject(event.subject, "change-orders", "order", orderId)) {
+          void queryClient.invalidateQueries({ queryKey: ["change-orders", "mine"] });
+          return;
+        }
+      }
+    });
+  }, [subscriptionKey, queryClient]);
 
   return query;
 }
@@ -180,9 +184,7 @@ export function useOrderDatasourceOptions(enabled: boolean) {
   return useQuery({
     queryKey: ["change-orders", "mine", "datasource-options", me],
     queryFn: async () => {
-      const page = (await listChangeOrders({ limit: 200 })) as unknown as {
-        items: ChangeOrder[];
-      };
+      const page = await unwrapApi(listChangeOrders({ limit: 200 }));
       if (me === undefined) return [];
       return [
         ...new Set(
@@ -200,13 +202,15 @@ export function useChangeOrder(orderId: string) {
   const queryClient = useQueryClient();
   const query = useQuery({
     queryKey: ["change-order", orderId],
-    queryFn: async () => (await getChangeOrder(orderId)) as unknown as ChangeOrder,
+    queryFn: () => unwrapApi(getChangeOrder(orderId)),
   });
 
-  useDomainEvent(
-    orderId === "" ? null : `change-orders/${orderId}`,
-    "any",
-    () => {
+  useSseEvent(
+    orderId === "" ? null : "*",
+    (event) => {
+      if (!matchesEntitySubject(event.subject, "change-orders", "order", orderId)) {
+        return;
+      }
       void queryClient.invalidateQueries({ queryKey: ["change-order", orderId] });
       void queryClient.invalidateQueries({ queryKey: ["change-order-timeline", orderId] });
     },
@@ -219,30 +223,27 @@ export function useChangeOrderTimeline(orderId: string, enabled: boolean) {
   return useQuery({
     queryKey: ["change-order-timeline", orderId],
     queryFn: async () => {
-      const page = (await listChangeOrderTimeline(orderId, { limit: 50 })) as unknown as {
-        items: ChangeOrderTimelineEntry[];
-      };
+      const page = await unwrapApi(listChangeOrderTimeline(orderId, { limit: 50 }));
       return page.items;
     },
     enabled: enabled && orderId !== "",
   });
 }
 
-function orderActionHeaders(order: ChangeOrder | null | undefined): Record<string, string> {
+function orderActionRequestInit(order: ChangeOrder | null | undefined): RequestInit {
   // Both headers are declared required on withdrawal/voidance (OpenAPI
   // IdempotencyKey parameter; order_lifecycle profile carries the
   // idempotency codes) — If-Match guards the aggregate version.
-  return {
-    "If-Match": `"${String(order?.version ?? 1)}"`,
+  return ifMatchHeader(order?.version, {
     "Idempotency-Key": `order-action-${randomUUID()}`,
-  };
+  });
 }
 
 export function useWithdrawOrder(order: ChangeOrder | null) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (reason: string) =>
-      withdrawChangeOrder(order?.id as string, { reason }, { headers: orderActionHeaders(order) }),
+      unwrapApi(withdrawChangeOrder(order?.id as string, { reason }, orderActionRequestInit(order))),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["change-order", order?.id] });
       void queryClient.invalidateQueries({ queryKey: ["change-order-timeline", order?.id] });
@@ -255,7 +256,7 @@ export function useVoidOrder(order: ChangeOrder | null) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (reason: string) =>
-      voidChangeOrder(order?.id as string, { reason }, { headers: orderActionHeaders(order) }),
+      unwrapApi(voidChangeOrder(order?.id as string, { reason }, orderActionRequestInit(order))),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["change-order", order?.id] });
       void queryClient.invalidateQueries({ queryKey: ["change-order-timeline", order?.id] });
@@ -268,11 +269,13 @@ export function useCopyOrderToDraft(order: ChangeOrder | null) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (input: { target_flow_id: string; title: string; description?: string }) =>
-      copyChangeOrderToDraft(order?.id as string, input, {
-        headers: {
-          "Idempotency-Key": `copy-draft-${randomUUID()}`,
-        },
-      }),
+      unwrapApi(
+        copyChangeOrderToDraft(order?.id as string, input, {
+          headers: {
+            "Idempotency-Key": `copy-draft-${randomUUID()}`,
+          },
+        }),
+      ),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["change-drafts"] });
     },
@@ -282,12 +285,14 @@ export function useCopyOrderToDraft(order: ChangeOrder | null) {
 export function useCreateRollbackDraft(order: ChangeOrder | null) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (input?: { title?: string; description?: string }) =>
-      (await createRollbackDraft(order?.id ?? "", input ?? {}, {
-        headers: {
-          "Idempotency-Key": `rollback-draft-${randomUUID()}`,
-        },
-      })) as unknown as ChangeDraft,
+    mutationFn: (input?: { title?: string; description?: string }) =>
+      unwrapApi(
+        createRollbackDraft(order?.id ?? "", input ?? {}, {
+          headers: {
+            "Idempotency-Key": `rollback-draft-${randomUUID()}`,
+          },
+        }),
+      ),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["change-order", order?.id] });
       void queryClient.invalidateQueries({ queryKey: ["change-order-timeline", order?.id] });
@@ -302,12 +307,7 @@ export function useMyDrafts(enabled: boolean) {
   return useQuery({
     queryKey: ["change-drafts", "mine"],
     queryFn: async () => {
-      const { listChangeDrafts } = await import(
-        "@/api/generated/client/change-drafts/change-drafts"
-      );
-      const page = (await listChangeDrafts({ limit: 50 })) as unknown as {
-        items: ChangeDraft[];
-      };
+      const page = await unwrapApi(listChangeDrafts({ limit: 50 }));
       // A submitted draft is terminal — its order lives in the orders card,
       // and the draft-phase vocabulary has no honest label for it.
       return page.items.filter((draft) => draft.state !== "submitted");

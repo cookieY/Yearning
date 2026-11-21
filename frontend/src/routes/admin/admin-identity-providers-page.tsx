@@ -1,10 +1,9 @@
-import i18next from "@/shared/i18n";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { KeyRound, Pencil, Plus, PlugZap, Trash2 } from "lucide-react";
 import type { IdentityProvider } from "@/api/generated/client/yearningV4HTTPAPI.schemas";
 import { useSession } from "@/features/auth/session-provider";
-import { describeError } from "@/shared/api/error-display";
+import { describeError, describeErrorText } from "@/shared/api/error-display";
 import { appToast } from "@/shared/components/shadcn-dashboard/sonner/sonner-08";
 import { PageHeader, PageLayout } from "@/shared/components/page-layout";
 import { PendingButton } from "@/shared/components/pending-button";
@@ -49,12 +48,6 @@ import { TableRowActions } from "@/shared/components/table-row-actions";
  * surface. LDAP transport is ldaps/starttls only — there is no plaintext
  * transport and no skip-verify option in the declared contract.
  */
-
-function describeErrorText(display: { messageKey: string; requestId: string | null }): string {
-  // Translated through the shared i18n bundle so users never see raw keys.
-  const text = i18next.t(display.messageKey);
-  return display.requestId === null ? text : `${text} (${display.requestId})`;
-}
 
 interface LdapDraft {
   provider_key: string;
@@ -132,10 +125,11 @@ function LdapConnectionTest({ providerId }: { providerId: string }) {
         onClick={() => {
           testConnection.mutate(providerId, {
             onSuccess: (task) => {
+              const outcome = "outcome" in task && typeof task.outcome === "string" ? task.outcome : undefined;
               const resolvedId =
                 typeof task.id === "string" && task.id.length > 0
                   ? task.id
-                  : ((task as unknown as { outcome?: string }).outcome ?? "succeeded");
+                  : (outcome ?? "succeeded");
               setErrorText(null);
               setTaskId(resolvedId);
               appToast.info(t("adminIdp.testConnection"), {
@@ -231,7 +225,9 @@ export function AdminIdentityProvidersContent({ embedded = false }: { embedded?:
                   <div className="flex min-w-0 flex-col">
                     <span className="text-sm font-medium">{ldap.display_name}</span>
                     <span className="text-muted-foreground truncate font-mono text-xs">
-                      {`${String((ldap.configuration as unknown as { host?: string }).host)}:${String((ldap.configuration as unknown as { port?: number }).port)} · ${String((ldap.configuration as unknown as { transport?: string }).transport)}`}
+                      {"host" in ldap.configuration
+                        ? `${ldap.configuration.host}:${String(ldap.configuration.port)} · ${ldap.configuration.transport}`
+                        : ""}
                     </span>
                   </div>
                   <div className="flex flex-wrap items-center gap-2">
@@ -320,15 +316,17 @@ export function AdminIdentityProvidersContent({ embedded = false }: { embedded?:
         </>
       )}
 
-      <ProviderFormDialog
-        open={createKind !== null || editing !== null}
-        kind={editing?.provider_kind ?? createKind ?? "oidc"}
-        editing={editing}
-        onClose={() => {
-          setEditing(null);
-          setCreateKind(null);
-        }}
-      />
+      {createKind !== null || editing !== null ? (
+        <ProviderFormDialog
+          key={editing?.id ?? `create-${createKind ?? "oidc"}`}
+          kind={editing?.provider_kind ?? createKind ?? "oidc"}
+          editing={editing}
+          onClose={() => {
+            setEditing(null);
+            setCreateKind(null);
+          }}
+        />
+      ) : null}
     </div>
   );
 }
@@ -351,10 +349,11 @@ function DeleteProviderButton({ provider, onEdit }: { provider: IdentityProvider
           onClick={() => {
             testConnection.mutate(provider.id, {
               onSuccess: (task) => {
+                const outcome = "outcome" in task && typeof task.outcome === "string" ? task.outcome : undefined;
                 const resolvedId =
                   typeof task.id === "string" && task.id.length > 0
                     ? task.id
-                    : ((task as unknown as { outcome?: string }).outcome ?? "succeeded");
+                    : (outcome ?? "succeeded");
                 setErrorText(null);
                 setTestTaskId(resolvedId);
                 appToast.info(t("adminIdp.testConnection"), {
@@ -440,13 +439,55 @@ function DeleteProviderButton({ provider, onEdit }: { provider: IdentityProvider
   );
 }
 
+function initialLdapDraft(editing: IdentityProvider | null): LdapDraft {
+  if (editing !== null && editing.provider_kind === "ldap" && "host" in editing.configuration) {
+    const configuration = editing.configuration;
+    return {
+      ...EMPTY_LDAP,
+      provider_key: editing.provider_key,
+      display_name: editing.display_name,
+      enabled: editing.enabled,
+      host: configuration.host,
+      port: configuration.port,
+      transport: configuration.transport,
+      server_name: configuration.server_name,
+      bind_dn: configuration.bind_dn,
+      base_dn: configuration.base_dn,
+      user_filter: configuration.user_filter,
+      username_attribute: configuration.username_attribute,
+      display_name_attribute: configuration.display_name_attribute,
+      email_attribute: configuration.email_attribute ?? "",
+      secret: "",
+    };
+  }
+  return EMPTY_LDAP;
+}
+
+function initialOidcDraft(editing: IdentityProvider | null): OidcDraft {
+  if (editing !== null && editing.provider_kind !== "ldap" && "issuer_url" in editing.configuration) {
+    const configuration = editing.configuration;
+    return {
+      ...EMPTY_OIDC,
+      provider_key: editing.provider_key,
+      display_name: editing.display_name,
+      enabled: editing.enabled,
+      issuer_url: configuration.issuer_url,
+      client_id: configuration.client_id,
+      scopes: configuration.scopes.join(" "),
+      username_claim: configuration.username_claim,
+      display_name_claim: configuration.display_name_claim ?? "",
+      email_claim: configuration.email_claim ?? "",
+      secret: "",
+    };
+  }
+  return EMPTY_OIDC;
+}
+
 function ProviderFormDialog({
-  open,
   kind,
   editing,
   onClose,
 }: {
-  open: boolean;
   kind: "ldap" | "oidc";
   editing: IdentityProvider | null;
   onClose: () => void;
@@ -454,55 +495,9 @@ function ProviderFormDialog({
   const { t } = useTranslation();
   const createProvider = useCreateIdentityProvider();
   const replaceProvider = useReplaceIdentityProvider();
-  const [ldapDraft, setLdapDraft] = useState<LdapDraft>(EMPTY_LDAP);
-  const [oidcDraft, setOidcDraft] = useState<OidcDraft>(EMPTY_OIDC);
-  const [openFor, setOpenFor] = useState<string | null>(null);
+  const [ldapDraft, setLdapDraft] = useState<LdapDraft>(() => initialLdapDraft(editing));
+  const [oidcDraft, setOidcDraft] = useState<OidcDraft>(() => initialOidcDraft(editing));
   const [errorText, setErrorText] = useState<string | null>(null);
-
-  const formKey = editing?.id ?? `create-${kind}`;
-  if (open && openFor !== formKey) {
-    setOpenFor(formKey);
-    setErrorText(null);
-    if (editing === null) {
-      setLdapDraft(EMPTY_LDAP);
-      setOidcDraft(EMPTY_OIDC);
-    } else if (editing.provider_kind === "ldap") {
-      const configuration = editing.configuration as unknown as Record<string, string | number>;
-      setLdapDraft({
-        ...EMPTY_LDAP,
-        provider_key: editing.provider_key,
-        display_name: editing.display_name,
-        enabled: editing.enabled,
-        host: String(configuration.host ?? ""),
-        port: Number(configuration.port ?? 636),
-        transport: configuration.transport as "ldaps" | "starttls",
-        server_name: String(configuration.server_name ?? ""),
-        bind_dn: String(configuration.bind_dn ?? ""),
-        base_dn: String(configuration.base_dn ?? ""),
-        user_filter: String(configuration.user_filter ?? ""),
-        username_attribute: String(configuration.username_attribute ?? ""),
-        display_name_attribute: String(configuration.display_name_attribute ?? ""),
-        email_attribute: String(configuration.email_attribute ?? ""),
-        secret: "",
-      });
-    } else {
-      const configuration = editing.configuration as unknown as Record<string, string | string[]>;
-      setOidcDraft({
-        ...EMPTY_OIDC,
-        provider_key: editing.provider_key,
-        display_name: editing.display_name,
-        enabled: editing.enabled,
-        issuer_url: String(configuration.issuer_url ?? ""),
-        client_id: String(configuration.client_id ?? ""),
-        scopes: (configuration.scopes as string[] | undefined)?.join(" ") ?? "openid",
-        username_claim: String(configuration.username_claim ?? ""),
-        display_name_claim: String(configuration.display_name_claim ?? ""),
-        email_claim: String(configuration.email_claim ?? ""),
-        secret: "",
-      });
-    }
-  }
-  if (!open && openFor !== null) setOpenFor(null);
 
   const submit = async () => {
     setErrorText(null);
@@ -600,7 +595,7 @@ function ProviderFormDialog({
   };
 
   return (
-    <Dialog open={open} onOpenChange={(next) => { if (!next) onClose(); }}>
+    <Dialog open onOpenChange={(next) => { if (!next) onClose(); }}>
       <DialogContent className="sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">

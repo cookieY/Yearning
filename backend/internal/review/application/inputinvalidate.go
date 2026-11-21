@@ -10,19 +10,15 @@ import (
 
 	"gorm.io/gorm"
 
-	"github.com/cookieY/YearningX/backend/internal/review/domain"
+	"github.com/cookieY/YearningX/backend/internal/review/persistence"
 )
 
 // InvalidateInputRefs invalidates unsubmitted Runs referencing (inputRefID, oldConfigHash)
 // to outdated (idempotent: filtered by state <> outdated).
 func InvalidateInputRefs(ctx context.Context, tx *gorm.DB, toolKind, inputRefID, oldConfigHash string) error {
-	var rows []struct {
-		ID      string
-		State   string
-		Version int64
-	}
+	var rows []persistence.ReviewRunModel
 	err := tx.WithContext(ctx).Raw(`
-		select r.id::text as id, r.state, r.version
+		select distinct r.id::text as id, r.draft_id::text as draft_id, r.draft_revision, r.state, r.version
 		from review_runs r
 		join change_drafts d on d.id = r.draft_id
 		join review_tool_calls c on c.review_run_id = r.id
@@ -32,25 +28,7 @@ func InvalidateInputRefs(ctx context.Context, tx *gorm.DB, toolKind, inputRefID,
 	if err != nil {
 		return err
 	}
-	seen := map[string]bool{}
-	for _, r := range rows {
-		if seen[r.ID] {
-			continue
-		}
-		seen[r.ID] = true
-		next, err := domain.RunTransition(domain.RunState(r.State), domain.RunEventInputsChanged)
-		if err != nil {
-			return domain.ErrIllegalTransition
-		}
-		res := tx.WithContext(ctx).Exec(`
-			update review_runs set state = ?, version = version + 1, finished_at = ?,
-				business_err_code = null, failure_name = null
-			where id = ? and version = ?`, string(next), nowUTC(), r.ID, r.Version)
-		if res.Error != nil {
-			return res.Error
-		}
-	}
-	return nil
+	return invalidateRuns(ctx, tx, rows)
 }
 
 // InputRefsExist reports whether an input is referenced by any Run (deletion guard).

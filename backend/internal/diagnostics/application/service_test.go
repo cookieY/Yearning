@@ -2,15 +2,20 @@ package application
 
 import (
 	"context"
+	"database/sql"
+	"database/sql/driver"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"syscall"
 	"testing"
 	"time"
@@ -889,4 +894,305 @@ func wireMockDiagLLMProvider(
 		_ = db.Exec(`delete from ai_providers where id = ?`, provID).Error
 	})
 	return &reviewapp.Services{DB: db, Crypter: crypter}
+}
+
+func TestDiagnoseStatementWithAI_GlobalBudgetEnforcementAndLedger(t *testing.T) {
+	db := openDiagnosticsTestDB(t)
+	crypter := newTestCrypter(t)
+	recorder, _ := auditlog.NewRecorder(db)
+	userID, dsID, _ := seedUserAndDatasource(t, db, true)
+	actor := domain.Actor{UserID: userID, Username: "diag_admin", Role: "admin"}
+
+	fake := &fakeCollectorBackend{
+		probeState: database.StatsProbeReady,
+		templatesByFP: map[string]string{
+			"fp_budget_stmt": "SELECT `id` FROM `budget_orders` WHERE `status` = ?",
+		},
+	}
+	svc, err := NewServices(db, crypter, recorder, nil, nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	svc.Collector = fake
+
+	cfg0, _ := svc.GetConfig(context.Background(), dsID)
+	_, _ = svc.UpdateConfig(context.Background(), actor, dsID, cfg0.Version, domain.UpdateDiagnosticsConfigInput{
+		Enabled: true, IntervalSeconds: 60, TopN: 200,
+	})
+	t0 := time.Now().UTC().Add(-5 * time.Minute)
+	fake.snapshotRows = []database.NativeStatementStatRow{
+		{EngineFingerprint: "fp_budget_stmt", DatabaseOrSchema: "trade_db", CallsTotal: 10, TotalExecTimeMS: 100},
+	}
+	_, _ = svc.CollectScheduledSnapshot(context.Background(), dsID, t0)
+	var stmt persistence.SQLDiagnosticsStatementModel
+	if err := db.Where("datasource_id = ? and engine_fingerprint = 'fp_budget_stmt'", dsID).First(&stmt).Error; err != nil {
+		t.Fatal(err)
+	}
+
+	var calls atomic.Int32
+	var returnErr atomic.Bool
+	t.Cleanup(addrguard.SetLoopbackBypassForTest(true))
+	llmServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		calls.Add(1)
+		if returnErr.Load() {
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		payload := map[string]any{
+			"observed_facts": []map[string]any{{"metric": "Calls", "value": "10", "window": "window"}},
+			"root_cause_hypotheses": []map[string]any{
+				{"hypothesis": "Status filter may scan rows.", "confidence": "medium", "evidence_basis": "calls=10"},
+			},
+			"optimization_recommendations": []map[string]any{
+				{
+					"kind":                  "index_ddl",
+					"title":                 "Review index on status column",
+					"rationale":             "Check whether filtering by status needs an index after inspecting selectivity.",
+					"applicable_conditions": []string{"status filter selectivity is high"},
+					"candidate_sql":         nil,
+					"risk_notes":            []string{"Index maintenance adds write overhead"},
+				},
+			},
+			"verification_steps": []string{"Verify index selectivity."},
+		}
+		content, _ := json.Marshal(payload)
+		resp, _ := json.Marshal(map[string]any{
+			"choices": []map[string]any{{"message": map[string]any{"content": string(content)}}},
+			"usage":   map[string]any{"prompt_tokens": 150, "completion_tokens": 50},
+		})
+		_, _ = w.Write(resp)
+	}))
+	defer llmServer.Close()
+
+	provID := uuid.NewString()
+	provEnv, err := crypter.Seal(crypto.PurposePayload, []byte("sk-diag-budget"), crypto.AAD{
+		DeploymentID: crypter.DeploymentID(),
+		Table:        "ai_providers", PrimaryKey: provID, Column: "secret_ciphertext", Purpose: "provider_secret",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = db.Exec(`delete from ai_providers`).Error
+	if err := db.Exec(`
+		insert into ai_providers (
+			id, name, provider_kind, base_url, model_name, enabled,
+			selection_priority, privacy_contract_hash, output_schema_hash, configuration,
+			secret_ciphertext, secret_nonce, secret_key_id, secret_algorithm,
+			version, created_by_user_id, created_at, updated_at
+		) values (?, ?, 'openai_compatible', ?, 'gpt-4o-mini', true,
+			1, ?, ?, '{"temperature":0.1}'::jsonb,
+			?, ?, ?, 'aes-256-gcm', 1, ?, now(), now())`,
+		provID, "diag-budget-"+provID[:8], llmServer.URL,
+		reviewprovider.PrivacyContractHash, reviewprovider.OutputSchemaHash,
+		provEnv.Ciphertext, provEnv.Nonce, provEnv.KeyID, userID).Error; err != nil {
+		t.Fatalf("seed provider: %v", err)
+	}
+	t.Cleanup(func() {
+		_ = db.Exec(`delete from ai_providers where id = ?`, provID).Error
+		_ = db.Exec(`delete from system_settings where namespace = 'ai_budget'`).Error
+		_ = db.Exec(`delete from ai_daily_budget_usage`).Error
+		_ = db.Exec(`delete from ai_usage_ledger`).Error
+	})
+
+	svc.Review = &reviewapp.Services{DB: db, Crypter: crypter}
+	day := svc.Review.BudgetDay(time.Now())
+	if err := db.Exec(`
+		insert into system_settings (namespace, schema_version, settings, version, updated_by_user_id, created_at, updated_at)
+		values ('ai_budget', 1, '{"enforced":true,"currency":"USD","daily_budget_minor":10,"alert_threshold_percent":80,"input_price_per_million_minor":10000,"output_price_per_million_minor":20000}'::jsonb, 1, ?, now(), now())
+		on conflict (namespace) do update set settings = excluded.settings`, userID).Error; err != nil {
+		t.Fatalf("seed ai_budget settings: %v", err)
+	}
+	_ = db.Exec(`delete from ai_daily_budget_usage`).Error
+	_ = db.Exec(`delete from ai_usage_ledger`).Error
+
+	// 1. Exhausted daily budget -> fail closed 2010 before calling LLM.
+	if err := db.Exec(`
+		insert into ai_daily_budget_usage (budget_day, currency, amount_minor, reserved_minor, version, updated_at)
+		values (?, 'USD', 10, 0, 1, now())`, day).Error; err != nil {
+		t.Fatalf("seed exhausted budget: %v", err)
+	}
+	_, err = svc.DiagnoseStatementWithAI(context.Background(), actor, dsID, stmt.ID, time.Time{}, time.Time{})
+	var diagErr *domain.Error
+	if !errors.As(err, &diagErr) || diagErr.Code != domain.CodeAIBudgetExhausted {
+		t.Fatalf("expected 2010 AI_DAILY_BUDGET_EXHAUSTED, got %v", err)
+	}
+	if calls.Load() != 0 {
+		t.Fatalf("expected 0 HTTP calls when daily budget exhausted, got %d", calls.Load())
+	}
+
+	// 2. Available budget + LLM 500 -> 2011 and reservation is released (reserved_minor == 0).
+	_ = db.Exec(`update ai_daily_budget_usage set amount_minor = 0, reserved_minor = 0 where budget_day = ? and currency = 'USD'`, day).Error
+	returnErr.Store(true)
+	_, err = svc.DiagnoseStatementWithAI(context.Background(), actor, dsID, stmt.ID, time.Time{}, time.Time{})
+	if !errors.As(err, &diagErr) || diagErr.Code != domain.CodeAIProviderFailed {
+		t.Fatalf("expected 2011 AI_PROVIDER_FAILED on HTTP 500, got %v", err)
+	}
+	if calls.Load() != 1 {
+		t.Fatalf("expected 1 HTTP call on LLM failure, got %d", calls.Load())
+	}
+	var usage struct {
+		AmountMinor   int64
+		ReservedMinor int64
+	}
+	if err := db.Raw(`select amount_minor, reserved_minor from ai_daily_budget_usage where budget_day = ? and currency = 'USD'`, day).Scan(&usage).Error; err != nil {
+		t.Fatal(err)
+	}
+	if usage.ReservedMinor != 0 || usage.AmountMinor != 0 {
+		t.Fatalf("expected released budget reservation (0/0), got amount=%d reserved=%d", usage.AmountMinor, usage.ReservedMinor)
+	}
+
+	// 3. Available budget + LLM 200 -> ledger row recorded and cost settled cleanly.
+	returnErr.Store(false)
+	rep, err := svc.DiagnoseStatementWithAI(context.Background(), actor, dsID, stmt.ID, time.Time{}, time.Time{})
+	if err != nil {
+		t.Fatalf("DiagnoseStatementWithAI with budget failed: %v", err)
+	}
+	var ledger struct {
+		ProviderID   string
+		ModelName    string
+		InputTokens  int64 `gorm:"column:input_token_count"`
+		OutputTokens int64 `gorm:"column:output_token_count"`
+		AmountMinor  int64
+		Outcome      string
+	}
+	if err := db.Raw(`select provider_id::text as provider_id, model_name, input_token_count, output_token_count, amount_minor, outcome
+		from ai_usage_ledger where review_run_id = ?`, rep.ReportID).Scan(&ledger).Error; err != nil {
+		t.Fatalf("query ai_usage_ledger: %v", err)
+	}
+	if ledger.Outcome != "succeeded" || ledger.InputTokens != 150 || ledger.OutputTokens != 50 ||
+		ledger.ProviderID != provID || ledger.ModelName != "gpt-4o-mini" || ledger.AmountMinor <= 0 {
+		t.Fatalf("unexpected ledger row: %+v", ledger)
+	}
+	if err := db.Raw(`select amount_minor, reserved_minor from ai_daily_budget_usage where budget_day = ? and currency = 'USD'`, day).Scan(&usage).Error; err != nil {
+		t.Fatal(err)
+	}
+	if usage.ReservedMinor != 0 || usage.AmountMinor != ledger.AmountMinor {
+		t.Fatalf("unexpected settled budget usage: amount=%d reserved=%d ledger=%d", usage.AmountMinor, usage.ReservedMinor, ledger.AmountMinor)
+	}
+}
+
+type diagBudgetStubState struct {
+	mu               sync.Mutex
+	failBudgetLoad   bool
+	failBudgetUpsert bool
+	txRollbacks      int
+	releases         []int64
+}
+
+type diagBudgetDriver struct{}
+
+var (
+	diagBudgetMu   sync.Mutex
+	diagBudgetMap  = map[string]*diagBudgetStubState{}
+	diagBudgetOnce sync.Once
+)
+
+func (diagBudgetDriver) Open(dsn string) (driver.Conn, error) {
+	diagBudgetMu.Lock()
+	st := diagBudgetMap[dsn]
+	diagBudgetMu.Unlock()
+	return &diagBudgetConn{state: st}, nil
+}
+
+type diagBudgetConn struct{ state *diagBudgetStubState }
+type diagBudgetTx struct{ state *diagBudgetStubState }
+
+func (c *diagBudgetConn) Prepare(string) (driver.Stmt, error) { return nil, errors.New("unsupported") }
+func (c *diagBudgetConn) Close() error                        { return nil }
+func (c *diagBudgetConn) Begin() (driver.Tx, error)           { return diagBudgetTx{state: c.state}, nil }
+func (c *diagBudgetConn) BeginTx(context.Context, driver.TxOptions) (driver.Tx, error) {
+	return diagBudgetTx{state: c.state}, nil
+}
+func (t diagBudgetTx) Commit() error { return nil }
+func (t diagBudgetTx) Rollback() error {
+	t.state.mu.Lock()
+	t.state.txRollbacks++
+	t.state.mu.Unlock()
+	return nil
+}
+
+func (c *diagBudgetConn) ExecContext(_ context.Context, query string, args []driver.NamedValue) (driver.Result, error) {
+	c.state.mu.Lock()
+	failUpsert := c.state.failBudgetUpsert
+	c.state.mu.Unlock()
+	if strings.Contains(query, "update ai_daily_budget_usage set reserved_minor = greatest") && len(args) > 0 {
+		if amt, ok := args[0].Value.(int64); ok {
+			c.state.mu.Lock()
+			c.state.releases = append(c.state.releases, amt)
+			c.state.mu.Unlock()
+		}
+	}
+	if failUpsert && strings.Contains(query, "insert into ai_daily_budget_usage") {
+		return nil, errors.New("simulated daily budget upsert failure")
+	}
+	return driver.RowsAffected(1), nil
+}
+
+func (c *diagBudgetConn) QueryContext(_ context.Context, query string, _ []driver.NamedValue) (driver.Rows, error) {
+	c.state.mu.Lock()
+	failLoad := c.state.failBudgetLoad
+	c.state.mu.Unlock()
+	if failLoad && strings.Contains(query, "namespace = 'ai_budget'") {
+		return nil, errors.New("simulated ai_budget query error")
+	}
+	return &diagBudgetStubRows{}, nil
+}
+
+type diagBudgetStubRows struct{}
+
+func (*diagBudgetStubRows) Columns() []string         { return []string{} }
+func (*diagBudgetStubRows) Close() error              { return nil }
+func (*diagBudgetStubRows) Next([]driver.Value) error { return io.EOF }
+
+func TestDiagnosticsBudgetFailClosedOnLoadErrorAndTransactionalSettle(t *testing.T) {
+	diagBudgetOnce.Do(func() {
+		sql.Register("diagnostics_budget_stub", diagBudgetDriver{})
+	})
+	st := &diagBudgetStubState{failBudgetLoad: true, failBudgetUpsert: true}
+	dsn := "diag-budget-" + uuid.NewString()
+	diagBudgetMu.Lock()
+	diagBudgetMap[dsn] = st
+	diagBudgetMu.Unlock()
+	t.Cleanup(func() {
+		diagBudgetMu.Lock()
+		delete(diagBudgetMap, dsn)
+		diagBudgetMu.Unlock()
+	})
+
+	sqlDB, err := sql.Open("diagnostics_budget_stub", dsn)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = sqlDB.Close() }()
+	gdb, err := gorm.Open(postgres.New(postgres.Config{
+		Conn: sqlDB, PreferSimpleProtocol: true, WithoutReturning: true,
+	}), &gorm.Config{DisableAutomaticPing: true, Logger: gormlogger.Discard})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	svc := &Services{Review: &reviewapp.Services{DB: gdb}}
+	if _, _, _, _, err := svc.reserveDailyBudget(context.Background(), gdb, 1024); err == nil {
+		t.Fatal("expected reserveDailyBudget to fail closed on LoadBudgetSettings DB error")
+	}
+
+	settings := reviewapp.BudgetSettings{
+		Enforced: true, Currency: "USD", DailyBudgetMinor: 10000,
+		InputPricePerMillionMinor: 10000, OutputPricePerMillionMinor: 20000,
+	}
+	res := &reviewapp.ProviderJSONResult{ModelName: "gpt-4o-mini", InputTokens: 200, OutputTokens: 100}
+	if err := svc.settleDailyBudget(context.Background(), gdb, uuid.NewString(), "2026-11-21", "USD", 500, settings, res, "succeeded"); err == nil {
+		t.Fatal("expected settleDailyBudget error when ai_daily_budget_usage upsert fails")
+	}
+	st.mu.Lock()
+	rollbacks := st.txRollbacks
+	releases := append([]int64(nil), st.releases...)
+	st.mu.Unlock()
+	if rollbacks != 1 {
+		t.Fatalf("expected 1 transaction rollback on partial Settle failure, got %d", rollbacks)
+	}
+	if len(releases) != 1 || releases[0] != 500 {
+		t.Fatalf("expected outer release of 500 after rolled-back Settle tx, got %v", releases)
+	}
 }

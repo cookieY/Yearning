@@ -1,10 +1,8 @@
 package application
 
 import (
-	"bytes"
 	"context"
 	"database/sql"
-	"encoding/json"
 	"fmt"
 	"strconv"
 	"strings"
@@ -19,8 +17,6 @@ import (
 	"github.com/cookieY/YearningX/backend/internal/execution/domain"
 	reviewapp "github.com/cookieY/YearningX/backend/internal/review/application"
 )
-
-const frozenPostgresSearchPathContextKey = "postgres_search_path"
 
 type SearchPathProbe func(
 	context.Context,
@@ -69,16 +65,6 @@ func (s *Services) loadFrozenPostgresReviewContext(
 			domain.ErrPreflightFailed("postgres_search_path_snapshot_mismatch")
 	}
 	return s.openFrozenPostgresReviewContext(row)
-}
-
-func (s *Services) loadFrozenPostgresSearchPath(
-	ctx context.Context, db *gorm.DB, stage *targetSnapshotRow,
-) (reviewapp.FrozenPostgresSearchPath, error) {
-	environment, err := s.loadFrozenPostgresReviewContext(ctx, db, stage)
-	if err != nil {
-		return reviewapp.FrozenPostgresSearchPath{}, err
-	}
-	return environment.Path, nil
 }
 
 // matchesStage binds the encrypted context to the reviewed order stage as
@@ -185,6 +171,9 @@ func (s *Services) failOrderAfterPostgresSearchPathPreflightTx(
 		}); err != nil {
 		return err
 	}
+	if err := s.syncSourceOrderRollbackOnOrderTransitionTx(ctx, tx, order, next, now); err != nil {
+		return err
+	}
 	return s.emitOrderEvent(
 		ctx, tx, EventExecFailed, order.ID, auditlog.Actor{
 			UserID: in.Actor.UserID, Username: in.Actor.Username,
@@ -221,52 +210,10 @@ func (s *Services) openFrozenPostgresReviewContext(
 	return environment, nil
 }
 
-func (s *Services) openFrozenPostgresSearchPath(
-	row frozenStageReviewRow,
-) (reviewapp.FrozenPostgresSearchPath, error) {
-	environment, err := s.openFrozenPostgresReviewContext(row)
-	if err != nil {
-		return reviewapp.FrozenPostgresSearchPath{}, err
-	}
-	return environment.Path, nil
-}
-
 func decodeFrozenPostgresReviewContext(
 	plain []byte,
 ) (reviewapp.FrozenPostgresReviewContext, bool) {
 	return reviewapp.DecodeFrozenPostgresReviewContext(plain)
-}
-
-func decodeFrozenPostgresSearchPathContext(
-	plain []byte,
-) (reviewapp.FrozenPostgresSearchPath, bool) {
-	decoder := json.NewDecoder(bytes.NewReader(plain))
-	decoder.UseNumber()
-	contextValue := map[string]any{}
-	if err := decoder.Decode(&contextValue); err != nil {
-		return reviewapp.FrozenPostgresSearchPath{}, false
-	}
-	rawValue, ok := contextValue[frozenPostgresSearchPathContextKey]
-	if !ok || rawValue == nil {
-		return reviewapp.FrozenPostgresSearchPath{}, false
-	}
-	raw, err := json.Marshal(rawValue)
-	if err != nil {
-		return reviewapp.FrozenPostgresSearchPath{}, false
-	}
-	strict := json.NewDecoder(bytes.NewReader(raw))
-	strict.DisallowUnknownFields()
-	var path reviewapp.FrozenPostgresSearchPath
-	if err := strict.Decode(&path); err != nil || path.Validate() != nil {
-		return reviewapp.FrozenPostgresSearchPath{}, false
-	}
-	return path, true
-}
-
-func equalFrozenPostgresSearchPath(
-	frozen, observed reviewapp.FrozenPostgresSearchPath,
-) bool {
-	return frozen.Equal(observed)
 }
 
 func databasePostgresSearchPath(
@@ -280,19 +227,6 @@ func databasePostgresSearchPath(
 		Effective:      append([]string(nil), path.Effective...),
 		CreationSchema: path.CreationSchema,
 	}
-}
-
-// ProbeFrozenPostgresSearchPath opens a separate execution-purpose connection
-// and compares the execution role, ordered explicit/effective path and
-// creation schema with the accepted review snapshot.
-func ProbeFrozenPostgresSearchPath(
-	ctx context.Context,
-	db *gorm.DB,
-	crypter *crypto.Crypter,
-	ds *datasource.DatasourceModel,
-	expected reviewapp.FrozenPostgresSearchPath,
-) error {
-	return ProbeFrozenPostgresReviewContext(ctx, db, crypter, ds, expected, nil, 0)
 }
 
 // ProbeFrozenPostgresReviewContext revalidates the frozen path and every

@@ -9,7 +9,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/cookieY/YearningX/backend/internal/review/domain"
 	"github.com/cookieY/YearningX/backend/internal/review/knowledge"
 	"github.com/cookieY/YearningX/backend/internal/review/provider"
 )
@@ -97,10 +96,9 @@ func TestPolicySnapshotBarrierNeverExecutesReplacementPolicy(t *testing.T) {
 // TestPolicySnapshotRejectsSameRunSubstitution removed under RCP-20261101.
 // Legacy premise: StartRun sealed the policy snapshot into the sql_grouping task payload, and the test
 // constructed a TaskInput substituting another Run's valid snapshot into this Run's payload to verify
-// Run-bound AAD rejection. On the ephemeral path, the policy snapshot is in-process er.Policy (with no
-// cross-Run task payload to substitute); Run-binding and AAD semantics of the snapshot envelope remain
-// continuously covered by unit tests TestPolicySnapshotSealVerifyRoundTrip and
-// TestPolicySnapshotVerificationFailsClosed (the run-policy-other substitution case).
+// Run-bound AAD rejection. On the ephemeral path, the sealed cross-task snapshot envelope was retired
+// along with the V1 task pipeline (policy_injections.go), and in-process er.Policy immutability is
+// verified by TestPolicySnapshotFreezesAtStartRun above.
 
 func mutateBarrierToolDefinition(t *testing.T, b *b7fx, replacement string) {
 	t.Helper()
@@ -215,80 +213,4 @@ func assertSnapshotExcludes(t *testing.T, policy *FrozenReviewPolicy, marker str
 	if strings.Contains(string(raw), marker) {
 		t.Fatalf("frozen policy contains post-StartRun replacement %q", marker)
 	}
-}
-
-func executePolicySnapshotBarrierTasks(
-	t *testing.T,
-	b *b7fx,
-	agent *AgentRunner,
-	runID string,
-) error {
-	t.Helper()
-	for round := 0; round < 20; round++ {
-		var rows []struct {
-			ID    string
-			Input []byte
-		}
-		if err := b.db.Raw(`
-			select id::text as id, input
-			from async_tasks
-			where aggregate_id = ? and state = 'queued'
-			order by created_at, id`, runID).Scan(&rows).Error; err != nil {
-			t.Fatal(err)
-		}
-		if len(rows) == 0 {
-			return nil
-		}
-		for _, row := range rows {
-			var input TaskInput
-			if err := json.Unmarshal(row.Input, &input); err != nil {
-				t.Fatal(err)
-			}
-			if err := agent.Execute(context.Background(), b.db, input, nil, nil); err != nil {
-				return err
-			}
-			if err := b.db.Exec(
-				`update async_tasks set state = 'succeeded', finished_at = now() where id = ?`,
-				row.ID,
-			).Error; err != nil {
-				t.Fatal(err)
-			}
-		}
-	}
-	t.Fatal("policy snapshot barrier task chain did not drain")
-	return nil
-}
-
-func policyBarrierStopped(t *testing.T, b *b7fx, runID string) bool {
-	t.Helper()
-	var runState string
-	if err := b.db.Raw(`select state from review_runs where id = ?`, runID).
-		Scan(&runState).Error; err != nil {
-		t.Fatal(err)
-	}
-	var draftState string
-	var raw []byte
-	if err := b.db.Raw(`
-		select input
-		from async_tasks
-		where aggregate_id = ?
-		order by created_at, id
-		limit 1`, runID).Scan(&raw).Error; err != nil {
-		t.Fatal(err)
-	}
-	var input TaskInput
-	if len(raw) > 0 {
-		if err := json.Unmarshal(raw, &input); err != nil {
-			t.Fatalf("decode policy barrier task input: %v", err)
-		}
-		if err := b.db.Raw(
-			`select state from change_drafts where id = ?`, input.DraftID,
-		).Scan(&draftState).Error; err != nil {
-			t.Fatal(err)
-		}
-	}
-	return runState == string(domain.RunStateOutdated) ||
-		draftState == string(domain.DraftStateOutdated) ||
-		draftState == string(domain.DraftStateFailed) ||
-		draftState == string(domain.DraftStatePartial)
 }

@@ -1,8 +1,5 @@
-// chain.go Provider selection chain and failover (provider_selection).
-//
-// Rules: ordered_enabled_providers sorted ascending by selection_priority;
-// fallback only when (result not yet accepted + send boundary known safe + identical privacy contract hash +
-// identical output schema hash); no fallback after result acceptance; at most 2 calls per step.
+// postgres.go implements GORM persistence for knowledge_entries using explicit column tags,
+// TableName bindings, optimistic version checks, and row-level locking without AutoMigrate.
 package knowledge
 
 import (
@@ -15,7 +12,7 @@ import (
 	"gorm.io/gorm/clause"
 )
 
-// Chain is an ordered Provider chain.
+// Model maps directly to the knowledge_entries table.
 type Model struct {
 	ID              string    `gorm:"column:id;primaryKey"`
 	Name            string    `gorm:"column:name"`
@@ -36,26 +33,19 @@ type Model struct {
 	UpdatedAt       time.Time `gorm:"column:updated_at"`
 }
 
-// NewChain constructs and validates Endpoints in the chain; an empty chain returns ErrNoProvider.
+// TableName binds Model to the knowledge_entries PostgreSQL table.
 func (Model) TableName() string { return "knowledge_entries" }
 
-// ValidateConfiguration validates each provider sequentially (health probes do not send review data).
+// ErrNotFound indicates the requested knowledge entry does not exist.
 var ErrNotFound = errors.New("knowledge: entry not found")
 
-// Result carries the response, actual Provider, and fallback count (shown in progress/Snapshot;
-// hides Endpoint and credentials). S008: Calls includes all real HTTP call records (including
-// failed attempts on candidates prior to fallback — each record carries its own Provider attribution).
+// ErrVersionConflict indicates an optimistic-locking mismatch during update.
 var ErrVersionConflict = errors.New("knowledge: version conflict")
 
-// ReviewStructured executes in chain order. Fallback occurs only when the error proves a response
-// was received (auth/input rejection, invalid schema) and both contract hashes match;
-// unknown-boundary errors such as network or timeout terminate the chain immediately (never replaying anonymized payloads).
+// ErrConcurrent indicates a concurrent mutation prevented safe deletion.
 var ErrConcurrent = errors.New("knowledge: concurrent modification")
 
-// Errors with an unknown send boundary must not be replayed across Providers
-// (provider_selection.fallback_allowed_only_when.send_boundary_known_safe).
-// Only errors that definitively received a response (auth/input rejection, invalid schema)
-// prove boundary safety; network/timeout/cancellation errors always terminate the chain.
+// Repository encapsulates GORM queries and mutations for knowledge entries.
 type Repository struct{ DB *gorm.DB }
 
 func strPtr(s string) *string {
@@ -71,8 +61,7 @@ func derefStr(p *string) string {
 	return *p
 }
 
-// On failure, also return the candidate info actually hit (ledger attribution, N10); S008: real call
-// records incurred before failure are surfaced with the error (reported usage is never discarded, Usage-02).
+// toEntry converts a persistence Model into a domain Entry.
 func toEntry(m *Model) *Entry {
 	def := Definition{}
 	_ = jsonUnmarshal(m.Definition, &def)
@@ -87,7 +76,7 @@ func toEntry(m *Model) *Entry {
 	}
 }
 
-// PlanHash folds the chain into a Run-scoped plan hash.
+// toModel serializes a domain Entry into a persistence Model.
 func toModel(e *Entry) (*Model, error) {
 	raw, err := jsonMarshal(e.Definition)
 	if err != nil {
@@ -104,8 +93,7 @@ func toModel(e *Entry) (*Model, error) {
 	}, nil
 }
 
-// chainError carries the candidate actually hit on failure (ledger attribution) and real call
-// records incurred prior to failure (S008 per-call reference ledger).
+// List returns keyset-paginated knowledge entries sorted newest-first, optionally filtered by name search.
 func (r *Repository) List(ctx context.Context, limit int, after, search string) ([]*Entry, error) {
 	q := r.DB.WithContext(ctx).Model(&Model{})
 	if after != "" {
@@ -127,7 +115,7 @@ func (r *Repository) List(ctx context.Context, limit int, after, search string) 
 	return out, nil
 }
 
-// ChainErrorInfo extracts the failed candidate from an error (false if none).
+// Get loads a single knowledge entry by ID or returns ErrNotFound.
 func (r *Repository) Get(ctx context.Context, id string) (*Entry, error) {
 	var m Model
 	if err := r.DB.WithContext(ctx).Where("id = ?", id).First(&m).Error; err != nil {
@@ -139,7 +127,7 @@ func (r *Repository) Get(ctx context.Context, id string) (*Entry, error) {
 	return toEntry(&m), nil
 }
 
-// ChainErrorCalls extracts real call records incurred prior to failure from an error.
+// Insert persists a new knowledge entry within tx and requires an exact 1-row insert.
 func (r *Repository) Insert(ctx context.Context, tx *gorm.DB, e *Entry) error {
 	m, err := toModel(e)
 	if err != nil {
@@ -150,15 +138,12 @@ func (r *Repository) Insert(ctx context.Context, tx *gorm.DB, e *Entry) error {
 		return res.Error
 	}
 	if res.RowsAffected != 1 {
-		// chain_test.go test_gate#6/#11: fallback contract consistency; auth rejection does not retry
-		// to success; exhausted chain fails closed.
 		return fmt.Errorf("knowledge: insert affected %d rows", res.RowsAffected)
 	}
 	return nil
 }
 
-// Deterministic error after receiving a response (invalid schema) -> boundary safe,
-// allowing failover to the next candidate with matching contracts.
+// UpdateVersioned applies partial column updates guarded by optimistic version matching.
 func (r *Repository) UpdateVersioned(ctx context.Context, tx *gorm.DB, e *Entry, expectVersion int64, sets map[string]any) error {
 	res := tx.WithContext(ctx).Model(&Model{}).
 		Where("id = ? and version = ?", e.ID, expectVersion).
@@ -172,8 +157,7 @@ func (r *Repository) UpdateVersioned(ctx context.Context, tx *gorm.DB, e *Entry,
 	return nil
 }
 
-// TestChainNoFallbackOnUnknownBoundary network-class unknown-boundary errors are not replayed
-// to the next candidate (M3/N5 tightening).
+// DeleteReferencedGuarded deletes an unreferenced entry under optimistic version checking, returning ErrReferenced if in use.
 func (r *Repository) DeleteReferencedGuarded(ctx context.Context, tx *gorm.DB, id string, expectVersion int64) error {
 	var n int64
 	if err := tx.WithContext(ctx).Raw(
@@ -195,17 +179,7 @@ func (r *Repository) DeleteReferencedGuarded(ctx context.Context, tx *gorm.DB, i
 	return nil
 }
 
-// contract_hash.go Platform-level contract fingerprints: privacy_contract_hash and
-// output_schema_hash are derived by the system from code constants, not administrator inputs.
-// The two fingerprints identify which generation of the privacy contract and output schema
-// the current binary uses when calling a Provider; only Providers with matching fingerprints
-// may fall back to each other (chain.go gate).
-//
-//   - PrivacyContractHash pins the canonical representation of the input_privacy rule set
-//     (corresponding 1-to-1 with input_privacy in ai-review-runtime-contract.json;
-//     modifying privacy rules requires updating privacyContractCanonical in lockstep, rotating the fingerprint).
-//   - OutputSchemaHash pins the output schema bytes compiled by compileOutputSchema
-//     (the fingerprint rotates automatically whenever the schema changes, requiring no manual maintenance).
+// LoadForUpdate acquires a FOR UPDATE lock on a single knowledge entry inside tx.
 func (r *Repository) LoadForUpdate(ctx context.Context, tx *gorm.DB, id string) (*Entry, error) {
 	var m Model
 	if err := tx.WithContext(ctx).Clauses(clause.Locking{Strength: "UPDATE"}).
@@ -218,8 +192,7 @@ func (r *Repository) LoadForUpdate(ctx context.Context, tx *gorm.DB, id string) 
 	return toEntry(&m), nil
 }
 
-// privacyContractCanonical is the canonical representation of the input privacy contract (fixed line order,
-// corresponding 1-to-1 with input_privacy keys and values in ai-review-runtime-contract.json).
+// MatchedEnabledForUpdate locks enabled entries and returns the deterministic subset matching touched objects.
 func (r *Repository) MatchedEnabledForUpdate(ctx context.Context, db *gorm.DB, touched TouchedObjects) ([]*Entry, error) {
 	var rows []Model
 	q := db.WithContext(ctx).Where("state = ?", string(StateEnabled)).
@@ -238,9 +211,7 @@ func (r *Repository) MatchedEnabledForUpdate(ctx context.Context, db *gorm.DB, t
 	return out, nil
 }
 
-// PrivacyContractHash / OutputSchemaHash are system-derived platform-level contract fingerprints
-// (uniform across all Providers within an instance; persisted columns serve as configuration-time audit
-// records, with both runtime assembly and persistence originating from here).
+// CursorOf encodes an entry's keyset pagination cursor (`created_at|id`).
 func CursorOf(e *Entry) string {
 	return e.CreatedAt.UTC().Format("2006-01-02T15:04:05.999999Z") + "|" + e.ID
 }

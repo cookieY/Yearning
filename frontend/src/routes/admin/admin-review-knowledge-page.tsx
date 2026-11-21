@@ -1,6 +1,6 @@
-import { ReviewInputListPage } from "@/features/admin/review-input-page";
+import { KnowledgeNotesPage } from "@/features/admin/knowledge-notes-page";
 
 /** /admin/review-engine/knowledge — the internal-experience entry page. */
 export default function AdminReviewKnowledgePage() {
-  return <ReviewInputListPage kind="knowledge" />;
+  return <KnowledgeNotesPage />;
 }

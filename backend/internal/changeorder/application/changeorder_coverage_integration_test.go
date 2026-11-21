@@ -28,9 +28,8 @@ func TestChangeOrderCommentsAndRollbackIntegration(t *testing.T) {
 	})
 	fx.seedGrant(t, submitter, flowID)
 	draftID := fx.seedReadyDraft(t, flowID, submitter)
-	fx.seedReadyRun(t, draftID, flowID)
 
-	view, err := fx.submitAs(t, draftID, submitter, "co-cov-sub")
+	view, err := fx.submitReadyDraftAs(t, draftID, flowID, submitter, "co-cov-sub")
 	if err != nil {
 		t.Fatalf("submitAs: %v", err)
 	}

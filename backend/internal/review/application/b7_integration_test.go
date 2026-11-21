@@ -15,6 +15,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"sort"
 	"strings"
 	"sync"
@@ -26,6 +28,7 @@ import (
 
 	"github.com/cookieY/YearningX/backend/internal/crypto"
 	"github.com/cookieY/YearningX/backend/internal/database"
+	"github.com/cookieY/YearningX/backend/internal/platform/addrguard"
 	"github.com/cookieY/YearningX/backend/internal/review/domain"
 	"github.com/cookieY/YearningX/backend/internal/review/knowledge"
 	"github.com/cookieY/YearningX/backend/internal/review/provider"
@@ -587,13 +590,22 @@ func TestB7Gate4KnowledgeChangeInvalidatesRun(t *testing.T) {
 	if state != string(domain.RunStateBlocked) {
 		t.Fatalf("precondition: run should be blocked, got %s", state)
 	}
-	// Mutate the entry through the real Service.Replace path to prevent regressions where overwriting the
-	// aggregate before reading oldHash causes the invalidation query to miss old Runs.
+	// Mutate the entry through the real Service.Replace path (with duplicate review_tool_calls rows
+	// for the same run) to verify SELECT DISTINCT invalidation without self-CAS collision.
 	repo := &knowledge.Repository{DB: b.db}
 	entry, err := repo.Get(context.Background(), b.entryGlobal)
 	if err != nil {
 		t.Fatal(err)
 	}
+	if err := b.db.Exec(`
+		insert into review_tool_calls (id, review_run_id, tool_kind, tool_name, input_ref_id, config_hash, success, started_at, finished_at)
+		values (?, ?, 'knowledge_entry', 'knowledge_lookup', ?, ?, true, now(), now())`,
+		uuid.NewString(), runID, b.entryGlobal, entry.ConfigHash).Error; err != nil {
+		t.Fatalf("seed duplicate review_tool_call: %v", err)
+	}
+	var runDraftID string
+	_ = b.db.Raw(`select draft_id::text from review_runs where id = ?`, runID).Scan(&runDraftID).Error
+
 	entry.Definition.KnowledgeText += " (revised)"
 	ks := &knowledge.Service{Repo: repo, Invalidate: InvalidateInputRefs}
 	_, err = ks.Replace(context.Background(), entry.ID, knowledge.ReplaceInput{
@@ -607,6 +619,11 @@ func TestB7Gate4KnowledgeChangeInvalidatesRun(t *testing.T) {
 	b.db.Raw(`select state from review_runs where id = ?`, runID).Row().Scan(&state)
 	if state != string(domain.RunStateOutdated) {
 		t.Fatalf("referencing run not outdated: %s", state)
+	}
+	var draftState string
+	_ = b.db.Raw(`select state from change_drafts where id = ?`, runDraftID).Scan(&draftState).Error
+	if draftState != string(domain.DraftStateDraft) {
+		t.Fatalf("expected change_drafts.state to remain draft per 000023_ephemeral_precheck, got %s", draftState)
 	}
 	// Mutating an unreferenced table-scoped entry has no effect (no reference to that Hash).
 }
@@ -673,40 +690,6 @@ var runKeyCounter int64
 
 func runKeySuffix() string {
 	return fmt.Sprintf("%d-%d", time.Now().UnixNano(), func() int64 { runKeyCounter++; return runKeyCounter }())
-}
-
-// drain claims and executes tasks for this Run until empty (invokes handler directly and
-// marks task status synchronously in this method to avoid replay).
-func (b *b7fx) drain(t *testing.T, agent *AgentRunner, runID string) {
-	t.Helper()
-	for round := 0; round < 10; round++ {
-		var rows []struct {
-			ID    string
-			Input []byte
-		}
-		if err := b.db.Raw(`select id::text, input from async_tasks
-			where aggregate_id = ? and state = 'queued' order by created_at`, runID).
-			Scan(&rows).Error; err != nil {
-			t.Fatal(err)
-		}
-		if len(rows) == 0 {
-			return
-		}
-		for _, r := range rows {
-			var in TaskInput
-			if err := json.Unmarshal(r.Input, &in); err != nil {
-				t.Fatalf("decode task input: %v", err)
-			}
-			execErr := agent.Execute(context.Background(), b.db, in, nil, nil)
-			if execErr != nil {
-				t.Fatalf("agent execute: %v", execErr)
-			}
-			if err := b.db.Exec(
-				`update async_tasks set state = 'succeeded', finished_at = now() where id = ?`, r.ID).Error; err != nil {
-				t.Fatal(err)
-			}
-		}
-	}
 }
 
 // TestB7Gate6InjectionAndFactsReachModel C1/C2: deterministic injection text and
@@ -1453,5 +1436,134 @@ func TestB7Gate16OutputModeNegotiationPersisted(t *testing.T) {
 	var de *domain.Error
 	if !errors.As(err, &de) || de.Code != 2011 || de.Detail == "" {
 		t.Fatalf("negotiation failure must map 2011 with detail, got %v", err)
+	}
+}
+
+func TestPromptToolAI_ProviderRoundTripAndFailClosed(t *testing.T) {
+	b := newB7Fixture(t)
+	ctx := context.Background()
+	t.Cleanup(addrguard.SetLoopbackBypassForTest(true))
+
+	var mode string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		var reply any
+		switch mode {
+		case "optimize_ok":
+			reply = map[string]any{"knowledge_text": "Limit batch INSERT rows to {{max_rows}}."}
+		case "optimize_drop_placeholder":
+			reply = map[string]any{"knowledge_text": "Limit batch INSERT rows."}
+		case "generate_ok":
+			var cases []map[string]any
+			cases = append(cases, map[string]any{"id": "x-sel", "sql": "SELECT 1;", "expected_compliant": true, "rationale": "Select should be stripped"})
+			for i := 1; i <= 5; i++ {
+				cases = append(cases, map[string]any{
+					"id":                 fmt.Sprintf("raw-c-%d", i),
+					"sql":                fmt.Sprintf("CREATE TABLE ok_%d (id BIGINT PRIMARY KEY) COMMENT='c';", i),
+					"expected_compliant": true,
+					"rationale":          "compliant",
+				})
+				cases = append(cases, map[string]any{
+					"id":                 fmt.Sprintf("raw-v-%d", i),
+					"sql":                fmt.Sprintf("CREATE TABLE bad_%d (id BIGINT PRIMARY KEY);", i),
+					"expected_compliant": false,
+					"rationale":          "missing comment",
+				})
+			}
+			reply = map[string]any{"cases": cases}
+		case "generate_insufficient":
+			reply = map[string]any{"cases": []map[string]any{
+				{"id": "c-1", "sql": "CREATE TABLE only_one (id INT);", "expected_compliant": true, "rationale": "incomplete"},
+			}}
+		case "run_ok":
+			reply = map[string]any{"results": []map[string]any{
+				{"id": "case-1", "actual_compliant": true, "finding_summary": "Passed"},
+				{"id": "case-2", "actual_compliant": false, "finding_summary": "Missing comment"},
+			}}
+		case "run_partial":
+			reply = map[string]any{"results": []map[string]any{
+				{"id": "case-1", "actual_compliant": true, "finding_summary": "Passed only one"},
+			}}
+		default:
+			w.WriteHeader(http.StatusBadGateway)
+			return
+		}
+		content, _ := json.Marshal(reply)
+		resp, _ := json.Marshal(map[string]any{
+			"choices": []map[string]any{{"message": map[string]any{"content": string(content)}}},
+			"usage":   map[string]any{"prompt_tokens": 20, "completion_tokens": 10},
+		})
+		_, _ = w.Write(resp)
+	}))
+	defer srv.Close()
+
+	// Point seeded enabled provider at our mock server.
+	if err := b.db.Exec(`update ai_providers set base_url = ? where id = ?`, srv.URL, b.providerID).Error; err != nil {
+		t.Fatalf("update ai_provider base_url: %v", err)
+	}
+
+	mode = "optimize_ok"
+	optOut, err := b.svc.OptimizePromptToolPrompt(ctx, OptimizePromptToolInput{
+		Name:          "builtin.dml-max-rows",
+		Engine:        "mysql",
+		Parameters:    map[string]any{"max_rows": 50},
+		KnowledgeText: "Limit rows <= {{max_rows}}",
+	})
+	if err != nil || optOut.KnowledgeText != "Limit batch INSERT rows to {{max_rows}}." {
+		t.Fatalf("OptimizePromptToolPrompt happy path failed: out=%+v err=%v", optOut, err)
+	}
+
+	mode = "optimize_drop_placeholder"
+	if _, err := b.svc.OptimizePromptToolPrompt(ctx, OptimizePromptToolInput{
+		Name:          "builtin.dml-max-rows",
+		Engine:        "mysql",
+		Parameters:    map[string]any{"max_rows": 50},
+		KnowledgeText: "Limit rows <= {{max_rows}}",
+	}); !domain.IsCode(err, domain.CodeAIProviderFailed) {
+		t.Fatalf("expected 2011 when placeholder dropped, got %v", err)
+	}
+
+	mode = "generate_ok"
+	genOut, err := b.svc.GeneratePromptToolTestCases(ctx, GeneratePromptToolTestCasesInput{
+		Name:          "builtin.ddl-table-comment-required",
+		Engine:        "mysql",
+		KnowledgeText: "Require table COMMENT",
+	})
+	if err != nil || len(genOut.Cases) != 10 || !isStatementValidForCategory(genOut.Cases[0].SQL, skillCategoryDDL) {
+		t.Fatalf("GeneratePromptToolTestCases happy path failed: out=%+v err=%v", genOut, err)
+	}
+
+	mode = "generate_insufficient"
+	if _, err := b.svc.GeneratePromptToolTestCases(ctx, GeneratePromptToolTestCasesInput{
+		Name:          "builtin.ddl-table-comment-required",
+		Engine:        "mysql",
+		KnowledgeText: "Require table COMMENT",
+	}); !domain.IsCode(err, domain.CodeAIProviderFailed) {
+		t.Fatalf("expected 2011 on insufficient cases, got %v", err)
+	}
+
+	testCases := []PromptToolTestCase{
+		{ID: "case-1", SQL: "CREATE TABLE t_ok (id INT) COMMENT='ok';", ExpectedCompliant: true},
+		{ID: "case-2", SQL: "CREATE TABLE t_bad (id INT);", ExpectedCompliant: false},
+	}
+	mode = "run_ok"
+	runOut, err := b.svc.RunPromptToolTest(ctx, RunPromptToolTestInput{
+		Name:          "builtin.ddl-table-comment-required",
+		Engine:        "mysql",
+		KnowledgeText: "Require table COMMENT",
+		Cases:         testCases,
+	})
+	if err != nil || !runOut.Passed || runOut.MatchedCount != 2 {
+		t.Fatalf("RunPromptToolTest happy path failed: out=%+v err=%v", runOut, err)
+	}
+
+	mode = "run_partial"
+	if _, err := b.svc.RunPromptToolTest(ctx, RunPromptToolTestInput{
+		Name:          "builtin.ddl-table-comment-required",
+		Engine:        "mysql",
+		KnowledgeText: "Require table COMMENT",
+		Cases:         testCases,
+	}); !domain.IsCode(err, domain.CodeAIProviderFailed) {
+		t.Fatalf("expected 2011 when verdict omitted, got %v", err)
 	}
 }

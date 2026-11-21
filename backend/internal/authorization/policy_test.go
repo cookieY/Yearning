@@ -19,13 +19,13 @@ func TestActorDenyMatrix(t *testing.T) {
 		"builtin_admin": admin,
 	}
 	adminOps := []string{
-		OpListUsers, OpCreateUser, OpUpdateUser, OpDeleteUser, OpGetUserDeletionImpact,
-		OpListFlows, OpCreateFlow, OpGetFlow, OpReplaceFlow, OpDeleteFlow,
-		OpListDatasources, OpCreateDatasource, OpGetDatasource, OpReplaceDatasource, OpDeleteDatasource,
-		OpTestDatasourceConnection, OpGetDatasourceCapabilities,
-		OpListPermissionGroups, OpCreatePermissionGroup, OpGetPermissionGroup, OpReplacePermissionGroup, OpDeletePermissionGroup,
-		OpListIdentityProviders, OpCreateIdentityProvider, OpGetIdentityProvider, OpReplaceIdentityProvider,
-		OpDeleteIdentityProvider, OpTestIdentityProviderConnection,
+		"listUsers", "createUser", "updateUser", "deleteUser", "getUserDeletionImpact",
+		"listFlows", "createFlow", "getFlow", "replaceFlow", "deleteFlow",
+		"listDatasources", "createDatasource", "getDatasource", "replaceDatasource", "deleteDatasource",
+		"testDatasourceConnection", "getDatasourceCapabilities",
+		"listPermissionGroups", "createPermissionGroup", "getPermissionGroup", "replacePermissionGroup", "deletePermissionGroup",
+		"listIdentityProviders", "createIdentityProvider", "getIdentityProvider", "replaceIdentityProvider",
+		"deleteIdentityProvider", "testIdentityProviderConnection",
 	}
 	// admin_surface_cases: management surface allows only builtin_admin.
 	for _, op := range adminOps {
@@ -38,7 +38,7 @@ func TestActorDenyMatrix(t *testing.T) {
 	}
 	// Authentication entry points allow all classes (anonymous-authentication rule:
 	// callable by both anonymous and authenticated_user).
-	for _, op := range []string{OpLogin, OpRegister, OpListAuthenticationProviders, OpLoginWithLdap, OpStartOidcLogin, OpFinishOidcLogin} {
+	for _, op := range []string{"login", "register", "listAuthenticationProviders", "loginWithLdap", "startOidcLogin", "finishOidcLogin"} {
 		for name, actor := range actors {
 			if got := Decide(op, actor); !got {
 				t.Fatalf("%s by %s: decide=%v want=true", op, name, got)
@@ -46,7 +46,7 @@ func TestActorDenyMatrix(t *testing.T) {
 		}
 	}
 	// Authenticated operations: deny anonymous, allow all others.
-	for _, op := range []string{OpLogout, OpGetCurrentUser, OpListCurrentUserFlows, OpStreamDomainEvents} {
+	for _, op := range []string{"logout", "getCurrentUser", "listCurrentUserFlows", "streamDomainEvents"} {
 		for name, actor := range actors {
 			want := name != "anonymous"
 			if got := Decide(op, actor); got != want {
@@ -87,5 +87,42 @@ func TestClassify(t *testing.T) {
 	}
 	if Classify(&session.Identity{UserID: "x", Role: "admin"}) != ActorBuiltinAdmin {
 		t.Fatal("role=admin user must classify builtin_admin")
+	}
+}
+
+func TestIsBusinessRelationshipOperationAllowlist(t *testing.T) {
+	registered := []string{
+		"listChangeDrafts", "runDraftReview", "getTask",
+		"submitChangeDraft", "decideChangeOrder", "revealOrderSql",
+		"createExecutionAttempt", "cancelExecutionAttempt",
+		"executeSelect", "createExecutionSchedule", "cancelExecutionSchedule",
+		"sendAssistantMessage", "submitAssistantSqlDraftOrder",
+	}
+	admin := &session.Identity{UserID: "u", Username: "admin", IsBuiltinAdmin: true}
+	for _, op := range registered {
+		if !IsBusinessRelationshipOperation(op) {
+			t.Fatalf("expected %q in business-relationship allowlist", op)
+		}
+		// Must remain denied by Decide so admin identity alone grants no management override.
+		if Decide(op, admin) {
+			t.Fatalf("expected Decide(%q, admin) == false", op)
+		}
+	}
+	for _, nonBusiness := range []string{"", "totally-unknown", "createUser", "replaceFlow", "getMyDashboard"} {
+		if IsBusinessRelationshipOperation(nonBusiness) {
+			t.Fatalf("expected %q NOT in business-relationship allowlist", nonBusiness)
+		}
+	}
+}
+
+func TestKnownOperationsCountAndDisjointFromBusinessOps(t *testing.T) {
+	known := KnownOperations()
+	if len(known) != 108 {
+		t.Fatalf("expected 108 classified policy operations, got %d", len(known))
+	}
+	for op := range known {
+		if IsBusinessRelationshipOperation(op) {
+			t.Fatalf("operation %q cannot belong to both static policy and business-relationship allowlist", op)
+		}
 	}
 }

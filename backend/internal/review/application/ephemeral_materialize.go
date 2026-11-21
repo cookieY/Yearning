@@ -5,15 +5,34 @@
 package application
 
 import (
+	"bytes"
 	"context"
+	"strings"
 	"time"
 
 	"gorm.io/gorm"
+
+	"github.com/cookieY/YearningX/backend/internal/review/changeset"
+	"github.com/cookieY/YearningX/backend/internal/review/domain"
+	"github.com/cookieY/YearningX/backend/internal/review/persistence"
 )
 
-// MaterializeEphemeralRunTx materializes an ephemeral Run inside the submission transaction. draftID/draftRevision
-// are supplied by the submitter (trial Runs only learn their attached draft at submit time); row values are column-for-column isomorphic to the DB path.
+// MaterializeEphemeralRunTx materializes an ephemeral Run inside the submission transaction using er.SQLPlaintext
+// when statement rows were not kept inline.
 func (s *Services) MaterializeEphemeralRunTx(ctx context.Context, tx *gorm.DB, er *EphemeralRun, draftID string, draftRevision int64) error {
+	var sqlBytes []byte
+	if er != nil {
+		er.mu.RLock()
+		sqlBytes = er.SQLPlaintext
+		er.mu.RUnlock()
+	}
+	return s.MaterializeEphemeralRunTxWithSQL(ctx, tx, er, draftID, draftRevision, sqlBytes)
+}
+
+// MaterializeEphemeralRunTxWithSQL materializes an ephemeral Run inside the submission transaction. draftID/draftRevision
+// are supplied by the submitter (trial Runs only learn their attached draft at submit time); row values are column-for-column
+// isomorphic to the DB path, streaming large (>500 statement) batches directly from sqlBytes.
+func (s *Services) MaterializeEphemeralRunTxWithSQL(ctx context.Context, tx *gorm.DB, er *EphemeralRun, draftID string, draftRevision int64, sqlBytes []byte) error {
 	er.mu.RLock()
 	defer er.mu.RUnlock()
 	now := nowUTC()
@@ -36,6 +55,54 @@ func (s *Services) MaterializeEphemeralRunTx(ctx context.Context, tx *gorm.DB, e
 	if len(er.Statements) > 0 {
 		if err := tx.WithContext(ctx).CreateInBatches(er.Statements, 512).Error; err != nil {
 			return err
+		}
+	} else if er.Run.StatementCount > 0 && !er.skipStmtMaterialize {
+		if len(sqlBytes) == 0 || s.Engine == nil {
+			return domain.ErrCoverageIncomplete
+		}
+		split := changeset.NewSplitter(bytes.NewReader(sqlBytes), er.Profile, 0)
+		batch := make([]persistence.SQLStatementModel, 0, 512)
+		var ordinal int32
+		for {
+			st, done, serr := split.Next()
+			if serr != nil {
+				return domain.ErrCoverageIncomplete
+			}
+			if done {
+				break
+			}
+			ordinal++
+			res, aerr := s.Engine.Analyze(er.Profile, st.SQL, er.Mapper)
+			if aerr != nil {
+				return domain.ErrCoverageIncomplete
+			}
+			op := strings.ToLower(operationOf(st.SQL))
+			stmtID := er.repOrdinalToStmtID[ordinal]
+			if stmtID == "" {
+				stmtID = newID()
+			}
+			rowModel, berr := buildSQLStatementModel(
+				er.ID, stmtID, ordinal, res, op, statementClassOf(op),
+				objectsAtStatementOrdinal(res.Objects, ordinal),
+			)
+			if berr != nil {
+				return berr
+			}
+			batch = append(batch, rowModel)
+			if len(batch) == 512 {
+				if err := tx.WithContext(ctx).CreateInBatches(batch, 512).Error; err != nil {
+					return err
+				}
+				batch = batch[:0]
+			}
+		}
+		if ordinal != er.Run.StatementCount {
+			return domain.ErrCoverageIncomplete
+		}
+		if len(batch) > 0 {
+			if err := tx.WithContext(ctx).CreateInBatches(batch, 512).Error; err != nil {
+				return err
+			}
 		}
 	}
 	for i := range er.Groups {

@@ -40,8 +40,6 @@ func buildAssistantDeps(b3 *B3Deps, b6 *B6Deps, b9 *B9Deps) (*AssistantDeps, err
 	if b3 == nil || b3.DB == nil || b3.Crypter == nil || b6 == nil {
 		return nil, errors.New("assistant: missing platform dependencies")
 	}
-	var ordersSvc = (*assistantapp.Services)(nil)
-	_ = ordersSvc
 	var b9Orders = b9.Orders
 	svc, err := assistantapp.NewServices(b3.DB, b3.Crypter, b6.Review, b6.AgentRunner(), b9Orders)
 	if err != nil {
@@ -71,20 +69,10 @@ func writeAssistantErr(c *gin.Context, err error) bool {
 		return true
 	}
 	var de *assistantdomain.Error
-	if errors.As(err, &de) {
-		msg := de.Message
-		if msg == "" {
-			msg = "Business operation failed"
-		}
-		WriteBusinessError(c, &BusinessError{
-			Code:    de.Code,
-			Name:    de.Name,
-			Message: msg,
-			Meta:    de.Meta,
-		})
-		return true
+	if !errors.As(err, &de) {
+		return false
 	}
-	return false
+	return writeDomainCodedError(c, de.Code, de.Name, de.Message, de.Meta)
 }
 
 // HandleListAssistantSessions handles GET /ai-assistant/sessions.
@@ -333,9 +321,6 @@ func (d *AssistantDeps) HandlePrecheckAssistantSqlDraft(c *gin.Context) {
 		return
 	}
 	locale := resolveRequestOutputLocale(c, body.OutputLocale)
-	if d.B6 != nil {
-		d.B6.EnsureWorker()
-	}
 	res, err := d.Assistant.PrecheckDraft(c.Request.Context(), assistantActor(c), assistantapp.PrecheckDraftInput{
 		SessionID:      sessionID,
 		DraftID:        draftID,
@@ -436,7 +421,9 @@ func mountAssistantRoutes(engine *gin.Engine, deps ServeDeps) {
 	if deps.Assistant == nil || deps.B6 == nil {
 		return
 	}
-	guard := deps.B6.requireB6User
+	guard := func(op string) gin.HandlerFunc {
+		return RequireBusinessOperation(op, businessSessions(deps))
+	}
 	api := engine.Group("/api/v4/ai-assistant/sessions")
 	api.GET("", guard("listAssistantSessions"), deps.Assistant.HandleListAssistantSessions)
 	api.POST("", guard("createAssistantSession"), deps.Assistant.HandleCreateAssistantSession)

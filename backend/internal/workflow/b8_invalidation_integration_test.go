@@ -120,7 +120,7 @@ func TestB8ReplaceFlowKeepsEphemeralRunDecoupled(t *testing.T) {
 		"stage_review_snapshots", "sql_statements", "sql_fingerprint_groups", "review_runs",
 		"change_drafts", "draft_sql_payloads", "async_tasks", "idempotency_records",
 		"domain_events", "outbox_events", "audit_events",
-		"flow_approval_step_actors", "flow_execution_actors", "flow_approval_steps",
+		"flow_query_capabilities", "flow_approval_step_actors", "flow_execution_actors", "flow_approval_steps",
 		"flow_stages", "flows", "permission_group_flow_grants", "permission_group_members",
 		"permission_groups", "datasource_credentials", "datasource_tls_materials",
 		"datasources", "rule_sets", "prompt_tools", "users", "ai_providers",
@@ -429,4 +429,167 @@ func (fakeWFTools) IndexMetadata(_ context.Context, _, _ string) (map[string]any
 }
 func (fakeWFTools) SafeExplain(_ context.Context, _, _ string) (map[string]any, error) {
 	return map[string]any{"access_method": "sequential_scan", "estimated_rows": 0, "estimate": true}, nil
+}
+
+func TestB8BatchFlowViewsMatchGetAndCurrentUserFlows(t *testing.T) {
+	acquireB8Lock(t)
+	password := os.Getenv("YEARNING_TEST_DATABASE_PASSWORD")
+	if password == "" {
+		t.Skip("integration PostgreSQL not configured: set YEARNING_TEST_DATABASE_PASSWORD")
+	}
+	dsn := fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=disable",
+		envOr("YEARNING_TEST_DATABASE_HOST", "localhost"),
+		envOr("YEARNING_TEST_DATABASE_PORT", "54330"),
+		envOr("YEARNING_TEST_DATABASE_USER", "yearning"),
+		password,
+		envOr("YEARNING_TEST_DATABASE_DBNAME", "yearning_v4"))
+	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{Logger: gormlogger.Discard})
+	if err != nil {
+		t.Fatalf("connect: %v", err)
+	}
+	for _, tbl := range []string{
+		"flow_query_capabilities", "flow_approval_step_actors", "flow_execution_actors",
+		"flow_approval_steps", "flow_stages", "flows",
+		"permission_group_flow_grants", "permission_group_members", "permission_groups",
+		"datasource_credentials", "datasource_tls_materials", "datasources",
+		"rule_sets", "users", "domain_events", "outbox_events", "audit_events",
+	} {
+		if err := db.Exec("truncate table " + tbl).Error; err != nil {
+			t.Fatalf("truncate %s: %v", tbl, err)
+		}
+	}
+
+	key := make([]byte, 32)
+	fpKey := make([]byte, 32)
+	for i := range key {
+		key[i] = byte(i + 1)
+		fpKey[i] = byte(0x80 + i)
+	}
+	keyringDoc := fmt.Sprintf(`{"contract_version":1,"deployment_id":"b8-wf-batch-itest","keys":[
+		{"key_id":"pay-1","purpose":"payload","status":"encrypt_decrypt","created_at":"2026-08-25T00:00:00Z","key_base64":"%s"},
+		{"key_id":"fp-1","purpose":"sql_fingerprint","status":"encrypt_decrypt","created_at":"2026-08-25T00:00:00Z","key_base64":"%s"}]}`,
+		base64.StdEncoding.EncodeToString(key),
+		base64.StdEncoding.EncodeToString(fpKey))
+	dir := t.TempDir()
+	if err := os.WriteFile(dir+"/keyring.json", []byte(keyringDoc), 0o400); err != nil {
+		t.Fatal(err)
+	}
+	ring, err := crypto.LoadKeyring(dir + "/keyring.json")
+	if err != nil {
+		t.Fatalf("keyring: %v", err)
+	}
+	crypter, err := crypto.NewCrypter(ring)
+	if err != nil {
+		t.Fatal(err)
+	}
+	recorder, _ := auditlog.NewRecorder(db)
+	wf, err := NewService(db, crypter, recorder)
+	if err != nil {
+		t.Fatalf("NewService: %v", err)
+	}
+	ctx := context.Background()
+	adminID := uuid.NewString()
+	reviewer2ID := uuid.NewString()
+	ds1ID := uuid.NewString()
+	ds2ID := uuid.NewString()
+	rsID := uuid.NewString()
+	for _, u := range []struct {
+		id, name, role string
+	}{
+		{adminID, "wf-batch-admin", "admin"},
+		{reviewer2ID, "wf-batch-rev", "user"},
+	} {
+		if err := db.Exec(`insert into users (id, username, display_name, is_builtin_admin, role, created_at, updated_at)
+			values (?, ?, ?, false, ?, now(), now())`, u.id, u.name, u.name, u.role).Error; err != nil {
+			t.Fatalf("insert user %s: %v", u.name, err)
+		}
+	}
+	for _, ds := range []struct{ id, name string }{{ds1ID, "batch-ds-alpha"}, {ds2ID, "batch-ds-beta"}} {
+		if err := db.Exec(`insert into datasources (id, name, engine, compatibility_mode, deployment_kind,
+			host, port, database_name, version_constraint, enabled, identity_fingerprint, version, created_by_user_id, created_at, updated_at)
+			values (?, ?, 'mysql', 'mysql', 'native', 'db.example.com', 3306, 'shop', '8.0.x', true, ?, 1, ?, now(), now())`,
+			ds.id, ds.name, strings.Repeat("c", 63)+ds.id[:1], adminID).Error; err != nil {
+			t.Fatalf("insert ds %s: %v", ds.name, err)
+		}
+	}
+	if err := db.Exec(`insert into rule_sets (id, name, enabled, rules, config_hash, version, created_by_user_id, created_at, updated_at)
+		values (?, 'batch-rules', true, '{}'::jsonb, repeat('a', 64), 1, ?, now(), now())`, rsID, adminID).Error; err != nil {
+		t.Fatalf("insert rule_set: %v", err)
+	}
+
+	actor := AdminActor{UserID: adminID, Username: "wf-batch-admin"}
+	cfView, err := wf.CreateFlow(ctx, actor, &FlowWrite{
+		Name: "batch-change-flow", FlowType: "change_review", Enabled: true, RuleSetID: &rsID,
+		Stages: []StageWrite{
+			{
+				Position: 1, DatasourceID: ds1ID,
+				ApprovalSteps:   []ApprovalStepWrite{{Position: 1, Actors: []ActorRef{{UserID: reviewer2ID}, {UserID: adminID}}}},
+				ExecutionActors: []ActorRef{{UserID: adminID}},
+			},
+			{
+				Position: 2, DatasourceID: ds2ID,
+				ApprovalSteps: []ApprovalStepWrite{
+					{Position: 1, Actors: []ActorRef{{UserID: reviewer2ID}}},
+					{Position: 2, Actors: []ActorRef{{UserID: adminID}}},
+				},
+				ExecutionActors: []ActorRef{{UserID: reviewer2ID}},
+			},
+		},
+	}, RequestMeta{})
+	if err != nil {
+		t.Fatalf("CreateFlow change_review: %v", err)
+	}
+	qfView, err := wf.CreateFlow(ctx, actor, &FlowWrite{
+		Name: "batch-query-flow", FlowType: "query_access", Enabled: true,
+		ApprovalSteps: []ApprovalStepWrite{
+			{Position: 1, Actors: []ActorRef{{UserID: reviewer2ID}, {UserID: adminID}}},
+			{Position: 2, Actors: []ActorRef{{UserID: adminID}}},
+		},
+		QueryCapabilities: []QueryCapabilityWrite{
+			{DatasourceID: ds1ID, CanQuery: true, CanExport: false},
+			{DatasourceID: ds2ID, CanQuery: true, CanExport: true},
+		},
+	}, RequestMeta{})
+	if err != nil {
+		t.Fatalf("CreateFlow query_access: %v", err)
+	}
+
+	if _, err := wf.CreateGroup(ctx, actor, &GroupWrite{
+		Name: "batch-pg", Enabled: true,
+		MemberUserIDs:  []string{adminID},
+		GrantedFlowIDs: []string{cfView.ID, qfView.ID},
+	}, RequestMeta{}); err != nil {
+		t.Fatalf("CreateGroup: %v", err)
+	}
+
+	wantByID := make(map[string]*FlowView, 2)
+	for _, id := range []string{cfView.ID, qfView.ID} {
+		g, gerr := wf.Get(ctx, id)
+		if gerr != nil {
+			t.Fatalf("Get(%s): %v", id, gerr)
+		}
+		wantByID[id] = g
+	}
+
+	listed, next, err := wf.List(ctx, 50, "", "", "", nil)
+	if err != nil || next != nil || len(listed) != 2 {
+		t.Fatalf("List() = len(%d) next=%v err=%v", len(listed), next, err)
+	}
+	for i := range listed {
+		got := listed[i]
+		want := wantByID[got.ID]
+		if !reflect.DeepEqual(&got, want) {
+			t.Fatalf("List view mismatch for %s:\ngot:  %+v\nwant: %+v", got.ID, got, want)
+		}
+	}
+
+	for _, ft := range []string{"change_review", "query_access"} {
+		cur, _, cerr := wf.CurrentUserFlows(ctx, adminID, ft, 50, "")
+		if cerr != nil || len(cur) != 1 {
+			t.Fatalf("CurrentUserFlows(%s) = len(%d) err=%v", ft, len(cur), cerr)
+		}
+		if !reflect.DeepEqual(&cur[0], wantByID[cur[0].ID]) {
+			t.Fatalf("CurrentUserFlows(%s) mismatch:\ngot:  %+v\nwant: %+v", ft, cur[0], wantByID[cur[0].ID])
+		}
+	}
 }

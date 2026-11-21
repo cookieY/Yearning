@@ -133,6 +133,10 @@ func TestUnsupportedObjectMetadataCannotBeSkippedByEmptyComplete(t *testing.T) {
 	} {
 		t.Run(sql, func(t *testing.T) {
 			b := newB7Fixture(t)
+			if strings.HasPrefix(sql, "DROP INDEX ") {
+				// Standalone DROP INDEX without ON <table> is valid PostgreSQL DDL syntax.
+				usePostgresStage(t, b)
+			}
 			runID := b.runMetadataContextReview(t, b.fakeDial(emptyCompleteProviderBody), sql)
 			expectMetadataContextPartial(t, b, runID)
 		})
@@ -232,6 +236,17 @@ func configureIRS01Scope(t *testing.T, b *b7fx, schemas []string) {
 		schemas[0], b.flowID).Error; err != nil {
 		t.Fatalf("point datasource default database at the scope schema: %v", err)
 	}
+}
+
+func usePostgresStage(t *testing.T, b *b7fx) {
+	t.Helper()
+	if err := b.db.Exec(`update datasources
+		set engine = 'postgresql', compatibility_mode = 'postgresql', version_constraint = '17.x'
+		where id in (select datasource_id from flow_stages where flow_id = ?)`,
+		b.flowID).Error; err != nil {
+		t.Fatalf("switch stage datasource to postgresql: %v", err)
+	}
+	stubPostgresStageSeams(b.fx)
 }
 
 func irs01SerializeAndDecodeRequest(
@@ -414,6 +429,8 @@ func TestIRS01UnqualifiedDropTableGraphScopeAndEmptyComplete(t *testing.T) {
 func TestIRS01UnqualifiedDropIndexHasNoCompleteMetadataParent(t *testing.T) {
 	b := newB7Fixture(t)
 	b.configureMetadataContextScope(t)
+	// Standalone DROP INDEX without ON <table> is valid PostgreSQL DDL syntax.
+	usePostgresStage(t, b)
 	source := &irs01RecordingFactSource{fakeFactSource: &fakeFactSource{}}
 	var serialized []byte
 	deps := b.irs01Deps(source, func(req provider.Request) ([]byte, int, error) {
@@ -425,7 +442,7 @@ func TestIRS01UnqualifiedDropIndexHasNoCompleteMetadataParent(t *testing.T) {
 		}
 		indexes := irs01ObjectsOfKind(group, "index", "target")
 		if len(indexes) != 1 || indexes[0].Token == "" ||
-			indexes[0].SchemaToken == "" || indexes[0].ParentToken != "" {
+			indexes[0].SchemaToken != "" || indexes[0].ParentToken != "" {
 			t.Fatalf("standalone DROP INDEX target graph = %+v", indexes)
 		}
 		if tables := irs01ObjectsOfKind(group, "table", "target"); len(tables) != 0 {

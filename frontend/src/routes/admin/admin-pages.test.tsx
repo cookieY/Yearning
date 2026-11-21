@@ -24,7 +24,7 @@ import AdminRuleSetsPage from "@/routes/admin/admin-rule-sets-page";
 import AdminReviewSkillsPage from "@/routes/admin/admin-review-skills-page";
 import AdminReviewKnowledgePage from "@/routes/admin/admin-review-knowledge-page";
 import { renderSkillDescription } from "@/features/admin/skill-description";
-import { convertParamDrafts, paramTypeKey, stringifyParamDrafts } from "@/features/admin/review-input-page";
+import { convertParamDrafts, paramTypeKey, stringifyParamDrafts } from "@/features/admin/skills-management-page";
 
 /**
  * FE-F9-REVIEW-ADMIN acceptance-gate component tests. The five package
@@ -751,6 +751,76 @@ describe("review-input dialog coverage", () => {
     expect(screen.getByTestId("knowledge-table")).toBeInTheDocument();
     await userEvent.click(screen.getByTestId("review-input-submit"));
     await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+  });
+
+  it("omits hidden scope locators when broadening a table-scoped knowledge entry to datasource or global", async () => {
+    const capturedBodies: Record<string, unknown>[] = [];
+    server.use(
+      http.put("*/admin/knowledge-entries/:id", async ({ request }) => {
+        const body = (await request.json()) as Record<string, unknown>;
+        capturedBodies.push(body);
+        return HttpResponse.json({
+          err_code: 0,
+          message: "ok",
+          data: {
+            id: "k-broaden-1",
+            name: typeof body.name === "string" ? body.name : "orderdb.orders",
+            purpose: typeof body.purpose === "string" ? body.purpose : null,
+            state: typeof body.state === "string" ? body.state : "draft",
+            scope_type: typeof body.scope_type === "string" ? body.scope_type : "global",
+            datasource_id: typeof body.datasource_id === "string" ? body.datasource_id : null,
+            database_name: typeof body.database_name === "string" ? body.database_name : null,
+            table_name: typeof body.table_name === "string" ? body.table_name : null,
+            definition: body.definition ?? { knowledge_text: "t", max_severity: "medium", version: 1 },
+            provenance: "manual",
+            source_finding_id: null,
+            version: 2,
+            config_hash: "cfg-broaden",
+            created_at: "2026-08-31T00:00:00Z",
+            updated_at: "2026-08-31T00:00:00Z",
+          },
+          request_id: "req-k-broaden",
+        });
+      }),
+    );
+
+    renderPage(<AdminReviewKnowledgePage />);
+    const rows = await screen.findAllByTestId(/review-input-row-/);
+    const tableRow = rows.find((row) => row.textContent.includes("orderdb.orders"));
+    if (tableRow === undefined) throw new Error("table-scoped row not rendered");
+
+    // Case 1: broaden table -> global (all three scope locators must be omitted).
+    await userEvent.click(within(tableRow).getByTestId(/review-input-edit-/));
+    await userEvent.click(screen.getByTestId("knowledge-scope"));
+    await userEvent.click(await screen.findByRole("option", { name: "\u5168\u5c40" }));
+    expect(screen.queryByTestId("knowledge-database")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("knowledge-table")).not.toBeInTheDocument();
+    await userEvent.click(screen.getByTestId("review-input-submit"));
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+
+    expect(capturedBodies).toHaveLength(1);
+    expect(capturedBodies[0]).toMatchObject({ scope_type: "global" });
+    expect(capturedBodies[0]?.datasource_id).toBeUndefined();
+    expect(capturedBodies[0]?.database_name).toBeUndefined();
+    expect(capturedBodies[0]?.table_name).toBeUndefined();
+
+    // Case 2: broaden table -> datasource (datasource_id and database_name remain, table_name omitted).
+    const rowsAfterBroaden = await screen.findAllByTestId(/review-input-row-/);
+    const tableRowAgain = rowsAfterBroaden.find((row) => row.textContent.includes("orderdb.orders"));
+    if (tableRowAgain === undefined) throw new Error("table-scoped row not rendered after first save");
+    await userEvent.click(within(tableRowAgain).getByTestId(/review-input-edit-/));
+    await userEvent.click(screen.getByTestId("knowledge-scope"));
+    await userEvent.click(await screen.findByRole("option", { name: "\u6570\u636e\u6e90\u7ea7" }));
+    expect(screen.getByTestId("knowledge-database")).toBeInTheDocument();
+    expect(screen.queryByTestId("knowledge-table")).not.toBeInTheDocument();
+    await userEvent.click(screen.getByTestId("review-input-submit"));
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+
+    expect(capturedBodies).toHaveLength(2);
+    expect(capturedBodies[1]?.scope_type).toBe("datasource");
+    expect(capturedBodies[1]?.datasource_id).toBeTruthy();
+    expect(capturedBodies[1]?.database_name).toBe("orderdb");
+    expect(capturedBodies[1]?.table_name).toBeUndefined();
   });
 
   it("deletes a draft entry successfully and surfaces the referenced error on a converted one", async () => {

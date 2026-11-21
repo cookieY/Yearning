@@ -25,18 +25,6 @@ import type {
 
 import { customInstance } from '../../../../shared/api/mutator';
 
-export type listAssistantSessionsResponse200 = {
-  data: ListAssistantSessions200
-  status: 200
-}
-
-export type listAssistantSessionsResponseSuccess = (listAssistantSessionsResponse200) & {
-  headers: Headers;
-};
-;
-
-export type listAssistantSessionsResponse = (listAssistantSessionsResponseSuccess)
-
 export const getListAssistantSessionsUrl = (params?: ListAssistantSessionsParams,) => {
   const normalizedParams = new URLSearchParams();
 
@@ -52,9 +40,9 @@ export const getListAssistantSessionsUrl = (params?: ListAssistantSessionsParams
   return stringifiedParams.length > 0 ? `/api/v4/ai-assistant/sessions?${stringifiedParams}` : `/api/v4/ai-assistant/sessions`
 }
 
-export const listAssistantSessions = async (params?: ListAssistantSessionsParams, options?: Parameters<typeof customInstance>[1]): Promise<listAssistantSessionsResponse> => {
+export const listAssistantSessions = async (params?: ListAssistantSessionsParams, options?: Parameters<typeof customInstance>[1]): Promise<ListAssistantSessions200> => {
 
-  return customInstance<listAssistantSessionsResponse>(getListAssistantSessionsUrl(params),
+  return customInstance<ListAssistantSessions200>(getListAssistantSessionsUrl(params),
   {
     ...options,
     method: 'GET'
@@ -63,18 +51,6 @@ export const listAssistantSessions = async (params?: ListAssistantSessionsParams
   }
 );}
 
-
-export type createAssistantSessionResponse200 = {
-  data: CreateAssistantSession200
-  status: 200
-}
-
-export type createAssistantSessionResponseSuccess = (createAssistantSessionResponse200) & {
-  headers: Headers;
-};
-;
-
-export type createAssistantSessionResponse = (createAssistantSessionResponseSuccess)
 
 export const getCreateAssistantSessionUrl = () => {
 
@@ -84,7 +60,7 @@ export const getCreateAssistantSessionUrl = () => {
   return `/api/v4/ai-assistant/sessions`
 }
 
-export const createAssistantSession = async (createAssistantSessionRequest?: CreateAssistantSessionRequest, options?: Parameters<typeof customInstance>[1]): Promise<createAssistantSessionResponse> => {
+export const createAssistantSession = async (createAssistantSessionRequest?: CreateAssistantSessionRequest, options?: Parameters<typeof customInstance>[1]): Promise<CreateAssistantSession200> => {
 
     const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
@@ -92,7 +68,7 @@ export const createAssistantSession = async (createAssistantSessionRequest?: Cre
     if (Array.isArray(h)) return Object.fromEntries(h);
     return h;
   };
-return customInstance<createAssistantSessionResponse>(getCreateAssistantSessionUrl(),
+return customInstance<CreateAssistantSession200>(getCreateAssistantSessionUrl(),
   {
     ...options,
     method: 'POST',
@@ -102,18 +78,6 @@ return customInstance<createAssistantSessionResponse>(getCreateAssistantSessionU
 );}
 
 
-export type getAssistantSessionResponse200 = {
-  data: GetAssistantSession200
-  status: 200
-}
-
-export type getAssistantSessionResponseSuccess = (getAssistantSessionResponse200) & {
-  headers: Headers;
-};
-;
-
-export type getAssistantSessionResponse = (getAssistantSessionResponseSuccess)
-
 export const getGetAssistantSessionUrl = (sessionId: string,) => {
 
 
@@ -122,9 +86,9 @@ export const getGetAssistantSessionUrl = (sessionId: string,) => {
   return `/api/v4/ai-assistant/sessions/${sessionId}`
 }
 
-export const getAssistantSession = async (sessionId: string, options?: Parameters<typeof customInstance>[1]): Promise<getAssistantSessionResponse> => {
+export const getAssistantSession = async (sessionId: string, options?: Parameters<typeof customInstance>[1]): Promise<GetAssistantSession200> => {
 
-  return customInstance<getAssistantSessionResponse>(getGetAssistantSessionUrl(sessionId),
+  return customInstance<GetAssistantSession200>(getGetAssistantSessionUrl(sessionId),
   {
     ...options,
     method: 'GET'
@@ -134,18 +98,6 @@ export const getAssistantSession = async (sessionId: string, options?: Parameter
 );}
 
 
-export type deleteAssistantSessionResponse200 = {
-  data: NullBusinessResultResponse
-  status: 200
-}
-
-export type deleteAssistantSessionResponseSuccess = (deleteAssistantSessionResponse200) & {
-  headers: Headers;
-};
-;
-
-export type deleteAssistantSessionResponse = (deleteAssistantSessionResponseSuccess)
-
 export const getDeleteAssistantSessionUrl = (sessionId: string,) => {
 
 
@@ -154,9 +106,9 @@ export const getDeleteAssistantSessionUrl = (sessionId: string,) => {
   return `/api/v4/ai-assistant/sessions/${sessionId}`
 }
 
-export const deleteAssistantSession = async (sessionId: string, options?: Parameters<typeof customInstance>[1]): Promise<deleteAssistantSessionResponse> => {
+export const deleteAssistantSession = async (sessionId: string, options?: Parameters<typeof customInstance>[1]): Promise<NullBusinessResultResponse> => {
 
-  return customInstance<deleteAssistantSessionResponse>(getDeleteAssistantSessionUrl(sessionId),
+  return customInstance<NullBusinessResultResponse>(getDeleteAssistantSessionUrl(sessionId),
   {
     ...options,
     method: 'DELETE'
@@ -165,23 +117,6 @@ export const deleteAssistantSession = async (sessionId: string, options?: Parame
   }
 );}
 
-
-export type sendAssistantMessageResponse200ApplicationJson = {
-  data: SendAssistantMessage200One
-  status: 200
-}
-
-export type sendAssistantMessageResponse200TextEventStream = {
-  data: string
-  status: 200
-}
-
-export type sendAssistantMessageResponseSuccess = (sendAssistantMessageResponse200ApplicationJson | sendAssistantMessageResponse200TextEventStream) & {
-  headers: Headers;
-};
-;
-
-export type sendAssistantMessageResponse = (sendAssistantMessageResponseSuccess)
 
 export const getSendAssistantMessageUrl = (sessionId: string,) => {
 
@@ -192,7 +127,7 @@ export const getSendAssistantMessageUrl = (sessionId: string,) => {
 }
 
 export const sendAssistantMessage = async (sessionId: string,
-    sendAssistantMessageRequest: SendAssistantMessageRequest, options?: Parameters<typeof customInstance>[1]): Promise<sendAssistantMessageResponse> => {
+    sendAssistantMessageRequest: SendAssistantMessageRequest, options?: Parameters<typeof customInstance>[1]): Promise<SendAssistantMessage200One | string> => {
 
     const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
@@ -200,7 +135,7 @@ export const sendAssistantMessage = async (sessionId: string,
     if (Array.isArray(h)) return Object.fromEntries(h);
     return h;
   };
-return customInstance<sendAssistantMessageResponse>(getSendAssistantMessageUrl(sessionId),
+return customInstance<SendAssistantMessage200One | string>(getSendAssistantMessageUrl(sessionId),
   {
     ...options,
     method: 'POST',
@@ -209,18 +144,6 @@ return customInstance<sendAssistantMessageResponse>(getSendAssistantMessageUrl(s
   }
 );}
 
-
-export type cancelAssistantMessageStreamResponse200 = {
-  data: CancelAssistantMessageStream200
-  status: 200
-}
-
-export type cancelAssistantMessageStreamResponseSuccess = (cancelAssistantMessageStreamResponse200) & {
-  headers: Headers;
-};
-;
-
-export type cancelAssistantMessageStreamResponse = (cancelAssistantMessageStreamResponseSuccess)
 
 export const getCancelAssistantMessageStreamUrl = (sessionId: string,
     messageId: string,) => {
@@ -232,9 +155,9 @@ export const getCancelAssistantMessageStreamUrl = (sessionId: string,
 }
 
 export const cancelAssistantMessageStream = async (sessionId: string,
-    messageId: string, options?: Parameters<typeof customInstance>[1]): Promise<cancelAssistantMessageStreamResponse> => {
+    messageId: string, options?: Parameters<typeof customInstance>[1]): Promise<CancelAssistantMessageStream200> => {
 
-  return customInstance<cancelAssistantMessageStreamResponse>(getCancelAssistantMessageStreamUrl(sessionId,messageId),
+  return customInstance<CancelAssistantMessageStream200>(getCancelAssistantMessageStreamUrl(sessionId,messageId),
   {
     ...options,
     method: 'POST'
@@ -243,18 +166,6 @@ export const cancelAssistantMessageStream = async (sessionId: string,
   }
 );}
 
-
-export type precheckAssistantSqlDraftResponse200 = {
-  data: PrecheckAssistantSqlDraft200
-  status: 200
-}
-
-export type precheckAssistantSqlDraftResponseSuccess = (precheckAssistantSqlDraftResponse200) & {
-  headers: Headers;
-};
-;
-
-export type precheckAssistantSqlDraftResponse = (precheckAssistantSqlDraftResponseSuccess)
 
 export const getPrecheckAssistantSqlDraftUrl = (sessionId: string,
     draftId: string,) => {
@@ -267,7 +178,7 @@ export const getPrecheckAssistantSqlDraftUrl = (sessionId: string,
 
 export const precheckAssistantSqlDraft = async (sessionId: string,
     draftId: string,
-    precheckAssistantSqlDraftRequest: PrecheckAssistantSqlDraftRequest, options?: Parameters<typeof customInstance>[1]): Promise<precheckAssistantSqlDraftResponse> => {
+    precheckAssistantSqlDraftRequest: PrecheckAssistantSqlDraftRequest, options?: Parameters<typeof customInstance>[1]): Promise<PrecheckAssistantSqlDraft200> => {
 
     const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
@@ -275,7 +186,7 @@ export const precheckAssistantSqlDraft = async (sessionId: string,
     if (Array.isArray(h)) return Object.fromEntries(h);
     return h;
   };
-return customInstance<precheckAssistantSqlDraftResponse>(getPrecheckAssistantSqlDraftUrl(sessionId,draftId),
+return customInstance<PrecheckAssistantSqlDraft200>(getPrecheckAssistantSqlDraftUrl(sessionId,draftId),
   {
     ...options,
     method: 'POST',
@@ -284,18 +195,6 @@ return customInstance<precheckAssistantSqlDraftResponse>(getPrecheckAssistantSql
   }
 );}
 
-
-export type submitAssistantSqlDraftOrderResponse200 = {
-  data: SubmitAssistantSqlDraftOrder200
-  status: 200
-}
-
-export type submitAssistantSqlDraftOrderResponseSuccess = (submitAssistantSqlDraftOrderResponse200) & {
-  headers: Headers;
-};
-;
-
-export type submitAssistantSqlDraftOrderResponse = (submitAssistantSqlDraftOrderResponseSuccess)
 
 export const getSubmitAssistantSqlDraftOrderUrl = (sessionId: string,
     draftId: string,) => {
@@ -308,7 +207,7 @@ export const getSubmitAssistantSqlDraftOrderUrl = (sessionId: string,
 
 export const submitAssistantSqlDraftOrder = async (sessionId: string,
     draftId: string,
-    submitAssistantSqlDraftOrderRequest: SubmitAssistantSqlDraftOrderRequest, options?: Parameters<typeof customInstance>[1]): Promise<submitAssistantSqlDraftOrderResponse> => {
+    submitAssistantSqlDraftOrderRequest: SubmitAssistantSqlDraftOrderRequest, options?: Parameters<typeof customInstance>[1]): Promise<SubmitAssistantSqlDraftOrder200> => {
 
     const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
@@ -316,7 +215,7 @@ export const submitAssistantSqlDraftOrder = async (sessionId: string,
     if (Array.isArray(h)) return Object.fromEntries(h);
     return h;
   };
-return customInstance<submitAssistantSqlDraftOrderResponse>(getSubmitAssistantSqlDraftOrderUrl(sessionId,draftId),
+return customInstance<SubmitAssistantSqlDraftOrder200>(getSubmitAssistantSqlDraftOrderUrl(sessionId,draftId),
   {
     ...options,
     method: 'POST',

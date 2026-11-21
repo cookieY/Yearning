@@ -15,7 +15,6 @@ import ProfilePage from "@/routes/profile/profile-page";
 import AdminSettingsNamespacePage from "@/routes/admin/admin-settings-page";
 import AdminAiBudgetPage from "@/routes/admin/admin-ai-budget-page";
 import AdminIdentityProvidersPage from "@/routes/admin/admin-identity-providers-page";
-import AdminNotificationsPage from "@/routes/admin/admin-notifications-page";
 import WorkspaceHomePage from "@/routes/workspace/workspace-home-page";
 import { QueryOrdersTab } from "@/routes/changes/query-orders-tab";
 
@@ -60,6 +59,23 @@ function renderPage(ui: React.ReactElement): void {
     <QueryClientProvider client={client}>
       <SessionProvider>
         <MemoryRouter>{ui}</MemoryRouter>
+      </SessionProvider>
+    </QueryClientProvider>,
+  );
+}
+
+function renderNotificationsPage(): void {
+  const client = new QueryClient({
+    defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+  });
+  render(
+    <QueryClientProvider client={client}>
+      <SessionProvider>
+        <MemoryRouter initialEntries={["/admin/settings/notifications"]}>
+          <Routes>
+            <Route path="/admin/settings/:namespace" element={<AdminSettingsNamespacePage />} />
+          </Routes>
+        </MemoryRouter>
       </SessionProvider>
     </QueryClientProvider>,
   );
@@ -183,7 +199,7 @@ describe("settings tabs (§18.47; AI budget moved out 2026-10-31)", () => {
 
   it("the notifications page keeps the five-tab settings bar", async () => {
     stubSession(true);
-    renderPage(<AdminNotificationsPage />);
+    renderNotificationsPage();
     for (const label of ["\u901a\u7528", "\u67e5\u8be2", "\u6267\u884c", "\u54c1\u724c", "\u901a\u77e5"]) {
       const tab = await screen.findByRole("tab", { name: label });
       expect(tab).toBeVisible();
@@ -301,7 +317,7 @@ describe("AI budget usage ring (2026-10-31 round 3)", () => {
 describe("notification channels page", () => {
   it("lists channels with secret presence and the Outbox deliveries (S007 three views)", async () => {
     stubSession(true);
-    renderPage(<AdminNotificationsPage />);
+    renderNotificationsPage();
     await screen.findByTestId("admin-notifications-table");
     expect(screen.getByTestId("admin-notifications-table").textContent).toContain("ops-mail");
     // Delivery records moved into the three-view switch: switch to the deliveries view before asserting. Base UI Tab does not respond
@@ -318,7 +334,7 @@ describe("notification channels page", () => {
 
   it("keeps the create button in the table card header, not the page header (round 4)", async () => {
     stubSession(true);
-    renderPage(<AdminNotificationsPage />);
+    renderNotificationsPage();
     const create = await screen.findByTestId("admin-notifications-create");
     // Button sits in the card header (card-action slot), not in the page header actions.
     expect(create.closest('[data-slot="card-action"]')).not.toBeNull();
@@ -327,7 +343,7 @@ describe("notification channels page", () => {
 
   it("shows the test-delivery outcome on the channel row (async task poll)", async () => {
     stubSession(true);
-    renderPage(<AdminNotificationsPage />);
+    renderNotificationsPage();
     await screen.findByTestId("admin-notifications-table");
     await openRowActions(`admin-channel-actions-${ADMIN_FIXTURE_CHANNEL_EMAIL_ID}`);
     await userEvent.click(screen.getByTestId(`admin-channel-test-${ADMIN_FIXTURE_CHANNEL_EMAIL_ID}`));
@@ -347,7 +363,7 @@ describe("notification channels page", () => {
 describe("notification rules view (S007)", () => {
   it("lists rules with event vocabulary and no AI pre-review triggers", async () => {
     stubSession(true);
-    renderPage(<AdminNotificationsPage />);
+    renderNotificationsPage();
     (await screen.findByTestId("admin-notifications-view-rules"));
     await userEvent.click(screen.getByTestId("admin-notifications-view-rules"));
     await screen.findByTestId("admin-rules-table");
@@ -357,7 +373,7 @@ describe("notification rules view (S007)", () => {
 
   it("supports filling the default template, inserting allowlisted placeholders, previewing, and saving a custom rule template", async () => {
     stubSession(true);
-    renderPage(<AdminNotificationsPage />);
+    renderNotificationsPage();
     await userEvent.click(await screen.findByTestId("admin-notifications-view-rules"));
     await screen.findByTestId("admin-rules-table");
     await userEvent.click(screen.getByTestId("admin-rules-create"));

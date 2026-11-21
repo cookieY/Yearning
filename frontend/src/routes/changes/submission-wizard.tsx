@@ -1,26 +1,15 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
-import { Link, useNavigate, useParams } from "react-router";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useNavigate, useParams } from "react-router";
+import { useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import type {
   ChangeDraft,
-  Flow,
   ReviewFinding,
 } from "@/api/generated/client/yearningV4HTTPAPI.schemas";
-import {
-  createChangeDraft,
-  replaceDraftSql,
-  revealDraftSql,
-  runDraftReview,
-  updateChangeDraft,
-} from "@/api/generated/client/change-drafts/change-drafts";
-import { submitChangeDraft } from "@/api/generated/client/change-orders/change-orders";
-import { DateTimePicker } from "@/shared/components/ui/date-time-picker";
 import { appToast } from "@/shared/components/shadcn-dashboard/sonner/sonner-08";
 import { useDraftEditorStore, selectDirty } from "@/features/review/draft-editor-store";
 import {
   computePrecheckProgress,
-  gateBlockers,
   isTerminalPhase,
   presentPhase,
   submissionDecision,
@@ -39,66 +28,44 @@ import {
   BULK_MODE_MIN_STATEMENTS,
 } from "@/features/review/bulk-constants";
 import { EvidenceSheet } from "@/features/review/evidence-sheet";
+import type { FindingListState } from "@/features/review/finding-list";
+import { PrecheckResultDialog } from "@/features/review/precheck-result-dialog";
 import {
-  FindingList,
-  type FindingListState,
-} from "@/features/review/finding-list";
-import { ReviewAllClear } from "@/features/review/review-all-clear";
-import { ReviewStatusCard } from "@/features/review/review-status-card";
+  FlowPicker,
+  FormSection,
+  MetaFields,
+  SubmitConfirmDialog,
+  SummaryRow,
+  isoToRequestedFor,
+  requestedForToIso,
+} from "@/features/review/submission-dialogs";
 import { SqlEditorPanel } from "@/features/review/sql-editor-panel";
 import { StagePath } from "@/features/review/stage-path";
 import { FlowTimelineCard } from "@/features/review/flow-timeline-card";
-import { startReviewEvents, stopReviewEvents } from "@/features/review/review-events";
 import {
+  saveDraftSqlRequest,
   useChangeDraft,
+  useCreateChangeDraftMutation,
   useCurrentUserChangeFlows,
   useFlowUpdated,
+  useRevealDraftSqlMutation,
   useReviewFindings,
   useReviewRun,
+  useRunDraftReviewMutation,
+  useSaveDraftSqlMutation,
+  useSubmitChangeDraftMutation,
+  useUpdateChangeDraftMutation,
 } from "@/features/review/use-draft-workspace";
-import { describeError } from "@/shared/api/error-display";
+import { businessErrCodeByName, describeError, describeErrorText } from "@/shared/api/error-display";
 import { BusinessError, TransportError } from "@/shared/api/mutator";
 import { ErrorState } from "@/shared/components/status/status-components";
 import { LoadingState } from "@/shared/components/status/loading-state";
 import { EmptyState } from "@/shared/components/status/empty-state";
 import { PageLayout } from "@/shared/components/page-layout";
 import { PendingButton } from "@/shared/components/pending-button";
-import { TableSearchInput } from "@/shared/components/table-search-input";
-import { Alert, AlertDescription, AlertTitle } from "@/shared/components/ui/alert";
-import { Badge } from "@/shared/components/ui/badge";
 import { Button } from "@/shared/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/shared/components/ui/card";
-import { Checkbox } from "@/shared/components/ui/checkbox";
-import { Input } from "@/shared/components/ui/input";
-import { Label } from "@/shared/components/ui/label";
-import { Progress } from "@/shared/components/ui/progress";
-import { Spinner } from "@/shared/components/ui/spinner";
-import { Tabs, TabsList, TabsTrigger } from "@/shared/components/ui/tabs";
-import { ScrollArea } from "@/shared/components/ui/scroll-area";
-import { TAB_PANEL_VARIANTS, TransitionPanel } from "@/shared/components/ui/transition-panel";
-import { MarkdownEditor } from "@/shared/components/markdown-editor";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/shared/components/ui/dialog";
-import {
-  CheckCircle2,
-  CircleAlert,
-  Loader2,
-  Play,
-  RotateCcw,
-  Send,
-  ShieldAlert,
-} from "lucide-react";
-import { randomUUID } from "@/shared/lib/uuid";
-
-function reviewOutputLanguage(language: string): "zh-CN" | "en-US" {
-  return language.toLowerCase().startsWith("en") ? "en-US" : "zh-CN";
-}
+import { CircleAlert, Play } from "lucide-react";
 
 /**
  * Workspace for the order submission journey (one-page continuous form +
@@ -166,315 +133,6 @@ function sameDraftMetadata(
     && left.rollback_enabled === right.rollback_enabled;
 }
 
-
-function idempotencyKey(): string {
-  return `draft-${randomUUID()}`;
-}
-
-// §18.74: If-Match on all draft mutation endpoints (sql/metadata/review/submit) compares against
-// draft row version (backend updateDraftVersioned/Submit both compare version); SQL content
-// revision is only the content number bound to a review — the two diverge after review completes, so revision must never be used as If-Match.
-function ifMatch(version: number | null): Record<string, string> {
-  return { "If-Match": `"${String(version ?? 1)}"` };
-}
-
-/** Optimistic-concurrency header built from the live store state: inside a
- * save→run chain the zustand update from the PUT response has already landed
- * here even though React has not re-rendered yet. */
-function liveIfMatch(): Record<string, string> {
-  return ifMatch(useDraftEditorStore.getState().savedVersion);
-}
-
-interface MetaFieldsProps {
-  title: string;
-  description: string;
-  onTitleChange: (title: string) => void;
-  onDescriptionChange: (description: string) => void;
-  titleError?: string | null;
-  /** §18.56 Option B: requested execution time (datetime-local string, empty = unset). */
-  requestedFor: string;
-  onRequestedForChange: (value: string) => void;
-  requestedForError?: string | null;
-  rollbackEnabled: boolean;
-  onRollbackEnabledChange: (checked: boolean) => void;
-  isRollbackDraft?: boolean;
-  sourceOrderId?: string | null;
-  sourceOrderDisplayNumber?: string | null;
-}
-
-/** Title / description / requested execution time / rollback-enabled fields of the Title & Description section in both modes. */
-function MetaFields({
-  title,
-  description,
-  onTitleChange,
-  onDescriptionChange,
-  requestedFor,
-  onRequestedForChange,
-  titleError,
-  requestedForError,
-  rollbackEnabled,
-  onRollbackEnabledChange,
-  isRollbackDraft = false,
-  sourceOrderId = null,
-  sourceOrderDisplayNumber = null,
-}: MetaFieldsProps) {
-  const { t } = useTranslation();
-  return (
-    <div className="grid gap-y-4">
-      {isRollbackDraft && (
-        <div
-          className="bg-muted/40 flex flex-wrap items-center justify-between gap-2 rounded-lg border px-3.5 py-2.5 text-sm"
-          data-testid="wizard-rollback-draft-banner"
-        >
-          <span className="flex items-center gap-2 font-medium">
-            <RotateCcw className="size-4 shrink-0" aria-hidden />
-            <Badge variant="outline">{t("orders.rollback.ticketBadge")}</Badge>
-            <span>{t("precheck.wizard.rollbackDraftBanner")}</span>
-          </span>
-          {sourceOrderId != null && (
-            <Link
-              to={`/changes/orders/${sourceOrderId}`}
-              className="text-foreground underline underline-offset-4 hover:opacity-80 font-mono text-xs"
-              data-testid="wizard-rollback-source-order-link"
-            >
-              {sourceOrderDisplayNumber ?? sourceOrderId}
-            </Link>
-          )}
-        </div>
-      )}
-      <div className="flex flex-col gap-1.5">
-        <Label htmlFor="draft-title-input" className="mb-1">{t("precheck.new.dialog.titleLabel")}<span className="text-destructive" aria-hidden>*</span></Label>
-        <Input
-          id="draft-title-input"
-          value={title}
-          onChange={(event) => { onTitleChange(event.target.value); }}
-          maxLength={256}
-          placeholder={t("precheck.wizard.titlePlaceholder")}
-          aria-invalid={titleError != null}
-          className="rounded-lg text-sm md:text-sm"
-          data-testid="draft-title-input"
-        />
-        {titleError != null && (
-          <p className="text-destructive text-xs" data-testid="wizard-title-error">{titleError}</p>
-        )}
-      </div>
-      <div className="grid gap-4 md:grid-cols-2 md:items-start">
-        <div className="flex flex-col gap-1.5">
-          <Label htmlFor="draft-requested-for" className="text-sm font-semibold">{t("precheck.wizard.requestedScheduleLabel")}</Label>
-          <DateTimePicker
-            id="draft-requested-for"
-            value={requestedFor}
-            onChange={onRequestedForChange}
-            enforceFuture
-            ariaLabel={t("precheck.wizard.requestedScheduleLabel")}
-            placeholder={t("precheck.wizard.requestedSchedulePlaceholder")}
-            testId="draft-requested-for"
-            className="w-full"
-            inputClassName="h-10 w-full text-sm"
-          />
-          <p className="text-muted-foreground text-[13px]" data-testid="draft-requested-for-hint">
-            {t("precheck.wizard.requestedScheduleHint")}
-          </p>
-          {requestedForError != null && (
-            <p className="text-destructive text-xs" data-testid="wizard-requested-for-error">{requestedForError}</p>
-          )}
-        </div>
-        <div className="flex flex-col gap-1.5">
-          <div className="flex items-center gap-2.5">
-            <Checkbox
-              id="draft-rollback-enabled"
-              checked={isRollbackDraft ? false : rollbackEnabled}
-              disabled={isRollbackDraft}
-              onCheckedChange={(checked) => {
-                if (!isRollbackDraft) {
-                  onRollbackEnabledChange(checked);
-                }
-              }}
-              data-testid="wizard-rollback-enabled"
-            />
-            <Label htmlFor="draft-rollback-enabled" className="cursor-pointer text-sm font-semibold">
-              {t("precheck.wizard.rollbackEnabledLabel")}
-            </Label>
-          </div>
-          <p className="text-muted-foreground pl-6 text-[13px]" data-testid="draft-rollback-enabled-hint">
-            {isRollbackDraft
-              ? t("precheck.wizard.rollbackDisabledOnRollbackDraftHint")
-              : t("precheck.wizard.rollbackEnabledHint")}
-          </p>
-        </div>
-      </div>
-      <div className="flex flex-col gap-1.5">
-        <Label htmlFor="draft-description-input" className="text-sm font-semibold">{t("precheck.new.dialog.descriptionLabel")}</Label>
-        <MarkdownEditor
-          id="draft-description-input"
-          value={description}
-          onChange={onDescriptionChange}
-          maxLength={4096}
-          placeholder={t("editor.placeholder")}
-          ariaLabel={t("precheck.new.dialog.descriptionLabel")}
-          data-testid="draft-description-input"
-        />
-      </div>
-    </div>
-  );
-}
-
-/** §18.56 Option B: datetime-local (local timezone) -> RFC3339 UTC; empty/invalid returns null. */
-export function requestedForToIso(value: string): string | null {
-  if (value === "") return null;
-  const due = new Date(value);
-  if (Number.isNaN(due.getTime())) return null;
-  return due.toISOString().replace(/\.\d{3}Z$/, "Z");
-}
-
-/** RFC3339 -> datetime-local (for display/prefill); null or past timestamp returns "". */
-export function isoToRequestedFor(iso: string | null | undefined): string {
-  if (iso == null || iso === "") return "";
-  const due = new Date(iso);
-  if (Number.isNaN(due.getTime()) || due.getTime() <= Date.now()) return "";
-  const pad = (n: number): string => String(n).padStart(2, "0");
-  return `${String(due.getFullYear())}-${pad(due.getMonth() + 1)}-${pad(due.getDate())}T${pad(due.getHours())}:${pad(due.getMinutes())}`;
-}
-
-interface FlowPickerProps {
-  flows: Flow[];
-  selectedFlowId: string | null;
-  onSelect: (flowId: string) => void;
-}
-
-/** Selectable flow cards (create mode): the frozen stage chain with its
- * datasource names is the deciding information, so each card shows it. The
- * flow is frozen once the draft is created. With many granted flows the
- * picker searches by title and scrolls inside a bounded region instead of
- * stretching the page (owner ruling 2026-09-04). One-page layout
- * (2026-10-24): the cards run three-up horizontally as radio cards —
- * selection is signalled by the bright border AND the check icon. */
-function FlowPicker({ flows, selectedFlowId, onSelect }: FlowPickerProps) {
-  const { t } = useTranslation();
-  const [query, setQuery] = useState("");
-  const keyword = query.trim().toLowerCase();
-  const visible = keyword === "" ? flows : flows.filter((flow) => flow.name.toLowerCase().includes(keyword));
-  return (
-    <div className="flex flex-col gap-3" data-testid="wizard-flow-picker">
-      <div className="max-w-64">
-        <TableSearchInput
-          value={query}
-          onChange={setQuery}
-          placeholder={t("precheck.wizard.searchPlaceholder")}
-          testId="wizard-flow-search"
-        />
-      </div>
-      {/* Height cap sits on the viewport (placing max-h on the root fails inside an auto-height chain, see
-          scroll-area.tsx comment). */}
-      {visible.length === 0 ? (
-        <div className="rounded-lg border border-dashed">
-          <EmptyState
-            filtered
-            title={t("precheck.wizard.searchEmpty")}
-            testId="wizard-flow-search-empty"
-          />
-        </div>
-      ) : (
-        <ScrollArea className="max-h-[380px]" viewportClassName="max-h-[380px]">
-          <div className="grid gap-3 pb-px sm:grid-cols-2 xl:grid-cols-3">
-          {visible.map((flow) => {
-            const selected = flow.id === selectedFlowId;
-            return (
-              <button
-                key={flow.id}
-                type="button"
-                onClick={() => { onSelect(flow.id); }}
-                aria-pressed={selected}
-                className={
-                  selected
-                    ? "flex flex-col gap-2 rounded-xl border border-foreground/70 bg-foreground/[0.04] p-4 text-left ring-1 ring-foreground/20"
-                    : "hover:border-foreground/30 flex flex-col gap-2 rounded-xl border p-4 text-left transition-colors"
-                }
-                data-testid={`use-flow-${flow.id}`}
-              >
-                <span className="flex items-center justify-between gap-2 text-sm font-semibold">
-                  {flow.name}
-                  {/* Reference plan-card radio: the border thickness draws the
-                      selection donut — colour-free by construction. */}
-                  <span
-                    aria-hidden
-                    className={
-                      selected
-                        ? "size-4 shrink-0 rounded-full border-[5px] border-foreground"
-                        : "size-4 shrink-0 rounded-full border-2 border-foreground/25"
-                    }
-                  />
-                </span>
-                <StagePath flow={flow} />
-              </button>
-            );
-          })}
-          </div>
-        </ScrollArea>
-      )}
-    </div>
-  );
-}
-
-/** One continuous-form section: title + short description + fields, separated from the next
- * section by a hairline (shared background — no per-section card). */
-function FormSection({
-  title,
-  hint,
-  action,
-  children,
-  last = false,
-}: {
-  title: string;
-  hint: string;
-  action?: ReactNode;
-  children: ReactNode;
-  last?: boolean;
-}) {
-  return (
-    <Card className="[--card-spacing:--spacing(4)]" data-last={last ? "true" : undefined}>
-      <CardHeader>
-        <CardTitle className="flex items-center justify-between gap-3">
-          <h5 className="text-base font-semibold">{title}</h5>
-          {action}
-        </CardTitle>
-      </CardHeader>
-      <CardContent>
-        {children}
-        <small className="text-muted-foreground mt-2 block text-xs">{hint}</small>
-      </CardContent>
-    </Card>
-  );
-}
-
-function SummaryRow({
-  label,
-  value,
-  testId,
-  muted = false,
-}: {
-  label: string;
-  value: ReactNode;
-  testId?: string;
-  /** Unfilled values (unfilled/unselected): quieter than real data. */
-  muted?: boolean;
-}) {
-  return (
-    <div className="flex items-baseline justify-between gap-3 text-sm">
-      <dt className="text-muted-foreground flex-none text-[13px]">{label}</dt>
-      <dd
-        className={
-          muted
-            ? "text-muted-foreground min-w-0 truncate text-right"
-            : "min-w-0 truncate text-right font-medium"
-        }
-        data-testid={testId}
-      >
-        {value}
-      </dd>
-    </div>
-  );
-}
 
 export default function SubmissionWizard({ mode }: { mode: "create" | "draft" }) {
   const { t, i18n } = useTranslation();
@@ -611,10 +269,7 @@ export default function SubmissionWizard({ mode }: { mode: "create" | "draft" })
   // the content switch runs through TransitionPanel's slide+blur motion —
   // same behaviour as the mine page tabs.
   const [resultsTab, setResultsTab] = useState<"overview" | "findings">("overview");
-  const [timedOutState, setTimedOutState] = useState<{ phase: RunPhase; timedOut: boolean }>({
-    phase: "idle",
-    timedOut: false,
-  });
+  const [timedOutRunKey, setTimedOutRunKey] = useState<string | null>(null);
 
   // Attach the editor store once per draft: the server draft carries no SQL
   // plaintext (it never does), so the editor starts empty until an explicit
@@ -675,14 +330,6 @@ export default function SubmissionWizard({ mode }: { mode: "create" | "draft" })
     }
   }, [localDraftId, mode]);
 
-  // The shared event feed lives for the page's lifetime in draft mode.
-  useEffect(() => {
-    if (mode !== "draft") return;
-    void startReviewEvents();
-    return () => { stopReviewEvents(); };
-  }, [mode]);
-
-
   // Bulk mode (frontend PRD F5): drafts beyond one max-statement size or a
   // thousand statements never mount the Monaco editor — the virtualized
   // browser takes over so the full SQL is never rendered.
@@ -738,22 +385,23 @@ export default function SubmissionWizard({ mode }: { mode: "create" | "draft" })
     hasPrecheckResult &&
     reviewRunError &&
     ((reviewRunErrorDetail instanceof TransportError && reviewRunErrorDetail.problem.status === 404) ||
-      (reviewRunErrorDetail instanceof BusinessError && reviewRunErrorDetail.err_code === 1002));
+      (reviewRunErrorDetail instanceof BusinessError &&
+        reviewRunErrorDetail.err_code === businessErrCodeByName("RESOURCE_NOT_FOUND")));
   const phasePresented = presentPhase(phase, sqlChangedSincePrecheck, hasPrecheckResult);
   const hasPresentedRun = hasPrecheckResult;
 
-  if (timedOutState.phase !== phase) {
-    setTimedOutState({ phase, timedOut: false });
-  }
+  const activeRunKey =
+    phase === "queued" || phase === "running" ? `${phase}:${run?.id ?? ""}` : null;
+  const timedOut = activeRunKey !== null && timedOutRunKey === activeRunKey;
   useEffect(() => {
-    if (phase !== "queued" && phase !== "running") return;
+    if (activeRunKey === null) return;
     const timer = setTimeout(() => {
-      setTimedOutState((previous) => ({ ...previous, timedOut: true }));
+      setTimedOutRunKey(activeRunKey);
     }, REVIEW_TIMEOUT_MS);
     return () => {
       clearTimeout(timer);
     };
-  }, [phase, run?.id]);
+  }, [activeRunKey]);
 
   // Leave guard: unsaved SQL would be lost silently in a refresh — the
   // pre-adoption local SQL of the create mode counts too.
@@ -784,30 +432,17 @@ export default function SubmissionWizard({ mode }: { mode: "create" | "draft" })
 
   // Ephemeral Runs no longer advance draft row version (RCP-20261101), so Run terminal state requires no draft refetch.
 
-  const formatActionError = useCallback((error: unknown, operationId: string) => {
-    const display = describeError(error, operationId);
-    const requestId = display.requestId !== null ? ` (${display.requestId})` : "";
-    // BUG-006/010: when meta.detail carries backend diagnostic text (such as preflight refusal reasons or raw driver
-    // errors), append it verbatim so operators see specific diagnostics rather than generic copy.
-    const detail = display.detail !== null ? ` ${display.detail}` : "";
-    return `${t(display.messageKey)}${detail}${requestId}`;
-  }, [t]);
-
   const showActionError = useCallback((error: unknown, operationId: string) => {
-    const msg = formatActionError(error, operationId);
+    const msg = describeErrorText(describeError(error, operationId), { detailSeparator: " " });
     setActionError(msg);
     appToast.error(msg);
-  }, [formatActionError]);
+  }, []);
 
-  const saveMutation = useMutation({
-    mutationFn: ({ draftId, sql }: { draftId: string; sql: string }) =>
-      replaceDraftSql(draftId, { sql }, { headers: liveIfMatch() }),
-    onSuccess: (saved, { draftId, sql }) => {
-      const savedDraft = saved as unknown as ChangeDraft;
+  const saveMutation = useSaveDraftSqlMutation({
+    onSuccess: (savedDraft, { sql }) => {
       store.markSaved(savedDraft.version, savedDraft.state, sql);
       setActionError(null);
       appToast.success(t("common.savedToast"));
-      void queryClient.invalidateQueries({ queryKey: ["change-draft", draftId] });
     },
     onError: (error) => { showActionError(error, "replaceDraftSql"); },
   });
@@ -831,15 +466,7 @@ export default function SubmissionWizard({ mode }: { mode: "create" | "draft" })
     [],
   );
 
-  const createMutation = useMutation({
-    mutationFn: (metadata: DraftMetadataSnapshot) =>
-      createChangeDraft({
-        flow_id: selectedFlowId as string,
-        title: metadata.title,
-        description: metadata.description,
-        requested_scheduled_for: metadata.requested_scheduled_for ?? undefined,
-        rollback_enabled: metadata.rollback_enabled,
-      }),
+  const createMutation = useCreateChangeDraftMutation({
     onError: (error) => { showActionError(error, "createChangeDraft"); },
   });
 
@@ -891,9 +518,7 @@ export default function SubmissionWizard({ mode }: { mode: "create" | "draft" })
         const current = useDraftEditorStore.getState();
         if (current.sql !== "" && current.savedVersion !== null) {
           try {
-            const saved = (await replaceDraftSql(adoptedDraftId, { sql: current.sql }, {
-              headers: ifMatch(current.savedVersion),
-            })) as unknown as ChangeDraft;
+            const saved = await saveDraftSqlRequest(adoptedDraftId, current.sql, current.savedVersion);
             store.markSaved(saved.version, saved.state, current.sql);
             // Same stale-cache hazard as the first-adoption PUT below: the
             // detail query may hold the envelope-only snapshot (has_sql
@@ -911,17 +536,15 @@ export default function SubmissionWizard({ mode }: { mode: "create" | "draft" })
       setStepError(null);
       setAdoptionPending(true);
       const metadataAtCreate = visibleMetadataRef.current;
-      let created: {
-        id: string;
-        version: number;
-        state: ChangeDraft["state"];
-      };
+      let created: ChangeDraft;
       try {
-        created = (await createMutation.mutateAsync(metadataAtCreate)) as unknown as {
-          id: string;
-          version: number;
-          state: ChangeDraft["state"];
-        };
+        created = await createMutation.mutateAsync({
+          flow_id: selectedFlowId as string,
+          title: metadataAtCreate.title,
+          description: metadataAtCreate.description,
+          requested_scheduled_for: metadataAtCreate.requested_scheduled_for ?? undefined,
+          rollback_enabled: metadataAtCreate.rollback_enabled,
+        });
       } catch (error) {
         showActionError(error, "createChangeDraft");
         return null;
@@ -951,9 +574,7 @@ export default function SubmissionWizard({ mode }: { mode: "create" | "draft" })
 
       if (sqlAtCreate !== "") {
         try {
-          const saved = (await replaceDraftSql(created.id, { sql: sqlAtCreate }, {
-            headers: ifMatch(created.version),
-          })) as unknown as ChangeDraft;
+          const saved = await saveDraftSqlRequest(created.id, sqlAtCreate, created.version);
           store.markSaved(saved.version, saved.state, sqlAtCreate);
           // The adoption PUT changes the draft row (has_sql/sql_size_bytes/
           // statement_count/version); without this invalidation the detail
@@ -1001,10 +622,8 @@ export default function SubmissionWizard({ mode }: { mode: "create" | "draft" })
     }
   }, [localDraftId, mode, store]);
 
-  const revealMutation = useMutation({
-    mutationFn: () => revealDraftSql(activeDraftId as string, { purpose: "draft-edit" }),
-    onSuccess: (reveal) => {
-      const payload = reveal as unknown as { sql: string };
+  const revealMutation = useRevealDraftSqlMutation(activeDraftId, {
+    onSuccess: (payload) => {
       if (draft === null) return;
       store.attach({
         id: draft.id,
@@ -1033,75 +652,27 @@ export default function SubmissionWizard({ mode }: { mode: "create" | "draft" })
 
   // Ephemeral AI precheck (RCP-20261101): send current editor SQL verbatim for review without creating a draft, writing
   // SQL, or adopting; the run id returns to client state and drives both presentation and polling.
-  const reviewMutation = useMutation({
-    mutationFn: ({ sql }: { sql: string }) =>
-      runDraftReview(
-        {
-          flow_id: (draft?.flow_id ?? selectedFlowId) as string,
-          draft_id: activeDraftId ?? undefined,
-          sql,
-        },
-        {
-          headers: {
-            "Idempotency-Key": idempotencyKey(),
-            "Accept-Language": reviewOutputLanguage(i18n.language),
-          },
-        },
-      ),
-    onSuccess: (started, { sql }) => {
+  const reviewMutation = useRunDraftReviewMutation({
+    onSuccess: (started, { body }) => {
       setPrecheckRequestError(null);
-      const runId = (started as { run_id?: string } | null)?.run_id;
-      if (typeof runId !== "string" || runId === "") return;
-      setLastPrecheckSql(sql);
-      setLastPrecheckRunId(runId);
-      void queryClient.invalidateQueries({ queryKey: ["review-run", runId] });
+      if (started.run_id === "") return;
+      setLastPrecheckSql(body.sql);
+      setLastPrecheckRunId(started.run_id);
     },
     onError: (error) => {
-      const msg = formatActionError(error, "runDraftReview");
-      setPrecheckRequestError(msg);
+      setPrecheckRequestError(describeErrorText(describeError(error, "runDraftReview"), { detailSeparator: " " }));
     },
   });
 
-  const submitMutation = useMutation({
-    mutationFn: async () => {
-      // Save Info folded into the submit path (owner ruling 2026-10-24):
-      // metadata edits must land on the bound draft envelope before the
-      // order freezes them. Draftless create-mode submission carries the
-      // same snapshot in the body instead.
-      if (metaBound && activeDraftId !== null) {
-        await metaSaveMutation.mutateAsync({
-          metadata: visibleMetadataRef.current,
-          revision: metadataEditRevisionRef.current,
-        });
-      }
-      return submitChangeDraft(
-        {
-          flow_id: (draft?.flow_id ?? selectedFlowId) as string,
-          draft_id: activeDraftId ?? undefined,
-          sql: localSqlText,
-          run_id: lastPrecheckRunId as string,
-          metadata: mode === "create"
-            ? {
-                title: (metaBound ? metaTitle : createTitle).trim(),
-                description: (metaBound ? metaDescription : createDescription) === ""
-                    ? undefined
-                    : (metaBound ? metaDescription : createDescription),
-                requested_scheduled_for:
-                  requestedForToIso(metaBound ? metaRequestedFor : createRequestedFor)
-                  ?? undefined,
-                rollback_enabled: metaBound ? metaRollbackEnabled : createRollbackEnabled,
-              }
-            : undefined,
-        },
-        {
-          headers: {
-            "Idempotency-Key": idempotencyKey(),
-          },
-        },
-      );
+  const metaSaveMutation = useUpdateChangeDraftMutation({
+    onSuccess: () => {
+      setActionError(null);
     },
-    onSuccess: (order) => {
-      const created = order as unknown as { id: string; display_number: string };
+    onError: (error) => { showActionError(error, "updateChangeDraft"); },
+  });
+
+  const submitMutation = useSubmitChangeDraftMutation({
+    onSuccess: (created) => {
       store.markServerState("submitted");
       setSubmitError(null);
       setConfirmSubmit(false);
@@ -1116,20 +687,10 @@ export default function SubmissionWizard({ mode }: { mode: "create" | "draft" })
       // Rejection keeps the dialog open with the backend's answer — the UI
       // never flips to a success state on its own (acceptance gate: backend rejection has no fake
       // success); the user can cancel or retry from the same context.
-      const msg = formatActionError(error, "submitChangeDraft");
+      const msg = describeErrorText(describeError(error, "submitChangeDraft"), { detailSeparator: " " });
       setSubmitError(msg);
       appToast.error(msg);
     },
-  });
-
-  const metaSaveMutation = useMutation({
-    mutationFn: ({ metadata }: { metadata: DraftMetadataSnapshot; revision: number }) =>
-      updateChangeDraft(activeDraftId as string, metadata, { headers: liveIfMatch() }),
-    onSuccess: () => {
-      setActionError(null);
-      void queryClient.invalidateQueries({ queryKey: ["change-draft", activeDraftId] });
-    },
-    onError: (error) => { showActionError(error, "updateChangeDraft"); },
   });
 
   // Remote schema/table/column prefetching is intentionally omitted from the
@@ -1158,8 +719,49 @@ export default function SubmissionWizard({ mode }: { mode: "create" | "draft" })
     setPrecheckRequestError(null);
     setResultsTab("overview");
     setPrecheckModalOpen(true);
-    reviewMutation.mutate({ sql: localSqlText }, { onSettled: finish });
-  }, [draft?.flow_id, localSqlText, mode, reviewMutation, selectedFlowId, t]);
+    reviewMutation.mutate(
+      {
+        body: {
+          flow_id: (draft?.flow_id ?? selectedFlowId) as string,
+          draft_id: activeDraftId ?? undefined,
+          sql: localSqlText,
+        },
+        language: i18n.language,
+      },
+      { onSettled: finish },
+    );
+  }, [activeDraftId, draft?.flow_id, i18n.language, localSqlText, mode, reviewMutation, selectedFlowId, t]);
+
+  const handleConfirmSubmit = (): void => {
+    submitMutation.mutate({
+      body: {
+        flow_id: (draft?.flow_id ?? selectedFlowId) as string,
+        draft_id: activeDraftId ?? undefined,
+        sql: localSqlText,
+        run_id: lastPrecheckRunId as string,
+        metadata: mode === "create"
+          ? {
+              title: (metaBound ? metaTitle : createTitle).trim(),
+              description: (metaBound ? metaDescription : createDescription) === ""
+                ? undefined
+                : (metaBound ? metaDescription : createDescription),
+              requested_scheduled_for:
+                requestedForToIso(metaBound ? metaRequestedFor : createRequestedFor) ?? undefined,
+              rollback_enabled: metaBound ? metaRollbackEnabled : createRollbackEnabled,
+            }
+          : undefined,
+      },
+      beforeSubmit:
+        metaBound && activeDraftId !== null
+          ? async () => {
+              await metaSaveMutation.mutateAsync({
+                draftId: activeDraftId,
+                body: visibleMetadataRef.current,
+              });
+            }
+          : undefined,
+    });
+  };
 
   // ---- Save and Return: the single secondary action (owner ruling 2026-10-24,
   // Save Info folded away) — persist SQL then metadata, then leave. ----
@@ -1204,7 +806,7 @@ export default function SubmissionWizard({ mode }: { mode: "create" | "draft" })
         onSuccess: (_saved, variables) => {
           if (!savedSqlMatchesEditor(variables.sql)) return;
           if (metaBound) {
-            metaSaveMutation.mutate({ metadata: metadataSnapshot, revision: metadataRevision }, {
+            metaSaveMutation.mutate({ draftId: activeDraftId as string, body: metadataSnapshot }, {
               onSuccess: () => {
                 if (editorIsCurrent(variables.sql) && metadataUnchanged()) leave();
               },
@@ -1216,7 +818,7 @@ export default function SubmissionWizard({ mode }: { mode: "create" | "draft" })
       return;
     }
     if (metaBound) {
-      metaSaveMutation.mutate({ metadata: metadataSnapshot, revision: metadataRevision }, {
+      metaSaveMutation.mutate({ draftId: activeDraftId as string, body: metadataSnapshot }, {
         onSuccess: () => {
           if (editorIsCurrent(current.sql) && metadataUnchanged()) leave();
         },
@@ -1767,323 +1369,6 @@ export default function SubmissionWizard({ mode }: { mode: "create" | "draft" })
     );
   }
 
-  function renderPrecheckDialog(): ReactNode {
-    const findingsState = buildFindingsState();
-    const hasTerminalBlockerState =
-      precheckExpired || reviewRunError || phasePresented === "outdated" || flowUpdated;
-    const isComplete = precheckProgress.percent === 100;
-    const showAuditDetails =
-      !reviewStartPending &&
-      !reviewMutation.isPending &&
-      precheckRequestError === null &&
-      (isComplete || hasTerminalBlockerState);
-
-    let stageLabel = t("precheck.wizard.progressStarting");
-    if (precheckProgress.stage === "queued") {
-      stageLabel = t("precheck.wizard.progressQueued");
-    } else if (precheckProgress.stage === "running") {
-      stageLabel = precheckProgress.totalStages > 0
-        ? t("precheck.wizard.progressRunning", {
-            completed: precheckProgress.completedStages,
-            total: precheckProgress.totalStages,
-          })
-        : t("precheck.wizard.progressRunningFallback");
-    } else if (precheckProgress.stage === "finalizing") {
-      stageLabel = t("precheck.wizard.progressFinalizing");
-    } else if (precheckProgress.stage === "complete") {
-      stageLabel = t("precheck.wizard.progressDoneHint");
-    }
-
-    const progressTone:
-      | "starting"
-      | "queued"
-      | "running"
-      | "finalizing"
-      | "passed"
-      | "warning"
-      | "blocked" = !isComplete
-      ? precheckProgress.stage === "queued" ||
-        precheckProgress.stage === "running" ||
-        precheckProgress.stage === "finalizing"
-        ? precheckProgress.stage
-        : "starting"
-      : phasePresented === "blocked" || phasePresented === "failed" || run?.gate.passed === false
-        ? "blocked"
-        : phasePresented === "partial" ||
-            (findingsState.status === "ready" && findingsState.findings.length > 0)
-          ? "warning"
-          : "passed";
-    const progressActive = !isComplete && precheckRequestError === null;
-    const progressPercent = isComplete ? 100 : precheckProgress.percent;
-    const gateBlockerItems =
-      showAuditDetails &&
-      isComplete &&
-      !hasTerminalBlockerState &&
-      isTerminalPhase(phasePresented)
-        ? gateBlockers(run?.gate ?? null)
-        : [];
-
-    return (
-      <Dialog
-        open={precheckModalOpen}
-        disablePointerDismissal
-        onOpenChange={(nextOpen, eventDetails) => {
-          // Only explicit close buttons (top-right X or footer Close) may dismiss the precheck dialog.
-          if (!nextOpen && eventDetails.reason !== "close-press") return;
-          setPrecheckModalOpen(nextOpen);
-        }}
-      >
-        <DialogContent
-          className="max-h-[min(680px,78vh)] sm:max-w-[56rem]"
-          viewportClassName="max-h-[calc(min(680px,78vh)-10.5rem)]"
-          style={
-            mainDialogAnchor !== null
-              ? {
-                  left: `${String(mainDialogAnchor.left)}px`,
-                  maxWidth: `min(56rem, ${String(mainDialogAnchor.maxWidth)}px)`,
-                }
-              : undefined
-          }
-          data-testid="precheck-dialog"
-        >
-          <DialogHeader>
-            <DialogTitle>{t("precheck.wizard.resultsCard")}</DialogTitle>
-            <DialogDescription>
-              {isComplete ? t("precheck.wizard.progressComplete") : t("precheck.wizard.progressTitle")}
-            </DialogDescription>
-          </DialogHeader>
-
-          {precheckRequestError !== null ? (
-            <Alert variant="destructive" data-testid="precheck-start-error">
-              <CircleAlert className="size-4" aria-hidden />
-              <AlertTitle>{t("errors.generic.business")}</AlertTitle>
-              <AlertDescription>{precheckRequestError}</AlertDescription>
-            </Alert>
-          ) : (
-            <div className="flex flex-col gap-4">
-              {(!showAuditDetails || (isComplete && !hasTerminalBlockerState)) && (
-                <div
-                  role="status"
-                  aria-live="polite"
-                  className={
-                    showAuditDetails
-                      ? "flex flex-col gap-2 rounded-lg bg-muted/30 p-3"
-                      : "flex flex-col gap-4 py-2"
-                  }
-                  data-testid="precheck-progress-panel"
-                >
-                  <div
-                    className={
-                      showAuditDetails
-                        ? "flex items-center justify-between gap-3 text-xs"
-                        : "flex items-center justify-between gap-3 text-sm"
-                    }
-                  >
-                    <span className="flex items-center gap-2 font-medium text-foreground">
-                      {showAuditDetails ? (
-                        progressTone === "blocked" ? (
-                          <CircleAlert className="size-3.5 text-[var(--risk-critical)]" aria-hidden />
-                        ) : progressTone === "warning" ? (
-                          <CircleAlert className="size-3.5 text-[var(--tone-amber)]" aria-hidden />
-                        ) : (
-                          <CheckCircle2 className="size-3.5 text-[var(--risk-safe)]" aria-hidden />
-                        )
-                      ) : (
-                        <Loader2 className="size-4 animate-spin text-primary" aria-hidden />
-                      )}
-                      {showAuditDetails ? t("precheck.wizard.progressDoneHint") : stageLabel}
-                    </span>
-                    <span
-                      className="font-semibold tabular-nums text-foreground"
-                      data-testid="precheck-progress-value"
-                    >
-                      {String(progressPercent)}%
-                    </span>
-                  </div>
-                  <Progress
-                    value={progressPercent}
-                    className="precheck-progress"
-                    data-progress-tone={progressTone}
-                    data-progress-active={String(progressActive)}
-                    data-testid="precheck-progress"
-                    aria-label={t("precheck.wizard.progressPercent", { percent: progressPercent })}
-                  />
-                  {!showAuditDetails &&
-                    timedOutState.timedOut &&
-                    (phasePresented === "queued" || phasePresented === "running") && (
-                      <div
-                        role="alert"
-                        className="text-muted-foreground flex items-center gap-2 rounded-md border p-3 text-sm"
-                        data-testid="review-timeout"
-                      >
-                        <CircleAlert className="size-4" aria-hidden />
-                        <span>{t("precheck.review.timeout")}</span>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="text-sm font-semibold"
-                          onClick={() => { void invalidateAll(); }}
-                        >
-                          {t("errors.retry")}
-                        </Button>
-                      </div>
-                    )}
-                </div>
-              )}
-
-              {showAuditDetails && (
-                <>
-                  {flowUpdated && (
-                    <div
-                      role="alert"
-                      className="text-muted-foreground flex items-center gap-2 rounded-md border p-3 text-sm"
-                      data-testid="precheck-modal-flow-updated"
-                    >
-                      <CircleAlert className="size-4" aria-hidden />
-                      <span>{t("precheck.flowUpdated.banner")}</span>
-                    </div>
-                  )}
-                  {gateBlockerItems.length > 0 && (
-                    <Alert variant="destructive" data-testid="gate-blockers">
-                      <ShieldAlert className="size-4" aria-hidden />
-                      <AlertTitle>{t("precheck.blocked.gate")}</AlertTitle>
-                      <AlertDescription>
-                        <ul className="list-disc pl-4">
-                          {gateBlockerItems.map((blocker) => (
-                            <li key={blocker.code}>{t(blocker.messageKey)}</li>
-                          ))}
-                        </ul>
-                      </AlertDescription>
-                    </Alert>
-                  )}
-                  <Tabs
-                    value={resultsTab}
-                    onValueChange={(next) => { setResultsTab(next === "findings" ? "findings" : "overview"); }}
-                  >
-                    <TabsList>
-                      <TabsTrigger value="overview" data-testid="tab-overview">{t("precheck.tabs.overview")}</TabsTrigger>
-                      <TabsTrigger value="findings" data-testid="tab-findings">{t("precheck.tabs.findings")}</TabsTrigger>
-                    </TabsList>
-                    <TransitionPanel
-                      activeIndex={resultsTab === "findings" ? 1 : 0}
-                      transition={{ duration: 0.2, ease: "easeInOut" }}
-                      variants={TAB_PANEL_VARIANTS}
-                      keepMounted
-                    >
-                      <div>
-                        <ReviewStatusCard
-                          flat
-                          phase={phasePresented}
-                          run={run}
-                          hasRunId={hasPresentedRun}
-                          isPending={reviewRunPending}
-                          isFetching={reviewRunFetching}
-                          isError={reviewRunError}
-                          error={reviewRunErrorDetail}
-                          onRetry={() => { void refetchReviewRun(); }}
-                        />
-                      </div>
-                      <div>
-                        {findingsState.status === "ready" && findingsState.findings.length === 0 ? (
-                          <ReviewAllClear />
-                        ) : (
-                          <FindingList
-                            state={findingsState}
-                            onOpenEvidence={(groupFindings) => { setEvidenceFindings(groupFindings); }}
-                            onRetry={() => {
-                              if (reviewRunError || run === null) {
-                                void refetchReviewRun();
-                              } else {
-                                void findingsQuery.refetch();
-                              }
-                            }}
-                            onLocate={
-                              isTerminalPhase(phasePresented)
-                                ? (finding) => {
-                                    const target = /`([^`]+)`/.exec(finding.message)?.[1];
-                                    if (target === undefined) return;
-                                    if (isBulk) {
-                                      const ordinal = /#(\d+)/.exec(target);
-                                      if (
-                                        ordinal !== null &&
-                                        Number(ordinal[1]) <= (bulkDigest?.statementCount ?? 0)
-                                      ) {
-                                        setBulkLocate({ ordinal: Number(ordinal[1]), nonce: Date.now() });
-                                        setPrecheckModalOpen(false);
-                                      }
-                                      return;
-                                    }
-                                    if (localSqlText.includes(target)) {
-                                      setLocate({ target, nonce: Date.now() });
-                                      setPrecheckModalOpen(false);
-                                    }
-                                  }
-                                : undefined
-                            }
-                            locateInEditor={(snippet) => {
-                              if (isBulk) {
-                                const ordinal = /#(\d+)/.exec(snippet);
-                                return (
-                                  ordinal !== null && Number(ordinal[1]) <= (bulkDigest?.statementCount ?? 0)
-                                );
-                              }
-                              return localSqlText.includes(snippet);
-                            }}
-                          />
-                        )}
-                      </div>
-                    </TransitionPanel>
-                  </Tabs>
-                </>
-              )}
-            </div>
-          )}
-
-          <DialogFooter className="border-t pt-4">
-            {precheckRequestError === null && stepError !== null && (
-              <p
-                role="alert"
-                className="text-destructive mr-auto self-center text-sm"
-                data-testid="precheck-dialog-step-error"
-              >
-                {stepError}
-              </p>
-            )}
-            <Button
-              variant="outline"
-              onClick={() => { setPrecheckModalOpen(false); }}
-              data-testid="precheck-dialog-close"
-            >
-              {t("common.close")}
-            </Button>
-            {precheckRequestError === null && (
-              <Button
-                variant="default"
-                onClick={handleAttemptSubmit}
-                disabled={
-                  !isComplete ||
-                  !submitDecision.submitEnabled ||
-                  submitMutation.isPending ||
-                  adoptionPending
-                }
-                aria-busy={submitMutation.isPending || adoptionPending}
-                className="disabled:border-border disabled:bg-muted disabled:text-muted-foreground disabled:opacity-100"
-                data-testid="submit-draft"
-              >
-                {submitMutation.isPending || adoptionPending ? (
-                  <Spinner data-icon="inline-start" aria-hidden />
-                ) : (
-                  <Send data-icon="inline-start" aria-hidden />
-                )}
-                {t("precheck.submit.action")}
-              </Button>
-            )}
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    );
-  }
-
   function renderPage(): ReactNode {
     return (
       <PageLayout
@@ -2120,7 +1405,42 @@ export default function SubmissionWizard({ mode }: { mode: "create" | "draft" })
           </aside>
         </div>
 
-        {renderPrecheckDialog()}
+        <PrecheckResultDialog
+          open={precheckModalOpen}
+          onOpenChange={setPrecheckModalOpen}
+          mainDialogAnchor={mainDialogAnchor}
+          precheckRequestError={precheckRequestError}
+          reviewStartPending={reviewStartPending}
+          reviewMutationPending={reviewMutation.isPending}
+          precheckProgress={precheckProgress}
+          phasePresented={phasePresented}
+          run={run}
+          hasPresentedRun={hasPresentedRun}
+          reviewRunPending={reviewRunPending}
+          reviewRunFetching={reviewRunFetching}
+          reviewRunError={reviewRunError}
+          reviewRunErrorDetail={reviewRunErrorDetail}
+          onRefetchReviewRun={() => { void refetchReviewRun(); }}
+          precheckExpired={precheckExpired}
+          flowUpdated={flowUpdated}
+          timedOut={timedOut}
+          onRetryTimedOut={() => { void invalidateAll(); }}
+          resultsTab={resultsTab}
+          onResultsTabChange={setResultsTab}
+          findingsState={buildFindingsState()}
+          onOpenEvidence={setEvidenceFindings}
+          onRefetchFindings={() => { void findingsQuery.refetch(); }}
+          isBulk={isBulk}
+          bulkDigest={bulkDigest}
+          localSqlText={localSqlText}
+          onLocate={(target) => { setLocate({ target, nonce: Date.now() }); }}
+          onBulkLocate={(ordinal) => { setBulkLocate({ ordinal, nonce: Date.now() }); }}
+          stepError={stepError}
+          submitEnabled={submitDecision.submitEnabled}
+          submitPending={submitMutation.isPending}
+          adoptionPending={adoptionPending}
+          onAttemptSubmit={handleAttemptSubmit}
+        />
 
         {/* Pure local batch import (RCP-20261101): confirming writes directly into the editor without uploading. */}
         <ImportDialog
@@ -2140,79 +1460,19 @@ export default function SubmissionWizard({ mode }: { mode: "create" | "draft" })
           }}
         />
 
-        {/* Submit confirmation (F6 deliverable submit confirmation and gate reasons): the
-         * summary card mirrors the gate, the dialog restates what submission
-         * freezes and what the backend would still reject — the mutation only
-         * fires after the explicit confirm. */}
-        <Dialog
+        <SubmitConfirmDialog
           open={confirmSubmit}
-          onOpenChange={(open) => {
-            setConfirmSubmit(open);
-            if (!open && hasPresentedRun) {
-              setPrecheckModalOpen(true);
-            }
-          }}
-        >
-          <DialogContent
-            style={
-              mainDialogAnchor !== null
-                ? {
-                    left: `${String(mainDialogAnchor.left)}px`,
-                    maxWidth: `min(24rem, ${String(mainDialogAnchor.maxWidth)}px)`,
-                  }
-                : undefined
-            }
-            data-testid="submit-confirm-dialog"
-          >
-            <DialogHeader>
-              <DialogTitle>{t("precheck.submit.confirmTitle")}</DialogTitle>
-              <DialogDescription>{t("precheck.submit.confirmDescription")}</DialogDescription>
-            </DialogHeader>
-            <div className="flex flex-col gap-3 text-sm">
-              <div>
-                <p className="text-muted-foreground text-xs">{t("precheck.wizard.summary.flow")}</p>
-                <p className="mt-1">{flow?.name ?? draft?.flow_id}</p>
-                <div className="mt-1">
-                  <StagePath flow={flow} />
-                </div>
-              </div>
-              <div>
-                <p className="text-muted-foreground text-xs">{t("precheck.submit.confirmGate")}</p>
-                <p className="mt-1" data-testid="submit-confirm-gate">
-                  {run?.gate.passed
-                    ? t("precheck.submit.confirmGatePassed")
-                    : t("precheck.submit.confirmGateFailed")}
-                </p>
-              </div>
-              {submitError !== null && (
-                <p role="alert" className="text-destructive text-sm" data-testid="submit-confirm-error">
-                  {submitError}
-                </p>
-              )}
-            </div>
-            <DialogFooter>
-              <Button
-                variant="outline"
-                onClick={() => {
-                  setConfirmSubmit(false);
-                  if (hasPresentedRun) {
-                    setPrecheckModalOpen(true);
-                  }
-                }}
-                data-testid="submit-confirm-cancel"
-              >
-                {t("common.cancel")}
-              </Button>
-              <PendingButton
-                pending={submitMutation.isPending}
-                onClick={() => { submitMutation.mutate(); }}
-                data-testid="submit-confirm-accept"
-              >
-                {t("precheck.submit.confirmAction")}
-              </PendingButton>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+          onOpenChange={setConfirmSubmit}
+          mainDialogAnchor={mainDialogAnchor}
+          flow={flow}
+          fallbackFlowId={draft?.flow_id}
+          gatePassed={run?.gate.passed === true}
+          submitError={submitError}
+          submitting={submitMutation.isPending}
+          hasPresentedRun={hasPresentedRun}
+          onReopenPrecheck={() => { setPrecheckModalOpen(true); }}
+          onConfirmSubmit={handleConfirmSubmit}
+        />
       </PageLayout>
     );
   }

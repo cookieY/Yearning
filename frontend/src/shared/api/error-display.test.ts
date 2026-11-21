@@ -4,8 +4,10 @@ import {
   businessErrorName,
   describeBusinessError,
   describeError,
+  describeErrorText,
   describeTransportError,
 } from "@/shared/api/error-display";
+import i18next from "@/shared/i18n";
 import { BusinessError, TransportError } from "@/shared/api/mutator";
 
 const REQUEST_ID = "11111111-1111-4111-8111-111111111111";
@@ -222,5 +224,40 @@ describe("validation fields passthrough (RCP-20261102-S008)", () => {
     );
     expect(undeclared.contractViolation).toBe(true);
     expect(undeclared.fields).toEqual({});
+  });
+});
+
+describe("describeErrorText", () => {
+  it("formats localized copy, optional detail separator, and request_id", () => {
+    const base = i18next.t("errors.INVALID_CREDENTIALS");
+    expect(
+      describeErrorText({
+        messageKey: "errors.INVALID_CREDENTIALS",
+        requestId: REQUEST_ID,
+        detail: "dial timeout",
+      }),
+    ).toBe(`${base}: dial timeout (${REQUEST_ID})`);
+
+    expect(
+      describeErrorText(
+        {
+          messageKey: "errors.INVALID_CREDENTIALS",
+          requestId: null,
+          detail: "dial timeout",
+        },
+        { detailSeparator: " " },
+      ),
+    ).toBe(`${base} dial timeout`);
+
+    expect(
+      describeErrorText(
+        {
+          messageKey: "errors.INVALID_CREDENTIALS",
+          requestId: REQUEST_ID,
+          detail: "dial timeout",
+        },
+        { includeDetail: false },
+      ),
+    ).toBe(`${base} (${REQUEST_ID})`);
   });
 });

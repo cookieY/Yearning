@@ -2,6 +2,7 @@ package application
 
 import (
 	"crypto/sha256"
+	"encoding/json"
 	"fmt"
 	"strings"
 	"testing"
@@ -164,5 +165,44 @@ func TestEffectiveChangeReviewToolHashMatchesFrozenPolicyContract(t *testing.T) 
 	const want = "888384165d619bd3796b1c34087ed2ccbd90f1584b089218d75bb1093ea25a80"
 	if got != want {
 		t.Fatalf("submission tool hash = %s, want frozen-policy hash %s", got, want)
+	}
+}
+
+func TestBuildFrozenFlowIncludesFlowAndStageNames(t *testing.T) {
+	svc := &Services{}
+	stage := reviewedHashParityStage()
+	doc, err := svc.buildFrozenFlow(
+		reviewedFlowIDForHashParity,
+		"release-flow",
+		7,
+		nil,
+		[]stageFact{stage},
+		map[int][]flowStepActors{1: {{Position: 1, Actors: []string{"user-a"}}}},
+		map[string][]string{stage.StageID: {"user-exec"}},
+	)
+	if err != nil {
+		t.Fatalf("buildFrozenFlow failed: %v", err)
+	}
+	if doc.FlowName != "release-flow" || len(doc.Stages) != 1 || doc.Stages[0].Name != "analytics-primary" {
+		t.Fatalf("expected flow_name and stage name in frozen document, got %+v", doc)
+	}
+	raw, err := json.Marshal(doc)
+	if err != nil {
+		t.Fatalf("json.Marshal frozen flow: %v", err)
+	}
+	var decoded map[string]any
+	if err := json.Unmarshal(raw, &decoded); err != nil {
+		t.Fatalf("json.Unmarshal frozen flow: %v", err)
+	}
+	if decoded["flow_name"] != "release-flow" {
+		t.Fatalf("encoded JSON flow_name = %v, want release-flow", decoded["flow_name"])
+	}
+	stages, ok := decoded["stages"].([]any)
+	if !ok || len(stages) != 1 {
+		t.Fatalf("encoded JSON stages = %v", decoded["stages"])
+	}
+	stMap := stages[0].(map[string]any)
+	if stMap["name"] != "analytics-primary" {
+		t.Fatalf("encoded JSON stage name = %v, want analytics-primary", stMap["name"])
 	}
 }

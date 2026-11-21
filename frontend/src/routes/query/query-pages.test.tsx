@@ -1,3 +1,4 @@
+import { StrictMode } from "react";
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import type { SqlCompletionCatalog } from "@/features/review/sql-completions";
 
@@ -81,7 +82,8 @@ import { SessionProvider } from "@/features/auth/session-provider";
 import i18next from "@/shared/i18n";
 import QueryEntryPage from "@/routes/query/query-entry-page";
 import QueryWorkspacePage from "@/routes/query/query-workspace-page";
-import QueryAccessApprovalsPage from "@/routes/approvals/query-access-page";
+import { ExportDialog } from "@/features/query/query-workspace-dialogs";
+import { ApprovalsWorkspacePage } from "@/routes/approvals/approval-queue-page";
 
 /**
  * Query-domain component tests (popup-free). Gates covered: query allows single SELECT only
@@ -127,7 +129,7 @@ function renderAt(path: string): void {
           <Routes>
             <Route path="/query" element={<QueryEntryPage />} />
             <Route path="/query/sessions/:sessionId" element={<QueryWorkspacePage />} />
-            <Route path="/approvals/query-access" element={<QueryAccessApprovalsPage />} />
+            <Route path="/approvals/query-access" element={<ApprovalsWorkspacePage />} />
           </Routes>
         </MemoryRouter>
       </SessionProvider>
@@ -1134,5 +1136,121 @@ describe("query renewal dialog — shadcn DatePicker with embedded time (owner 2
     await waitFor(() => {
       expect(screen.getByTestId("query-datasource-select")).toHaveTextContent("analytics-mysql");
     });
+  });
+
+  it("fires a single execution and download under StrictMode and locale changes, and suppresses late download on cancel or close", async () => {
+    const xlsxModule = await import("@/features/query/xlsx-export");
+    const downloadSpy = vi.spyOn(xlsxModule, "downloadXlsx").mockImplementation(() => {});
+    const exportCtx = {
+      datasourceId: QUERY_FIXTURE_DS_MYSQL_ID,
+      schemaName: "app",
+      sql: "select id from app.users limit 1",
+    };
+
+    try {
+      let executeCalls = 0;
+      let resolveFirst!: () => void;
+      server.use(
+        http.post("*/query-sessions/:id/executions", async () => {
+          executeCalls += 1;
+          await new Promise<void>((resolve) => {
+            resolveFirst = resolve;
+          });
+          return HttpResponse.json({
+            err_code: 0,
+            message: "ok",
+            data: {
+              execution_id: "exec-strict-1",
+              columns: [{ name: "id", type: "int" }],
+              rows: [[1]],
+              page: { next_cursor: null, has_more: false },
+              elapsed_ms: 5,
+            },
+            request_id: "req-strict-1",
+          });
+        }),
+      );
+
+      const view = render(
+        <StrictMode>
+          <ExportDialog context={exportCtx} sessionId="qs-fixture-active" onClose={() => {}} />
+        </StrictMode>,
+      );
+      await waitFor(() => {
+        expect(executeCalls).toBe(1);
+      });
+      await i18next.changeLanguage("en-US");
+      resolveFirst();
+      await screen.findByTestId("query-export-done");
+      expect(executeCalls).toBe(1);
+      expect(downloadSpy).toHaveBeenCalledTimes(1);
+      view.unmount();
+      await i18next.changeLanguage("zh-CN");
+
+      downloadSpy.mockClear();
+      let resolveCancelRun!: () => void;
+      server.use(
+        http.post("*/query-sessions/:id/executions", async () => {
+          await new Promise<void>((resolve) => {
+            resolveCancelRun = resolve;
+          });
+          return HttpResponse.json({
+            err_code: 0,
+            message: "ok",
+            data: {
+              execution_id: "exec-cancel-1",
+              columns: [{ name: "id", type: "int" }],
+              rows: [[1]],
+              page: { next_cursor: null, has_more: false },
+              elapsed_ms: 5,
+            },
+            request_id: "req-cancel-1",
+          });
+        }),
+      );
+      const cancelView = render(
+        <ExportDialog context={exportCtx} sessionId="qs-fixture-active" onClose={() => {}} />,
+      );
+      await userEvent.click(await screen.findByTestId("query-export-cancel"));
+      resolveCancelRun();
+      await screen.findByTestId("query-export-failure");
+      expect(downloadSpy).not.toHaveBeenCalled();
+      cancelView.unmount();
+
+      downloadSpy.mockClear();
+      let resolveCloseRun!: () => void;
+      const onClose = vi.fn();
+      server.use(
+        http.post("*/query-sessions/:id/executions", async () => {
+          await new Promise<void>((resolve) => {
+            resolveCloseRun = resolve;
+          });
+          return HttpResponse.json({
+            err_code: 0,
+            message: "ok",
+            data: {
+              execution_id: "exec-close-1",
+              columns: [{ name: "id", type: "int" }],
+              rows: [[1]],
+              page: { next_cursor: null, has_more: false },
+              elapsed_ms: 5,
+            },
+            request_id: "req-close-1",
+          });
+        }),
+      );
+      const closeView = render(
+        <ExportDialog context={exportCtx} sessionId="qs-fixture-active" onClose={onClose} />,
+      );
+      await userEvent.click(await screen.findByTestId("query-export-close"));
+      expect(onClose).toHaveBeenCalledTimes(1);
+      closeView.unmount();
+      resolveCloseRun();
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      expect(downloadSpy).not.toHaveBeenCalled();
+    } finally {
+      await i18next.changeLanguage("zh-CN");
+      downloadSpy.mockRestore();
+    }
   });
 });

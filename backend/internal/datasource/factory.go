@@ -5,8 +5,6 @@ package datasource
 
 import (
 	"context"
-	"encoding/json"
-	"encoding/pem"
 	"errors"
 	"fmt"
 	"time"
@@ -43,82 +41,26 @@ func NewFactory(crypter *crypto.Crypter) (*Factory, error) {
 
 // OpenCredential decrypts the specified credential row.
 func (f *Factory) OpenCredential(c *DatasourceCredentialModel) (credentialPayload, error) {
-	plain, err := f.crypter.Open(crypto.PurposePayload, crypto.Envelope{
-		Ciphertext: c.CredentialCiphertext,
-		Nonce:      c.CredentialNonce,
-		KeyID:      c.CredentialKeyID,
-		Algorithm:  c.CredentialAlgorithm,
-	}, crypto.AAD{
-		DeploymentID: f.crypter.DeploymentID(),
-		Table:        "datasource_credentials", PrimaryKey: c.ID,
-		Column: "credential", Purpose: "datasource_credential",
-	})
+	if f == nil {
+		return credentialPayload{}, errors.New("datasource: nil factory")
+	}
+	cred, err := OpenCredentialEnvelope(f.crypter, c)
 	if err != nil {
 		return credentialPayload{}, err
 	}
-	var payload credentialPayload
-	if err := json.Unmarshal(plain, &payload); err != nil {
-		return credentialPayload{}, fmt.Errorf("datasource: credential payload malformed")
-	}
-	return payload, nil
+	return credentialPayload{Username: cred.Username, Password: cred.Password}, nil
 }
 
 // openTLSMaterial decrypts TLS material and splits its PEM blocks; returns nil when unconfigured.
 func (f *Factory) openTLSMaterial(m *DatasourceTLSMaterialModel) (*database.TLSMaterial, error) {
-	if m == nil || m.MaterialCiphertext == nil || m.MaterialKeyID == nil {
-		return nil, nil
+	if f == nil {
+		return nil, errors.New("datasource: nil factory")
 	}
-	plain, err := f.crypter.Open(crypto.PurposePayload, crypto.Envelope{
-		Ciphertext: m.MaterialCiphertext,
-		Nonce:      m.MaterialNonce,
-		KeyID:      *m.MaterialKeyID,
-		Algorithm:  derefString(m.MaterialAlgorithm),
-	}, crypto.AAD{
-		DeploymentID: f.crypter.DeploymentID(),
-		Table:        "datasource_tls_materials", PrimaryKey: m.ID,
-		Column: "material", Purpose: "datasource_tls",
-	})
-	if err != nil {
-		return nil, err
-	}
-	return splitTLSMaterial(m.VerifyServer, derefString(m.ServerName), plain)
+	return OpenTLSEnvelope(f.crypter, m)
 }
 
-// splitTLSMaterial splits concatenated PEM blocks. First collect all certificate blocks and any private key,
-// then classify based on whether a private key is present: with private key => the last certificate block is
-// the client certificate (a single cert + key is pure mTLS client material) and remaining certs form the CA chain;
-// without private key => all certificate blocks form the CA chain.
-// Client certificates are never mixed into RootCAs (preventing trust surface expansion).
 func splitTLSMaterial(verifyServer bool, serverName string, plain []byte) (*database.TLSMaterial, error) {
-	mat := &database.TLSMaterial{VerifyServer: verifyServer, ServerName: serverName}
-	var certs [][]byte
-	rest := plain
-	for {
-		var block *pem.Block
-		block, rest = pem.Decode(rest)
-		if block == nil {
-			break
-		}
-		switch block.Type {
-		case "CERTIFICATE":
-			certs = append(certs, pem.EncodeToMemory(block))
-		case "PRIVATE KEY", "RSA PRIVATE KEY", "EC PRIVATE KEY":
-			mat.KeyPEM = pem.EncodeToMemory(block)
-		}
-	}
-	if len(certs) > 0 {
-		caCerts := certs
-		if mat.KeyPEM != nil {
-			// With private key => the last certificate is the client certificate (including single-cert mTLS:
-			// client cert + private key only, delegating trust chain verification to system roots); remaining certs form the CA chain.
-			mat.CertPEM = certs[len(certs)-1]
-			caCerts = certs[:len(certs)-1]
-		}
-		for _, c := range caCerts {
-			mat.CAPEM = append(mat.CAPEM, c...)
-		}
-	}
-	return mat, nil
+	return SplitTLSMaterial(verifyServer, serverName, plain)
 }
 
 // ProbeResult is the structured result of a connection probe (excluding credentials).

@@ -7,7 +7,6 @@ import { MemoryRouter, Route, Routes } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { server } from "@/test/msw/server";
 import "@/shared/i18n";
-import { startReviewEvents, stopReviewEvents } from "@/features/review/review-events";
 import {
   FIXTURE_OWNER_ID,
   resetReviewFixture,
@@ -26,9 +25,6 @@ import OrderDetailPage from "@/routes/changes/order-detail-page";
  * (E005), and a sent-boundary fate only offers copy-to-new-draft (E004).
  */
 
-// The terminal attempt facts reach this page through the order-subject event
-// feed (the attempt query only polls while live), so the component tests run
-// the real fixture transport — exactly what the browser MSW worker does.
 vi.stubEnv("VITE_ENABLE_MOCK", "true");
 
 beforeEach(() => {
@@ -37,11 +33,9 @@ beforeEach(() => {
   grantSession();
   window.localStorage.setItem("yearning-mock-scenario", "ready");
   window.localStorage.setItem("yearning-mock-auth", "admin");
-  void startReviewEvents();
 });
 
 afterEach(() => {
-  stopReviewEvents();
   resetReviewFixture();
   window.localStorage.removeItem("yearning-mock-scenario");
   window.localStorage.removeItem("yearning-mock-auth");

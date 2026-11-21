@@ -16,29 +16,87 @@ import (
 // qualified object must already name an allowed physical schema. A logical
 // alias cannot be treated as its physical target because explicit SQL
 // qualifiers are not rewritten. The input program is never mutated.
+type validityMemoKey struct {
+	complete            bool
+	definitionsComplete bool
+	operation           fingerprint.ValidityOperation
+	unsupported         string
+	reqPtr              *fingerprint.ValidityRequirement
+	reqLen              int
+	effPtr              *fingerprint.ValidityEffect
+	effLen              int
+}
+
+func statementValidityMemoKey(facts fingerprint.StatementValidity) validityMemoKey {
+	var k validityMemoKey
+	k.complete = facts.Complete
+	k.definitionsComplete = facts.DefinitionsComplete
+	k.operation = facts.Operation
+	k.unsupported = facts.Unsupported
+	k.reqLen = len(facts.Requirements)
+	if k.reqLen > 0 {
+		k.reqPtr = &facts.Requirements[0]
+	}
+	k.effLen = len(facts.Effects)
+	if k.effLen > 0 {
+		k.effPtr = &facts.Effects[0]
+	}
+	return k
+}
+
+type memoizedBoundStatement struct {
+	facts fingerprint.StatementValidity
+	ok    bool
+}
+
 func bindValidityProgram(
 	program ValidityProgram,
 	binding *stageSchemaBinding,
 	mapper *privacy.RunMapper,
 ) (ValidityProgram, bool) {
-	out := cloneValidityProgram(program)
+	out := ValidityProgram{Complete: program.Complete}
+	if program.Statements != nil {
+		out.Statements = make([]StatementValidityAtOrdinal, len(program.Statements))
+	}
 	if binding == nil || !binding.defensible || mapper == nil {
-		for i := range out.Statements {
-			out.Statements[i].Facts.Complete = false
+		for i := range program.Statements {
+			st := program.Statements[i]
+			st.Facts = cloneStatementValidity(st.Facts)
+			st.Facts.Complete = false
+			out.Statements[i] = st
 		}
 		out.Complete = false
 		return out, false
 	}
 
 	bindingComplete := true
-	for i := range out.Statements {
-		statement, ok := bindStatementValidity(
-			out.Statements[i].Ordinal, out.Statements[i].Facts, binding, mapper,
-		)
-		out.Statements[i].Facts = statement
+	useMemo := binding.postgres == nil
+	var memo map[validityMemoKey]memoizedBoundStatement
+	if useMemo {
+		memo = make(map[validityMemoKey]memoizedBoundStatement, min(len(program.Statements), 64))
+	}
+	for i := range program.Statements {
+		st := program.Statements[i]
+		var statement fingerprint.StatementValidity
+		var ok bool
+		if useMemo {
+			key := statementValidityMemoKey(st.Facts)
+			if cached, hit := memo[key]; hit {
+				statement, ok = cached.facts, cached.ok
+			} else {
+				statement, ok = bindStatementValidity(st.Ordinal, st.Facts, binding, mapper)
+				memo[key] = memoizedBoundStatement{facts: statement, ok: ok}
+			}
+		} else {
+			statement, ok = bindStatementValidity(st.Ordinal, st.Facts, binding, mapper)
+		}
 		if !ok {
 			bindingComplete = false
-			out.Statements[i].Facts.Complete = false
+			statement.Complete = false
+		}
+		out.Statements[i] = StatementValidityAtOrdinal{
+			Ordinal: st.Ordinal,
+			Facts:   statement,
 		}
 	}
 	out.Complete = program.Complete && bindingComplete

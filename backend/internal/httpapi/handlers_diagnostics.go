@@ -80,20 +80,10 @@ func writeDiagnosticsErr(c *gin.Context, err error) bool {
 		return true
 	}
 	var de *diagdomain.Error
-	if errors.As(err, &de) {
-		msg := de.Message
-		if msg == "" {
-			msg = "Business operation failed"
-		}
-		WriteBusinessError(c, &BusinessError{
-			Code:    de.Code,
-			Name:    de.Name,
-			Message: msg,
-			Meta:    de.Meta,
-		})
-		return true
+	if !errors.As(err, &de) {
+		return false
 	}
-	return false
+	return writeDomainCodedError(c, de.Code, de.Name, de.Message, de.Meta)
 }
 
 func parseTimeQuery(c *gin.Context, name string) (time.Time, bool) {
@@ -372,9 +362,6 @@ func (d *DiagnosticsDeps) HandlePrecheckDiagnosticOptimizationDraft(c *gin.Conte
 	if err := c.ShouldBindJSON(&req); err != nil || !isValidUUID(req.FlowID) {
 		WriteBusinessError(c, &BusinessError{Code: bizerr.CodeValidationFailed, Name: "VALIDATION_FAILED", Message: "Invalid request parameters"})
 		return
-	}
-	if d.B6 != nil {
-		d.B6.EnsureWorker()
 	}
 	precheckCtx := reviewapp.WithOutputLocale(c.Request.Context(), resolveRequestOutputLocale(c, req.OutputLocale))
 	res, err := d.Diagnostics.PrecheckOptimizationDraft(

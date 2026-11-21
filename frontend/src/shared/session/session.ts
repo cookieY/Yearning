@@ -30,7 +30,8 @@ export function sessionRole(user: SessionUser): SessionRole {
 }
 
 export function toSessionUser(currentUser: CurrentUser): SessionUser {
-  const capabilities = (currentUser as unknown as { capabilities?: unknown }).capabilities;
+  const capabilities =
+    "capabilities" in currentUser ? (currentUser as { capabilities?: unknown }).capabilities : undefined;
   return {
     displayName: currentUser.display_name ?? currentUser.username,
     canAccessAdmin: currentUser.can_access_admin,

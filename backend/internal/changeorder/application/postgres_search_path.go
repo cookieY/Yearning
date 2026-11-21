@@ -1,9 +1,7 @@
 package application
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
 
 	"github.com/cookieY/YearningX/backend/internal/changeorder/domain"
@@ -12,8 +10,6 @@ import (
 	execapp "github.com/cookieY/YearningX/backend/internal/execution/application"
 	reviewapp "github.com/cookieY/YearningX/backend/internal/review/application"
 )
-
-const frozenPostgresSearchPathContextKey = "postgres_search_path"
 
 // ExecutionSearchPathProbe opens an execution-purpose connection, reads the
 // fixed environment, and rejects a path different from the accepted review.
@@ -95,14 +91,6 @@ func (s *Services) probeSubmitPostgresSearchPath(
 	return nil
 }
 
-func decodeStageSnapshotPostgresSearchPath(
-	crypter *crypto.Crypter, runID string, stagePosition int32, snap stageSnapRow,
-) (reviewapp.FrozenPostgresSearchPath, bool) {
-	return decodeStageSnapshotPostgresSearchPathPlain(
-		openStageSnapshotContext(crypter, runID, stagePosition, snap),
-	)
-}
-
 func decodeStageSnapshotPostgresReviewContext(
 	crypter *crypto.Crypter, runID string, stagePosition int32, snap stageSnapRow,
 ) (reviewapp.FrozenPostgresReviewContext, bool) {
@@ -130,36 +118,4 @@ func openStageSnapshotContext(
 		return nil
 	}
 	return plain
-}
-
-func decodeStageSnapshotPostgresSearchPathPlain(
-	plain []byte,
-) (reviewapp.FrozenPostgresSearchPath, bool) {
-	decoder := json.NewDecoder(bytes.NewReader(plain))
-	decoder.UseNumber()
-	contextValue := map[string]any{}
-	if err := decoder.Decode(&contextValue); err != nil {
-		return reviewapp.FrozenPostgresSearchPath{}, false
-	}
-	rawValue, ok := contextValue[frozenPostgresSearchPathContextKey]
-	if !ok || rawValue == nil {
-		return reviewapp.FrozenPostgresSearchPath{}, false
-	}
-	raw, err := json.Marshal(rawValue)
-	if err != nil {
-		return reviewapp.FrozenPostgresSearchPath{}, false
-	}
-	strict := json.NewDecoder(bytes.NewReader(raw))
-	strict.DisallowUnknownFields()
-	var path reviewapp.FrozenPostgresSearchPath
-	if err := strict.Decode(&path); err != nil || path.Validate() != nil {
-		return reviewapp.FrozenPostgresSearchPath{}, false
-	}
-	return path, true
-}
-
-func decodeStageSnapshotPostgresReviewContextPlain(
-	plain []byte,
-) (reviewapp.FrozenPostgresReviewContext, bool) {
-	return reviewapp.DecodeFrozenPostgresReviewContext(plain)
 }

@@ -10,7 +10,7 @@ import (
 	"github.com/cookieY/YearningX/backend/internal/review/privacy"
 )
 
-// Package domain defines the pure domain model for the Review bounded context: Draft/Run state machines, SubmissionGate, and business errors. All transition functions are side-effect free; persistence adapters apply their results within the same transaction using aggregate version CAS (state-machine-test-policy).
+// Limits caps input streaming, fingerprint cardinality, and sampled references per batch.
 type Limits struct {
 	MaxInputBytes         int // 32 MiB
 	MaxStatements         int // 100,000
@@ -18,10 +18,10 @@ type Limits struct {
 	MaxUniqueFingerprints int // 1,000
 	ComplexityWarning     int // 200
 	MaxSamplesPerGroup    int // 3
-	MaxExceptionalRefs    int // DraftState is the controlled enum for change_drafts.state (state-machines.json: change_draft).
+	MaxExceptionalRefs    int // 1,000
 }
 
-// ValidDraftState reports whether s is a valid contract state; unknown persisted states must be surfaced as PERSISTENCE_ENUM_UNKNOWN and never mapped to a default state.
+// DefaultLimits returns the contract defaults for streaming statement classification and grouping.
 func DefaultLimits() Limits {
 	return Limits{
 		MaxInputBytes:         33554432,
@@ -34,7 +34,7 @@ func DefaultLimits() Limits {
 	}
 }
 
-// DraftTrigger is a trigger for the change_draft state machine (action = user command, event = system outcome).
+// Sample captures metadata for an anonymized representative statement within a fingerprint group.
 type Sample struct {
 	Index              int
 	Offset             int64
@@ -44,7 +44,7 @@ type Sample struct {
 	Quality            string
 }
 
-// DraftActionRunReview explicitly starts a precheck review by the user (R001: sole review entry point).
+// Group aggregates statements sharing a canonical execution shape fingerprint.
 type Group struct {
 	CanonicalHMAC           string
 	Count                   int
@@ -61,24 +61,24 @@ type Group struct {
 	Samples                 []Sample
 }
 
-// DraftActionSubmit submits a change order (implemented in B9; this package only validates state).
+// Exceptional records a statement flagged due to non-exact parse quality or warnings.
 type Exceptional struct {
 	Sample
 	Reason string
 }
 
-// draftEdges is the complete transition table of the state machine, keyed by source+trigger.
+// Batch is the summarized structural grouping artifact produced by Stream.
 type Batch struct {
 	StatementCount         int
 	TotalBytes             int64
 	UniqueFingerprintCount int
 	ComplexityWarning      bool
-	Groups                 []*Group // RCP-20261101-EPHEMERAL-PRECHECK: with ephemeral precheck, drafts no longer enter reviewing/ready; submission validity is carried by the materialized Run row (state=ready + HMAC match + gate re-verification); draft is directly submittable.
+	Groups                 []*Group
 	Exceptional            []Exceptional
 	ExceptionalCount       int
 }
 
-// RCP-20261024-REVIEW-RERUN-FROM-READY: ready allows explicit re-run of precheck, where the new Run supersedes the old Run (rewriting review_run_id while keeping the old Run as history).
+// Stream splits raw SQL from r, analyzes each statement into fingerprint groups, and enforces safety limits.
 func Stream(ctx context.Context, r io.Reader,
 	profile fingerprint.Profile, engine *fingerprint.Engine,
 	mapper *privacy.RunMapper, limits Limits) (*Batch, error) {
@@ -92,7 +92,6 @@ func Stream(ctx context.Context, r io.Reader,
 	counter := &countingReader{r: r}
 	split := NewSplitter(counter, profile, limits.MaxStatementBytes)
 	batch := &Batch{Groups: []*Group{}}
-	// ErrIllegalTransition indicates an undeclared (state, trigger) combination in the state machine. The HTTP layer maps this to err_code 1010 INVALID_STATE_TRANSITION without mutating state or emitting events.
 	groups := map[string]*Group{}
 
 	for {
@@ -104,7 +103,6 @@ func Stream(ctx context.Context, r io.Reader,
 			return nil, err
 		}
 		if done {
-			// ErrTerminalState indicates any trigger attempted on a terminal state.
 			if counter.total > int64(limits.MaxInputBytes) {
 				return nil, &fingerprint.Failure{
 					Code:   fingerprint.ErrNameBatchTooLarge,
@@ -115,7 +113,6 @@ func Stream(ctx context.Context, r io.Reader,
 		}
 		batch.StatementCount++
 		batch.TotalBytes += int64(len(stmt.SQL))
-		// DraftTerminal reports whether s is a terminal change_draft state (submitted).
 		if counter.total > int64(limits.MaxInputBytes) {
 			return nil, &fingerprint.Failure{
 				Code:   fingerprint.ErrNameBatchTooLarge,
@@ -188,11 +185,10 @@ func Stream(ctx context.Context, r io.Reader,
 	return batch, nil
 }
 
-// DraftTransition returns the target state for trigger on s. Undeclared combinations return ErrIllegalTransition; terminal states return ErrTerminalState.
+// absorb merges a statement analysis result into its Group and maintains up to 3 samples (first, extreme, last).
 func absorb(g *Group, stmt Statement, res fingerprint.Result) {
 	g.Count++
 	g.LastIndex = stmt.Index
-	// DraftRunReviewSources returns the set of valid source states for run_review (used by illegal-pair tests when expanding the full Cartesian product of machine vocabulary; re-run from ready was introduced by RCP-20261024-REVIEW-RERUN-FROM-READY).
 	newExtreme := res.ParameterCount < g.MinParams || res.ParameterCount > g.MaxParams
 	if res.ParameterCount < g.MinParams {
 		g.MinParams = res.ParameterCount
@@ -218,7 +214,6 @@ func absorb(g *Group, stmt Statement, res fingerprint.Result) {
 		ExecutionShapeHMAC: res.ExecutionShapeHMAC,
 		ParameterCount:     res.ParameterCount, Quality: res.Quality,
 	}
-	// DraftEditable reports whether SQL/metadata can be modified. Edits are blocked while reviewing is in progress, require invalidation first when ready (review_inputs_changed), and are immutable once submitted. Modifying SQL/flow in ready state triggers an invalidation event handled by the application layer.
 	if g.Count == 1 {
 		g.Samples = []Sample{sample}
 		return
@@ -270,7 +265,6 @@ func dedupSortedStrings(in []string) []string {
 	return out
 }
 
-// DraftActiveReview reports whether the state implies an in-flight Run (used to prevent duplicate active Runs).
 type countingReader struct {
 	r     io.Reader
 	total int64

@@ -5,7 +5,7 @@ import { appToast as toast } from "@/shared/components/shadcn-dashboard/sonner/s
 import { Pencil, Plus, ShieldCheck, Trash2, UserRound } from "lucide-react";
 import type { User, UserDeletionImpact } from "@/api/generated/client/yearningV4HTTPAPI.schemas";
 import { useSession } from "@/features/auth/session-provider";
-import { describeError } from "@/shared/api/error-display";
+import { describeError, describeErrorText } from "@/shared/api/error-display";
 import { ErrorState } from "@/shared/components/status/status-components";
 import { LoadingState } from "@/shared/components/status/loading-state";
 import { EmptyState } from "@/shared/components/status/empty-state";
@@ -55,12 +55,6 @@ import { TableRowActions } from "@/shared/components/table-row-actions";
  * disable); the builtin admin row is immutable (1103). The legacy
  * per-user permission-group binding moved to the permission-group form.
  */
-
-function describeErrorText(display: { messageKey: string; requestId: string | null }): string {
-  // Translated through the shared i18n bundle so users never see raw keys.
-  const text = i18next.t(display.messageKey);
-  return display.requestId === null ? text : `${text} (${display.requestId})`;
-}
 
 interface UserFormState {
   username: string;
@@ -248,7 +242,9 @@ export default function AdminUsersPage() {
       </Card>
 
       <CreateUserDialog open={createOpen} onClose={() => { setCreateOpen(false); }} />
-      <EditUserDialog user={editing} onClose={() => { setEditing(null); }} />
+      {editing !== null ? (
+        <EditUserDialog key={editing.id} user={editing} onClose={() => { setEditing(null); }} />
+      ) : null}
     </PageLayout>
   );
 }
@@ -580,30 +576,19 @@ function CreateUserDialog({ open, onClose }: { open: boolean; onClose: () => voi
   );
 }
 
-function EditUserDialog({ user, onClose }: { user: User | null; onClose: () => void }) {
+function EditUserDialog({ user, onClose }: { user: User; onClose: () => void }) {
   const { t } = useTranslation();
   const updateUser = useUpdateUser();
-  const [displayName, setDisplayName] = useState("");
-  const [email, setEmail] = useState("");
-  const [role, setRole] = useState<"user" | "admin">("user");
+  const [displayName, setDisplayName] = useState(() => user.display_name ?? "");
+  const [email, setEmail] = useState(() => user.email ?? "");
+  const [role, setRole] = useState<"user" | "admin">(() =>
+    user.is_builtin_admin || user.role === "admin" ? "admin" : "user",
+  );
   const [errorText, setErrorText] = useState<string | null>(null);
-  const [openFor, setOpenFor] = useState<string | null>(null);
-
-  if (user !== null && openFor !== user.id) {
-    setOpenFor(user.id);
-    setDisplayName(user.display_name ?? "");
-    setEmail(user.email ?? "");
-    setRole(user.is_builtin_admin || user.role === "admin" ? "admin" : "user");
-    setErrorText(null);
-  }
-  if (user === null && openFor !== null) {
-    setOpenFor(null);
-  }
 
   const emailInvalid = email.trim() !== "" && !/.+@.+\..+/.test(email);
 
   const submit = async () => {
-    if (user === null) return;
     setErrorText(null);
     try {
       await updateUser.mutateAsync({
@@ -625,12 +610,12 @@ function EditUserDialog({ user, onClose }: { user: User | null; onClose: () => v
   };
 
   return (
-    <Dialog open={user !== null} onOpenChange={(next) => { if (!next) onClose(); }}>
+    <Dialog open onOpenChange={(next) => { if (!next) onClose(); }}>
       <DialogContent data-testid="admin-user-edit-dialog">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <UserRound className="size-4" />
-            {t("adminUsers.editTitle", { name: user?.username ?? "" })}
+            {t("adminUsers.editTitle", { name: user.username })}
           </DialogTitle>
           <DialogDescription>{t("adminUsers.editDescription")}</DialogDescription>
         </DialogHeader>
@@ -665,7 +650,7 @@ function EditUserDialog({ user, onClose }: { user: User | null; onClose: () => v
             <Label htmlFor="user-edit-role">{t("adminUsers.roleLabel")}</Label>
             <Select
               value={role}
-              disabled={user?.is_builtin_admin === true}
+              disabled={user.is_builtin_admin}
               onValueChange={(value) => {
                 if (value === "user" || value === "admin") {
                   setRole(value);
@@ -680,7 +665,7 @@ function EditUserDialog({ user, onClose }: { user: User | null; onClose: () => v
                 <SelectItem value="admin">{t("adminUsers.roleAdmin")}</SelectItem>
               </SelectContent>
             </Select>
-            {user?.is_builtin_admin === true && (
+            {user.is_builtin_admin && (
               <p className="text-muted-foreground text-xs">{t("adminUsers.builtinRoleLocked")}</p>
             )}
           </div>

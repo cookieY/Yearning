@@ -49,34 +49,42 @@ func mergeSANObjectRefs(
 	return merged
 }
 
-func buildSANStageRequest(
-	ctx context.Context,
-	db *gorm.DB,
-	crypter *crypto.Crypter,
-	runID string,
-	target frozenDatasourceTarget,
-	groups []provider.AnonymizedGroup,
-	policyObjects []provider.AnonymizedObjectReference,
-	stageSkills []agent.SkillInjection,
-	stageKnowledge []*knowledge.Entry,
-	sanEvidence []provider.NormalizedEvidenceRef,
-	runMapper *privacy.RunMapper,
-	outputLocale string,
-	evidenceIncomplete bool,
-	localePending bool,
-	schemaPending bool,
-	cachedSANGroups *[]provider.AnonymizedGroup,
-) (provider.Request, error) {
+// stagePromptRequest bundles all stage-scoped context needed to format either a SAN or default model request.
+type stagePromptRequest struct {
+	db                 *gorm.DB
+	crypter            *crypto.Crypter
+	runID              string
+	ruleConfigHash     []byte
+	target             frozenDatasourceTarget
+	targetContext      string
+	groups             []provider.AnonymizedGroup
+	policyObjects      []provider.AnonymizedObjectReference
+	rawSkills          []agent.SkillInjection
+	compiledSkills     []agent.SkillInjection
+	rawKnowledge       []*knowledge.Entry
+	compiledKnowledge  []*knowledge.Entry
+	evidence           []provider.NormalizedEvidenceRef
+	sanEvidence        []provider.NormalizedEvidenceRef
+	runMapper          *privacy.RunMapper
+	stageLegend        []agent.TokenLegendEntry
+	outputLocale       string
+	evidenceIncomplete bool
+	localePending      bool
+	schemaPending      bool
+	cachedSANGroups    *[]provider.AnonymizedGroup
+}
+
+func buildSANStageRequest(ctx context.Context, in stagePromptRequest) (provider.Request, error) {
 	sanGroups, err := prepareSANGroups(
-		ctx, db, crypter, runID,
-		target.Engine+"/"+target.CompatibilityMode,
-		groups, runMapper, cachedSANGroups,
+		ctx, in.db, in.crypter, in.runID,
+		in.target.Engine+"/"+in.target.CompatibilityMode,
+		in.groups, in.runMapper, in.cachedSANGroups,
 	)
 	if err != nil {
 		return provider.Request{}, err
 	}
 
-	rawRefs := detokenizeObjectRefsForSAN(mergeSANObjectRefs(groups, policyObjects), runMapper)
+	rawRefs := detokenizeObjectRefsForSAN(mergeSANObjectRefs(in.groups, in.policyObjects), in.runMapper)
 	promptRefs := make([]promptprofile.ObjectReference, len(rawRefs))
 	for i, obj := range rawRefs {
 		ranges := make([]promptprofile.StatementOrdinalRange, len(obj.StatementOrdinalRanges))
@@ -94,8 +102,8 @@ func buildSANStageRequest(
 		}
 	}
 
-	rawSkills := make([]promptprofile.RuleInput, 0, len(stageSkills))
-	for _, sk := range stageSkills {
+	rawSkills := make([]promptprofile.RuleInput, 0, len(in.rawSkills))
+	for _, sk := range in.rawSkills {
 		renderedText, rerr := renderSANPolicyText(sk.KnowledgeText)
 		if rerr != nil {
 			return provider.Request{}, fmt.Errorf("%w: %v", domain.ErrCoverageIncomplete, rerr)
@@ -107,8 +115,8 @@ func buildSANStageRequest(
 		})
 	}
 
-	rawKnowledge := make([]promptprofile.RuleInput, 0, len(stageKnowledge))
-	for _, entry := range stageKnowledge {
+	rawKnowledge := make([]promptprofile.RuleInput, 0, len(in.rawKnowledge))
+	for _, entry := range in.rawKnowledge {
 		if entry == nil {
 			continue
 		}
@@ -123,26 +131,26 @@ func buildSANStageRequest(
 	}
 
 	sysPrompt := promptprofile.BuildSANReviewSystemPrompt(promptprofile.ReviewSystemPromptInput{
-		OutputLocale:       outputLocale,
-		EngineProfile:      target.Engine + "/" + target.CompatibilityMode,
-		ServerVersion:      target.ServerVersion,
+		OutputLocale:       in.outputLocale,
+		EngineProfile:      in.target.Engine + "/" + in.target.CompatibilityMode,
+		ServerVersion:      in.target.ServerVersion,
 		ObjectReferences:   promptRefs,
 		Skills:             rawSkills,
 		Knowledge:          rawKnowledge,
-		EvidenceIncomplete: evidenceIncomplete,
-		LocaleRetry:        localePending,
-		SchemaRetry:        schemaPending,
+		EvidenceIncomplete: in.evidenceIncomplete,
+		LocaleRetry:        in.localePending,
+		SchemaRetry:        in.schemaPending,
 	})
 
-	evidenceOut := sanEvidence
+	evidenceOut := in.sanEvidence
 	if evidenceOut == nil {
 		evidenceOut = []provider.NormalizedEvidenceRef{}
 	}
 
 	return provider.Request{
 		RequestSchemaVersion:      1,
-		ReviewRunID:               runID,
-		EngineProfile:             target.Engine + "/" + target.CompatibilityMode,
+		ReviewRunID:               in.runID,
+		EngineProfile:             in.target.Engine + "/" + in.target.CompatibilityMode,
 		SystemPrompt:              sysPrompt,
 		AnonymizedStatementGroups: sanGroups,
 		NormalizedEvidence:        evidenceOut,

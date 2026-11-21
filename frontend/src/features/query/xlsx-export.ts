@@ -164,11 +164,19 @@ export async function exportExecutionToXlsx(
         return;
       }
       page = await fetchExportPage(cursor);
+      if (isCancelled()) {
+        callbacks.onFailure("cancelled", rowsExported);
+        return;
+      }
       sheet.appendPage(page);
       pagesRead += 1;
       rowsExported = sheet.rowCount();
       callbacks.onProgress({ pagesRead, rowsExported, finished: false, failure: null });
       cursor = ((page as { page?: { next_cursor?: string | null } }).page?.next_cursor as string | null) ?? null;
+    }
+    if (isCancelled()) {
+      callbacks.onFailure("cancelled", rowsExported);
+      return;
     }
     const bytes = sheet.finish();
     callbacks.onDone(bytes, rowsExported);

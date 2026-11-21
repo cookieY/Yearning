@@ -4,7 +4,6 @@
 package httpapi
 
 import (
-	"context"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -23,7 +22,6 @@ import (
 	"github.com/cookieY/YearningX/backend/internal/identity"
 	"github.com/cookieY/YearningX/backend/internal/identity/session"
 	"github.com/cookieY/YearningX/backend/internal/review/application"
-	"github.com/cookieY/YearningX/backend/internal/review/domain"
 	"github.com/cookieY/YearningX/backend/internal/review/provider"
 	"github.com/cookieY/YearningX/backend/internal/tasks"
 )
@@ -34,14 +32,12 @@ type B6Deps struct {
 	Sessions *identity.SessionStore
 	DB       *gorm.DB
 
-	workerOnce  sync.Once
-	workerOwner string
-	agentOnce   sync.Once
-	agent       *application.AgentRunner
+	agentOnce sync.Once
+	agent     *application.AgentRunner
 }
 
-// AgentRunner singleton executor for ephemeral prechecks (wired with the same AgentDeps as EnsureWorker;
-// RCP-20261101-EPHEMERAL-PRECHECK: precheck no longer uses the DB task chain).
+// AgentRunner singleton executor for ephemeral prechecks
+// (RCP-20261101-EPHEMERAL-PRECHECK: precheck no longer uses the DB task chain).
 func (d *B6Deps) AgentRunner() *application.AgentRunner {
 	d.agentOnce.Do(func() {
 		deps := application.AgentDeps{
@@ -72,76 +68,6 @@ func buildB6FromB3(b3 *B3Deps) (*B6Deps, error) {
 	return &B6Deps{Review: svc, Sessions: b3.Sessions, DB: b3.DB}, nil
 }
 
-// EnsureWorker starts the in-process review worker (triggered once when the first Run is created;
-// centralized lifecycle management belongs to a later wiring package -- see review-implementation-notes.md).
-// From B7 onward, the serve path wires AgentRunner: real Provider chain + read-only evidence + deterministic injection;
-// when no Provider is enabled, Run fails closed (2011) without falling back to Fake heuristics.
-func (d *B6Deps) EnsureWorker() {
-	d.workerOnce.Do(func() {
-		if d.workerOwner == "" {
-			d.workerOwner = "serve-" + uuid.NewString()[:8]
-		}
-		deps := application.AgentDeps{
-			Dial: func(ep provider.Endpoint) (provider.Client, error) {
-				return provider.NewOpenAIAdapter(ep, nil)
-			},
-			FactSourceFor: application.AdapterFactSourceFor(d.DB, d.Review.Crypter),
-		}
-		// M5: startup reconciliation (recalculate daily cost from ledger + clear stale reservations).
-		settings, err := d.Review.LoadBudgetSettings(context.Background(), d.DB)
-		if err == nil {
-			_ = d.Review.ReconcileDailyUsage(context.Background(), d.DB, settings.Currency)
-		}
-		w, _ := d.Review.NewAgentReviewWorker(d.workerOwner, deps, 30*time.Second)
-		go w.Run(context.Background())
-	})
-}
-
-// requireB6User B6 business operation guard: enforces the authenticated prerequisite for
-// change-draft-owner / task-reader / review-evidence-relevant-actor rules in authorization-policy.json
-// (business relationships are verified in the application layer); state-changing requests enforce double-submit CSRF.
-// authorization package is outside B6 allowed_paths; centralized registration is deferred to a later governance package
-// (see docs/contracts/review-implementation-notes.md).
-func (d *B6Deps) requireB6User(op string) gin.HandlerFunc {
-	return func(c *gin.Context) {
-		id := session.FromContext(c.Request.Context())
-		if id == nil {
-			WriteProblem(c, http.StatusUnauthorized, "authentication required")
-			c.Abort()
-			return
-		}
-		if isMutatingMethod(c.Request.Method) {
-			raw, err := c.Cookie(sessionCookieName)
-			if err != nil || raw == "" {
-				WriteProblem(c, http.StatusUnauthorized, "authentication required")
-				c.Abort()
-				return
-			}
-			token := c.GetHeader(csrfHeader)
-			if token == "" {
-				WriteProblem(c, http.StatusForbidden, "csrf token missing")
-				c.Abort()
-				return
-			}
-			want, err := d.Sessions.CSRFHashByToken(c.Request.Context(), raw)
-			if err != nil || identity.TokenHash(token) != want {
-				WriteProblem(c, http.StatusForbidden, "csrf token invalid")
-				c.Abort()
-				return
-			}
-		}
-		c.Next()
-	}
-}
-
-func isMutatingMethod(m string) bool {
-	switch m {
-	case "POST", "PUT", "PATCH", "DELETE":
-		return true
-	}
-	return false
-}
-
 // uuidParam validates that the path parameter is a UUID; writes 1001 and returns false if invalid.
 func uuidParam(c *gin.Context, name string) (string, bool) {
 	raw := c.Param(name)
@@ -164,35 +90,16 @@ func b6Meta(c *gin.Context) application.RequestMeta {
 	}
 }
 
-// writeReviewErr maps B6 domain errors (extending errmap; unrecognized errors treated as internal errors).
+// writeReviewErr maps B6 domain errors via shared MapReviewError; unrecognized errors are handled as internal errors.
 func writeReviewErr(c *gin.Context, err error) bool {
-	var de *domain.Error
-	switch {
-	case err == nil:
+	if err == nil {
 		return true
-	case errors.Is(err, application.ErrNotFound):
-		WriteBusinessError(c, &BusinessError{Code: bizerr.CodeResourceNotFound, Name: "RESOURCE_NOT_FOUND", Message: "Resource not found"})
-	case errors.Is(err, application.ErrVersionConflict):
-		WriteBusinessError(c, &BusinessError{Code: bizerr.CodeVersionConflict, Name: "VERSION_CONFLICT", Message: "Resource version conflict; please refresh and retry"})
-	case errors.Is(err, application.ErrConcurrent):
-		WriteBusinessError(c, &BusinessError{Code: bizerr.CodeConcurrentModification, Name: "CONCURRENT_MODIFICATION", Message: "Concurrent modification conflict; please retry"})
-	case errors.Is(err, application.ErrValidation):
-		WriteBusinessError(c, &BusinessError{Code: bizerr.CodeValidationFailed, Name: "VALIDATION_FAILED", Message: "Invalid request parameters"})
-	case errors.Is(err, application.ErrReferenced):
-		WriteBusinessError(c, &BusinessError{Code: bizerr.CodeResourceReferenced, Name: "RESOURCE_REFERENCED", Message: "Resource is referenced by a change order and cannot be deleted"})
-	case errors.Is(err, domain.ErrIllegalTransition), errors.Is(err, domain.ErrTerminalState):
-		WriteBusinessError(c, &BusinessError{Code: bizerr.CodeInvalidStateTransition, Name: "INVALID_STATE_TRANSITION", Message: "Operation is not allowed in the current state"})
-	case errors.As(err, &de):
-		// F-UX-003 review C-1: domain.Error Detail is passed through meta.detail (same shape as B7
-		// MapReviewError); previously this branch dropped Detail so bare 1001 never reached the UI.
-		be := &BusinessError{Code: de.Code, Name: de.Name, Message: "Business operation failed"}
-		if de.Detail != "" {
-			be.Meta = map[string]any{"detail": de.Detail}
-		}
-		WriteBusinessError(c, be)
-	default:
+	}
+	be := MapReviewError(err)
+	if be == nil {
 		return false
 	}
+	WriteBusinessError(c, be)
 	return true
 }
 
@@ -428,16 +335,17 @@ func (d *B6Deps) HandleStartEphemeralReview(c *gin.Context) {
 		WriteBusinessError(c, &BusinessError{Code: bizerr.CodeValidationFailed, Name: "VALIDATION_FAILED", Message: "Invalid request body"})
 		return
 	}
-	d.EnsureWorker() // Reconciliation (ledger recalculation) and existing lifecycle wiring
 	outputLocale := strings.TrimSpace(body.OutputLocale)
 	if outputLocale == "" {
 		outputLocale = application.ResolveOutputLocale(c.GetHeader("Accept-Language"))
 	}
+	sqlBytes := []byte(body.SQL)
+	body.SQL = "" // Release up to 32 MiB request string immediately for GC.
 	runID, err := d.Review.StartEphemeralRun(c.Request.Context(), b6Actor(c), d.AgentRunner(),
 		application.EphemeralStartInput{
 			FlowID:         body.FlowID,
 			DraftID:        body.DraftID,
-			SQL:            []byte(body.SQL),
+			SQL:            sqlBytes,
 			OutputLocale:   outputLocale,
 			IdempotencyKey: strings.TrimSpace(c.GetHeader("Idempotency-Key")),
 		})

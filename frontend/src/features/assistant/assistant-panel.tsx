@@ -15,51 +15,16 @@ import {
   useDeleteAssistantSession,
   useSendAssistantMessage,
 } from "./use-assistant";
-import { SqlDraftCard } from "./sql-draft-card";
-import { AssistantMarkdown } from "./assistant-markdown";
+import { AssistantComposer } from "./assistant-composer";
+import {
+  AssistantMessageList,
+  type AssistantTypewriterState,
+} from "./assistant-message-list";
 import { describeError } from "@/shared/api/error-display";
 import { appToast } from "@/shared/components/shadcn-dashboard/sonner/sonner-08";
-import { Alert, AlertDescription } from "@/shared/components/ui/alert";
 import { Badge } from "@/shared/components/ui/badge";
 import { Button } from "@/shared/components/ui/button";
-import {
-  CodeBlock,
-  CodeBlockContent,
-} from "@/shared/components/ui/code-block";
-import {
-  Empty,
-  EmptyContent,
-  EmptyDescription,
-  EmptyHeader,
-  EmptyMedia,
-  EmptyTitle,
-} from "@/shared/components/ui/empty";
 import { Input } from "@/shared/components/ui/input";
-import {
-  InputGroup,
-  InputGroupAddon,
-  InputGroupButton,
-  InputGroupTextarea,
-} from "@/shared/components/ui/input-group";
-import {
-  Marker,
-  MarkerContent,
-} from "@/shared/components/ui/marker";
-import {
-  Message,
-  MessageContent,
-  MessageFooter,
-  MessageGroup,
-  MessageHeader,
-} from "@/shared/components/ui/message";
-import {
-  MessageScroller,
-  MessageScrollerButton,
-  MessageScrollerContent,
-  MessageScrollerItem,
-  MessageScrollerProvider,
-  MessageScrollerViewport,
-} from "@/shared/components/ui/message-scroller";
 import {
   Select,
   SelectContent,
@@ -68,35 +33,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/shared/components/ui/select";
-import { Spinner } from "@/shared/components/ui/spinner";
-import { Textarea } from "@/shared/components/ui/textarea";
-import {
-  Trace,
-  TraceCollapsible,
-  TraceCollapsibleContent,
-  TraceCollapsibleTrigger,
-  TraceDescription,
-  TraceIcon,
-  TraceLine,
-  TraceTitle,
-} from "@/shared/components/ui/trace";
 import {
   BookOpen,
-  Brain,
   Code2,
-  Database,
   Maximize2,
   Minimize2,
   Plus,
-  RotateCcw,
-  Send,
-  ShieldCheck,
   Sparkles,
-  Square,
-  Terminal,
   Trash2,
   Wand2,
-  Wrench,
 } from "lucide-react";
 
 export interface AssistantPanelProps {
@@ -161,109 +106,6 @@ export function unwrapAssistantReplyContent(raw: string): string {
   return raw;
 }
 
-function resolveCitationTitle(
-  citationId: string,
-  fallbackTitle: string,
-  t: (key: string) => string,
-): string {
-  switch (citationId) {
-    case "help-query-access":
-      return t("assistant.citations.help-query-access");
-    case "help-change-orders":
-      return t("assistant.citations.help-change-orders");
-    case "help-ai-precheck":
-      return t("assistant.citations.help-ai-precheck");
-    case "help-approvals":
-      return t("assistant.citations.help-approvals");
-    case "help-execution-verify":
-      return t("assistant.citations.help-execution-verify");
-    case "help-rollback-orders":
-      return t("assistant.citations.help-rollback-orders");
-    case "help-error-codes":
-      return t("assistant.citations.help-error-codes");
-    case "help-permission-model":
-      return t("assistant.citations.help-permission-model");
-    case "help-sql-diagnostics":
-      return t("assistant.citations.help-sql-diagnostics");
-    case "help-admin-governance":
-      return t("assistant.citations.help-admin-governance");
-    case "help-admin-review-rules":
-      return t("assistant.citations.help-admin-review-rules");
-    case "help-admin-notifications-audit":
-      return t("assistant.citations.help-admin-notifications-audit");
-    default:
-      return fallbackTitle;
-  }
-}
-
-function buildReasoningSummary(
-  msg: AssistantMessage,
-  t: (key: string) => string,
-): string {
-  if (msg.capability === "sql_optimize") {
-    return t("assistant.trace.reasoning.sql_optimize");
-  }
-  if (msg.capability === "sql_generate") {
-    return t("assistant.trace.reasoning.sql_generate");
-  }
-  return t("assistant.trace.reasoning.platform_help");
-}
-
-function buildPrivacyGateOutput(msg: AssistantMessage): string {
-  return JSON.stringify(
-    {
-      gate: "prompt_scope_gate_v4",
-      resolved_capability: msg.capability,
-      zero_leak_verified: true,
-      direct_sql_execution: "forbidden",
-      state: msg.state,
-    },
-    null,
-    2,
-  );
-}
-
-function buildCapabilityToolOutput(
-  msg: AssistantMessage,
-  t: (key: string) => string,
-): string {
-  if (msg.sql_draft !== null) {
-    return JSON.stringify(
-      {
-        datasource: msg.sql_draft.datasource_name,
-        engine: msg.sql_draft.engine,
-        schema: msg.sql_draft.schema_name,
-        referenced_tables: msg.sql_draft.referenced_tables,
-        statement_kind: msg.sql_draft.statement_kind,
-        risk_category: msg.sql_draft.risk_category,
-      },
-      null,
-      2,
-    );
-  }
-  if (msg.citations.length > 0) {
-    return JSON.stringify(
-      {
-        matched_articles: msg.citations.map((c) => ({
-          id: c.citation_id,
-          title: resolveCitationTitle(c.citation_id, c.title, t),
-          route: c.route_path,
-        })),
-      },
-      null,
-      2,
-    );
-  }
-  return JSON.stringify(
-    {
-      capability: msg.capability,
-      scope: "authorized_session_context",
-    },
-    null,
-    2,
-  );
-}
-
 export function AssistantPanel({
   open,
   isExpanded = false,
@@ -290,9 +132,9 @@ export function AssistantPanel({
   const [liveValidatorStatus, setLiveValidatorStatus] = useState<
     "idle" | "running" | "completed"
   >("idle");
-  const [streamingMsgId, setStreamingMsgId] = useState<string | null>(null);
-  const [streamedCharCount, setStreamedCharCount] = useState<number>(0);
-  const [streamTargetLength, setStreamTargetLength] = useState<number>(0);
+  const [typewriter, setTypewriter] = useState<AssistantTypewriterState | null>(null);
+  const activeTypewriterMsgId = typewriter?.msgId ?? null;
+  const streamedCharCount = typewriter?.count ?? 0;
   const [contextCompactedBanner, setContextCompactedBanner] =
     useState<boolean>(false);
   const [panelError, setPanelError] = useState<string | null>(null);
@@ -445,23 +287,22 @@ export function AssistantPanel({
 
   // Progressive typewriter streaming effect for newly arrived assistant replies
   useEffect(() => {
-    if (streamingMsgId === null || streamedCharCount >= streamTargetLength) {
+    if (activeTypewriterMsgId === null) {
       return;
     }
     const timer = window.setInterval(() => {
-      setStreamedCharCount((prev) => {
-        const next = prev + 36;
-        if (next >= streamTargetLength) {
-          setStreamingMsgId(null);
-          return streamTargetLength;
+      setTypewriter((prev) => {
+        if (prev === null || prev.msgId !== activeTypewriterMsgId) {
+          return prev;
         }
-        return next;
+        const next = prev.count + 36;
+        return next >= prev.target ? null : { ...prev, count: next };
       });
     }, 20);
     return () => {
       window.clearInterval(timer);
     };
-  }, [streamingMsgId, streamedCharCount, streamTargetLength]);
+  }, [activeTypewriterMsgId]);
 
   const handleQuickStarter = (intent: AssistantCapability) => {
     setActiveIntent(intent);
@@ -478,7 +319,7 @@ export function AssistantPanel({
   const handleNewSession = () => {
     setPanelError(null);
     setLastFailedPayload(null);
-    setStreamingMsgId(null);
+    setTypewriter(null);
     createSessionMutation.mutate(
       {
         title: t("assistant.newSessionDefaultTitle"),
@@ -502,7 +343,7 @@ export function AssistantPanel({
   const handleDeleteCurrentSession = () => {
     if (currentSession === null || deleteSessionMutation.isPending) return;
     setPanelError(null);
-    setStreamingMsgId(null);
+    setTypewriter(null);
     const deletingId = currentSession.id;
     deleteSessionMutation.mutate(
       {
@@ -541,7 +382,7 @@ export function AssistantPanel({
     setPendingUserPayload(null);
     setSelectedDraftId(null);
     setContextCompactedBanner(false);
-    setStreamingMsgId(null);
+    setTypewriter(null);
     setLiveReasoningText("");
     setLiveReasoningDone(false);
     setLiveStreamedReply("");
@@ -670,11 +511,13 @@ export function AssistantPanel({
             response.assistant_message.content,
           );
           if (!receivedSSEDeltaRef.current && unwrapped.length > 64) {
-            setStreamingMsgId(response.assistant_message.id);
-            setStreamTargetLength(unwrapped.length);
-            setStreamedCharCount(Math.min(unwrapped.length, 64));
+            setTypewriter({
+              msgId: response.assistant_message.id,
+              count: 64,
+              target: unwrapped.length,
+            });
           } else {
-            setStreamingMsgId(null);
+            setTypewriter(null);
           }
           if (response.assistant_message.sql_draft !== null) {
             setSelectedDraftId(response.assistant_message.sql_draft.id);
@@ -741,10 +584,7 @@ export function AssistantPanel({
   };
 
   const handleStopGenerating = () => {
-    if (streamingMsgId !== null) {
-      setStreamingMsgId(null);
-      setStreamedCharCount(streamTargetLength);
-    }
+    setTypewriter(null);
     if (abortControllerRef.current !== null) {
       abortControllerRef.current.abort();
       abortControllerRef.current = null;
@@ -779,8 +619,7 @@ export function AssistantPanel({
     }
   };
 
-  const isTypewriting =
-    streamingMsgId !== null && streamedCharCount < streamTargetLength;
+  const isTypewriting = typewriter !== null && typewriter.count < typewriter.target;
   const isBusy =
     sendMessageMutation.isPending ||
     createSessionMutation.isPending ||
@@ -872,7 +711,7 @@ export function AssistantPanel({
                 if (val) {
                   setSelectedSessionId(val);
                   setSelectedDraftId(null);
-                  setStreamingMsgId(null);
+                  setTypewriter(null);
                   setPanelError(null);
                 }
               }}
@@ -992,691 +831,54 @@ export function AssistantPanel({
         )}
       </div>
 
-      {/* Message stream / Empty state */}
-      <MessageScrollerProvider
-        key={effectiveSessionId ?? "none"}
-        autoScroll
-        defaultScrollPosition="end"
-      >
-        <MessageScroller className="flex-1">
-          <MessageScrollerViewport
-            ref={messageViewportRef}
-            className="px-3.5 py-3"
-            data-testid="assistant-message-viewport"
-          >
-            <MessageScrollerContent className="gap-4">
-              {messages.length === 0 && pendingUserPayload === null ? (
-                <Empty className="my-auto py-8" data-testid="assistant-empty-state">
-                  <EmptyHeader>
-                    <EmptyMedia variant="icon">
-                      <Sparkles aria-hidden="true" />
-                    </EmptyMedia>
-                    <EmptyTitle>{t("assistant.emptyTitle")}</EmptyTitle>
-                    <EmptyDescription>{t("assistant.emptyDescription")}</EmptyDescription>
-                  </EmptyHeader>
-                  <EmptyContent>
-                    <div className="flex flex-wrap items-center justify-center gap-2">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          handleQuickStarter("platform_help");
-                        }}
-                        data-testid="assistant-starter-platform_help"
-                      >
-                        <BookOpen data-icon="inline-start" aria-hidden="true" />
-                        {t("assistant.intents.platform_help")}
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          handleQuickStarter("sql_optimize");
-                        }}
-                        data-testid="assistant-starter-sql_optimize"
-                      >
-                        <Wand2 data-icon="inline-start" aria-hidden="true" />
-                        {t("assistant.intents.sql_optimize")}
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          handleQuickStarter("sql_generate");
-                        }}
-                        data-testid="assistant-starter-sql_generate"
-                      >
-                        <Code2 data-icon="inline-start" aria-hidden="true" />
-                        {t("assistant.intents.sql_generate")}
-                      </Button>
-                    </div>
-                  </EmptyContent>
-                </Empty>
-              ) : (
-                <MessageGroup className="gap-4">
-                  {(contextCompactedBanner ||
-                    (currentSession !== null &&
-                      currentSession.compacted_through_seq > 0)) && (
-                    <MessageScrollerItem
-                      key="compacted-marker"
-                      messageId="compacted-marker"
-                      className="[content-visibility:visible]"
-                    >
-                      <Marker
-                        variant="separator"
-                        data-testid="assistant-compacted-marker"
-                      >
-                        <MarkerContent>
-                          {t("assistant.trace.compactedNotice")}
-                        </MarkerContent>
-                      </Marker>
-                    </MessageScrollerItem>
-                  )}
+      <AssistantMessageList
+        effectiveSessionId={effectiveSessionId}
+        messageViewportRef={messageViewportRef}
+        messages={messages}
+        pendingUserPayload={pendingUserPayload}
+        activeIntent={activeIntent}
+        showCompactedMarker={
+          contextCompactedBanner ||
+          (currentSession !== null && currentSession.compacted_through_seq > 0)
+        }
+        typewriter={typewriter}
+        unwrapReplyContent={unwrapAssistantReplyContent}
+        changeFlows={changeFlows}
+        activeSelectedDraftId={activeSelectedDraftId}
+        liveAgentStep={liveAgentStep}
+        liveReasoningDone={liveReasoningDone}
+        liveReasoningText={liveReasoningText}
+        liveValidatorStatus={liveValidatorStatus}
+        liveStreamedReply={liveStreamedReply}
+        onQuickStarter={handleQuickStarter}
+        onSelectDraft={(draftId) => {
+          setSelectedDraftId(draftId);
+        }}
+        onRetryFailed={handleRetryFailed}
+      />
 
-                  {messages.map((msg) => {
-                    const isUser = msg.role === "user";
-                    const citations = msg.citations;
-                    const cleanContent = isUser
-                      ? msg.content
-                      : unwrapAssistantReplyContent(msg.content);
-                    const isMsgTypewriting =
-                      !isUser &&
-                      streamingMsgId === msg.id &&
-                      streamedCharCount < cleanContent.length;
-                    const displayedContent = isMsgTypewriting
-                      ? cleanContent.slice(0, streamedCharCount)
-                      : cleanContent;
-                    const isRunningState =
-                      msg.state === "streaming" || isMsgTypewriting;
-
-                    return (
-                      <MessageScrollerItem
-                        key={msg.id}
-                        messageId={msg.id}
-                        className="[content-visibility:visible]"
-                      >
-                      <Message
-                        align={isUser ? "end" : "start"}
-                        data-testid={`assistant-message-${msg.id}`}
-                      >
-                        <MessageContent
-                          className={
-                            isUser ? "max-w-[88%] items-end" : "max-w-[96%]"
-                          }
-                        >
-                          <MessageHeader className="gap-1.5">
-                            <span>
-                              {isUser
-                                ? t("assistant.roleUser")
-                                : t("assistant.roleAssistant")}
-                            </span>
-                            {isRunningState && (
-                              <Badge
-                                variant="secondary"
-                                role="status"
-                                aria-live="polite"
-                                className="text-[10px]"
-                              >
-                                {t("assistant.statusStreaming")}
-                              </Badge>
-                            )}
-                            {msg.state === "cancelled" && (
-                              <Badge variant="outline" className="text-[10px]">
-                                {t("assistant.statusCancelled")}
-                              </Badge>
-                            )}
-                            {msg.state === "failed" && (
-                              <Badge variant="destructive" className="text-[10px]">
-                                {t("assistant.statusFailed")}
-                              </Badge>
-                            )}
-                          </MessageHeader>
-
-                          {/* Codex-style Agent Trace (Reasoning + Tool Calls + Sources) */}
-                          {!isUser && (
-                            <Trace
-                              className="px-1"
-                              data-testid={`assistant-trace-${msg.id}`}
-                            >
-                              {/* 1. Reasoning / Thought Process */}
-                              <TraceCollapsible defaultOpen={isRunningState}>
-                                <TraceCollapsibleTrigger>
-                                  <TraceLine
-                                    status={isRunningState ? "running" : undefined}
-                                  >
-                                    <TraceIcon>
-                                      <Brain />
-                                    </TraceIcon>
-                                    <TraceTitle>
-                                      {isRunningState
-                                        ? t("assistant.trace.thinkingRunning")
-                                        : t("assistant.trace.thinkingDone")}
-                                    </TraceTitle>
-                                  </TraceLine>
-                                </TraceCollapsibleTrigger>
-                                <TraceCollapsibleContent>
-                                  <div className="whitespace-pre-wrap text-xs">
-                                    {buildReasoningSummary(msg, t)}
-                                  </div>
-                                </TraceCollapsibleContent>
-                              </TraceCollapsible>
-
-                              {/* 2. Tool: Prompt Scope Gate & Zero-Leak Privacy Anonymizer */}
-                              <TraceCollapsible>
-                                <TraceCollapsibleTrigger>
-                                  <TraceLine>
-                                    <TraceIcon>
-                                      <ShieldCheck />
-                                    </TraceIcon>
-                                    <TraceTitle>
-                                      {t("assistant.trace.toolPrivacyGate")}
-                                    </TraceTitle>
-                                    <TraceDescription>
-                                      {msg.capability}
-                                    </TraceDescription>
-                                  </TraceLine>
-                                </TraceCollapsibleTrigger>
-                                <TraceCollapsibleContent>
-                                  <CodeBlock size="sm">
-                                    <CodeBlockContent wrap className="max-h-48">
-                                      {buildPrivacyGateOutput(msg)}
-                                    </CodeBlockContent>
-                                  </CodeBlock>
-                                </TraceCollapsibleContent>
-                              </TraceCollapsible>
-
-                              {/* 3. Tool: Capability Knowledge / Schema Catalog Inspector */}
-                              <TraceCollapsible>
-                                <TraceCollapsibleTrigger>
-                                  <TraceLine>
-                                    <TraceIcon>
-                                      {msg.capability === "platform_help" ? (
-                                        <Wrench />
-                                      ) : (
-                                        <Database />
-                                      )}
-                                    </TraceIcon>
-                                    <TraceTitle>
-                                      {msg.capability === "platform_help"
-                                        ? t("assistant.trace.toolKnowledge")
-                                        : t("assistant.trace.toolSchemaCatalog")}
-                                    </TraceTitle>
-                                    <TraceDescription>
-                                      {msg.sql_draft !== null
-                                        ? `${msg.sql_draft.engine} · ${msg.sql_draft.schema_name}`
-                                        : `${String(citations.length)} refs`}
-                                    </TraceDescription>
-                                  </TraceLine>
-                                </TraceCollapsibleTrigger>
-                                <TraceCollapsibleContent>
-                                  <CodeBlock size="sm">
-                                    <CodeBlockContent wrap className="max-h-48">
-                                      {buildCapabilityToolOutput(msg, t)}
-                                    </CodeBlockContent>
-                                  </CodeBlock>
-                                </TraceCollapsibleContent>
-                              </TraceCollapsible>
-
-                              {/* 4. Tool: AST SQL Validator & Token Restorer (when SQL draft generated) */}
-                              {msg.sql_draft !== null && (
-                                <TraceCollapsible>
-                                  <TraceCollapsibleTrigger>
-                                    <TraceLine>
-                                      <TraceIcon>
-                                        <Terminal />
-                                      </TraceIcon>
-                                      <TraceTitle>
-                                        {t("assistant.trace.toolSqlValidator")}
-                                      </TraceTitle>
-                                      <TraceDescription>
-                                        {`${msg.sql_draft.statement_kind.toUpperCase()} · ${msg.sql_draft.risk_category.toUpperCase()}`}
-                                      </TraceDescription>
-                                    </TraceLine>
-                                  </TraceCollapsibleTrigger>
-                                  <TraceCollapsibleContent>
-                                    <CodeBlock size="sm">
-                                      <CodeBlockContent wrap className="max-h-48">
-                                        {JSON.stringify(
-                                          {
-                                            verified_single_statement: true,
-                                            statement_kind:
-                                              msg.sql_draft.statement_kind,
-                                            risk_category:
-                                              msg.sql_draft.risk_category,
-                                            sql_hmac: msg.sql_draft.sql_hmac,
-                                            submission_state:
-                                              msg.sql_draft.submission_state,
-                                          },
-                                          null,
-                                          2,
-                                        )}
-                                      </CodeBlockContent>
-                                    </CodeBlock>
-                                  </TraceCollapsibleContent>
-                                </TraceCollapsible>
-                              )}
-
-                              {/* 5. Sources / Citations Trace */}
-                              {citations.length > 0 && (
-                                <TraceCollapsible>
-                                  <TraceCollapsibleTrigger>
-                                    <TraceLine>
-                                      <TraceIcon>
-                                        <BookOpen />
-                                      </TraceIcon>
-                                      <TraceTitle>
-                                        {t("assistant.trace.usedSources", {
-                                          count: citations.length,
-                                        })}
-                                      </TraceTitle>
-                                    </TraceLine>
-                                  </TraceCollapsibleTrigger>
-                                  <TraceCollapsibleContent>
-                                    <Trace>
-                                      {citations.map((cite) => {
-                                        const localizedTitle =
-                                          resolveCitationTitle(
-                                            cite.citation_id,
-                                            cite.title,
-                                            t,
-                                          );
-                                        return (
-                                          <TraceLine
-                                            key={`trace-${cite.citation_id}-${cite.source_ref}`}
-                                          >
-                                            <TraceIcon>
-                                              <BookOpen />
-                                            </TraceIcon>
-                                            <TraceTitle>
-                                              {localizedTitle}
-                                            </TraceTitle>
-                                          </TraceLine>
-                                        );
-                                      })}
-                                    </Trace>
-                                  </TraceCollapsibleContent>
-                                </TraceCollapsible>
-                              )}
-                            </Trace>
-                          )}
-
-                          {/* Message Content Surface (Message component primitive + blue user bubble) */}
-                          {isUser ? (
-                            <div
-                              className="bg-comment-own self-end rounded-2xl px-3.5 py-2.5 text-xs leading-relaxed whitespace-pre-wrap text-white"
-                              data-testid={`assistant-user-bubble-${msg.id}`}
-                            >
-                              {cleanContent}
-                            </div>
-                          ) : (
-                            <div
-                              className="bg-muted text-foreground w-full max-w-full self-start rounded-2xl px-3.5 py-2.5 text-xs leading-relaxed"
-                              data-testid={`assistant-reply-bubble-${msg.id}`}
-                            >
-                              <AssistantMarkdown
-                                content={displayedContent}
-                                isStreaming={isRunningState}
-                              />
-                            </div>
-                          )}
-
-                          {/* Validated & Restored SQL Draft Card */}
-                          {msg.state === "completed" &&
-                            msg.sql_draft !== null &&
-                            effectiveSessionId !== null && (
-                              <SqlDraftCard
-                                sessionId={effectiveSessionId}
-                                draft={msg.sql_draft}
-                                flows={changeFlows}
-                                isSelected={
-                                  activeSelectedDraftId === msg.sql_draft.id
-                                }
-                                onSelectDraft={(draftId) => {
-                                  setSelectedDraftId(draftId);
-                                }}
-                              />
-                            )}
-
-                          {msg.state === "failed" && (
-                            <MessageFooter>
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="sm"
-                                className="h-6 px-2 text-xs"
-                                onClick={handleRetryFailed}
-                                data-testid={`assistant-retry-message-${msg.id}`}
-                              >
-                                <RotateCcw
-                                  data-icon="inline-start"
-                                  aria-hidden="true"
-                                />
-                                {t("assistant.retryTurn")}
-                              </Button>
-                            </MessageFooter>
-                          )}
-                        </MessageContent>
-                      </Message>
-                    </MessageScrollerItem>
-                  );
-                })}
-
-                {/* Optimistic User Turn + Live Agent Streaming Turn while awaiting LLM */}
-                {pendingUserPayload !== null && (
-                  <>
-                    <MessageScrollerItem
-                      key="pending-user-turn"
-                      messageId="pending-user-turn"
-                      className="[content-visibility:visible]"
-                    >
-                      <Message
-                        align="end"
-                        data-testid="assistant-pending-user-message"
-                      >
-                        <MessageContent className="max-w-[88%] items-end">
-                          <MessageHeader>
-                            <span>{t("assistant.roleUser")}</span>
-                          </MessageHeader>
-                          <div
-                            className="bg-comment-own self-end rounded-2xl px-3.5 py-2.5 text-xs leading-relaxed whitespace-pre-wrap text-white"
-                            data-testid="assistant-pending-user-bubble"
-                          >
-                            {pendingUserPayload.content}
-                          </div>
-                        </MessageContent>
-                      </Message>
-                    </MessageScrollerItem>
-
-                    <MessageScrollerItem
-                      key="pending-assistant-turn"
-                      messageId="pending-assistant-turn"
-                      className="[content-visibility:visible]"
-                    >
-                      <Message
-                        align="start"
-                        data-testid="assistant-streaming-turn"
-                      >
-                        <MessageContent className="max-w-[96%]">
-                          <MessageHeader className="gap-1.5">
-                            <span>{t("assistant.roleAssistant")}</span>
-                            <Badge
-                              variant="secondary"
-                              role="status"
-                              aria-live="polite"
-                              className="text-[10px]"
-                            >
-                              {t("assistant.statusStreaming")}
-                            </Badge>
-                          </MessageHeader>
-
-                          <Trace className="px-1">
-                            <TraceLine
-                              status={
-                                liveAgentStep === 0 ? "running" : undefined
-                              }
-                            >
-                              <TraceIcon>
-                                <ShieldCheck />
-                              </TraceIcon>
-                              <TraceTitle>
-                                {t("assistant.trace.toolPrivacyGate")}
-                              </TraceTitle>
-                              <TraceDescription>
-                                {pendingUserPayload.capability_hint ??
-                                  activeIntent}
-                              </TraceDescription>
-                            </TraceLine>
-
-                            <TraceLine
-                              status={
-                                liveAgentStep === 0
-                                  ? "pending"
-                                  : liveAgentStep === 1
-                                    ? "running"
-                                    : undefined
-                              }
-                            >
-                              <TraceIcon>
-                                {(pendingUserPayload.capability_hint ??
-                                  activeIntent) === "platform_help" ? (
-                                  <Wrench />
-                                ) : (
-                                  <Database />
-                                )}
-                              </TraceIcon>
-                              <TraceTitle>
-                                {(pendingUserPayload.capability_hint ??
-                                  activeIntent) === "platform_help"
-                                  ? t("assistant.trace.toolKnowledge")
-                                  : t("assistant.trace.toolSchemaCatalog")}
-                              </TraceTitle>
-                            </TraceLine>
-
-                            <TraceCollapsible defaultOpen>
-                              <TraceCollapsibleTrigger>
-                                <TraceLine
-                                  status={
-                                    liveReasoningDone ? undefined : "running"
-                                  }
-                                >
-                                  <TraceIcon>
-                                    <Brain />
-                                  </TraceIcon>
-                                  <TraceTitle>
-                                    {liveReasoningDone
-                                      ? t("assistant.trace.thinkingDone")
-                                      : t("assistant.trace.thinkingRunning")}
-                                  </TraceTitle>
-                                </TraceLine>
-                              </TraceCollapsibleTrigger>
-                              <TraceCollapsibleContent>
-                                <div className="whitespace-pre-wrap text-xs">
-                                  {liveReasoningText !== ""
-                                    ? liveReasoningText
-                                    : t("assistant.trace.thinkingRunning")}
-                                </div>
-                              </TraceCollapsibleContent>
-                            </TraceCollapsible>
-
-                            {liveValidatorStatus !== "idle" && (
-                              <TraceLine
-                                status={
-                                  liveValidatorStatus === "running"
-                                    ? "running"
-                                    : undefined
-                                }
-                              >
-                                <TraceIcon>
-                                  <Terminal />
-                                </TraceIcon>
-                                <TraceTitle>
-                                  {t("assistant.trace.toolSqlValidator")}
-                                </TraceTitle>
-                              </TraceLine>
-                            )}
-                          </Trace>
-
-                          {liveStreamedReply !== "" && (
-                            <div
-                              className="bg-muted text-foreground w-full max-w-full self-start rounded-2xl px-3.5 py-2.5 text-xs leading-relaxed"
-                              data-testid="assistant-live-reply-bubble"
-                            >
-                              <AssistantMarkdown
-                                content={liveStreamedReply}
-                                isStreaming={true}
-                              />
-                            </div>
-                          )}
-                        </MessageContent>
-                      </Message>
-                    </MessageScrollerItem>
-                  </>
-                )}
-                </MessageGroup>
-              )}
-            </MessageScrollerContent>
-          </MessageScrollerViewport>
-          <MessageScrollerButton aria-label={t("assistant.scrollToBottom")} />
-        </MessageScroller>
-      </MessageScrollerProvider>
-
-      {/* Error Banner with Retry */}
-      {panelError !== null && (
-        <div className="px-3.5 pb-2" data-testid="assistant-error-banner">
-          <Alert variant="destructive">
-            <AlertDescription className="flex items-center justify-between gap-2 text-xs">
-              <span>{panelError}</span>
-              {lastFailedPayload !== null && (
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="h-6 px-2 text-xs"
-                  onClick={handleRetryFailed}
-                  data-testid="assistant-error-retry-button"
-                >
-                  <RotateCcw data-icon="inline-start" aria-hidden="true" />
-                  {t("assistant.retryTurn")}
-                </Button>
-              )}
-            </AlertDescription>
-          </Alert>
-        </div>
-      )}
-
-      {/* Composer Footer */}
-      <div className="border-border flex flex-col gap-2 border-t p-3">
-        {activeIntent === "sql_optimize" && (
-          <div className="flex flex-col gap-1.5">
-            <div className="flex items-center justify-between">
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                className="h-6 px-2 text-xs"
-                onClick={() => {
-                  setShowExecutionPlan((prev) => !prev);
-                }}
-                data-testid="assistant-toggle-plan-button"
-              >
-                {showExecutionPlan
-                  ? t("assistant.hideExecutionPlan")
-                  : t("assistant.addExecutionPlan")}
-              </Button>
-            </div>
-            {showExecutionPlan && (
-              <Textarea
-                value={executionPlanInput}
-                onChange={(event) => {
-                  setExecutionPlanInput(event.target.value);
-                }}
-                placeholder={t("assistant.executionPlanPlaceholder")}
-                rows={2}
-                className="font-mono text-xs"
-                data-testid="assistant-execution-plan-textarea"
-              />
-            )}
-          </div>
-        )}
-
-        {isSlashClearMatch && (
-          <div
-            className="border-border bg-popover flex items-center justify-between rounded-lg border p-1 shadow-sm"
-            data-testid="assistant-slash-command-menu"
-          >
-            <button
-              type="button"
-              onClick={() => {
-                void handleClearContext();
-              }}
-              className="hover:bg-accent hover:text-accent-foreground flex w-full items-center justify-between rounded-md px-2.5 py-1.5 text-left text-xs transition-colors"
-              data-testid="assistant-slash-command-clear"
-            >
-              <span className="flex items-center gap-2">
-                <Badge variant="secondary" className="font-mono text-[11px]">
-                  /clear
-                </Badge>
-                <span className="text-foreground">
-                  {t("assistant.clearCommandDescription")}
-                </span>
-              </span>
-              <span className="text-muted-foreground font-mono text-[10px]">
-                Enter
-              </span>
-            </button>
-          </div>
-        )}
-
-        <InputGroup>
-          <InputGroupTextarea
-            ref={promptInputRef}
-            value={promptInput}
-            onChange={(event) => {
-              setPromptInput(event.target.value);
-            }}
-            onKeyDown={(event) => {
-              if (event.key === "Tab" && isSlashClearMatch) {
-                event.preventDefault();
-                setPromptInput("/clear");
-                return;
-              }
-              if (
-                event.key === "Enter" &&
-                !event.shiftKey &&
-                !event.nativeEvent.isComposing
-              ) {
-                event.preventDefault();
-                if (isSlashClearMatch) {
-                  void handleClearContext();
-                  return;
-                }
-                handleSend();
-              }
-            }}
-            placeholder={t("assistant.inputPlaceholder")}
-            aria-label={t("assistant.inputPlaceholder")}
-            rows={2}
-            data-testid="assistant-prompt-input"
-          />
-          <InputGroupAddon align="block-end" className="justify-between">
-            <span className="text-muted-foreground text-[11px]">
-              {t("assistant.inputHint")}
-            </span>
-            <div className="flex items-center gap-1.5">
-              {isBusy && (
-                <InputGroupButton
-                  type="button"
-                  variant="outline"
-                  size="xs"
-                  onClick={handleStopGenerating}
-                  data-testid="assistant-stop-button"
-                >
-                  <Square data-icon="inline-start" aria-hidden="true" />
-                  {t("assistant.stopGenerating")}
-                </InputGroupButton>
-              )}
-              <InputGroupButton
-                type="button"
-                variant="default"
-                size="xs"
-                disabled={promptInput.trim() === "" || isBusy}
-                onClick={handleSend}
-                data-testid="assistant-send-button"
-              >
-                {isBusy ? (
-                  <Spinner data-icon="inline-start" aria-hidden="true" />
-                ) : (
-                  <Send data-icon="inline-start" aria-hidden="true" />
-                )}
-                {t("assistant.send")}
-              </InputGroupButton>
-            </div>
-          </InputGroupAddon>
-        </InputGroup>
-      </div>
+      <AssistantComposer
+        promptInputRef={promptInputRef}
+        panelError={panelError}
+        lastFailedPayload={lastFailedPayload}
+        onRetryFailed={handleRetryFailed}
+        activeIntent={activeIntent}
+        showExecutionPlan={showExecutionPlan}
+        onToggleExecutionPlan={() => {
+          setShowExecutionPlan((prev) => !prev);
+        }}
+        executionPlanInput={executionPlanInput}
+        onExecutionPlanChange={setExecutionPlanInput}
+        isSlashClearMatch={isSlashClearMatch}
+        promptInput={promptInput}
+        onPromptInputChange={setPromptInput}
+        isBusy={isBusy}
+        onClearContext={() => {
+          void handleClearContext();
+        }}
+        onSend={handleSend}
+        onStopGenerating={handleStopGenerating}
+      />
     </div>
   );
 }

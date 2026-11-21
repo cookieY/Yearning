@@ -2,7 +2,6 @@
 // Rule = name + enabled + flow scope (empty = all) + one trigger event + one target role + one channel;
 // preview only resolves targets and renders fixed copy, never sending or mutating state. Event vocabulary comes from
 // NotificationRuleEventType (AI precheck family is structurally excluded — the generated type is the vocabulary).
-import i18next from "@/shared/i18n";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Plus, Pencil, Trash2, Eye } from "lucide-react";
@@ -23,7 +22,7 @@ import {
   usePreviewNotificationRule,
   useReplaceNotificationRule,
 } from "@/features/admin/use-admin";
-import { describeError } from "@/shared/api/error-display";
+import { describeError, describeErrorText } from "@/shared/api/error-display";
 import { appToast } from "@/shared/components/shadcn-dashboard/sonner/sonner-08";
 import { PageLayout } from "@/shared/components/page-layout";
 import { PendingButton } from "@/shared/components/pending-button";
@@ -174,11 +173,6 @@ function buildDefaultMessageTemplate(
   ].join("\n");
 }
 
-function describeErrorText(display: { messageKey: string; requestId: string | null }): string {
-  const text = i18next.t(display.messageKey);
-  return display.requestId === null ? text : `${text} (${display.requestId})`;
-}
-
 export function RulesView({ isAdmin }: { isAdmin: boolean }) {
   const { t } = useTranslation();
   const rulesQuery = useNotificationRules(isAdmin);
@@ -262,8 +256,12 @@ export function RulesView({ isAdmin }: { isAdmin: boolean }) {
         </Card>
       )}
 
-      <RuleFormDialog open={createOpen} editing={null} onClose={() => { setCreateOpen(false); }} />
-      <RuleFormDialog open={editing !== null} editing={editing} onClose={() => { setEditing(null); }} />
+      {createOpen ? (
+        <RuleFormDialog key="create" editing={null} onClose={() => { setCreateOpen(false); }} />
+      ) : null}
+      {editing !== null ? (
+        <RuleFormDialog key={editing.id} editing={editing} onClose={() => { setEditing(null); }} />
+      ) : null}
     </PageLayout>
   );
 }
@@ -333,12 +331,23 @@ const EMPTY_RULE: NotificationRuleWrite = {
   message_template: null,
 };
 
+function initialRuleDraft(editing: NotificationRule | null): NotificationRuleWrite {
+  if (editing === null) return EMPTY_RULE;
+  return {
+    name: editing.name,
+    enabled: editing.enabled,
+    flow_id: editing.flow_id,
+    event_type: editing.event_type,
+    target_kind: editing.target_kind,
+    channel_id: editing.channel_id,
+    message_template: editing.message_template ?? null,
+  };
+}
+
 function RuleFormDialog({
-  open,
   editing,
   onClose,
 }: {
-  open: boolean;
   editing: NotificationRule | null;
   onClose: () => void;
 }) {
@@ -350,44 +359,20 @@ function RuleFormDialog({
   const flowsQuery = useFlows(true);
   const flows = flowsQuery.data?.items ?? [];
   const channels = channelsQuery.data?.items ?? [];
-  const [draft, setDraft] = useState<NotificationRuleWrite>(EMPTY_RULE);
-  // Fall back to the first channel when no initial value is set (Base UI Select requires controlled values to match items).
-  const firstChannel = channels[0];
-  if (draft.channel_id === "" && firstChannel !== undefined) {
-    setDraft({ ...draft, channel_id: firstChannel.id });
-  }
+  const [draft, setDraft] = useState<NotificationRuleWrite>(() => initialRuleDraft(editing));
   const [sampleOrder, setSampleOrder] = useState("");
   const [preview, setPreview] = useState<NotificationRulePreview | null>(null);
-  const [openFor, setOpenFor] = useState<string | null>(null);
   const [errorText, setErrorText] = useState<string | null>(null);
 
-  const formKey = editing?.id ?? "create";
-  if (open && openFor !== formKey) {
-    setOpenFor(formKey);
-    setErrorText(null);
-    setPreview(null);
-    setSampleOrder("");
-    setDraft(
-      editing === null
-        ? EMPTY_RULE
-        : {
-            name: editing.name,
-            enabled: editing.enabled,
-            flow_id: editing.flow_id,
-            event_type: editing.event_type,
-            target_kind: editing.target_kind,
-            channel_id: editing.channel_id,
-            message_template: editing.message_template ?? null,
-          },
-    );
-  }
-  if (!open && openFor !== null) setOpenFor(null);
+  // Fall back to the first channel when no initial value is set (Base UI Select requires controlled values to match items).
+  const effectiveChannelId = draft.channel_id || channels[0]?.id || "";
+  const effectiveRule: NotificationRuleWrite = { ...draft, channel_id: effectiveChannelId };
 
   const runPreview = async () => {
     setErrorText(null);
     try {
       const result = await previewRule.mutateAsync({
-        rule: draft,
+        rule: effectiveRule,
         sample_order_id: sampleOrder === "" ? null : sampleOrder,
       });
       setPreview(result);
@@ -400,9 +385,9 @@ function RuleFormDialog({
     setErrorText(null);
     try {
       if (editing === null) {
-        await createRule.mutateAsync(draft);
+        await createRule.mutateAsync(effectiveRule);
       } else {
-        await replaceRule.mutateAsync({ ruleId: editing.id, version: editing.version, body: draft });
+        await replaceRule.mutateAsync({ ruleId: editing.id, version: editing.version, body: effectiveRule });
       }
       appToast.success(t("common.save"), { description: draft.name });
       onClose();
@@ -425,7 +410,7 @@ function RuleFormDialog({
   };
 
   return (
-    <Dialog open={open} onOpenChange={(next) => { if (!next) onClose(); }}>
+    <Dialog open onOpenChange={(next) => { if (!next) onClose(); }}>
       <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-xl">
         <DialogHeader>
           <DialogTitle>{editing === null ? t("adminRules.createTitle") : t("adminRules.editTitle", { name: editing.name })}</DialogTitle>
@@ -505,7 +490,7 @@ function RuleFormDialog({
           <div className="flex flex-col gap-2">
             <Label htmlFor="rule-channel">{t("adminRules.column.channel")}</Label>
             <Select
-              value={draft.channel_id}
+              value={effectiveChannelId}
               onValueChange={(value) => { if (value !== null) { setDraft({ ...draft, channel_id: value }); } }}
             >
               <SelectTrigger id="rule-channel" className="w-full" data-testid="rule-channel">
@@ -623,7 +608,7 @@ function RuleFormDialog({
           </Button>
           <PendingButton
             pending={createRule.isPending || replaceRule.isPending}
-            disabled={draft.name.trim() === "" || draft.channel_id === ""}
+            disabled={draft.name.trim() === "" || effectiveChannelId === ""}
             onClick={() => { void submit(); }}
             data-testid="rule-form-submit"
           >

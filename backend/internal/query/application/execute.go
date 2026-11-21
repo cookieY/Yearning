@@ -8,7 +8,6 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
-	"encoding/pem"
 	"errors"
 	"strings"
 	"sync"
@@ -16,7 +15,6 @@ import (
 
 	"gorm.io/gorm"
 
-	"github.com/cookieY/YearningX/backend/internal/crypto"
 	"github.com/cookieY/YearningX/backend/internal/database"
 	"github.com/cookieY/YearningX/backend/internal/datasource"
 	"github.com/cookieY/YearningX/backend/internal/query/domain"
@@ -679,8 +677,8 @@ func (s *Services) maskingVocabulary(ctx context.Context, flowID, dsID string) (
 }
 
 // openQueryPool opens a query-purpose connection pool (one pool per execution: per-request timeout + dedicated
-// connection cursor contract; credential envelope AAD matches datasource.Factory field for field --
-// replicated read-only since datasource/** is outside B11 allowed_paths; payload is {username,password}).
+// connection cursor contract) by delegating encrypted credential/TLS loading to datasource.ResolveCredential
+// and datasource.ResolveTLSMaterial.
 // SEC-0027: acquires a global pool slot before opening and binds release to the pool's first Close (covering execution,
 // pagination, and metadata close paths); budget exhaustion returns errQueryPoolBusy (mapped by callers to
 // the 1012 family "system busy" error, distinct from datasource unavailable).
@@ -701,32 +699,19 @@ func (s *Services) openQueryPool(ctx context.Context, ds *datasource.DatasourceM
 		pool.SetCloseHook(release)
 		return adapter, pool, nil
 	}
-	cred, resolvedPurpose, err := s.loadReadOnlyQueryCredential(ctx, ds.ID)
+	cred, err := datasource.ResolveCredential(ctx, s.DB, s.Crypter, ds.ID, datasource.CredentialResolveOptions{
+		Purposes: []string{"query", "review"},
+	})
 	if err != nil {
 		return fail(datasourceUnavailable())
 	}
-	plain, err := s.openQueryCredential(cred)
+	tlsPurposes := []string{cred.Purpose, "review"}
+	if cred.Purpose == "review" {
+		tlsPurposes = []string{"review", "query"}
+	}
+	tlsMat, err := datasource.ResolveTLSMaterial(ctx, s.DB, s.Crypter, ds.ID, tlsPurposes...)
 	if err != nil {
-		return fail(err)
-	}
-	var tlsMat *database.TLSMaterial
-	var tlsRow datasource.DatasourceTLSMaterialModel
-	tlsPurposes := []string{resolvedPurpose}
-	if resolvedPurpose == "query" {
-		tlsPurposes = append(tlsPurposes, "review")
-	} else {
-		tlsPurposes = append(tlsPurposes, "query")
-	}
-	for _, tlsPurpose := range tlsPurposes {
-		if err := s.DB.WithContext(ctx).Where(
-			"datasource_id = ? and purpose = ?", ds.ID, tlsPurpose).First(&tlsRow).Error; err == nil {
-			mat, merr := s.openQueryTLS(&tlsRow)
-			if merr != nil {
-				return fail(datasourceUnavailable())
-			}
-			tlsMat = mat
-			break
-		}
+		return fail(datasourceUnavailable())
 	}
 	ep := database.Endpoint{
 		Host: ds.Host, Port: ds.Port,
@@ -740,7 +725,7 @@ func (s *Services) openQueryPool(ctx context.Context, ds *datasource.DatasourceM
 		adapter = database.NewPostgreSQLAdapter(ep, opts)
 	}
 	pool, err := adapter.OpenPurposePool(ctx, database.PurposeQuery,
-		database.Credential{Username: plain.Username, Password: plain.Password}, tlsMat)
+		database.Credential{Username: cred.Username, Password: cred.Password}, tlsMat)
 	if err != nil {
 		return fail(datasourceUnavailable())
 	}
@@ -770,21 +755,11 @@ func (s *Services) loadReadOnlyQueryCredential(
 }
 
 func (s *Services) openQueryCredential(cred *datasource.DatasourceCredentialModel) (*queryCredentialPayload, error) {
-	plain, err := s.Crypter.Open(crypto.PurposePayload, crypto.Envelope{
-		Ciphertext: cred.CredentialCiphertext, Nonce: cred.CredentialNonce,
-		KeyID: cred.CredentialKeyID, Algorithm: cred.CredentialAlgorithm,
-	}, crypto.AAD{
-		DeploymentID: s.Crypter.DeploymentID(), Table: "datasource_credentials",
-		PrimaryKey: cred.ID, Column: "credential", Purpose: "datasource_credential",
-	})
+	c, err := datasource.OpenCredentialEnvelope(s.Crypter, cred)
 	if err != nil {
 		return nil, datasourceUnavailable()
 	}
-	var p queryCredentialPayload
-	if err := json.Unmarshal(plain, &p); err != nil {
-		return nil, datasourceUnavailable()
-	}
-	return &p, nil
+	return &queryCredentialPayload{Username: c.Username, Password: c.Password}, nil
 }
 
 type queryCredentialPayload struct {
@@ -792,50 +767,9 @@ type queryCredentialPayload struct {
 	Password string `json:"password"`
 }
 
-// openQueryTLS decrypts TLS material and splits the PEM bundle (present but undecryptable maps to
-// datasource unavailable; fails closed and never downgrades to plaintext).
+// openQueryTLS decrypts TLS material and splits the PEM bundle via datasource.OpenTLSEnvelope.
 func (s *Services) openQueryTLS(tls *datasource.DatasourceTLSMaterialModel) (*database.TLSMaterial, error) {
-	if tls.MaterialCiphertext == nil || tls.MaterialKeyID == nil {
-		return nil, nil
-	}
-	plain, err := s.Crypter.Open(crypto.PurposePayload, crypto.Envelope{
-		Ciphertext: tls.MaterialCiphertext, Nonce: tls.MaterialNonce,
-		KeyID: *tls.MaterialKeyID, Algorithm: derefString(tls.MaterialAlgorithm),
-	}, crypto.AAD{
-		DeploymentID: s.Crypter.DeploymentID(), Table: "datasource_tls_materials",
-		PrimaryKey: tls.ID, Column: "material", Purpose: "datasource_tls",
-	})
-	if err != nil {
-		return nil, err
-	}
-	mat := &database.TLSMaterial{
-		VerifyServer: tls.VerifyServer, ServerName: derefString(tls.ServerName),
-	}
-	var certs [][]byte
-	for rest := plain; ; {
-		var block *pem.Block
-		block, rest = pem.Decode(rest)
-		if block == nil {
-			break
-		}
-		switch block.Type {
-		case "CERTIFICATE":
-			certs = append(certs, pem.EncodeToMemory(block))
-		case "PRIVATE KEY", "RSA PRIVATE KEY", "EC PRIVATE KEY":
-			mat.KeyPEM = pem.EncodeToMemory(block)
-		}
-	}
-	if len(certs) > 0 {
-		caCerts := certs
-		if mat.KeyPEM != nil {
-			mat.CertPEM = certs[len(certs)-1]
-			caCerts = certs[:len(certs)-1]
-		}
-		for _, c := range caCerts {
-			mat.CAPEM = append(mat.CAPEM, c...)
-		}
-	}
-	return mat, nil
+	return datasource.OpenTLSEnvelope(s.Crypter, tls)
 }
 
 func derefString(p *string) string {

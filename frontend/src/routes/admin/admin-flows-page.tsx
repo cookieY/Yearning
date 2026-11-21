@@ -1,4 +1,3 @@
-import i18next from "@/shared/i18n";
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router";
 import { useTranslation } from "react-i18next";
@@ -7,7 +6,7 @@ import { ArrowDown, ArrowUp, Database, EyeOff, Pencil, Plus, Trash2, Workflow } 
 import { Checkbox } from "@/shared/components/ui/checkbox";
 import type { Flow, FlowMaskingRule, User } from "@/api/generated/client/yearningV4HTTPAPI.schemas";
 import { useSession } from "@/features/auth/session-provider";
-import { describeError } from "@/shared/api/error-display";
+import { describeError, describeErrorText } from "@/shared/api/error-display";
 import { ErrorState } from "@/shared/components/status/status-components";
 import { LoadingState } from "@/shared/components/status/loading-state";
 import { EmptyState } from "@/shared/components/status/empty-state";
@@ -60,12 +59,6 @@ import { PendingButton } from "@/shared/components/pending-button";
  * flows additionally expose the per-datasource sensitive-column vocabulary
  * (Q006 admin face; <=256 literal columns, case-fold normalized server-side).
  */
-
-function describeErrorText(display: { messageKey: string; requestId: string | null }): string {
-  // Translated through the shared i18n bundle so users never see raw keys.
-  const text = i18next.t(display.messageKey);
-  return display.requestId === null ? text : `${text} (${display.requestId})`;
-}
 
 interface StageDraft {
   position: number;
@@ -276,15 +269,17 @@ export default function AdminFlowsPage() {
         </CardContent>
       </Card>
 
-      <FlowFormDialog
-        open={createType !== null || editing !== null}
-        flowType={editing?.flow_type ?? createType ?? "change_review"}
-        editing={editing}
-        onClose={() => {
-          setEditing(null);
-          setCreateType(null);
-        }}
-      />
+      {createType !== null || editing !== null ? (
+        <FlowFormDialog
+          key={editing?.id ?? `create-${createType ?? "change_review"}`}
+          flowType={editing?.flow_type ?? createType ?? "change_review"}
+          editing={editing}
+          onClose={() => {
+            setEditing(null);
+            setCreateType(null);
+          }}
+        />
+      ) : null}
     </PageLayout>
   );
 }
@@ -385,13 +380,37 @@ function FlowRow({ flow, onEdit }: { flow: Flow; onEdit: () => void }) {
   );
 }
 
+function initialFlowForm(editing: Flow | null): FlowFormState {
+  if (editing === null) return { ...EMPTY_FORM };
+  return {
+    name: editing.name,
+    enabled: editing.enabled,
+    ruleSetId: editing.rule_set_id ?? "",
+    stages: (editing.stages ?? []).map((stage) => ({
+      position: stage.position,
+      datasourceId: stage.datasource_id,
+      approvalSteps: stage.approval_steps.map((step) => ({
+        position: step.position,
+        actorIds: step.actors.map((actor) => actor.user_id),
+      })),
+      executionActorIds: stage.execution_actors.map((actor) => actor.user_id),
+    })),
+    queryCapabilities: (editing.query_capabilities ?? []).map((capability) => ({
+      datasourceId: capability.datasource_id,
+      canExport: capability.can_export,
+    })),
+    approvalSteps: (editing.approval_steps ?? []).map((step) => ({
+      position: step.position,
+      actorIds: step.actors.map((actor) => actor.user_id),
+    })),
+  };
+}
+
 function FlowFormDialog({
-  open,
   flowType,
   editing,
   onClose,
 }: {
-  open: boolean;
   flowType: "change_review" | "query_access";
   editing: Flow | null;
   onClose: () => void;
@@ -406,46 +425,10 @@ function FlowFormDialog({
   const createFlow = useCreateFlow();
   const replaceFlow = useReplaceFlow();
 
-  const [form, setForm] = useState<FlowFormState>(EMPTY_FORM);
-  const [openFor, setOpenFor] = useState<string | null>(null);
+  const [form, setForm] = useState<FlowFormState>(() => initialFlowForm(editing));
   const [errorText, setErrorText] = useState<string | null>(null);
   const [queryDsSearch, setQueryDsSearch] = useState("");
   const [stageDsSearchByIndex, setStageDsSearchByIndex] = useState<Record<number, string>>({});
-
-  const formKey = editing?.id ?? `create-${flowType}`;
-  if (open && openFor !== formKey) {
-    setOpenFor(formKey);
-    setQueryDsSearch("");
-    setStageDsSearchByIndex({});
-    setForm(
-      editing === null
-        ? { ...EMPTY_FORM }
-        : {
-            name: editing.name,
-            enabled: editing.enabled,
-            ruleSetId: editing.rule_set_id ?? "",
-            stages: (editing.stages ?? []).map((stage) => ({
-              position: stage.position,
-              datasourceId: stage.datasource_id,
-              approvalSteps: stage.approval_steps.map((step) => ({
-                position: step.position,
-                actorIds: step.actors.map((actor) => actor.user_id),
-              })),
-              executionActorIds: stage.execution_actors.map((actor) => actor.user_id),
-            })),
-            queryCapabilities: (editing.query_capabilities ?? []).map((capability) => ({
-              datasourceId: capability.datasource_id,
-              canExport: capability.can_export,
-            })),
-            approvalSteps: (editing.approval_steps ?? []).map((step) => ({
-              position: step.position,
-              actorIds: step.actors.map((actor) => actor.user_id),
-            })),
-          },
-    );
-    setErrorText(null);
-  }
-  if (!open && openFor !== null) setOpenFor(null);
 
   const datasources = useMemo(() => datasourcesQuery.data?.items ?? [], [datasourcesQuery.data]);
   const users = usersQuery.data?.items ?? [];
@@ -595,7 +578,7 @@ function FlowFormDialog({
   };
 
   return (
-    <Dialog open={open} onOpenChange={(next) => { if (!next) onClose(); }}>
+    <Dialog open onOpenChange={(next) => { if (!next) onClose(); }}>
       <DialogContent
         className="max-h-[min(760px,86vh)] sm:max-w-3xl"
         viewportClassName="max-h-[calc(min(760px,86vh)-10.5rem)]"

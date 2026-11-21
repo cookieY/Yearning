@@ -664,3 +664,6 @@ func buildWatermark(username string, at time.Time) string {
 
 // jsonMarshal is a deterministic JSON encoding helper.
 func jsonMarshal(v any) ([]byte, error) { return json.Marshal(v) }
+
+// jsonUnmarshalStrict decodes JSON into the target value.
+func jsonUnmarshalStrict(data []byte, v any) error { return json.Unmarshal(data, v) }

@@ -1,10 +1,7 @@
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { getMyDashboard } from "@/api/generated/client/dashboard/dashboard";
 import { getOperationsDashboard } from "@/api/generated/client/administration/administration";
-import type {
-  MyDashboard,
-  OperationsDashboard,
-} from "@/api/generated/client/yearningV4HTTPAPI.schemas";
+import { unwrapApi } from "@/shared/api/mutator";
 
 /**
  * Dashboard reads (dashboard PRD §2/§3/§9). Both endpoints are authenticated
@@ -20,7 +17,7 @@ import type {
 export function useMyDashboardQuery(enabled: boolean) {
   return useQuery({
     queryKey: ["dashboard", "me"],
-    queryFn: async () => (await getMyDashboard()) as unknown as MyDashboard,
+    queryFn: () => unwrapApi(getMyDashboard()),
     enabled,
     staleTime: 60_000,
     refetchOnWindowFocus: false,
@@ -30,8 +27,7 @@ export function useMyDashboardQuery(enabled: boolean) {
 export function useOperationsDashboardQuery(windowDays: number, enabled: boolean) {
   return useQuery({
     queryKey: ["admin", "dashboard", "operations", windowDays],
-    queryFn: async () =>
-      (await getOperationsDashboard({ window_days: windowDays })) as unknown as OperationsDashboard,
+    queryFn: () => unwrapApi(getOperationsDashboard({ window_days: windowDays })),
     enabled,
     // Window switches keep the previous chart on screen instead of
     // collapsing the card to a skeleton on every refetch.

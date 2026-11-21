@@ -214,4 +214,50 @@ export const customInstance = async <T>(url: string, options?: RequestInit): Pro
   });
 };
 
+type SuccessEnvelope<R> = Extract<R, { err_code: 0 }>;
+
+type NormalizePage<D> = D extends { items: readonly unknown[]; page: infer P }
+  ? Omit<D, "items" | "page"> & {
+      items: NonNullable<D["items"]>[number][];
+      page: P;
+    }
+  : D;
+
+/**
+ * Extracts the `data` payload type from a generated OpenAPI success/business-error
+ * union (`customInstance` unwraps `err_code === 0` at runtime and throws
+ * `BusinessError` on non-zero envelopes) and normalizes `Page & { items?: T[] }`
+ * intersections so array elements keep their contract element type `T`.
+ */
+export type UnwrapEnvelope<R> = NormalizePage<
+  [SuccessEnvelope<R>] extends [never]
+    ? R extends { data: infer D }
+      ? D
+      : R
+    : SuccessEnvelope<R> extends { data: infer D }
+      ? D
+      : SuccessEnvelope<R>
+>;
+
+/**
+ * Typed bridge aligning generated client promises (typed as full OpenAPI envelopes)
+ * with `customInstance`'s runtime unwrapping of `envelope.data`.
+ */
+export function unwrapApi<R>(promise: Promise<R>): Promise<UnwrapEnvelope<R>> {
+  return promise as unknown as Promise<UnwrapEnvelope<R>>;
+}
+
+/** Builds optimistic-concurrency `RequestInit` headers carrying a quoted `If-Match` row version. */
+export function ifMatchHeader(
+  version: number | undefined,
+  extraHeaders?: Record<string, string>,
+): RequestInit {
+  return {
+    headers: {
+      ...extraHeaders,
+      "If-Match": `"${String(version ?? 1)}"`,
+    },
+  };
+}
+
 export default customInstance;

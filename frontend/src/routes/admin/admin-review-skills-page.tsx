@@ -1,6 +1,6 @@
-import { ReviewInputListPage } from "@/features/admin/review-input-page";
+import { SkillsManagementPage } from "@/features/admin/skills-management-page";
 
 /** /admin/review-engine/skills — the PromptTool registry page. */
 export default function AdminReviewSkillsPage() {
-  return <ReviewInputListPage kind="skills" />;
+  return <SkillsManagementPage />;
 }

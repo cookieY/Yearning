@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { Link } from "react-router";
+import { ROUTE_ALIAS_MAP } from "@/shared/lib/route-aliases";
 import {
   CodeBlock,
   CodeBlockActions,
@@ -15,29 +16,12 @@ export interface AssistantMarkdownProps {
   isStreaming?: boolean;
 }
 
-const ASSISTANT_ROUTE_ALIAS_MAP: Record<string, string> = {
-  "/dashboard": "/workspace",
-  "/orders/new": "/changes/new",
-  "/orders": "/changes/mine",
-  "/changes/orders": "/changes/mine",
-  "/approvals": "/approvals/changes",
-  "/approvals/queries": "/approvals/query",
-  "/query/access-requests": "/query/requests",
-  "/query/grants": "/query/requests",
-  "/admin/review-engine": "/admin/review-engine/skills",
-  "/admin/review-engine/rules": "/admin/review-engine/skills",
-  "/admin/review-engine/rule-sets": "/admin/rule-sets",
-  "/admin/audit": "/records",
-  "/admin/audit-logs": "/records",
-  "/admin/notifications": "/admin/settings/notifications",
-};
-
 /**
  * Resolves contract/help route aliases to canonical frontend router paths.
  */
 export function resolveAssistantRoutePath(routePath: string): string {
   const trimmed = routePath.trim();
-  const mapped = ASSISTANT_ROUTE_ALIAS_MAP[trimmed];
+  const mapped = ROUTE_ALIAS_MAP[trimmed];
   if (mapped !== undefined) {
     return mapped;
   }

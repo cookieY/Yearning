@@ -14,7 +14,6 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
-	"sync"
 )
 
 // KeyStatus represents the capability status of a keyring entry.
@@ -58,9 +57,8 @@ type KeyMetadata struct {
 	CreatedAt string    `json:"created_at"`
 }
 
-// Keyring holds parsed keys; read-only in-process and safe for concurrent use.
+// Keyring holds parsed keys; immutable once loaded by LoadKeyring and safe for concurrent reads.
 type Keyring struct {
-	mu          sync.RWMutex
 	deployment  string
 	byID        map[string][]byte
 	metaByID    map[string]KeyMetadata
@@ -261,8 +259,6 @@ func LoadKeyring(path string) (*Keyring, error) {
 
 // HasStateKey reports whether the oidc_state HMAC key is present (must be true before configuring an OIDC Provider).
 func (r *Keyring) HasStateKey() bool {
-	r.mu.RLock()
-	defer r.mu.RUnlock()
 	return r.hasStateKey
 }
 
@@ -270,16 +266,12 @@ func (r *Keyring) HasStateKey() bool {
 // Shared by serve startup and Readiness (contract availability:
 // readiness_requires_current_and_all_referenced_keys; SEC-0046 detection surface).
 func (r *Keyring) HasCurrentKey(purpose string) bool {
-	r.mu.RLock()
-	defer r.mu.RUnlock()
 	_, ok := r.current[purpose]
 	return ok
 }
 
 // CurrentKey returns the current encrypt_decrypt key for purpose.
 func (r *Keyring) CurrentKey(purpose string) (string, []byte, error) {
-	r.mu.RLock()
-	defer r.mu.RUnlock()
 	id, ok := r.current[purpose]
 	if !ok {
 		return "", nil, ErrNoCurrentKey
@@ -289,8 +281,6 @@ func (r *Keyring) CurrentKey(purpose string) (string, []byte, error) {
 
 // KeyByID returns the key for the specified key_id; unknown keys fail closed.
 func (r *Keyring) KeyByID(id string) ([]byte, error) {
-	r.mu.RLock()
-	defer r.mu.RUnlock()
 	key, ok := r.byID[id]
 	if !ok {
 		return nil, ErrUnknownKey
@@ -300,8 +290,6 @@ func (r *Keyring) KeyByID(id string) ([]byte, error) {
 
 // ListMetadata returns the list of entries without secret key material.
 func (r *Keyring) ListMetadata() []KeyMetadata {
-	r.mu.RLock()
-	defer r.mu.RUnlock()
 	out := make([]KeyMetadata, 0, len(r.metaByID))
 	for _, m := range r.metaByID {
 		out = append(out, m)
@@ -311,7 +299,5 @@ func (r *Keyring) ListMetadata() []KeyMetadata {
 
 // DeploymentID returns the stable non-secret deployment identifier (part of AAD).
 func (r *Keyring) DeploymentID() string {
-	r.mu.RLock()
-	defer r.mu.RUnlock()
 	return r.deployment
 }

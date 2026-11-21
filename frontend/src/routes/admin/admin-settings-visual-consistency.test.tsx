@@ -9,7 +9,6 @@ import { SessionProvider } from "@/features/auth/session-provider";
 import AdminAiBudgetPage from "@/routes/admin/admin-ai-budget-page";
 import AdminAnnouncementsPage from "@/routes/admin/admin-announcements-page";
 import AdminIdentityProvidersPage from "@/routes/admin/admin-identity-providers-page";
-import AdminNotificationsPage from "@/routes/admin/admin-notifications-page";
 import AdminSettingsNamespacePage from "@/routes/admin/admin-settings-page";
 import { resetAdminFixture } from "@/shared/mock/admin-fixture";
 import { server } from "@/test/msw/server";
@@ -334,13 +333,13 @@ describe("admin settings visual consistency", () => {
 
 describe("settings-related pages use one page heading", () => {
   it.each([
-    ["identity providers", <AdminIdentityProvidersPage />, "\u8ba4\u8bc1Provider"],
-    ["notifications", <AdminNotificationsPage />, "\u901a\u77e5"],
-    ["announcements", <AdminAnnouncementsPage />, "\u516c\u544a\u7ba1\u7406"],
-    ["AI budget", <AdminAiBudgetPage />, "AI \u9884\u7b97"],
-  ] as const)("renders a single level-one heading on %s", async (_name, page, title) => {
+    ["identity providers", () => renderPage(<AdminIdentityProvidersPage />), "\u8ba4\u8bc1Provider"],
+    ["notifications", () => renderSettingsNamespace("notifications"), "\u901a\u77e5"],
+    ["announcements", () => renderPage(<AdminAnnouncementsPage />), "\u516c\u544a\u7ba1\u7406"],
+    ["AI budget", () => renderPage(<AdminAiBudgetPage />), "AI \u9884\u7b97"],
+  ] as const)("renders a single level-one heading on %s", async (_name, mount, title) => {
     stubAdminSession();
-    const view = renderPage(page);
+    const view = mount();
     expect(await screen.findByRole("heading", { level: 1, name: title })).toBeVisible();
     expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
     view.unmount();
@@ -378,7 +377,7 @@ describe("provider and channel dialogs use shadcn form controls", () => {
 
   it("renders channel kind, TLS and enabled through shared primitives", async () => {
     stubAdminSession();
-    renderPage(<AdminNotificationsPage />);
+    renderSettingsNamespace("notifications");
     await screen.findByTestId("admin-notifications-create");
     await userEvent.click(screen.getByTestId("admin-notifications-create"));
     const dialog = await screen.findByRole("dialog");

@@ -874,20 +874,20 @@ func TestServiceOrderBridgeAndStreamingCoverage(t *testing.T) {
 		t.Fatalf("expected 2011 on provider error without datasource, got %v", err)
 	}
 
-	// SendMessage with ProviderSynthesizer returning unmapped SQL token so fallback to DeterministicSynthesizer runs
-	psFallback := NewProviderSynthesizer(nil, nil, &stubSynth{out: &SynthesizeOutput{
+	// SendMessage with ProviderSynthesizer returning an unmapped SQL token must fail closed with 6004 SQL_RESTORATION_INVALID
+	psFailClosed := NewProviderSynthesizer(nil, nil, &stubSynth{out: &SynthesizeOutput{
 		AssistantReply: "Draft reply",
 		AnonymizedSQL:  "SELECT unknown_ident FROM table_1",
 	}})
-	fx.svc.Synthesizer = psFallback
-	if r, err := fx.svc.SendMessage(ctx, fx.userA, SendMessageInput{
+	fx.svc.Synthesizer = psFailClosed
+	if _, err := fx.svc.SendMessage(ctx, fx.userA, SendMessageInput{
 		SessionID:      s2.ID,
 		Content:        "Select from warehouses",
 		CapabilityHint: string(domain.CapabilitySQLGenerate),
 		DatasourceID:   &fx.dsChangeID,
 		TargetTable:    &roTable,
-	}); err != nil || r.SQLDraft == nil {
-		t.Fatalf("expected DeterministicSynthesizer fallback to recover SQL draft, got %+v err=%v", r, err)
+	}); !hasErrCode(err, domain.CodeAssistantSQLRestorationInvalid) {
+		t.Fatalf("expected fail-closed 6004 SQL_RESTORATION_INVALID on unmapped token without silent fallback, got %v", err)
 	}
 
 	// Test openSessionTitle, openMessagePayload, openDraftPayload, openSummaryContent edge cases

@@ -4,9 +4,11 @@
 
 - **Cloud OpenAI-Compatible (`default` Profile)**: Public endpoints require `https://` (OpenAI, DeepSeek, Qwen, OpenRouter). Every request runs in-memory anonymization + `AssertZeroLeak` and restores real identifiers only for authorized reviewers.
 - **Self-Hosted LAN Models (`san` Profile)**: Private RFC1918 vLLM/Ollama endpoints allow `http://` or `https://` under `addrguard` SSRF protection. Models named `san-*` or `sql-audit-nano*` route to the compact Raw-SQL Native contract (`PrivacyContractHashSAN`) and never fall back to cloud `default` providers with raw payloads.
-- **Reference Pricing & Global Daily Budget (`/admin/review-engine/ai-budget`)**: Configure `CNY` / `USD` per-1M-token timezone-aware pricing windows and enforce a global daily budget (`2010 AI_DAILY_BUDGET_EXHAUSTED` when exceeded).
+- **Reference Pricing & Global Daily Budget (`/admin/review-engine/ai-budget`)**: Configure `CNY` / `USD` per-1M-token timezone-aware pricing windows and enforce a shared global daily budget across AI Review Precheck, Database AI Assistant, and SQL Performance AI Diagnostics (`2010 AI_DAILY_BUDGET_EXHAUSTED` when exceeded).
 
 ## 2. Core Built-In Review Skills (48 Seeded Rules in `/admin/review-engine/skills`)
+
+Custom Prompt Tools and tuned built-in parameters follow the `draft` -> `enabled` / `disabled` lifecycle; Prompt Tool workbench prompt optimization, test-case generation, and test execution require an enabled AI Provider and fail closed with `2011 AI_PROVIDER_FAILED` when unavailable.
 
 | Category | Built-In `finding_key` Examples | Tunable Parameters |
 | :--- | :--- | :--- |

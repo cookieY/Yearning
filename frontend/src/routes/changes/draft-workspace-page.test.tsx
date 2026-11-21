@@ -19,7 +19,7 @@ import {
   fixtureRunIds,
   resetReviewFixture,
 } from "@/shared/mock/review-fixture";
-import { getReviewEventClient } from "@/shared/events/review-event-client";
+import { publishSseEvent } from "@/shared/events/sse-event-bus";
 import DraftWorkspacePage from "./draft-workspace-page";
 import OrderDetailPage from "./order-detail-page";
 
@@ -579,14 +579,10 @@ describe("DraftWorkspacePage", () => {
   it("treats a flow.updated domain event as a submission blocker", async () => {
     await renderReadyWorkspace();
     expect(await screen.findByTestId("review-status")).toBeVisible();
-    getReviewEventClient().ingest({
-      specversion: "1.0",
+    publishSseEvent({
       id: "0198d9cc-e65d-7b9d-a8aa-3c81945f9901",
       type: "io.yearning.v4.flow.updated",
-      source: "yearning://control-plane",
       subject: `flows/${FIXTURE_FLOW_ID}`,
-      time: "2026-08-30T00:00:00Z",
-      sequence: 1,
       data: {
         resource_id: FIXTURE_FLOW_ID,
         action: "updated",

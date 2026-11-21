@@ -24,7 +24,6 @@ import type {
   ListMyFlowDatasourceTablesParams,
   ListReviewRunFindings200,
   ListReviewRunFindingsParams,
-  ProblemResponse,
   ReplaceDraftSql200,
   ReplaceDraftSqlBody,
   RevealDraftSql200,
@@ -36,18 +35,6 @@ import type {
 } from '../yearningV4HTTPAPI.schemas';
 
 import { customInstance } from '../../../../shared/api/mutator';
-
-export type listCurrentUserFlowsResponse200 = {
-  data: ListCurrentUserFlows200
-  status: 200
-}
-
-export type listCurrentUserFlowsResponseSuccess = (listCurrentUserFlowsResponse200) & {
-  headers: Headers;
-};
-;
-
-export type listCurrentUserFlowsResponse = (listCurrentUserFlowsResponseSuccess)
 
 export const getListCurrentUserFlowsUrl = (params: ListCurrentUserFlowsParams,) => {
   const normalizedParams = new URLSearchParams();
@@ -64,9 +51,9 @@ export const getListCurrentUserFlowsUrl = (params: ListCurrentUserFlowsParams,) 
   return stringifiedParams.length > 0 ? `/api/v4/users/me/flows?${stringifiedParams}` : `/api/v4/users/me/flows`
 }
 
-export const listCurrentUserFlows = async (params: ListCurrentUserFlowsParams, options?: Parameters<typeof customInstance>[1]): Promise<listCurrentUserFlowsResponse> => {
+export const listCurrentUserFlows = async (params: ListCurrentUserFlowsParams, options?: Parameters<typeof customInstance>[1]): Promise<ListCurrentUserFlows200> => {
 
-  return customInstance<listCurrentUserFlowsResponse>(getListCurrentUserFlowsUrl(params),
+  return customInstance<ListCurrentUserFlows200>(getListCurrentUserFlowsUrl(params),
   {
     ...options,
     method: 'GET'
@@ -75,25 +62,6 @@ export const listCurrentUserFlows = async (params: ListCurrentUserFlowsParams, o
   }
 );}
 
-
-export type listMyFlowDatasourceSchemasResponse200 = {
-  data: ListMyFlowDatasourceSchemas200
-  status: 200
-}
-
-export type listMyFlowDatasourceSchemasResponse403 = {
-  data: ProblemResponse
-  status: 403
-}
-
-export type listMyFlowDatasourceSchemasResponseSuccess = (listMyFlowDatasourceSchemasResponse200) & {
-  headers: Headers;
-};
-export type listMyFlowDatasourceSchemasResponseError = (listMyFlowDatasourceSchemasResponse403) & {
-  headers: Headers;
-};
-
-export type listMyFlowDatasourceSchemasResponse = (listMyFlowDatasourceSchemasResponseSuccess | listMyFlowDatasourceSchemasResponseError)
 
 export const getListMyFlowDatasourceSchemasUrl = (flowId: string,
     datasourceId: string,) => {
@@ -105,9 +73,9 @@ export const getListMyFlowDatasourceSchemasUrl = (flowId: string,
 }
 
 export const listMyFlowDatasourceSchemas = async (flowId: string,
-    datasourceId: string, options?: Parameters<typeof customInstance>[1]): Promise<listMyFlowDatasourceSchemasResponse> => {
+    datasourceId: string, options?: Parameters<typeof customInstance>[1]): Promise<ListMyFlowDatasourceSchemas200> => {
 
-  return customInstance<listMyFlowDatasourceSchemasResponse>(getListMyFlowDatasourceSchemasUrl(flowId,datasourceId),
+  return customInstance<ListMyFlowDatasourceSchemas200>(getListMyFlowDatasourceSchemasUrl(flowId,datasourceId),
   {
     ...options,
     method: 'GET'
@@ -116,25 +84,6 @@ export const listMyFlowDatasourceSchemas = async (flowId: string,
   }
 );}
 
-
-export type listMyFlowDatasourceTablesResponse200 = {
-  data: ListMyFlowDatasourceTables200
-  status: 200
-}
-
-export type listMyFlowDatasourceTablesResponse403 = {
-  data: ProblemResponse
-  status: 403
-}
-
-export type listMyFlowDatasourceTablesResponseSuccess = (listMyFlowDatasourceTablesResponse200) & {
-  headers: Headers;
-};
-export type listMyFlowDatasourceTablesResponseError = (listMyFlowDatasourceTablesResponse403) & {
-  headers: Headers;
-};
-
-export type listMyFlowDatasourceTablesResponse = (listMyFlowDatasourceTablesResponseSuccess | listMyFlowDatasourceTablesResponseError)
 
 export const getListMyFlowDatasourceTablesUrl = (flowId: string,
     datasourceId: string,
@@ -155,9 +104,9 @@ export const getListMyFlowDatasourceTablesUrl = (flowId: string,
 
 export const listMyFlowDatasourceTables = async (flowId: string,
     datasourceId: string,
-    params: ListMyFlowDatasourceTablesParams, options?: Parameters<typeof customInstance>[1]): Promise<listMyFlowDatasourceTablesResponse> => {
+    params: ListMyFlowDatasourceTablesParams, options?: Parameters<typeof customInstance>[1]): Promise<ListMyFlowDatasourceTables200> => {
 
-  return customInstance<listMyFlowDatasourceTablesResponse>(getListMyFlowDatasourceTablesUrl(flowId,datasourceId,params),
+  return customInstance<ListMyFlowDatasourceTables200>(getListMyFlowDatasourceTablesUrl(flowId,datasourceId,params),
   {
     ...options,
     method: 'GET'
@@ -166,25 +115,6 @@ export const listMyFlowDatasourceTables = async (flowId: string,
   }
 );}
 
-
-export type listMyFlowDatasourceColumnsResponse200 = {
-  data: ListMyFlowDatasourceColumns200
-  status: 200
-}
-
-export type listMyFlowDatasourceColumnsResponse403 = {
-  data: ProblemResponse
-  status: 403
-}
-
-export type listMyFlowDatasourceColumnsResponseSuccess = (listMyFlowDatasourceColumnsResponse200) & {
-  headers: Headers;
-};
-export type listMyFlowDatasourceColumnsResponseError = (listMyFlowDatasourceColumnsResponse403) & {
-  headers: Headers;
-};
-
-export type listMyFlowDatasourceColumnsResponse = (listMyFlowDatasourceColumnsResponseSuccess | listMyFlowDatasourceColumnsResponseError)
 
 export const getListMyFlowDatasourceColumnsUrl = (flowId: string,
     datasourceId: string,
@@ -205,9 +135,9 @@ export const getListMyFlowDatasourceColumnsUrl = (flowId: string,
 
 export const listMyFlowDatasourceColumns = async (flowId: string,
     datasourceId: string,
-    params: ListMyFlowDatasourceColumnsParams, options?: Parameters<typeof customInstance>[1]): Promise<listMyFlowDatasourceColumnsResponse> => {
+    params: ListMyFlowDatasourceColumnsParams, options?: Parameters<typeof customInstance>[1]): Promise<ListMyFlowDatasourceColumns200> => {
 
-  return customInstance<listMyFlowDatasourceColumnsResponse>(getListMyFlowDatasourceColumnsUrl(flowId,datasourceId,params),
+  return customInstance<ListMyFlowDatasourceColumns200>(getListMyFlowDatasourceColumnsUrl(flowId,datasourceId,params),
   {
     ...options,
     method: 'GET'
@@ -216,18 +146,6 @@ export const listMyFlowDatasourceColumns = async (flowId: string,
   }
 );}
 
-
-export type listChangeDraftsResponse200 = {
-  data: ListChangeDrafts200
-  status: 200
-}
-
-export type listChangeDraftsResponseSuccess = (listChangeDraftsResponse200) & {
-  headers: Headers;
-};
-;
-
-export type listChangeDraftsResponse = (listChangeDraftsResponseSuccess)
 
 export const getListChangeDraftsUrl = (params?: ListChangeDraftsParams,) => {
   const normalizedParams = new URLSearchParams();
@@ -244,9 +162,9 @@ export const getListChangeDraftsUrl = (params?: ListChangeDraftsParams,) => {
   return stringifiedParams.length > 0 ? `/api/v4/change-drafts?${stringifiedParams}` : `/api/v4/change-drafts`
 }
 
-export const listChangeDrafts = async (params?: ListChangeDraftsParams, options?: Parameters<typeof customInstance>[1]): Promise<listChangeDraftsResponse> => {
+export const listChangeDrafts = async (params?: ListChangeDraftsParams, options?: Parameters<typeof customInstance>[1]): Promise<ListChangeDrafts200> => {
 
-  return customInstance<listChangeDraftsResponse>(getListChangeDraftsUrl(params),
+  return customInstance<ListChangeDrafts200>(getListChangeDraftsUrl(params),
   {
     ...options,
     method: 'GET'
@@ -255,25 +173,6 @@ export const listChangeDrafts = async (params?: ListChangeDraftsParams, options?
   }
 );}
 
-
-export type createChangeDraftResponse200 = {
-  data: CreateChangeDraft200
-  status: 200
-}
-
-export type createChangeDraftResponse403 = {
-  data: ProblemResponse
-  status: 403
-}
-
-export type createChangeDraftResponseSuccess = (createChangeDraftResponse200) & {
-  headers: Headers;
-};
-export type createChangeDraftResponseError = (createChangeDraftResponse403) & {
-  headers: Headers;
-};
-
-export type createChangeDraftResponse = (createChangeDraftResponseSuccess | createChangeDraftResponseError)
 
 export const getCreateChangeDraftUrl = () => {
 
@@ -283,7 +182,7 @@ export const getCreateChangeDraftUrl = () => {
   return `/api/v4/change-drafts`
 }
 
-export const createChangeDraft = async (createChangeDraftRequest: CreateChangeDraftRequest, options?: Parameters<typeof customInstance>[1]): Promise<createChangeDraftResponse> => {
+export const createChangeDraft = async (createChangeDraftRequest: CreateChangeDraftRequest, options?: Parameters<typeof customInstance>[1]): Promise<CreateChangeDraft200> => {
 
     const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
@@ -291,7 +190,7 @@ export const createChangeDraft = async (createChangeDraftRequest: CreateChangeDr
     if (Array.isArray(h)) return Object.fromEntries(h);
     return h;
   };
-return customInstance<createChangeDraftResponse>(getCreateChangeDraftUrl(),
+return customInstance<CreateChangeDraft200>(getCreateChangeDraftUrl(),
   {
     ...options,
     method: 'POST',
@@ -301,18 +200,6 @@ return customInstance<createChangeDraftResponse>(getCreateChangeDraftUrl(),
 );}
 
 
-export type getChangeDraftResponse200 = {
-  data: GetChangeDraft200
-  status: 200
-}
-
-export type getChangeDraftResponseSuccess = (getChangeDraftResponse200) & {
-  headers: Headers;
-};
-;
-
-export type getChangeDraftResponse = (getChangeDraftResponseSuccess)
-
 export const getGetChangeDraftUrl = (draftId: string,) => {
 
 
@@ -321,9 +208,9 @@ export const getGetChangeDraftUrl = (draftId: string,) => {
   return `/api/v4/change-drafts/${draftId}`
 }
 
-export const getChangeDraft = async (draftId: string, options?: Parameters<typeof customInstance>[1]): Promise<getChangeDraftResponse> => {
+export const getChangeDraft = async (draftId: string, options?: Parameters<typeof customInstance>[1]): Promise<GetChangeDraft200> => {
 
-  return customInstance<getChangeDraftResponse>(getGetChangeDraftUrl(draftId),
+  return customInstance<GetChangeDraft200>(getGetChangeDraftUrl(draftId),
   {
     ...options,
     method: 'GET'
@@ -332,18 +219,6 @@ export const getChangeDraft = async (draftId: string, options?: Parameters<typeo
   }
 );}
 
-
-export type updateChangeDraftResponse200 = {
-  data: UpdateChangeDraft200
-  status: 200
-}
-
-export type updateChangeDraftResponseSuccess = (updateChangeDraftResponse200) & {
-  headers: Headers;
-};
-;
-
-export type updateChangeDraftResponse = (updateChangeDraftResponseSuccess)
 
 export const getUpdateChangeDraftUrl = (draftId: string,) => {
 
@@ -354,7 +229,7 @@ export const getUpdateChangeDraftUrl = (draftId: string,) => {
 }
 
 export const updateChangeDraft = async (draftId: string,
-    updateChangeDraftRequest: UpdateChangeDraftRequest, options?: Parameters<typeof customInstance>[1]): Promise<updateChangeDraftResponse> => {
+    updateChangeDraftRequest: UpdateChangeDraftRequest, options?: Parameters<typeof customInstance>[1]): Promise<UpdateChangeDraft200> => {
 
     const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
@@ -362,7 +237,7 @@ export const updateChangeDraft = async (draftId: string,
     if (Array.isArray(h)) return Object.fromEntries(h);
     return h;
   };
-return customInstance<updateChangeDraftResponse>(getUpdateChangeDraftUrl(draftId),
+return customInstance<UpdateChangeDraft200>(getUpdateChangeDraftUrl(draftId),
   {
     ...options,
     method: 'PATCH',
@@ -372,18 +247,6 @@ return customInstance<updateChangeDraftResponse>(getUpdateChangeDraftUrl(draftId
 );}
 
 
-export type deleteChangeDraftResponse200 = {
-  data: DeleteChangeDraft200
-  status: 200
-}
-
-export type deleteChangeDraftResponseSuccess = (deleteChangeDraftResponse200) & {
-  headers: Headers;
-};
-;
-
-export type deleteChangeDraftResponse = (deleteChangeDraftResponseSuccess)
-
 export const getDeleteChangeDraftUrl = (draftId: string,) => {
 
 
@@ -392,9 +255,9 @@ export const getDeleteChangeDraftUrl = (draftId: string,) => {
   return `/api/v4/change-drafts/${draftId}`
 }
 
-export const deleteChangeDraft = async (draftId: string, options?: Parameters<typeof customInstance>[1]): Promise<deleteChangeDraftResponse> => {
+export const deleteChangeDraft = async (draftId: string, options?: Parameters<typeof customInstance>[1]): Promise<DeleteChangeDraft200> => {
 
-  return customInstance<deleteChangeDraftResponse>(getDeleteChangeDraftUrl(draftId),
+  return customInstance<DeleteChangeDraft200>(getDeleteChangeDraftUrl(draftId),
   {
     ...options,
     method: 'DELETE'
@@ -403,18 +266,6 @@ export const deleteChangeDraft = async (draftId: string, options?: Parameters<ty
   }
 );}
 
-
-export type replaceDraftSqlResponse200 = {
-  data: ReplaceDraftSql200
-  status: 200
-}
-
-export type replaceDraftSqlResponseSuccess = (replaceDraftSqlResponse200) & {
-  headers: Headers;
-};
-;
-
-export type replaceDraftSqlResponse = (replaceDraftSqlResponseSuccess)
 
 export const getReplaceDraftSqlUrl = (draftId: string,) => {
 
@@ -425,7 +276,7 @@ export const getReplaceDraftSqlUrl = (draftId: string,) => {
 }
 
 export const replaceDraftSql = async (draftId: string,
-    replaceDraftSqlBody: ReplaceDraftSqlBody, options?: Parameters<typeof customInstance>[1]): Promise<replaceDraftSqlResponse> => {
+    replaceDraftSqlBody: ReplaceDraftSqlBody, options?: Parameters<typeof customInstance>[1]): Promise<ReplaceDraftSql200> => {
 
     const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
@@ -433,7 +284,7 @@ export const replaceDraftSql = async (draftId: string,
     if (Array.isArray(h)) return Object.fromEntries(h);
     return h;
   };
-return customInstance<replaceDraftSqlResponse>(getReplaceDraftSqlUrl(draftId),
+return customInstance<ReplaceDraftSql200>(getReplaceDraftSqlUrl(draftId),
   {
     ...options,
     method: 'PUT',
@@ -442,25 +293,6 @@ return customInstance<replaceDraftSqlResponse>(getReplaceDraftSqlUrl(draftId),
   }
 );}
 
-
-export type revealDraftSqlResponse200 = {
-  data: RevealDraftSql200
-  status: 200
-}
-
-export type revealDraftSqlResponse403 = {
-  data: ProblemResponse
-  status: 403
-}
-
-export type revealDraftSqlResponseSuccess = (revealDraftSqlResponse200) & {
-  headers: Headers;
-};
-export type revealDraftSqlResponseError = (revealDraftSqlResponse403) & {
-  headers: Headers;
-};
-
-export type revealDraftSqlResponse = (revealDraftSqlResponseSuccess | revealDraftSqlResponseError)
 
 export const getRevealDraftSqlUrl = (draftId: string,) => {
 
@@ -471,7 +303,7 @@ export const getRevealDraftSqlUrl = (draftId: string,) => {
 }
 
 export const revealDraftSql = async (draftId: string,
-    revealRequest: RevealRequest, options?: Parameters<typeof customInstance>[1]): Promise<revealDraftSqlResponse> => {
+    revealRequest: RevealRequest, options?: Parameters<typeof customInstance>[1]): Promise<RevealDraftSql200> => {
 
     const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
@@ -479,7 +311,7 @@ export const revealDraftSql = async (draftId: string,
     if (Array.isArray(h)) return Object.fromEntries(h);
     return h;
   };
-return customInstance<revealDraftSqlResponse>(getRevealDraftSqlUrl(draftId),
+return customInstance<RevealDraftSql200>(getRevealDraftSqlUrl(draftId),
   {
     ...options,
     method: 'POST',
@@ -488,25 +320,6 @@ return customInstance<revealDraftSqlResponse>(getRevealDraftSqlUrl(draftId),
   }
 );}
 
-
-export type runDraftReviewResponse200 = {
-  data: RunDraftReview200
-  status: 200
-}
-
-export type runDraftReviewResponse429 = {
-  data: ProblemResponse
-  status: 429
-}
-
-export type runDraftReviewResponseSuccess = (runDraftReviewResponse200) & {
-  headers: Headers;
-};
-export type runDraftReviewResponseError = (runDraftReviewResponse429) & {
-  headers: Headers;
-};
-
-export type runDraftReviewResponse = (runDraftReviewResponseSuccess | runDraftReviewResponseError)
 
 export const getRunDraftReviewUrl = () => {
 
@@ -519,7 +332,7 @@ export const getRunDraftReviewUrl = () => {
 /**
  * Ephemeral AI precheck (RCP-20261101-EPHEMERAL-PRECHECK). The request carries the current editor SQL plus the flow; nothing is persisted before submission - no draft row, no SQL payload, no run rows. The run executes in process memory with a TTL and is readable via GET /review-runs/{review_run_id} until it expires or the process restarts, after which the client must precheck again. Submitting an order materializes the accepted run. draft_id is optional UI anchoring only and is never written by this operation.
  */
-export const runDraftReview = async (runDraftReviewBody: RunDraftReviewBody, options?: Parameters<typeof customInstance>[1]): Promise<runDraftReviewResponse> => {
+export const runDraftReview = async (runDraftReviewBody: RunDraftReviewBody, options?: Parameters<typeof customInstance>[1]): Promise<RunDraftReview200> => {
 
     const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
@@ -527,7 +340,7 @@ export const runDraftReview = async (runDraftReviewBody: RunDraftReviewBody, opt
     if (Array.isArray(h)) return Object.fromEntries(h);
     return h;
   };
-return customInstance<runDraftReviewResponse>(getRunDraftReviewUrl(),
+return customInstance<RunDraftReview200>(getRunDraftReviewUrl(),
   {
     ...options,
     method: 'POST',
@@ -537,18 +350,6 @@ return customInstance<runDraftReviewResponse>(getRunDraftReviewUrl(),
 );}
 
 
-export type getReviewRunResponse200 = {
-  data: GetReviewRun200
-  status: 200
-}
-
-export type getReviewRunResponseSuccess = (getReviewRunResponse200) & {
-  headers: Headers;
-};
-;
-
-export type getReviewRunResponse = (getReviewRunResponseSuccess)
-
 export const getGetReviewRunUrl = (reviewRunId: string,) => {
 
 
@@ -557,9 +358,9 @@ export const getGetReviewRunUrl = (reviewRunId: string,) => {
   return `/api/v4/review-runs/${reviewRunId}`
 }
 
-export const getReviewRun = async (reviewRunId: string, options?: Parameters<typeof customInstance>[1]): Promise<getReviewRunResponse> => {
+export const getReviewRun = async (reviewRunId: string, options?: Parameters<typeof customInstance>[1]): Promise<GetReviewRun200> => {
 
-  return customInstance<getReviewRunResponse>(getGetReviewRunUrl(reviewRunId),
+  return customInstance<GetReviewRun200>(getGetReviewRunUrl(reviewRunId),
   {
     ...options,
     method: 'GET'
@@ -568,18 +369,6 @@ export const getReviewRun = async (reviewRunId: string, options?: Parameters<typ
   }
 );}
 
-
-export type listReviewRunFindingsResponse200 = {
-  data: ListReviewRunFindings200
-  status: 200
-}
-
-export type listReviewRunFindingsResponseSuccess = (listReviewRunFindingsResponse200) & {
-  headers: Headers;
-};
-;
-
-export type listReviewRunFindingsResponse = (listReviewRunFindingsResponseSuccess)
 
 export const getListReviewRunFindingsUrl = (reviewRunId: string,
     params?: ListReviewRunFindingsParams,) => {
@@ -598,9 +387,9 @@ export const getListReviewRunFindingsUrl = (reviewRunId: string,
 }
 
 export const listReviewRunFindings = async (reviewRunId: string,
-    params?: ListReviewRunFindingsParams, options?: Parameters<typeof customInstance>[1]): Promise<listReviewRunFindingsResponse> => {
+    params?: ListReviewRunFindingsParams, options?: Parameters<typeof customInstance>[1]): Promise<ListReviewRunFindings200> => {
 
-  return customInstance<listReviewRunFindingsResponse>(getListReviewRunFindingsUrl(reviewRunId,params),
+  return customInstance<ListReviewRunFindings200>(getListReviewRunFindingsUrl(reviewRunId,params),
   {
     ...options,
     method: 'GET'

@@ -1,4 +1,5 @@
-// The derived key and legacy severity compatibility metadata are deterministically injected along with the rule body. The effective severity of an actual violation is fixed to Critical at runtime; legacy max_severity serves only as historical configuration compatibility info.
+// Package privacy provides Run-scoped anonymous identifier mapping, AEAD envelope sealing,
+// and outbound leak assertions to keep raw SQL identifiers out of standard Provider requests.
 package privacy
 
 import (
@@ -9,7 +10,7 @@ import (
 	"sync"
 )
 
-// escapeSkillBody prevents the body from closing the data delimiter tag (M8/N2: defense-in-depth against injection).
+// IdentifierKind identifies the SQL object category of an anonymized token.
 type IdentifierKind string
 
 const (
@@ -21,14 +22,13 @@ const (
 	KindConstraint IdentifierKind = "constraint"
 	KindAlias      IdentifierKind = "alias"
 	KindCTE        IdentifierKind = "cte"
-	// TokenLegendEntry is an anonymous token legend entry injected into the model context (NEW-AI-03 bootstrap): it carries only the token and semantic role, never the original identifier — on the real Provider path the model has no schema value to fill on the first turn (tokens are produced only after tool returns, creating a circular dependency; after SEC-0041 binding, guessing a non-frozen member triggers 2012), so the controlled legend lets the model initiate its first tool call with valid tokens.
-	KindGeneric IdentifierKind = "ident"
+	KindGeneric    IdentifierKind = "ident"
 )
 
-// Token is a Run-scoped stable anonymous token (e.g. schema_1/table_2).
+// ScopeCaseSensitive marks case-sensitive quoted SQL identifier scopes (vs default case-folding).
 const ScopeCaseSensitive = "exact"
 
-// Kind is the token category (schema|table|...; privacy.IdentifierKind string).
+// ValidIdentifierKind reports whether k is one of the recognized IdentifierKind constants.
 func ValidIdentifierKind(k IdentifierKind) bool {
 	switch k {
 	case KindDatabase, KindSchema, KindTable, KindColumn, KindIndex, KindConstraint, KindAlias, KindCTE, KindGeneric:
@@ -37,23 +37,22 @@ func ValidIdentifierKind(k IdentifierKind) bool {
 	return false
 }
 
-// tokenRoleText maps category to semantic role (describes role only, containing no original name).
 type mappingEntry struct {
 	Kind     IdentifierKind
 	Scope    string
 	Original string
 }
 
-// ContextInput holds the assembly inputs for a single review step.
+// RunMapper maintains a concurrency-safe bijection between raw scoped identifiers and anonymous tokens.
 type RunMapper struct {
 	mu        sync.Mutex
 	seq       map[IdentifierKind]int
 	tokens    map[string]string       // key: kind+"\x00"+scope+"\x00"+normalized original -> token
-	originals map[string]mappingEntry // RuleSetConfig holds lexical deterministic rules (participates only in snapshot hashing, never enters context).
-	entries   []mappingEntry          // Skills holds enabled skills bound to the rule set (deterministically injected).
+	originals map[string]mappingEntry // token -> mapping entry
+	entries   []mappingEntry          // insertion-ordered entries for deterministic snapshots
 }
 
-// Knowledge holds scope-matched enabled knowledge entries (deterministically injected).
+// NewRunMapper constructs an empty RunMapper ready for tokenization or state restoration.
 func NewRunMapper() *RunMapper {
 	return &RunMapper{
 		seq:       make(map[IdentifierKind]int),
@@ -62,15 +61,15 @@ func NewRunMapper() *RunMapper {
 	}
 }
 
-// Groups holds the anonymized statement groups for this stage.
+// Delimiter characters rejected in identifiers and scopes to preserve the line-oriented TSV mapping format.
 const mappingForbiddenRunes = "\t\n\r\x00"
 
-// Evidence holds existing normalized evidence references.
+// Token returns the stable anonymous token for original under the default case-folding scope.
 func (m *RunMapper) Token(kind IdentifierKind, original string) (string, error) {
 	return m.ScopedToken(kind, "", original)
 }
 
-// TokenLegend holds the controlled anonymous token legend (NEW-AI-03; pre-tokenized from the stage-frozen schema binding set; contains only tokens and kinds, never raw identifiers).
+// ScopedToken allocates or returns the deterministic anonymous token for (kind, scope, original).
 func (m *RunMapper) ScopedToken(kind IdentifierKind, scope, original string) (string, error) {
 	if !ValidIdentifierKind(kind) {
 		return "", fmt.Errorf("privacy: invalid identifier kind %q", kind)
@@ -96,19 +95,19 @@ func (m *RunMapper) ScopedToken(kind IdentifierKind, scope, original string) (st
 	return tok, nil
 }
 
-// SystemPrompt constructs the system instructions (hard-rule semantics: injected content is treated as data sections, the model must not rewrite instructions, and all rules apply unconditionally).
+// Lookup returns an already-allocated token for (kind, original) without allocating a new one.
 func (m *RunMapper) Lookup(kind IdentifierKind, original string) string {
 	return m.LookupScoped(kind, "", original)
 }
 
-// Finding copywriting constraints (owner ruling 2026-10-30 readability optimization): title states the problem directly, body uses short sentences for fact + impact, and suggestion includes applicable conditions; summary surface avoids dumping internal field names, never fabricates, and stays concise without dropping key qualifiers. Technical details are carried by evidence_ids while user summaries retain natural-language conclusions and key grounds.
+// LookupScoped returns an already-allocated token for (kind, scope, original) without mutating state.
 func (m *RunMapper) LookupScoped(kind IdentifierKind, scope, original string) string {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	return m.tokens[identityKey(kind, canonicalScope(scope), original)]
 }
 
-// SEC-0028: tool facts and schema metadata are explicitly declared as untrusted data — indirect Prompt Injection defense (malicious object names/comments enter the evidence channel via tokenized facts, and the model is instructed never to follow instruction-like text within them).
+// Original resolves an anonymous token back to its kind and raw identifier if registered.
 func (m *RunMapper) Original(token string) (IdentifierKind, string, bool) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -119,7 +118,7 @@ func (m *RunMapper) Original(token string) (IdentifierKind, string, bool) {
 	return e.Kind, e.Original, true
 }
 
-// NEW-AI-03: supplement tool descriptions with parameter specifications (parameter names + required flags) — the model must be able to construct valid argument sets.
+// Restore validates and atomically merges persisted MappingPair entries into the mapper without partial mutation on error.
 func (m *RunMapper) Restore(pairs []MappingPair) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -158,7 +157,8 @@ func (m *RunMapper) Restore(pairs []MappingPair) error {
 			if exist != p.Token {
 				return fmt.Errorf("privacy: restore entry %d token conflict for mapped identifier", i+1)
 			}
-			continue // NEW-AI-03: controlled anonymous token legend (pre-tokenized from the stage-frozen schema binding set). Contains only tokens and semantic roles, never raw identifiers; identifier values outside the legend are unknown to the review scope and tool calls carrying them will be rejected.
+			// Identical pre-existing mapping entry; idempotently continue validation.
+			continue
 		}
 		if exist, ok := m.originals[p.Token]; ok {
 			_ = exist
@@ -180,14 +180,14 @@ func (m *RunMapper) Restore(pairs []MappingPair) error {
 	return nil
 }
 
-// BuildRequest constructs a Provider request (privacy invariant: contains only anonymized groups, evidence references, and the anonymous token legend).
+// Len returns the number of registered identifier mappings.
 func (m *RunMapper) Len() int {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	return len(m.entries)
 }
 
-// NEW-AI-03: pass parameter declarations through with the descriptor (JSON Schema shape).
+// MappingPair represents one serialized identifier mapping entry stored in an AEAD envelope.
 type MappingPair struct {
 	Kind     IdentifierKind
 	Scope    string
@@ -195,6 +195,7 @@ type MappingPair struct {
 	Token    string
 }
 
+// Snapshot returns all registered mappings in deterministic insertion order.
 func (m *RunMapper) Snapshot() []MappingPair {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -206,7 +207,7 @@ func (m *RunMapper) Snapshot() []MappingPair {
 	return out
 }
 
-// agent_test.go test_gate#2/#8/#9 (assembly side): zero plaintext leakage in requests and context; bounded anonymized groups; zero Provider call surface on read paths.
+// MarshalMapping encodes mapping pairs into the versionless tab-delimited format sealed inside AEAD ciphertext.
 func MarshalMapping(pairs []MappingPair) []byte {
 	var b strings.Builder
 	for _, p := range pairs {
@@ -224,7 +225,7 @@ func MarshalMapping(pairs []MappingPair) []byte {
 	return []byte(b.String())
 }
 
-// TestRequestCarriesNoRawPrivacy test_gate#2: serialized request contains no raw SQL, literals, comments, or identifier mappings — only anonymized shapes and evidence references.
+// UnmarshalMapping parses and validates tab-delimited mapping pairs decoded from AEAD plaintext.
 func UnmarshalMapping(data []byte) ([]MappingPair, error) {
 	var pairs []MappingPair
 	for i, line := range strings.Split(strings.TrimRight(string(data), "\n"), "\n") {
@@ -271,7 +272,7 @@ func identityKey(kind IdentifierKind, scope, original string) string {
 	return string(kind) + "\x00" + scope + "\x00" + original
 }
 
-// Anonymized groups appear with representative shape + count.
+// SortPairsForToken sorts mapping pairs lexicographically by anonymous token.
 func SortPairsForToken(pairs []MappingPair) {
 	sort.SliceStable(pairs, func(i, j int) bool { return pairs[i].Token < pairs[j].Token })
 }

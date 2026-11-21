@@ -4,8 +4,8 @@ package identity
 
 import (
 	"context"
-	"database/sql"
 	"errors"
+	"sort"
 	"strings"
 	"time"
 
@@ -15,6 +15,7 @@ import (
 
 	"github.com/cookieY/YearningX/backend/internal/authorization/auditlog"
 	"github.com/cookieY/YearningX/backend/internal/authorization/bizerr"
+	"github.com/cookieY/YearningX/backend/internal/platform/txutil"
 )
 
 // UserView is the user representation in API responses; never includes password_hash.
@@ -268,8 +269,9 @@ func (s *Service) GetDeletionImpact(ctx context.Context, actor ActorRef, userID 
 // membership/role references, revokes Query Grants and Sessions, marks flows with emptied nodes as invalid,
 // deletes the user row, and writes domain_events/outbox and audit records in the same transaction.
 func (s *Service) DeleteUser(ctx context.Context, actor ActorRef, userID string, expectVersion int64, meta RequestMeta) error {
-	affectedFlows := map[string]bool{}
-	err := s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+	var affectedFlows map[string]bool
+	err := txutil.Serializable(ctx, s.db, func(tx *gorm.DB) error {
+		affectedFlows = map[string]bool{}
 		var user UserModel
 		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
 			Where("id = ?", userID).First(&user).Error; err != nil {
@@ -307,11 +309,8 @@ func (s *Service) DeleteUser(ctx context.Context, actor ActorRef, userID string,
 			return err
 		}
 
-		// Delete external identities and group/node memberships (logical-relations: delete_source).
+		// Delete external identities, sessions, and group/node memberships (logical-relations: delete_source).
 		if err := tx.Where("user_id = ?", userID).Delete(&ExternalIdentityModel{}).Error; err != nil {
-			return err
-		}
-		if err := s.sessions.RevokeByUser(ctx, tx, userID, "user_deleted"); err != nil {
 			return err
 		}
 		if err := tx.Exec("delete from auth_sessions where user_id = ?", userID).Error; err != nil {
@@ -347,42 +346,55 @@ func (s *Service) DeleteUser(ctx context.Context, actor ActorRef, userID string,
 			return err
 		}
 		// Empty approval nodes invalidate the flow (flows remain valid while nodes still have other candidates).
-		for _, ref := range steps {
-			var remaining int64
-			if err := tx.Table("flow_approval_step_actors").
-				Where("step_id = ?", ref.StepID).Count(&remaining).Error; err != nil {
+		if len(steps) > 0 {
+			stepIDs := make([]string, len(steps))
+			for i, ref := range steps {
+				stepIDs[i] = ref.StepID
+			}
+			var emptiedFlowIDs []string
+			if err := tx.Raw(`
+				select distinct s.flow_id::text
+				from flow_approval_steps s
+				where s.id in ?
+				  and not exists (
+				      select 1 from flow_approval_step_actors a where a.step_id = s.id
+				  )`, stepIDs).Scan(&emptiedFlowIDs).Error; err != nil {
 				return err
 			}
-			if remaining == 0 {
-				var flowID string
-				if err := tx.Table("flow_approval_steps").
-					Select("flow_id").Where("id = ?", ref.StepID).Scan(&flowID).Error; err != nil {
-					return err
-				}
+			for _, flowID := range emptiedFlowIDs {
 				if flowID != "" {
 					affectedFlows[flowID] = true
 				}
 			}
 		}
-		for _, ref := range stages {
-			var remaining int64
-			if err := tx.Table("flow_execution_actors").
-				Where("stage_id = ?", ref.StageID).Count(&remaining).Error; err != nil {
+		if len(stages) > 0 {
+			stageIDs := make([]string, len(stages))
+			for i, ref := range stages {
+				stageIDs[i] = ref.StageID
+			}
+			var emptiedFlowIDs []string
+			if err := tx.Raw(`
+				select distinct st.flow_id::text
+				from flow_stages st
+				where st.id in ?
+				  and not exists (
+				      select 1 from flow_execution_actors a where a.stage_id = st.id
+				  )`, stageIDs).Scan(&emptiedFlowIDs).Error; err != nil {
 				return err
 			}
-			if remaining == 0 {
-				var flowID string
-				if err := tx.Table("flow_stages").
-					Select("flow_id").Where("id = ?", ref.StageID).Scan(&flowID).Error; err != nil {
-					return err
-				}
+			for _, flowID := range emptiedFlowIDs {
 				if flowID != "" {
 					affectedFlows[flowID] = true
 				}
 			}
 		}
-		for flowID := range affectedFlows {
-			if err := tx.Exec("update flows set status = 'invalid', version = version + 1, updated_at = now() where id = ?", flowID).Error; err != nil {
+		if len(affectedFlows) > 0 {
+			flowIDs := make([]string, 0, len(affectedFlows))
+			for flowID := range affectedFlows {
+				flowIDs = append(flowIDs, flowID)
+			}
+			sort.Strings(flowIDs)
+			if err := tx.Exec(`update flows set status = 'invalid', version = version + 1, updated_at = now() where id in ?`, flowIDs).Error; err != nil {
 				return err
 			}
 		}
@@ -414,7 +426,7 @@ func (s *Service) DeleteUser(ctx context.Context, actor ActorRef, userID string,
 			RequestID: strPtr(meta.RequestID),
 			Metadata:  map[string]any{"invalidated_flow_count": len(affectedFlows)},
 		})
-	}, &sql.TxOptions{Isolation: sql.LevelSerializable})
+	})
 	if err != nil {
 		return err
 	}

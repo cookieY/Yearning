@@ -1,26 +1,20 @@
 // factsource.go B4 Adapter wiring for the built-in tool evidence collection port.
 //
-// Package datasource is outside B7 allowed_paths, so review/application implements equivalent decryption
-// here using the same Crypter, the same AAD recipe (datasource_credential/datasource_tls purposes and
-// table/column bindings), and the same credential plaintext struct, constructing a review-purpose
-// connection pool via the Adapter exported by package database.
-// Drift risk: if datasource.Factory adjusts its envelope recipe, this file must be updated in lockstep
-// (covered by integration tests using real encrypted rows).
+// Target datasource credential & TLS envelope decryption delegates to package datasource
+// so AAD and PEM splitting stay single-sourced while review/application enforces its own
+// read-only purpose order (review -> query) and TOCTOU identity pinning.
 package application
 
 import (
 	"bytes"
 	"context"
-	"encoding/json"
-	"encoding/pem"
 	"errors"
-	"fmt"
-	"strings"
 
 	"gorm.io/gorm"
 
 	"github.com/cookieY/YearningX/backend/internal/crypto"
 	"github.com/cookieY/YearningX/backend/internal/database"
+	"github.com/cookieY/YearningX/backend/internal/datasource"
 	"github.com/cookieY/YearningX/backend/internal/review/changeset"
 	"github.com/cookieY/YearningX/backend/internal/review/fingerprint"
 	"github.com/cookieY/YearningX/backend/internal/review/tool"
@@ -190,13 +184,18 @@ func probeDatasourceIdentity(
 }
 
 // openCredential decrypts an enabled read-only credential (preferring review, falling back to query;
-// never falling back to execution).
+// never falling back to execution). Fails closed if the higher-priority credential exists but is unreadable.
 func openCredential(ctx context.Context, db *gorm.DB, crypter *crypto.Crypter, datasourceID string) (database.Credential, error) {
-	cred, err := openCredentialForPurpose(ctx, db, crypter, datasourceID, "review")
-	if err == nil || !errors.Is(err, ErrFactSourceUnavailable) {
-		return cred, err
+	res, err := datasource.ResolveCredential(ctx, db, crypter, datasourceID, datasource.CredentialResolveOptions{
+		Purposes: []string{"review", "query"},
+	})
+	if err != nil {
+		if errors.Is(err, datasource.ErrCredentialMissing) {
+			return database.Credential{}, ErrFactSourceUnavailable
+		}
+		return database.Credential{}, err
 	}
-	return openCredentialForPurpose(ctx, db, crypter, datasourceID, "query")
+	return database.Credential{Username: res.Username, Password: res.Password}, nil
 }
 
 func openCredentialForPurpose(
@@ -209,109 +208,21 @@ func openCredentialForPurpose(
 	if credentialPurpose != "review" && credentialPurpose != "query" && credentialPurpose != "execution" {
 		return database.Credential{}, ErrFactSourceUnavailable
 	}
-	var row struct {
-		ID         string
-		Ciphertext []byte
-		Nonce      []byte
-		KeyID      string
-		Purpose    string
-		Enabled    bool
-	}
-	err := db.WithContext(ctx).Raw(`
-		select id::text as id, credential_ciphertext as ciphertext, credential_nonce as nonce,
-		       credential_key_id as key_id, purpose, enabled
-		from datasource_credentials
-		where datasource_id = ? and purpose = ? and enabled limit 1`,
-		datasourceID, credentialPurpose).Scan(&row).Error
-	if err != nil {
-		return database.Credential{}, err
-	}
-	if row.ID == "" {
-		return database.Credential{}, ErrFactSourceUnavailable
-	}
-	plain, err := crypter.Open(crypto.PurposePayload, crypto.Envelope{
-		Ciphertext: row.Ciphertext, Nonce: row.Nonce, KeyID: row.KeyID, Algorithm: "aes-256-gcm",
-	}, crypto.AAD{
-		DeploymentID: crypter.DeploymentID(),
-		Table:        "datasource_credentials", PrimaryKey: row.ID,
-		Column: "credential", Purpose: "datasource_credential",
+	res, err := datasource.ResolveCredential(ctx, db, crypter, datasourceID, datasource.CredentialResolveOptions{
+		Purposes: []string{credentialPurpose},
 	})
 	if err != nil {
+		if errors.Is(err, datasource.ErrCredentialMissing) {
+			return database.Credential{}, ErrFactSourceUnavailable
+		}
 		return database.Credential{}, err
 	}
-	var payload struct {
-		Username string `json:"username"`
-		Password string `json:"password"`
-	}
-	if err := json.Unmarshal(plain, &payload); err != nil {
-		return database.Credential{}, fmt.Errorf("review: credential payload malformed")
-	}
-	return database.Credential{Username: payload.Username, Password: payload.Password}, nil
+	return database.Credential{Username: res.Username, Password: res.Password}, nil
 }
 
-// openTLS decrypts TLS material and splits PEM blocks (same semantics as datasource.splitTLSMaterial:
-// when a private key is present => last certificate is client cert and the rest form the CA chain;
-// when no private key is present => all certificates form the CA chain).
+// openTLS decrypts TLS material and splits PEM blocks via the canonical datasource helper.
 func openTLS(ctx context.Context, db *gorm.DB, crypter *crypto.Crypter, datasourceID string) (*database.TLSMaterial, error) {
-	var row struct {
-		ID         string
-		Ciphertext []byte
-		Nonce      []byte
-		KeyID      *string
-		Algorithm  *string
-		Verify     bool
-		ServerName *string
-	}
-	err := db.WithContext(ctx).Raw(`
-		select id::text as id, material_ciphertext as ciphertext, material_nonce as nonce,
-		       material_key_id as key_id, material_algorithm as algorithm,
-		       verify_server as verify, server_name
-		from datasource_tls_materials where datasource_id = ? limit 1`, datasourceID).Scan(&row).Error
-	if err != nil {
-		return nil, err
-	}
-	if row.ID == "" || row.KeyID == nil {
-		return nil, nil
-	}
-	plain, err := crypter.Open(crypto.PurposePayload, crypto.Envelope{
-		Ciphertext: row.Ciphertext, Nonce: row.Nonce, KeyID: *row.KeyID, Algorithm: derefString(row.Algorithm),
-	}, crypto.AAD{
-		DeploymentID: crypter.DeploymentID(),
-		Table:        "datasource_tls_materials", PrimaryKey: row.ID,
-		Column: "material", Purpose: "datasource_tls",
-	})
-	if err != nil {
-		return nil, err
-	}
-	mat := &database.TLSMaterial{VerifyServer: row.Verify}
-	if row.ServerName != nil {
-		mat.ServerName = *row.ServerName
-	}
-	var certs [][]byte
-	rest := plain
-	var lastKey []byte
-	for {
-		var block *pem.Block
-		block, rest = pem.Decode(rest)
-		if block == nil {
-			break
-		}
-		switch {
-		case block.Type == "CERTIFICATE":
-			certs = append(certs, pem.EncodeToMemory(block))
-		case strings.HasSuffix(block.Type, "PRIVATE KEY"):
-			lastKey = pem.EncodeToMemory(block)
-		}
-	}
-	if lastKey != nil && len(certs) > 0 {
-		mat.CertPEM = certs[len(certs)-1]
-		mat.KeyPEM = lastKey
-		certs = certs[:len(certs)-1]
-	}
-	for _, c := range certs {
-		mat.CAPEM = append(mat.CAPEM, c...)
-	}
-	return mat, nil
+	return datasource.ResolveTLSMaterial(ctx, db, crypter, datasourceID)
 }
 
 // ---- Evidence collection implementations for the five built-in tools (database.Port semantics) ----
@@ -714,4 +625,22 @@ func derefString(p *string) string {
 		return ""
 	}
 	return *p
+}
+
+// policyCatalogSource is intentionally narrower than tool.FactSource. Raw
+// catalog identities are authoritative privacy input and must never become a
+// Provider-visible tool result.
+type policyCatalogSource interface {
+	PolicyCatalog(context.Context, []string) (database.PolicyCatalog, error)
+}
+
+func (f *factSource) PolicyCatalog(
+	ctx context.Context,
+	schemas []string,
+) (database.PolicyCatalog, error) {
+	if f == nil || f.adapter == nil || f.pool == nil ||
+		f.pool.Purpose() != database.PurposeReview {
+		return database.PolicyCatalog{}, ErrFactSourceUnavailable
+	}
+	return database.ReadPolicyCatalog(ctx, f.adapter, f.pool, schemas)
 }

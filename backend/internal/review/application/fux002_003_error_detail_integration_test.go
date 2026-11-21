@@ -83,7 +83,7 @@ func TestB7ProviderUniqueConflictDetailAxis(t *testing.T) {
 	}
 }
 
-// TestStartRunWithoutSQLStatesCause F-UX-003: starting an AI precheck on a draft without saved SQL
+// TestStartRunWithoutSQLStatesCause F-UX-003: starting an ephemeral precheck without SQL
 // returns 1001 with Detail stating that SQL is missing rather than a generic "invalid request parameters".
 func TestStartRunWithoutSQLStatesCause(t *testing.T) {
 	f := newFixture(t)
@@ -93,14 +93,14 @@ func TestStartRunWithoutSQLStatesCause(t *testing.T) {
 	if err != nil {
 		t.Fatalf("create draft: %v", err)
 	}
-	_, err = f.svc.StartRun(context.Background(), f.owner, StartRunInput{
-		DraftID: view.ID, ExpectVersion: view.Version, IdempotencyKey: "fux003-no-sql",
+	_, err = f.svc.StartEphemeralRun(context.Background(), f.owner, &AgentRunner{}, EphemeralStartInput{
+		FlowID: f.flowID, DraftID: view.ID, SQL: nil, IdempotencyKey: "fux003-no-sql",
 	})
 	var de *domain.Error
 	if !errors.As(err, &de) || de.Code != 1001 {
-		t.Fatalf("start run without sql: want 1001, got %v", err)
+		t.Fatalf("start ephemeral run without sql: want 1001, got %v", err)
 	}
-	if !strings.Contains(de.Detail, "SQL has not been saved") {
+	if !strings.Contains(de.Detail, "SQL must not be empty") {
 		t.Fatalf("missing-sql detail: %q", de.Detail)
 	}
 }

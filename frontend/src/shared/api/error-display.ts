@@ -1,3 +1,4 @@
+import i18next from "@/shared/i18n";
 import {
   BUSINESS_ERROR_CATALOG,
 } from "@/api/generated/projections/business-error-catalog";
@@ -131,4 +132,25 @@ export function businessErrCodeByName(name: string): number | null {
     if (entry.name === name) return Number(code);
   }
   return null;
+}
+
+export interface DescribeErrorTextOptions {
+  includeDetail?: boolean;
+  detailSeparator?: string;
+}
+
+/**
+ * Formats an `ErrorDisplay` into a localized user-facing string with optional
+ * operator diagnostic detail and trailing `request_id`.
+ */
+export function describeErrorText(
+  display: Pick<ErrorDisplay, "messageKey" | "requestId"> & { detail?: string | null },
+  options?: DescribeErrorTextOptions,
+): string {
+  const base = i18next.t(display.messageKey);
+  const includeDetail = options?.includeDetail ?? true;
+  const rawDetail = includeDetail && typeof display.detail === "string" ? display.detail.trim() : "";
+  const sep = options?.detailSeparator ?? ": ";
+  const text = rawDetail !== "" ? `${base}${sep}${rawDetail}` : base;
+  return display.requestId === null ? text : `${text} (${display.requestId})`;
 }

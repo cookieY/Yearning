@@ -4,6 +4,7 @@ import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { ScrollText } from "lucide-react";
 import { listAuditEvents } from "@/api/generated/client/administration/administration";
+import { unwrapApi } from "@/shared/api/mutator";
 import { useCursorPage } from "@/shared/lib/cursor-page";
 import { formatTimestamp } from "@/shared/lib/timezones";
 import { TablePagination } from "@/shared/components/ui/table-pagination";
@@ -50,17 +51,16 @@ export default function AuditRecordsPage() {
   const eventsQuery = useQuery({
     queryKey: ["admin", "audit-events", pager.after, pager.pageSize],
     queryFn: async () => {
-      const response = (await listAuditEvents({
-        limit: pager.pageSize,
-        after: pager.after || undefined,
-      })) as unknown as {
-        items?: AuditEvent[];
-        page?: { has_more?: boolean; next_cursor?: string | null };
-      };
+      const response = await unwrapApi(
+        listAuditEvents({
+          limit: pager.pageSize,
+          after: pager.after || undefined,
+        }),
+      );
       return {
-        items: response.items ?? [],
-        hasMore: response.page?.has_more ?? false,
-        nextCursor: response.page?.next_cursor ?? null,
+        items: response.items,
+        hasMore: response.page.has_more,
+        nextCursor: response.page.next_cursor,
       };
     },
     enabled: session.status === "authenticated" && isAdmin,

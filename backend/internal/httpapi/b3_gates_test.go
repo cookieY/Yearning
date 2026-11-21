@@ -619,6 +619,59 @@ func TestDeleteUserFlowInvalidationAndActiveOrders(t *testing.T) {
 	if code != 200 || errCode(body) != 0 {
 		t.Fatalf("deletion after terminal order: %d %v", code, body)
 	}
+
+	// Set-based flow invalidation across multiple flows/stages + auth_sessions cleanup while preserving flows with co-actors.
+	frank := fx.adminCreateUser(t, "frank", "frank-password-1234")
+	grace := fx.adminCreateUser(t, "grace", "grace-password-1234")
+	frankClient := testClient{t: t, engine: fx.engine, cookies: map[string]string{}}
+	if code, body, _ := frankClient.login("frank", "frank-password-1234"); code != 200 || errCode(body) != 0 {
+		t.Fatalf("frank login failed: %d %v", code, body)
+	}
+	// fExecOnly: grace is approver, frank is sole executor -> emptied execution stage invalidates flow.
+	fExecOnly := fx.adminCreateFlowWithActors(t, "frank-exec-flow", ruleSetID, dsID, []string{grace}, []string{frank})
+	// fCoActor: grace & frank share approval and execution -> retains grace, stays enabled.
+	fCoActor := fx.adminCreateFlowWithActors(t, "frank-co-flow", ruleSetID, dsID, []string{frank, grace}, []string{frank, grace})
+
+	fx.adminDeleteUser(t, frank)
+	var sExec, sCo string
+	_ = fx.db.Raw(`select status from flows where id = ?`, fExecOnly).Scan(&sExec).Error
+	_ = fx.db.Raw(`select status from flows where id = ?`, fCoActor).Scan(&sCo).Error
+	if sExec != "invalid" {
+		t.Fatalf("flow with emptied execution actors must be invalid, got %q", sExec)
+	}
+	if sCo != "enabled" {
+		t.Fatalf("flow with remaining co-actor must stay enabled, got %q", sCo)
+	}
+	var sessionCount int64
+	_ = fx.db.Raw(`select count(*) from auth_sessions where user_id = ?`, frank).Scan(&sessionCount).Error
+	if sessionCount != 0 {
+		t.Fatalf("expected 0 remaining auth_sessions for deleted user, got %d", sessionCount)
+	}
+}
+
+func (fx *b3Fixture) adminCreateFlowWithActors(t *testing.T, name, ruleSetID, dsID string, approvers, executors []string) string {
+	t.Helper()
+	appRefs := make([]map[string]any, len(approvers))
+	for i, u := range approvers {
+		appRefs[i] = map[string]any{"user_id": u}
+	}
+	execRefs := make([]map[string]any, len(executors))
+	for i, u := range executors {
+		execRefs[i] = map[string]any{"user_id": u}
+	}
+	code, body, raw := fx.admin.do("POST", "/api/v4/admin/flows", map[string]any{
+		"name": name, "flow_type": "change_review", "enabled": true, "rule_set_id": ruleSetID,
+		"stages": []map[string]any{{
+			"position": 1, "datasource_id": dsID,
+			"approval_steps":   []map[string]any{{"position": 1, "actors": appRefs}},
+			"execution_actors": execRefs,
+		}},
+	}, true)
+	if code != 200 || errCode(body) != 0 {
+		t.Fatalf("create flow %s: %d %s", name, code, raw)
+	}
+	id, _ := body["data"].(map[string]any)["id"].(string)
+	return id
 }
 
 // Datasource reference protection and optimistic concurrency.

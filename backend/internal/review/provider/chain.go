@@ -1,4 +1,6 @@
-// errors.go defines Review-domain business error codes (error-codes.json domain=review, 2001-2012). Command paths may also return common/management domain codes (1001/1002/1010/1012/2014, etc.), constructed as domain.Error instances by the application layer as needed.
+// chain.go manages ordered AI Provider candidate failover (provider_selection).
+// Failover only occurs on known-safe boundary failures (auth/input rejection or schema invalidity)
+// when contract digests match, and never exceeds MaxCallsPerStep calls.
 package provider
 
 import (
@@ -7,13 +9,13 @@ import (
 	"fmt"
 )
 
-// Error carries a numeric business error code and stable name. Detail is optional: an operator-facing snapshot of upstream rejection causes (such as HTTP status and error snippet from a probed peer), passed through to the UI via the declarative error response detail field — free of secrets and raw SQL, length-bounded by the caller. Fields is optional (RCP-20261102-S008): field-level rejection causes for VALIDATION_FAILED, where key = request body field name (snake_case matching the OpenAPI request schema) and value = human-readable constraint descriptions for that field; passed through meta.fields for frontend form field targeting.
+// Chain holds an ordered slice of validated Endpoints and their dialed Client adapters.
 type Chain struct {
 	Endpoints []Endpoint
 	adapters  []Client
 }
 
-// Business error codes (error-codes.json 2001-2012).
+// NewChain validates endpoints and dials one Client adapter per configured Provider candidate.
 func NewChain(endpoints []Endpoint, dial func(Endpoint) (Client, error)) (*Chain, error) {
 	if len(endpoints) == 0 {
 		return nil, ErrNoProvider
@@ -32,7 +34,7 @@ func NewChain(endpoints []Endpoint, dial func(Endpoint) (Client, error)) (*Chain
 	return c, nil
 }
 
-// Sentinel error collection.
+// ValidateConfiguration probes each Provider in the chain without sending review payloads.
 func (c *Chain) ValidateConfiguration(ctx context.Context) error {
 	var first error
 	for _, a := range c.adapters {
@@ -43,7 +45,7 @@ func (c *Chain) ValidateConfiguration(ctx context.Context) error {
 	return first
 }
 
-// ErrBatchTooLarge indicates input exceeded limits (32MiB / 100k statements / 512KiB single statement).
+// Result records the accepted Response along with winning Provider metadata and per-call usage logs.
 type Result struct {
 	Response      *Response
 	ProviderID    string
@@ -54,14 +56,13 @@ type Result struct {
 	Calls         []CallRecord
 }
 
-// ErrParseFailed indicates statement splitting or parsing failed (fail closed).
+// ReviewStructured executes a prebuilt Request across the Provider chain without per-endpoint rebuilding.
 func (c *Chain) ReviewStructured(ctx context.Context, req Request) (*Result, error) {
 	return c.ReviewStructuredGuarded(ctx, req, nil)
 }
 
-// ReviewStructuredGuarded validates a trusted local send boundary immediately
-// before each actual attempt, including fallback. A guard failure never falls
-// through to another Provider and is never attributed as an unsent attempt.
+// ReviewStructuredGuarded validates a trusted local send boundary immediately before each actual attempt,
+// including fallback. A guard failure never falls through to another Provider or records an unsent attempt.
 func (c *Chain) ReviewStructuredGuarded(ctx context.Context, req Request, beforeSend func(context.Context) error) (*Result, error) {
 	return c.reviewStructuredChain(ctx, false, func(context.Context, Endpoint) (Request, error) {
 		return req, nil
@@ -70,7 +71,7 @@ func (c *Chain) ReviewStructuredGuarded(ctx context.Context, req Request, before
 
 // ReviewStructuredPerEndpoint rebuilds the Request for each attempted Endpoint right before
 // dispatching, allowing safe fallback across mixed prompt-profile providers ("default" <-> "san")
-// while continuing to enforce identical OutputSchemaHash and fail-closed beforeSend verification.
+// while enforcing identical OutputSchemaHash and fail-closed beforeSend verification.
 func (c *Chain) ReviewStructuredPerEndpoint(
 	ctx context.Context,
 	buildReq func(context.Context, Endpoint) (Request, error),
@@ -128,7 +129,8 @@ func (c *Chain) reviewStructuredChain(
 		}
 		lastErr = err
 		lastAttempted = i
-		// ErrFingerprintFailed indicates the fingerprint engine failed.
+		// Only known-safe rejections after receiving a response allow falling back; unknown-boundary
+		// network or timeout errors abort the chain without replaying the request.
 		if errors.Is(err, ErrRejected) || errors.Is(err, ErrSchemaInvalid) {
 			continue
 		}
@@ -137,7 +139,7 @@ func (c *Chain) reviewStructuredChain(
 	if lastErr == nil {
 		lastErr = ErrNoProvider
 	}
-	// ErrAnonymizationFailed indicates anonymization failed; sending raw SQL is forbidden.
+	// Preserve the last attempted Provider metadata and real call records for usage accounting.
 	if lastAttempted >= 0 && lastAttempted < len(c.Endpoints) {
 		ep := c.Endpoints[lastAttempted]
 		return nil, &chainError{
@@ -149,10 +151,10 @@ func (c *Chain) reviewStructuredChain(
 	return nil, fmt.Errorf("provider chain exhausted: %w", lastErr)
 }
 
-// ErrTooManyFingerprints indicates unique fingerprints exceeded 1,000.
+// PlanHash folds the configured Provider chain into a deterministic plan identity digest.
 func (c *Chain) PlanHash() string { return PlanHash(c.Endpoints) }
 
-// ErrCoverageIncomplete indicates stage coverage is incomplete.
+// chainError preserves the failed candidate attribution and incurred CallRecord slices across failover.
 type chainError struct {
 	wrapped    error
 	providerID string
@@ -164,7 +166,7 @@ type chainError struct {
 func (e *chainError) Error() string { return e.wrapped.Error() }
 func (e *chainError) Unwrap() error { return e.wrapped }
 
-// ErrBlockedByRisk indicates blocking due to high/critical findings.
+// ChainErrorInfo extracts the last attempted candidate identity from a wrapped chain error.
 func ChainErrorInfo(err error) (providerID, modelName string, fallback int, ok bool) {
 	var ce *chainError
 	if errors.As(err, &ce) {
@@ -173,7 +175,7 @@ func ChainErrorInfo(err error) (providerID, modelName string, fallback int, ok b
 	return "", "", 0, false
 }
 
-// ErrSchemaInvalid indicates the provider output schema is invalid (B7; reserved for runtime).
+// ChainErrorCalls returns all recorded CallRecords incurred prior to chain exhaustion.
 func ChainErrorCalls(err error) []CallRecord {
 	var ce *chainError
 	if errors.As(err, &ce) {

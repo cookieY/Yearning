@@ -2,7 +2,6 @@ import { useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type {
   ChangeOrder,
-  ChangeOrderComment,
   ReviewFinding,
 } from "@/api/generated/client/yearningV4HTTPAPI.schemas";
 import {
@@ -14,7 +13,12 @@ import {
   recordOrderSqlCopy,
   revealOrderSql,
 } from "@/api/generated/client/change-orders/change-orders";
-import { getReviewEventClient, useDomainEvent } from "@/shared/events/review-event-client";
+import { ifMatchHeader, unwrapApi } from "@/shared/api/mutator";
+import {
+  matchesEntitySubject,
+  subscribeSseEvent,
+  useSseEvent,
+} from "@/shared/events/sse-event-bus";
 import { useSession } from "@/features/auth/session-provider";
 import { holdsSessionSlot } from "@/shared/dev/mock-super";
 import { stageApprovalSteps } from "@/features/orders/approval-steps";
@@ -52,11 +56,7 @@ export function useApprovalQueue(enabled: boolean) {
       // lifecycle); the frozen-actor narrowing stays client-side
       // (presentation only). Boundary: the 200-row newest-first cap is
       // documented in the migration contract §14.3.
-      const page = (await listChangeOrders({
-        limit: 200,
-      })) as unknown as {
-        items: ChangeOrder[];
-      };
+      const page = await unwrapApi(listChangeOrders({ limit: 200 }));
       if (me === undefined) return [];
       return page.items.filter((order) =>
         order.stages.some((stage) =>
@@ -70,20 +70,19 @@ export function useApprovalQueue(enabled: boolean) {
   // Peer decisions arrive as aggregate events; re-reading the relation list
   // is the only state update (events are notifications, api/events/README).
   const orders = query.data;
-  const subscriptionKey =
-    orders === undefined ? "" : orders.map((order) => `${order.id}:${String(order.version)}`).join("|");
+  const subscriptionKey = orders === undefined ? "" : orders.map((order) => order.id).join("|");
   useEffect(() => {
     if (subscriptionKey === "") return;
-    const client = getReviewEventClient();
-    const unsubscribes = (orders ?? []).map((order) =>
-      client.subscribe(`change-orders/${order.id}`, () => {
-        void queryClient.invalidateQueries({ queryKey: ["change-orders", "approval-queue"] });
-      }),
-    );
-    return () => {
-      for (const unsubscribe of unsubscribes) unsubscribe();
-    };
-  }, [subscriptionKey, orders, queryClient]);
+    const targets = new Set(subscriptionKey.split("|"));
+    return subscribeSseEvent("*", (event) => {
+      for (const orderId of targets) {
+        if (matchesEntitySubject(event.subject, "change-orders", "order", orderId)) {
+          void queryClient.invalidateQueries({ queryKey: ["change-orders", "approval-queue"] });
+          return;
+        }
+      }
+    });
+  }, [subscriptionKey, queryClient]);
 
   return query;
 }
@@ -97,18 +96,17 @@ export function useApprovalDecision(order: ChangeOrder | null) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (input: ApprovalDecisionInput) =>
-      decideChangeOrder(
-        order?.id as string,
-        { decision: input.decision, comment: input.comment },
-        {
-          // Both headers are declared required on approval-decisions —
-          // If-Match guards the aggregate version, Idempotency-Key makes the
-          // decision retry-safe (order_decision profile).
-          headers: {
-            "If-Match": `"${String(order?.version ?? 1)}"`,
+      unwrapApi(
+        decideChangeOrder(
+          order?.id as string,
+          { decision: input.decision, comment: input.comment },
+          ifMatchHeader(order?.version, {
+            // Both headers are declared required on approval-decisions —
+            // If-Match guards the aggregate version, Idempotency-Key makes the
+            // decision retry-safe (order_decision profile).
             "Idempotency-Key": `order-decision-${randomUUID()}`,
-          },
-        },
+          }),
+        ),
       ),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["change-order", order?.id] });
@@ -124,18 +122,18 @@ export function useOrderComments(orderId: string, enabled: boolean) {
   const query = useQuery({
     queryKey: ["change-order-comments", orderId],
     queryFn: async () => {
-      const page = (await listChangeOrderComments(orderId, { limit: 50 })) as unknown as {
-        items: ChangeOrderComment[];
-      };
+      const page = await unwrapApi(listChangeOrderComments(orderId, { limit: 50 }));
       return page.items;
     },
     enabled: enabled && orderId !== "",
   });
 
-  useDomainEvent(
-    orderId === "" ? null : `change-orders/${orderId}`,
-    "any",
-    () => {
+  useSseEvent(
+    orderId === "" ? null : "*",
+    (event) => {
+      if (!matchesEntitySubject(event.subject, "change-orders", "order", orderId)) {
+        return;
+      }
       void queryClient.invalidateQueries({ queryKey: ["change-order-comments", orderId] });
     },
   );
@@ -163,13 +161,19 @@ export function useCreateOrderComment(orderId: string) {
 export function useOrderReviewFindings(orderId: string, enabled: boolean) {
   return useQuery({
     queryKey: ["change-order-review-findings", orderId],
-    queryFn: async () =>
-      fetchAllCursorPages(async (after) =>
-        (await listOrderReviewFindings(orderId, {
-          limit: 200,
-          ...(after === null ? {} : { after }),
-        })) as unknown as CursorPage<ReviewFinding>,
-      ),
+    queryFn: () =>
+      fetchAllCursorPages(async (after) => {
+        const res = await unwrapApi(
+          listOrderReviewFindings(orderId, {
+            limit: 200,
+            ...(after === null ? {} : { after }),
+          }),
+        );
+        return {
+          items: res.items,
+          page: res.page,
+        } satisfies CursorPage<ReviewFinding>;
+      }),
     enabled: enabled && orderId !== "",
   });
 }
@@ -191,12 +195,7 @@ export interface OrderSqlReveal {
 export function useRevealOrderSql(orderId: string) {
   return useMutation({
     mutationFn: async (purpose: string) => {
-      const data = (await revealOrderSql(orderId, { purpose })) as unknown as {
-        reveal_id: string;
-        sql: string;
-        watermark: string;
-        valid_until: string;
-      };
+      const data = await unwrapApi(revealOrderSql(orderId, { purpose }));
       return {
         revealId: data.reveal_id,
         sql: data.sql,

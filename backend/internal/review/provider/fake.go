@@ -1,4 +1,5 @@
-// StageResultData is the terminal summary of a single stage in a review event.
+// fake.go provides FakeAdapter, an in-memory Provider Port implementation for unit and integration
+// tests that still enforces response size limits and strict ValidateOutput schema verification.
 package provider
 
 import (
@@ -9,30 +10,29 @@ import (
 	"net/http"
 )
 
-// ReviewEventData is the review.completed/blocked payload (review-event-data.schema.json; state is restricted to ready|blocked|partial|failed).
+// FakeAdapter dispatches review requests to an in-memory callback rather than an HTTP upstream.
 type FakeAdapter struct {
 	Endpoint Endpoint
-	// GatePayload is the submission gate result shared between events and API.
-	Respond func(req Request) (body []byte, status int, err error)
-	client  *http.Client
-	base    string
+	Respond  func(req Request) (body []byte, status int, err error)
+	client   *http.Client
+	base     string
 }
 
-// DraftStateReason is the controlled reason_code value for state_changed payloads.
+// NewLocalFakeAdapter constructs a FakeAdapter bound to ep and its response callback.
 func NewLocalFakeAdapter(ep Endpoint, respond func(Request) ([]byte, int, error)) *FakeAdapter {
 	return &FakeAdapter{Endpoint: ep, Respond: respond, client: http.DefaultClient}
 }
 
-// gate.go implements pure SubmissionGate evaluation: deterministically applies policy decoupled from AI conclusions. Any high/critical finding or incomplete outcome blocks submission; model confidence cannot override the gate (B8 takes over workflow rules).
+// ValidateConfiguration runs a synthetic probe against the callback to verify structured output handling.
 func (f *FakeAdapter) ValidateConfiguration(ctx context.Context) error {
 	_, err := f.ReviewStructured(ctx, ProbeRequest())
 	return err
 }
 
-// GateReasonCode is the controlled vocabulary for gate.reason_codes.
+// Health always reports healthy for an in-process FakeAdapter.
 func (f *FakeAdapter) Health(context.Context) error { return nil }
 
-// GateInput summarizes the terminal state across all stage snapshots of a Run.
+// NegotiateOutputMode verifies configuration via ValidateConfiguration and returns json_schema mode.
 func (f *FakeAdapter) NegotiateOutputMode(ctx context.Context) (string, error) {
 	if err := f.ValidateConfiguration(ctx); err != nil {
 		return "", err
@@ -40,7 +40,7 @@ func (f *FakeAdapter) NegotiateOutputMode(ctx context.Context) (string, error) {
 	return OutputModeJSONSchema, nil
 }
 
-// none indicates no findings
+// ReviewStructured executes the fake callback and validates the returned payload against Response schema rules.
 func (f *FakeAdapter) ReviewStructured(ctx context.Context, req Request) (CallOutcome, error) {
 	if f.Respond == nil {
 		return CallOutcome{}, fmt.Errorf("fake provider: no responder installed")

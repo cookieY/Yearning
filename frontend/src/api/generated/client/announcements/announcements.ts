@@ -13,18 +13,6 @@ import type {
 
 import { customInstance } from '../../../../shared/api/mutator';
 
-export type getCurrentAnnouncementResponse200 = {
-  data: CurrentAnnouncementResultResponse
-  status: 200
-}
-
-export type getCurrentAnnouncementResponseSuccess = (getCurrentAnnouncementResponse200) & {
-  headers: Headers;
-};
-;
-
-export type getCurrentAnnouncementResponse = (getCurrentAnnouncementResponseSuccess)
-
 export const getGetCurrentAnnouncementUrl = () => {
 
 
@@ -33,9 +21,9 @@ export const getGetCurrentAnnouncementUrl = () => {
   return `/api/v4/announcements/current`
 }
 
-export const getCurrentAnnouncement = async ( options?: Parameters<typeof customInstance>[1]): Promise<getCurrentAnnouncementResponse> => {
+export const getCurrentAnnouncement = async ( options?: Parameters<typeof customInstance>[1]): Promise<CurrentAnnouncementResultResponse> => {
 
-  return customInstance<getCurrentAnnouncementResponse>(getGetCurrentAnnouncementUrl(),
+  return customInstance<CurrentAnnouncementResultResponse>(getGetCurrentAnnouncementUrl(),
   {
     ...options,
     method: 'GET'

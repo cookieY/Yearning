@@ -6,24 +6,21 @@ package application
 import (
 	"context"
 	"crypto/sha256"
-	"database/sql"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"math/rand"
 	"os"
-	"strings"
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5/pgconn"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 	"sync"
 
 	"github.com/cookieY/YearningX/backend/internal/authorization/auditlog"
 	"github.com/cookieY/YearningX/backend/internal/crypto"
+	"github.com/cookieY/YearningX/backend/internal/platform/txutil"
 	"github.com/cookieY/YearningX/backend/internal/query/domain"
 )
 
@@ -98,35 +95,13 @@ func newID() string { return uuid.NewString() }
 
 func (s *Services) now() time.Time { return s.nowFunc().UTC() }
 
-// serializable runs fn in a serializable transaction with <= 3 jittered retries on 40001/40P01 (matching the execution domain).
 func (s *Services) serializable(ctx context.Context, fn func(tx *gorm.DB) error) error {
-	var lastErr error
-	for attempt := 0; attempt < 3; attempt++ {
-		err := s.DB.WithContext(ctx).Transaction(fn, &sql.TxOptions{Isolation: sql.LevelSerializable})
-		if err == nil {
-			return nil
-		}
-		if !isSerializationFailure(err) {
-			return err
-		}
-		lastErr = err
-		time.Sleep(time.Duration(20+rand.Intn(40)) * time.Millisecond)
-	}
-	return lastErr
+	return txutil.Serializable(ctx, s.DB, fn)
 }
 
-func isSerializationFailure(err error) bool {
-	var pgErr *pgconn.PgError
-	return errors.As(err, &pgErr) && (pgErr.Code == "40001" || pgErr.Code == "40P01")
-}
+func isSerializationFailure(err error) bool { return txutil.IsSerializationFailure(err) }
 
-func isUniqueViolation(err error) bool {
-	if errors.Is(err, gorm.ErrDuplicatedKey) {
-		return true
-	}
-	var pgErr *pgconn.PgError
-	return errors.As(err, &pgErr) && pgErr.Code == "23505"
-}
+func isUniqueViolation(err error) bool { return txutil.IsUniqueViolation(err) }
 
 // ---- Domain events (frozen surface in repository-event-routing) ----
 
@@ -163,112 +138,31 @@ func (s *Services) emitQueryEvent(ctx context.Context, tx *gorm.DB, internalType
 
 // ---- Idempotency (matching execution/changeorder contract surface) ----
 
+func (s *Services) idemStore() *txutil.IdempotencyStore {
+	return &txutil.IdempotencyStore{
+		DB:      s.DB,
+		Crypter: s.Crypter,
+		Errs: txutil.IdempotencyErrors{
+			Reused:     func() error { return domain.ErrIdemReused() },
+			InProgress: func() error { return domain.ErrIdemInProgress() },
+			Concurrent: func() error { return domain.ErrConcurrent() },
+		},
+	}
+}
+
 func (s *Services) idemClaim(ctx context.Context, userID, route, aggregateID, key, reqHash string) (claimed bool, replay []byte, err error) {
-	ins := s.DB.WithContext(ctx).Exec(`
-		insert into idempotency_records (id, requesting_user_id, route_template, aggregate_id,
-		    idempotency_key, request_hash, state, created_at, expires_at)
-		values (?, ?, ?, ?, ?, ?, 'in_progress', now(), now() + interval '24 hours')`,
-		newID(), userID, route, aggregateID, key, reqHash)
-	if ins.Error == nil {
-		return true, nil, nil
-	}
-	if !isUniqueViolation(ins.Error) {
-		return false, nil, ins.Error
-	}
-	var row struct {
-		State                  string
-		RequestHash            string
-		ResponseBodyCiphertext []byte
-		ResponseBodyNonce      []byte
-		ResponseBodyKeyID      string
-		ResponseBodyAlgorithm  string
-	}
-	if err := s.DB.WithContext(ctx).Raw(`
-		select state, request_hash, response_body_ciphertext, response_body_nonce,
-		       response_key_id as response_body_key_id,
-		       response_body_algorithm as response_body_algorithm
-		from idempotency_records
-		where requesting_user_id = ? and route_template = ? and aggregate_id = ? and idempotency_key = ?`,
-		userID, route, aggregateID, key).Scan(&row).Error; err != nil {
-		return false, nil, err
-	}
-	if row.RequestHash != reqHash {
-		return false, nil, domain.ErrIdemReused()
-	}
-	if row.State != "completed" {
-		var expired bool
-		_ = s.DB.WithContext(ctx).Raw(
-			`select expires_at < now() from idempotency_records
-			 where requesting_user_id = ? and route_template = ? and aggregate_id = ? and idempotency_key = ?`,
-			userID, route, aggregateID, key).Scan(&expired).Error
-		if expired {
-			if err := s.idemReleaseExpired(ctx, userID, route, aggregateID, key); err != nil {
-				return false, nil, err
-			}
-			return s.idemClaim(ctx, userID, route, aggregateID, key, reqHash)
-		}
-		return false, nil, domain.ErrIdemInProgress()
-	}
-	env := crypto.Envelope{
-		Ciphertext: row.ResponseBodyCiphertext, Nonce: row.ResponseBodyNonce,
-		KeyID: row.ResponseBodyKeyID, Algorithm: row.ResponseBodyAlgorithm,
-	}
-	plain, err := s.Crypter.Open(crypto.PurposePayload, env, crypto.AAD{
-		DeploymentID: s.Crypter.DeploymentID(), Table: "idempotency_records",
-		PrimaryKey: userID + "#" + route + "#" + aggregateID + "#" + key,
-		Column:     "response_body_ciphertext", Purpose: crypto.PurposePayload,
-	})
-	if err != nil {
-		return false, nil, err
-	}
-	return false, plain, nil
+	return s.idemStore().Claim(ctx, userID, route, aggregateID, key, reqHash)
 }
 
 func (s *Services) idemRelease(ctx context.Context, userID, route, aggregateID, key string) error {
-	return s.DB.WithContext(ctx).Exec(`
-		delete from idempotency_records
-		where requesting_user_id = ? and route_template = ? and aggregate_id = ?
-		  and idempotency_key = ? and state = 'in_progress'`,
-		userID, route, aggregateID, key).Error
-}
-
-func (s *Services) idemReleaseExpired(ctx context.Context, userID, route, aggregateID, key string) error {
-	return s.DB.WithContext(ctx).Exec(`
-		delete from idempotency_records
-		where requesting_user_id = ? and route_template = ? and aggregate_id = ?
-		  and idempotency_key = ? and expires_at < now()`,
-		userID, route, aggregateID, key).Error
+	return s.idemStore().Release(ctx, userID, route, aggregateID, key)
 }
 
 func (s *Services) idemComplete(ctx context.Context, userID, route, aggregateID, key string, response []byte) error {
-	env, err := s.Crypter.Seal(crypto.PurposePayload, response, crypto.AAD{
-		DeploymentID: s.Crypter.DeploymentID(), Table: "idempotency_records",
-		PrimaryKey: userID + "#" + route + "#" + aggregateID + "#" + key,
-		Column:     "response_body_ciphertext", Purpose: crypto.PurposePayload,
-	})
-	if err != nil {
-		return err
-	}
-	res := s.DB.WithContext(ctx).Exec(`
-		update idempotency_records set state='completed', response_http_status=200,
-		    response_body_ciphertext=?, response_body_nonce=?, response_key_id=?,
-		    response_body_algorithm='aes-256-gcm'
-		where requesting_user_id = ? and route_template = ? and aggregate_id = ?
-		  and idempotency_key = ? and state = 'in_progress'`,
-		env.Ciphertext, env.Nonce, env.KeyID, userID, route, aggregateID, key)
-	if res.Error != nil {
-		return res.Error
-	}
-	if res.RowsAffected != 1 {
-		return domain.ErrConcurrent()
-	}
-	return nil
+	return s.idemStore().Complete(ctx, userID, route, aggregateID, key, response)
 }
 
-func idemRequestHash(parts ...string) string {
-	sum := sha256.Sum256([]byte(strings.Join(parts, ";")))
-	return hex.EncodeToString(sum[:])
-}
+func idemRequestHash(parts ...string) string { return txutil.RequestHash(parts...) }
 
 // ---- Cryptographic helpers (AAD contract surface) ----
 

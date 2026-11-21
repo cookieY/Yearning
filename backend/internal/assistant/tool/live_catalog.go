@@ -3,15 +3,13 @@ package tool
 
 import (
 	"context"
-	"encoding/json"
-	"encoding/pem"
-	"strings"
 
 	"gorm.io/gorm"
 
 	"github.com/cookieY/YearningX/backend/internal/assistant/domain"
 	"github.com/cookieY/YearningX/backend/internal/crypto"
 	"github.com/cookieY/YearningX/backend/internal/database"
+	"github.com/cookieY/YearningX/backend/internal/datasource"
 )
 
 // AdapterCatalogReader reads catalog metadata using read-only datasource credentials (review/query).
@@ -113,104 +111,16 @@ func (r *AdapterCatalogReader) openReadPool(ctx context.Context, datasourceID st
 }
 
 func (r *AdapterCatalogReader) openReadCredential(ctx context.Context, datasourceID string) (database.Credential, database.Purpose, error) {
-	for _, p := range []database.Purpose{database.PurposeReview, database.PurposeQuery} {
-		var row struct {
-			ID         string
-			Ciphertext []byte
-			Nonce      []byte
-			KeyID      string
-		}
-		err := r.DB.WithContext(ctx).Raw(`
-			select id::text as id, credential_ciphertext as ciphertext, credential_nonce as nonce,
-			       credential_key_id as key_id
-			from datasource_credentials
-			where datasource_id = ? and purpose = ? and enabled limit 1`,
-			datasourceID, string(p)).Scan(&row).Error
-		if err != nil || row.ID == "" {
-			continue
-		}
-		plain, err := r.Crypter.Open(crypto.PurposePayload, crypto.Envelope{
-			Ciphertext: row.Ciphertext, Nonce: row.Nonce, KeyID: row.KeyID, Algorithm: "aes-256-gcm",
-		}, crypto.AAD{
-			DeploymentID: r.Crypter.DeploymentID(),
-			Table:        "datasource_credentials", PrimaryKey: row.ID,
-			Column: "credential", Purpose: "datasource_credential",
-		})
-		if err != nil {
-			continue
-		}
-		var payload struct {
-			Username string `json:"username"`
-			Password string `json:"password"`
-		}
-		if json.Unmarshal(plain, &payload) != nil {
-			continue
-		}
-		return database.Credential{Username: payload.Username, Password: payload.Password}, p, nil
+	res, err := datasource.ResolveCredential(ctx, r.DB, r.Crypter, datasourceID, datasource.CredentialResolveOptions{
+		Purposes:       []string{string(database.PurposeReview), string(database.PurposeQuery)},
+		SkipUnreadable: true,
+	})
+	if err != nil {
+		return database.Credential{}, "", domain.ErrDatasourceForbidden()
 	}
-	return database.Credential{}, "", domain.ErrDatasourceForbidden()
+	return database.Credential{Username: res.Username, Password: res.Password}, database.Purpose(res.Purpose), nil
 }
 
 func (r *AdapterCatalogReader) openTLSMaterial(ctx context.Context, datasourceID string) (*database.TLSMaterial, error) {
-	var row struct {
-		ID         string
-		Ciphertext []byte
-		Nonce      []byte
-		KeyID      *string
-		Algorithm  *string
-		Verify     bool
-		ServerName *string
-	}
-	err := r.DB.WithContext(ctx).Raw(`
-		select id::text as id, material_ciphertext as ciphertext, material_nonce as nonce,
-		       material_key_id as key_id, material_algorithm as algorithm,
-		       verify_server as verify, server_name
-		from datasource_tls_materials where datasource_id = ? limit 1`, datasourceID).Scan(&row).Error
-	if err != nil || row.ID == "" || row.KeyID == nil {
-		return nil, err
-	}
-	alg := "aes-256-gcm"
-	if row.Algorithm != nil && *row.Algorithm != "" {
-		alg = *row.Algorithm
-	}
-	plain, err := r.Crypter.Open(crypto.PurposePayload, crypto.Envelope{
-		Ciphertext: row.Ciphertext, Nonce: row.Nonce, KeyID: *row.KeyID, Algorithm: alg,
-	}, crypto.AAD{
-		DeploymentID: r.Crypter.DeploymentID(),
-		Table:        "datasource_tls_materials", PrimaryKey: row.ID,
-		Column: "material", Purpose: "datasource_tls",
-	})
-	if err != nil {
-		return nil, err
-	}
-	mat := &database.TLSMaterial{VerifyServer: row.Verify}
-	if row.ServerName != nil {
-		mat.ServerName = *row.ServerName
-	}
-	var certs [][]byte
-	rest := plain
-	for {
-		var blk *pem.Block
-		blk, rest = pem.Decode(rest)
-		if blk == nil {
-			break
-		}
-		switch {
-		case blk.Type == "CERTIFICATE":
-			certs = append(certs, pem.EncodeToMemory(blk))
-		case strings.HasSuffix(blk.Type, "PRIVATE KEY"):
-			mat.KeyPEM = append(mat.KeyPEM, pem.EncodeToMemory(blk)...)
-		}
-	}
-	if len(mat.KeyPEM) > 0 && len(certs) > 0 {
-		mat.CertPEM = certs[len(certs)-1]
-		for _, c := range certs[:len(certs)-1] {
-			mat.CAPEM = append(mat.CAPEM, c...)
-		}
-	} else {
-		for _, c := range certs {
-			mat.CAPEM = append(mat.CAPEM, c...)
-		}
-	}
-	return mat, nil
+	return datasource.ResolveTLSMaterial(ctx, r.DB, r.Crypter, datasourceID)
 }

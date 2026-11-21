@@ -30,15 +30,6 @@ vi.mock("@/features/review/sql-editor-panel", () => ({
   }) => (
     <textarea data-testid={testId ?? "sql-editor-stub"} readOnly value={value} onChange={() => {}} />
   ),
-  SqlReadOnlyViewer: ({
-    value,
-    "data-testid": testId,
-  }: {
-    value: string;
-    "data-testid"?: string;
-  }) => (
-    <pre data-testid={testId ?? "sql-readonly-stub"}>{value}</pre>
-  ),
 }));
 
 /**

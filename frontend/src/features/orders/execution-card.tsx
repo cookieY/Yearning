@@ -28,7 +28,9 @@ import {
 } from "@/features/orders/use-execution";
 import { useCopyOrderToDraft } from "@/features/orders/use-orders";
 import { useSession } from "@/features/auth/session-provider";
+import { listCurrentUserFlows } from "@/api/generated/client/change-drafts/change-drafts";
 import { describeError } from "@/shared/api/error-display";
+import { unwrapApi } from "@/shared/api/mutator";
 import { appToast } from "@/shared/components/shadcn-dashboard/sonner/sonner-08";
 import { PendingButton } from "@/shared/components/pending-button";
 import { ErrorState } from "@/shared/components/status/status-components";
@@ -995,12 +997,10 @@ function CopyDraftCard({ order }: { order: ChangeOrder }) {
     if (flowsLoaded) return;
     setFlowsPending(true);
     try {
-      const { listCurrentUserFlows } = await import("@/api/generated/client/change-drafts/change-drafts");
-      const page = (await listCurrentUserFlows({ flow_type: "change_review" })) as unknown as {
-        items: Array<{ id: string; name: string }>;
-      };
-      setFlows(page.items);
-      setFlowId(page.items[0]?.id ?? "");
+      const page = await unwrapApi(listCurrentUserFlows({ flow_type: "change_review" }));
+      const flowList = page.items.map((item) => ({ id: item.id, name: item.name }));
+      setFlows(flowList);
+      setFlowId(flowList[0]?.id ?? "");
       setFlowsLoaded(true);
     } catch {
       setFlows([]);
@@ -1014,9 +1014,8 @@ function CopyDraftCard({ order }: { order: ChangeOrder }) {
       { target_flow_id: flowId, title: title.trim() },
       {
         onSuccess: (draft) => {
-          const draftId = (draft as unknown as { id: string }).id;
           appToast.success(t("common.createdToast"), { description: title.trim() });
-          void navigate(`/changes/drafts/${draftId}`);
+          void navigate(`/changes/drafts/${draft.id}`);
         },
         onError: (mutationError) => {
           const display = describeError(mutationError, "copyChangeOrderToDraft");

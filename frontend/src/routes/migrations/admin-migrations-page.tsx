@@ -1,9 +1,8 @@
-import i18next from "@/shared/i18n";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { CircleCheck, CircleDashed, DatabaseZap, ShieldAlert } from "lucide-react";
 import type { LegacyMigrationCandidate, LegacyMigrationRun } from "@/api/generated/client/yearningV4HTTPAPI.schemas";
-import { describeError } from "@/shared/api/error-display";
+import { describeError, describeErrorText } from "@/shared/api/error-display";
 import { appToast } from "@/shared/components/shadcn-dashboard/sonner/sonner-08";
 import { useCursorPage } from "@/shared/lib/cursor-page";
 import { formatTimestamp } from "@/shared/lib/timezones";
@@ -36,12 +35,6 @@ import { useApproveMigrationRun, useConfirmMigrationCandidate, useMigrationRuns 
  * starts Apply — only the offline migration command may (M001). The
  * approval section says so explicitly.
  */
-
-function describeErrorText(display: { messageKey: string; requestId: string | null }): string {
-  // Translated through the shared i18n bundle so users never see raw keys.
-  const text = i18next.t(display.messageKey);
-  return display.requestId === null ? text : `${text} (${display.requestId})`;
-}
 
 export default function AdminMigrationsPage() {
   const { t } = useTranslation();

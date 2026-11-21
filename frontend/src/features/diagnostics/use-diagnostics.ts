@@ -13,29 +13,19 @@ import { listCurrentUserFlows } from "@/api/generated/client/change-drafts/chang
 import type {
   ConfirmDiagnosticOrderLinkRequest,
   DiagnoseStatementWithAiRequest,
-  DiagnosticAiReport,
-  DiagnosticDatasourceSummary,
-  DiagnosticOrderLink,
-  DiagnosticStatementDetail,
-  DiagnosticsOverview,
-  Flow,
   GetDiagnosticsOverviewParams,
   PrecheckDiagnosticOptimizationDraftRequest,
-  PrecheckDiagnosticOptimizationDraftResponse,
   SubmitDiagnosticOptimizationOrderRequest,
-  SubmitDiagnosticOptimizationOrderResponse,
-  TriggerManualDiagnosticsSnapshotResponse,
 } from "@/api/generated/client/yearningV4HTTPAPI.schemas";
+import { unwrapApi } from "@/shared/api/mutator";
 import { randomUUID } from "@/shared/lib/uuid";
 
 export function useDiagnosticDatasources(enabled: boolean) {
   return useQuery({
     queryKey: ["admin", "diagnostics", "datasources"],
     queryFn: async () => {
-      const response = (await listDiagnosticDatasources()) as unknown as {
-        items?: DiagnosticDatasourceSummary[];
-      };
-      return response.items ?? [];
+      const response = await unwrapApi(listDiagnosticDatasources());
+      return response.items;
     },
     enabled,
   });
@@ -61,15 +51,14 @@ export function useDiagnosticsOverview(
       apiParams.sort_by ?? "total_exec_time_ms",
       apiParams.limit ?? 200,
     ],
-    queryFn: async () => {
+    queryFn: () => {
       const effectiveParams: GetDiagnosticsOverviewParams = { ...apiParams };
       if (!effectiveParams.from && !effectiveParams.to && rangeMinutes !== 60) {
         const now = Date.now();
         effectiveParams.to = new Date(now).toISOString();
         effectiveParams.from = new Date(now - rangeMinutes * 60_000).toISOString();
       }
-      const response = await getDiagnosticsOverview(datasourceId, effectiveParams);
-      return response as unknown as DiagnosticsOverview;
+      return unwrapApi(getDiagnosticsOverview(datasourceId, effectiveParams));
     },
     placeholderData: keepPreviousData,
     enabled: enabled && datasourceId !== "",
@@ -79,10 +68,8 @@ export function useDiagnosticsOverview(
 export function useTriggerManualDiagnosticsSnapshot() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (datasourceId: string) => {
-      const response = await triggerManualDiagnosticsSnapshot(datasourceId);
-      return response as unknown as TriggerManualDiagnosticsSnapshotResponse;
-    },
+    mutationFn: (datasourceId: string) =>
+      unwrapApi(triggerManualDiagnosticsSnapshot(datasourceId)),
     onSuccess: (_data, datasourceId) => {
       void queryClient.invalidateQueries({
         queryKey: ["admin", "diagnostics", datasourceId],
@@ -110,14 +97,10 @@ export function useDiagnosticStatementDetail(
       params.from ?? "",
       params.to ?? "",
     ],
-    queryFn: async () => {
-      const response = await getDiagnosticStatementDetail(
-        datasourceId,
-        statementId ?? "",
-        params,
-      );
-      return response as unknown as DiagnosticStatementDetail;
-    },
+    queryFn: () =>
+      unwrapApi(
+        getDiagnosticStatementDetail(datasourceId, statementId ?? "", params),
+      ),
     enabled: enabled && datasourceId !== "" && statementId !== null && statementId !== "",
   });
 }
@@ -125,18 +108,14 @@ export function useDiagnosticStatementDetail(
 export function useConfirmDiagnosticOrderLink() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (input: {
+    mutationFn: (input: {
       datasourceId: string;
       statementId: string;
       body: ConfirmDiagnosticOrderLinkRequest;
-    }) => {
-      const response = await confirmDiagnosticOrderLink(
-        input.datasourceId,
-        input.statementId,
-        input.body,
-      );
-      return response as unknown as DiagnosticOrderLink;
-    },
+    }) =>
+      unwrapApi(
+        confirmDiagnosticOrderLink(input.datasourceId, input.statementId, input.body),
+      ),
     onSuccess: (_data, variables) => {
       void queryClient.invalidateQueries({
         queryKey: ["admin", "diagnostics", variables.datasourceId, "statements", variables.statementId],
@@ -148,18 +127,14 @@ export function useConfirmDiagnosticOrderLink() {
 export function useDiagnoseStatementWithAi() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (input: {
+    mutationFn: (input: {
       datasourceId: string;
       statementId: string;
       body?: DiagnoseStatementWithAiRequest;
-    }) => {
-      const response = await diagnoseStatementWithAi(
-        input.datasourceId,
-        input.statementId,
-        input.body ?? {},
-      );
-      return response as unknown as DiagnosticAiReport;
-    },
+    }) =>
+      unwrapApi(
+        diagnoseStatementWithAi(input.datasourceId, input.statementId, input.body ?? {}),
+      ),
     onSuccess: (_data, variables) => {
       void queryClient.invalidateQueries({
         queryKey: ["admin", "diagnostics", variables.datasourceId, "statements", variables.statementId],
@@ -171,24 +146,19 @@ export function useDiagnoseStatementWithAi() {
 export function usePrecheckDiagnosticOptimizationDraft() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (input: {
+    mutationFn: (input: {
       datasourceId: string;
       statementId: string;
       reportId: string;
       body: PrecheckDiagnosticOptimizationDraftRequest;
-    }) => {
-      const response = await precheckDiagnosticOptimizationDraft(
-        input.datasourceId,
-        input.reportId,
-        input.body,
-        {
+    }) =>
+      unwrapApi(
+        precheckDiagnosticOptimizationDraft(input.datasourceId, input.reportId, input.body, {
           headers: {
             "Idempotency-Key": `diag-precheck-${randomUUID()}`,
           },
-        },
-      );
-      return response as unknown as PrecheckDiagnosticOptimizationDraftResponse;
-    },
+        }),
+      ),
     onSuccess: (_data, variables) => {
       void queryClient.invalidateQueries({
         queryKey: ["admin", "diagnostics", variables.datasourceId, "statements", variables.statementId],
@@ -200,24 +170,19 @@ export function usePrecheckDiagnosticOptimizationDraft() {
 export function useSubmitDiagnosticOptimizationOrder() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (input: {
+    mutationFn: (input: {
       datasourceId: string;
       statementId: string;
       reportId: string;
       body: SubmitDiagnosticOptimizationOrderRequest;
-    }) => {
-      const response = await submitDiagnosticOptimizationOrder(
-        input.datasourceId,
-        input.reportId,
-        input.body,
-        {
+    }) =>
+      unwrapApi(
+        submitDiagnosticOptimizationOrder(input.datasourceId, input.reportId, input.body, {
           headers: {
             "Idempotency-Key": `diag-order-${randomUUID()}`,
           },
-        },
-      );
-      return response as unknown as SubmitDiagnosticOptimizationOrderResponse;
-    },
+        }),
+      ),
     onSuccess: (_data, variables) => {
       void queryClient.invalidateQueries({
         queryKey: ["admin", "diagnostics", variables.datasourceId, "statements", variables.statementId],
@@ -231,10 +196,8 @@ export function useDiagnosticChangeFlows(enabled: boolean) {
   return useQuery({
     queryKey: ["current-user-flows", "diagnostics-change-review"],
     queryFn: async () => {
-      const page = (await listCurrentUserFlows({ flow_type: "change_review" })) as unknown as {
-        items?: Flow[];
-      };
-      return page.items ?? [];
+      const page = await unwrapApi(listCurrentUserFlows({ flow_type: "change_review" }));
+      return page.items;
     },
     enabled,
   });

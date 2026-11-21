@@ -13,18 +13,6 @@ import type {
 
 import { customInstance } from '../../../../shared/api/mutator';
 
-export type getTaskResponse200 = {
-  data: GetTask200
-  status: 200
-}
-
-export type getTaskResponseSuccess = (getTaskResponse200) & {
-  headers: Headers;
-};
-;
-
-export type getTaskResponse = (getTaskResponseSuccess)
-
 export const getGetTaskUrl = (taskId: string,) => {
 
 
@@ -33,9 +21,9 @@ export const getGetTaskUrl = (taskId: string,) => {
   return `/api/v4/tasks/${taskId}`
 }
 
-export const getTask = async (taskId: string, options?: Parameters<typeof customInstance>[1]): Promise<getTaskResponse> => {
+export const getTask = async (taskId: string, options?: Parameters<typeof customInstance>[1]): Promise<GetTask200> => {
 
-  return customInstance<getTaskResponse>(getGetTaskUrl(taskId),
+  return customInstance<GetTask200>(getGetTaskUrl(taskId),
   {
     ...options,
     method: 'GET'

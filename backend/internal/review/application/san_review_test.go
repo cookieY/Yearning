@@ -116,19 +116,19 @@ func TestBuildSANStageRequest_CompactPromptTruncationAndQualifiedObjects(t *test
 	}
 
 	var cached []provider.AnonymizedGroup
-	req, err := buildSANStageRequest(
-		ctx, nil, nil, runID,
-		frozenDatasourceTarget{
+	req, err := buildSANStageRequest(ctx, stagePromptRequest{
+		runID: runID,
+		target: frozenDatasourceTarget{
 			DatasourceID:      "ds-1",
 			Engine:            "mysql",
 			CompatibilityMode: "mysql",
 			ServerVersion:     "8.0.36",
 		},
-		groups,
-		policyObjects,
-		skills,
-		entries,
-		[]provider.NormalizedEvidenceRef{
+		groups:        groups,
+		policyObjects: policyObjects,
+		rawSkills:     skills,
+		rawKnowledge:  entries,
+		sanEvidence: []provider.NormalizedEvidenceRef{
 			{
 				EvidenceID: "ev-1",
 				FactKind:   "table_statistics",
@@ -138,13 +138,12 @@ func TestBuildSANStageRequest_CompactPromptTruncationAndQualifiedObjects(t *test
 				},
 			},
 		},
-		mapper,
-		"zh-CN",
-		true,
-		false,
-		true,
-		&cached,
-	)
+		runMapper:          mapper,
+		outputLocale:       "zh-CN",
+		evidenceIncomplete: true,
+		schemaPending:      true,
+		cachedSANGroups:    &cached,
+	})
 	if err != nil {
 		t.Fatalf("buildSANStageRequest failed: %v", err)
 	}
@@ -185,11 +184,15 @@ func TestBuildSANStageRequest_CompactPromptTruncationAndQualifiedObjects(t *test
 	}
 	// Cached SAN groups reuse on second call without needing resolver again.
 	ctxMissing := context.Background()
-	req2, err := buildSANStageRequest(
-		ctxMissing, nil, nil, runID,
-		frozenDatasourceTarget{DatasourceID: "ds-1", Engine: "mysql", CompatibilityMode: "mysql", ServerVersion: "8.0.36"},
-		groups, policyObjects, nil, nil, nil, mapper, "en-US", false, false, false, &cached,
-	)
+	req2, err := buildSANStageRequest(ctxMissing, stagePromptRequest{
+		runID:           runID,
+		target:          frozenDatasourceTarget{DatasourceID: "ds-1", Engine: "mysql", CompatibilityMode: "mysql", ServerVersion: "8.0.36"},
+		groups:          groups,
+		policyObjects:   policyObjects,
+		runMapper:       mapper,
+		outputLocale:    "en-US",
+		cachedSANGroups: &cached,
+	})
 	if err != nil {
 		t.Fatalf("cached buildSANStageRequest failed: %v", err)
 	}
@@ -391,11 +394,14 @@ func TestMixedProfileChainFallback_ZeroRawLeakToDefaultEndpoint(t *testing.T) {
 	var cached []provider.AnonymizedGroup
 	res, err := chain.ReviewStructuredPerEndpoint(ctx, func(reqCtx context.Context, ep provider.Endpoint) (provider.Request, error) {
 		if endpointIsSAN(ep) {
-			return buildSANStageRequest(
-				reqCtx, nil, nil, runID,
-				frozenDatasourceTarget{DatasourceID: "ds-1", Engine: "mysql", CompatibilityMode: "mysql", ServerVersion: "8.0.36"},
-				groups, nil, nil, nil, nil, mapper, "en-US", false, false, false, &cached,
-			)
+			return buildSANStageRequest(reqCtx, stagePromptRequest{
+				runID:           runID,
+				target:          frozenDatasourceTarget{DatasourceID: "ds-1", Engine: "mysql", CompatibilityMode: "mysql", ServerVersion: "8.0.36"},
+				groups:          groups,
+				runMapper:       mapper,
+				outputLocale:    "en-US",
+				cachedSANGroups: &cached,
+			})
 		}
 		return agent.BuildRequest(runID, agent.ContextInput{
 			EngineProfile:    "mysql/mysql",
@@ -539,22 +545,24 @@ func TestSANReviewHelpers_UnitEdgeCases(t *testing.T) {
 	ctxOK := withRepresentativeSQLResolver(ctx, func(string, string) (string, bool, error) {
 		return "SELECT id FROM shop.orders;", true, nil
 	})
-	if _, err := buildSANStageRequest(
-		ctxOK, nil, nil, "run-1",
-		frozenDatasourceTarget{Engine: "mysql", CompatibilityMode: "mysql", ServerVersion: "8.0.36"},
-		groups, nil,
-		[]agent.SkillInjection{{FindingKey: "sk.bad", KnowledgeText: `Bad {{ref:schema:["shop"]`}},
-		nil, nil, mapper, "en-US", false, false, false, nil,
-	); !errors.Is(err, domain.ErrCoverageIncomplete) {
+	if _, err := buildSANStageRequest(ctxOK, stagePromptRequest{
+		runID:        "run-1",
+		target:       frozenDatasourceTarget{Engine: "mysql", CompatibilityMode: "mysql", ServerVersion: "8.0.36"},
+		groups:       groups,
+		rawSkills:    []agent.SkillInjection{{FindingKey: "sk.bad", KnowledgeText: `Bad {{ref:schema:["shop"]`}},
+		runMapper:    mapper,
+		outputLocale: "en-US",
+	}); !errors.Is(err, domain.ErrCoverageIncomplete) {
 		t.Fatalf("expected invalid skill reference in SAN stage build to return ErrCoverageIncomplete, got %v", err)
 	}
-	if _, err := buildSANStageRequest(
-		ctxOK, nil, nil, "run-1",
-		frozenDatasourceTarget{Engine: "mysql", CompatibilityMode: "mysql", ServerVersion: "8.0.36"},
-		groups, nil, nil,
-		[]*knowledge.Entry{nil, {FindingKey: "kb.bad", Definition: knowledge.Definition{KnowledgeText: `Bad {{ref:table:["shop"]}}`}}},
-		nil, mapper, "en-US", false, false, false, nil,
-	); !errors.Is(err, domain.ErrCoverageIncomplete) {
+	if _, err := buildSANStageRequest(ctxOK, stagePromptRequest{
+		runID:        "run-1",
+		target:       frozenDatasourceTarget{Engine: "mysql", CompatibilityMode: "mysql", ServerVersion: "8.0.36"},
+		groups:       groups,
+		rawKnowledge: []*knowledge.Entry{nil, {FindingKey: "kb.bad", Definition: knowledge.Definition{KnowledgeText: `Bad {{ref:table:["shop"]}}`}}},
+		runMapper:    mapper,
+		outputLocale: "en-US",
+	}); !errors.Is(err, domain.ErrCoverageIncomplete) {
 		t.Fatalf("expected invalid knowledge reference in SAN stage build to return ErrCoverageIncomplete, got %v", err)
 	}
 

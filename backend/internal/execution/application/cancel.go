@@ -61,20 +61,28 @@ func (s *Services) Cancel(ctx context.Context, in CancelInput, runnerCancel func
 		return &v, true, nil
 	}
 	var out *AttemptView
+	var triggerCancel bool
 	txErr := s.serializable(ctx, func(tx *gorm.DB) error {
-		v, cerr := s.cancelOnce(ctx, tx, in, runnerCancel)
+		triggerCancel = false
+		v, startedCancel, cerr := s.cancelOnce(ctx, tx, in)
 		if cerr != nil {
 			return cerr
 		}
 		out = v
+		triggerCancel = startedCancel
 		return nil
 	})
 	if txErr != nil {
-		var de *domain.Error
-		if errors.As(txErr, &de) {
-			_ = s.idemRelease(ctx, in.Actor.UserID, route, in.AttemptID, in.IdempotencyKey)
-		}
+		_ = s.idemRelease(ctx, in.Actor.UserID, route, in.AttemptID, in.IdempotencyKey)
 		return nil, false, txErr
+	}
+	// Trigger in-process driver/context cancellation and start watchdog only after transaction commit
+	// so rolled-back 40001 retries never abort live DB execution or leak duplicate watchdogs.
+	if triggerCancel {
+		if runnerCancel != nil {
+			runnerCancel(in.AttemptID)
+		}
+		go s.cancelWatchdog(context.WithoutCancel(ctx), in.AttemptID, s.cancelWatchdogDelay())
 	}
 	raw, merr := json.Marshal(out)
 	if merr != nil {
@@ -86,39 +94,41 @@ func (s *Services) Cancel(ctx context.Context, in CancelInput, runnerCancel func
 	return out, false, nil
 }
 
-// cancelOnce marks the Attempt as cancelling and triggers in-process cancellation; terminal state is persisted by the Runner.
-func (s *Services) cancelOnce(ctx context.Context, tx *gorm.DB, in CancelInput,
-	runnerCancel func(string) bool) (*AttemptView, error) {
+// cancelOnce marks the Attempt as cancelling and returns true when a new cancellation was initiated;
+// terminal state is persisted by the Runner or timeout sweep.
+func (s *Services) cancelOnce(ctx context.Context, tx *gorm.DB, in CancelInput) (*AttemptView, bool, error) {
 	at, err := s.loadAttemptForUpdate(ctx, tx, in.AttemptID)
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
 	if at.OrderID != in.OrderID {
-		return nil, domain.ErrNotFound()
+		return nil, false, domain.ErrNotFound()
 	}
 	if !s.isFrozenExecutor(ctx, tx, at.StageID, in.Actor.UserID) {
-		return nil, domain.ErrNotFrozen()
+		return nil, false, domain.ErrNotFrozen()
 	}
 	if domain.AttemptState(at.State).Terminal() {
 		// Idempotent: already in a terminal state, return view directly (cancelled/unknown/failed cannot be cancelled again).
-		return s.buildAttemptView(ctx, tx, at.ID)
+		v, berr := s.buildAttemptView(ctx, tx, at.ID)
+		return v, false, berr
 	}
 	if in.ExpectVersion != at.Version {
-		return nil, domain.ErrConcurrent()
+		return nil, false, domain.ErrConcurrent()
 	}
 	if at.State == string(domain.AttemptCancelling) {
 		// Already cancelling: return idempotently (waiting for Runner terminal state).
-		return s.buildAttemptView(ctx, tx, at.ID)
+		v, berr := s.buildAttemptView(ctx, tx, at.ID)
+		return v, false, berr
 	}
 	if at.State != string(domain.AttemptRunning) {
-		return nil, domain.ErrIllegal()
+		return nil, false, domain.ErrIllegal()
 	}
 	// Set cancelling (both Runner inter-statement checks and watchCancel trigger driver cancellation;
-	// the in-process handle is triggered directly for immediate effect).
+	// the in-process handle is triggered by Cancel right after commit for immediate effect).
 	if err := s.updateAttemptVersioned(ctx, tx, at, at.Version, map[string]any{
 		"state": string(domain.AttemptCancelling), "version": at.Version + 1,
 	}); err != nil {
-		return nil, err
+		return nil, false, err
 	}
 	// Record cancellation reason in audit log (audit surface outside domain_events; excluded from domain event payload).
 	if rerr := s.Recorder.Audit(ctx, tx, auditlog.AuditInput{
@@ -128,19 +138,13 @@ func (s *Services) cancelOnce(ctx context.Context, tx *gorm.DB, in CancelInput,
 		Action: "cancel", Outcome: "succeeded",
 		Metadata: map[string]any{"reason": in.Reason},
 	}); rerr != nil {
-		return nil, rerr
+		return nil, false, rerr
 	}
-	if runnerCancel != nil {
-		runnerCancel(at.ID)
+	v, berr := s.buildAttemptView(ctx, tx, at.ID)
+	if berr != nil {
+		return nil, false, berr
 	}
-	// 30s watchdog (timer starts at this cancellation request): if still cancelling when the timer
-	// fires, adjudicate by send boundary (not_started -> cancelled / crossed boundary -> result_unknown
-	// manual verification). Paths where the watchdog is unreachable (process death / ineffective
-	// cancellation) are backed by lease-expiry reconciliation: heartbeat does not renew cancelling
-	// rows (run.go heartbeatLoop), and withdraw linkage writes a 30s bounded lease when entering
-	// cancelling — once the lease expires, it falls into the sweep adjudication below.
-	go s.cancelWatchdog(context.WithoutCancel(ctx), at.ID, s.cancelWatchdogDelay())
-	return s.buildAttemptView(ctx, tx, at.ID)
+	return v, true, nil
 }
 
 // cancelWatchdog adjudicates cancellation timeout (PRD §11: wait 30s for confirmation).
@@ -150,47 +154,7 @@ func (s *Services) cancelWatchdog(ctx context.Context, attemptID string, delay t
 		return
 	case <-time.After(delay):
 	}
-	_ = s.serializable(ctx, func(tx *gorm.DB) error {
-		at, err := s.loadAttemptForUpdate(ctx, tx, attemptID)
-		if err != nil || at.State != string(domain.AttemptCancelling) {
-			return nil
-		}
-		order, err := s.lockOrder(ctx, tx, at.OrderID)
-		if err != nil {
-			return err
-		}
-		stage, err := s.loadOrderStage(ctx, tx, at.OrderID)
-		if err != nil {
-			return err
-		}
-		actor := Actor{UserID: at.InitiatedByUserID, Username: at.InitiatedByUsername}
-		now := nowUTC()
-		if domain.SendBoundary(at.SendBoundary) == domain.BoundaryNotStarted {
-			code := int(domain.CodeIllegalTransition)
-			name := "EXECUTION_CANCELLED"
-			if err := s.updateAttemptVersioned(ctx, tx, at, at.Version, map[string]any{
-				"state": string(domain.AttemptCancelled), "finished_at": now,
-				"business_err_code": &code, "failure_name": &name,
-				"lease_owner": nil, "lease_expires_at": nil, "version": at.Version + 1,
-			}); err != nil {
-				return err
-			}
-			if err := s.touchStageLocked(ctx, tx, at.StageID, string(orderdomain.StageCancelled)); err != nil {
-				return err
-			}
-			if orderdomain.OrderState(order.State) == orderdomain.StateRunning {
-				next, terr := orderdomain.OrderTransition(orderdomain.StateRunning, orderdomain.EventCancelledWithoutPartial)
-				if terr != nil {
-					return domain.ErrIllegal()
-				}
-				return s.updateOrderVersionedRaw(ctx, tx, order.ID, order.Version, map[string]any{
-					"state": string(next), "version": order.Version + 1, "terminal_at": now,
-				})
-			}
-			return nil
-		}
-		return s.markResultUnknown(ctx, tx, at, "CANCEL_NOT_CONFIRMED", actor, order, stage)
-	})
+	_ = s.sweepCancelOne(ctx, attemptID)
 }
 
 // SweepCancelTimeouts sweeps cancelling Attempts unconfirmed after 30 seconds:
@@ -264,6 +228,9 @@ func (s *Services) sweepCancelOne(ctx context.Context, attemptID string) error {
 				if err := s.updateOrderVersionedRaw(ctx, tx, order.ID, order.Version, map[string]any{
 					"state": string(next), "version": order.Version + 1, "terminal_at": now,
 				}); err != nil {
+					return err
+				}
+				if err := s.syncSourceOrderRollbackOnOrderTransitionTx(ctx, tx, order, next, now); err != nil {
 					return err
 				}
 			}

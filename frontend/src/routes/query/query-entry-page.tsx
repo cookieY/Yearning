@@ -1,4 +1,3 @@
-import i18next from "@/shared/i18n";
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router";
@@ -6,7 +5,11 @@ import { appToast as toast } from "@/shared/components/shadcn-dashboard/sonner/s
 import { Ban, CalendarClock, ChevronRight, Clock, Database, FilePlus2 } from "lucide-react";
 import type { Flow, QueryAccessRequest, QueryGrant } from "@/api/generated/client/yearningV4HTTPAPI.schemas";
 import { useSession } from "@/features/auth/session-provider";
-import { describeError, businessErrCodeByName } from "@/shared/api/error-display";
+import {
+  businessErrCodeByName,
+  describeError,
+  describeErrorText,
+} from "@/shared/api/error-display";
 import { BusinessError } from "@/shared/api/mutator";
 import { ErrorState } from "@/shared/components/status/status-components";
 import { LoadingState } from "@/shared/components/status/loading-state";
@@ -585,10 +588,4 @@ function AccessRequestDialog({ flow, onClose }: { flow: Flow | null; onClose: ()
       </DialogContent>
     </Dialog>
   );
-}
-
-function describeErrorText(display: { messageKey: string; requestId: string | null }): string {
-  // Translated through the shared i18n bundle so users never see raw keys.
-  const text = i18next.t(display.messageKey);
-  return display.requestId === null ? text : `${text} (${display.requestId})`;
 }

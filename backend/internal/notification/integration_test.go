@@ -369,7 +369,7 @@ func TestSuppressionPerRecipient(t *testing.T) {
 		on conflict (id) do update set email = 'newappr@test.local'`, newApprover)
 	db.Exec(`update notification_deliveries set recipient_key = 'user:' || ?::text where recipient_user_id = ?::uuid`,
 		oldApprover, oldApprover)
-	db.Exec(`update notification_deliveries set state = 'failed', delivery_attempt_count = 1, next_attempt_at = now()`)
+	db.Exec(`update notification_deliveries set state = 'failed', delivery_attempt_count = 1, next_attempt_at = now() - interval '1 minute'`)
 	worker.Tick(ctx)
 	db.Raw(`select count(*) from notification_deliveries`).Scan(&total)
 	if total != 0 {
@@ -504,7 +504,7 @@ func TestNotificationSuppression(t *testing.T) {
 	// Todo already handled (step left active state) -> suppress before sending.
 	db.Exec(`update order_approval_steps set state = 'approved', decided_at = now() where id = ?`, stepID)
 	// Make the delivery claimable (queued -> sending is handled by Tick; set to failed with an expired retry timestamp).
-	db.Exec(`update notification_deliveries set state = 'failed', delivery_attempt_count = 1, next_attempt_at = now()`)
+	db.Exec(`update notification_deliveries set state = 'failed', delivery_attempt_count = 1, next_attempt_at = now() - interval '1 minute'`)
 	worker.Tick(ctx)
 	db.Raw(`select count(*) from notification_deliveries`).Scan(&total)
 	if total != 0 {
@@ -615,6 +615,83 @@ func TestNotificationCustomTemplateAndPreview(t *testing.T) {
 	}
 	if !strings.Contains(msgs[0], "OrderID="+orderID) || !strings.Contains(msgs[0], "Reviewer=supuser") {
 		t.Fatalf("delivered SMTP payload did not render custom template: %q", msgs[0])
+	}
+}
+
+func TestNotificationFlowAndStageNameSnapshotAndFallback(t *testing.T) {
+	db, ns, worker := newTestService(t)
+	ctx := context.Background()
+	chID, err := createDingtalkChannel(ctx, ns, "it-flow-name-"+uniqueSuffix())
+	if err != nil {
+		t.Fatalf("createChannel: %v", err)
+	}
+
+	orderID := "33333333-3333-4333-8333-333333334444"
+	seedUserAndOrder(t, db, orderID)
+	seedApprovalStepActive(t, db, orderID, "88888888-8888-4888-8888-888888888888")
+
+	flowID := "55555555-5555-4555-8555-555555555551"
+	ruleSetID := "66666666-6666-4666-8666-666666666661"
+	flowNameFallback := "legacy-lookup-flow-" + uniqueSuffix()
+	now := time.Now().UTC()
+	if err := db.Exec(`insert into flows (id, name, flow_type, status, rule_set_id, version, created_by_user_id, created_at, updated_at)
+		values (?, ?, 'change_review', 'enabled', ?, 1, '44444444-4444-4444-8444-444444444444', ?, ?)
+		on conflict (id) do update set name = excluded.name`, flowID, flowNameFallback, ruleSetID, now, now).Error; err != nil {
+		t.Fatalf("seed flow: %v", err)
+	}
+	t.Cleanup(func() {
+		_ = db.Exec(`delete from flows where id = ?`, flowID).Error
+	})
+
+	sealSnapshot := func(payload string) {
+		env, serr := worker.crypter.Seal(crypto.PurposePayload, []byte(payload), crypto.AAD{
+			DeploymentID: worker.crypter.DeploymentID(),
+			Table:        "order_flow_snapshots",
+			PrimaryKey:   orderID,
+			Column:       "flow_snapshot_ciphertext",
+			Purpose:      crypto.PurposePayload,
+		})
+		if serr != nil {
+			t.Fatalf("seal flow snapshot: %v", serr)
+		}
+		if err := db.Exec(`insert into order_flow_snapshots (
+				order_id, flow_snapshot_ciphertext, flow_snapshot_nonce,
+				flow_snapshot_key_id, flow_snapshot_algorithm, snapshot_hash, created_at
+			) values (?, ?, ?, ?, ?, repeat('e', 64), ?)
+			on conflict (order_id) do update set
+				flow_snapshot_ciphertext = excluded.flow_snapshot_ciphertext,
+				flow_snapshot_nonce = excluded.flow_snapshot_nonce,
+				flow_snapshot_key_id = excluded.flow_snapshot_key_id`,
+			orderID, env.Ciphertext, env.Nonce, env.KeyID, env.Algorithm, now).Error; err != nil {
+			t.Fatalf("upsert order_flow_snapshots: %v", err)
+		}
+	}
+
+	tpl := "Flow={{flow_name}} Stage={{stage_name}}"
+	// Case 1: new snapshot with explicit flow_name and stages[].name.
+	sealSnapshot(fmt.Sprintf(`{"flow_id":%q,"flow_name":"release-prod-flow","stages":[{"position":1,"name":"stage-canary-mysql"}]}`, flowID))
+	p1, err := ns.PreviewRule(ctx, &RulePreviewInput{
+		Rule:          RuleWrite{Name: "p1", Enabled: true, EventType: "change_order.submitted", TargetKind: TargetSubmitter, ChannelID: chID, MessageTemplate: &tpl},
+		SampleOrderID: orderID,
+	})
+	if err != nil {
+		t.Fatalf("PreviewRule new snapshot: %v", err)
+	}
+	if !strings.Contains(p1.Message, "Flow=release-prod-flow Stage=stage-canary-mysql") {
+		t.Fatalf("expected snapshot flow/stage names, got %q", p1.Message)
+	}
+
+	// Case 2: legacy snapshot omitting flow_name and stages[].name falls back to flows.name and order_stages.datasource_name_snapshot.
+	sealSnapshot(fmt.Sprintf(`{"flow_id":%q,"stages":[{"position":1}]}`, flowID))
+	p2, err := ns.PreviewRule(ctx, &RulePreviewInput{
+		Rule:          RuleWrite{Name: "p2", Enabled: true, EventType: "change_order.submitted", TargetKind: TargetSubmitter, ChannelID: chID, MessageTemplate: &tpl},
+		SampleOrderID: orderID,
+	})
+	if err != nil {
+		t.Fatalf("PreviewRule legacy fallback: %v", err)
+	}
+	if !strings.Contains(p2.Message, "Flow="+flowNameFallback+" Stage=seed-ds") {
+		t.Fatalf("expected legacy fallback flow/stage names, got %q", p2.Message)
 	}
 }
 

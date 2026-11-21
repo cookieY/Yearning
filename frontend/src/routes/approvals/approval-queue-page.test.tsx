@@ -13,7 +13,7 @@ import {
   seedFixtureOrder,
   type FixtureOrder,
 } from "@/shared/mock/review-fixture";
-import ApprovalQueuePage from "./approval-queue-page";
+import { ApprovalsWorkspacePage } from "./approval-queue-page";
 
 /**
  * Approval queue gates (FE-F7): the queue narrows the relation-scoped read
@@ -105,7 +105,7 @@ function renderQueue() {
       <SessionProvider>
         <MemoryRouter initialEntries={["/approvals/changes"]}>
           <Routes>
-            <Route path="/approvals/changes" element={<ApprovalQueuePage />} />
+            <Route path="/approvals/changes" element={<ApprovalsWorkspacePage />} />
             <Route
               path="/approvals/orders/:orderId"
               element={<p data-testid="order-detail-target" />}

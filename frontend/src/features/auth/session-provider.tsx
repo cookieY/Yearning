@@ -2,7 +2,7 @@ import { createContext, useContext, useEffect, type ReactNode } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { getCurrentUser, logout as logoutRequest } from "@/api/generated/client/authentication/authentication";
 import type { CurrentUser } from "@/api/generated/client/yearningV4HTTPAPI.schemas";
-import { TransportError, SESSION_EXPIRED_EVENT } from "@/shared/api/mutator";
+import { TransportError, SESSION_EXPIRED_EVENT, unwrapApi } from "@/shared/api/mutator";
 import { setSystemTimezone, useSystemTimezone } from "@/shared/lib/timezones";
 
 /**
@@ -50,11 +50,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const sessionQuery = useQuery<CurrentUser | null>({
     queryKey: SESSION_QUERY_KEY,
     queryFn: async () => {
-      // The unified mutator already unwraps err_code=0 to the envelope's
-      // `data`; an HTTP 401 throws a TransportError before any envelope
-      // exists. The generated client types the result as the envelope union,
-      // so the narrow is the sanctioned bridge to the contract type.
-      const current = (await getCurrentUser()) as unknown as CurrentUser;
+      const current = await unwrapApi(getCurrentUser());
       if (typeof current.system_timezone === "string" && current.system_timezone.trim() !== "") {
         setSystemTimezone(current.system_timezone);
       }

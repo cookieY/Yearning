@@ -18,6 +18,7 @@ import { useSession } from "@/features/auth/session-provider";
 import { useCursorPage } from "@/shared/lib/cursor-page";
 import { TablePagination } from "@/shared/components/ui/table-pagination";
 import { describeError } from "@/shared/api/error-display";
+import { unwrapApi } from "@/shared/api/mutator";
 import { appToast } from "@/shared/components/shadcn-dashboard/sonner/sonner-08";
 import { ErrorState } from "@/shared/components/status/status-components";
 import { LoadingState } from "@/shared/components/status/loading-state";
@@ -322,14 +323,16 @@ function ProviderFormDialog({
     if (!canFetchCatalog) return;
     const seq = ++catalogSeq.current;
     const timer = setTimeout(() => {
-      listAiProviderModels({
-        base_url: form.baseUrl.trim(),
-        ...(form.apiKey.trim() !== "" ? { api_key: form.apiKey.trim() } : {}),
-        ...(form.apiKey.trim() === "" && editing !== null ? { provider_id: editing.id } : {}),
-      })
+      void unwrapApi(
+        listAiProviderModels({
+          base_url: form.baseUrl.trim(),
+          ...(form.apiKey.trim() !== "" ? { api_key: form.apiKey.trim() } : {}),
+          ...(form.apiKey.trim() === "" && editing !== null ? { provider_id: editing.id } : {}),
+        }),
+      )
         .then((res) => {
           if (catalogSeq.current !== seq) return;
-          setCatalog({ key: catalogKey, state: "done", items: (res as unknown as { items: string[] }).items });
+          setCatalog({ key: catalogKey, state: "done", items: res.items });
         })
         .catch(() => {
           if (catalogSeq.current !== seq) return;

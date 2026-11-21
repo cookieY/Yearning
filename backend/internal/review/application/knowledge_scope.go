@@ -1,35 +1,11 @@
 package application
 
 import (
-	"context"
-
-	"gorm.io/gorm"
-
 	"github.com/cookieY/YearningX/backend/internal/database"
 	"github.com/cookieY/YearningX/backend/internal/review/knowledge"
-	"github.com/cookieY/YearningX/backend/internal/review/persistence"
 	"github.com/cookieY/YearningX/backend/internal/review/privacy"
 	"github.com/cookieY/YearningX/backend/internal/review/provider"
 )
-
-// knowledgeScopeForStage loads the frozen anonymous object graph and resolves
-// only objects whose physical schema is defensible. The returned completeness
-// flag must make the Stage partial when false; valid prefix matches remain
-// available so observed mandatory rules are not discarded.
-func (r *AgentRunner) knowledgeScopeForStage(
-	ctx context.Context,
-	db *gorm.DB,
-	run *persistence.ReviewRunModel,
-	snap *persistence.StageReviewSnapshotModel,
-	binding *stageSchemaBinding,
-	mapper *privacy.RunMapper,
-) (knowledge.TouchedObjects, bool, error) {
-	groups, err := r.stageGroups(ctx, db, run.ID, snap.DatasourceID)
-	if err != nil {
-		return knowledge.TouchedObjects{}, false, err
-	}
-	return resolveKnowledgeScope(snap.DatasourceID, groups, binding, mapper)
-}
 
 // resolveKnowledgeScope is the pure identity resolver used by the freeze path
 // and focused tests. Grouping objects are the persisted SQL object graph, not

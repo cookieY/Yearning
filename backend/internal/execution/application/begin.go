@@ -167,9 +167,9 @@ func (s *Services) Begin(ctx context.Context, in BeginInput) (view *AttemptView,
 		return nil
 	})
 	if txErr != nil {
+		_ = s.idemRelease(ctx, in.Actor.UserID, route, in.OrderID, in.IdempotencyKey)
 		var de *domain.Error
 		if errors.As(txErr, &de) {
-			_ = s.idemRelease(ctx, in.Actor.UserID, route, in.OrderID, in.IdempotencyKey)
 			// Previously, preflight failures left no trace (no Attempt, no audit), making diagnosis
 			// impossible for both executors and admins (BUG-006); record an audit event here.
 			if de.Code == domain.CodePreflightFailed {

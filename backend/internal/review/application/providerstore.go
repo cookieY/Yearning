@@ -21,6 +21,7 @@ import (
 
 	"github.com/cookieY/YearningX/backend/internal/crypto"
 	"github.com/cookieY/YearningX/backend/internal/review/domain"
+	"github.com/cookieY/YearningX/backend/internal/review/persistence"
 	"github.com/cookieY/YearningX/backend/internal/review/promptprofile"
 	"github.com/cookieY/YearningX/backend/internal/review/provider"
 )
@@ -655,16 +656,12 @@ func (s *Services) LoadProviderChain(ctx context.Context, db *gorm.DB,
 	return provider.NewChain(endpoints, dial)
 }
 
-// invalidateAllUnsubmittedRuns Provider chain change -> invalidates all non-outdated, non-terminal Runs
-// of unsubmitted drafts (inputs_changed).
+// invalidateAllUnsubmittedRuns invalidates all non-outdated Runs of unsubmitted drafts
+// when the active AI Provider chain changes (inputs_changed).
 func invalidateAllUnsubmittedRuns(ctx context.Context, tx *gorm.DB) error {
-	var rows []struct {
-		ID      string
-		State   string
-		Version int64
-	}
+	var rows []persistence.ReviewRunModel
 	err := tx.WithContext(ctx).Raw(`
-		select r.id::text as id, r.state, r.version
+		select r.id::text as id, r.draft_id::text as draft_id, r.draft_revision, r.state, r.version
 		from review_runs r
 		join change_drafts d on d.id = r.draft_id
 		where r.state <> 'outdated'
@@ -672,20 +669,7 @@ func invalidateAllUnsubmittedRuns(ctx context.Context, tx *gorm.DB) error {
 	if err != nil {
 		return err
 	}
-	for _, r := range rows {
-		next, err := domain.RunTransition(domain.RunState(r.State), domain.RunEventInputsChanged)
-		if err != nil {
-			return domain.ErrIllegalTransition
-		}
-		res := tx.WithContext(ctx).Exec(`
-			update review_runs set state = ?, version = version + 1, finished_at = ?,
-				business_err_code = null, failure_name = null
-			where id = ? and version = ?`, string(next), nowUTC(), r.ID, r.Version)
-		if res.Error != nil {
-			return res.Error
-		}
-	}
-	return nil
+	return invalidateRuns(ctx, tx, rows)
 }
 
 // TestAIProviderConnection executes a targeted health probe against a single Provider.

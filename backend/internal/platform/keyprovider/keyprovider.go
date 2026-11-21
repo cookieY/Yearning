@@ -44,12 +44,9 @@ func (p *FileProvider) Health(ctx context.Context) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
-	if _, err := crypto.ValidateKeyringFile(p.path); err != nil {
-		return fmt.Errorf("%w: keyring file form invalid", ErrUnhealthy)
-	}
 	ring, err := crypto.LoadKeyring(p.path)
 	if err != nil {
-		return fmt.Errorf("%w: keyring content invalid", ErrUnhealthy)
+		return fmt.Errorf("%w: keyring invalid", ErrUnhealthy)
 	}
 	if !ring.HasCurrentKey(crypto.PurposePayload) {
 		return fmt.Errorf("%w: no encrypt_decrypt key for purpose payload", ErrUnhealthy)

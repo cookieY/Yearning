@@ -6,26 +6,19 @@ import (
 	"github.com/cookieY/YearningX/backend/internal/crypto"
 )
 
-// Package agent constructs the context and requests for controlled model review (PRD 9.1 agent: model loop and tool scheduling).
-//
-// Three categories of review inputs converge deterministically during request assembly:
-//  1. Toolset evidence collection (normalized Evidence references, never carrying raw payloads);
-//  2. Audit skills (enabled Prompt Tools bound to the rule set, injected via knowledge_text);
-//  3. Internal experience (scope-matched knowledge entries, injected and rendered).
-//
-// Lexical deterministic rules (rule_sets.config) are executed by code and never enter the model context.
+// EnvelopeBinding identifies the Review Run and 1-based statement index authenticated by the AEAD AAD.
 type EnvelopeBinding struct {
 	ReviewRunID  string
 	StatementIdx int
 }
 
-// RuntimeBudget defines the technical safety boundaries for each Run (PRD 9.5; no admin-configurable per-order token or cost budget is provided).
+// MappingTable and MappingColumn define the fixed AEAD AAD target table and column constants.
 const (
 	MappingTable  = "review_identifier_mappings"
 	MappingColumn = "identifier_mapping"
 )
 
-// seconds
+// SealMapping encrypts identifier mapping pairs into an AEAD envelope bound to the Review Run and statement.
 func SealMapping(c *crypto.Crypter, binding EnvelopeBinding, pairs []MappingPair) (crypto.Envelope, error) {
 	if c == nil {
 		return crypto.Envelope{}, fmt.Errorf("privacy: nil crypter")
@@ -43,7 +36,7 @@ func SealMapping(c *crypto.Crypter, binding EnvelopeBinding, pairs []MappingPair
 	return c.Seal(crypto.PurposePayload, MarshalMapping(pairs), aad)
 }
 
-// seconds
+// OpenMapping decrypts and decodes an identifier mapping AEAD envelope after verifying its AAD binding.
 func OpenMapping(c *crypto.Crypter, binding EnvelopeBinding, env crypto.Envelope) ([]MappingPair, error) {
 	if c == nil {
 		return nil, fmt.Errorf("privacy: nil crypter")

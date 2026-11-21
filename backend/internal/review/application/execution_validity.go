@@ -2,67 +2,31 @@ package application
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
-
-	"gorm.io/gorm"
+	"strconv"
 
 	"github.com/cookieY/YearningX/backend/internal/review/domain"
 	"github.com/cookieY/YearningX/backend/internal/review/fingerprint"
-	"github.com/cookieY/YearningX/backend/internal/review/persistence"
 	"github.com/cookieY/YearningX/backend/internal/review/privacy"
 	"github.com/cookieY/YearningX/backend/internal/review/provider"
 )
 
 const executionValidityVersion = "object-preconditions-v1"
 
-// loadValidityProgram reads each original occurrence. Fingerprint grouping is
-// deliberately excluded from ordering and object-state evaluation.
-func loadValidityProgram(ctx context.Context, db *gorm.DB, run *persistence.ReviewRunModel) (ValidityProgram, map[int32]string, error) {
-	var rows []struct {
-		Ordinal int32
-		Typed   []byte
-		GroupID string
-	}
-	err := db.WithContext(ctx).Raw(`
-		select s.ordinal, s.typed_shape::text as typed, g.id::text as group_id
-		from sql_statements s
-		join sql_fingerprint_groups g on g.review_run_id = s.review_run_id
-		 and g.canonical_fingerprint_hmac = s.canonical_fingerprint_hmac
-		 and g.dialect_fingerprint_hmac = s.dialect_fingerprint_hmac
-		where s.review_run_id = ? order by s.ordinal`, run.ID).Scan(&rows).Error
-	if err != nil {
-		return ValidityProgram{}, nil, err
-	}
-	program := ValidityProgram{Complete: len(rows) == int(run.StatementCount)}
-	groups := make(map[int32]string, len(rows))
-	for i, row := range rows {
-		var shape struct {
-			Validity fingerprint.StatementValidity `json:"execution_validity"`
-		}
-		if err := json.Unmarshal(row.Typed, &shape); err != nil {
-			return ValidityProgram{}, nil, err
-		}
-		if row.Ordinal != int32(i+1) || row.GroupID == "" {
-			program.Complete = false
-		}
-		program.Statements = append(program.Statements, StatementValidityAtOrdinal{Ordinal: row.Ordinal, Facts: shape.Validity})
-		groups[row.Ordinal] = row.GroupID
-	}
-	return program, groups, nil
-}
-
-func evaluateStageValidity(ctx context.Context, db *gorm.DB, run *persistence.ReviewRunModel, binding *stageSchemaBinding, mapper *privacy.RunMapper, engine, locale string, refs []provider.NormalizedEvidenceRef) (ValidityResult, []mappedFinding, map[string]any, error) {
-	program, groups, err := loadValidityProgram(ctx, db, run)
-	if err != nil {
-		return ValidityResult{}, nil, nil, err
-	}
-	return evaluateValidityProgram(ctx, program, groups, binding, mapper, engine, locale, refs)
-}
-
 // evaluateValidityProgram is the pure-compute side: program/group mappings are supplied by the caller
-// (DB path via loadValidityProgram; ephemeral Run constructed from in-memory models — RCP-20261101).
+// from in-memory ephemeral Run models.
 func evaluateValidityProgram(ctx context.Context, program ValidityProgram, groups map[int32]string,
+	binding *stageSchemaBinding, mapper *privacy.RunMapper, engine, locale string, refs []provider.NormalizedEvidenceRef,
+) (ValidityResult, []mappedFinding, map[string]any, error) {
+	return evaluateValidityProgramWithGroupLookup(ctx, program, func(ord int32) string {
+		return groups[ord]
+	}, binding, mapper, engine, locale, refs)
+}
+
+func evaluateValidityProgramWithGroupLookup(ctx context.Context, program ValidityProgram, groupOf func(int32) string,
 	binding *stageSchemaBinding, mapper *privacy.RunMapper, engine, locale string, refs []provider.NormalizedEvidenceRef,
 ) (ValidityResult, []mappedFinding, map[string]any, error) {
 	program, _ = bindValidityProgram(program, binding, mapper)
@@ -72,7 +36,7 @@ func evaluateValidityProgram(ctx context.Context, program ValidityProgram, group
 	if err != nil {
 		return ValidityResult{}, nil, nil, err
 	}
-	programJSON, err := json.Marshal(program)
+	programDigest, err := sha256ValidityProgram(program)
 	if err != nil {
 		return ValidityResult{}, nil, nil, err
 	}
@@ -94,19 +58,61 @@ func evaluateValidityProgram(ctx context.Context, program ValidityProgram, group
 		"version":               executionValidityVersion,
 		"scope":                 "modeled_object_existence_preconditions",
 		"status":                result.Status,
-		"program_digest":        sha256Hex(programJSON),
+		"program_digest":        programDigest,
 		"fact_digest":           sha256Hex(factsJSON),
 		"schema_binding_digest": sha256Hex(bindingJSON),
 	}
 	var findings []mappedFinding
 	for _, violation := range result.Violations {
-		gid := groups[violation.Ordinal]
+		gid := groupOf(violation.Ordinal)
 		if gid == "" {
 			return ValidityResult{}, nil, nil, domain.ErrCoverageIncomplete
 		}
 		findings = append(findings, executionValidityFinding(violation, gid, locale))
 	}
 	return result, findings, proof, nil
+}
+
+// sha256ValidityProgram streams the exact JSON serialization of program directly into SHA-256 while caching
+// marshaled StatementValidity fragments across repeated statements (avoiding multi-megabyte buffer allocations).
+func sha256ValidityProgram(program ValidityProgram) (string, error) {
+	h := sha256.New()
+	_, _ = h.Write([]byte(`{"complete":`))
+	if program.Complete {
+		_, _ = h.Write([]byte("true"))
+	} else {
+		_, _ = h.Write([]byte("false"))
+	}
+	if program.Statements == nil {
+		_, _ = h.Write([]byte(`,"statements":null}`))
+		return hex.EncodeToString(h.Sum(nil)), nil
+	}
+	_, _ = h.Write([]byte(`,"statements":[`))
+	factsCache := make(map[validityMemoKey][]byte, min(len(program.Statements), 64))
+	var numBuf [16]byte
+	for i := range program.Statements {
+		if i > 0 {
+			_, _ = h.Write([]byte{','})
+		}
+		st := program.Statements[i]
+		key := statementValidityMemoKey(st.Facts)
+		factsBytes, ok := factsCache[key]
+		if !ok {
+			b, err := json.Marshal(st.Facts)
+			if err != nil {
+				return "", err
+			}
+			factsBytes = b
+			factsCache[key] = factsBytes
+		}
+		_, _ = h.Write([]byte(`{"ordinal":`))
+		_, _ = h.Write(strconv.AppendInt(numBuf[:0], int64(st.Ordinal), 10))
+		_, _ = h.Write([]byte(`,"facts":`))
+		_, _ = h.Write(factsBytes)
+		_, _ = h.Write([]byte{'}'})
+	}
+	_, _ = h.Write([]byte(`]}`))
+	return hex.EncodeToString(h.Sum(nil)), nil
 }
 
 // executionValidityFinding constructs a deterministic finding for an execution precondition violation.

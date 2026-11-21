@@ -6,8 +6,10 @@ package application
 import (
 	"context"
 	"errors"
+	"strings"
 	"time"
 
+	"github.com/go-sql-driver/mysql"
 	"github.com/jackc/pgx/v5/pgconn"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
@@ -17,6 +19,7 @@ import (
 	"github.com/cookieY/YearningX/backend/internal/authorization/auditlog"
 	"github.com/cookieY/YearningX/backend/internal/crypto"
 	"github.com/cookieY/YearningX/backend/internal/database"
+	"github.com/cookieY/YearningX/backend/internal/platform/txutil"
 	"github.com/cookieY/YearningX/backend/internal/review/domain"
 	"github.com/cookieY/YearningX/backend/internal/review/fingerprint"
 	"github.com/cookieY/YearningX/backend/internal/review/persistence"
@@ -335,6 +338,31 @@ func splitCursor(c string) (string, string, bool) {
 func isPgCheckViolation(err error) bool {
 	var pgErr *pgconn.PgError
 	return errors.As(err, &pgErr) && pgErr.Code == "23514"
+}
+
+func isUniqueViolationErr(err error) bool { return txutil.IsUniqueViolation(err) }
+
+// uniqueViolationConstraint extracts the constraint/index name from a unique constraint violation
+// (PG uses ConstraintName; MySQL extracts the key name from 1062 message "for key '...'" — that arm is
+// defensive since the platform DB is strictly PG and go-sql-driver is used only for target business DBs).
+// Constraint names in both dialects include the column name, allowing callers to tell which unique axis
+// collided; returns an empty string when unavailable (driver differences / future wrappers) to degrade to generic wording.
+func uniqueViolationConstraint(err error) string {
+	var pgErr *pgconn.PgError
+	if errors.As(err, &pgErr) && pgErr.Code == "23505" {
+		return pgErr.ConstraintName
+	}
+	var mysqlErr *mysql.MySQLError
+	if errors.As(err, &mysqlErr) && mysqlErr.Number == 1062 {
+		const marker = "for key '"
+		if i := strings.Index(mysqlErr.Message, marker); i >= 0 {
+			rest := mysqlErr.Message[i+len(marker):]
+			if j := strings.Index(rest, "'"); j >= 0 {
+				return rest[:j]
+			}
+		}
+	}
+	return ""
 }
 
 // failureCodeOf maps a domain error to a business code; unknown errors default to fingerprint failure (fail closed).

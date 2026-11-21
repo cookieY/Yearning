@@ -5,8 +5,6 @@ package application
 
 import (
 	"context"
-	"encoding/json"
-	"encoding/pem"
 	"errors"
 	"fmt"
 	"hash/fnv"
@@ -15,6 +13,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"golang.org/x/sync/singleflight"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 
@@ -22,6 +21,7 @@ import (
 	orderapp "github.com/cookieY/YearningX/backend/internal/changeorder/application"
 	"github.com/cookieY/YearningX/backend/internal/crypto"
 	"github.com/cookieY/YearningX/backend/internal/database"
+	"github.com/cookieY/YearningX/backend/internal/datasource"
 	"github.com/cookieY/YearningX/backend/internal/diagnostics/domain"
 	"github.com/cookieY/YearningX/backend/internal/diagnostics/persistence"
 	"github.com/cookieY/YearningX/backend/internal/review/application"
@@ -117,8 +117,11 @@ type LiveStatsCollectorBackend struct {
 	DB      *gorm.DB
 	Crypter *crypto.Crypter
 
-	mu    sync.Mutex
-	pools map[string]*sharedReadPoolEntry
+	mu         sync.Mutex
+	closed     bool
+	pools      map[string]*sharedReadPoolEntry
+	poolGroup  singleflight.Group
+	openPoolFn func(ctx context.Context, ds DatasourceRow) (*sharedReadPoolEntry, error)
 }
 
 // NewLiveStatsCollectorBackend constructs a live read-only database statistics collector.
@@ -130,180 +133,163 @@ func NewLiveStatsCollectorBackend(db *gorm.DB, crypter *crypto.Crypter) *LiveSta
 	}
 }
 
+func closeSharedReadPoolEntry(entry *sharedReadPoolEntry) {
+	if entry == nil {
+		return
+	}
+	if entry.pool != nil {
+		_ = entry.pool.Close()
+	}
+	if entry.adapter != nil {
+		_ = entry.adapter.Close()
+	}
+}
+
 func (b *LiveStatsCollectorBackend) Close() {
 	b.mu.Lock()
 	defer b.mu.Unlock()
+	b.closed = true
 	for k, entry := range b.pools {
-		_ = entry.pool.Close()
-		_ = entry.adapter.Close()
+		closeSharedReadPoolEntry(entry)
 		delete(b.pools, k)
 	}
 }
 
 func (b *LiveStatsCollectorBackend) acquireReadPool(ctx context.Context, ds DatasourceRow) (database.Adapter, *database.PurposePool, error) {
 	b.mu.Lock()
+	if b.closed {
+		b.mu.Unlock()
+		return nil, nil, context.Canceled
+	}
 	if cached, ok := b.pools[ds.ID]; ok && cached != nil {
 		b.mu.Unlock()
 		return cached.adapter, cached.pool, nil
 	}
 	b.mu.Unlock()
 
-	cred, purpose, err := b.openReadOnlyCredential(ctx, ds.ID)
-	if err != nil {
-		return nil, nil, err
-	}
-	if !database.ReadOnlyPurpose(purpose) {
-		return nil, nil, database.ErrReadOnlyViolation
-	}
-	mat, err := b.openTLSMaterial(ctx, ds.ID)
-	if err != nil {
-		return nil, nil, err
-	}
-	dbName := ""
-	if ds.DatabaseName != nil {
-		dbName = *ds.DatabaseName
-	}
-	ep := database.Endpoint{
-		Host:             ds.Host,
-		Port:             ds.Port,
-		DatabaseName:     dbName,
-		CompatibilityMod: ds.CompatibilityMode,
-	}
-	opts := database.AdapterOptions{
-		StatementTimeoutMS: 2000,
-		MaxOpenConns:       2, // D5: diagnostics connections consume at most 2 active connections on the target database
-	}
-	var adapter database.Adapter
-	switch ds.CompatibilityMode {
-	case "mysql":
-		adapter = database.NewMySQLAdapter(ep, opts)
-	case "postgresql":
-		adapter = database.NewPostgreSQLAdapter(ep, opts)
-	default:
-		return nil, nil, database.ErrUnsupportedTarget
-	}
-	connCtx, cancel := context.WithTimeout(ctx, 3*time.Second)
-	defer cancel()
-	pool, err := adapter.OpenPurposePool(connCtx, purpose, cred, mat)
-	if err != nil {
-		_ = adapter.Close()
+	if err := ctx.Err(); err != nil {
 		return nil, nil, err
 	}
 
-	b.mu.Lock()
-	if existing, ok := b.pools[ds.ID]; ok && existing != nil {
+	resCh := b.poolGroup.DoChan(ds.ID, func() (any, error) {
+		b.mu.Lock()
+		if b.closed {
+			b.mu.Unlock()
+			return nil, context.Canceled
+		}
+		if cached, ok := b.pools[ds.ID]; ok && cached != nil {
+			b.mu.Unlock()
+			return cached, nil
+		}
 		b.mu.Unlock()
-		_ = pool.Close()
-		_ = adapter.Close()
-		return existing.adapter, existing.pool, nil
+
+		// Decouple dial lifetime from any single caller so one canceled waiter cannot abort coalesced callers.
+		dialCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 3*time.Second)
+		defer cancel()
+		return b.openAndCacheReadPool(dialCtx, ds)
+	})
+
+	select {
+	case <-ctx.Done():
+		return nil, nil, ctx.Err()
+	case res := <-resCh:
+		if res.Err != nil {
+			return nil, nil, res.Err
+		}
+		entry, ok := res.Val.(*sharedReadPoolEntry)
+		if !ok || entry == nil {
+			return nil, nil, database.ErrUnsupportedTarget
+		}
+		return entry.adapter, entry.pool, nil
 	}
-	b.pools[ds.ID] = &sharedReadPoolEntry{adapter: adapter, pool: pool}
-	b.mu.Unlock()
-	return adapter, pool, nil
+}
+
+func (b *LiveStatsCollectorBackend) openAndCacheReadPool(ctx context.Context, ds DatasourceRow) (*sharedReadPoolEntry, error) {
+	var entry *sharedReadPoolEntry
+	if b.openPoolFn != nil {
+		opened, err := b.openPoolFn(ctx, ds)
+		if err != nil {
+			return nil, err
+		}
+		entry = opened
+	} else {
+		cred, purpose, err := b.openReadOnlyCredential(ctx, ds.ID)
+		if err != nil {
+			return nil, err
+		}
+		if !database.ReadOnlyPurpose(purpose) {
+			return nil, database.ErrReadOnlyViolation
+		}
+		mat, err := b.openTLSMaterial(ctx, ds.ID)
+		if err != nil {
+			return nil, err
+		}
+		dbName := ""
+		if ds.DatabaseName != nil {
+			dbName = *ds.DatabaseName
+		}
+		ep := database.Endpoint{
+			Host:             ds.Host,
+			Port:             ds.Port,
+			DatabaseName:     dbName,
+			CompatibilityMod: ds.CompatibilityMode,
+		}
+		opts := database.AdapterOptions{
+			StatementTimeoutMS: 2000,
+			MaxOpenConns:       2, // D5: diagnostics connections consume at most 2 active connections on the target database
+		}
+		var adapter database.Adapter
+		switch ds.CompatibilityMode {
+		case "mysql":
+			adapter = database.NewMySQLAdapter(ep, opts)
+		case "postgresql":
+			adapter = database.NewPostgreSQLAdapter(ep, opts)
+		default:
+			return nil, database.ErrUnsupportedTarget
+		}
+		pool, err := adapter.OpenPurposePool(ctx, purpose, cred, mat)
+		if err != nil {
+			_ = adapter.Close()
+			return nil, err
+		}
+		entry = &sharedReadPoolEntry{adapter: adapter, pool: pool}
+	}
+
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	if b.closed {
+		closeSharedReadPoolEntry(entry)
+		return nil, context.Canceled
+	}
+	if b.pools == nil {
+		b.pools = make(map[string]*sharedReadPoolEntry)
+	}
+	if existing, ok := b.pools[ds.ID]; ok && existing != nil {
+		closeSharedReadPoolEntry(entry)
+		return existing, nil
+	}
+	b.pools[ds.ID] = entry
+	return entry, nil
 }
 
 // openReadOnlyCredential loads only query or review read-only credentials and never falls back to execution credentials (D2/P101).
 func (b *LiveStatsCollectorBackend) openReadOnlyCredential(ctx context.Context, datasourceID string) (database.Credential, database.Purpose, error) {
-	for _, p := range []database.Purpose{database.PurposeQuery, database.PurposeReview} {
-		var row struct {
-			ID         string
-			Ciphertext []byte
-			Nonce      []byte
-			KeyID      string
-		}
-		err := b.DB.WithContext(ctx).Raw(`
-			select id::text as id, credential_ciphertext as ciphertext, credential_nonce as nonce,
-			       credential_key_id as key_id
-			from datasource_credentials
-			where datasource_id = ? and purpose = ? and enabled limit 1`,
-			datasourceID, string(p)).Scan(&row).Error
-		if err != nil || row.ID == "" {
-			continue
-		}
-		plain, err := b.Crypter.Open(crypto.PurposePayload, crypto.Envelope{
-			Ciphertext: row.Ciphertext, Nonce: row.Nonce, KeyID: row.KeyID, Algorithm: "aes-256-gcm",
-		}, crypto.AAD{
-			DeploymentID: b.Crypter.DeploymentID(),
-			Table:        "datasource_credentials", PrimaryKey: row.ID,
-			Column: "credential", Purpose: "datasource_credential",
-		})
-		if err != nil {
-			continue
-		}
-		var payload struct {
-			Username string `json:"username"`
-			Password string `json:"password"`
-		}
-		if json.Unmarshal(plain, &payload) != nil {
-			continue
-		}
-		return database.Credential{Username: payload.Username, Password: payload.Password}, p, nil
+	res, err := datasource.ResolveCredential(ctx, b.DB, b.Crypter, datasourceID, datasource.CredentialResolveOptions{
+		Purposes:       []string{string(database.PurposeQuery), string(database.PurposeReview)},
+		SkipUnreadable: true,
+	})
+	if err != nil {
+		return database.Credential{}, "", domain.ErrInsufficientDBPrivilege("missing_read_only_credential")
 	}
-	return database.Credential{}, "", domain.ErrInsufficientDBPrivilege("missing_read_only_credential")
+	purpose := database.Purpose(res.Purpose)
+	if !database.ReadOnlyPurpose(purpose) {
+		return database.Credential{}, "", domain.ErrInsufficientDBPrivilege("missing_read_only_credential")
+	}
+	return database.Credential{Username: res.Username, Password: res.Password}, purpose, nil
 }
 
 func (b *LiveStatsCollectorBackend) openTLSMaterial(ctx context.Context, datasourceID string) (*database.TLSMaterial, error) {
-	var row struct {
-		ID         string
-		Ciphertext []byte
-		Nonce      []byte
-		KeyID      *string
-		Algorithm  *string
-		Verify     bool
-		ServerName *string
-	}
-	err := b.DB.WithContext(ctx).Raw(`
-		select id::text as id, material_ciphertext as ciphertext, material_nonce as nonce,
-		       material_key_id as key_id, material_algorithm as algorithm,
-		       verify_server as verify, server_name
-		from datasource_tls_materials where datasource_id = ? limit 1`, datasourceID).Scan(&row).Error
-	if err != nil || row.ID == "" || row.KeyID == nil {
-		return nil, err
-	}
-	alg := "aes-256-gcm"
-	if row.Algorithm != nil && *row.Algorithm != "" {
-		alg = *row.Algorithm
-	}
-	plain, err := b.Crypter.Open(crypto.PurposePayload, crypto.Envelope{
-		Ciphertext: row.Ciphertext, Nonce: row.Nonce, KeyID: *row.KeyID, Algorithm: alg,
-	}, crypto.AAD{
-		DeploymentID: b.Crypter.DeploymentID(),
-		Table:        "datasource_tls_materials", PrimaryKey: row.ID,
-		Column: "material", Purpose: "datasource_tls",
-	})
-	if err != nil {
-		return nil, err
-	}
-	mat := &database.TLSMaterial{VerifyServer: row.Verify}
-	if row.ServerName != nil {
-		mat.ServerName = *row.ServerName
-	}
-	var certs [][]byte
-	rest := plain
-	for {
-		var blk *pem.Block
-		blk, rest = pem.Decode(rest)
-		if blk == nil {
-			break
-		}
-		switch {
-		case blk.Type == "CERTIFICATE":
-			certs = append(certs, pem.EncodeToMemory(blk))
-		case strings.HasSuffix(blk.Type, "PRIVATE KEY"):
-			mat.KeyPEM = append(mat.KeyPEM, pem.EncodeToMemory(blk)...)
-		}
-	}
-	if len(mat.KeyPEM) > 0 && len(certs) > 0 {
-		mat.CertPEM = certs[len(certs)-1]
-		for _, c := range certs[:len(certs)-1] {
-			mat.CAPEM = append(mat.CAPEM, c...)
-		}
-	} else {
-		for _, c := range certs {
-			mat.CAPEM = append(mat.CAPEM, c...)
-		}
-	}
-	return mat, nil
+	return datasource.ResolveTLSMaterial(ctx, b.DB, b.Crypter, datasourceID)
 }
 
 func (b *LiveStatsCollectorBackend) Probe(ctx context.Context, ds DatasourceRow) (*database.StatsProbeResult, error) {
@@ -965,57 +951,7 @@ func (s *Services) persistSnapshotAndBuckets(
 		}
 	}
 
-	// Merge duplicate rows across schemas within the same snapshot by EngineFingerprint (consistent with unique(datasource_id, engine_fingerprint) on sql_diagnostics_statements).
-	mergedRows := make([]database.NativeStatementStatRow, 0, len(rows))
-	mergedIdx := make(map[string]int, len(rows))
-	for _, r := range rows {
-		if r.EngineFingerprint == "" {
-			continue
-		}
-		if idx, exists := mergedIdx[r.EngineFingerprint]; exists {
-			m := &mergedRows[idx]
-			if m.DatabaseOrSchema == "" && r.DatabaseOrSchema != "" {
-				m.DatabaseOrSchema = r.DatabaseOrSchema
-			}
-			m.CallsTotal += r.CallsTotal
-			m.TotalExecTimeMS += r.TotalExecTimeMS
-			m.RowsExaminedOrSharedBlksReadTotal += r.RowsExaminedOrSharedBlksReadTotal
-			m.RowsSentOrRowsReturnedTotal += r.RowsSentOrRowsReturnedTotal
-			m.LockTimeMSOrTempBlksWrittenTotal += r.LockTimeMSOrTempBlksWrittenTotal
-			if r.PlansTotal != nil {
-				v := *r.PlansTotal
-				if m.PlansTotal != nil {
-					v += *m.PlansTotal
-				}
-				m.PlansTotal = &v
-			}
-			if r.TotalPlanTimeMS != nil {
-				v := *r.TotalPlanTimeMS
-				if m.TotalPlanTimeMS != nil {
-					v += *m.TotalPlanTimeMS
-				}
-				m.TotalPlanTimeMS = &v
-			}
-			if r.TempBlksReadTotal != nil {
-				v := *r.TempBlksReadTotal
-				if m.TempBlksReadTotal != nil {
-					v += *m.TempBlksReadTotal
-				}
-				m.TempBlksReadTotal = &v
-			}
-			if r.SharedBlksHitTotal != nil {
-				v := *r.SharedBlksHitTotal
-				if m.SharedBlksHitTotal != nil {
-					v += *m.SharedBlksHitTotal
-				}
-				m.SharedBlksHitTotal = &v
-			}
-			continue
-		}
-		mergedIdx[r.EngineFingerprint] = len(mergedRows)
-		mergedRows = append(mergedRows, r)
-	}
-	rows = mergedRows
+	rows = mergeSnapshotStatRows(rows)
 
 	err := s.DB.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var existingStmts []persistence.SQLDiagnosticsStatementModel
@@ -1027,13 +963,14 @@ func (s *Services) persistSnapshotAndBuckets(
 			stmtMap[st.EngineFingerprint] = st
 		}
 
+		newStmts := make([]persistence.SQLDiagnosticsStatementModel, 0)
 		buckets := make([]persistence.SQLDiagnosticsBucketMetricModel, 0, len(rows))
 		for _, r := range rows {
 			prev, exists := stmtMap[r.EngineFingerprint]
 
 			if !exists {
 				stmtID := uuid.NewString()
-				newStmt := persistence.SQLDiagnosticsStatementModel{
+				newStmts = append(newStmts, persistence.SQLDiagnosticsStatementModel{
 					ID:                                      stmtID,
 					DatasourceID:                            ds.ID,
 					Engine:                                  ds.Engine,
@@ -1055,10 +992,7 @@ func (s *Services) persistSnapshotAndBuckets(
 					Version:                                 1,
 					CreatedAt:                               sampledAt,
 					UpdatedAt:                               sampledAt,
-				}
-				if err := tx.Create(&newStmt).Error; err != nil {
-					return err
-				}
+				})
 				avgMS := 0.0
 				if r.CallsTotal > 0 {
 					avgMS = r.TotalExecTimeMS / float64(r.CallsTotal)
@@ -1089,46 +1023,9 @@ func (s *Services) persistSnapshotAndBuckets(
 				continue
 			}
 
-			// Monotonic delta calculation: if any primary counter decreases, mark a counter reset (reset_detected = true) and never emit negative deltas.
-			reset := r.CallsTotal < prev.LatestCallsTotal || r.TotalExecTimeMS+0.001 < prev.LatestTotalExecTimeMS
-			if reset {
+			delta := computeBucketDelta(r, prev, gapDetected)
+			if delta.reset {
 				anyReset = true
-			}
-			var deltaCalls int64
-			var deltaExecMS float64
-			var deltaRowsExamined int64
-			var deltaRowsSent int64
-			var deltaLockOrTemp float64
-			var deltaPlans *int64
-			var deltaPlanMS *float64
-			var deltaTempRead *int64
-			var deltaSharedHit *int64
-			coverageMode := "window_delta"
-
-			if reset {
-				coverageMode = "reset_or_gap"
-				deltaCalls = maxInt64(0, r.CallsTotal)
-				deltaExecMS = maxFloat64(0, r.TotalExecTimeMS)
-				deltaRowsExamined = maxInt64(0, r.RowsExaminedOrSharedBlksReadTotal)
-				deltaRowsSent = maxInt64(0, r.RowsSentOrRowsReturnedTotal)
-				deltaLockOrTemp = maxFloat64(0, r.LockTimeMSOrTempBlksWrittenTotal)
-			} else {
-				if gapDetected {
-					coverageMode = "reset_or_gap"
-				}
-				deltaCalls = maxInt64(0, r.CallsTotal-prev.LatestCallsTotal)
-				deltaExecMS = maxFloat64(0, r.TotalExecTimeMS-prev.LatestTotalExecTimeMS)
-				deltaRowsExamined = maxInt64(0, r.RowsExaminedOrSharedBlksReadTotal-prev.LatestRowsExaminedOrSharedBlksReadTotal)
-				deltaRowsSent = maxInt64(0, r.RowsSentOrRowsReturnedTotal-prev.LatestRowsSentOrRowsReturnedTotal)
-				deltaLockOrTemp = maxFloat64(0, r.LockTimeMSOrTempBlksWrittenTotal-prev.LatestLockTimeMSOrTempBlksWrittenTotal)
-				deltaPlans = diffOptionalInt64(r.PlansTotal, prev.LatestPlansTotal)
-				deltaPlanMS = diffOptionalFloat64(r.TotalPlanTimeMS, prev.LatestTotalPlanTimeMS)
-				deltaTempRead = diffOptionalInt64(r.TempBlksReadTotal, prev.LatestTempBlksReadTotal)
-				deltaSharedHit = diffOptionalInt64(r.SharedBlksHitTotal, prev.LatestSharedBlksHitTotal)
-			}
-			avgMS := 0.0
-			if deltaCalls > 0 {
-				avgMS = deltaExecMS / float64(deltaCalls)
 			}
 
 			if err := tx.Model(&persistence.SQLDiagnosticsStatementModel{}).
@@ -1158,26 +1055,32 @@ func (s *Services) persistSnapshotAndBuckets(
 				SnapshotID:                        snapshotID,
 				BucketStart:                       bucketStart,
 				BucketEnd:                         sampledAt,
-				CoverageMode:                      coverageMode,
+				CoverageMode:                      delta.coverageMode,
 				CallsTotal:                        r.CallsTotal,
 				TotalExecTimeMS:                   r.TotalExecTimeMS,
 				RowsExaminedOrSharedBlksReadTotal: r.RowsExaminedOrSharedBlksReadTotal,
 				RowsSentOrRowsReturnedTotal:       r.RowsSentOrRowsReturnedTotal,
 				LockTimeMSOrTempBlksWrittenTotal:  r.LockTimeMSOrTempBlksWrittenTotal,
-				DeltaCalls:                        deltaCalls,
-				DeltaExecTimeMS:                   deltaExecMS,
-				AvgExecTimeMS:                     avgMS,
-				DeltaRowsExaminedOrSharedBlksRead: deltaRowsExamined,
-				DeltaRowsSentOrRowsReturned:       deltaRowsSent,
-				DeltaLockTimeMSOrTempBlksWritten:  deltaLockOrTemp,
-				DeltaPlans:                        deltaPlans,
-				DeltaPlanTimeMS:                   deltaPlanMS,
-				DeltaTempBlksRead:                 deltaTempRead,
-				DeltaSharedBlksHit:                deltaSharedHit,
-				ResetDetected:                     reset,
+				DeltaCalls:                        delta.calls,
+				DeltaExecTimeMS:                   delta.execMS,
+				AvgExecTimeMS:                     delta.avgMS,
+				DeltaRowsExaminedOrSharedBlksRead: delta.rowsExamined,
+				DeltaRowsSentOrRowsReturned:       delta.rowsSent,
+				DeltaLockTimeMSOrTempBlksWritten:  delta.lockOrTemp,
+				DeltaPlans:                        delta.plans,
+				DeltaPlanTimeMS:                   delta.planMS,
+				DeltaTempBlksRead:                 delta.tempRead,
+				DeltaSharedBlksHit:                delta.sharedHit,
+				ResetDetected:                     delta.reset,
 				FirstObserved:                     false,
 				CreatedAt:                         sampledAt,
 			})
+		}
+
+		if len(newStmts) > 0 {
+			if err := tx.Create(&newStmts).Error; err != nil {
+				return err
+			}
 		}
 
 		snap := persistence.SQLDiagnosticsSnapshotModel{
@@ -1319,6 +1222,101 @@ func (s *Services) computeYearningFingerprint(engine, compatibilityMode, templat
 	return &h
 }
 
+type bucketDeltaResult struct {
+	coverageMode string
+	calls        int64
+	execMS       float64
+	avgMS        float64
+	rowsExamined int64
+	rowsSent     int64
+	lockOrTemp   float64
+	plans        *int64
+	planMS       *float64
+	tempRead     *int64
+	sharedHit    *int64
+	reset        bool
+}
+
+func addOptionalMetric[T int64 | float64](dst **T, src *T) {
+	if src == nil {
+		return
+	}
+	v := *src
+	if *dst != nil {
+		v += **dst
+	}
+	*dst = &v
+}
+
+// mergeSnapshotStatRows merges duplicate EngineFingerprint rows across schemas within one snapshot
+// so entries align with unique(datasource_id, engine_fingerprint) on sql_diagnostics_statements.
+func mergeSnapshotStatRows(rows []database.NativeStatementStatRow) []database.NativeStatementStatRow {
+	merged := make([]database.NativeStatementStatRow, 0, len(rows))
+	idxByFP := make(map[string]int, len(rows))
+	for _, r := range rows {
+		if r.EngineFingerprint == "" {
+			continue
+		}
+		if idx, exists := idxByFP[r.EngineFingerprint]; exists {
+			m := &merged[idx]
+			if m.DatabaseOrSchema == "" && r.DatabaseOrSchema != "" {
+				m.DatabaseOrSchema = r.DatabaseOrSchema
+			}
+			m.CallsTotal += r.CallsTotal
+			m.TotalExecTimeMS += r.TotalExecTimeMS
+			m.RowsExaminedOrSharedBlksReadTotal += r.RowsExaminedOrSharedBlksReadTotal
+			m.RowsSentOrRowsReturnedTotal += r.RowsSentOrRowsReturnedTotal
+			m.LockTimeMSOrTempBlksWrittenTotal += r.LockTimeMSOrTempBlksWrittenTotal
+			addOptionalMetric(&m.PlansTotal, r.PlansTotal)
+			addOptionalMetric(&m.TotalPlanTimeMS, r.TotalPlanTimeMS)
+			addOptionalMetric(&m.TempBlksReadTotal, r.TempBlksReadTotal)
+			addOptionalMetric(&m.SharedBlksHitTotal, r.SharedBlksHitTotal)
+			continue
+		}
+		idxByFP[r.EngineFingerprint] = len(merged)
+		merged = append(merged, r)
+	}
+	return merged
+}
+
+// computeBucketDelta calculates monotonic non-negative counter deltas and detects counter resets.
+func computeBucketDelta(
+	r database.NativeStatementStatRow,
+	prev persistence.SQLDiagnosticsStatementModel,
+	gapDetected bool,
+) bucketDeltaResult {
+	reset := r.CallsTotal < prev.LatestCallsTotal || r.TotalExecTimeMS+0.001 < prev.LatestTotalExecTimeMS
+	res := bucketDeltaResult{
+		coverageMode: "window_delta",
+		reset:        reset,
+	}
+	if reset {
+		res.coverageMode = "reset_or_gap"
+		res.calls = maxInt64(0, r.CallsTotal)
+		res.execMS = maxFloat64(0, r.TotalExecTimeMS)
+		res.rowsExamined = maxInt64(0, r.RowsExaminedOrSharedBlksReadTotal)
+		res.rowsSent = maxInt64(0, r.RowsSentOrRowsReturnedTotal)
+		res.lockOrTemp = maxFloat64(0, r.LockTimeMSOrTempBlksWrittenTotal)
+	} else {
+		if gapDetected {
+			res.coverageMode = "reset_or_gap"
+		}
+		res.calls = maxInt64(0, r.CallsTotal-prev.LatestCallsTotal)
+		res.execMS = maxFloat64(0, r.TotalExecTimeMS-prev.LatestTotalExecTimeMS)
+		res.rowsExamined = maxInt64(0, r.RowsExaminedOrSharedBlksReadTotal-prev.LatestRowsExaminedOrSharedBlksReadTotal)
+		res.rowsSent = maxInt64(0, r.RowsSentOrRowsReturnedTotal-prev.LatestRowsSentOrRowsReturnedTotal)
+		res.lockOrTemp = maxFloat64(0, r.LockTimeMSOrTempBlksWrittenTotal-prev.LatestLockTimeMSOrTempBlksWrittenTotal)
+		res.plans = diffOptionalMetric(r.PlansTotal, prev.LatestPlansTotal, maxInt64)
+		res.planMS = diffOptionalMetric(r.TotalPlanTimeMS, prev.LatestTotalPlanTimeMS, maxFloat64)
+		res.tempRead = diffOptionalMetric(r.TempBlksReadTotal, prev.LatestTempBlksReadTotal, maxInt64)
+		res.sharedHit = diffOptionalMetric(r.SharedBlksHitTotal, prev.LatestSharedBlksHitTotal, maxInt64)
+	}
+	if res.calls > 0 {
+		res.avgMS = res.execMS / float64(res.calls)
+	}
+	return res
+}
+
 func maxInt64(a, b int64) int64 {
 	if a > b {
 		return a
@@ -1333,24 +1331,13 @@ func maxFloat64(a, b float64) float64 {
 	return b
 }
 
-func diffOptionalInt64(cur, prev *int64) *int64 {
+func diffOptionalMetric[T int64 | float64](cur, prev *T, maxFn func(T, T) T) *T {
 	if cur == nil {
 		return nil
 	}
+	var zero T
 	if prev == nil || *cur < *prev {
-		v := maxInt64(0, *cur)
-		return &v
-	}
-	v := *cur - *prev
-	return &v
-}
-
-func diffOptionalFloat64(cur, prev *float64) *float64 {
-	if cur == nil {
-		return nil
-	}
-	if prev == nil || *cur < *prev {
-		v := maxFloat64(0, *cur)
+		v := maxFn(zero, *cur)
 		return &v
 	}
 	v := *cur - *prev

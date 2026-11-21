@@ -1,6 +1,8 @@
 package application
 
 import (
+	"errors"
+	"regexp"
 	"sort"
 	"strings"
 	"unicode"
@@ -9,6 +11,28 @@ import (
 	"github.com/cookieY/YearningX/backend/internal/database"
 	"github.com/cookieY/YearningX/backend/internal/review/privacy"
 )
+
+// ErrPolicyPrivacy indicates a fail-closed privacy boundary violation while compiling policy prose or catalogs.
+var ErrPolicyPrivacy = errors.New("review: policy privacy sanitization failed")
+
+func policyIdentifierRegex(identifier string, caseInsensitive bool) (*regexp.Regexp, error) {
+	body := regexp.QuoteMeta(identifier)
+	if caseInsensitive {
+		body = "(?i:" + body + ")"
+	}
+	// Policy prose may use non-ASCII text immediately beside object names. Treat
+	// non-ASCII characters as boundaries conservatively while ASCII identifier
+	// continuations keep preventing id matching identity or orders matching orders_archive.
+	return regexp.Compile(`(^|[^A-Za-z0-9_$])(` + body + `)([^A-Za-z0-9_$]|$)`)
+}
+
+func policyIdentifierPresent(value, identifier string, caseInsensitive bool) bool {
+	if value == "" || identifier == "" {
+		return false
+	}
+	pattern, err := policyIdentifierRegex(identifier, caseInsensitive)
+	return err == nil && pattern.MatchString(value)
+}
 
 type policyCatalogIdentity struct {
 	kind                   database.PolicyCatalogKind

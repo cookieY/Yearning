@@ -276,29 +276,23 @@ func (s *Services) DiagnoseStatementWithAI(
 		return nil, err
 	}
 
+	agg := &aggregatedStatementStat{stmt: stmt}
+	for _, b := range buckets {
+		agg.absorbBucket(b)
+	}
 	var calls int64
 	var totalMS float64
 	var rowsExamined int64
 	var rowsSent int64
 	var lockOrTemp float64
 	coverageMode := "cumulative_only"
-	deltaBuckets := 0
-	resetDetected := false
-	for _, b := range buckets {
-		if b.ResetDetected {
-			resetDetected = true
-		}
-		if !b.FirstObserved {
-			deltaBuckets++
-			calls += b.DeltaCalls
-			totalMS += b.DeltaExecTimeMS
-			rowsExamined += b.DeltaRowsExaminedOrSharedBlksRead
-			rowsSent += b.DeltaRowsSentOrRowsReturned
-			lockOrTemp += b.DeltaLockTimeMSOrTempBlksWritten
-		}
-	}
-	if deltaBuckets > 0 {
-		if resetDetected {
+	if agg.deltaBucketCount > 0 {
+		calls = agg.calls
+		totalMS = agg.totalExecTimeMS
+		rowsExamined = agg.rowsExaminedOrSharedBlksRead
+		rowsSent = agg.rowsSentOrRowsReturned
+		lockOrTemp = agg.lockTimeMSOrTempBlksWritten
+		if agg.resetDetected {
 			coverageMode = "reset_or_gap"
 		} else {
 			coverageMode = "window_delta"
@@ -328,8 +322,9 @@ func (s *Services) DiagnoseStatementWithAI(
 	isEnglish := strings.EqualFold(application.OutputLocaleFromContext(ctx), "en-US")
 	windowLabel := fmt.Sprintf("%s ~ %s (%s)", from.Format(time.RFC3339), to.Format(time.RFC3339), coverageMode)
 
-	llmPayload, candidateSQL, candidateKind, err := s.invokeLLMDiagnosis(
-		ctx, priv, ds, desensitized, windowLabel, coverageMode,
+	reportID := uuid.NewString()
+	llmPayload, candidateSQL, candidateKind, err := s.invokeLLMDiagnosisWithReportID(
+		ctx, reportID, priv, ds, desensitized, windowLabel, coverageMode,
 		calls, totalMS, avgMS, rowsExamined, rowsSent, lockOrTemp, isEnglish,
 	)
 	if err != nil {
@@ -344,7 +339,6 @@ func (s *Services) DiagnoseStatementWithAI(
 		return nil, err
 	}
 
-	reportID := uuid.NewString()
 	payload := persistedAIReportPayload{
 		DesensitizedContextSummary:  desensitized.AnonymizedSummary,
 		ObservedFacts:               observedFacts,
@@ -897,20 +891,6 @@ func (s *Services) VerifyCandidateSQLHMAC(row *persistence.SQLDiagnosticsAIRepor
 	return hex.EncodeToString(mac) == hex.EncodeToString(row.CandidateSQLHMAC)
 }
 
-var anonTokenRestorePattern = regexp.MustCompile(`(?i)\b(?:database|schema|table|column|index|constraint|alias|cte|ident)_[0-9]+\b`)
-
-func restoreAnonymizedTokensInText(priv *privacy.TurnPrivacySession, text string) string {
-	if priv == nil || text == "" {
-		return text
-	}
-	return anonTokenRestorePattern.ReplaceAllStringFunc(text, func(tok string) string {
-		if _, orig, ok := priv.LookupIdentifier(strings.ToLower(tok)); ok && orig != "" {
-			return orig
-		}
-		return tok
-	})
-}
-
 func buildDiagnoseMessagesForEndpoint(
 	ep provider.Endpoint,
 	priv *privacy.TurnPrivacySession,
@@ -1021,7 +1001,7 @@ func parseAndFinalizeDiagnoseResponse(
 	restoreText := func(raw string) string {
 		trimmed := strings.TrimSpace(raw)
 		if !usedSAN && priv != nil {
-			trimmed = restoreAnonymizedTokensInText(priv, trimmed)
+			trimmed = priv.RestoreTextTokens(trimmed)
 		}
 		return strings.TrimSpace(trimmed)
 	}
@@ -1095,6 +1075,28 @@ func (s *Services) invokeLLMDiagnosis(
 	lockOrTemp float64,
 	isEnglish bool,
 ) (*persistedAIReportPayload, *string, *string, error) {
+	return s.invokeLLMDiagnosisWithReportID(
+		ctx, uuid.NewString(), priv, ds, desensitized, windowLabel, coverageMode,
+		calls, totalMS, avgMS, rowsExamined, rowsSent, lockOrTemp, isEnglish,
+	)
+}
+
+func (s *Services) invokeLLMDiagnosisWithReportID(
+	ctx context.Context,
+	reportID string,
+	priv *privacy.TurnPrivacySession,
+	ds *DatasourceRow,
+	desensitized *DesensitizeTemplateResult,
+	windowLabel string,
+	coverageMode string,
+	calls int64,
+	totalMS float64,
+	avgMS float64,
+	rowsExamined int64,
+	rowsSent int64,
+	lockOrTemp float64,
+	isEnglish bool,
+) (*persistedAIReportPayload, *string, *string, error) {
 	if s.Review == nil || priv == nil || ds == nil || desensitized == nil {
 		dsID := ""
 		if ds != nil {
@@ -1103,24 +1105,128 @@ func (s *Services) invokeLLMDiagnosis(
 		logLLMDiagnosisFailure(dsID, provider.Endpoint{}, errors.New("diagnostics: AI provider service unavailable"))
 		return nil, nil, nil, domain.ErrAIProviderFailed("No enabled AI provider is configured")
 	}
+
+	budgetDB := s.DB
+	if budgetDB == nil {
+		budgetDB = s.Review.DB
+	}
+	estTokens := int64(len(desensitized.AnonymizedTemplate)+len(desensitized.AnonymizedSummary))/3 + 512
+	reservedMinor, budgetDay, budgetCurrency, budgetSettings, berr := s.reserveDailyBudget(ctx, budgetDB, estTokens)
+	if berr != nil {
+		return nil, nil, nil, berr
+	}
+
 	var lastEP provider.Endpoint
-	rawResp, usedSAN, err := s.Review.CallActiveProviderJSONPerEndpoint(ctx, func(ep provider.Endpoint) (string, string, error) {
+	res, err := s.Review.CallActiveProviderJSONWithMetaPerEndpoint(ctx, func(ep provider.Endpoint) (string, string, error) {
 		lastEP = ep
 		return buildDiagnoseMessagesForEndpoint(
 			ep, priv, ds, desensitized, windowLabel, coverageMode,
 			calls, totalMS, avgMS, rowsExamined, rowsSent, lockOrTemp, isEnglish,
 		)
 	})
-	if err != nil || strings.TrimSpace(rawResp) == "" {
+	if err != nil || res == nil || strings.TrimSpace(res.Content) == "" {
+		s.releaseDailyBudget(context.WithoutCancel(ctx), budgetDB, budgetDay, budgetCurrency, reservedMinor)
 		logLLMDiagnosisFailure(ds.ID, lastEP, err)
 		return nil, nil, nil, mapLLMInvocationError(err)
 	}
-	payload, candSQL, candKind, ok := parseAndFinalizeDiagnoseResponse(rawResp, usedSAN, priv, windowLabel)
+	payload, candSQL, candKind, ok := parseAndFinalizeDiagnoseResponse(res.Content, res.UsedSAN, priv, windowLabel)
+	outcome := "succeeded"
+	if !ok {
+		outcome = "schema_failed"
+	}
+	if serr := s.settleDailyBudget(ctx, budgetDB, reportID, budgetDay, budgetCurrency, reservedMinor, budgetSettings, res, outcome); serr != nil && ok {
+		return nil, nil, nil, serr
+	}
 	if !ok {
 		logLLMDiagnosisFailure(ds.ID, lastEP, errors.New("diagnostics: llm response rejected by schema or hallucination guard"))
 		return nil, nil, nil, domain.ErrAIProviderFailed("AI provider response failed diagnosis schema or plan-fact validation")
 	}
 	return payload, candSQL, candKind, nil
+}
+
+func (s *Services) reserveDailyBudget(ctx context.Context, budgetDB *gorm.DB, estTokens int64) (int64, string, string, application.BudgetSettings, error) {
+	if s.Review == nil || budgetDB == nil {
+		return 0, "", "", application.BudgetSettings{}, nil
+	}
+	settings, err := s.Review.LoadBudgetSettings(ctx, budgetDB)
+	if err != nil {
+		return 0, "", "", settings, err
+	}
+	if !settings.Enforced {
+		return 0, "", "", settings, nil
+	}
+	amountMinor := int64(1)
+	if settings.InputPricePerMillionMinor > 0 {
+		if calc := (estTokens * settings.InputPricePerMillionMinor) / 1_000_000; calc > amountMinor {
+			amountMinor = calc
+		}
+	}
+	day := s.Review.BudgetDay(time.Now())
+	if err := s.Review.Reserve(ctx, budgetDB, day, settings.Currency, settings, amountMinor); err != nil {
+		if errors.Is(err, application.ErrBudgetExhausted) {
+			return 0, "", "", settings, domain.ErrAIBudgetExhausted()
+		}
+		return 0, "", "", settings, err
+	}
+	return amountMinor, day, settings.Currency, settings, nil
+}
+
+func (s *Services) settleDailyBudget(
+	ctx context.Context,
+	budgetDB *gorm.DB,
+	reportID string,
+	day string,
+	currency string,
+	reservedMinor int64,
+	settings application.BudgetSettings,
+	res *application.ProviderJSONResult,
+	outcome string,
+) error {
+	if s.Review == nil || budgetDB == nil || !settings.Enforced || reservedMinor <= 0 || day == "" {
+		return nil
+	}
+	var inTokens, outTokens int64
+	providerID := uuid.Nil.String()
+	modelName := "diagnostics"
+	if res != nil {
+		inTokens = res.InputTokens
+		outTokens = res.OutputTokens
+		if parsed, err := uuid.Parse(strings.TrimSpace(res.ProviderID)); err == nil {
+			providerID = parsed.String()
+		}
+		if strings.TrimSpace(res.ModelName) != "" {
+			modelName = strings.TrimSpace(res.ModelName)
+		}
+	}
+	actualMinor := application.TokenBasedAmount(
+		inTokens, outTokens,
+		settings.InputPricePerMillionMinor, settings.OutputPricePerMillionMinor,
+		reservedMinor,
+	)
+	settleCtx := context.WithoutCancel(ctx)
+	if err := budgetDB.WithContext(settleCtx).Transaction(func(tx *gorm.DB) error {
+		if err := s.Review.Settle(
+			settleCtx, tx, reportID, providerID, modelName,
+			1, inTokens, outTokens, actualMinor, currency, day, outcome,
+		); err != nil {
+			return err
+		}
+		if rem := reservedMinor - actualMinor; rem > 0 {
+			return s.Review.Release(settleCtx, tx, day, currency, rem)
+		}
+		return nil
+	}); err != nil {
+		_ = s.Review.Release(settleCtx, budgetDB, day, currency, reservedMinor)
+		return err
+	}
+	return nil
+}
+
+func (s *Services) releaseDailyBudget(ctx context.Context, budgetDB *gorm.DB, day, currency string, amountMinor int64) {
+	if s.Review == nil || budgetDB == nil || amountMinor <= 0 || day == "" {
+		return
+	}
+	_ = s.Review.Release(ctx, budgetDB, day, currency, amountMinor)
 }
 
 func mapLLMInvocationError(err error) error {

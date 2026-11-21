@@ -337,6 +337,7 @@ func TestMetadataCacheNeverBypassesSessionOrAuthGuards(t *testing.T) {
 	if dsn == "" {
 		t.Skip("YEARNING_TEST_DATABASE_DSN not set")
 	}
+	acquireQueryPGTestLock(t)
 	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{Logger: gormlogger.Default.LogMode(gormlogger.Silent)})
 	if err != nil {
 		t.Fatal(err)
@@ -362,11 +363,16 @@ func TestMetadataCacheNeverBypassesSessionOrAuthGuards(t *testing.T) {
 	otherID := uuid.NewString()
 	flowID := uuid.NewString()
 	dsID := uuid.NewString()
+	pgID := uuid.NewString()
+	grantID := uuid.NewString()
+	reqID := uuid.NewString()
 	sessionID := uuid.NewString()
+	ownerName := "mc_owner_" + ownerID[:8]
+	flowName := "mc-flow-" + flowID[:8]
 	fp := "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 
 	for _, u := range []struct{ id, name string }{
-		{ownerID, "mc_owner_" + ownerID[:8]},
+		{ownerID, ownerName},
 		{otherID, "mc_other_" + otherID[:8]},
 	} {
 		if err := db.Exec(`insert into users (id, username, display_name, is_builtin_admin, version, created_at, updated_at)
@@ -377,6 +383,10 @@ func TestMetadataCacheNeverBypassesSessionOrAuthGuards(t *testing.T) {
 	defer func() {
 		_ = db.Exec(`delete from query_session_capabilities where session_id = ?`, sessionID).Error
 		_ = db.Exec(`delete from query_sessions where id = ?`, sessionID).Error
+		_ = db.Exec(`delete from query_grants where id = ?`, grantID).Error
+		_ = db.Exec(`delete from permission_group_flow_grants where permission_group_id = ?`, pgID).Error
+		_ = db.Exec(`delete from permission_group_members where permission_group_id = ?`, pgID).Error
+		_ = db.Exec(`delete from permission_groups where id = ?`, pgID).Error
 		_ = db.Exec(`delete from flow_query_capabilities where flow_id = ?`, flowID).Error
 		_ = db.Exec(`delete from flows where id = ?`, flowID).Error
 		_ = db.Exec(`delete from datasources where id = ?`, dsID).Error
@@ -390,18 +400,34 @@ func TestMetadataCacheNeverBypassesSessionOrAuthGuards(t *testing.T) {
 		t.Fatal(err)
 	}
 	if err := db.Exec(`insert into flows (id, name, flow_type, status, version, created_by_user_id, created_at, updated_at)
-		values (?, ?, 'query_access', 'enabled', 1, ?, now(), now())`, flowID, "mc-flow-"+flowID[:8], ownerID).Error; err != nil {
+		values (?, ?, 'query_access', 'enabled', 1, ?, now(), now())`, flowID, flowName, ownerID).Error; err != nil {
 		t.Fatal(err)
 	}
 	if err := db.Exec(`insert into flow_query_capabilities (flow_id, datasource_id, can_query, can_export)
 		values (?, ?, true, false)`, flowID, dsID).Error; err != nil {
 		t.Fatal(err)
 	}
-	if err := db.Exec(`insert into query_sessions (id, user_id_snapshot, flow_id_snapshot, state, version, created_at, updated_at)
-		values (?, ?, ?, 'active', 1, now(), now())`, sessionID, ownerID, flowID).Error; err != nil {
+	if err := db.Exec(`insert into permission_groups (id, name, enabled, version, created_by_user_id, created_at, updated_at)
+		values (?, ?, true, 1, ?, now(), now())`, pgID, "mc-pg-"+pgID[:8], ownerID).Error; err != nil {
 		t.Fatal(err)
 	}
-	if err := db.Exec(`insert into query_session_capabilities (session_id, datasource_id, datasource_name_snapshot, identity_fingerprint_snapshot, state, can_query, can_export)
+	if err := db.Exec(`insert into permission_group_members (permission_group_id, user_id) values (?, ?)`, pgID, ownerID).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Exec(`insert into permission_group_flow_grants (permission_group_id, flow_id) values (?, ?)`, pgID, flowID).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Exec(`insert into query_grants (id, query_access_request_id, requester_user_id_snapshot, requester_username_snapshot, state, expires_at, version, created_at)
+		values (?, ?, ?, ?, 'active', now() + interval '1 hour', 1, now())`,
+		grantID, reqID, ownerID, ownerName).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Exec(`insert into query_sessions (id, user_id_snapshot, username_snapshot, flow_id_snapshot, flow_name_snapshot, grant_id, approval_required_snapshot, state, version, created_at, last_seen_at)
+		values (?, ?, ?, ?, ?, ?, true, 'active', 1, now(), now())`,
+		sessionID, ownerID, ownerName, flowID, flowName, grantID).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Exec(`insert into query_session_capabilities (session_id, datasource_id, datasource_name_snapshot, datasource_identity_fingerprint, state, can_query, can_export)
 		values (?, ?, 'mc-ds', ?, 'active', true, false)`, sessionID, dsID, fp).Error; err != nil {
 		t.Fatal(err)
 	}
@@ -432,8 +458,9 @@ func TestMetadataCacheNeverBypassesSessionOrAuthGuards(t *testing.T) {
 	}
 
 	// Wrong actor is rejected even though cache is warm.
-	if _, err := svc.ListSchemas(ctx, other, sessionID, dsID); err == nil || !errors.Is(err, domain.ErrNotFound()) {
-		t.Fatalf("expected ErrNotFound for non-owner actor, got %v", err)
+	var derr *domain.Error
+	if _, err := svc.ListSchemas(ctx, other, sessionID, dsID); !errors.As(err, &derr) || derr.Code != domain.CodeNotFound {
+		t.Fatalf("expected CodeNotFound for non-owner actor, got %v", err)
 	}
 
 	// Disabling the datasource blocks metadata reads even while cached.
@@ -448,10 +475,11 @@ func TestMetadataCacheNeverBypassesSessionOrAuthGuards(t *testing.T) {
 	}
 
 	// Closing the session blocks metadata reads even while cached.
-	if err := db.Exec(`update query_sessions set state = 'revoked' where id = ?`, sessionID).Error; err != nil {
+	if err := db.Exec(`update query_sessions set state = 'revoked', closed_at = now(), close_reason = 'revoked' where id = ?`, sessionID).Error; err != nil {
 		t.Fatal(err)
 	}
-	if _, err := svc.ListSchemas(ctx, owner, sessionID, dsID); err == nil {
-		t.Fatal("expected revoked session to reject ListSchemas despite warm cache")
+	derr = nil
+	if _, err := svc.ListSchemas(ctx, owner, sessionID, dsID); !errors.As(err, &derr) || derr.Code != domain.CodeGrantRevoked {
+		t.Fatalf("expected CodeGrantRevoked for revoked session despite warm cache, got %v", err)
 	}
 }

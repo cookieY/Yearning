@@ -13,6 +13,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"runtime/debug"
 	"time"
 
 	"go.uber.org/zap"
@@ -28,6 +29,13 @@ import (
 	"github.com/cookieY/YearningX/backend/internal/review/privacy"
 	"github.com/cookieY/YearningX/backend/internal/review/provider"
 )
+
+// fakeProviderPlanHash is the static plan hash stamped onto review runs using the fallback plan identity.
+var fakeProviderPlanHash = sha256Hex([]byte("fake-runner-v1"))
+
+// heavyGroupingSem limits concurrent heavyweight (> ephemeralSyncSyntaxCheckMaxBytes) groupings
+// inside a single review worker process to keep peak RSS within the Pod memory budget.
+var heavyGroupingSem = make(chan struct{}, 2)
 
 // ExecuteEphemeralRun executes an ephemeral precheck in a goroutine until reaching a terminal state
 // (idempotent: returns immediately if already terminal). Any failure converges to an in-memory terminal
@@ -61,11 +69,6 @@ func (r *AgentRunner) ExecuteEphemeralRun(ctx context.Context, er *EphemeralRun)
 // ephemeralGrouping mirrors the analysis section of groupingPhase: streaming analysis -> in-memory model construction.
 func (r *AgentRunner) ephemeralGrouping(ctx context.Context, er *EphemeralRun) error {
 	s := r.svc
-	split := changeset.NewSplitter(bytes.NewReader(er.SQLPlaintext), er.Profile, 0)
-	stmts, aggs, err := analyzeRunStatements(split, er.Profile, er.Mapper, s.Engine, int32(er.ExpectedStatementCount), nil)
-	if err != nil {
-		return err
-	}
 	stages, err := s.loadFlowStages(ctx, s.DB, er.FlowID)
 	if err != nil {
 		return err
@@ -73,6 +76,59 @@ func (r *AgentRunner) ephemeralGrouping(ctx context.Context, er *EphemeralRun) e
 	if len(stages) == 0 {
 		return domain.ErrCoverageIncomplete
 	}
+	hasPostgresStage := false
+	for i := range stages {
+		if stages[i].Engine == "postgresql" || stages[i].CompatibilityMode == "postgresql" {
+			hasPostgresStage = true
+			break
+		}
+	}
+
+	er.mu.RLock()
+	plain := er.SQLPlaintext
+	profile := er.Profile
+	mapper := er.Mapper
+	expectedCount := int32(er.ExpectedStatementCount)
+	validateSyntax := !er.syntaxValidated
+	runID := er.ID
+	er.mu.RUnlock()
+
+	releaseRawSQL := func() {
+		er.mu.Lock()
+		er.SQLPlaintext = nil
+		er.mu.Unlock()
+		if s.Ephemeral != nil {
+			s.Ephemeral.releaseSQLBytes(er)
+		}
+	}
+	defer releaseRawSQL()
+
+	if len(plain) > ephemeralSyncSyntaxCheckMaxBytes {
+		select {
+		case heavyGroupingSem <- struct{}{}:
+			defer func() { <-heavyGroupingSem }()
+		case <-ctx.Done():
+			return ctx.Err()
+		}
+	}
+
+	analysis, err := analyzeRunStatementsStreaming(streamingAnalysisOptions{
+		runID:           runID,
+		rawSQL:          plain,
+		profile:         profile,
+		mapper:          mapper,
+		engine:          s.Engine,
+		expectedCount:   expectedCount,
+		validateSyntax:  validateSyntax,
+		inlineLimit:     ephemeralInlineStatementLimit,
+		collectPostgres: hasPostgresStage,
+	})
+	plain = nil
+	releaseRawSQL()
+	if err != nil {
+		return err
+	}
+
 	for i := range stages {
 		if stages[i].IdentityFP == nil || *stages[i].IdentityFP == "" {
 			return &domain.Error{Code: domain.CodeReviewCoverageIncomp, Name: "REVIEW_COVERAGE_INCOMPLETE"}
@@ -92,22 +148,16 @@ func (r *AgentRunner) ephemeralGrouping(ctx context.Context, er *EphemeralRun) e
 		}
 		frozenTargets[st.Position] = target
 	}
-	postgresStatements := make([]postgresAnalyzedStatement, 0, len(stmts))
-	for i := range stmts {
-		postgresStatements = append(postgresStatements, postgresAnalyzedStatement{
-			result: stmts[i].res, objects: stmts[i].objects,
-			pathUnsafe: stmts[i].pathUnsafe, callables: stmts[i].callables, callablesOK: stmts[i].callableOK,
-		})
-	}
 	postgresContextByPosition := make(map[int]map[string]any, len(stages))
 	for i := range stages {
 		stage := stages[i]
-		extra, perr := postgresContextValueForStage(ctx, s, stage, frozenTargets[stage.Position], postgresStatements, er.Mapper)
+		extra, perr := postgresContextValueForStage(ctx, s, stage, frozenTargets[stage.Position], analysis.postgresStatements, er.Mapper)
 		if perr != nil {
 			return domain.ErrCoverageIncomplete
 		}
 		postgresContextByPosition[stage.Position] = extra
 	}
+	analysis.postgresStatements = nil
 	fpKeyID, err := s.Crypter.HMACKeyID(sqlHMACPurpose)
 	if err != nil {
 		return err
@@ -115,6 +165,7 @@ func (r *AgentRunner) ephemeralGrouping(ctx context.Context, er *EphemeralRun) e
 	now := nowUTC()
 	er.mu.Lock()
 	defer er.mu.Unlock()
+	er.SQLPlaintext = nil
 	er.Run = persistence.ReviewRunModel{
 		ID: er.ID, DraftID: er.DraftID, DraftRevision: 0,
 		State:            string(domain.RunStateRunning),
@@ -122,58 +173,26 @@ func (r *AgentRunner) ephemeralGrouping(ctx context.Context, er *EphemeralRun) e
 		ToolConfigHash: er.ToolHash, ProviderPlanHash: fakeProviderPlanHash,
 		FingerprintAlgorithmVersion:   fingerprint.AlgorithmVersion,
 		AnonymizationAlgorithmVersion: "run-mapper-v1",
-		StatementCount:                int32(len(stmts)),
-		FingerprintGroupCount:         int32(len(aggs)),
+		StatementCount:                analysis.statementCount,
+		FingerprintGroupCount:         int32(len(analysis.groups)),
 		BudgetDay:                     now.Format("2006-01-02"),
 		Version:                       1,
 		CreatedAt:                     er.CreatedAt,
 		StartedAt:                     &now,
 	}
-	// Statement models (column-for-column identical to groupingPhase).
-	er.Statements = make([]persistence.SQLStatementModel, 0, len(stmts))
-	for i := range stmts {
-		st := stmts[i]
-		typed, merr := jsonMarshal(map[string]any{
-			"kind": st.res.StatementKind, "operation": st.operation,
-			"dialect_profile": st.res.DialectProfile, "quality": st.res.Quality,
-			"tuple_count": st.res.TupleCount, "parameter_count": st.res.ParameterCount,
-			"anonymized_sql": st.res.AnonymizedSQL, "objects": st.objects,
-			"statement_ordinal":         i + 1,
-			"metadata_context_complete": st.res.MetadataContextComplete,
-			"execution_validity":        st.res.Validity,
-		})
-		if merr != nil {
-			return merr
-		}
-		lit, merr := jsonMarshal(st.res.LiteralTypeCounts)
-		if merr != nil {
-			return merr
-		}
-		er.Statements = append(er.Statements, persistence.SQLStatementModel{
-			ID: newID(), ReviewRunID: er.ID, Ordinal: int32(i + 1),
-			StatementKind: st.class, Operation: st.operation,
-			SizeBytes:        int32(st.res.ByteLen),
-			AlgorithmVersion: st.res.AlgorithmVersion, DialectProfile: st.res.DialectProfile,
-			FingerprintQuality: st.res.Quality, FingerprintKeyID: st.res.FingerprintKeyID,
-			CanonicalFingerprintHMAC: st.res.CanonicalFingerprintHMAC,
-			DialectFingerprintHMAC:   st.res.DialectFingerprintHMAC,
-			ExecutionShapeHMAC:       st.res.ExecutionShapeHMAC,
-			TypedShape:               typed, LiteralTypeCounts: lit,
-			TupleCount: int32(st.res.TupleCount), ParameterCount: int32(st.res.ParameterCount),
-		})
-	}
-	// Group models (representative statements resolved in memory).
-	er.Groups = make([]persistence.SQLFingerprintGroupModel, 0, len(aggs))
-	for i := range aggs {
-		g := aggs[i]
-		repID := ""
-		for j := range er.Statements {
-			if er.Statements[j].CanonicalFingerprintHMAC == g.canon &&
-				er.Statements[j].DialectFingerprintHMAC == g.dialect {
-				repID = er.Statements[j].ID
-				break
-			}
-		}
+	er.analyzedStatementCount = analysis.statementCount
+	er.Statements = analysis.inlineStatements
+	er.repOrdinalToStmtID = analysis.repOrdinalToStmtID
+	er.validityTable = analysis.validityTable
+	er.validityRefs = analysis.validityRefs
+
+	// Group models (representative statements resolved in O(1) via repOrdinalToStmtID).
+	er.Groups = make([]persistence.SQLFingerprintGroupModel, 0, len(analysis.groups))
+	er.groupMeta = make(map[string]ephemeralGroupMeta, len(analysis.groups))
+	er.repSQLByGroup = make(map[string]string, len(analysis.groups))
+	for i := range analysis.groups {
+		g := analysis.groups[i]
+		repID := analysis.repOrdinalToStmtID[g.representativeOrdinal]
 		if repID == "" {
 			return &domain.Error{Code: domain.CodeReviewCoverageIncomp, Name: "REVIEW_COVERAGE_INCOMPLETE"}
 		}
@@ -195,13 +214,21 @@ func (r *AgentRunner) ephemeralGrouping(ctx context.Context, er *EphemeralRun) e
 		if merr != nil {
 			return merr
 		}
+		gid := newID()
 		er.Groups = append(er.Groups, persistence.SQLFingerprintGroupModel{
-			ID: newID(), ReviewRunID: er.ID,
+			ID: gid, ReviewRunID: er.ID,
 			CanonicalFingerprintHMAC: g.canon, DialectFingerprintHMAC: g.dialect,
 			AlgorithmVersion: fingerprint.AlgorithmVersion, FingerprintKeyID: fpKeyID,
 			TypedShape: typed, InValueCountMax: int32(g.inMax), ValuesRowCountMax: int32(g.valMax),
 			StatementCount: int32(g.count), RepresentativeStatementID: repID,
 		})
+		er.groupMeta[gid] = ephemeralGroupMeta{
+			RepKind:      g.repKind,
+			RepOperation: g.repOperation,
+			SizeMax:      g.sizeMax,
+			RepOrdinal:   g.representativeOrdinal,
+		}
+		er.repSQLByGroup[gid] = g.repSQL
 	}
 	// Stage snapshot skeletons (identical to groupingPhase: encrypted frozen target context).
 	er.Snapshots = make([]persistence.StageReviewSnapshotModel, 0, len(stages))
@@ -299,7 +326,7 @@ func (r *AgentRunner) ephemeralReview(ctx context.Context, er *EphemeralRun) err
 	}
 	// B8 coverage check (in-memory counts).
 	er.mu.RLock()
-	stmtCount := int64(len(er.Statements))
+	stmtCount := er.trackedStatementCountLocked()
 	var groupSum int64
 	for _, g := range er.Groups {
 		groupSum += int64(g.StatementCount)
@@ -343,8 +370,8 @@ func (r *AgentRunner) ephemeralFinish(er *EphemeralRun, trigger domain.RunTrigge
 		zap.String("trigger", string(trigger)), zap.Int32("code", bizCode),
 		zap.String("name", failureName))
 	er.mu.Lock()
-	defer er.mu.Unlock()
 	if domain.RunTerminal(er.state) {
+		er.mu.Unlock()
 		return
 	}
 	next, err := domain.RunTransition(er.state, trigger)
@@ -382,6 +409,24 @@ func (r *AgentRunner) ephemeralFinish(er *EphemeralRun, trigger domain.RunTrigge
 	er.FinishedAt = &now
 	er.Run.FinishedAt = &now
 	er.expiresAt = now.Add(r.svc.EphemeralTTL())
+	er.SQLPlaintext = nil
+	er.validityRefs = nil
+	er.validityTable = nil
+	er.repSQLByGroup = nil
+	er.groupMeta = nil
+	if next != domain.RunStateReady || len(er.Statements) > 0 {
+		er.repOrdinalToStmtID = nil
+	}
+	wasBulk := er.bulkSQL
+	er.mu.Unlock()
+
+	if r.svc != nil && r.svc.Ephemeral != nil {
+		r.svc.Ephemeral.releaseSQLBytes(er)
+		r.svc.Ephemeral.enforceTerminalCap()
+	}
+	if wasBulk {
+		debug.FreeOSMemory()
+	}
 }
 
 // ephemeralFreezeInjections mirrors freezeInjections (in-memory sink; knowledge scope resolved via in-memory groups).
@@ -591,23 +636,36 @@ func ephemeralStageGroups(er *EphemeralRun, datasourceID string) []provider.Anon
 	out := []provider.AnonymizedGroup{}
 	for gi := range er.Groups {
 		g := &er.Groups[gi]
-		var rep *persistence.SQLStatementModel
-		for i := range er.Statements {
-			if er.Statements[i].ID == g.RepresentativeStatementID {
-				rep = &er.Statements[i]
-				break
-			}
-		}
-		if rep == nil {
-			continue
-		}
+		var repKind, repOp string
 		var sizeMax int64
-		for i := range er.Statements {
-			st := &er.Statements[i]
-			if st.CanonicalFingerprintHMAC == g.CanonicalFingerprintHMAC &&
-				st.DialectFingerprintHMAC == g.DialectFingerprintHMAC &&
-				int64(st.SizeBytes) > sizeMax {
-				sizeMax = int64(st.SizeBytes)
+		if er.groupMeta != nil {
+			meta, ok := er.groupMeta[g.ID]
+			if !ok {
+				continue
+			}
+			repKind = meta.RepKind
+			repOp = meta.RepOperation
+			sizeMax = meta.SizeMax
+		} else {
+			var rep *persistence.SQLStatementModel
+			for i := range er.Statements {
+				if er.Statements[i].ID == g.RepresentativeStatementID {
+					rep = &er.Statements[i]
+					break
+				}
+			}
+			if rep == nil {
+				continue
+			}
+			repKind = rep.StatementKind
+			repOp = rep.Operation
+			for i := range er.Statements {
+				st := &er.Statements[i]
+				if st.CanonicalFingerprintHMAC == g.CanonicalFingerprintHMAC &&
+					st.DialectFingerprintHMAC == g.DialectFingerprintHMAC &&
+					int64(st.SizeBytes) > sizeMax {
+					sizeMax = int64(st.SizeBytes)
+				}
 			}
 		}
 		stats := map[string]any{}
@@ -633,7 +691,7 @@ func ephemeralStageGroups(er *EphemeralRun, datasourceID string) []provider.Anon
 		delete(stats, "statement_ordinal_ranges")
 		stats["max_statement_bytes"] = sizeMax
 		shape := fmt.Sprintf("kind=%v op=%v where=%v",
-			rep.StatementKind, rep.Operation, !boolValue(stats["unbounded_mutation"]))
+			repKind, repOp, !boolValue(stats["unbounded_mutation"]))
 		out = append(out, provider.AnonymizedGroup{
 			GroupID: g.ID, RepresentativeShape: shape, StatementCount: int64(g.StatementCount), Statistics: stats,
 			RepresentativeAnonymizedSQL: metadata.SQL, Objects: metadata.Objects,
@@ -652,7 +710,39 @@ func ephemeralValidityOf(er *EphemeralRun) stageValidityFunc {
 		refs []provider.NormalizedEvidenceRef,
 	) (ValidityResult, []mappedFinding, map[string]any, error) {
 		er.mu.RLock()
-		defer er.mu.RUnlock()
+		if len(er.validityRefs) > 0 {
+			refsCompact := er.validityRefs
+			table := er.validityTable
+			stmtCount := run.StatementCount
+			groupIDs := make([]string, len(er.Groups))
+			for i := range er.Groups {
+				groupIDs[i] = er.Groups[i].ID
+			}
+			er.mu.RUnlock()
+			program := ValidityProgram{
+				Complete:   int32(len(refsCompact)) == stmtCount,
+				Statements: make([]StatementValidityAtOrdinal, len(refsCompact)),
+			}
+			groupIdxByOrd := make([]uint16, len(refsCompact))
+			for i, ref := range refsCompact {
+				program.Statements[i] = StatementValidityAtOrdinal{
+					Ordinal: int32(i + 1),
+					Facts:   table[ref.validityIdx],
+				}
+				groupIdxByOrd[i] = ref.groupIdx
+			}
+			return evaluateValidityProgramWithGroupLookup(ctx, program, func(ord int32) string {
+				idx := int(ord - 1)
+				if idx < 0 || idx >= len(groupIdxByOrd) {
+					return ""
+				}
+				gi := int(groupIdxByOrd[idx])
+				if gi < 0 || gi >= len(groupIDs) {
+					return ""
+				}
+				return groupIDs[gi]
+			}, binding, mapper, engine, locale, refs)
+		}
 		program := ValidityProgram{Complete: int32(len(er.Statements)) == run.StatementCount}
 		groups := map[int32]string{}
 		for i := range er.Statements {
@@ -661,6 +751,7 @@ func ephemeralValidityOf(er *EphemeralRun) stageValidityFunc {
 				Validity fingerprint.StatementValidity `json:"execution_validity"`
 			}
 			if err := jsonUnmarshalStrict(st.TypedShape, &shape); err != nil {
+				er.mu.RUnlock()
 				return ValidityResult{}, nil, nil, err
 			}
 			if st.Ordinal != int32(i+1) {
@@ -681,11 +772,19 @@ func ephemeralValidityOf(er *EphemeralRun) stageValidityFunc {
 			program.Statements = append(program.Statements, StatementValidityAtOrdinal{Ordinal: st.Ordinal, Facts: shape.Validity})
 			groups[st.Ordinal] = gid
 		}
+		er.mu.RUnlock()
 		return evaluateValidityProgram(ctx, program, groups, binding, mapper, engine, locale, refs)
 	}
 }
 
 func strPtr(v string) *string { return &v }
+
+func addMandatoryFindingKey(dst map[string]bool, findingKey string) {
+	if findingKey == "" {
+		return
+	}
+	dst[findingKey] = true
+}
 
 // ephemeralRepresentativeSQL resolves the representative statement SQL for a fingerprint group directly from
 // EphemeralRun memory so built-in tools such as safe_explain can inspect execution plans before materialization.
@@ -694,6 +793,10 @@ func ephemeralRepresentativeSQL(er *EphemeralRun, runID, groupID string) (string
 		return "", false, nil
 	}
 	er.mu.RLock()
+	if sqlText, ok := er.repSQLByGroup[groupID]; ok && sqlText != "" {
+		er.mu.RUnlock()
+		return sqlText, true, nil
+	}
 	var repStmtID string
 	for i := range er.Groups {
 		if er.Groups[i].ID == groupID && er.Groups[i].ReviewRunID == runID {
@@ -731,4 +834,20 @@ func ephemeralRepresentativeSQL(er *EphemeralRun, runID, groupID string) (string
 			return string(stmt.SQL), true, nil
 		}
 	}
+}
+
+// findingProvenance is encrypted with the stage context and bound to the
+// existing finding ID. It records the runtime classification without extending
+// the public finding schema or storing model-supplied source identifiers.
+func findingProvenance(id string, f mappedFinding) map[string]any {
+	cause, sourceKey := f.cause, ""
+	switch cause {
+	case "policy_finding":
+		sourceKey = f.sourceKey // assigned only after frozen mandatory-key lookup
+	case "proven_invalid_execution":
+	default:
+		cause = "agent_observation"
+	}
+	return map[string]any{"finding_id": id, "cause": cause, "source_key": sourceKey,
+		"fingerprint_group_id": f.groupID, "evidence_ids": append([]string(nil), f.evidence...)}
 }

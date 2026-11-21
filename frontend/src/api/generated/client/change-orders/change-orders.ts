@@ -38,7 +38,6 @@ import type {
   ListOrderReviewFindings200,
   ListOrderReviewFindingsParams,
   ListReviewFindingEvidence200,
-  ProblemResponse,
   ReasonRequest,
   RecordOrderSqlCopy200,
   RecordRawReviewEvidenceCopy200,
@@ -55,18 +54,6 @@ import type {
 
 import { customInstance } from '../../../../shared/api/mutator';
 
-export type submitChangeDraftResponse200 = {
-  data: SubmitChangeDraft200
-  status: 200
-}
-
-export type submitChangeDraftResponseSuccess = (submitChangeDraftResponse200) & {
-  headers: Headers;
-};
-;
-
-export type submitChangeDraftResponse = (submitChangeDraftResponseSuccess)
-
 export const getSubmitChangeDraftUrl = () => {
 
 
@@ -78,7 +65,7 @@ export const getSubmitChangeDraftUrl = () => {
 /**
  * Submit the ephemeral precheck result as an immutable workorder (RCP-20261101-EPHEMERAL-PRECHECK). The request carries the flow, the current SQL and the ephemeral run_id; the server verifies the SQL is byte-identical to what was prechecked, materializes the run in the submission transaction (the only persistence point for review content), and freezes the order. draft_id is omitted for direct create-mode submission; the draft is never modified by precheck and is only marked submitted here.
  */
-export const submitChangeDraft = async (submitChangeDraftBody: SubmitChangeDraftBody, options?: Parameters<typeof customInstance>[1]): Promise<submitChangeDraftResponse> => {
+export const submitChangeDraft = async (submitChangeDraftBody: SubmitChangeDraftBody, options?: Parameters<typeof customInstance>[1]): Promise<SubmitChangeDraft200> => {
 
     const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
@@ -86,7 +73,7 @@ export const submitChangeDraft = async (submitChangeDraftBody: SubmitChangeDraft
     if (Array.isArray(h)) return Object.fromEntries(h);
     return h;
   };
-return customInstance<submitChangeDraftResponse>(getSubmitChangeDraftUrl(),
+return customInstance<SubmitChangeDraft200>(getSubmitChangeDraftUrl(),
   {
     ...options,
     method: 'POST',
@@ -95,18 +82,6 @@ return customInstance<submitChangeDraftResponse>(getSubmitChangeDraftUrl(),
   }
 );}
 
-
-export type listChangeOrdersResponse200 = {
-  data: ListChangeOrders200
-  status: 200
-}
-
-export type listChangeOrdersResponseSuccess = (listChangeOrdersResponse200) & {
-  headers: Headers;
-};
-;
-
-export type listChangeOrdersResponse = (listChangeOrdersResponseSuccess)
 
 export const getListChangeOrdersUrl = (params?: ListChangeOrdersParams,) => {
   const normalizedParams = new URLSearchParams();
@@ -123,9 +98,9 @@ export const getListChangeOrdersUrl = (params?: ListChangeOrdersParams,) => {
   return stringifiedParams.length > 0 ? `/api/v4/change-orders?${stringifiedParams}` : `/api/v4/change-orders`
 }
 
-export const listChangeOrders = async (params?: ListChangeOrdersParams, options?: Parameters<typeof customInstance>[1]): Promise<listChangeOrdersResponse> => {
+export const listChangeOrders = async (params?: ListChangeOrdersParams, options?: Parameters<typeof customInstance>[1]): Promise<ListChangeOrders200> => {
 
-  return customInstance<listChangeOrdersResponse>(getListChangeOrdersUrl(params),
+  return customInstance<ListChangeOrders200>(getListChangeOrdersUrl(params),
   {
     ...options,
     method: 'GET'
@@ -134,18 +109,6 @@ export const listChangeOrders = async (params?: ListChangeOrdersParams, options?
   }
 );}
 
-
-export type getChangeOrderResponse200 = {
-  data: GetChangeOrder200
-  status: 200
-}
-
-export type getChangeOrderResponseSuccess = (getChangeOrderResponse200) & {
-  headers: Headers;
-};
-;
-
-export type getChangeOrderResponse = (getChangeOrderResponseSuccess)
 
 export const getGetChangeOrderUrl = (orderId: string,) => {
 
@@ -155,9 +118,9 @@ export const getGetChangeOrderUrl = (orderId: string,) => {
   return `/api/v4/change-orders/${orderId}`
 }
 
-export const getChangeOrder = async (orderId: string, options?: Parameters<typeof customInstance>[1]): Promise<getChangeOrderResponse> => {
+export const getChangeOrder = async (orderId: string, options?: Parameters<typeof customInstance>[1]): Promise<GetChangeOrder200> => {
 
-  return customInstance<getChangeOrderResponse>(getGetChangeOrderUrl(orderId),
+  return customInstance<GetChangeOrder200>(getGetChangeOrderUrl(orderId),
   {
     ...options,
     method: 'GET'
@@ -166,25 +129,6 @@ export const getChangeOrder = async (orderId: string, options?: Parameters<typeo
   }
 );}
 
-
-export type revealOrderSqlResponse200 = {
-  data: RevealOrderSql200
-  status: 200
-}
-
-export type revealOrderSqlResponse403 = {
-  data: ProblemResponse
-  status: 403
-}
-
-export type revealOrderSqlResponseSuccess = (revealOrderSqlResponse200) & {
-  headers: Headers;
-};
-export type revealOrderSqlResponseError = (revealOrderSqlResponse403) & {
-  headers: Headers;
-};
-
-export type revealOrderSqlResponse = (revealOrderSqlResponseSuccess | revealOrderSqlResponseError)
 
 export const getRevealOrderSqlUrl = (orderId: string,) => {
 
@@ -195,7 +139,7 @@ export const getRevealOrderSqlUrl = (orderId: string,) => {
 }
 
 export const revealOrderSql = async (orderId: string,
-    revealRequest: RevealRequest, options?: Parameters<typeof customInstance>[1]): Promise<revealOrderSqlResponse> => {
+    revealRequest: RevealRequest, options?: Parameters<typeof customInstance>[1]): Promise<RevealOrderSql200> => {
 
     const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
@@ -203,7 +147,7 @@ export const revealOrderSql = async (orderId: string,
     if (Array.isArray(h)) return Object.fromEntries(h);
     return h;
   };
-return customInstance<revealOrderSqlResponse>(getRevealOrderSqlUrl(orderId),
+return customInstance<RevealOrderSql200>(getRevealOrderSqlUrl(orderId),
   {
     ...options,
     method: 'POST',
@@ -212,25 +156,6 @@ return customInstance<revealOrderSqlResponse>(getRevealOrderSqlUrl(orderId),
   }
 );}
 
-
-export type recordOrderSqlCopyResponse200 = {
-  data: RecordOrderSqlCopy200
-  status: 200
-}
-
-export type recordOrderSqlCopyResponse403 = {
-  data: ProblemResponse
-  status: 403
-}
-
-export type recordOrderSqlCopyResponseSuccess = (recordOrderSqlCopyResponse200) & {
-  headers: Headers;
-};
-export type recordOrderSqlCopyResponseError = (recordOrderSqlCopyResponse403) & {
-  headers: Headers;
-};
-
-export type recordOrderSqlCopyResponse = (recordOrderSqlCopyResponseSuccess | recordOrderSqlCopyResponseError)
 
 export const getRecordOrderSqlCopyUrl = (orderId: string,) => {
 
@@ -241,7 +166,7 @@ export const getRecordOrderSqlCopyUrl = (orderId: string,) => {
 }
 
 export const recordOrderSqlCopy = async (orderId: string,
-    copyAuditRequest: CopyAuditRequest, options?: Parameters<typeof customInstance>[1]): Promise<recordOrderSqlCopyResponse> => {
+    copyAuditRequest: CopyAuditRequest, options?: Parameters<typeof customInstance>[1]): Promise<RecordOrderSqlCopy200> => {
 
     const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
@@ -249,7 +174,7 @@ export const recordOrderSqlCopy = async (orderId: string,
     if (Array.isArray(h)) return Object.fromEntries(h);
     return h;
   };
-return customInstance<recordOrderSqlCopyResponse>(getRecordOrderSqlCopyUrl(orderId),
+return customInstance<RecordOrderSqlCopy200>(getRecordOrderSqlCopyUrl(orderId),
   {
     ...options,
     method: 'POST',
@@ -258,25 +183,6 @@ return customInstance<recordOrderSqlCopyResponse>(getRecordOrderSqlCopyUrl(order
   }
 );}
 
-
-export type listOrderReviewFindingsResponse200 = {
-  data: ListOrderReviewFindings200
-  status: 200
-}
-
-export type listOrderReviewFindingsResponse403 = {
-  data: ProblemResponse
-  status: 403
-}
-
-export type listOrderReviewFindingsResponseSuccess = (listOrderReviewFindingsResponse200) & {
-  headers: Headers;
-};
-export type listOrderReviewFindingsResponseError = (listOrderReviewFindingsResponse403) & {
-  headers: Headers;
-};
-
-export type listOrderReviewFindingsResponse = (listOrderReviewFindingsResponseSuccess | listOrderReviewFindingsResponseError)
 
 export const getListOrderReviewFindingsUrl = (orderId: string,
     params?: ListOrderReviewFindingsParams,) => {
@@ -295,9 +201,9 @@ export const getListOrderReviewFindingsUrl = (orderId: string,
 }
 
 export const listOrderReviewFindings = async (orderId: string,
-    params?: ListOrderReviewFindingsParams, options?: Parameters<typeof customInstance>[1]): Promise<listOrderReviewFindingsResponse> => {
+    params?: ListOrderReviewFindingsParams, options?: Parameters<typeof customInstance>[1]): Promise<ListOrderReviewFindings200> => {
 
-  return customInstance<listOrderReviewFindingsResponse>(getListOrderReviewFindingsUrl(orderId,params),
+  return customInstance<ListOrderReviewFindings200>(getListOrderReviewFindingsUrl(orderId,params),
   {
     ...options,
     method: 'GET'
@@ -306,25 +212,6 @@ export const listOrderReviewFindings = async (orderId: string,
   }
 );}
 
-
-export type listReviewFindingEvidenceResponse200 = {
-  data: ListReviewFindingEvidence200
-  status: 200
-}
-
-export type listReviewFindingEvidenceResponse403 = {
-  data: ProblemResponse
-  status: 403
-}
-
-export type listReviewFindingEvidenceResponseSuccess = (listReviewFindingEvidenceResponse200) & {
-  headers: Headers;
-};
-export type listReviewFindingEvidenceResponseError = (listReviewFindingEvidenceResponse403) & {
-  headers: Headers;
-};
-
-export type listReviewFindingEvidenceResponse = (listReviewFindingEvidenceResponseSuccess | listReviewFindingEvidenceResponseError)
 
 export const getListReviewFindingEvidenceUrl = (findingId: string,) => {
 
@@ -334,9 +221,9 @@ export const getListReviewFindingEvidenceUrl = (findingId: string,) => {
   return `/api/v4/review-findings/${findingId}/evidence`
 }
 
-export const listReviewFindingEvidence = async (findingId: string, options?: Parameters<typeof customInstance>[1]): Promise<listReviewFindingEvidenceResponse> => {
+export const listReviewFindingEvidence = async (findingId: string, options?: Parameters<typeof customInstance>[1]): Promise<ListReviewFindingEvidence200> => {
 
-  return customInstance<listReviewFindingEvidenceResponse>(getListReviewFindingEvidenceUrl(findingId),
+  return customInstance<ListReviewFindingEvidence200>(getListReviewFindingEvidenceUrl(findingId),
   {
     ...options,
     method: 'GET'
@@ -345,25 +232,6 @@ export const listReviewFindingEvidence = async (findingId: string, options?: Par
   }
 );}
 
-
-export type revealRawReviewEvidenceResponse200 = {
-  data: RevealRawReviewEvidence200
-  status: 200
-}
-
-export type revealRawReviewEvidenceResponse403 = {
-  data: ProblemResponse
-  status: 403
-}
-
-export type revealRawReviewEvidenceResponseSuccess = (revealRawReviewEvidenceResponse200) & {
-  headers: Headers;
-};
-export type revealRawReviewEvidenceResponseError = (revealRawReviewEvidenceResponse403) & {
-  headers: Headers;
-};
-
-export type revealRawReviewEvidenceResponse = (revealRawReviewEvidenceResponseSuccess | revealRawReviewEvidenceResponseError)
 
 export const getRevealRawReviewEvidenceUrl = (evidenceId: string,) => {
 
@@ -374,7 +242,7 @@ export const getRevealRawReviewEvidenceUrl = (evidenceId: string,) => {
 }
 
 export const revealRawReviewEvidence = async (evidenceId: string,
-    revealRequest: RevealRequest, options?: Parameters<typeof customInstance>[1]): Promise<revealRawReviewEvidenceResponse> => {
+    revealRequest: RevealRequest, options?: Parameters<typeof customInstance>[1]): Promise<RevealRawReviewEvidence200> => {
 
     const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
@@ -382,7 +250,7 @@ export const revealRawReviewEvidence = async (evidenceId: string,
     if (Array.isArray(h)) return Object.fromEntries(h);
     return h;
   };
-return customInstance<revealRawReviewEvidenceResponse>(getRevealRawReviewEvidenceUrl(evidenceId),
+return customInstance<RevealRawReviewEvidence200>(getRevealRawReviewEvidenceUrl(evidenceId),
   {
     ...options,
     method: 'POST',
@@ -391,25 +259,6 @@ return customInstance<revealRawReviewEvidenceResponse>(getRevealRawReviewEvidenc
   }
 );}
 
-
-export type revealIdentifierMappingResponse200 = {
-  data: RevealIdentifierMapping200
-  status: 200
-}
-
-export type revealIdentifierMappingResponse403 = {
-  data: ProblemResponse
-  status: 403
-}
-
-export type revealIdentifierMappingResponseSuccess = (revealIdentifierMappingResponse200) & {
-  headers: Headers;
-};
-export type revealIdentifierMappingResponseError = (revealIdentifierMappingResponse403) & {
-  headers: Headers;
-};
-
-export type revealIdentifierMappingResponse = (revealIdentifierMappingResponseSuccess | revealIdentifierMappingResponseError)
 
 export const getRevealIdentifierMappingUrl = (reviewRunId: string,) => {
 
@@ -423,7 +272,7 @@ export const getRevealIdentifierMappingUrl = (reviewRunId: string,) => {
  * Authorized reveal of the review run's anonymized identifier mapping (draft owner only, same caliber as raw reveal). Audited per action (review_evidence.mapping_revealed); response is no-store; plaintext mappings never enter logs or the model context.
  */
 export const revealIdentifierMapping = async (reviewRunId: string,
-    identifierMappingRevealRequest: IdentifierMappingRevealRequest, options?: Parameters<typeof customInstance>[1]): Promise<revealIdentifierMappingResponse> => {
+    identifierMappingRevealRequest: IdentifierMappingRevealRequest, options?: Parameters<typeof customInstance>[1]): Promise<RevealIdentifierMapping200> => {
 
     const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
@@ -431,7 +280,7 @@ export const revealIdentifierMapping = async (reviewRunId: string,
     if (Array.isArray(h)) return Object.fromEntries(h);
     return h;
   };
-return customInstance<revealIdentifierMappingResponse>(getRevealIdentifierMappingUrl(reviewRunId),
+return customInstance<RevealIdentifierMapping200>(getRevealIdentifierMappingUrl(reviewRunId),
   {
     ...options,
     method: 'POST',
@@ -440,25 +289,6 @@ return customInstance<revealIdentifierMappingResponse>(getRevealIdentifierMappin
   }
 );}
 
-
-export type recordRawReviewEvidenceCopyResponse200 = {
-  data: RecordRawReviewEvidenceCopy200
-  status: 200
-}
-
-export type recordRawReviewEvidenceCopyResponse403 = {
-  data: ProblemResponse
-  status: 403
-}
-
-export type recordRawReviewEvidenceCopyResponseSuccess = (recordRawReviewEvidenceCopyResponse200) & {
-  headers: Headers;
-};
-export type recordRawReviewEvidenceCopyResponseError = (recordRawReviewEvidenceCopyResponse403) & {
-  headers: Headers;
-};
-
-export type recordRawReviewEvidenceCopyResponse = (recordRawReviewEvidenceCopyResponseSuccess | recordRawReviewEvidenceCopyResponseError)
 
 export const getRecordRawReviewEvidenceCopyUrl = (evidenceId: string,) => {
 
@@ -469,7 +299,7 @@ export const getRecordRawReviewEvidenceCopyUrl = (evidenceId: string,) => {
 }
 
 export const recordRawReviewEvidenceCopy = async (evidenceId: string,
-    copyAuditRequest: CopyAuditRequest, options?: Parameters<typeof customInstance>[1]): Promise<recordRawReviewEvidenceCopyResponse> => {
+    copyAuditRequest: CopyAuditRequest, options?: Parameters<typeof customInstance>[1]): Promise<RecordRawReviewEvidenceCopy200> => {
 
     const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
@@ -477,7 +307,7 @@ export const recordRawReviewEvidenceCopy = async (evidenceId: string,
     if (Array.isArray(h)) return Object.fromEntries(h);
     return h;
   };
-return customInstance<recordRawReviewEvidenceCopyResponse>(getRecordRawReviewEvidenceCopyUrl(evidenceId),
+return customInstance<RecordRawReviewEvidenceCopy200>(getRecordRawReviewEvidenceCopyUrl(evidenceId),
   {
     ...options,
     method: 'POST',
@@ -486,25 +316,6 @@ return customInstance<recordRawReviewEvidenceCopyResponse>(getRecordRawReviewEvi
   }
 );}
 
-
-export type copyChangeOrderToDraftResponse200 = {
-  data: CopyChangeOrderToDraft200
-  status: 200
-}
-
-export type copyChangeOrderToDraftResponse403 = {
-  data: ProblemResponse
-  status: 403
-}
-
-export type copyChangeOrderToDraftResponseSuccess = (copyChangeOrderToDraftResponse200) & {
-  headers: Headers;
-};
-export type copyChangeOrderToDraftResponseError = (copyChangeOrderToDraftResponse403) & {
-  headers: Headers;
-};
-
-export type copyChangeOrderToDraftResponse = (copyChangeOrderToDraftResponseSuccess | copyChangeOrderToDraftResponseError)
 
 export const getCopyChangeOrderToDraftUrl = (orderId: string,) => {
 
@@ -515,7 +326,7 @@ export const getCopyChangeOrderToDraftUrl = (orderId: string,) => {
 }
 
 export const copyChangeOrderToDraft = async (orderId: string,
-    copyChangeOrderToDraftRequest: CopyChangeOrderToDraftRequest, options?: Parameters<typeof customInstance>[1]): Promise<copyChangeOrderToDraftResponse> => {
+    copyChangeOrderToDraftRequest: CopyChangeOrderToDraftRequest, options?: Parameters<typeof customInstance>[1]): Promise<CopyChangeOrderToDraft200> => {
 
     const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
@@ -523,7 +334,7 @@ export const copyChangeOrderToDraft = async (orderId: string,
     if (Array.isArray(h)) return Object.fromEntries(h);
     return h;
   };
-return customInstance<copyChangeOrderToDraftResponse>(getCopyChangeOrderToDraftUrl(orderId),
+return customInstance<CopyChangeOrderToDraft200>(getCopyChangeOrderToDraftUrl(orderId),
   {
     ...options,
     method: 'POST',
@@ -532,25 +343,6 @@ return customInstance<copyChangeOrderToDraftResponse>(getCopyChangeOrderToDraftU
   }
 );}
 
-
-export type createRollbackDraftResponse200 = {
-  data: CreateRollbackDraft200
-  status: 200
-}
-
-export type createRollbackDraftResponse403 = {
-  data: ProblemResponse
-  status: 403
-}
-
-export type createRollbackDraftResponseSuccess = (createRollbackDraftResponse200) & {
-  headers: Headers;
-};
-export type createRollbackDraftResponseError = (createRollbackDraftResponse403) & {
-  headers: Headers;
-};
-
-export type createRollbackDraftResponse = (createRollbackDraftResponseSuccess | createRollbackDraftResponseError)
 
 export const getCreateRollbackDraftUrl = (orderId: string,) => {
 
@@ -561,7 +353,7 @@ export const getCreateRollbackDraftUrl = (orderId: string,) => {
 }
 
 export const createRollbackDraft = async (orderId: string,
-    createRollbackDraftRequest?: CreateRollbackDraftRequest, options?: Parameters<typeof customInstance>[1]): Promise<createRollbackDraftResponse> => {
+    createRollbackDraftRequest?: CreateRollbackDraftRequest, options?: Parameters<typeof customInstance>[1]): Promise<CreateRollbackDraft200> => {
 
     const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
@@ -569,7 +361,7 @@ export const createRollbackDraft = async (orderId: string,
     if (Array.isArray(h)) return Object.fromEntries(h);
     return h;
   };
-return customInstance<createRollbackDraftResponse>(getCreateRollbackDraftUrl(orderId),
+return customInstance<CreateRollbackDraft200>(getCreateRollbackDraftUrl(orderId),
   {
     ...options,
     method: 'POST',
@@ -578,18 +370,6 @@ return customInstance<createRollbackDraftResponse>(getCreateRollbackDraftUrl(ord
   }
 );}
 
-
-export type listChangeOrderCommentsResponse200 = {
-  data: ListChangeOrderComments200
-  status: 200
-}
-
-export type listChangeOrderCommentsResponseSuccess = (listChangeOrderCommentsResponse200) & {
-  headers: Headers;
-};
-;
-
-export type listChangeOrderCommentsResponse = (listChangeOrderCommentsResponseSuccess)
 
 export const getListChangeOrderCommentsUrl = (orderId: string,
     params?: ListChangeOrderCommentsParams,) => {
@@ -608,9 +388,9 @@ export const getListChangeOrderCommentsUrl = (orderId: string,
 }
 
 export const listChangeOrderComments = async (orderId: string,
-    params?: ListChangeOrderCommentsParams, options?: Parameters<typeof customInstance>[1]): Promise<listChangeOrderCommentsResponse> => {
+    params?: ListChangeOrderCommentsParams, options?: Parameters<typeof customInstance>[1]): Promise<ListChangeOrderComments200> => {
 
-  return customInstance<listChangeOrderCommentsResponse>(getListChangeOrderCommentsUrl(orderId,params),
+  return customInstance<ListChangeOrderComments200>(getListChangeOrderCommentsUrl(orderId,params),
   {
     ...options,
     method: 'GET'
@@ -619,25 +399,6 @@ export const listChangeOrderComments = async (orderId: string,
   }
 );}
 
-
-export type createChangeOrderCommentResponse200 = {
-  data: CreateChangeOrderComment200
-  status: 200
-}
-
-export type createChangeOrderCommentResponse403 = {
-  data: ProblemResponse
-  status: 403
-}
-
-export type createChangeOrderCommentResponseSuccess = (createChangeOrderCommentResponse200) & {
-  headers: Headers;
-};
-export type createChangeOrderCommentResponseError = (createChangeOrderCommentResponse403) & {
-  headers: Headers;
-};
-
-export type createChangeOrderCommentResponse = (createChangeOrderCommentResponseSuccess | createChangeOrderCommentResponseError)
 
 export const getCreateChangeOrderCommentUrl = (orderId: string,) => {
 
@@ -648,7 +409,7 @@ export const getCreateChangeOrderCommentUrl = (orderId: string,) => {
 }
 
 export const createChangeOrderComment = async (orderId: string,
-    createCommentRequest: CreateCommentRequest, options?: Parameters<typeof customInstance>[1]): Promise<createChangeOrderCommentResponse> => {
+    createCommentRequest: CreateCommentRequest, options?: Parameters<typeof customInstance>[1]): Promise<CreateChangeOrderComment200> => {
 
     const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
@@ -656,7 +417,7 @@ export const createChangeOrderComment = async (orderId: string,
     if (Array.isArray(h)) return Object.fromEntries(h);
     return h;
   };
-return customInstance<createChangeOrderCommentResponse>(getCreateChangeOrderCommentUrl(orderId),
+return customInstance<CreateChangeOrderComment200>(getCreateChangeOrderCommentUrl(orderId),
   {
     ...options,
     method: 'POST',
@@ -665,18 +426,6 @@ return customInstance<createChangeOrderCommentResponse>(getCreateChangeOrderComm
   }
 );}
 
-
-export type listChangeOrderTimelineResponse200 = {
-  data: ListChangeOrderTimeline200
-  status: 200
-}
-
-export type listChangeOrderTimelineResponseSuccess = (listChangeOrderTimelineResponse200) & {
-  headers: Headers;
-};
-;
-
-export type listChangeOrderTimelineResponse = (listChangeOrderTimelineResponseSuccess)
 
 export const getListChangeOrderTimelineUrl = (orderId: string,
     params?: ListChangeOrderTimelineParams,) => {
@@ -695,9 +444,9 @@ export const getListChangeOrderTimelineUrl = (orderId: string,
 }
 
 export const listChangeOrderTimeline = async (orderId: string,
-    params?: ListChangeOrderTimelineParams, options?: Parameters<typeof customInstance>[1]): Promise<listChangeOrderTimelineResponse> => {
+    params?: ListChangeOrderTimelineParams, options?: Parameters<typeof customInstance>[1]): Promise<ListChangeOrderTimeline200> => {
 
-  return customInstance<listChangeOrderTimelineResponse>(getListChangeOrderTimelineUrl(orderId,params),
+  return customInstance<ListChangeOrderTimeline200>(getListChangeOrderTimelineUrl(orderId,params),
   {
     ...options,
     method: 'GET'
@@ -706,25 +455,6 @@ export const listChangeOrderTimeline = async (orderId: string,
   }
 );}
 
-
-export type decideChangeOrderResponse200 = {
-  data: DecideChangeOrder200
-  status: 200
-}
-
-export type decideChangeOrderResponse403 = {
-  data: ProblemResponse
-  status: 403
-}
-
-export type decideChangeOrderResponseSuccess = (decideChangeOrderResponse200) & {
-  headers: Headers;
-};
-export type decideChangeOrderResponseError = (decideChangeOrderResponse403) & {
-  headers: Headers;
-};
-
-export type decideChangeOrderResponse = (decideChangeOrderResponseSuccess | decideChangeOrderResponseError)
 
 export const getDecideChangeOrderUrl = (orderId: string,) => {
 
@@ -735,7 +465,7 @@ export const getDecideChangeOrderUrl = (orderId: string,) => {
 }
 
 export const decideChangeOrder = async (orderId: string,
-    approvalDecisionRequest: ApprovalDecisionRequest, options?: Parameters<typeof customInstance>[1]): Promise<decideChangeOrderResponse> => {
+    approvalDecisionRequest: ApprovalDecisionRequest, options?: Parameters<typeof customInstance>[1]): Promise<DecideChangeOrder200> => {
 
     const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
@@ -743,7 +473,7 @@ export const decideChangeOrder = async (orderId: string,
     if (Array.isArray(h)) return Object.fromEntries(h);
     return h;
   };
-return customInstance<decideChangeOrderResponse>(getDecideChangeOrderUrl(orderId),
+return customInstance<DecideChangeOrder200>(getDecideChangeOrderUrl(orderId),
   {
     ...options,
     method: 'POST',
@@ -752,25 +482,6 @@ return customInstance<decideChangeOrderResponse>(getDecideChangeOrderUrl(orderId
   }
 );}
 
-
-export type createExecutionAttemptResponse200 = {
-  data: CreateExecutionAttempt200
-  status: 200
-}
-
-export type createExecutionAttemptResponse403 = {
-  data: ProblemResponse
-  status: 403
-}
-
-export type createExecutionAttemptResponseSuccess = (createExecutionAttemptResponse200) & {
-  headers: Headers;
-};
-export type createExecutionAttemptResponseError = (createExecutionAttemptResponse403) & {
-  headers: Headers;
-};
-
-export type createExecutionAttemptResponse = (createExecutionAttemptResponseSuccess | createExecutionAttemptResponseError)
 
 export const getCreateExecutionAttemptUrl = (orderId: string,) => {
 
@@ -781,7 +492,7 @@ export const getCreateExecutionAttemptUrl = (orderId: string,) => {
 }
 
 export const createExecutionAttempt = async (orderId: string,
-    executionAttemptRequest?: ExecutionAttemptRequest, options?: Parameters<typeof customInstance>[1]): Promise<createExecutionAttemptResponse> => {
+    executionAttemptRequest?: ExecutionAttemptRequest, options?: Parameters<typeof customInstance>[1]): Promise<CreateExecutionAttempt200> => {
 
     const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
@@ -789,7 +500,7 @@ export const createExecutionAttempt = async (orderId: string,
     if (Array.isArray(h)) return Object.fromEntries(h);
     return h;
   };
-return customInstance<createExecutionAttemptResponse>(getCreateExecutionAttemptUrl(orderId),
+return customInstance<CreateExecutionAttempt200>(getCreateExecutionAttemptUrl(orderId),
   {
     ...options,
     method: 'POST',
@@ -798,18 +509,6 @@ return customInstance<createExecutionAttemptResponse>(getCreateExecutionAttemptU
   }
 );}
 
-
-export type createExecutionScheduleResponse200 = {
-  data: CreateExecutionSchedule200
-  status: 200
-}
-
-export type createExecutionScheduleResponseSuccess = (createExecutionScheduleResponse200) & {
-  headers: Headers;
-};
-;
-
-export type createExecutionScheduleResponse = (createExecutionScheduleResponseSuccess)
 
 export const getCreateExecutionScheduleUrl = (orderId: string,) => {
 
@@ -820,7 +519,7 @@ export const getCreateExecutionScheduleUrl = (orderId: string,) => {
 }
 
 export const createExecutionSchedule = async (orderId: string,
-    scheduleRequest: ScheduleRequest, options?: Parameters<typeof customInstance>[1]): Promise<createExecutionScheduleResponse> => {
+    scheduleRequest: ScheduleRequest, options?: Parameters<typeof customInstance>[1]): Promise<CreateExecutionSchedule200> => {
 
     const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
@@ -828,7 +527,7 @@ export const createExecutionSchedule = async (orderId: string,
     if (Array.isArray(h)) return Object.fromEntries(h);
     return h;
   };
-return customInstance<createExecutionScheduleResponse>(getCreateExecutionScheduleUrl(orderId),
+return customInstance<CreateExecutionSchedule200>(getCreateExecutionScheduleUrl(orderId),
   {
     ...options,
     method: 'POST',
@@ -837,25 +536,6 @@ return customInstance<createExecutionScheduleResponse>(getCreateExecutionSchedul
   }
 );}
 
-
-export type cancelExecutionScheduleResponse200 = {
-  data: CancelExecutionSchedule200
-  status: 200
-}
-
-export type cancelExecutionScheduleResponse403 = {
-  data: ProblemResponse
-  status: 403
-}
-
-export type cancelExecutionScheduleResponseSuccess = (cancelExecutionScheduleResponse200) & {
-  headers: Headers;
-};
-export type cancelExecutionScheduleResponseError = (cancelExecutionScheduleResponse403) & {
-  headers: Headers;
-};
-
-export type cancelExecutionScheduleResponse = (cancelExecutionScheduleResponseSuccess | cancelExecutionScheduleResponseError)
 
 export const getCancelExecutionScheduleUrl = (orderId: string,) => {
 
@@ -868,9 +548,9 @@ export const getCancelExecutionScheduleUrl = (orderId: string,) => {
 /**
  * Cancel the live execution schedule of a scheduled order (owner ruling 2026-10-30): any frozen executor of the current stage may cancel; the order returns to stage_execution_pending (re-schedule or execute immediately); the schedule row settles as cancelled and the due-time claim can never fire it. Cancel and the scheduler's due claim are mutually exclusive via schedule-row CAS - first committer wins.
  */
-export const cancelExecutionSchedule = async (orderId: string, options?: Parameters<typeof customInstance>[1]): Promise<cancelExecutionScheduleResponse> => {
+export const cancelExecutionSchedule = async (orderId: string, options?: Parameters<typeof customInstance>[1]): Promise<CancelExecutionSchedule200> => {
 
-  return customInstance<cancelExecutionScheduleResponse>(getCancelExecutionScheduleUrl(orderId),
+  return customInstance<CancelExecutionSchedule200>(getCancelExecutionScheduleUrl(orderId),
   {
     ...options,
     method: 'POST'
@@ -880,25 +560,6 @@ export const cancelExecutionSchedule = async (orderId: string, options?: Paramet
 );}
 
 
-export type getExecutionAttemptResponse200 = {
-  data: GetExecutionAttempt200
-  status: 200
-}
-
-export type getExecutionAttemptResponse403 = {
-  data: ProblemResponse
-  status: 403
-}
-
-export type getExecutionAttemptResponseSuccess = (getExecutionAttemptResponse200) & {
-  headers: Headers;
-};
-export type getExecutionAttemptResponseError = (getExecutionAttemptResponse403) & {
-  headers: Headers;
-};
-
-export type getExecutionAttemptResponse = (getExecutionAttemptResponseSuccess | getExecutionAttemptResponseError)
-
 export const getGetExecutionAttemptUrl = (attemptId: string,) => {
 
 
@@ -907,9 +568,9 @@ export const getGetExecutionAttemptUrl = (attemptId: string,) => {
   return `/api/v4/execution-attempts/${attemptId}`
 }
 
-export const getExecutionAttempt = async (attemptId: string, options?: Parameters<typeof customInstance>[1]): Promise<getExecutionAttemptResponse> => {
+export const getExecutionAttempt = async (attemptId: string, options?: Parameters<typeof customInstance>[1]): Promise<GetExecutionAttempt200> => {
 
-  return customInstance<getExecutionAttemptResponse>(getGetExecutionAttemptUrl(attemptId),
+  return customInstance<GetExecutionAttempt200>(getGetExecutionAttemptUrl(attemptId),
   {
     ...options,
     method: 'GET'
@@ -918,25 +579,6 @@ export const getExecutionAttempt = async (attemptId: string, options?: Parameter
   }
 );}
 
-
-export type listExecutionAttemptStatementsResponse200 = {
-  data: ListExecutionAttemptStatements200
-  status: 200
-}
-
-export type listExecutionAttemptStatementsResponse403 = {
-  data: ProblemResponse
-  status: 403
-}
-
-export type listExecutionAttemptStatementsResponseSuccess = (listExecutionAttemptStatementsResponse200) & {
-  headers: Headers;
-};
-export type listExecutionAttemptStatementsResponseError = (listExecutionAttemptStatementsResponse403) & {
-  headers: Headers;
-};
-
-export type listExecutionAttemptStatementsResponse = (listExecutionAttemptStatementsResponseSuccess | listExecutionAttemptStatementsResponseError)
 
 export const getListExecutionAttemptStatementsUrl = (attemptId: string,
     params?: ListExecutionAttemptStatementsParams,) => {
@@ -955,9 +597,9 @@ export const getListExecutionAttemptStatementsUrl = (attemptId: string,
 }
 
 export const listExecutionAttemptStatements = async (attemptId: string,
-    params?: ListExecutionAttemptStatementsParams, options?: Parameters<typeof customInstance>[1]): Promise<listExecutionAttemptStatementsResponse> => {
+    params?: ListExecutionAttemptStatementsParams, options?: Parameters<typeof customInstance>[1]): Promise<ListExecutionAttemptStatements200> => {
 
-  return customInstance<listExecutionAttemptStatementsResponse>(getListExecutionAttemptStatementsUrl(attemptId,params),
+  return customInstance<ListExecutionAttemptStatements200>(getListExecutionAttemptStatementsUrl(attemptId,params),
   {
     ...options,
     method: 'GET'
@@ -966,18 +608,6 @@ export const listExecutionAttemptStatements = async (attemptId: string,
   }
 );}
 
-
-export type cancelExecutionAttemptResponse200 = {
-  data: CancelExecutionAttempt200
-  status: 200
-}
-
-export type cancelExecutionAttemptResponseSuccess = (cancelExecutionAttemptResponse200) & {
-  headers: Headers;
-};
-;
-
-export type cancelExecutionAttemptResponse = (cancelExecutionAttemptResponseSuccess)
 
 export const getCancelExecutionAttemptUrl = (attemptId: string,) => {
 
@@ -988,7 +618,7 @@ export const getCancelExecutionAttemptUrl = (attemptId: string,) => {
 }
 
 export const cancelExecutionAttempt = async (attemptId: string,
-    reasonRequest: ReasonRequest, options?: Parameters<typeof customInstance>[1]): Promise<cancelExecutionAttemptResponse> => {
+    reasonRequest: ReasonRequest, options?: Parameters<typeof customInstance>[1]): Promise<CancelExecutionAttempt200> => {
 
     const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
@@ -996,7 +626,7 @@ export const cancelExecutionAttempt = async (attemptId: string,
     if (Array.isArray(h)) return Object.fromEntries(h);
     return h;
   };
-return customInstance<cancelExecutionAttemptResponse>(getCancelExecutionAttemptUrl(attemptId),
+return customInstance<CancelExecutionAttempt200>(getCancelExecutionAttemptUrl(attemptId),
   {
     ...options,
     method: 'POST',
@@ -1005,18 +635,6 @@ return customInstance<cancelExecutionAttemptResponse>(getCancelExecutionAttemptU
   }
 );}
 
-
-export type createExecutionVerificationResponse200 = {
-  data: CreateExecutionVerification200
-  status: 200
-}
-
-export type createExecutionVerificationResponseSuccess = (createExecutionVerificationResponse200) & {
-  headers: Headers;
-};
-;
-
-export type createExecutionVerificationResponse = (createExecutionVerificationResponseSuccess)
 
 export const getCreateExecutionVerificationUrl = (attemptId: string,) => {
 
@@ -1027,7 +645,7 @@ export const getCreateExecutionVerificationUrl = (attemptId: string,) => {
 }
 
 export const createExecutionVerification = async (attemptId: string,
-    executionVerificationRequest: ExecutionVerificationRequest, options?: Parameters<typeof customInstance>[1]): Promise<createExecutionVerificationResponse> => {
+    executionVerificationRequest: ExecutionVerificationRequest, options?: Parameters<typeof customInstance>[1]): Promise<CreateExecutionVerification200> => {
 
     const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
@@ -1035,7 +653,7 @@ export const createExecutionVerification = async (attemptId: string,
     if (Array.isArray(h)) return Object.fromEntries(h);
     return h;
   };
-return customInstance<createExecutionVerificationResponse>(getCreateExecutionVerificationUrl(attemptId),
+return customInstance<CreateExecutionVerification200>(getCreateExecutionVerificationUrl(attemptId),
   {
     ...options,
     method: 'POST',
@@ -1044,25 +662,6 @@ return customInstance<createExecutionVerificationResponse>(getCreateExecutionVer
   }
 );}
 
-
-export type withdrawChangeOrderResponse200 = {
-  data: WithdrawChangeOrder200
-  status: 200
-}
-
-export type withdrawChangeOrderResponse403 = {
-  data: ProblemResponse
-  status: 403
-}
-
-export type withdrawChangeOrderResponseSuccess = (withdrawChangeOrderResponse200) & {
-  headers: Headers;
-};
-export type withdrawChangeOrderResponseError = (withdrawChangeOrderResponse403) & {
-  headers: Headers;
-};
-
-export type withdrawChangeOrderResponse = (withdrawChangeOrderResponseSuccess | withdrawChangeOrderResponseError)
 
 export const getWithdrawChangeOrderUrl = (orderId: string,) => {
 
@@ -1073,7 +672,7 @@ export const getWithdrawChangeOrderUrl = (orderId: string,) => {
 }
 
 export const withdrawChangeOrder = async (orderId: string,
-    reasonRequest: ReasonRequest, options?: Parameters<typeof customInstance>[1]): Promise<withdrawChangeOrderResponse> => {
+    reasonRequest: ReasonRequest, options?: Parameters<typeof customInstance>[1]): Promise<WithdrawChangeOrder200> => {
 
     const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
@@ -1081,7 +680,7 @@ export const withdrawChangeOrder = async (orderId: string,
     if (Array.isArray(h)) return Object.fromEntries(h);
     return h;
   };
-return customInstance<withdrawChangeOrderResponse>(getWithdrawChangeOrderUrl(orderId),
+return customInstance<WithdrawChangeOrder200>(getWithdrawChangeOrderUrl(orderId),
   {
     ...options,
     method: 'POST',
@@ -1090,25 +689,6 @@ return customInstance<withdrawChangeOrderResponse>(getWithdrawChangeOrderUrl(ord
   }
 );}
 
-
-export type voidChangeOrderResponse200 = {
-  data: VoidChangeOrder200
-  status: 200
-}
-
-export type voidChangeOrderResponse403 = {
-  data: ProblemResponse
-  status: 403
-}
-
-export type voidChangeOrderResponseSuccess = (voidChangeOrderResponse200) & {
-  headers: Headers;
-};
-export type voidChangeOrderResponseError = (voidChangeOrderResponse403) & {
-  headers: Headers;
-};
-
-export type voidChangeOrderResponse = (voidChangeOrderResponseSuccess | voidChangeOrderResponseError)
 
 export const getVoidChangeOrderUrl = (orderId: string,) => {
 
@@ -1119,7 +699,7 @@ export const getVoidChangeOrderUrl = (orderId: string,) => {
 }
 
 export const voidChangeOrder = async (orderId: string,
-    reasonRequest: ReasonRequest, options?: Parameters<typeof customInstance>[1]): Promise<voidChangeOrderResponse> => {
+    reasonRequest: ReasonRequest, options?: Parameters<typeof customInstance>[1]): Promise<VoidChangeOrder200> => {
 
     const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
@@ -1127,7 +707,7 @@ export const voidChangeOrder = async (orderId: string,
     if (Array.isArray(h)) return Object.fromEntries(h);
     return h;
   };
-return customInstance<voidChangeOrderResponse>(getVoidChangeOrderUrl(orderId),
+return customInstance<VoidChangeOrder200>(getVoidChangeOrderUrl(orderId),
   {
     ...options,
     method: 'POST',

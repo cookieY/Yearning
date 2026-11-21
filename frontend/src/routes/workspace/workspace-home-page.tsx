@@ -15,6 +15,7 @@ import {
   TrendingUp,
 } from "lucide-react";
 import { getSystemHealthDashboard } from "@/api/generated/client/administration/administration";
+import { unwrapApi } from "@/shared/api/mutator";
 import { FlowType } from "@/api/generated/client/yearningV4HTTPAPI.schemas";
 import { listCurrentUserFlows } from "@/api/generated/client/change-drafts/change-drafts";
 import { ChangeOrderState } from "@/api/generated/client/yearningV4HTTPAPI.schemas";
@@ -85,8 +86,7 @@ const RECENT_ROW_COUNT = 3;
 function useSystemHealthQuery(enabled: boolean) {
   return useQuery({
     queryKey: ["admin", "dashboard", "system-health"],
-    queryFn: async () =>
-      (await getSystemHealthDashboard()) as unknown as SystemHealthDashboard,
+    queryFn: () => unwrapApi(getSystemHealthDashboard()),
     enabled,
     staleTime: 60_000,
     // §18.83 (owner 2026-10-23): the health read surface is open to every
@@ -96,18 +96,12 @@ function useSystemHealthQuery(enabled: boolean) {
   });
 }
 
-/** Locale-neutral duration: 18s / 1m 36s / 420ms. Values are runtime ms from
- * the dashboard contract; the preview shows them with their unit suffix. */
-interface FlowsPage {
-  items: unknown[];
-}
-
 /** Grant data for the first-login zero-permission notice: the page never
  * guesses permissions client-side (auth PRD §11), it asks the two flow lists. */
 function useCurrentUserFlows(flowType: FlowType) {
   return useQuery({
     queryKey: ["auth", "flows", flowType],
-    queryFn: async () => (await listCurrentUserFlows({ flow_type: flowType })) as unknown as FlowsPage,
+    queryFn: () => unwrapApi(listCurrentUserFlows({ flow_type: flowType })),
     retry: false,
     staleTime: 5 * 60_000,
     refetchOnWindowFocus: false,

@@ -8,12 +8,14 @@ import (
 	"math"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 
 	"github.com/cookieY/YearningX/backend/internal/authorization/auditlog"
+	"github.com/cookieY/YearningX/backend/internal/database"
 	"github.com/cookieY/YearningX/backend/internal/diagnostics/domain"
 	"github.com/cookieY/YearningX/backend/internal/diagnostics/persistence"
 )
@@ -47,6 +49,49 @@ type aggregatedStatementStat struct {
 	latestLockOrTemp             float64
 }
 
+func (a *aggregatedStatementStat) absorbBucket(b persistence.SQLDiagnosticsBucketMetricModel) {
+	a.latestCallsTotal = b.CallsTotal
+	a.latestTotalExecTimeMS = b.TotalExecTimeMS
+	a.latestRowsExamined = b.RowsExaminedOrSharedBlksReadTotal
+	a.latestRowsSent = b.RowsSentOrRowsReturnedTotal
+	a.latestLockOrTemp = b.LockTimeMSOrTempBlksWrittenTotal
+	if b.ResetDetected {
+		a.resetDetected = true
+	}
+	if b.FirstObserved {
+		a.cumulativeBucketCount++
+	} else {
+		a.deltaBucketCount++
+		a.calls += b.DeltaCalls
+		a.totalExecTimeMS += b.DeltaExecTimeMS
+		a.rowsExaminedOrSharedBlksRead += b.DeltaRowsExaminedOrSharedBlksRead
+		a.rowsSentOrRowsReturned += b.DeltaRowsSentOrRowsReturned
+		a.lockTimeMSOrTempBlksWritten += b.DeltaLockTimeMSOrTempBlksWritten
+	}
+}
+
+func aggregateBucketsByStatement(
+	buckets []persistence.SQLDiagnosticsBucketMetricModel,
+	stmtByID map[string]persistence.SQLDiagnosticsStatementModel,
+) (map[string]*aggregatedStatementStat, map[string][]persistence.SQLDiagnosticsBucketMetricModel) {
+	byStmt := make(map[string]*aggregatedStatementStat)
+	bucketBySnap := make(map[string][]persistence.SQLDiagnosticsBucketMetricModel)
+	for _, b := range buckets {
+		bucketBySnap[b.SnapshotID] = append(bucketBySnap[b.SnapshotID], b)
+		st, ok := stmtByID[b.StatementID]
+		if !ok {
+			continue
+		}
+		agg, exists := byStmt[b.StatementID]
+		if !exists {
+			agg = &aggregatedStatementStat{stmt: st}
+			byStmt[b.StatementID] = agg
+		}
+		agg.absorbBucket(b)
+	}
+	return byStmt, bucketBySnap
+}
+
 func (a *aggregatedStatementStat) effectiveMetrics(overallMode string) (calls int64, totalMS float64, avgMS float64, rowsExamined int64, rowsSent int64, lockOrTemp float64, mode string) {
 	if overallMode != "cumulative_only" && a.deltaBucketCount > 0 {
 		calls = a.calls
@@ -75,18 +120,17 @@ func (a *aggregatedStatementStat) effectiveMetrics(overallMode string) (calls in
 	return
 }
 
-// GetOverview returns the 6 overview chart groups and sortable SQL statement table for the given datasource and time window (P101).
-func (s *Services) GetOverview(ctx context.Context, datasourceID string, q OverviewQuery) (*domain.DiagnosticsOverviewView, error) {
-	ds, err := s.loadDatasourceRow(ctx, datasourceID)
-	if err != nil {
-		return nil, err
-	}
-	cfg, err := s.ensureDiagnosticsConfigRow(ctx, datasourceID)
-	if err != nil {
-		return nil, err
-	}
+type overviewWindow struct {
+	now         time.Time
+	from        time.Time
+	to          time.Time
+	compareFrom time.Time
+	compareTo   time.Time
+	sortBy      string
+	limit       int
+}
 
-	now := time.Now().UTC()
+func resolveOverviewQuery(q OverviewQuery, now time.Time) (overviewWindow, error) {
 	to := q.To.UTC()
 	if to.IsZero() {
 		to = now
@@ -113,29 +157,55 @@ func (s *Services) GetOverview(ctx context.Context, datasourceID string, q Overv
 			sortBy = "total_exec_time_ms"
 		}
 	default:
-		return nil, domain.ErrValidation("Unsupported sort_by field")
+		return overviewWindow{}, domain.ErrValidation("Unsupported sort_by field")
+	}
+	return overviewWindow{
+		now:         now,
+		from:        from,
+		to:          to,
+		compareFrom: compareFrom,
+		compareTo:   compareTo,
+		sortBy:      sortBy,
+		limit:       limit,
+	}, nil
+}
+
+// GetOverview returns the 6 overview chart groups and sortable SQL statement table for the given datasource and time window (P101).
+func (s *Services) GetOverview(ctx context.Context, datasourceID string, q OverviewQuery) (*domain.DiagnosticsOverviewView, error) {
+	ds, err := s.loadDatasourceRow(ctx, datasourceID)
+	if err != nil {
+		return nil, err
+	}
+	cfg, err := s.ensureDiagnosticsConfigRow(ctx, datasourceID)
+	if err != nil {
+		return nil, err
+	}
+
+	win, err := resolveOverviewQuery(q, time.Now().UTC())
+	if err != nil {
+		return nil, err
 	}
 
 	var snapshots []persistence.SQLDiagnosticsSnapshotModel
 	if err := s.DB.WithContext(ctx).
-		Where("datasource_id = ? and sampled_at >= ? and sampled_at <= ? and probe_state in ('ready', 'no_samples')", datasourceID, from, to).
+		Where("datasource_id = ? and sampled_at >= ? and sampled_at <= ? and probe_state in ('ready', 'no_samples')", datasourceID, win.from, win.to).
 		Order("sampled_at asc, id asc").
 		Find(&snapshots).Error; err != nil {
 		return nil, err
 	}
 
 	// Auto-collect an initial snapshot on demand when diagnostics is enabled and the live window has no snapshots yet.
-	if len(snapshots) == 0 && cfg.Enabled && cfg.State != "paused_on_failure" && (q.To.IsZero() || now.Sub(to) < 2*time.Minute) {
-		if cfg.LastCollectedAt == nil || now.Sub(*cfg.LastCollectedAt) >= 15*time.Second {
-			if _, collectErr := s.CollectScheduledSnapshot(ctx, datasourceID, now); collectErr == nil {
+	if len(snapshots) == 0 && cfg.Enabled && cfg.State != "paused_on_failure" && (q.To.IsZero() || win.now.Sub(win.to) < 2*time.Minute) {
+		if cfg.LastCollectedAt == nil || win.now.Sub(*cfg.LastCollectedAt) >= 15*time.Second {
+			if _, collectErr := s.CollectScheduledSnapshot(ctx, datasourceID, win.now); collectErr == nil {
 				if refreshedCfg, cfgErr := s.ensureDiagnosticsConfigRow(ctx, datasourceID); cfgErr == nil {
 					cfg = refreshedCfg
 				}
-				if now.After(to) {
-					to = now
+				if win.now.After(win.to) {
+					win.to = win.now
 				}
 				_ = s.DB.WithContext(ctx).
-					Where("datasource_id = ? and sampled_at >= ? and sampled_at <= ? and probe_state in ('ready', 'no_samples')", datasourceID, from, to).
+					Where("datasource_id = ? and sampled_at >= ? and sampled_at <= ? and probe_state in ('ready', 'no_samples')", datasourceID, win.from, win.to).
 					Order("sampled_at asc, id asc").
 					Find(&snapshots).Error
 			} else if refreshedCfg, cfgErr := s.ensureDiagnosticsConfigRow(ctx, datasourceID); cfgErr == nil {
@@ -146,7 +216,7 @@ func (s *Services) GetOverview(ctx context.Context, datasourceID string, q Overv
 
 	var buckets []persistence.SQLDiagnosticsBucketMetricModel
 	if err := s.DB.WithContext(ctx).
-		Where("datasource_id = ? and bucket_end >= ? and bucket_end <= ?", datasourceID, from, to).
+		Where("datasource_id = ? and bucket_end >= ? and bucket_end <= ?", datasourceID, win.from, win.to).
 		Order("bucket_end asc, id asc").
 		Find(&buckets).Error; err != nil {
 		return nil, err
@@ -163,7 +233,61 @@ func (s *Services) GetOverview(ctx context.Context, datasourceID string, q Overv
 		stmtByID[st.ID] = st
 	}
 
-	// Determine the overall coverage mode (cumulative_only | window_delta | reset_or_gap).
+	overallCoverage := determineOverallCoverageMode(snapshots, buckets)
+	byStmt, bucketBySnap := aggregateBucketsByStatement(buckets, stmtByID)
+	loadTrend := buildOverviewLoadTrend(snapshots, bucketBySnap, overallCoverage, cfg.IntervalSeconds)
+	stmtRows := s.buildSortedStatementRows(ctx, ds, byStmt, overallCoverage, win.sortBy)
+
+	topCount := min(10, len(stmtRows))
+	topStatements := buildOverviewTopStatements(stmtRows[:topCount])
+	scatterPoints := buildOverviewScatterPoints(stmtRows)
+	heatmap := buildOverviewHeatmap(stmtRows[:topCount], snapshots, bucketBySnap, overallCoverage)
+
+	var baselineBuckets []persistence.SQLDiagnosticsBucketMetricModel
+	if err := s.DB.WithContext(ctx).
+		Where("datasource_id = ? and bucket_end >= ? and bucket_end < ?", datasourceID, win.compareFrom, win.compareTo).
+		Find(&baselineBuckets).Error; err != nil {
+		return nil, err
+	}
+	baseByStmt, _ := aggregateBucketsByStatement(baselineBuckets, stmtByID)
+	regressions, newHighLoad := buildOverviewComparisonCharts(byStmt, baseByStmt, overallCoverage)
+
+	if len(stmtRows) > win.limit {
+		stmtRows = stmtRows[:win.limit]
+	}
+
+	probeState := cfg.LastProbeState
+	if !cfg.Enabled {
+		probeState = "disabled"
+	}
+
+	return &domain.DiagnosticsOverviewView{
+		DatasourceID:      ds.ID,
+		Engine:            ds.Engine,
+		CompatibilityMode: ds.CompatibilityMode,
+		ProbeState:        probeState,
+		State:             cfg.State,
+		CoverageMode:      overallCoverage,
+		From:              win.from,
+		To:                win.to,
+		CompareFrom:       &win.compareFrom,
+		CompareTo:         &win.compareTo,
+		LastCollectedAt:   cfg.LastCollectedAt,
+		SnapshotCount:     len(snapshots),
+		LoadTrend:         loadTrend,
+		TopStatements:     topStatements,
+		ScatterPoints:     scatterPoints,
+		Heatmap:           heatmap,
+		Regressions:       regressions,
+		NewHighLoad:       newHighLoad,
+		Statements:        stmtRows,
+	}, nil
+}
+
+func determineOverallCoverageMode(
+	snapshots []persistence.SQLDiagnosticsSnapshotModel,
+	buckets []persistence.SQLDiagnosticsBucketMetricModel,
+) string {
 	hasDelta := false
 	hasResetOrGap := false
 	var totalWindowDeltaCalls int64
@@ -181,56 +305,27 @@ func (s *Services) GetOverview(ctx context.Context, datasourceID string, q Overv
 			hasResetOrGap = true
 		}
 	}
-	overallCoverage := "cumulative_only"
 	if hasDelta && totalWindowDeltaCalls > 0 {
 		if hasResetOrGap {
-			overallCoverage = "reset_or_gap"
-		} else {
-			overallCoverage = "window_delta"
+			return "reset_or_gap"
 		}
+		return "window_delta"
 	}
+	return "cumulative_only"
+}
 
-	// Aggregate per-statement metrics and per-snapshot bucket metrics within the current window.
-	byStmt := make(map[string]*aggregatedStatementStat)
-	bucketBySnap := make(map[string][]persistence.SQLDiagnosticsBucketMetricModel)
-	for _, b := range buckets {
-		bucketBySnap[b.SnapshotID] = append(bucketBySnap[b.SnapshotID], b)
-		st, ok := stmtByID[b.StatementID]
-		if !ok {
-			continue
-		}
-		agg, exists := byStmt[b.StatementID]
-		if !exists {
-			agg = &aggregatedStatementStat{stmt: st}
-			byStmt[b.StatementID] = agg
-		}
-		agg.latestCallsTotal = b.CallsTotal
-		agg.latestTotalExecTimeMS = b.TotalExecTimeMS
-		agg.latestRowsExamined = b.RowsExaminedOrSharedBlksReadTotal
-		agg.latestRowsSent = b.RowsSentOrRowsReturnedTotal
-		agg.latestLockOrTemp = b.LockTimeMSOrTempBlksWrittenTotal
-		if b.ResetDetected {
-			agg.resetDetected = true
-		}
-		if b.FirstObserved {
-			agg.cumulativeBucketCount++
-		} else {
-			agg.deltaBucketCount++
-			agg.calls += b.DeltaCalls
-			agg.totalExecTimeMS += b.DeltaExecTimeMS
-			agg.rowsExaminedOrSharedBlksRead += b.DeltaRowsExaminedOrSharedBlksRead
-			agg.rowsSentOrRowsReturned += b.DeltaRowsSentOrRowsReturned
-			agg.lockTimeMSOrTempBlksWritten += b.DeltaLockTimeMSOrTempBlksWritten
-		}
-	}
-
-	// Chart 1: SQL load trend line chart.
+func buildOverviewLoadTrend(
+	snapshots []persistence.SQLDiagnosticsSnapshotModel,
+	bucketBySnap map[string][]persistence.SQLDiagnosticsBucketMetricModel,
+	overallCoverage string,
+	intervalSeconds int,
+) []domain.DiagnosticsLoadBucketPointView {
 	loadTrend := make([]domain.DiagnosticsLoadBucketPointView, 0, len(snapshots))
 	for _, snap := range snapshots {
 		snapBuckets := bucketBySnap[snap.ID]
 		if len(snapBuckets) == 0 {
 			loadTrend = append(loadTrend, domain.DiagnosticsLoadBucketPointView{
-				BucketStart:     snap.SampledAt.Add(-time.Duration(maxInt(60, cfg.IntervalSeconds)) * time.Second),
+				BucketStart:     snap.SampledAt.Add(-time.Duration(maxInt(60, intervalSeconds)) * time.Second),
 				BucketEnd:       snap.SampledAt,
 				TotalExecTimeMS: 0,
 				Calls:           0,
@@ -272,15 +367,22 @@ func (s *Services) GetOverview(ctx context.Context, datasourceID string, q Overv
 			ResetDetected:   reset,
 		})
 	}
+	return loadTrend
+}
 
-	// Compute grand total execution time across the window for share calculation.
+func (s *Services) buildSortedStatementRows(
+	ctx context.Context,
+	ds *DatasourceRow,
+	byStmt map[string]*aggregatedStatementStat,
+	overallCoverage string,
+	sortBy string,
+) []domain.DiagnosticsStatementRowView {
 	var grandTotalExecMS float64
 	stmtRows := make([]domain.DiagnosticsStatementRowView, 0, len(byStmt))
 	for _, agg := range byStmt {
 		_, totalMS, _, _, _, _, _ := agg.effectiveMetrics(overallCoverage)
 		grandTotalExecMS += totalMS
 	}
-
 	for _, agg := range byStmt {
 		calls, totalMS, avgMS, rowsExamined, rowsSent, lockOrTemp, mode := agg.effectiveMetrics(overallCoverage)
 		share := 0.0
@@ -311,34 +413,88 @@ func (s *Services) GetOverview(ctx context.Context, datasourceID string, q Overv
 			LastSeenAt:                   agg.stmt.LastSeenAt,
 		})
 	}
-
 	sortStatementRows(stmtRows, sortBy)
+	s.backfillOverviewTemplatePreviews(ctx, ds, stmtRows)
+	return stmtRows
+}
 
-	// Populate readable SQL template previews for top statements in the overview when not yet cached.
-	if s.Collector != nil && ds != nil {
-		previewLimit := 25
-		if len(stmtRows) < previewLimit {
-			previewLimit = len(stmtRows)
+const overviewPreviewConcurrency = 2
+
+// backfillOverviewTemplatePreviews fetches uncached readable SQL templates for top overview statements
+// with worker concurrency aligned to the D5 <= 2 connection budget, aborting early on target-wide errors.
+func (s *Services) backfillOverviewTemplatePreviews(ctx context.Context, ds *DatasourceRow, stmtRows []domain.DiagnosticsStatementRowView) {
+	if s.Collector == nil || ds == nil || len(stmtRows) == 0 {
+		return
+	}
+	previewLimit := min(25, len(stmtRows))
+	type previewSlot struct {
+		idx               int
+		engineFingerprint string
+		databaseOrSchema  string
+	}
+	var pending []previewSlot
+	for i := 0; i < previewLimit; i++ {
+		if stmtRows[i].TemplatePreview == nil && stmtRows[i].TemplateStatus != "unavailable" {
+			pending = append(pending, previewSlot{
+				idx:               i,
+				engineFingerprint: stmtRows[i].EngineFingerprint,
+				databaseOrSchema:  stmtRows[i].DatabaseOrSchema,
+			})
 		}
-		for i := 0; i < previewLimit; i++ {
-			if stmtRows[i].TemplatePreview == nil {
-				if rawTmpl, terr := s.Collector.ReadTemplate(ctx, *ds, stmtRows[i].EngineFingerprint, stmtRows[i].DatabaseOrSchema); terr == nil && strings.TrimSpace(rawTmpl) != "" {
-					p := truncatePreview(rawTmpl, 160)
-					stmtRows[i].TemplatePreview = &p
+	}
+	if len(pending) == 0 {
+		return
+	}
+	results := make([]*string, previewLimit)
+	sem := make(chan struct{}, overviewPreviewConcurrency)
+	fetchCtx, cancelFetch := context.WithCancel(ctx)
+	defer cancelFetch()
+	var wg sync.WaitGroup
+dispatch:
+	for _, slot := range pending {
+		if fetchCtx.Err() != nil {
+			break dispatch
+		}
+		select {
+		case sem <- struct{}{}:
+		case <-fetchCtx.Done():
+			break dispatch
+		}
+		if fetchCtx.Err() != nil {
+			<-sem
+			break dispatch
+		}
+		wg.Add(1)
+		go func(sl previewSlot) {
+			defer func() {
+				<-sem
+				wg.Done()
+			}()
+			rawTmpl, terr := s.Collector.ReadTemplate(fetchCtx, *ds, sl.engineFingerprint, sl.databaseOrSchema)
+			if terr != nil {
+				if !errors.Is(terr, database.ErrTemplateUnavailable) && !errors.Is(terr, database.ErrStatementRequired) {
+					cancelFetch()
 				}
+				return
 			}
+			if strings.TrimSpace(rawTmpl) != "" {
+				p := truncatePreview(rawTmpl, 160)
+				results[sl.idx] = &p
+			}
+		}(slot)
+	}
+	wg.Wait()
+	for _, slot := range pending {
+		if results[slot.idx] != nil {
+			stmtRows[slot.idx].TemplatePreview = results[slot.idx]
 		}
 	}
+}
 
-	// Chart 2: Top 10 SQL hotspots horizontal bar chart.
-	topCount := 10
-	if len(stmtRows) < topCount {
-		topCount = len(stmtRows)
-	}
-	topStatements := make([]domain.DiagnosticsTopStatementItemView, 0, topCount)
-	for i := 0; i < topCount; i++ {
-		r := stmtRows[i]
-		topStatements = append(topStatements, domain.DiagnosticsTopStatementItemView{
+func buildOverviewTopStatements(topRows []domain.DiagnosticsStatementRowView) []domain.DiagnosticsTopStatementItemView {
+	out := make([]domain.DiagnosticsTopStatementItemView, 0, len(topRows))
+	for _, r := range topRows {
+		out = append(out, domain.DiagnosticsTopStatementItemView{
 			StatementID:       r.StatementID,
 			EngineFingerprint: r.EngineFingerprint,
 			DatabaseOrSchema:  r.DatabaseOrSchema,
@@ -349,11 +505,13 @@ func (s *Services) GetOverview(ctx context.Context, datasourceID string, q Overv
 			ShareOfTotalTime:  r.ShareOfTotalTime,
 		})
 	}
+	return out
+}
 
-	// Chart 3: Call count vs. average latency scatter plot.
-	scatterPoints := make([]domain.DiagnosticsScatterPointView, 0, len(stmtRows))
+func buildOverviewScatterPoints(stmtRows []domain.DiagnosticsStatementRowView) []domain.DiagnosticsScatterPointView {
+	out := make([]domain.DiagnosticsScatterPointView, 0, len(stmtRows))
 	for _, r := range stmtRows {
-		scatterPoints = append(scatterPoints, domain.DiagnosticsScatterPointView{
+		out = append(out, domain.DiagnosticsScatterPointView{
 			StatementID:                  r.StatementID,
 			EngineFingerprint:            r.EngineFingerprint,
 			DatabaseOrSchema:             r.DatabaseOrSchema,
@@ -363,11 +521,17 @@ func (s *Services) GetOverview(ctx context.Context, datasourceID string, q Overv
 			RowsExaminedOrSharedBlksRead: r.RowsExaminedOrSharedBlksRead,
 		})
 	}
+	return out
+}
 
-	// Chart 4: SQL hotspot heatmap (Top 10 fingerprints x time buckets).
-	heatmap := make([]domain.DiagnosticsHeatmapSeriesView, 0, topCount)
-	for i := 0; i < topCount; i++ {
-		topStmt := stmtRows[i]
+func buildOverviewHeatmap(
+	topRows []domain.DiagnosticsStatementRowView,
+	snapshots []persistence.SQLDiagnosticsSnapshotModel,
+	bucketBySnap map[string][]persistence.SQLDiagnosticsBucketMetricModel,
+	overallCoverage string,
+) []domain.DiagnosticsHeatmapSeriesView {
+	heatmap := make([]domain.DiagnosticsHeatmapSeriesView, 0, len(topRows))
+	for _, topStmt := range topRows {
 		cells := make([]domain.DiagnosticsHeatmapBucketCellView, 0, len(snapshots))
 		for _, snap := range snapshots {
 			snapBuckets := bucketBySnap[snap.ID]
@@ -385,20 +549,20 @@ func (s *Services) GetOverview(ctx context.Context, datasourceID string, q Overv
 					Calls:               0,
 					UnobservedBelowTopN: true,
 				})
-			} else {
-				execMS := matched.DeltaExecTimeMS
-				calls := matched.DeltaCalls
-				if overallCoverage == "cumulative_only" {
-					execMS = matched.TotalExecTimeMS
-					calls = matched.CallsTotal
-				}
-				cells = append(cells, domain.DiagnosticsHeatmapBucketCellView{
-					BucketStart:         matched.BucketEnd,
-					TotalExecTimeMS:     round3(execMS),
-					Calls:               calls,
-					UnobservedBelowTopN: false,
-				})
+				continue
 			}
+			execMS := matched.DeltaExecTimeMS
+			calls := matched.DeltaCalls
+			if overallCoverage == "cumulative_only" {
+				execMS = matched.TotalExecTimeMS
+				calls = matched.CallsTotal
+			}
+			cells = append(cells, domain.DiagnosticsHeatmapBucketCellView{
+				BucketStart:         matched.BucketEnd,
+				TotalExecTimeMS:     round3(execMS),
+				Calls:               calls,
+				UnobservedBelowTopN: false,
+			})
 		}
 		heatmap = append(heatmap, domain.DiagnosticsHeatmapSeriesView{
 			StatementID:       topStmt.StatementID,
@@ -407,34 +571,14 @@ func (s *Services) GetOverview(ctx context.Context, datasourceID string, q Overv
 			Buckets:           cells,
 		})
 	}
+	return heatmap
+}
 
-	// Chart 5 & Chart 6: Performance regression ranking and newly observed high-load SQL against the comparison window (compareFrom..compareTo).
-	var baselineBuckets []persistence.SQLDiagnosticsBucketMetricModel
-	if err := s.DB.WithContext(ctx).
-		Where("datasource_id = ? and bucket_end >= ? and bucket_end < ?", datasourceID, compareFrom, compareTo).
-		Find(&baselineBuckets).Error; err != nil {
-		return nil, err
-	}
-	baseByStmt := make(map[string]*aggregatedStatementStat)
-	for _, b := range baselineBuckets {
-		st, ok := stmtByID[b.StatementID]
-		if !ok {
-			continue
-		}
-		agg, exists := baseByStmt[b.StatementID]
-		if !exists {
-			agg = &aggregatedStatementStat{stmt: st}
-			baseByStmt[b.StatementID] = agg
-		}
-		if b.FirstObserved {
-			agg.cumulativeBucketCount++
-		} else {
-			agg.deltaBucketCount++
-			agg.calls += b.DeltaCalls
-			agg.totalExecTimeMS += b.DeltaExecTimeMS
-		}
-	}
-
+func buildOverviewComparisonCharts(
+	byStmt map[string]*aggregatedStatementStat,
+	baseByStmt map[string]*aggregatedStatementStat,
+	overallCoverage string,
+) ([]domain.DiagnosticsRegressionItemView, []domain.DiagnosticsNewHighLoadItemView) {
 	regressions := make([]domain.DiagnosticsRegressionItemView, 0)
 	newHighLoad := make([]domain.DiagnosticsNewHighLoadItemView, 0)
 
@@ -508,37 +652,7 @@ func (s *Services) GetOverview(ctx context.Context, datasourceID string, q Overv
 	if len(newHighLoad) > 10 {
 		newHighLoad = newHighLoad[:10]
 	}
-
-	if len(stmtRows) > limit {
-		stmtRows = stmtRows[:limit]
-	}
-
-	probeState := cfg.LastProbeState
-	if !cfg.Enabled {
-		probeState = "disabled"
-	}
-
-	return &domain.DiagnosticsOverviewView{
-		DatasourceID:      ds.ID,
-		Engine:            ds.Engine,
-		CompatibilityMode: ds.CompatibilityMode,
-		ProbeState:        probeState,
-		State:             cfg.State,
-		CoverageMode:      overallCoverage,
-		From:              from,
-		To:                to,
-		CompareFrom:       &compareFrom,
-		CompareTo:         &compareTo,
-		LastCollectedAt:   cfg.LastCollectedAt,
-		SnapshotCount:     len(snapshots),
-		LoadTrend:         loadTrend,
-		TopStatements:     topStatements,
-		ScatterPoints:     scatterPoints,
-		Heatmap:           heatmap,
-		Regressions:       regressions,
-		NewHighLoad:       newHighLoad,
-		Statements:        stmtRows,
-	}, nil
+	return regressions, newHighLoad
 }
 
 // GetStatementDetail returns the single SQL fingerprint detail view (including on-demand SQL template fetching, 3 trend/cost/before-after order comparison charts, and the latest AI report).
@@ -593,24 +707,7 @@ func (s *Services) GetStatementDetail(
 	agg := &aggregatedStatementStat{stmt: stmt}
 	for _, b := range stmtBuckets {
 		bucketBySnap[b.SnapshotID] = b
-		agg.latestCallsTotal = b.CallsTotal
-		agg.latestTotalExecTimeMS = b.TotalExecTimeMS
-		agg.latestRowsExamined = b.RowsExaminedOrSharedBlksReadTotal
-		agg.latestRowsSent = b.RowsSentOrRowsReturnedTotal
-		agg.latestLockOrTemp = b.LockTimeMSOrTempBlksWrittenTotal
-		if b.ResetDetected {
-			agg.resetDetected = true
-		}
-		if b.FirstObserved {
-			agg.cumulativeBucketCount++
-		} else {
-			agg.deltaBucketCount++
-			agg.calls += b.DeltaCalls
-			agg.totalExecTimeMS += b.DeltaExecTimeMS
-			agg.rowsExaminedOrSharedBlksRead += b.DeltaRowsExaminedOrSharedBlksRead
-			agg.rowsSentOrRowsReturned += b.DeltaRowsSentOrRowsReturned
-			agg.lockTimeMSOrTempBlksWritten += b.DeltaLockTimeMSOrTempBlksWritten
-		}
+		agg.absorbBucket(b)
 	}
 
 	overallCoverage := "cumulative_only"

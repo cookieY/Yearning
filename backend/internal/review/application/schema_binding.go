@@ -59,28 +59,8 @@ type stageSchemaBinding struct {
 	postgres *frozenPostgresPathBinding
 }
 
-// frozenStageSchemas constructs the frozen object scope for all stage snapshots of a Run
-// (key = stage_position). Any unavailable condition retains the fail-closed default binding for that
-// stage without returning an error — an unavailable binding is a tool-level rejection condition (2012)
-// and does not alter Run lifecycle semantics.
-func (r *AgentRunner) frozenStageSchemas(ctx context.Context, db *gorm.DB,
-	run *persistence.ReviewRunModel, snapshots []persistence.StageReviewSnapshotModel) map[int32]*stageSchemaBinding {
-	// DB path: the Run row does not store flow_id, resolving it via the draft row (ephemeral Runs have no
-	// draft row — RCP-20261101: callers use frozenStageSchemasForFlow to pass the flow directly).
-	var flowID string
-	if err := db.WithContext(ctx).Raw(
-		`select flow_id::text from change_drafts where id = ?`, run.DraftID).Scan(&flowID).Error; err != nil || flowID == "" {
-		out := make(map[int32]*stageSchemaBinding, len(snapshots))
-		for i := range snapshots {
-			out[snapshots[i].StagePosition] = &stageSchemaBinding{}
-		}
-		return out
-	}
-	return r.frozenStageSchemasForFlow(ctx, db, flowID, run, snapshots)
-}
-
-// frozenStageSchemasForFlow constructs per-stage schema bindings for an explicit flow (reused by the DB
-// path after resolving flow_id from the draft; ephemeral Runs pass er.FlowID directly — no draft row to query).
+// frozenStageSchemasForFlow constructs per-stage schema bindings for an explicit flow (reused across
+// ephemeral Runs by passing er.FlowID directly — no draft row to query).
 func (r *AgentRunner) frozenStageSchemasForFlow(ctx context.Context, db *gorm.DB, flowID string,
 	run *persistence.ReviewRunModel, snapshots []persistence.StageReviewSnapshotModel) map[int32]*stageSchemaBinding {
 	out := make(map[int32]*stageSchemaBinding, len(snapshots))

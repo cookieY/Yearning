@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"gorm.io/driver/postgres"
@@ -72,7 +73,6 @@ func TestEnsureFlowStagesIdentityGuardsAndBootstrap(t *testing.T) {
 	// Guard branches on nil / custom DatasourceIdentityProbe / malformed UUIDs must be safe no-ops.
 	var nilSvc *Services
 	nilSvc.ensureFlowStagesIdentity(context.Background(), uuid.NewString(), uuid.NewString())
-	nilSvc.ensureDraftFlowStagesIdentity(context.Background(), uuid.NewString(), uuid.NewString())
 
 	probeSetSvc := &Services{
 		DatasourceIdentityProbe: func(_ context.Context, _ *gorm.DB, _ *crypto.Crypter, _ datasourceTargetRow) (database.ServerIdentity, error) {
@@ -80,7 +80,6 @@ func TestEnsureFlowStagesIdentityGuardsAndBootstrap(t *testing.T) {
 		},
 	}
 	probeSetSvc.ensureFlowStagesIdentity(context.Background(), uuid.NewString(), uuid.NewString())
-	probeSetSvc.ensureDraftFlowStagesIdentity(context.Background(), uuid.NewString(), uuid.NewString())
 
 	dsn := strings.TrimSpace(os.Getenv("YEARNING_TEST_POSTGRES_DSN"))
 	rawPort := strings.TrimSpace(os.Getenv("YEARNING_TEST_ADAPTER_PG_PORT"))
@@ -247,43 +246,29 @@ func TestEnsureFlowStagesIdentityGuardsAndBootstrap(t *testing.T) {
 		t.Fatalf("expected 64-hex fingerprint after ensureFlowStagesIdentity, got %q", afterFP)
 	}
 
-	// Also verify ensureDraftFlowStagesIdentity resets from NULL -> 64-hex.
+	// Also verify StartEphemeralRun invokes ensureFlowStagesIdentity before freezing policy hash.
 	if err := db.Exec(`update datasources set identity_fingerprint = null where id = ?`, dsID).Error; err != nil {
 		t.Fatal(err)
 	}
-	draftID := uuid.NewString()
-	if err := db.Exec(`insert into change_drafts (id, owner_user_id, flow_id, flow_version_seen,
-		title, description, state, revision, version, created_at, updated_at)
-		values (?, ?, ?, 1, 'boot-draft', '', 'draft', 1, 1, now(), now())`,
-		draftID, actorID, flowID).Error; err != nil {
-		t.Fatal(err)
-	}
-	svc.ensureDraftFlowStagesIdentity(ctx, "not-a-uuid", draftID)
-	svc.ensureDraftFlowStagesIdentity(ctx, actorID, "not-a-uuid")
-	svc.ensureDraftFlowStagesIdentity(ctx, otherID, draftID)
-	svc.ensureDraftFlowStagesIdentity(ctx, actorID, draftID)
-	var draftFP string
-	if err := db.Raw(`select coalesce(identity_fingerprint, '') from datasources where id = ?`, dsID).Scan(&draftFP).Error; err != nil {
-		t.Fatal(err)
-	}
-	if draftFP != afterFP {
-		t.Fatalf("expected ensureDraftFlowStagesIdentity to restore %q, got %q", afterFP, draftFP)
-	}
-
-	// Also verify StartRun invokes ensureDraftFlowStagesIdentity before freezing policy hash.
-	if err := db.Exec(`update datasources set identity_fingerprint = null where id = ?`, dsID).Error; err != nil {
-		t.Fatal(err)
-	}
-	_, _ = svc.StartRun(ctx, Actor{UserID: actorID, Username: "rev_actor"}, StartRunInput{
-		DraftID:        draftID,
-		ExpectVersion:  1,
-		IdempotencyKey: "idem-startrun-boot-1",
+	runner := NewAgentRunner(svc, AgentDeps{})
+	runID, _ := svc.StartEphemeralRun(ctx, Actor{UserID: actorID, Username: "rev_actor"}, runner, EphemeralStartInput{
+		FlowID:         flowID,
+		SQL:            []byte("SELECT 1;"),
+		IdempotencyKey: "idem-ephemeral-boot-1",
 	})
+	if runID != "" {
+		for deadline := time.Now().Add(5 * time.Second); time.Now().Before(deadline); {
+			if er := svc.Ephemeral.Get(runID, actorID); er != nil && er.TerminalState() {
+				break
+			}
+			time.Sleep(10 * time.Millisecond)
+		}
+	}
 	var startRunFP string
 	if err := db.Raw(`select coalesce(identity_fingerprint, '') from datasources where id = ?`, dsID).Scan(&startRunFP).Error; err != nil {
 		t.Fatal(err)
 	}
 	if startRunFP != afterFP {
-		t.Fatalf("expected StartRun to bootstrap stage identity %q, got %q", afterFP, startRunFP)
+		t.Fatalf("expected StartEphemeralRun to bootstrap stage identity %q, got %q", afterFP, startRunFP)
 	}
 }

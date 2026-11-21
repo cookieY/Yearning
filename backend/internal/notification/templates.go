@@ -76,56 +76,6 @@ var forbiddenStaticPatterns = []string{
 	"create table ", "truncate table ", "password=", "secret=", "access_token=",
 }
 
-// locale supports the two fixed languages (S006 general.default_locale vocabulary).
-var localeText = map[string]map[string]string{
-	"zh-CN": {
-		"order_submitted":             "\u5de5\u5355 %s \u5df2\u63d0\u4ea4\uff0c\u7b49\u5f85\u5ba1\u6279\u3002",
-		"approval_decided":            "\u5de5\u5355 %s \u5ba1\u6279\u6709\u65b0\u8fdb\u5c55\uff08%s\uff09\u3002",
-		"order_rejected":              "\u5de5\u5355 %s \u5df2\u88ab\u62d2\u7edd\u3002",
-		"execution_scheduled":         "\u5de5\u5355 %s \u5df2\u9884\u7ea6\u6267\u884c\u3002",
-		"execution_started":           "\u5de5\u5355 %s \u5f00\u59cb\u6267\u884c\u3002",
-		"execution_succeeded":         "\u5de5\u5355 %s \u6267\u884c\u6210\u529f\u3002",
-		"execution_failed":            "\u5de5\u5355 %s \u6267\u884c\u5931\u8d25\uff08%s\uff09\u3002",
-		"execution_partial":           "\u5de5\u5355 %s \u90e8\u5206\u5931\u8d25\uff08%s\uff09\u3002",
-		"execution_unknown":           "\u5de5\u5355 %s \u6267\u884c\u7ed3\u679c\u672a\u77e5\uff08%s\uff09\uff0c\u8bf7\u51bb\u7ed3\u6267\u884c\u4eba\u6838\u9a8c\u3002",
-		"execution_blocked":           "\u5de5\u5355 %s \u56e0\u6570\u636e\u6e90\u4e0d\u53ef\u7528\u88ab\u963b\u65ad\u3002",
-		"execution_missed":            "\u5de5\u5355 %s \u9884\u7ea6\u5df2\u9519\u8fc7\uff0c\u4e0d\u81ea\u52a8\u8865\u8dd1\uff0c\u8bf7\u91cd\u65b0\u53d1\u8d77\u3002",
-		"execution_pending":           "\u5de5\u5355 %s \u5ba1\u6279\u5df2\u5168\u90e8\u901a\u8fc7\uff0c\u7b49\u5f85\u6267\u884c\u3002",
-		"schedule_cancelled":          "\u5de5\u5355 %s \u7684\u6267\u884c\u9884\u7ea6\u5df2\u53d6\u6d88\u3002",
-		"execution_cancelled":         "\u5de5\u5355 %s \u6267\u884c\u5df2\u53d6\u6d88\u3002",
-		"execution_partial_cancelled": "\u5de5\u5355 %s \u90e8\u5206\u53d6\u6d88\u5df2\u5b8c\u6210\uff08\u5df2\u6267\u884c\u9636\u6bb5\u4fdd\u7559\uff0c\u4e0d\u81ea\u52a8\u56de\u6eda\uff09\u3002",
-		"step_activated":              "\u5de5\u5355 %s \u6709\u65b0\u7684\u5ba1\u6279\u6b65\u9aa4\u5f85\u5904\u7406\u3002",
-		"order_withdrawn":             "\u5de5\u5355 %s \u5df2\u88ab\u64a4\u56de\u3002",
-		"order_voided":                "\u5de5\u5355 %s \u5df2\u4f5c\u5e9f\u3002",
-		"budget_warning":              "AI\u65e5\u9884\u7b97\u5df2\u8fbe\u9608\u503c\u3002",
-		"budget_exhausted":            "AI\u65e5\u9884\u7b97\u5df2\u8017\u5c3d\u3002",
-		"provider_failover":           "AI Provider\u5df2\u89e6\u53d1\u6545\u969c\u5207\u6362\u3002",
-	},
-	"en-US": {
-		"order_submitted":             "Order %s submitted and pending approval.",
-		"approval_decided":            "Order %s has an approval update (%s).",
-		"order_rejected":              "Order %s was rejected.",
-		"execution_scheduled":         "Order %s scheduled for execution.",
-		"execution_started":           "Order %s execution started.",
-		"execution_succeeded":         "Order %s executed successfully.",
-		"execution_failed":            "Order %s execution failed (%s).",
-		"execution_partial":           "Order %s partially failed (%s).",
-		"execution_unknown":           "Order %s result unknown (%s); frozen executor verification required.",
-		"execution_blocked":           "Order %s blocked by datasource unavailability.",
-		"execution_missed":            "Order %s schedule missed; no auto catch-up, please reschedule.",
-		"execution_pending":           "Order %s fully approved and awaiting execution.",
-		"schedule_cancelled":          "The execution schedule for order %s was cancelled.",
-		"execution_cancelled":         "Order %s execution cancelled.",
-		"execution_partial_cancelled": "Order %s partial cancellation completed (executed stages retained; no automatic rollback).",
-		"step_activated":              "Order %s has a new approval step pending.",
-		"order_withdrawn":             "Order %s was withdrawn.",
-		"order_voided":                "Order %s was voided.",
-		"budget_warning":              "AI daily budget threshold reached.",
-		"budget_exhausted":            "AI daily budget exhausted.",
-		"provider_failover":           "AI provider failover triggered.",
-	},
-}
-
 // eventLabels provides bilingual human labels for {{event_label}}.
 var eventLabels = map[string]map[string]string{
 	"zh-CN": {
@@ -348,45 +298,6 @@ func RenderTemplateString(tpl string, vars map[string]string) string {
 		rest = afterOpen[relClose+2:]
 	}
 	return out.String()
-}
-
-// RenderEvent renders a notification message body (event type + order reference + bounded reason code).
-// Order reference = display_number (frozen YR-... format); reason accepts only tokens matching
-// ^[A-Z0-9_]{1,64}$ and falls back to generic wording otherwise — never passing through free text.
-func RenderEvent(eventType, locale, orderRef, reason string) string {
-	key, ok := templateKey[eventType]
-	if !ok || key == "grant_revoked" {
-		return ""
-	}
-	if locale != "en-US" {
-		locale = "zh-CN"
-	}
-	texts := localeText[locale]
-	if texts == nil {
-		return ""
-	}
-	tpl, ok := texts[key]
-	if !ok {
-		return ""
-	}
-	if !validReason(reason) {
-		reason = ""
-	}
-	switch key {
-	case "order_submitted", "execution_scheduled", "execution_started",
-		"execution_succeeded", "execution_blocked", "execution_missed",
-		"execution_cancelled", "execution_partial_cancelled",
-		"execution_pending", "schedule_cancelled", "step_activated",
-		"order_withdrawn", "order_voided", "order_rejected":
-		return fmt.Sprintf(tpl, orderRef)
-	case "approval_decided":
-		return fmt.Sprintf(tpl, orderRef, reasonOr(reason, locale, "reviewed"))
-	case "execution_failed", "execution_partial", "execution_unknown":
-		return fmt.Sprintf(tpl, orderRef, reasonOr(reason, locale, "failed"))
-	case "budget_warning", "budget_exhausted", "provider_failover":
-		return tpl
-	}
-	return ""
 }
 
 // boundedText strips control characters and truncates length (unified sanitizer for display fields).
@@ -665,6 +576,7 @@ func (w *Worker) buildOrderTemplateVars(ctx context.Context, ev *OutboxEventMode
 				PrimaryKey: orderID, Column: "flow_snapshot_ciphertext", Purpose: crypto.PurposePayload,
 			}); oerr == nil {
 				var doc struct {
+					FlowID   string `json:"flow_id"`
 					FlowName string `json:"flow_name"`
 					Stages   []struct {
 						Position int    `json:"position"`
@@ -674,6 +586,11 @@ func (w *Worker) buildOrderTemplateVars(ctx context.Context, ev *OutboxEventMode
 				if json.Unmarshal(plain, &doc) == nil {
 					if doc.FlowName != "" {
 						vars["flow_name"] = boundedText(doc.FlowName, 128)
+					} else if doc.FlowID != "" {
+						var flowName string
+						if ferr := w.db.WithContext(ctx).Raw(`select name from flows where id = ?`, doc.FlowID).Scan(&flowName).Error; ferr == nil && flowName != "" {
+							vars["flow_name"] = boundedText(flowName, 128)
+						}
 					}
 					stagePos := 1
 					if orderRow.CurrentStagePosition != nil && *orderRow.CurrentStagePosition > 0 {
@@ -705,6 +622,9 @@ func (w *Worker) buildOrderTemplateVars(ctx context.Context, ev *OutboxEventMode
 	if stageRow.ID != "" {
 		vars["datasource_name"] = nonEmptyOr(boundedText(stageRow.DatasourceName, 128), "-")
 		vars["datasource_engine"] = nonEmptyOr(boundedText(stageRow.DatasourceEngine, 64), "-")
+		if vars["stage_name"] == "-" && stageRow.DatasourceName != "" {
+			vars["stage_name"] = boundedText(stageRow.DatasourceName, 128)
+		}
 		var execUsers []string
 		_ = w.db.WithContext(ctx).Raw(`
 			select username_snapshot from order_execution_actors

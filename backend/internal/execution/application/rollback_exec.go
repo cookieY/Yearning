@@ -804,7 +804,7 @@ func (s *Services) executeDMLStatementWithRollback(
 			return ev, res, err
 		}
 		res, ev, meta, _, err := rollback.ExecuteAndCapturePostgresDML(
-			execCtx, target.Adapter, target.Pool, tx, int(st.Ordinal), parsed, rollback.DefaultMaxCapturedRowsPerStatement,
+			execCtx, target.Pool, tx, int(st.Ordinal), parsed, rollback.DefaultMaxCapturedRowsPerStatement,
 		)
 		if meta != nil && meta.ServerVersion != "" {
 			rbCtx.DatabaseVersion = meta.ServerVersion

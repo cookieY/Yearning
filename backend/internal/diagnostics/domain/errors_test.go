@@ -40,6 +40,12 @@ func TestErrors_ConstructorsAndFormatting(t *testing.T) {
 		t.Fatalf("unexpected custom invalid state error: %+v", err)
 	}
 
+	if CodeIdempotencyConflict != 1007 {
+		t.Fatalf("CodeIdempotencyConflict = %d, want 1007 (IDEMPOTENCY_KEY_REUSED_WITH_DIFFERENT_PAYLOAD)", CodeIdempotencyConflict)
+	}
+	if CodeIdempotencyConflict == 1011 {
+		t.Fatal("CodeIdempotencyConflict must not collide with 1011 (PRECONDITION_REQUIRED)")
+	}
 	if err := ErrIdempotencyConflict(""); err.Code != CodeIdempotencyConflict || err.Message == "" {
 		t.Fatalf("unexpected default idempotency conflict error: %+v", err)
 	}

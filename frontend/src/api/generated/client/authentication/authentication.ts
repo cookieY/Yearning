@@ -17,24 +17,11 @@ import type {
   LoginRequest,
   LoginWithLdap200,
   Logout200,
-  ProblemResponse,
   Register200,
   RegisterRequest
 } from '../yearningV4HTTPAPI.schemas';
 
 import { customInstance } from '../../../../shared/api/mutator';
-
-export type loginResponse200 = {
-  data: Login200
-  status: 200
-}
-
-export type loginResponseSuccess = (loginResponse200) & {
-  headers: Headers;
-};
-;
-
-export type loginResponse = (loginResponseSuccess)
 
 export const getLoginUrl = () => {
 
@@ -44,7 +31,7 @@ export const getLoginUrl = () => {
   return `/api/v4/auth/login`
 }
 
-export const login = async (loginRequest: LoginRequest, options?: Parameters<typeof customInstance>[1]): Promise<loginResponse> => {
+export const login = async (loginRequest: LoginRequest, options?: Parameters<typeof customInstance>[1]): Promise<Login200> => {
 
     const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
@@ -52,7 +39,7 @@ export const login = async (loginRequest: LoginRequest, options?: Parameters<typ
     if (Array.isArray(h)) return Object.fromEntries(h);
     return h;
   };
-return customInstance<loginResponse>(getLoginUrl(),
+return customInstance<Login200>(getLoginUrl(),
   {
     ...options,
     method: 'POST',
@@ -61,18 +48,6 @@ return customInstance<loginResponse>(getLoginUrl(),
   }
 );}
 
-
-export type logoutResponse200 = {
-  data: Logout200
-  status: 200
-}
-
-export type logoutResponseSuccess = (logoutResponse200) & {
-  headers: Headers;
-};
-;
-
-export type logoutResponse = (logoutResponseSuccess)
 
 export const getLogoutUrl = () => {
 
@@ -82,9 +57,9 @@ export const getLogoutUrl = () => {
   return `/api/v4/auth/logout`
 }
 
-export const logout = async ( options?: Parameters<typeof customInstance>[1]): Promise<logoutResponse> => {
+export const logout = async ( options?: Parameters<typeof customInstance>[1]): Promise<Logout200> => {
 
-  return customInstance<logoutResponse>(getLogoutUrl(),
+  return customInstance<Logout200>(getLogoutUrl(),
   {
     ...options,
     method: 'POST'
@@ -94,25 +69,6 @@ export const logout = async ( options?: Parameters<typeof customInstance>[1]): P
 );}
 
 
-export type registerResponse200 = {
-  data: Register200
-  status: 200
-}
-
-export type registerResponse403 = {
-  data: ProblemResponse
-  status: 403
-}
-
-export type registerResponseSuccess = (registerResponse200) & {
-  headers: Headers;
-};
-export type registerResponseError = (registerResponse403) & {
-  headers: Headers;
-};
-
-export type registerResponse = (registerResponseSuccess | registerResponseError)
-
 export const getRegisterUrl = () => {
 
 
@@ -121,7 +77,7 @@ export const getRegisterUrl = () => {
   return `/api/v4/auth/register`
 }
 
-export const register = async (registerRequest: RegisterRequest, options?: Parameters<typeof customInstance>[1]): Promise<registerResponse> => {
+export const register = async (registerRequest: RegisterRequest, options?: Parameters<typeof customInstance>[1]): Promise<Register200> => {
 
     const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
@@ -129,7 +85,7 @@ export const register = async (registerRequest: RegisterRequest, options?: Param
     if (Array.isArray(h)) return Object.fromEntries(h);
     return h;
   };
-return customInstance<registerResponse>(getRegisterUrl(),
+return customInstance<Register200>(getRegisterUrl(),
   {
     ...options,
     method: 'POST',
@@ -139,18 +95,6 @@ return customInstance<registerResponse>(getRegisterUrl(),
 );}
 
 
-export type listAuthenticationProvidersResponse200 = {
-  data: ListAuthenticationProviders200
-  status: 200
-}
-
-export type listAuthenticationProvidersResponseSuccess = (listAuthenticationProvidersResponse200) & {
-  headers: Headers;
-};
-;
-
-export type listAuthenticationProvidersResponse = (listAuthenticationProvidersResponseSuccess)
-
 export const getListAuthenticationProvidersUrl = () => {
 
 
@@ -159,9 +103,9 @@ export const getListAuthenticationProvidersUrl = () => {
   return `/api/v4/auth/providers`
 }
 
-export const listAuthenticationProviders = async ( options?: Parameters<typeof customInstance>[1]): Promise<listAuthenticationProvidersResponse> => {
+export const listAuthenticationProviders = async ( options?: Parameters<typeof customInstance>[1]): Promise<ListAuthenticationProviders200> => {
 
-  return customInstance<listAuthenticationProvidersResponse>(getListAuthenticationProvidersUrl(),
+  return customInstance<ListAuthenticationProviders200>(getListAuthenticationProvidersUrl(),
   {
     ...options,
     method: 'GET'
@@ -170,18 +114,6 @@ export const listAuthenticationProviders = async ( options?: Parameters<typeof c
   }
 );}
 
-
-export type loginWithLdapResponse200 = {
-  data: LoginWithLdap200
-  status: 200
-}
-
-export type loginWithLdapResponseSuccess = (loginWithLdapResponse200) & {
-  headers: Headers;
-};
-;
-
-export type loginWithLdapResponse = (loginWithLdapResponseSuccess)
 
 export const getLoginWithLdapUrl = () => {
 
@@ -191,7 +123,7 @@ export const getLoginWithLdapUrl = () => {
   return `/api/v4/auth/ldap/login`
 }
 
-export const loginWithLdap = async (loginRequest: LoginRequest, options?: Parameters<typeof customInstance>[1]): Promise<loginWithLdapResponse> => {
+export const loginWithLdap = async (loginRequest: LoginRequest, options?: Parameters<typeof customInstance>[1]): Promise<LoginWithLdap200> => {
 
     const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
@@ -199,7 +131,7 @@ export const loginWithLdap = async (loginRequest: LoginRequest, options?: Parame
     if (Array.isArray(h)) return Object.fromEntries(h);
     return h;
   };
-return customInstance<loginWithLdapResponse>(getLoginWithLdapUrl(),
+return customInstance<LoginWithLdap200>(getLoginWithLdapUrl(),
   {
     ...options,
     method: 'POST',
@@ -209,18 +141,6 @@ return customInstance<loginWithLdapResponse>(getLoginWithLdapUrl(),
 );}
 
 
-export type startOidcLoginResponse302 = {
-  data: void
-  status: 302
-}
-
-;
-export type startOidcLoginResponseError = (startOidcLoginResponse302) & {
-  headers: Headers;
-};
-
-export type startOidcLoginResponse = (startOidcLoginResponseError)
-
 export const getStartOidcLoginUrl = (providerKey: string,) => {
 
 
@@ -229,9 +149,9 @@ export const getStartOidcLoginUrl = (providerKey: string,) => {
   return `/api/v4/auth/oidc/${providerKey}/start`
 }
 
-export const startOidcLogin = async (providerKey: string, options?: Parameters<typeof customInstance>[1]): Promise<startOidcLoginResponse> => {
+export const startOidcLogin = async (providerKey: string, options?: Parameters<typeof customInstance>[1]): Promise<unknown> => {
 
-  return customInstance<startOidcLoginResponse>(getStartOidcLoginUrl(providerKey),
+  return customInstance<unknown>(getStartOidcLoginUrl(providerKey),
   {
     ...options,
     method: 'GET'
@@ -240,23 +160,6 @@ export const startOidcLogin = async (providerKey: string, options?: Parameters<t
   }
 );}
 
-
-export type finishOidcLoginResponse302 = {
-  data: void
-  status: 302
-}
-
-export type finishOidcLoginResponse401 = {
-  data: ProblemResponse
-  status: 401
-}
-
-;
-export type finishOidcLoginResponseError = (finishOidcLoginResponse302 | finishOidcLoginResponse401) & {
-  headers: Headers;
-};
-
-export type finishOidcLoginResponse = (finishOidcLoginResponseError)
 
 export const getFinishOidcLoginUrl = (providerKey: string,
     params: FinishOidcLoginParams,) => {
@@ -275,9 +178,9 @@ export const getFinishOidcLoginUrl = (providerKey: string,
 }
 
 export const finishOidcLogin = async (providerKey: string,
-    params: FinishOidcLoginParams, options?: Parameters<typeof customInstance>[1]): Promise<finishOidcLoginResponse> => {
+    params: FinishOidcLoginParams, options?: Parameters<typeof customInstance>[1]): Promise<unknown> => {
 
-  return customInstance<finishOidcLoginResponse>(getFinishOidcLoginUrl(providerKey,params),
+  return customInstance<unknown>(getFinishOidcLoginUrl(providerKey,params),
   {
     ...options,
     method: 'GET'
@@ -286,25 +189,6 @@ export const finishOidcLogin = async (providerKey: string,
   }
 );}
 
-
-export type getCurrentUserResponse200 = {
-  data: GetCurrentUser200
-  status: 200
-}
-
-export type getCurrentUserResponse401 = {
-  data: ProblemResponse
-  status: 401
-}
-
-export type getCurrentUserResponseSuccess = (getCurrentUserResponse200) & {
-  headers: Headers;
-};
-export type getCurrentUserResponseError = (getCurrentUserResponse401) & {
-  headers: Headers;
-};
-
-export type getCurrentUserResponse = (getCurrentUserResponseSuccess | getCurrentUserResponseError)
 
 export const getGetCurrentUserUrl = () => {
 
@@ -314,9 +198,9 @@ export const getGetCurrentUserUrl = () => {
   return `/api/v4/users/me`
 }
 
-export const getCurrentUser = async ( options?: Parameters<typeof customInstance>[1]): Promise<getCurrentUserResponse> => {
+export const getCurrentUser = async ( options?: Parameters<typeof customInstance>[1]): Promise<GetCurrentUser200> => {
 
-  return customInstance<getCurrentUserResponse>(getGetCurrentUserUrl(),
+  return customInstance<GetCurrentUser200>(getGetCurrentUserUrl(),
   {
     ...options,
     method: 'GET'
@@ -325,25 +209,6 @@ export const getCurrentUser = async ( options?: Parameters<typeof customInstance
   }
 );}
 
-
-export type changeMyPasswordResponse200 = {
-  data: ChangeMyPassword200
-  status: 200
-}
-
-export type changeMyPasswordResponse401 = {
-  data: ProblemResponse
-  status: 401
-}
-
-export type changeMyPasswordResponseSuccess = (changeMyPasswordResponse200) & {
-  headers: Headers;
-};
-export type changeMyPasswordResponseError = (changeMyPasswordResponse401) & {
-  headers: Headers;
-};
-
-export type changeMyPasswordResponse = (changeMyPasswordResponseSuccess | changeMyPasswordResponseError)
 
 export const getChangeMyPasswordUrl = () => {
 
@@ -357,7 +222,7 @@ export const getChangeMyPasswordUrl = () => {
  * Verifies the old password, applies the 12-character minimum policy, stores a fresh Argon2id hash and revokes every session of the user (including the current one — the client must return to the login screen). Accounts bound to an external identity provider are rejected with PASSWORD_MANAGED_BY_IDENTITY_SOURCE. The builtin admin may change its own password here; the login lockout is only ever cleared by the CLI reset command, never by this endpoint.
  * @summary Self-service local password change
  */
-export const changeMyPassword = async (changeMyPasswordRequest: ChangeMyPasswordRequest, options?: Parameters<typeof customInstance>[1]): Promise<changeMyPasswordResponse> => {
+export const changeMyPassword = async (changeMyPasswordRequest: ChangeMyPasswordRequest, options?: Parameters<typeof customInstance>[1]): Promise<ChangeMyPassword200> => {
 
     const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
@@ -365,7 +230,7 @@ export const changeMyPassword = async (changeMyPasswordRequest: ChangeMyPassword
     if (Array.isArray(h)) return Object.fromEntries(h);
     return h;
   };
-return customInstance<changeMyPasswordResponse>(getChangeMyPasswordUrl(),
+return customInstance<ChangeMyPassword200>(getChangeMyPasswordUrl(),
   {
     ...options,
     method: 'POST',

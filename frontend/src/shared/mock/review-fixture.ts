@@ -15,6 +15,10 @@ import { adminFixtureTask } from "@/shared/mock/admin-fixture";
 import { queryFlowsCatalogPage } from "@/shared/mock/query-fixture";
 import { CATALOG_FLOW_IDS, reviewCatalogFlowViews } from "@/shared/mock/flow-catalog";
 import { digestSqlText, type SqlDigest } from "@/features/review/bulk-import/sql-digest";
+import {
+  publishSseEvent,
+  resetSseEventBusForTest,
+} from "@/shared/events/sse-event-bus";
 import { canVoid, withdrawOutcome } from "@/features/orders/order-state";
 import {
   BULK_MODE_MIN_STATEMENTS,
@@ -455,6 +459,7 @@ export function resetReviewFixture(): void {
   world.sequences.clear();
   world.flowVersion = 1;
   world.flowUpdated = false;
+  resetSseEventBusForTest();
 }
 
 /** Test seam: seeds a persisted order with an explicit aggregate state so
@@ -542,12 +547,13 @@ function emit(
 ): void {
   const sequence = (world.sequences.get(subject) ?? 0) + 1;
   world.sequences.set(subject, sequence);
+  const id = uuid();
   world.outbox.push({
     subject,
     sequence,
     payload: {
       specversion: "1.0",
-      id: uuid(),
+      id,
       type,
       source: "yearning://control-plane",
       subject,
@@ -559,6 +565,7 @@ function emit(
       data,
     },
   });
+  publishSseEvent({ id, type, subject, data });
 }
 
 /** Optimistic concurrency: the client must echo the draft ROW VERSION it

@@ -6,36 +6,42 @@ import (
 	"strings"
 )
 
-// DefaultRuntimeBudget returns the contract defaults (grouping prevents context overflow on the Provider side; the 5-minute P95 target is not a hard timeout).
+// Forbidden marks a raw secret/identifier value that must never appear in anonymized outbound text.
+// What classifies the error without ever logging or returning the raw Value.
 type Forbidden struct {
 	Value string
 	What  string
 }
 
-// SkillInjection is an enabled Prompt Tool pending injection.
-var anonTokenPattern = regexp.MustCompile(`^(?:database|schema|table|column|index|constraint|alias|ident)_[0-9]+$`)
+// AnonTokenBodyPattern is the canonical anonymous database object token body regex.
+const AnonTokenBodyPattern = `(?:database|schema|table|column|index|constraint|alias|cte|ident)_[0-9]+`
 
-// all|mysql|postgresql: database engine targeted by the skill
+// AnonTokenPattern matches safe Run-scoped anonymous tokens emitted by the privacy layer.
+var AnonTokenPattern = regexp.MustCompile(`^` + AnonTokenBodyPattern + `$`)
+
+// placeholderPattern matches typed literal placeholders such as :int, :decimal, or :string.
 var placeholderPattern = regexp.MustCompile(`^:[a-z_]+$`)
 
-// tunable parameters (persisted in-row in DB; threshold values)
+// collapsePattern matches collapsed IN-list cardinality markers such as [5].
 var collapsePattern = regexp.MustCompile(`^\[[0-9]+\]$`)
 
-// §18.66: system-derived key for the row (skill.<id> or inherited built-in semantic key)
+// tokenRunPattern extracts comparable single identifier or numeric tokens.
 var tokenRunPattern = regexp.MustCompile(`[A-Za-z_][A-Za-z0-9_]*|[0-9]+(?:\.[0-9]+)?`)
 
-// v1 compatibility metadata; does not cap Critical outcomes for actual mandatory rule violations
+// leakRunPattern scans anonymized output into raw token, placeholder, collapse, or punctuation runs.
 var leakRunPattern = regexp.MustCompile(`[A-Za-z_][A-Za-z0-9_]*|:[a-z_]+|\[[0-9]+\]|[0-9]+(?:\.[0-9]+)?|.`)
 
-// paramPlaceholderRe matches {{parameter_name}} placeholders in knowledge text.
+// anonymizedForbiddenChars rejects unnormalized string delimiters and SQL comment starters.
+// Hash characters (#) remain permitted for PostgreSQL JSON path operators (#>, #>>, #-).
 var anonymizedForbiddenChars = []string{"'", `"`, "`", "--", "/*", "$$"}
 
-// RenderParameters replaces parameter placeholders in knowledge text with current in-row values (missing parameters render as "unconfigured"; values render as decimal numbers, raw strings, or comma-joined string arrays).
+// ExtractComparisonTokens splits anonymized output into lowercase comparable tokens while skipping
+// anonymous tokens, typed literal placeholders, and collapse markers.
 func ExtractComparisonTokens(anonymized string) []string {
 	runs := leakRunPattern.FindAllString(anonymized, -1)
 	out := make([]string, 0, len(runs))
 	for _, r := range runs {
-		if anonTokenPattern.MatchString(r) || placeholderPattern.MatchString(r) || collapsePattern.MatchString(r) {
+		if AnonTokenPattern.MatchString(r) || placeholderPattern.MatchString(r) || collapsePattern.MatchString(r) {
 			continue
 		}
 		if strings.TrimSpace(r) == "" || len(r) == 1 && !isTokenRune(r[0]) {
@@ -50,9 +56,8 @@ func isTokenRune(b byte) bool {
 	return b == '_' || (b >= '0' && b <= '9') || (b >= 'a' && b <= 'z') || (b >= 'A' && b <= 'Z')
 }
 
-// MatchesEngine reports whether the skill matches the frozen datasource. Only mysql/postgresql base rules also match the declared compatibility mode (e.g. TiDB/mysql); explicit vendor engines still require an exact raw engine match. Callers must pass the frozen target and never use drifted configuration.
-//
-// compatibilityMode remains variadic for backward compatibility with single-argument callers; new call sites should also pass the frozen compatibility_mode.
+// AssertNoLeakValues verifies tokenized string values contain no forbidden raw identifiers (SEC-0002).
+// Unlike AssertNoLeak, JSON quote delimiters around tokenized values are expected and not rejected.
 func AssertNoLeakValues(values []string, forbidden []Forbidden) error {
 	for _, v := range values {
 		if v == "" {
@@ -83,7 +88,7 @@ func AssertNoLeakValues(values []string, forbidden []Forbidden) error {
 	return nil
 }
 
-// RenderSkillInjection renders the skill injection text (using the same delimiter format as internal experience).
+// AssertNoLeak fails closed when anonymized SQL or context retains forbidden delimiters or raw values.
 func AssertNoLeak(anonymized string, forbidden []Forbidden) error {
 	lowerAnon := strings.ToLower(anonymized)
 	for _, ch := range anonymizedForbiddenChars {
@@ -118,7 +123,7 @@ func AssertNoLeak(anonymized string, forbidden []Forbidden) error {
 		for k := range leaked {
 			kinds = append(kinds, k)
 		}
-		// Render parameter placeholders first, then escape (escaping applies to the rendered text to prevent parameter values from escaping delimiters — critical fix: the injection chain must carry current thresholds).
+		// Sort category names for deterministic error messages.
 		for i := 1; i < len(kinds); i++ {
 			for j := i; j > 0 && kinds[j] < kinds[j-1]; j-- {
 				kinds[j], kinds[j-1] = kinds[j-1], kinds[j]

@@ -347,6 +347,9 @@ func TestIdentityBootstrapAndFallback_PGFlow(t *testing.T) {
 		on conflict (namespace) do update set settings = excluded.settings, updated_at = now()`, requesterID).Error; err != nil {
 		t.Fatal(err)
 	}
+	t.Cleanup(func() {
+		_ = db.Exec(`delete from system_settings where namespace = 'query'`).Error
+	})
 	if err := db.Exec(`update datasources set identity_fingerprint = null where id = ?`, dsReachable).Error; err != nil {
 		t.Fatal(err)
 	}

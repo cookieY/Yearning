@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/cookieY/YearningX/backend/internal/authorization/auditlog"
+	"github.com/cookieY/YearningX/backend/internal/platform/txutil"
 )
 
 // Recipient represents a single delivery target (UserID is nil for channel-level targets such as DingTalk group robots).
@@ -336,6 +337,4 @@ func (ev *OutboxEventModel) reasonCode() string {
 	return ""
 }
 
-func isUniqueViolation(err error) bool {
-	return err != nil && strings.Contains(err.Error(), "SQLSTATE 23505")
-}
+func isUniqueViolation(err error) bool { return txutil.IsUniqueViolation(err) }

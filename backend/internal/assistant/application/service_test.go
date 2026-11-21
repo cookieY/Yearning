@@ -280,6 +280,7 @@ func newAssistantFixture(t *testing.T) *assistantTestFixture {
 	if err != nil {
 		t.Fatalf("NewServices: %v", err)
 	}
+	svc.Synthesizer = NewProviderSynthesizer(db, crypter, &DeterministicSynthesizer{})
 	svc.Authorizer.Catalog = &fakeCatalog{}
 	return &assistantTestFixture{
 		db:            db,

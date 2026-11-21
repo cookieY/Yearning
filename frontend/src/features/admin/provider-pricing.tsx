@@ -13,7 +13,7 @@ import {
   useCreateAiProviderRateVersion,
   useSettingsNamespace,
 } from "@/features/admin/use-admin";
-import { describeError } from "@/shared/api/error-display";
+import { describeError, describeErrorText } from "@/shared/api/error-display";
 import { appToast } from "@/shared/components/shadcn-dashboard/sonner/sonner-08";
 import i18next from "@/shared/i18n";
 import { Alert, AlertDescription, AlertTitle } from "@/shared/components/ui/alert";
@@ -45,11 +45,6 @@ import {
  */
 
 export const RATE_REFERENCE_DECLARATION_KEY = "admin.providers.pricing.declaration";
-
-function describeErrorText(display: { messageKey: string; requestId: string | null }): string {
-  const text = i18next.t(display.messageKey);
-  return display.requestId === null ? text : `${text} (${display.requestId})`;
-}
 
 function minuteToHM(minute: number): string {
   const h = Math.floor(minute / 60);

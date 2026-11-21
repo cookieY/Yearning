@@ -52,25 +52,18 @@ func b9Meta(c *gin.Context) application.RequestMeta {
 
 // writeOrderErr maps B9 domain errors (domain.Error carries contract code).
 func writeOrderErr(c *gin.Context, err error) bool {
-	var de *domain.Error
-	switch {
-	case err == nil:
+	if err == nil {
 		return true
-	case errors.As(err, &de):
-		name := de.Name
-		if i := strings.Index(name, ":"); i >= 0 {
-			// SUBMISSION_GATE_FAILED:reason -> contract name + reason metadata.
-			reason := name[i+1:]
-			name = name[:i]
-			WriteBusinessError(c, &BusinessError{Code: int(de.Code), Name: name,
-				Message: "Submission gate check failed", Meta: map[string]any{"reason": reason}})
-			return true
-		}
-		WriteBusinessError(c, &BusinessError{Code: int(de.Code), Name: de.Name, Message: "Business operation failed"})
-	default:
+	}
+	var de *domain.Error
+	if !errors.As(err, &de) {
 		return false
 	}
-	return true
+	if base, reason, ok := splitColonReason(de.Name); ok {
+		// SUBMISSION_GATE_FAILED:reason -> contract name + reason metadata.
+		return writeDomainCodedError(c, int(de.Code), base, "Submission gate check failed", map[string]any{"reason": reason})
+	}
+	return writeDomainCodedError(c, int(de.Code), de.Name, "Business operation failed", nil)
 }
 
 // requireCursor validates "ts|id" cursor shape (B6 convention: invalid cursor returns 1001).
@@ -103,31 +96,6 @@ func idemKey(c *gin.Context) (string, bool) {
 		return "", false
 	}
 	return key, true
-}
-
-// HandleSubmitDraft POST /change-drafts/{draft_id}/submission.
-func (d *B9Deps) HandleSubmitDraft(c *gin.Context) {
-	draftID, ok := uuidParam(c, "draft_id")
-	if !ok {
-		return
-	}
-	version, ok := parseIfMatch(c)
-	if !ok {
-		return
-	}
-	key, ok := idemKey(c)
-	if !ok {
-		return
-	}
-	view, _, err := d.Orders.Submit(c.Request.Context(), b9Actor(c), b9Meta(c),
-		application.SubmitInput{DraftID: draftID, ExpectVersion: version, IdempotencyKey: key})
-	if err != nil {
-		if !writeOrderErr(c, err) {
-			WriteProblem(c, http.StatusInternalServerError, "internal error")
-		}
-		return
-	}
-	WriteSuccess(c, view)
 }
 
 // HandleSubmitOrderV2 POST /change-orders (RCP-20261101-EPHEMERAL-PRECHECK).

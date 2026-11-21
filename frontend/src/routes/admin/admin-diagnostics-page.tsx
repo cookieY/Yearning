@@ -1,4 +1,3 @@
-import i18next from "@/shared/i18n";
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useSearchParams } from "react-router";
@@ -27,7 +26,7 @@ import {
   useDiagnosticsOverview,
   useTriggerManualDiagnosticsSnapshot,
 } from "@/features/diagnostics/use-diagnostics";
-import { describeError } from "@/shared/api/error-display";
+import { describeError, describeErrorText } from "@/shared/api/error-display";
 import { formatTimestamp } from "@/shared/lib/timezones";
 import { appToast } from "@/shared/components/shadcn-dashboard/sonner/sonner-08";
 import { EmptyState } from "@/shared/components/status/empty-state";
@@ -88,11 +87,6 @@ const PRESET_MINUTES: Record<TimeRangePreset, number> = {
   "24h": 1440,
   "7d": 10080,
 };
-
-function describeErrorText(display: { messageKey: string; requestId: string | null }): string {
-  const text = i18next.t(display.messageKey);
-  return display.requestId === null ? text : `${text} (${display.requestId})`;
-}
 
 export default function AdminDiagnosticsPage() {
   const { t } = useTranslation();

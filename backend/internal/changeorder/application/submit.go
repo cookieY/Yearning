@@ -24,60 +24,11 @@ import (
 	reviewdomain "github.com/cookieY/YearningX/backend/internal/review/domain"
 )
 
-// SubmitInput parameters for submitting a work order.
-type SubmitInput struct {
+// submitOnceInput holds internal submission command parameters passed by submitV2Tx.
+type submitOnceInput struct {
 	DraftID        string
 	ExpectVersion  int64
 	IdempotencyKey string
-}
-
-// idemRouteSubmit idempotency route template (matches OpenAPI path).
-const idemRouteSubmit = "POST /change-drafts/{draft_id}/submission"
-
-// Submit submits a draft as an immutable work order.
-func (s *Services) Submit(ctx context.Context, actor Actor, meta RequestMeta, in SubmitInput) (view *OrderView, replayed bool, err error) {
-	reqHash := idemRequestHash(actor.UserID, in.DraftID, fmt.Sprint(in.ExpectVersion))
-	claimed, replay, err := s.idemClaim(ctx, actor.UserID, idemRouteSubmit, in.DraftID, in.IdempotencyKey, reqHash)
-	if err != nil {
-		return nil, false, err
-	}
-	if claimed == nil {
-		var v OrderView
-		if err := json.Unmarshal(replay, &v); err != nil {
-			return nil, false, err
-		}
-		return &v, true, nil
-	}
-	view, err = s.submitTx(ctx, actor, in)
-	if err != nil {
-		_ = s.idemRelease(ctx, actor.UserID, idemRouteSubmit, in.DraftID, in.IdempotencyKey)
-		return nil, false, err
-	}
-	raw, err := json.Marshal(view)
-	if err != nil {
-		return nil, false, err
-	}
-	if err := s.idemComplete(ctx, actor.UserID, idemRouteSubmit, in.DraftID, in.IdempotencyKey, raw); err != nil {
-		return nil, false, err
-	}
-	return view, false, nil
-}
-
-// submitTx single serializable transaction body (40001 is retried by the serializable wrapper).
-func (s *Services) submitTx(ctx context.Context, actor Actor, in SubmitInput) (*OrderView, error) {
-	var view *OrderView
-	err := s.serializable(ctx, func(tx *gorm.DB) error {
-		v, err := s.submitOnce(ctx, tx, actor, in)
-		if err != nil {
-			return err
-		}
-		view = v
-		return nil
-	})
-	if err != nil {
-		return nil, err
-	}
-	return view, nil
 }
 
 // acceptedRunRow is the frozen surface of an accepted (state=ready) Run.
@@ -106,7 +57,7 @@ type stageSnapRow struct {
 }
 
 // submitOnce command body: validate -> freeze -> activate -> emit events.
-func (s *Services) submitOnce(ctx context.Context, tx *gorm.DB, actor Actor, in SubmitInput) (*OrderView, error) {
+func (s *Services) submitOnce(ctx context.Context, tx *gorm.DB, actor Actor, in submitOnceInput) (*OrderView, error) {
 	// 1. Draft row lock + ownership.
 	var draft struct {
 		ID              string
@@ -160,13 +111,14 @@ func (s *Services) submitOnce(ctx context.Context, tx *gorm.DB, actor Actor, in 
 	// 5. Flow row and version drift check (2001).
 	var flow struct {
 		ID        string
+		Name      string
 		FlowType  string
 		Status    string
 		RuleSetID *string
 		Version   int64
 	}
 	if err := tx.WithContext(ctx).Raw(
-		`select id::text as id, flow_type, status, rule_set_id::text as rule_set_id, version
+		`select id::text as id, name, flow_type, status, rule_set_id::text as rule_set_id, version
 		 from flows where id = ?`, draft.FlowID).Scan(&flow).Error; err != nil {
 		return nil, err
 	}
@@ -424,7 +376,7 @@ func (s *Services) submitOnce(ctx context.Context, tx *gorm.DB, actor Actor, in 
 		return nil, err
 	}
 	// Complete flow snapshot (frozen template structure; AEAD bound to the order row).
-	frozenFlow, err := s.buildFrozenFlow(draft.FlowID, flow.Version, flow.RuleSetID, stages, stepsByPos, execByStage)
+	frozenFlow, err := s.buildFrozenFlow(draft.FlowID, flow.Name, flow.Version, flow.RuleSetID, stages, stepsByPos, execByStage)
 	if err != nil {
 		return nil, err
 	}
@@ -678,6 +630,7 @@ func (s *Services) nextDisplayNumber(ctx context.Context, tx *gorm.DB, at time.T
 // (read-only display for admin/troubleshooting; execution reads column snapshots and does not rely on this document for authorization).
 type frozenFlowDocument struct {
 	FlowID      string            `json:"flow_id"`
+	FlowName    string            `json:"flow_name,omitempty"`
 	FlowVersion int64             `json:"flow_version"`
 	RuleSetID   *string           `json:"rule_set_id"`
 	Stages      []frozenFlowStage `json:"stages"`
@@ -685,6 +638,7 @@ type frozenFlowDocument struct {
 
 type frozenFlowStage struct {
 	Position        int              `json:"position"`
+	Name            string           `json:"name,omitempty"`
 	DatasourceID    string           `json:"datasource_id"`
 	Engine          string           `json:"engine"`
 	IdentityFP      string           `json:"identity_fingerprint"`
@@ -697,12 +651,12 @@ type frozenFlowStep struct {
 	Actors   []string `json:"actors"`
 }
 
-func (s *Services) buildFrozenFlow(flowID string, flowVersion int64, ruleSetID *string,
+func (s *Services) buildFrozenFlow(flowID, flowName string, flowVersion int64, ruleSetID *string,
 	stages []stageFact, stepsByPos map[int][]flowStepActors, execByStage map[string][]string) (*frozenFlowDocument, error) {
-	doc := &frozenFlowDocument{FlowID: flowID, FlowVersion: flowVersion, RuleSetID: ruleSetID}
+	doc := &frozenFlowDocument{FlowID: flowID, FlowName: flowName, FlowVersion: flowVersion, RuleSetID: ruleSetID}
 	for _, st := range stages {
 		fs := frozenFlowStage{
-			Position: st.Position, DatasourceID: st.DatasourceID, Engine: st.Engine,
+			Position: st.Position, Name: st.Name, DatasourceID: st.DatasourceID, Engine: st.Engine,
 			IdentityFP: deref(st.IdentityFP),
 		}
 		for _, step := range stepsByPos[st.Position] {

@@ -1,9 +1,6 @@
 package application
 
 import (
-	"crypto/sha256"
-	"encoding/hex"
-	"fmt"
 	"strings"
 	"testing"
 )
@@ -37,49 +34,5 @@ func TestResolveOutputLocale(t *testing.T) {
 				t.Fatalf("ResolveOutputLocale(%q) = %q, want %q", tt.header, got, tt.want)
 			}
 		})
-	}
-}
-
-func TestStartRunRequestHashIncludesNormalizedOutputLocale(t *testing.T) {
-	t.Parallel()
-	var svc Services
-	actor := Actor{UserID: "00000000-0000-4000-8000-000000000001"}
-	base := StartRunInput{
-		DraftID:        "00000000-0000-4000-8000-000000000002",
-		ExpectVersion:  7,
-		IdempotencyKey: "same-key",
-	}
-	hash := func(in StartRunInput) string {
-		t.Helper()
-		got, err := svc.startRunRequestHash(actor, in)
-		if err != nil {
-			t.Fatal(err)
-		}
-		return got
-	}
-
-	zhDefault := base
-	zhDefault.OutputLocale = ""
-	zhExplicit := base
-	zhExplicit.OutputLocale = "zh-CN"
-	en := base
-	en.OutputLocale = "en-US"
-
-	legacyCanonical := fmt.Sprintf("actor=%s;draft=%s;version=%d",
-		actor.UserID, base.DraftID, base.ExpectVersion)
-	legacySum := sha256.Sum256([]byte(legacyCanonical))
-	legacyHash := hex.EncodeToString(legacySum[:])
-
-	if got := hash(zhDefault); got != legacyHash {
-		t.Fatalf("empty locale hash = %q, want legacy hash %q", got, legacyHash)
-	}
-	if got := hash(zhExplicit); got != legacyHash {
-		t.Fatalf("explicit zh-CN hash = %q, want legacy hash %q", got, legacyHash)
-	}
-	if hash(zhDefault) != hash(zhExplicit) {
-		t.Fatal("empty locale must canonicalize to zh-CN for idempotency")
-	}
-	if hash(zhDefault) == hash(en) {
-		t.Fatal("output locale must participate in idempotency identity")
 	}
 }

@@ -33,6 +33,12 @@ func TestErrorsAndTypesCoverage(t *testing.T) {
 	if ErrInvalidState("").Code != CodeInvalidStateTransition || ErrInvalidState("custom").Message != "custom" {
 		t.Fatal("unexpected ErrInvalidState behavior")
 	}
+	if CodeIdempotencyConflict != 1007 {
+		t.Fatalf("CodeIdempotencyConflict = %d, want 1007 (IDEMPOTENCY_KEY_REUSED_WITH_DIFFERENT_PAYLOAD)", CodeIdempotencyConflict)
+	}
+	if CodeIdempotencyConflict == 1011 {
+		t.Fatal("CodeIdempotencyConflict must not collide with 1011 (PRECONDITION_REQUIRED)")
+	}
 	if ErrIdempotencyConflict("").Code != CodeIdempotencyConflict || ErrIdempotencyConflict("custom").Message != "custom" {
 		t.Fatal("unexpected ErrIdempotencyConflict behavior")
 	}

@@ -529,6 +529,112 @@ func stmtFactOf(ordinal int32, res *database.StatementResult) stmtFact {
 	return f
 }
 
+func rollbackConfirmed(rbRes *database.StatementResult, rerr error) bool {
+	return rerr == nil && rbRes != nil && rbRes.Outcome != database.OutcomeResultUnknown
+}
+
+func classifyDMLFailureRollback(rbRes *database.StatementResult, rerr error) (domain.AttemptState, int, string) {
+	if rollbackConfirmed(rbRes, rerr) {
+		return domain.AttemptFailed, int(domain.CodeStatementRejected), "DML_STATEMENT_FAILED"
+	}
+	return domain.AttemptResultUnknown, int(domain.CodeResultUnknown), "ROLLBACK_AMBIGUOUS"
+}
+
+func classifyDMLCancelRollback(rbRes *database.StatementResult, rerr error) (domain.AttemptState, int, string) {
+	if rollbackConfirmed(rbRes, rerr) {
+		return domain.AttemptCancelled, int(domain.CodeIllegalTransition), "EXECUTION_CANCELLED"
+	}
+	return domain.AttemptResultUnknown, int(domain.CodeResultUnknown), "CANCEL_NOT_CONFIRMED"
+}
+
+func classifyDMLSearchPathFailureRollback(
+	rbRes *database.StatementResult,
+	rerr error,
+	priorFacts int,
+) (domain.AttemptState, domain.SendBoundary, int, string) {
+	if !rollbackConfirmed(rbRes, rerr) {
+		return domain.AttemptResultUnknown, domain.BoundarySent, int(domain.CodeResultUnknown), "ROLLBACK_AMBIGUOUS"
+	}
+	if priorFacts == 0 {
+		return domain.AttemptFailed, domain.BoundaryNotStarted, int(domain.CodePreflightFailed), "postgres_search_path_changed"
+	}
+	return domain.AttemptFailed, domain.BoundarySent, int(domain.CodeStatementRejected), "postgres_search_path_changed"
+}
+
+func classifyDMLRollbackCapabilityOrConflict(
+	rbRes *database.StatementResult,
+	rerr error,
+	code int,
+	name string,
+) (domain.AttemptState, domain.SendBoundary, int, string) {
+	if !rollbackConfirmed(rbRes, rerr) {
+		return domain.AttemptResultUnknown, domain.BoundarySent, int(domain.CodeResultUnknown), "ROLLBACK_AMBIGUOUS"
+	}
+	return domain.AttemptFailed, domain.BoundarySent, code, name
+}
+
+func buildDMLPreCommitAbortFacts(
+	s *Services,
+	rbRes *database.StatementResult,
+	rerr error,
+	lastOrdinal int32,
+	reason string,
+	facts []stmtFact,
+) resultFacts {
+	if !rollbackConfirmed(rbRes, rerr) {
+		return resultFacts{
+			Terminal:    domain.AttemptResultUnknown,
+			Boundary:    domain.BoundarySent,
+			ReasonCode:  int(domain.CodeResultUnknown),
+			FailureName: "ROLLBACK_AMBIGUOUS",
+			Statements:  facts,
+		}
+	}
+	return s.rollbackUnsupportedFacts(lastOrdinal, domain.BoundarySent, reason, facts)
+}
+
+func (s *Services) abortDMLOnPreCommitRollbackError(
+	ctx context.Context,
+	execCtx context.Context,
+	target *stageTarget,
+	tx database.DMLTransaction,
+	rbCtx *orderRollbackContext,
+	attemptID string,
+	fence int64,
+	lastOrdinal int32,
+	reason string,
+	facts []stmtFact,
+	actor Actor,
+) error {
+	rbRes, rerr := target.Adapter.RollbackDMLTransaction(execCtx, tx)
+	_ = s.persistUnsupportedRollbackEvidence(ctx, rbCtx, "dml", reason)
+	return s.applyResult(ctx, attemptID, fence, buildDMLPreCommitAbortFacts(s, rbRes, rerr, lastOrdinal, reason, facts), actor)
+}
+
+func (s *Services) ensureDMLTxSearchPath(
+	execCtx context.Context,
+	target *stageTarget,
+	tx database.DMLTransaction,
+	ordinal int32,
+) error {
+	if target.FrozenPath == nil {
+		return nil
+	}
+	// A user-defined function or operator may mutate the transaction's
+	// session setting. Reapply the frozen path and re-resolve this
+	// statement's reviewed relations before every send.
+	if err := database.ApplyTxSearchPath(execCtx, target.Pool, tx, target.SearchPath); err != nil {
+		return err
+	}
+	return s.verifyPostgresReviewContextOnDMLTransaction(
+		execCtx, target.Pool, tx, *target.FrozenPath, target.Binding, ordinal,
+	)
+}
+
+func ddlBeatCompleted(priorSucceeded, factsCount int) int {
+	return priorSucceeded + factsCount
+}
+
 func ddlNotSentFacts(
 	previous domain.SendBoundary,
 	err error,
@@ -652,65 +758,20 @@ func (r *Runner) runDML(ctx context.Context, in TaskInput, at *persistence.Execu
 		}
 		// Inter-statement cancellation check (PRD §5: stop sending subsequent statements; already-executed statements roll back with the transaction).
 		if s.attemptCancelling(ctx, in.AttemptID) {
-			if rbRes, rerr := target.Adapter.RollbackDMLTransaction(execCtx, tx); rerr == nil &&
-				rbRes != nil && rbRes.Outcome != database.OutcomeResultUnknown {
-				terminal, boundary = domain.AttemptCancelled, domain.BoundarySent
-				reasonCode = int(domain.CodeIllegalTransition)
-				failureName = "EXECUTION_CANCELLED"
-			} else {
-				terminal, boundary = domain.AttemptResultUnknown, domain.BoundarySent
-				reasonCode, failureName = int(domain.CodeResultUnknown), "CANCEL_NOT_CONFIRMED"
-			}
+			rbRes, rerr := target.Adapter.RollbackDMLTransaction(execCtx, tx)
+			terminal, reasonCode, failureName = classifyDMLCancelRollback(rbRes, rerr)
+			boundary = domain.BoundarySent
 			break
 		}
-		if target.FrozenPath != nil {
-			// A user-defined function or operator may mutate the transaction's
-			// session setting. Reapply the frozen path and re-resolve this
-			// statement's reviewed relations before every send.
-			if aerr := database.ApplyTxSearchPath(
-				execCtx, target.Pool, tx, target.SearchPath,
-			); aerr != nil {
-				if _, rerr := target.Adapter.RollbackDMLTransaction(execCtx, tx); rerr != nil {
-					terminal, boundary = domain.AttemptResultUnknown, domain.BoundarySent
-					reasonCode, failureName = int(domain.CodeResultUnknown), "ROLLBACK_AMBIGUOUS"
-				} else {
-					terminal = domain.AttemptFailed
-					if len(facts) == 0 {
-						boundary = domain.BoundaryNotStarted
-						reasonCode = int(domain.CodePreflightFailed)
-					} else {
-						boundary = domain.BoundarySent
-						reasonCode = int(domain.CodeStatementRejected)
-					}
-					failureName = "postgres_search_path_changed"
-				}
-				break
-			}
-			if verr := s.verifyPostgresReviewContextOnDMLTransaction(
-				execCtx, target.Pool, tx, *target.FrozenPath,
-				target.Binding, st.Ordinal,
-			); verr != nil {
-				if _, rerr := target.Adapter.RollbackDMLTransaction(execCtx, tx); rerr != nil {
-					terminal, boundary = domain.AttemptResultUnknown, domain.BoundarySent
-					reasonCode, failureName = int(domain.CodeResultUnknown), "ROLLBACK_AMBIGUOUS"
-				} else {
-					terminal = domain.AttemptFailed
-					if len(facts) == 0 {
-						boundary = domain.BoundaryNotStarted
-						reasonCode = int(domain.CodePreflightFailed)
-					} else {
-						boundary = domain.BoundarySent
-						reasonCode = int(domain.CodeStatementRejected)
-					}
-					failureName = "postgres_search_path_changed"
-				}
-				break
-			}
+		if err := s.ensureDMLTxSearchPath(execCtx, target, tx, st.Ordinal); err != nil {
+			rbRes, rerr := target.Adapter.RollbackDMLTransaction(execCtx, tx)
+			terminal, boundary, reasonCode, failureName = classifyDMLSearchPathFailureRollback(rbRes, rerr, len(facts))
+			break
 		}
 		stmtEv, res, eerr := s.executeDMLStatementWithRollback(execCtx, target, tx, rbCtx, st)
 		if eerr != nil {
 			if isCap, isConf, reason := classifyRollbackDMLError(eerr); isCap || isConf {
-				_, _ = target.Adapter.RollbackDMLTransaction(execCtx, tx)
+				rbRes, rerr := target.Adapter.RollbackDMLTransaction(execCtx, tx)
 				now := nowUTC()
 				code := int(domain.CodeStatementRejected)
 				name := failureRollbackUnsupported
@@ -740,8 +801,7 @@ func (r *Runner) runDML(ctx context.Context, in TaskInput, at *persistence.Execu
 				}
 				facts = append(facts, fact)
 				_ = s.persistStatementFact(ctx, in.AttemptID, fence, fact)
-				terminal, boundary = domain.AttemptFailed, domain.BoundarySent
-				reasonCode, failureName = code, name
+				terminal, boundary, reasonCode, failureName = classifyDMLRollbackCapabilityOrConflict(rbRes, rerr, code, name)
 				skipSuffix = true
 				break
 			}
@@ -772,30 +832,14 @@ func (r *Runner) runDML(ctx context.Context, in TaskInput, at *persistence.Execu
 			boundary = domain.BoundarySent
 		case database.OutcomeFailed:
 			// Deterministic failure: roll back and confirm (E001: whole-stage transaction rollback -> order failed).
-			if rbRes, rerr := target.Adapter.RollbackDMLTransaction(execCtx, tx); rerr == nil &&
-				rbRes != nil && rbRes.Outcome == database.OutcomeCancelled {
-				terminal, boundary = domain.AttemptFailed, domain.BoundarySent
-				reasonCode = int(domain.CodeStatementRejected)
-				failureName = "DML_STATEMENT_FAILED"
-			} else if rbRes != nil && rbRes.Outcome == database.OutcomeResultUnknown {
-				terminal, boundary = domain.AttemptResultUnknown, domain.BoundarySent
-				reasonCode, failureName = int(domain.CodeResultUnknown), "ROLLBACK_AMBIGUOUS"
-			} else {
-				terminal, boundary = domain.AttemptFailed, domain.BoundarySent
-				reasonCode = int(domain.CodeStatementRejected)
-				failureName = "DML_STATEMENT_FAILED"
-			}
+			rbRes, rerr := target.Adapter.RollbackDMLTransaction(execCtx, tx)
+			terminal, reasonCode, failureName = classifyDMLFailureRollback(rbRes, rerr)
+			boundary = domain.BoundarySent
 		case database.OutcomeCancelled:
 			// Cancellation confirmed: roll back current transaction (previously committed stages are not rolled back).
-			if rbRes, rerr := target.Adapter.RollbackDMLTransaction(execCtx, tx); rerr == nil &&
-				rbRes != nil && rbRes.Outcome != database.OutcomeResultUnknown {
-				terminal, boundary = domain.AttemptCancelled, domain.BoundarySent
-				reasonCode = int(domain.CodeIllegalTransition)
-				failureName = "EXECUTION_CANCELLED"
-			} else {
-				terminal, boundary = domain.AttemptResultUnknown, domain.BoundarySent
-				reasonCode, failureName = int(domain.CodeResultUnknown), "CANCEL_NOT_CONFIRMED"
-			}
+			rbRes, rerr := target.Adapter.RollbackDMLTransaction(execCtx, tx)
+			terminal, reasonCode, failureName = classifyDMLCancelRollback(rbRes, rerr)
+			boundary = domain.BoundarySent
 		case database.OutcomeResultUnknown:
 			terminal, boundary = domain.AttemptResultUnknown, domain.BoundarySent
 			reasonCode, failureName = int(domain.CodeResultUnknown), res.SanitizedFailureName
@@ -815,15 +859,9 @@ func (r *Runner) runDML(ctx context.Context, in TaskInput, at *persistence.Execu
 			return ferr
 		}
 		if s.attemptCancelling(ctx, in.AttemptID) {
-			if rbRes, rerr := target.Adapter.RollbackDMLTransaction(execCtx, tx); rerr == nil &&
-				rbRes != nil && rbRes.Outcome != database.OutcomeResultUnknown {
-				terminal, boundary = domain.AttemptCancelled, domain.BoundarySent
-				reasonCode = int(domain.CodeIllegalTransition)
-				failureName = "EXECUTION_CANCELLED"
-			} else {
-				terminal, boundary = domain.AttemptResultUnknown, domain.BoundarySent
-				reasonCode, failureName = int(domain.CodeResultUnknown), "CANCEL_NOT_CONFIRMED"
-			}
+			rbRes, rerr := target.Adapter.RollbackDMLTransaction(execCtx, tx)
+			terminal, reasonCode, failureName = classifyDMLCancelRollback(rbRes, rerr)
+			boundary = domain.BoundarySent
 			_ = s.finalizeSourceOrderRollbackStatus(ctx, rbCtx, terminal)
 			return s.applyResult(ctx, in.AttemptID, fence, resultFacts{
 				Terminal: terminal, Boundary: boundary,
@@ -838,20 +876,18 @@ func (r *Runner) runDML(ctx context.Context, in TaskInput, at *persistence.Execu
 		if rbCtx != nil && rbCtx.RollbackEnabled && rbCtx.TicketType == "normal" {
 			bundle := rollback.AssembleOrderEvidenceBundle("dml", capturedRollbackStmts)
 			if strings.TrimSpace(bundle.RollbackSQL) == "" && len(capturedRollbackStmts) > 0 && totalRollbackRows > 0 {
-				_, _ = target.Adapter.RollbackDMLTransaction(execCtx, tx)
-				reason := "failed to generate deterministic rollback SQL for captured rows"
-				_ = s.persistUnsupportedRollbackEvidence(ctx, rbCtx, "dml", reason)
-				return s.applyResult(ctx, in.AttemptID, fence,
-					s.rollbackUnsupportedFacts(plan[len(plan)-1].Ordinal, domain.BoundarySent, reason, facts), actor)
+				return s.abortDMLOnPreCommitRollbackError(
+					ctx, execCtx, target, tx, rbCtx, in.AttemptID, fence,
+					plan[len(plan)-1].Ordinal, "failed to generate deterministic rollback SQL for captured rows", facts, actor,
+				)
 			}
 			preSealedEvID = newID()
 			env, mac, serr := rollback.SealEvidenceBundle(s.Crypter, preSealedEvID, bundle)
 			if serr != nil {
-				_, _ = target.Adapter.RollbackDMLTransaction(execCtx, tx)
-				reason := fmt.Sprintf("failed to seal rollback evidence before commit: %v", serr)
-				_ = s.persistUnsupportedRollbackEvidence(ctx, rbCtx, "dml", reason)
-				return s.applyResult(ctx, in.AttemptID, fence,
-					s.rollbackUnsupportedFacts(plan[len(plan)-1].Ordinal, domain.BoundarySent, reason, facts), actor)
+				return s.abortDMLOnPreCommitRollbackError(
+					ctx, execCtx, target, tx, rbCtx, in.AttemptID, fence,
+					plan[len(plan)-1].Ordinal, fmt.Sprintf("failed to seal rollback evidence before commit: %v", serr), facts, actor,
+				)
 			}
 			preSealedEnv = env
 			preSealedHMAC = mac
@@ -949,6 +985,7 @@ func (r *Runner) runDDL(ctx context.Context, in TaskInput, at *persistence.Execu
 	facts := []stmtFact{}
 	capturedDDLStmts := []rollback.StatementEvidence{}
 	var ddlPostExecErr error
+	priorSucceeded := 0
 	succeeded := 0
 	terminal := domain.AttemptSucceeded
 	boundary := domain.BoundaryNotStarted
@@ -962,6 +999,7 @@ func (r *Runner) runDDL(ctx context.Context, in TaskInput, at *persistence.Execu
 		switch ledger[st.Ordinal] {
 		case domain.StmtSucceeded:
 			// Statement already succeeded: fact confirmed by a prior run, skip idempotently without resending.
+			priorSucceeded++
 			succeeded++
 			continue
 		case domain.StmtNotStarted, "":
@@ -1166,7 +1204,7 @@ func (r *Runner) runDDL(ctx context.Context, in TaskInput, at *persistence.Execu
 		fact := stmtFactOf(st.Ordinal, res)
 		facts = append(facts, fact)
 		_ = s.persistStatementFact(ctx, in.AttemptID, fence, fact)
-		reportBeat(beat, succeeded+len(facts), len(plan))
+		reportBeat(beat, ddlBeatCompleted(priorSucceeded, len(facts)), len(plan))
 		if r.hooks != nil && r.hooks.AfterStatementPersist != nil {
 			if herr := r.hooks.AfterStatementPersist(in.AttemptID, st.Ordinal); herr != nil {
 				return herr

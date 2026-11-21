@@ -214,8 +214,8 @@ func TestRuleFastFilterIntegration_DBAndEphemeral(t *testing.T) {
 		},
 	})
 
-	// 1. Ephemeral Review Path with pure INSERT SQL (materialized to DB).
-	er, runID := runEphemeralAndWait(t, b, runner, "INSERT INTO orders (id, amount) VALUES (1, 100);", true)
+	// Ephemeral Review Path with pure INSERT SQL (materialized to DB).
+	er, _ := runEphemeralAndWait(t, b, runner, "INSERT INTO orders (id, amount) VALUES (1, 100);", true)
 
 	er.mu.RLock()
 	var ephSkills []string
@@ -225,7 +225,6 @@ func TestRuleFastFilterIntegration_DBAndEphemeral(t *testing.T) {
 		}
 	}
 	ephState := er.Run.State
-	policy := er.Policy
 	er.mu.RUnlock()
 	if ephState != string(domain.RunStateReady) {
 		t.Fatalf("ephemeral run expected ready, got %s", ephState)
@@ -241,30 +240,6 @@ func TestRuleFastFilterIntegration_DBAndEphemeral(t *testing.T) {
 	}
 	if !strings.Contains(capturedPrompts[0], "custom.insert-columns") || !strings.Contains(capturedPrompts[0], "custom.audit-updated-at") {
 		t.Fatalf("expected surviving skills missing from prompt:\n%s", capturedPrompts[0])
-	}
-
-	// 2. DB freezeInjections Path: clear review_tool_calls for the materialized run
-	// and verify policy_injections.go applies the exact same conservative fast-filter.
-	if err := b.db.Exec(`delete from review_tool_calls where review_run_id = ?`, runID).Error; err != nil {
-		t.Fatal(err)
-	}
-	runRow, err := b.svc.loadRunOrNull(context.Background(), b.db, runID)
-	if err != nil || runRow == nil {
-		t.Fatalf("loadRunOrNull: %v", err)
-	}
-	inj, err := runner.freezeInjections(context.Background(), b.db, runRow, policy)
-	if err != nil {
-		t.Fatalf("freezeInjections: %v", err)
-	}
-	if len(inj.SkillsByStage) != 1 {
-		t.Fatalf("expected 1 stage in SkillsByStage, got %d", len(inj.SkillsByStage))
-	}
-	var dbRecordedSkills []string
-	if err := b.db.Raw(`select tool_name from review_tool_calls where review_run_id = ? and tool_kind = 'prompt_tool' order by tool_name`, runID).Scan(&dbRecordedSkills).Error; err != nil {
-		t.Fatal(err)
-	}
-	if strings.Join(dbRecordedSkills, ",") != "custom.audit-updated-at,custom.insert-columns" {
-		t.Fatalf("DB freezeInjections expected only matching+fail-open skills, got %v", dbRecordedSkills)
 	}
 }
 

@@ -319,19 +319,19 @@ func TestPostgreSQL17And18DMLAndDDLRollbackIntegration(t *testing.T) {
 	}{
 		{
 			name:        "PG17_TxSelectForUpdateReturning",
-			port:        54333,
-			user:        "yr",
-			pass:        "f12-target-a16f4908848a",
-			db:          "target",
+			port:        envIntOr("YEARNING_ROLLBACK_TEST_PG17_PORT", 54333),
+			user:        envOr("YEARNING_ROLLBACK_TEST_PG17_USER", "yr"),
+			pass:        envOr("YEARNING_ROLLBACK_TEST_PG17_PASSWORD", "f12-target-a16f4908848a"),
+			db:          envOr("YEARNING_ROLLBACK_TEST_PG17_DB", "target"),
 			expectPG18:  false,
 			expectedStr: rollback.StrategyPGDMLTxReturning,
 		},
 		{
 			name:        "PG18_NativeReturningOldNew",
-			port:        54332,
-			user:        "yearning",
-			pass:        "f12-meta-a4512e1f9cbe",
-			db:          "yearning_f12b",
+			port:        envIntOr("YEARNING_ROLLBACK_TEST_PG18_PORT", 54332),
+			user:        envOr("YEARNING_ROLLBACK_TEST_PG18_USER", "yearning"),
+			pass:        envOr("YEARNING_ROLLBACK_TEST_PG18_PASSWORD", "f12-meta-a4512e1f9cbe"),
+			db:          envOr("YEARNING_ROLLBACK_TEST_PG18_DB", "yearning_f12b"),
 			expectPG18:  true,
 			expectedStr: rollback.StrategyPG18DMLReturning,
 		},
@@ -359,7 +359,7 @@ func TestPostgreSQL17And18DMLAndDDLRollbackIntegration(t *testing.T) {
 				_, _ = adapter.RollbackDMLTransaction(ctx, tx1)
 				t.Fatalf("AnalyzeStatement INSERT: %v", err)
 			}
-			_, evIns, metaIns, strategyIns, err := rollback.ExecuteAndCapturePostgresDML(ctx, adapter, pool, tx1, 1, capIns, 0)
+			_, evIns, metaIns, strategyIns, err := rollback.ExecuteAndCapturePostgresDML(ctx, pool, tx1, 1, capIns, 0)
 			if err != nil {
 				_, _ = adapter.RollbackDMLTransaction(ctx, tx1)
 				t.Fatalf("ExecuteAndCapturePostgresDML INSERT: %v", err)
@@ -391,7 +391,7 @@ func TestPostgreSQL17And18DMLAndDDLRollbackIntegration(t *testing.T) {
 				_, _ = adapter.RollbackDMLTransaction(ctx, tx2)
 				t.Fatalf("AnalyzeStatement UPDATE: %v", err)
 			}
-			_, evUpd, _, strategyUpd, err := rollback.ExecuteAndCapturePostgresDML(ctx, adapter, pool, tx2, 1, capUpd, 0)
+			_, evUpd, _, strategyUpd, err := rollback.ExecuteAndCapturePostgresDML(ctx, pool, tx2, 1, capUpd, 0)
 			if err != nil {
 				_, _ = adapter.RollbackDMLTransaction(ctx, tx2)
 				t.Fatalf("ExecuteAndCapturePostgresDML UPDATE: %v", err)
@@ -440,7 +440,7 @@ func TestPostgreSQL17And18DMLAndDDLRollbackIntegration(t *testing.T) {
 				_, _ = adapter.RollbackDMLTransaction(ctx, tx3)
 				t.Fatalf("AnalyzeStatement DELETE: %v", err)
 			}
-			_, evDel, _, _, err := rollback.ExecuteAndCapturePostgresDML(ctx, adapter, pool, tx3, 1, capDel, 0)
+			_, evDel, _, _, err := rollback.ExecuteAndCapturePostgresDML(ctx, pool, tx3, 1, capDel, 0)
 			if err != nil {
 				_, _ = adapter.RollbackDMLTransaction(ctx, tx3)
 				t.Fatalf("ExecuteAndCapturePostgresDML DELETE: %v", err)

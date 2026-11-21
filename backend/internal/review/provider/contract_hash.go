@@ -1,4 +1,5 @@
-// events.go builds domain event payloads (api/events/domain-event.schema.json). Internal event names follow repository-event-routing.json: change_draft.revised / change_draft.precheck_completed -> io.yearning.v4.change_draft.state_changed (emit_one); review_run.completed -> io.yearning.v4.review.completed | review.blocked (choose_one, discriminated by gate.passed).
+// contract_hash.go computes platform-level privacy_contract_hash and output_schema_hash digests
+// derived directly from compiled policy and schema constants rather than mutable admin configuration.
 package provider
 
 import (
@@ -9,7 +10,6 @@ import (
 	"github.com/cookieY/YearningX/backend/internal/review/promptprofile"
 )
 
-// Internal domain event names (repository-commands events field).
 const privacyContractCanonical = `raw_SQL_to_provider: forbidden
 literal_values_to_provider: forbidden
 SQL_comments_to_provider: forbidden
@@ -45,7 +45,7 @@ func mustJSON(v any) []byte {
 	return b
 }
 
-// External event types (CloudEvents type).
+// Compiled contract digests used to freeze Provider snapshots and gate failover compatibility.
 var (
 	PrivacyContractHashDefault = hashHex([]byte(privacyContractCanonical))
 	PrivacyContractHashSAN     = hashHex([]byte(privacyContractCanonicalSAN))

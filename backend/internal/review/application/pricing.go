@@ -726,9 +726,11 @@ func (s *Services) RecordCallUsage(ctx context.Context, db *gorm.DB, runID strin
 		newID(), runID, stagePosition, modelTurn, callIndex,
 		rec.ProviderID, rec.ModelName, rec.SentAt,
 		nullableString(rec.ReasoningEffort), nullableInt(rec.MaxTokens), nullableTemperature(rec.Temperature),
-		nullableUUID(rate.VersionID), nullableUUID(rate.WindowID), rate.Source, nullableCurrency(rate),
+		nullableString(rate.VersionID), nullableString(rate.WindowID), rate.Source, nullableString(rate.Currency),
 		inTok, outTok, cached, cacheWrite, reasoning,
-		usageReported, amount, cost.Basis, cost.Note, rec.Outcome, nullableHTTPStatus(rec.HTTPStatus), nowUTC()).Error
+		// HTTPStatus=0 indicates no HTTP response was received (network error / timeout / cancellation);
+		// nullableInt persists 0 as NULL rather than violating the DB CHECK constraint (R1 C-1).
+		usageReported, amount, cost.Basis, cost.Note, rec.Outcome, nullableInt(rec.HTTPStatus), nowUTC()).Error
 }
 
 // nullableCount extracts a nullable count value from tri-state detail (passing nil through as NULL).
@@ -766,29 +768,6 @@ func nullableTemperature(f *float64) any {
 		return nil
 	}
 	return strconv.FormatFloat(*f, 'f', -1, 64)
-}
-
-// nullableHTTPStatus R1 C-1: HTTPStatus=0 indicates no response was received (network error /
-// timeout / cancellation) — persisted as NULL (permitted by CHECK) rather than writing 0 and violating the constraint.
-func nullableHTTPStatus(v int) any {
-	if v == 0 {
-		return nil
-	}
-	return v
-}
-
-func nullableUUID(id string) any {
-	if id == "" {
-		return nil
-	}
-	return id
-}
-
-func nullableCurrency(rate EffectiveRate) any {
-	if rate.Currency == "" {
-		return nil
-	}
-	return rate.Currency
 }
 
 func derefTime(t *time.Time, fallback time.Time) time.Time {
@@ -866,35 +845,7 @@ func (s *Services) ListCallUsage(ctx context.Context, limit int, after, runID, p
 	if currency != "" {
 		q = q.Where("currency = ?", currency)
 	}
-	var rows []struct {
-		ID               string
-		ReviewRunID      string
-		StagePosition    int32
-		ModelTurn        int
-		CallIndex        int
-		ProviderID       string
-		ModelName        string
-		SentAt           time.Time
-		ReasoningEffort  *string
-		MaxTokens        *int64
-		Temperature      *string
-		RateVersionID    *string
-		RateWindowID     *string
-		RateSource       string
-		Currency         *string
-		InputTokens      *int64
-		OutputTokens     *int64
-		CachedTokens     *int64
-		CacheWriteTokens *int64
-		ReasoningTokens  *int64
-		UsageReported    bool
-		ReferenceAmount  *string
-		CalcBasis        string
-		DetailNote       string
-		Outcome          string
-		HTTPStatus       *int
-		CreatedAt        time.Time
-	}
+	var rows []CallUsageView
 	if err := q.Select("id::text as id, review_run_id::text as review_run_id, stage_position, model_turn, call_index, " +
 		"provider_id::text as provider_id, model_name, sent_at, reasoning_effort, max_tokens, temperature::text as temperature, " +
 		"rate_version_id::text as rate_version_id, rate_window_id::text as rate_window_id, rate_source, currency::text as currency, " +
@@ -909,23 +860,9 @@ func (s *Services) ListCallUsage(ctx context.Context, limit int, after, runID, p
 		v := rows[len(rows)-1].SentAt.UTC().Format("2006-01-02T15:04:05.999999Z") + "|" + rows[len(rows)-1].ID
 		next = &v
 	}
-	out := make([]*CallUsageView, 0, len(rows))
+	out := make([]*CallUsageView, len(rows))
 	for i := range rows {
-		r := &rows[i]
-		view := &CallUsageView{
-			ID: r.ID, ReviewRunID: r.ReviewRunID, StagePosition: r.StagePosition,
-			ModelTurn: r.ModelTurn, CallIndex: r.CallIndex,
-			ProviderID: r.ProviderID, ModelName: r.ModelName, SentAt: r.SentAt,
-			ReasoningEffort: r.ReasoningEffort, MaxTokens: r.MaxTokens, Temperature: r.Temperature,
-			RateVersionID: r.RateVersionID, RateWindowID: r.RateWindowID,
-			RateSource: r.RateSource, Currency: r.Currency,
-			InputTokens: r.InputTokens, OutputTokens: r.OutputTokens,
-			CachedTokens: r.CachedTokens, CacheWriteTokens: r.CacheWriteTokens,
-			ReasoningTokens: r.ReasoningTokens, UsageReported: r.UsageReported,
-			ReferenceAmount: r.ReferenceAmount, CalcBasis: r.CalcBasis, DetailNote: r.DetailNote,
-			Outcome: r.Outcome, HTTPStatus: r.HTTPStatus, CreatedAt: r.CreatedAt,
-		}
-		out = append(out, view)
+		out[i] = &rows[i]
 	}
 	return out, next, nil
 }

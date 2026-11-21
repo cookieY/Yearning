@@ -41,11 +41,16 @@ func makeBatchTestBuilder(t *testing.T, ep provider.Endpoint, groups []provider.
 		rawKnowledge, compiledKnowledge []*knowledge.Entry,
 	) (provider.Request, error) {
 		if endpointIsSAN(ep) {
-			return buildSANStageRequest(
-				ctx, nil, nil, "run-batch-test", target,
-				groups, nil, rawSkills, rawKnowledge,
-				nil, mapper, "en-US", false, false, false, &cachedSAN,
-			)
+			return buildSANStageRequest(ctx, stagePromptRequest{
+				runID:           "run-batch-test",
+				target:          target,
+				groups:          groups,
+				rawSkills:       rawSkills,
+				rawKnowledge:    rawKnowledge,
+				runMapper:       mapper,
+				outputLocale:    "en-US",
+				cachedSANGroups: &cachedSAN,
+			})
 		}
 		cin := agent.ContextInput{
 			EngineProfile: "mysql/mysql",

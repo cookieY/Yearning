@@ -78,10 +78,7 @@ func (s *Services) CreateSchedule(ctx context.Context, in CreateScheduleInput) (
 		return nil
 	})
 	if txErr != nil {
-		var de *domain.Error
-		if errors.As(txErr, &de) {
-			_ = s.idemRelease(ctx, in.Actor.UserID, route, in.OrderID, in.IdempotencyKey)
-		}
+		_ = s.idemRelease(ctx, in.Actor.UserID, route, in.OrderID, in.IdempotencyKey)
 		return nil, false, txErr
 	}
 	raw, merr := json.Marshal(out)
@@ -217,10 +214,7 @@ func (s *Services) CancelSchedule(ctx context.Context, in CancelScheduleInput) (
 		return nil
 	})
 	if txErr != nil {
-		var de *domain.Error
-		if errors.As(txErr, &de) {
-			_ = s.idemRelease(ctx, in.Actor.UserID, route, in.OrderID, in.IdempotencyKey)
-		}
+		_ = s.idemRelease(ctx, in.Actor.UserID, route, in.OrderID, in.IdempotencyKey)
 		return nil, false, txErr
 	}
 	raw, merr := json.Marshal(out)

@@ -14,18 +14,6 @@ import type {
 
 import { customInstance } from '../../../../shared/api/mutator';
 
-export type getMyDashboardResponse200 = {
-  data: MyDashboardResultResponse
-  status: 200
-}
-
-export type getMyDashboardResponseSuccess = (getMyDashboardResponse200) & {
-  headers: Headers;
-};
-;
-
-export type getMyDashboardResponse = (getMyDashboardResponseSuccess)
-
 export const getGetMyDashboardUrl = () => {
 
 
@@ -34,9 +22,9 @@ export const getGetMyDashboardUrl = () => {
   return `/api/v4/dashboard/me`
 }
 
-export const getMyDashboard = async ( options?: Parameters<typeof customInstance>[1]): Promise<getMyDashboardResponse> => {
+export const getMyDashboard = async ( options?: Parameters<typeof customInstance>[1]): Promise<MyDashboardResultResponse> => {
 
-  return customInstance<getMyDashboardResponse>(getGetMyDashboardUrl(),
+  return customInstance<MyDashboardResultResponse>(getGetMyDashboardUrl(),
   {
     ...options,
     method: 'GET'
@@ -46,18 +34,6 @@ export const getMyDashboard = async ( options?: Parameters<typeof customInstance
 );}
 
 
-export type getLatestReleaseResponse200 = {
-  data: LatestReleaseResultResponse
-  status: 200
-}
-
-export type getLatestReleaseResponseSuccess = (getLatestReleaseResponse200) & {
-  headers: Headers;
-};
-;
-
-export type getLatestReleaseResponse = (getLatestReleaseResponseSuccess)
-
 export const getGetLatestReleaseUrl = () => {
 
 
@@ -66,9 +42,9 @@ export const getGetLatestReleaseUrl = () => {
   return `/api/v4/releases/latest`
 }
 
-export const getLatestRelease = async ( options?: Parameters<typeof customInstance>[1]): Promise<getLatestReleaseResponse> => {
+export const getLatestRelease = async ( options?: Parameters<typeof customInstance>[1]): Promise<LatestReleaseResultResponse> => {
 
-  return customInstance<getLatestReleaseResponse>(getGetLatestReleaseUrl(),
+  return customInstance<LatestReleaseResultResponse>(getGetLatestReleaseUrl(),
   {
     ...options,
     method: 'GET'

@@ -304,7 +304,7 @@ func runServe(ctx context.Context, args []string) error {
 		}
 	}()
 
-	router := httpapi.NewServeRouter(httpapi.ServeDeps{
+	wiredDeps, err := httpapi.BuildServeDeps(ctx, httpapi.ServeDeps{
 		Logger:       logger,
 		Readiness:    readiness,
 		SessionStore: sessionStore,
@@ -332,6 +332,10 @@ func runServe(ctx context.Context, args []string) error {
 			SecureCookie: cfg.Session.Secure,
 		},
 	})
+	if err != nil {
+		return err
+	}
+	router := httpapi.NewServeRouter(wiredDeps)
 
 	logger.Info("serve starting",
 		zap.String("listen", cfg.Server.ListenAddress),

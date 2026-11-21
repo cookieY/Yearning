@@ -10,8 +10,7 @@ import type {
 } from "@/api/generated/client/yearningV4HTTPAPI.schemas";
 import { useSession } from "@/features/auth/session-provider";
 import { BusinessError } from "@/shared/api/mutator";
-import i18next from "@/shared/i18n";
-import { describeError } from "@/shared/api/error-display";
+import { describeError, describeErrorText } from "@/shared/api/error-display";
 import { appToast } from "@/shared/components/shadcn-dashboard/sonner/sonner-08";
 import { PageHeader, PageLayout } from "@/shared/components/page-layout";
 import { PendingButton } from "@/shared/components/pending-button";
@@ -120,12 +119,6 @@ export default function AdminSettingsNamespacePage() {
       </TransitionPanel>
     </PageLayout>
   );
-}
-
-function describeErrorText(display: { messageKey: string; requestId: string | null }): string {
-  // Translated through the shared i18n bundle so users never see raw keys.
-  const text = i18next.t(display.messageKey);
-  return display.requestId === null ? text : `${text} (${display.requestId})`;
 }
 
 function NamespaceSettings({ namespace }: { namespace: SettingsPageNamespace }) {

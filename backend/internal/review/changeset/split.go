@@ -22,13 +22,16 @@ type Splitter struct {
 	maxStatementBytes int
 
 	buf     []byte // windowHasContent reports whether any lexical token exists in the byte range (distinguishing comment-only statements).
+	readBuf []byte // reusable chunk scratch buffer allocated lazily in fill()
 	winBase int64  // cutTail handles the final statement at EOF without a trailing semicolon.
 	// Whitespace tail = normal completion; non-empty tail must be fully lexable, failing closed if unprovable.
 	used int // Limits aligns with capacity-slo-contract product_limits.
 
-	lex  fingerprint.LexOutput // cap on exceptional statement references (total count is unbounded)
-	eof  bool
-	next int // DefaultLimits returns the default contract limits.
+	lex         fingerprint.LexOutput // cap on exceptional statement references (total count is unbounded)
+	tokIdx      int                   // cursor into lex.Tokens for tryCut()
+	tokStartIdx int                   // cursor into lex.Tokens for windowHasContent()
+	eof         bool
+	next        int // DefaultLimits returns the default contract limits.
 }
 
 // Sample is a representative sample reference within a group (contains no raw SQL; execution stage re-reads raw text by Offset).
@@ -85,10 +88,12 @@ func (s *Splitter) fill() error {
 			Statement: s.next + 1,
 		}
 	}
-	chunk := make([]byte, readChunk)
-	n, err := s.reader.Read(chunk)
+	if s.readBuf == nil {
+		s.readBuf = make([]byte, readChunk)
+	}
+	n, err := s.reader.Read(s.readBuf)
 	if n > 0 {
-		s.buf = append(s.buf, chunk[:n]...)
+		s.buf = append(s.buf, s.readBuf[:n]...)
 	}
 	if err == io.EOF {
 		s.eof = true
@@ -102,11 +107,15 @@ func (s *Splitter) fill() error {
 		if errors.Is(lexErr, fingerprint.ErrUnterminated) {
 			// Validate once more after EOF: trailing whitespace/overflow bytes have no subsequent statement to trigger the check.
 			s.lex = lex
+			s.tokIdx = 0
+			s.tokStartIdx = 0
 			return nil
 		}
 		return lexicalFailureWithLocation(s.buf, s.winBase, s.used, s.next+1, s.profile.Flags(), lexErr)
 	}
 	s.lex = lex
+	s.tokIdx = 0
+	s.tokStartIdx = 0
 	return nil
 }
 
@@ -188,7 +197,9 @@ func findInvalidUTF8Offset(buf []byte, start int) (int, bool) {
 
 // Input limit is measured in raw bytes (including separating whitespace), not net statement bytes.
 func (s *Splitter) tryCut() (Statement, bool, error) {
-	for _, t := range s.lex.Tokens {
+	for s.tokIdx < len(s.lex.Tokens) {
+		t := s.lex.Tokens[s.tokIdx]
+		s.tokIdx++
 		if t.Start < s.used || !t.IsPunct(";") {
 			continue
 		}
@@ -228,7 +239,11 @@ func (s *Splitter) tryCut() (Statement, bool, error) {
 
 // countingReader counts raw bytes read from the underlying reader (including separators and trailing whitespace).
 func (s *Splitter) windowHasContent(start, end int) bool {
-	for _, t := range s.lex.Tokens {
+	for s.tokStartIdx < len(s.lex.Tokens) && s.lex.Tokens[s.tokStartIdx].End <= start {
+		s.tokStartIdx++
+	}
+	for i := s.tokStartIdx; i < len(s.lex.Tokens); i++ {
+		t := s.lex.Tokens[i]
 		if t.Start >= end {
 			break
 		}

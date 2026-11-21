@@ -36,7 +36,7 @@
 
 1. 在 Provider 表单第 3 栏 **参考计价** 中，按 `CNY` 或 `USD` / 百万 Token 配置生效日期与分时时段（例如 DeepSeek 夜间优惠时段 `[00:30, 08:30)`），分别填写普通输入、输出、缓存读取（`cached_tokens`）与缓存写入（`cache_write_tokens`）单价。
 2. 在 **AI 预算（`/admin/review-engine/ai-budget`）** 中设置 **全局单日预算上限** 与 **告警百分比阈值**（例如每日 `¥100`，达 `80%` 触发通知告警）。
-3. 开启 **预算强制阻断（`enforced`）** 需要两步确认（点击后系统弹窗展示影响范围并下发 `impact_token`）。达到预算上限时新预审返回 `2010 AI_DAILY_BUDGET_EXHAUSTED`。
+3. 开启 **预算强制阻断（`enforced`）** 需要两步确认（点击后系统弹窗展示影响范围并下发 `impact_token`）。达到全局单日预算上限时，新的 AI 预审、数据库 AI 助手对话与 SQL 性能 AI 诊断请求均会统一 Fail Closed 返回 `2010 AI_DAILY_BUDGET_EXHAUSTED`。
 
 ## 3. 48 条内置审核技能分类速查（`/admin/review-engine/skills`）
 
@@ -98,7 +98,7 @@
   Rule: Every CREATE TABLE statement in production schemas must define both created_at and updated_at timestamp columns declared NOT NULL with a default value.
   Output a finding whenever either column is missing or nullable.
   ```
-- 保存并点击 **启用**（启用时系统会自动执行内联 Eval 门禁校验结构化输出合法性），再把它勾选进 `/admin/rule-sets` 规则集即可生效。
+- 保存并点击 **启用**（启用时系统会自动执行内联 Eval 门禁校验结构化输出合法性），再把它勾选进 `/admin/rule-sets` 规则集即可生效。Prompt Tool 工作台的 AI 提示词优化、测试用例生成与测试运行依赖已启用的 AI Provider，未配置或调用/结构校验失败时将直接 Fail Closed 返回 `2011 AI_PROVIDER_FAILED`。
 
 ### 示例 2：沉淀表级 DBA 内部经验（`/admin/review-engine/knowledge`）
 

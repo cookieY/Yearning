@@ -101,20 +101,16 @@ type ValidityInput struct {
 	Facts   ValidityFactIndex `json:"facts"`
 }
 
-// PreconditionEvaluator is a pure deterministic Port. Implementations never
+// PreconditionEvaluator is a pure deterministic evaluator. Methods never
 // connect to a database, execute SQL, or call a Provider.
-type PreconditionEvaluator interface {
-	Evaluate(context.Context, ValidityInput) (ValidityResult, error)
-}
+type PreconditionEvaluator struct{}
 
 // NewPreconditionEvaluator returns the deterministic in-process evaluator.
 func NewPreconditionEvaluator() PreconditionEvaluator {
-	return preconditionEvaluator{}
+	return PreconditionEvaluator{}
 }
 
-type preconditionEvaluator struct{}
-
-func (preconditionEvaluator) Evaluate(
+func (PreconditionEvaluator) Evaluate(
 	_ context.Context,
 	in ValidityInput,
 ) (ValidityResult, error) {

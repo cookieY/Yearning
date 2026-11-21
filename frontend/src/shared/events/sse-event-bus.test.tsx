@@ -9,6 +9,10 @@ import {
   ORDER_SSE_EVENT_TYPES,
   QUERY_SSE_EVENT_TYPES,
   buildEventStreamUrl,
+  publishSseEvent,
+  resetSseEventBusForTest,
+  subscribeSseEvent,
+  useSseEvent,
   useSseEventBus,
 } from "@/shared/events/sse-event-bus";
 
@@ -343,8 +347,8 @@ describe("Global SSE event broadcast bus", () => {
       });
     });
 
-    // Only the first delivery triggers invalidations (6 order/dashboard prefixes).
-    expect(invalidateSpy).toHaveBeenCalledTimes(6);
+    // Only the first delivery triggers invalidations (7 order/dashboard prefixes).
+    expect(invalidateSpy).toHaveBeenCalledTimes(7);
 
     // Overflow past 2048 entries evicts the oldest ID while keeping recent IDs deduplicated.
     invalidateSpy.mockClear();
@@ -398,6 +402,8 @@ describe("Global SSE event broadcast bus", () => {
       ["change-orders"],
       ["change-order"],
       ["change-order-timeline"],
+      ["change-order-comments"],
+      ["change-draft"],
       ["execution-attempt"],
       ["execution-statements"],
       ["dashboard"],
@@ -463,5 +469,116 @@ describe("Global SSE event broadcast bus", () => {
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["query"] });
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["admin", "flows"] });
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["dashboard"] });
+  });
+
+  it("delivers decoded SSE subject and payload to subscribeSseEvent listeners and deduplicates by id", () => {
+    const received: Array<{ id: string; type: string; subject?: string; data?: unknown }> = [];
+    const unsubscribe = subscribeSseEvent("io.yearning.v4.flow.updated", (evt) => {
+      received.push(evt);
+    });
+
+    render(<BusHarness authenticated={true} />);
+    const source = MockEventSource.instances[0];
+    if (source === undefined) throw new Error("missing EventSource");
+
+    act(() => {
+      source.emitNamed("io.yearning.v4.flow.updated", {
+        id: "evt-sub-1",
+        type: "io.yearning.v4.flow.updated",
+        subject: "flows/flow-9",
+        data: { revision: 4 },
+      });
+      // Duplicate event id must not notify twice.
+      source.emitNamed("io.yearning.v4.flow.updated", {
+        id: "evt-sub-1",
+        type: "io.yearning.v4.flow.updated",
+        subject: "flows/flow-9",
+        data: { revision: 4 },
+      });
+    });
+
+    expect(received).toEqual([
+      {
+        id: "evt-sub-1",
+        type: "io.yearning.v4.flow.updated",
+        subject: "flows/flow-9",
+        data: { revision: 4 },
+      },
+    ]);
+
+    act(() => {
+      publishSseEvent({
+        id: "evt-pub-2",
+        type: "io.yearning.v4.flow.updated",
+        subject: "flow:flow-9",
+      });
+    });
+    expect(received).toHaveLength(2);
+    expect(received[1]?.subject).toBe("flow:flow-9");
+
+    unsubscribe();
+    act(() => {
+      publishSseEvent({
+        id: "evt-pub-3",
+        type: "io.yearning.v4.flow.updated",
+        subject: "flow:flow-9",
+      });
+    });
+    expect(received).toHaveLength(2);
+  });
+
+  it("useSseEvent subscribes cleanly and publishSseEvent deduplicates by event id until reset", () => {
+    resetSseEventBusForTest();
+    const received: string[] = [];
+
+    function HookProbe({ enabled }: { enabled: boolean }) {
+      useSseEvent(enabled ? "io.yearning.v4.change_order.state_changed" : null, (event) => {
+        received.push(event.id);
+      });
+      return null;
+    }
+
+    const { rerender, unmount } = render(<HookProbe enabled={true} />);
+
+    act(() => {
+      expect(
+        publishSseEvent({
+          id: "evt-dedupe-1",
+          type: "io.yearning.v4.change_order.state_changed",
+          subject: "change-orders/123",
+        }),
+      ).toBe(true);
+      expect(
+        publishSseEvent({
+          id: "evt-dedupe-1",
+          type: "io.yearning.v4.change_order.state_changed",
+          subject: "change-orders/123",
+        }),
+      ).toBe(false);
+    });
+    expect(received).toEqual(["evt-dedupe-1"]);
+
+    resetSseEventBusForTest();
+    act(() => {
+      expect(
+        publishSseEvent({
+          id: "evt-dedupe-1",
+          type: "io.yearning.v4.change_order.state_changed",
+          subject: "change-orders/123",
+        }),
+      ).toBe(true);
+    });
+    expect(received).toEqual(["evt-dedupe-1", "evt-dedupe-1"]);
+
+    rerender(<HookProbe enabled={false} />);
+    act(() => {
+      publishSseEvent({
+        id: "evt-dedupe-2",
+        type: "io.yearning.v4.change_order.state_changed",
+        subject: "change-orders/123",
+      });
+    });
+    expect(received).toEqual(["evt-dedupe-1", "evt-dedupe-1"]);
+    unmount();
   });
 });

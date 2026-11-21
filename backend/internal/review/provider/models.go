@@ -1,4 +1,5 @@
-// GateResult is the persistable submission gate decision.
+// models.go fetches the OpenAI-compatible GET /models catalog for AI Provider setup forms under
+// the same HTTPS-only, 4 MiB response cap, and sanitized rejection guarantees as review calls.
 package provider
 
 import (
@@ -17,10 +18,9 @@ type modelsListResponse struct {
 	} `json:"data"`
 }
 
-// EvaluateGate evaluates the submission gate from stage snapshot terminal states and highest severities. Submission passes only when all stages passed and there are no high/critical findings; any incompleteness blocks submission (fail closed).
 var modelsHTTPClient = NewHTTPClient()
 
-// An empty workflow with no stages cannot prove submittability.
+// ListModels queries baseURL/models and returns deduplicated, sorted model identifiers.
 func ListModels(ctx context.Context, baseURL, apiKey string) ([]string, error) {
 	u, err := ParseBaseURL(baseURL)
 	if err != nil {

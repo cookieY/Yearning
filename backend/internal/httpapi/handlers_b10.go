@@ -55,26 +55,22 @@ func currentUserID(c *gin.Context) string {
 
 // writeExecErr maps execution domain errors (splitting colon-suffixed reason into Meta).
 func writeExecErr(c *gin.Context, err error) bool {
-	var de *domain.Error
-	switch {
-	case err == nil:
+	if err == nil {
 		return true
-	case errors.As(err, &de):
-		name := de.Name
-		var meta map[string]any
-		if i := strings.Index(name, ":"); i >= 0 {
-			reason := name[i+1:]
-			// detail equals reason: frontend S18.75-A uniformly renders diagnostic text from meta.detail
-			// (BUG-006 -- previously executors could not see preflight rejection reasons).
-			meta = map[string]any{"reason": reason, "detail": reason}
-			name = name[:i]
-		}
-		WriteBusinessError(c, &BusinessError{Code: int(de.Code), Name: name,
-			Message: "Execution request rejected", Meta: meta})
-	default:
+	}
+	var de *domain.Error
+	if !errors.As(err, &de) {
 		return false
 	}
-	return true
+	name := de.Name
+	var meta map[string]any
+	if base, reason, ok := splitColonReason(name); ok {
+		// detail equals reason: frontend S18.75-A uniformly renders diagnostic text from meta.detail
+		// (BUG-006 -- previously executors could not see preflight rejection reasons).
+		name = base
+		meta = map[string]any{"reason": reason, "detail": reason}
+	}
+	return writeDomainCodedError(c, int(de.Code), name, "Execution request rejected", meta)
 }
 
 // writeForbidden403 returns uniform 403 for non-stakeholders (without leaking existence).

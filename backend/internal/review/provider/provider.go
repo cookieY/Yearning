@@ -1,4 +1,5 @@
-// INSERT RowsAffected != 1 has no business semantics (admin_create profile declares no conflict codes): return a non-sentinel error to take the internal error path rather than disguising it as a business code.
+// Package provider defines the structured AI model Provider Port, request/response schemas,
+// endpoint validation, SSRF-guarded HTTP client, and per-call usage types.
 package provider
 
 import (
@@ -18,12 +19,11 @@ import (
 	"github.com/cookieY/YearningX/backend/internal/review/promptprofile"
 )
 
-// UpdateVersioned performs an optimistic-lock update (WHERE id AND version).
+// Request is the ReviewStructured input payload sent to an AI Provider adapter.
 type Request struct {
-	RequestSchemaVersion int    `json:"request_schema_version"`
-	ReviewRunID          string `json:"review_run_id"`
-	EngineProfile        string `json:"engine_profile"`
-	// DeleteReferencedGuarded physically deletes an entry; rejects if referenced by review_tool_calls.
+	RequestSchemaVersion      int                     `json:"request_schema_version"`
+	ReviewRunID               string                  `json:"review_run_id"`
+	EngineProfile             string                  `json:"engine_profile"`
 	SystemPrompt              string                  `json:"system_prompt"`
 	RuleSnapshot              []byte                  `json:"rule_snapshot"`
 	AnonymizedStatementGroups []AnonymizedGroup       `json:"anonymized_statement_groups"`
@@ -32,7 +32,7 @@ type Request struct {
 	OutputSchema              []byte                  `json:"output_schema"`
 }
 
-// LoadForUpdate reads rows with a row lock (used by the assembler).
+// AnonymizedGroup summarizes one fingerprint group of SQL statements for model review.
 type AnonymizedGroup struct {
 	GroupID                     string                      `json:"group_id"`
 	RepresentativeShape         string                      `json:"representative_shape"`
@@ -55,8 +55,7 @@ type StatementOrdinalRange struct {
 	End   int32 `json:"end"`
 }
 
-// MatchedEnabled returns enabled entries matching the current Stage objects (deterministically sorted). Returns only global entries when touched is nil.
-// MatchedEnabledForUpdate matches enabled entries by touched objects and locks the rows — the freeze path reads under lock within the same transaction that writes references, mutually exclusive with Replace's invalidation chain (the former unlocked variant had no callers and was removed per Reviewer observation).
+// AnonymizedObjectReference describes an anonymous object relationship referenced by a statement group.
 type AnonymizedObjectReference struct {
 	Token                  string                  `json:"token"`
 	Kind                   string                  `json:"kind"`
@@ -67,14 +66,14 @@ type AnonymizedObjectReference struct {
 	StatementOrdinalRanges []StatementOrdinalRange `json:"statement_ordinal_ranges"`
 }
 
-// CursorOf returns the pagination cursor value.
+// NormalizedEvidenceRef carries a bounded, normalized tool evidence fact into the model context.
 type NormalizedEvidenceRef struct {
 	EvidenceID string         `json:"evidence_id"`
 	FactKind   string         `json:"fact_kind"`
 	Fact       map[string]any `json:"fact,omitempty"`
 }
 
-// service.go implements the internal experience entry application service: CRUD, enable gate (Schema subset + privacy scan + injection check + Eval), config_hash, and outdated triggering.
+// ToolDescriptor declares a built-in fact tool and its parameter JSON schema to the model.
 type ToolDescriptor struct {
 	Name        string         `json:"name"`
 	Kind        string         `json:"kind"`
@@ -82,7 +81,7 @@ type ToolDescriptor struct {
 	InputSchema map[string]any `json:"input_schema,omitempty"`
 }
 
-// Invalidator invalidates unsubmitted Reviews referencing the old hash after an entry hash change (injected by the application layer to avoid reverse dependencies).
+// Response is the validated structured output returned by an AI Provider adapter.
 type Response struct {
 	SchemaVersion int           `json:"schema_version"`
 	ReviewRunID   string        `json:"review_run_id"`
@@ -92,7 +91,7 @@ type Response struct {
 	ToolRequests  []ToolRequest `json:"tool_requests"`
 }
 
-// KindName is the reference kind name (review_tool_calls.tool_kind value).
+// Finding is a structured review finding emitted within Response.
 type Finding struct {
 	FindingKey          string   `json:"finding_key"`
 	Category            string   `json:"category"`
@@ -105,30 +104,26 @@ type Finding struct {
 	FactBasis           string   `json:"fact_basis"`
 }
 
-// Service implements entry aggregate use cases.
+// ToolRequest is a validated follow-up fact tool request emitted by the model.
 type ToolRequest struct {
 	ToolCallID string         `json:"tool_call_id"`
 	ToolName   string         `json:"tool_name"`
 	Arguments  map[string]any `json:"arguments"`
 }
 
-// may be nil in tests
+// Provider call safety bounds enforced across adapters and failovers.
 const (
 	MaxTimeout      = 120 * time.Second
 	MaxResponseByte = 4194304
 	MaxCallsPerStep = 2
 )
 
-// EvalReport is the enable gate result (admin-surface test report).
+// Provider error sentinels used for failover eligibility checks.
 var ErrSchemaInvalid = errors.New("provider: output schema invalid")
-
-// CreateInput holds creation parameters (state is always draft).
 var ErrRejected = errors.New("provider: request rejected")
-
-// Create creates a draft entry.
 var ErrNoProvider = errors.New("provider: no eligible provider")
 
-// ReplaceInput holds replacement parameters (If-Match version is in ExpectVersion).
+// Endpoint holds decrypted runtime configuration for a single AI Provider candidate.
 type Endpoint struct {
 	ProviderID          string
 	Name                string
@@ -215,7 +210,7 @@ func (e Endpoint) EffectivePromptProfile() string {
 	return profile
 }
 
-// Replace performs an optimistic-lock replacement; transitioning to enabled requires passing the enable gate first; hash changes trigger invalidation of unsubmitted Reviews.
+// PlanHash hashes the ordered provider chain, prompt profiles, contract digests, and generation parameters.
 func PlanHash(chain []Endpoint) string {
 	h := sha256.New()
 	for _, e := range chain {
@@ -233,7 +228,7 @@ func PlanHash(chain []Endpoint) string {
 	return hex.EncodeToString(h.Sum(nil))
 }
 
-// Enabling (or modifying while enabled) must pass the enable gate.
+// GenerationParamsCanonical serializes configured max_tokens, reasoning_effort, and temperature in fixed key order.
 func GenerationParamsCanonical(cfg map[string]any) string {
 	var b strings.Builder
 	if v, ok := cfg["max_tokens"]; ok {
@@ -254,7 +249,7 @@ func GenerationParamsCanonical(cfg map[string]any) string {
 	return b.String()
 }
 
-// Changing an enabled definition/scope, or exiting the enabled state, invalidates unsubmitted Reviews referencing the old hash (outdated). Because state does not enter config_hash, disabling must be checked separately.
+// Validate checks that required Endpoint identifiers, contract hashes, and base URL are valid.
 func (e Endpoint) Validate() error {
 	if e.ProviderID == "" || e.BaseURL == "" || e.ModelName == "" || e.APIKey == "" {
 		return fmt.Errorf("provider %q: incomplete endpoint", e.Name)
@@ -268,14 +263,14 @@ func (e Endpoint) Validate() error {
 	return nil
 }
 
-// Delete physically deletes an entry (only when unreferenced by any Review and not in enabled state).
+// CallOutcome aggregates the decoded Response, token totals, and real HTTP CallRecords for one call.
 type CallOutcome struct {
 	Response *Response
 	Usage    Usage
 	Calls    []CallRecord
 }
 
-// ---- Enable Gate ----
+// UsageDetail captures nullable tri-state token counts reported by upstream providers.
 type UsageDetail struct {
 	InputTokens      *int64
 	OutputTokens     *int64
@@ -284,45 +279,40 @@ type UsageDetail struct {
 	ReasoningTokens  *int64
 }
 
-// Privacy scan patterns: credential/secret/connection-string shapes (database/table names enter context in a controlled manner, but secret-like content is forbidden).
+// CallRecord captures per-HTTP-attempt metadata, generation parameters, outcome, and usage detail.
 type CallRecord struct {
-	ProviderID string
-	ModelName  string
-	SentAt     time.Time
-	HTTPStatus int
-	Outcome    string // ok | schema_failed | error
-	Detail     *UsageDetail
-	// OpenAI-style key
+	ProviderID      string
+	ModelName       string
+	SentAt          time.Time
+	HTTPStatus      int
+	Outcome         string // ok | schema_failed | error
+	Detail          *UsageDetail
 	ReasoningEffort string
 	MaxTokens       int
 	Temperature     *float64
 }
 
-// JWT header
+// Controlled CallRecord outcome values.
 const (
 	CallOutcomeOK           = "ok"
 	CallOutcomeSchemaFailed = "schema_failed"
 	CallOutcomeError        = "error"
 )
 
-// long hex string (secret/hash string)
+// Client defines the AI Provider adapter interface.
 type Client interface {
-	// Injection check patterns: instruction override / role markers / prompt escape.
 	ValidateConfiguration(ctx context.Context) error
-	// RunEval executes the four enable-gate checks and produces a report (Eval = structured check on rendered content: injected content must not violate Schema constraints or severity consistency).
 	NegotiateOutputMode(ctx context.Context) (string, error)
-	// §18.66: severity enum membership establishes severity consistency (closure semantics replacing the template-subset-of-allowlist check).
 	ReviewStructured(ctx context.Context, req Request) (CallOutcome, error)
-	// RenderInjection renders the deterministic injection text (the sole form entering model context: controlled fields + delimiter tags; content is wrapped in data delimiters after instruction patterns have been rejected by the gate).
 	Health(ctx context.Context) error
 }
 
-// jsonMarshal/jsonUnmarshal are stable serialization helpers for definition structs.
+// HTTPClient wraps a redirect-disabled, addrguard-dialing HTTP client bounded by MaxTimeout.
 type HTTPClient struct {
 	Inner *http.Client
 }
 
-// escapeBody prevents the body from closing the data delimiter tag (M8: defense-in-depth against injection).
+// NewHTTPClient constructs an SSRF-guarded HTTPClient for AI Provider requests.
 func NewHTTPClient() *HTTPClient {
 	return &HTTPClient{Inner: &http.Client{
 		Timeout: MaxTimeout,
@@ -350,18 +340,12 @@ func isHex64(s string) bool {
 	return true
 }
 
-// Package persistence provides Review-domain GORM persistence: models and repository implementations.
-// Model names match gorm-model-registry.json; column tags correspond column-for-column
-// with postgresql-column-catalog.json; no embedded gorm.Model, no json tags, and no
-// automatic Association saving (gorm-persistence-contract).
-// Raw SQL and evidence ciphertexts only store AEAD envelopes; models do not implement any plaintext output interface.
 var now = time.Now
 
-// EncodeTextArray encodes values into a PG array literal (text[] columns are backed by string
-// to avoid GORM relationship parsing on slice fields).
+// ProbeRunID is the deterministic synthetic Run ID used for provider health probes.
 const ProbeRunID = "00000000-0000-4000-8000-000000000000"
 
-// DecodeTextArray decodes a PG array literal.
+// ProbeRequest builds a minimal anonymized probe request to validate structured output support.
 func ProbeRequest() Request {
 	return Request{
 		RequestSchemaVersion: 1,

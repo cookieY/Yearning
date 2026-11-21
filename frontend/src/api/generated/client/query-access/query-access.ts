@@ -22,7 +22,6 @@ import type {
   ListQueryGrantsParams,
   ListQueryOrders200,
   ListQueryOrdersParams,
-  ProblemResponse,
   ReasonRequest,
   RelinquishQueryGrant200,
   RevokeQueryGrant200,
@@ -30,18 +29,6 @@ import type {
 } from '../yearningV4HTTPAPI.schemas';
 
 import { customInstance } from '../../../../shared/api/mutator';
-
-export type listQueryAccessRequestsResponse200 = {
-  data: ListQueryAccessRequests200
-  status: 200
-}
-
-export type listQueryAccessRequestsResponseSuccess = (listQueryAccessRequestsResponse200) & {
-  headers: Headers;
-};
-;
-
-export type listQueryAccessRequestsResponse = (listQueryAccessRequestsResponseSuccess)
 
 export const getListQueryAccessRequestsUrl = (params?: ListQueryAccessRequestsParams,) => {
   const normalizedParams = new URLSearchParams();
@@ -58,9 +45,9 @@ export const getListQueryAccessRequestsUrl = (params?: ListQueryAccessRequestsPa
   return stringifiedParams.length > 0 ? `/api/v4/query-access-requests?${stringifiedParams}` : `/api/v4/query-access-requests`
 }
 
-export const listQueryAccessRequests = async (params?: ListQueryAccessRequestsParams, options?: Parameters<typeof customInstance>[1]): Promise<listQueryAccessRequestsResponse> => {
+export const listQueryAccessRequests = async (params?: ListQueryAccessRequestsParams, options?: Parameters<typeof customInstance>[1]): Promise<ListQueryAccessRequests200> => {
 
-  return customInstance<listQueryAccessRequestsResponse>(getListQueryAccessRequestsUrl(params),
+  return customInstance<ListQueryAccessRequests200>(getListQueryAccessRequestsUrl(params),
   {
     ...options,
     method: 'GET'
@@ -69,25 +56,6 @@ export const listQueryAccessRequests = async (params?: ListQueryAccessRequestsPa
   }
 );}
 
-
-export type createQueryAccessRequestResponse200 = {
-  data: CreateQueryAccessRequest200
-  status: 200
-}
-
-export type createQueryAccessRequestResponse403 = {
-  data: ProblemResponse
-  status: 403
-}
-
-export type createQueryAccessRequestResponseSuccess = (createQueryAccessRequestResponse200) & {
-  headers: Headers;
-};
-export type createQueryAccessRequestResponseError = (createQueryAccessRequestResponse403) & {
-  headers: Headers;
-};
-
-export type createQueryAccessRequestResponse = (createQueryAccessRequestResponseSuccess | createQueryAccessRequestResponseError)
 
 export const getCreateQueryAccessRequestUrl = () => {
 
@@ -97,7 +65,7 @@ export const getCreateQueryAccessRequestUrl = () => {
   return `/api/v4/query-access-requests`
 }
 
-export const createQueryAccessRequest = async (createQueryAccessRequestBody: CreateQueryAccessRequest, options?: Parameters<typeof customInstance>[1]): Promise<createQueryAccessRequestResponse> => {
+export const createQueryAccessRequest = async (createQueryAccessRequestBody: CreateQueryAccessRequest, options?: Parameters<typeof customInstance>[1]): Promise<CreateQueryAccessRequest200> => {
 
     const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
@@ -105,7 +73,7 @@ export const createQueryAccessRequest = async (createQueryAccessRequestBody: Cre
     if (Array.isArray(h)) return Object.fromEntries(h);
     return h;
   };
-return customInstance<createQueryAccessRequestResponse>(getCreateQueryAccessRequestUrl(),
+return customInstance<CreateQueryAccessRequest200>(getCreateQueryAccessRequestUrl(),
   {
     ...options,
     method: 'POST',
@@ -115,18 +83,6 @@ return customInstance<createQueryAccessRequestResponse>(getCreateQueryAccessRequ
 );}
 
 
-export type getQueryAccessRequestResponse200 = {
-  data: GetQueryAccessRequest200
-  status: 200
-}
-
-export type getQueryAccessRequestResponseSuccess = (getQueryAccessRequestResponse200) & {
-  headers: Headers;
-};
-;
-
-export type getQueryAccessRequestResponse = (getQueryAccessRequestResponseSuccess)
-
 export const getGetQueryAccessRequestUrl = (requestId: string,) => {
 
 
@@ -135,9 +91,9 @@ export const getGetQueryAccessRequestUrl = (requestId: string,) => {
   return `/api/v4/query-access-requests/${requestId}`
 }
 
-export const getQueryAccessRequest = async (requestId: string, options?: Parameters<typeof customInstance>[1]): Promise<getQueryAccessRequestResponse> => {
+export const getQueryAccessRequest = async (requestId: string, options?: Parameters<typeof customInstance>[1]): Promise<GetQueryAccessRequest200> => {
 
-  return customInstance<getQueryAccessRequestResponse>(getGetQueryAccessRequestUrl(requestId),
+  return customInstance<GetQueryAccessRequest200>(getGetQueryAccessRequestUrl(requestId),
   {
     ...options,
     method: 'GET'
@@ -146,18 +102,6 @@ export const getQueryAccessRequest = async (requestId: string, options?: Paramet
   }
 );}
 
-
-export type decideQueryAccessResponse200 = {
-  data: DecideQueryAccess200
-  status: 200
-}
-
-export type decideQueryAccessResponseSuccess = (decideQueryAccessResponse200) & {
-  headers: Headers;
-};
-;
-
-export type decideQueryAccessResponse = (decideQueryAccessResponseSuccess)
 
 export const getDecideQueryAccessUrl = (requestId: string,) => {
 
@@ -168,7 +112,7 @@ export const getDecideQueryAccessUrl = (requestId: string,) => {
 }
 
 export const decideQueryAccess = async (requestId: string,
-    approvalDecisionRequest: ApprovalDecisionRequest, options?: Parameters<typeof customInstance>[1]): Promise<decideQueryAccessResponse> => {
+    approvalDecisionRequest: ApprovalDecisionRequest, options?: Parameters<typeof customInstance>[1]): Promise<DecideQueryAccess200> => {
 
     const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
@@ -176,7 +120,7 @@ export const decideQueryAccess = async (requestId: string,
     if (Array.isArray(h)) return Object.fromEntries(h);
     return h;
   };
-return customInstance<decideQueryAccessResponse>(getDecideQueryAccessUrl(requestId),
+return customInstance<DecideQueryAccess200>(getDecideQueryAccessUrl(requestId),
   {
     ...options,
     method: 'POST',
@@ -185,18 +129,6 @@ return customInstance<decideQueryAccessResponse>(getDecideQueryAccessUrl(request
   }
 );}
 
-
-export type withdrawQueryAccessRequestResponse200 = {
-  data: WithdrawQueryAccessRequest200
-  status: 200
-}
-
-export type withdrawQueryAccessRequestResponseSuccess = (withdrawQueryAccessRequestResponse200) & {
-  headers: Headers;
-};
-;
-
-export type withdrawQueryAccessRequestResponse = (withdrawQueryAccessRequestResponseSuccess)
 
 export const getWithdrawQueryAccessRequestUrl = (requestId: string,) => {
 
@@ -207,7 +139,7 @@ export const getWithdrawQueryAccessRequestUrl = (requestId: string,) => {
 }
 
 export const withdrawQueryAccessRequest = async (requestId: string,
-    reasonRequest: ReasonRequest, options?: Parameters<typeof customInstance>[1]): Promise<withdrawQueryAccessRequestResponse> => {
+    reasonRequest: ReasonRequest, options?: Parameters<typeof customInstance>[1]): Promise<WithdrawQueryAccessRequest200> => {
 
     const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
@@ -215,7 +147,7 @@ export const withdrawQueryAccessRequest = async (requestId: string,
     if (Array.isArray(h)) return Object.fromEntries(h);
     return h;
   };
-return customInstance<withdrawQueryAccessRequestResponse>(getWithdrawQueryAccessRequestUrl(requestId),
+return customInstance<WithdrawQueryAccessRequest200>(getWithdrawQueryAccessRequestUrl(requestId),
   {
     ...options,
     method: 'POST',
@@ -224,18 +156,6 @@ return customInstance<withdrawQueryAccessRequestResponse>(getWithdrawQueryAccess
   }
 );}
 
-
-export type listQueryGrantsResponse200 = {
-  data: ListQueryGrants200
-  status: 200
-}
-
-export type listQueryGrantsResponseSuccess = (listQueryGrantsResponse200) & {
-  headers: Headers;
-};
-;
-
-export type listQueryGrantsResponse = (listQueryGrantsResponseSuccess)
 
 export const getListQueryGrantsUrl = (params?: ListQueryGrantsParams,) => {
   const normalizedParams = new URLSearchParams();
@@ -252,9 +172,9 @@ export const getListQueryGrantsUrl = (params?: ListQueryGrantsParams,) => {
   return stringifiedParams.length > 0 ? `/api/v4/query-grants?${stringifiedParams}` : `/api/v4/query-grants`
 }
 
-export const listQueryGrants = async (params?: ListQueryGrantsParams, options?: Parameters<typeof customInstance>[1]): Promise<listQueryGrantsResponse> => {
+export const listQueryGrants = async (params?: ListQueryGrantsParams, options?: Parameters<typeof customInstance>[1]): Promise<ListQueryGrants200> => {
 
-  return customInstance<listQueryGrantsResponse>(getListQueryGrantsUrl(params),
+  return customInstance<ListQueryGrants200>(getListQueryGrantsUrl(params),
   {
     ...options,
     method: 'GET'
@@ -263,18 +183,6 @@ export const listQueryGrants = async (params?: ListQueryGrantsParams, options?: 
   }
 );}
 
-
-export type getQueryGrantResponse200 = {
-  data: GetQueryGrant200
-  status: 200
-}
-
-export type getQueryGrantResponseSuccess = (getQueryGrantResponse200) & {
-  headers: Headers;
-};
-;
-
-export type getQueryGrantResponse = (getQueryGrantResponseSuccess)
 
 export const getGetQueryGrantUrl = (grantId: string,) => {
 
@@ -284,9 +192,9 @@ export const getGetQueryGrantUrl = (grantId: string,) => {
   return `/api/v4/query-grants/${grantId}`
 }
 
-export const getQueryGrant = async (grantId: string, options?: Parameters<typeof customInstance>[1]): Promise<getQueryGrantResponse> => {
+export const getQueryGrant = async (grantId: string, options?: Parameters<typeof customInstance>[1]): Promise<GetQueryGrant200> => {
 
-  return customInstance<getQueryGrantResponse>(getGetQueryGrantUrl(grantId),
+  return customInstance<GetQueryGrant200>(getGetQueryGrantUrl(grantId),
   {
     ...options,
     method: 'GET'
@@ -295,25 +203,6 @@ export const getQueryGrant = async (grantId: string, options?: Parameters<typeof
   }
 );}
 
-
-export type revokeQueryGrantResponse200 = {
-  data: RevokeQueryGrant200
-  status: 200
-}
-
-export type revokeQueryGrantResponse403 = {
-  data: ProblemResponse
-  status: 403
-}
-
-export type revokeQueryGrantResponseSuccess = (revokeQueryGrantResponse200) & {
-  headers: Headers;
-};
-export type revokeQueryGrantResponseError = (revokeQueryGrantResponse403) & {
-  headers: Headers;
-};
-
-export type revokeQueryGrantResponse = (revokeQueryGrantResponseSuccess | revokeQueryGrantResponseError)
 
 export const getRevokeQueryGrantUrl = (grantId: string,) => {
 
@@ -324,7 +213,7 @@ export const getRevokeQueryGrantUrl = (grantId: string,) => {
 }
 
 export const revokeQueryGrant = async (grantId: string,
-    reasonRequest: ReasonRequest, options?: Parameters<typeof customInstance>[1]): Promise<revokeQueryGrantResponse> => {
+    reasonRequest: ReasonRequest, options?: Parameters<typeof customInstance>[1]): Promise<RevokeQueryGrant200> => {
 
     const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
@@ -332,7 +221,7 @@ export const revokeQueryGrant = async (grantId: string,
     if (Array.isArray(h)) return Object.fromEntries(h);
     return h;
   };
-return customInstance<revokeQueryGrantResponse>(getRevokeQueryGrantUrl(grantId),
+return customInstance<RevokeQueryGrant200>(getRevokeQueryGrantUrl(grantId),
   {
     ...options,
     method: 'POST',
@@ -341,18 +230,6 @@ return customInstance<revokeQueryGrantResponse>(getRevokeQueryGrantUrl(grantId),
   }
 );}
 
-
-export type relinquishQueryGrantResponse200 = {
-  data: RelinquishQueryGrant200
-  status: 200
-}
-
-export type relinquishQueryGrantResponseSuccess = (relinquishQueryGrantResponse200) & {
-  headers: Headers;
-};
-;
-
-export type relinquishQueryGrantResponse = (relinquishQueryGrantResponseSuccess)
 
 export const getRelinquishQueryGrantUrl = (grantId: string,) => {
 
@@ -363,7 +240,7 @@ export const getRelinquishQueryGrantUrl = (grantId: string,) => {
 }
 
 export const relinquishQueryGrant = async (grantId: string,
-    reasonRequest: ReasonRequest, options?: Parameters<typeof customInstance>[1]): Promise<relinquishQueryGrantResponse> => {
+    reasonRequest: ReasonRequest, options?: Parameters<typeof customInstance>[1]): Promise<RelinquishQueryGrant200> => {
 
     const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
@@ -371,7 +248,7 @@ export const relinquishQueryGrant = async (grantId: string,
     if (Array.isArray(h)) return Object.fromEntries(h);
     return h;
   };
-return customInstance<relinquishQueryGrantResponse>(getRelinquishQueryGrantUrl(grantId),
+return customInstance<RelinquishQueryGrant200>(getRelinquishQueryGrantUrl(grantId),
   {
     ...options,
     method: 'POST',
@@ -380,18 +257,6 @@ return customInstance<relinquishQueryGrantResponse>(getRelinquishQueryGrantUrl(g
   }
 );}
 
-
-export type createQueryGrantRenewalRequestResponse200 = {
-  data: CreateQueryGrantRenewalRequest200
-  status: 200
-}
-
-export type createQueryGrantRenewalRequestResponseSuccess = (createQueryGrantRenewalRequestResponse200) & {
-  headers: Headers;
-};
-;
-
-export type createQueryGrantRenewalRequestResponse = (createQueryGrantRenewalRequestResponseSuccess)
 
 export const getCreateQueryGrantRenewalRequestUrl = (grantId: string,) => {
 
@@ -402,7 +267,7 @@ export const getCreateQueryGrantRenewalRequestUrl = (grantId: string,) => {
 }
 
 export const createQueryGrantRenewalRequest = async (grantId: string,
-    createQueryGrantRenewalRequestBody: CreateQueryGrantRenewalRequest, options?: Parameters<typeof customInstance>[1]): Promise<createQueryGrantRenewalRequestResponse> => {
+    createQueryGrantRenewalRequestBody: CreateQueryGrantRenewalRequest, options?: Parameters<typeof customInstance>[1]): Promise<CreateQueryGrantRenewalRequest200> => {
 
     const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
@@ -410,7 +275,7 @@ export const createQueryGrantRenewalRequest = async (grantId: string,
     if (Array.isArray(h)) return Object.fromEntries(h);
     return h;
   };
-return customInstance<createQueryGrantRenewalRequestResponse>(getCreateQueryGrantRenewalRequestUrl(grantId),
+return customInstance<CreateQueryGrantRenewalRequest200>(getCreateQueryGrantRenewalRequestUrl(grantId),
   {
     ...options,
     method: 'POST',
@@ -419,25 +284,6 @@ return customInstance<createQueryGrantRenewalRequestResponse>(getCreateQueryGran
   }
 );}
 
-
-export type listQueryOrdersResponse200 = {
-  data: ListQueryOrders200
-  status: 200
-}
-
-export type listQueryOrdersResponse403 = {
-  data: ProblemResponse
-  status: 403
-}
-
-export type listQueryOrdersResponseSuccess = (listQueryOrdersResponse200) & {
-  headers: Headers;
-};
-export type listQueryOrdersResponseError = (listQueryOrdersResponse403) & {
-  headers: Headers;
-};
-
-export type listQueryOrdersResponse = (listQueryOrdersResponseSuccess | listQueryOrdersResponseError)
 
 export const getListQueryOrdersUrl = (params?: ListQueryOrdersParams,) => {
   const normalizedParams = new URLSearchParams();
@@ -457,9 +303,9 @@ export const getListQueryOrdersUrl = (params?: ListQueryOrdersParams,) => {
 /**
  * 本人查询工单组合视图（RCP-20261021）——access_requests 与 query_sessions 两源合并、统一按 created_at 倒序键集分页；request 与 session 按 kind 二选一出现。
  */
-export const listQueryOrders = async (params?: ListQueryOrdersParams, options?: Parameters<typeof customInstance>[1]): Promise<listQueryOrdersResponse> => {
+export const listQueryOrders = async (params?: ListQueryOrdersParams, options?: Parameters<typeof customInstance>[1]): Promise<ListQueryOrders200> => {
 
-  return customInstance<listQueryOrdersResponse>(getListQueryOrdersUrl(params),
+  return customInstance<ListQueryOrders200>(getListQueryOrdersUrl(params),
   {
     ...options,
     method: 'GET'

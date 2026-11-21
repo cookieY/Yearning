@@ -1,29 +1,43 @@
-import { useMemo, useState } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useEffect, useMemo, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type {
   ChangeDraft,
-  Flow,
+  ChangeOrder,
+  CreateChangeDraftRequest,
   ReviewFinding,
   ReviewRun,
   ReviewRunState,
+  RunDraftReview200,
+  RunDraftReviewBody,
+  SqlReveal,
+  SubmitChangeDraftBody,
+  UpdateChangeDraftRequest,
 } from "@/api/generated/client/yearningV4HTTPAPI.schemas";
 import {
+  createChangeDraft,
   getChangeDraft,
   getReviewRun,
   listCurrentUserFlows,
   listReviewRunFindings,
+  replaceDraftSql,
+  revealDraftSql,
+  runDraftReview,
+  updateChangeDraft,
 } from "@/api/generated/client/change-drafts/change-drafts";
-import { useDomainEvent } from "@/shared/events/review-event-client";
+import { submitChangeDraft } from "@/api/generated/client/change-orders/change-orders";
+import { ifMatchHeader, type UnwrapEnvelope, unwrapApi } from "@/shared/api/mutator";
+import { subscribeSseEvent, useSseEvent } from "@/shared/events/sse-event-bus";
 import { fetchAllCursorPages, type CursorPage } from "@/shared/lib/fetch-all-cursor-pages";
+import { randomUUID } from "@/shared/lib/uuid";
+import { useDraftEditorStore } from "./draft-editor-store";
 import { mergeRunPhase, type RunPhase } from "./run-state";
 
 /**
  * Server-state hooks for the AI Precheck Workspace. All reads go through the
- * generated client; domain events (FE-F3 Review Event Client) are treated as
- * notifications that trigger an HTTP re-read plus an immediate monotonic
- * phase fold for responsive UI — the resource, not the event, stays the
- * truth (api/events/README.md). Generated client types describe the raw
- * envelope, so the mutator-unwrapped data is narrowed at the query boundary.
+ * generated client; domain events (SSE event bus) are treated as notifications
+ * that trigger an HTTP re-read plus an immediate monotonic phase fold for
+ * responsive UI — the resource, not the event, stays the truth
+ * (api/events/README.md).
  */
 
 const RUNNING_REFETCH_MS = 1_000;
@@ -32,14 +46,17 @@ export function useChangeDraft(draftId: string, enabled = true) {
   const queryClient = useQueryClient();
   const query = useQuery({
     queryKey: ["change-draft", draftId],
-    queryFn: async () => (await getChangeDraft(draftId)) as unknown as ChangeDraft,
+    queryFn: () => unwrapApi(getChangeDraft(draftId)),
     enabled: enabled && draftId !== "",
   });
 
-  useDomainEvent(
-    `change-drafts/${draftId}`,
-    "io.yearning.v4.change_draft.state_changed",
-    () => {
+  useSseEvent(
+    enabled && draftId !== "" ? "io.yearning.v4.change_draft.state_changed" : null,
+    (event) => {
+      const sub = event.subject;
+      if (sub !== undefined && sub !== "" && sub !== `change-drafts/${draftId}` && sub !== `draft:${draftId}`) {
+        return;
+      }
       void queryClient.invalidateQueries({ queryKey: ["change-draft", draftId] });
     },
   );
@@ -51,9 +68,7 @@ export function useCurrentUserChangeFlows() {
   return useQuery({
     queryKey: ["current-user-flows", "change_review"],
     queryFn: async () => {
-      const page = (await listCurrentUserFlows({ flow_type: "change_review" })) as unknown as {
-        items: Flow[];
-      };
+      const page = await unwrapApi(listCurrentUserFlows({ flow_type: "change_review" }));
       return page.items;
     },
     staleTime: 5 * 60_000,
@@ -73,10 +88,23 @@ export function useFlowUpdated(flowId: string | null): boolean {
   }
   const queryClient = useQueryClient();
 
-  useDomainEvent(flowId === null ? null : `flows/${flowId}`, "io.yearning.v4.flow.updated", () => {
-    setState({ flowId, updated: true });
-    void queryClient.invalidateQueries({ queryKey: ["current-user-flows"] });
-  });
+  useEffect(() => {
+    if (flowId === null) return;
+    return subscribeSseEvent("io.yearning.v4.flow.updated", (event) => {
+      const sub = event.subject;
+      if (
+        sub !== undefined &&
+        sub !== "" &&
+        sub !== `flows/${flowId}` &&
+        sub !== `flow:${flowId}` &&
+        !sub.startsWith("permission-groups/")
+      ) {
+        return;
+      }
+      setState({ flowId, updated: true });
+      void queryClient.invalidateQueries({ queryKey: ["current-user-flows"] });
+    });
+  }, [flowId, queryClient]);
 
   return state.updated;
 }
@@ -103,8 +131,7 @@ export function useReviewRun(runId: string | null): ReviewProgress {
   const queryClient = useQueryClient();
   const query = useQuery({
     queryKey: ["review-run", runId],
-    queryFn: async () =>
-      (await getReviewRun(runId as string)) as unknown as ReviewRun,
+    queryFn: () => unwrapApi(getReviewRun(runId as string)),
     enabled: runId !== null,
     refetchInterval: (query) => {
       const state = query.state.data?.state;
@@ -136,15 +163,19 @@ export function useReviewRun(runId: string | null): ReviewProgress {
     setFolded({ runId, phase });
   }
 
-  useDomainEvent(
-    runId === null ? null : `review-runs/${runId}`,
-    "any",
+  useSseEvent(
+    runId === null ? null : "*",
     (event) => {
+      if (runId === null) return;
+      const sub = event.subject;
+      if (sub !== undefined && sub !== "" && sub !== `review-runs/${runId}` && sub !== `review_run:${runId}`) {
+        return;
+      }
       if (
         event.type === "io.yearning.v4.review.completed" ||
         event.type === "io.yearning.v4.review.blocked"
       ) {
-        const data = event.data as { state?: ReviewRunState };
+        const data = (event.data ?? {}) as { state?: ReviewRunState };
         if (typeof data.state === "string") {
           setFolded((previous) => ({
             runId,
@@ -175,13 +206,19 @@ export function useReviewRun(runId: string | null): ReviewProgress {
 export function useReviewFindings(runId: string | null, enabled: boolean) {
   return useQuery({
     queryKey: ["review-findings", runId],
-    queryFn: async () =>
-      fetchAllCursorPages(async (after) =>
-        (await listReviewRunFindings(runId as string, {
-          limit: 200,
-          ...(after === null ? {} : { after }),
-        })) as unknown as CursorPage<ReviewFinding>,
-      ),
+    queryFn: () =>
+      fetchAllCursorPages(async (after) => {
+        const res = await unwrapApi(
+          listReviewRunFindings(runId as string, {
+            limit: 200,
+            ...(after === null ? {} : { after }),
+          }),
+        );
+        return {
+          items: res.items,
+          page: res.page,
+        } satisfies CursorPage<ReviewFinding>;
+      }),
     enabled: runId !== null && enabled,
   });
 }
@@ -201,4 +238,169 @@ export function useSeverityFilter(): {
     [severity],
   );
   return { severity, setSeverity, visible };
+}
+
+function reviewOutputLanguage(language: string): "zh-CN" | "en-US" {
+  return language.toLowerCase().startsWith("en") ? "en-US" : "zh-CN";
+}
+
+function draftIdempotencyHeaders(): Record<string, string> {
+  return { "Idempotency-Key": `draft-${randomUUID()}` };
+}
+
+/** Sends a version-checked PUT to replace draft SQL and unwraps the updated draft envelope. */
+export function saveDraftSqlRequest(
+  draftId: string,
+  sql: string,
+  version: number | null | undefined,
+): Promise<ChangeDraft> {
+  return unwrapApi(replaceDraftSql(draftId, { sql }, ifMatchHeader(version ?? 1)));
+}
+
+export interface SaveDraftSqlVariables {
+  draftId: string;
+  sql: string;
+  version?: number | null;
+}
+
+/** Saves draft SQL with optimistic concurrency and invalidates the draft query on success. */
+export function useSaveDraftSqlMutation(options?: {
+  onSuccess?: (saved: ChangeDraft, variables: SaveDraftSqlVariables) => void;
+  onError?: (error: unknown) => void;
+}) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ draftId, sql, version }: SaveDraftSqlVariables) =>
+      saveDraftSqlRequest(draftId, sql, version ?? useDraftEditorStore.getState().savedVersion),
+    onSuccess: (saved, variables) => {
+      options?.onSuccess?.(saved, variables);
+      void queryClient.invalidateQueries({ queryKey: ["change-draft", variables.draftId] });
+    },
+    onError: (error) => {
+      options?.onError?.(error);
+    },
+  });
+}
+
+/** Creates a change draft shell and unwraps the created ChangeDraft record. */
+export function useCreateChangeDraftMutation(options?: {
+  onError?: (error: unknown) => void;
+}) {
+  return useMutation({
+    mutationFn: (body: CreateChangeDraftRequest) => unwrapApi(createChangeDraft(body)),
+    onError: (error) => {
+      options?.onError?.(error);
+    },
+  });
+}
+
+/** Reveals encrypted draft SQL plaintext for editing. */
+export function useRevealDraftSqlMutation(
+  draftId: string | null,
+  options?: {
+    onSuccess?: (reveal: SqlReveal) => void;
+    onError?: (error: unknown) => void;
+  },
+) {
+  return useMutation({
+    mutationFn: () => unwrapApi(revealDraftSql(draftId as string, { purpose: "draft-edit" })),
+    onSuccess: (reveal) => {
+      options?.onSuccess?.(reveal);
+    },
+    onError: (error) => {
+      options?.onError?.(error);
+    },
+  });
+}
+
+export type RunDraftReviewResult = UnwrapEnvelope<RunDraftReview200>;
+
+export interface RunDraftReviewVariables {
+  body: RunDraftReviewBody;
+  language: string;
+}
+
+/** Starts an ephemeral AI precheck run and invalidates its polling query when accepted. */
+export function useRunDraftReviewMutation(options?: {
+  onSuccess?: (started: RunDraftReviewResult, variables: RunDraftReviewVariables) => void;
+  onError?: (error: unknown) => void;
+}) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ body, language }: RunDraftReviewVariables) =>
+      unwrapApi(
+        runDraftReview(body, {
+          headers: {
+            ...draftIdempotencyHeaders(),
+            "Accept-Language": reviewOutputLanguage(language),
+          },
+        }),
+      ),
+    onSuccess: (started, variables) => {
+      options?.onSuccess?.(started, variables);
+      if (started.run_id !== "") {
+        void queryClient.invalidateQueries({ queryKey: ["review-run", started.run_id] });
+      }
+    },
+    onError: (error) => {
+      options?.onError?.(error);
+    },
+  });
+}
+
+export interface UpdateChangeDraftVariables {
+  draftId: string;
+  body: UpdateChangeDraftRequest;
+  version?: number | null;
+}
+
+/** Updates draft metadata with optimistic concurrency and invalidates the draft query. */
+export function useUpdateChangeDraftMutation(options?: {
+  onSuccess?: (saved: ChangeDraft, variables: UpdateChangeDraftVariables) => void;
+  onError?: (error: unknown) => void;
+}) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ draftId, body, version }: UpdateChangeDraftVariables) =>
+      unwrapApi(
+        updateChangeDraft(
+          draftId,
+          body,
+          ifMatchHeader(version ?? useDraftEditorStore.getState().savedVersion ?? 1),
+        ),
+      ),
+    onSuccess: (saved, variables) => {
+      options?.onSuccess?.(saved, variables);
+      void queryClient.invalidateQueries({ queryKey: ["change-draft", variables.draftId] });
+    },
+    onError: (error) => {
+      options?.onError?.(error);
+    },
+  });
+}
+
+export interface SubmitChangeDraftVariables {
+  body: SubmitChangeDraftBody;
+  beforeSubmit?: () => Promise<void>;
+}
+
+/** Submits a prechecked SQL change order (saving bound draft metadata first when provided). */
+export function useSubmitChangeDraftMutation(options?: {
+  onSuccess?: (order: ChangeOrder) => void;
+  onError?: (error: unknown) => void;
+}) {
+  return useMutation({
+    mutationFn: async ({ body, beforeSubmit }: SubmitChangeDraftVariables) => {
+      if (beforeSubmit !== undefined) {
+        await beforeSubmit();
+      }
+      return unwrapApi(submitChangeDraft(body, { headers: draftIdempotencyHeaders() }));
+    },
+    onSuccess: (order) => {
+      options?.onSuccess?.(order);
+    },
+    onError: (error) => {
+      options?.onError?.(error);
+    },
+  });
 }

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router";
 import { useTranslation } from "react-i18next";
 import type { ChangeOrder } from "@/api/generated/client/yearningV4HTTPAPI.schemas";
@@ -7,7 +7,6 @@ import { frozenExecutorStageFor, myApprovalStepFor, ORDER_STATES } from "@/featu
 import { OrderStateBadge } from "@/features/orders/order-state-badge";
 import { useSession } from "@/features/auth/session-provider";
 import { useMyAccessRequests } from "@/features/query/use-query-domain";
-import { startReviewEvents, stopReviewEvents } from "@/features/review/review-events";
 import { ApprovalTabBadge, QueryAccessApprovalsContent } from "@/routes/approvals/query-access-page";
 import { ErrorState } from "@/shared/components/status/status-components";
 import { LoadingState } from "@/shared/components/status/loading-state";
@@ -137,38 +136,6 @@ function usePendingApprovalTabCounts() {
   );
 
   return { pendingOrdersCount, pendingQueryAccessCount };
-}
-
-export default function ApprovalQueuePage() {
-  const { t } = useTranslation();
-  const navigate = useNavigate();
-  const { pendingOrdersCount, pendingQueryAccessCount } = usePendingApprovalTabCounts();
-
-  return (
-    <PageLayout data-testid="approval-queue-page">
-      <PageHeader
-        icon={Inbox}
-        title={t("approvals.queue.title")}
-      />
-      <Tabs value="orders">
-        <TabsList className="flex w-full justify-start overflow-x-auto overflow-y-hidden">
-          <TabsTrigger value="orders" data-testid="approvals-tab-orders">
-            {t("approvals.queryAccess.ordersTab")}
-            <ApprovalTabBadge count={pendingOrdersCount} testId="approvals-tab-orders-badge" />
-          </TabsTrigger>
-          <TabsTrigger
-            value="query-access"
-            onClick={() => { void navigate("/approvals/query-access"); }}
-            data-testid="approvals-tab-query"
-          >
-            {t("approvals.queryAccess.queryTab")}
-            <ApprovalTabBadge count={pendingQueryAccessCount} testId="approvals-tab-query-badge" />
-          </TabsTrigger>
-        </TabsList>
-      </Tabs>
-      <ApprovalQueueContent />
-    </PageLayout>
-  );
 }
 
 export function ApprovalsWorkspacePage() {
@@ -305,14 +272,6 @@ export function ApprovalQueueContent() {
   const queueBodyRef = useFlipReorder<HTMLTableSectionElement>(
     JSON.stringify(visibleQueue.map((order) => order.id)),
   );
-
-  // The shared event feed keeps the queue live against peer decisions —
-  // each row's subject is subscribed by the hook, this page just scopes the
-  // connection lifecycle like every other event-driven page.
-  useEffect(() => {
-    void startReviewEvents();
-    return () => { stopReviewEvents(); };
-  }, []);
 
   return (
     <div className="flex flex-col gap-5">

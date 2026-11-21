@@ -1,13 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type {
-  AssistantMessage,
   AssistantSession,
   AssistantSessionDetail,
-  ChangeOrder,
   CreateAssistantSessionRequest,
   Flow,
   PrecheckAssistantSqlDraftRequest,
-  PrecheckAssistantSqlDraftResponse,
   SendAssistantMessageRequest,
   SendAssistantMessageResponse,
   SubmitAssistantSqlDraftOrderRequest,
@@ -27,11 +24,13 @@ import { listCurrentUserFlows } from "@/api/generated/client/change-drafts/chang
 import { SUCCESS_ERR_CODE } from "@/api/generated/projections/business-error-catalog";
 import {
   BusinessError,
+  ifMatchHeader,
   type ProblemDetails,
   readCsrfToken,
   resolveActivePlatformLocale,
   SESSION_EXPIRED_EVENT,
   TransportError,
+  unwrapApi,
 } from "@/shared/api/mutator";
 import { randomUUID } from "@/shared/lib/uuid";
 
@@ -90,10 +89,7 @@ export function useAssistantSessions(enabled: boolean) {
   return useQuery({
     queryKey: ["assistant-sessions"],
     queryFn: async () => {
-      const page = (await listAssistantSessions({ limit: 50 })) as unknown as {
-        items: AssistantSession[];
-        page: { has_more: boolean; next_cursor: string | null };
-      };
+      const page = await unwrapApi(listAssistantSessions({ limit: 50 }));
       return page.items;
     },
     enabled,
@@ -103,8 +99,7 @@ export function useAssistantSessions(enabled: boolean) {
 export function useAssistantSessionDetail(sessionId: string | null, enabled: boolean) {
   return useQuery({
     queryKey: ["assistant-session", sessionId],
-    queryFn: async () =>
-      (await getAssistantSession(sessionId ?? "")) as unknown as AssistantSessionDetail,
+    queryFn: () => unwrapApi(getAssistantSession(sessionId ?? "")),
     enabled: enabled && sessionId !== null && sessionId !== "",
   });
 }
@@ -114,12 +109,8 @@ export function useAssistantAuthorizedFlows(enabled: boolean) {
     queryKey: ["current-user-flows", "assistant"],
     queryFn: async () => {
       const [changePage, queryPage] = await Promise.all([
-        listCurrentUserFlows({ flow_type: "change_review" }) as unknown as Promise<{
-          items: Flow[];
-        }>,
-        listCurrentUserFlows({ flow_type: "query_access" }) as unknown as Promise<{
-          items: Flow[];
-        }>,
+        unwrapApi(listCurrentUserFlows({ flow_type: "change_review" })),
+        unwrapApi(listCurrentUserFlows({ flow_type: "query_access" })),
       ]);
       return [...changePage.items, ...queryPage.items];
     },
@@ -132,8 +123,8 @@ export function useAssistantAuthorizedFlows(enabled: boolean) {
 export function useCreateAssistantSession() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (input?: CreateAssistantSessionRequest) =>
-      (await createAssistantSession(input ?? {})) as unknown as AssistantSession,
+    mutationFn: (input?: CreateAssistantSessionRequest) =>
+      unwrapApi(createAssistantSession(input ?? {})),
     onSuccess: (created) => {
       queryClient.setQueryData<AssistantSessionDetail>(
         ["assistant-session", created.id],
@@ -151,12 +142,8 @@ export function useCreateAssistantSession() {
 export function useDeleteAssistantSession() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (input: { sessionId: string; version: number }) =>
-      await deleteAssistantSession(input.sessionId, {
-        headers: {
-          "If-Match": `"${String(input.version)}"`,
-        },
-      }),
+    mutationFn: (input: { sessionId: string; version: number }) =>
+      deleteAssistantSession(input.sessionId, ifMatchHeader(input.version)),
     onSuccess: (_data, variables) => {
       queryClient.removeQueries({ queryKey: ["assistant-session", variables.sessionId] });
       void queryClient.invalidateQueries({ queryKey: ["assistant-sessions"] });
@@ -246,7 +233,7 @@ export function dispatchSSEFrame(
           : {}),
       });
     case "done":
-      return parsed as unknown as SendAssistantMessageResponse;
+      return JSON.parse(dataStr) as SendAssistantMessageResponse;
     default:
       return null;
   }
@@ -261,10 +248,12 @@ export async function streamAssistantMessageSSE(input: {
 }): Promise<SendAssistantMessageResponse> {
   // In unit test environments where sendAssistantMessage is a Vitest mock, delegate directly
   if (!input.forceFetch && "mock" in sendAssistantMessage) {
-    return (await sendAssistantMessage(input.sessionId, input.body, {
-      signal: input.signal,
-      ...(input.callbacks ? { callbacks: input.callbacks } : {}),
-    })) as unknown as SendAssistantMessageResponse;
+    return unwrapApi(
+      sendAssistantMessage(input.sessionId, input.body, {
+        signal: input.signal,
+        ...(input.callbacks ? { callbacks: input.callbacks } : {}),
+      }),
+    );
   }
 
   const activeLocale = resolveActivePlatformLocale();
@@ -427,11 +416,8 @@ export function useSendAssistantMessage(sessionId: string | null) {
 export function useCancelAssistantMessageStream(sessionId: string | null) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (input: { sessionId: string; messageId: string }) =>
-      (await cancelAssistantMessageStream(
-        input.sessionId,
-        input.messageId,
-      )) as unknown as AssistantMessage,
+    mutationFn: (input: { sessionId: string; messageId: string }) =>
+      unwrapApi(cancelAssistantMessageStream(input.sessionId, input.messageId)),
     onSuccess: (_data, variables) => {
       const targetId = variables.sessionId || sessionId;
       if (targetId !== null && targetId !== "") {
@@ -444,16 +430,18 @@ export function useCancelAssistantMessageStream(sessionId: string | null) {
 export function usePrecheckAssistantSqlDraft(sessionId: string | null) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (input: {
+    mutationFn: (input: {
       sessionId: string;
       draftId: string;
       body: PrecheckAssistantSqlDraftRequest;
     }) =>
-      (await precheckAssistantSqlDraft(input.sessionId, input.draftId, input.body, {
-        headers: {
-          "Idempotency-Key": `assistant-precheck-${randomUUID()}`,
-        },
-      })) as unknown as PrecheckAssistantSqlDraftResponse,
+      unwrapApi(
+        precheckAssistantSqlDraft(input.sessionId, input.draftId, input.body, {
+          headers: {
+            "Idempotency-Key": `assistant-precheck-${randomUUID()}`,
+          },
+        }),
+      ),
     onSuccess: (_data, variables) => {
       const targetId = variables.sessionId || sessionId;
       if (targetId !== null && targetId !== "") {
@@ -466,16 +454,18 @@ export function usePrecheckAssistantSqlDraft(sessionId: string | null) {
 export function useSubmitAssistantSqlDraftOrder(sessionId: string | null) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (input: {
+    mutationFn: (input: {
       sessionId: string;
       draftId: string;
       body: SubmitAssistantSqlDraftOrderRequest;
     }) =>
-      (await submitAssistantSqlDraftOrder(input.sessionId, input.draftId, input.body, {
-        headers: {
-          "Idempotency-Key": `assistant-order-${randomUUID()}`,
-        },
-      })) as unknown as ChangeOrder,
+      unwrapApi(
+        submitAssistantSqlDraftOrder(input.sessionId, input.draftId, input.body, {
+          headers: {
+            "Idempotency-Key": `assistant-order-${randomUUID()}`,
+          },
+        }),
+      ),
     onSuccess: (_data, variables) => {
       const targetId = variables.sessionId || sessionId;
       if (targetId !== null && targetId !== "") {

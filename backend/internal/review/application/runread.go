@@ -69,19 +69,6 @@ type FindingView struct {
 	EvidenceIDs        []string `json:"evidence_ids"`
 }
 
-// loadRunOrNull reads a Run row, returning nil if absent (pre-grouping phase).
-func (s *Services) loadRunOrNull(ctx context.Context, db *gorm.DB, runID string) (*persistence.ReviewRunModel, error) {
-	var m persistence.ReviewRunModel
-	err := db.WithContext(ctx).Where("id = ?", runID).First(&m).Error
-	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return nil, nil
-	}
-	if err != nil {
-		return nil, err
-	}
-	return &m, nil
-}
-
 // loadRun reads a Run row.
 func (s *Services) loadRun(ctx context.Context, db *gorm.DB, runID string) (*persistence.ReviewRunModel, error) {
 	var m persistence.ReviewRunModel
@@ -121,23 +108,6 @@ func (s *Services) loadStageSnapshots(ctx context.Context, db *gorm.DB, runID st
 		return nil, err
 	}
 	return rows, nil
-}
-
-// stageGateInputs returns terminal stage summaries (inputs to gate evaluation).
-func (s *Services) stageGateInputs(ctx context.Context, db *gorm.DB, runID string) ([]persistence.StageReviewSnapshotModel, []domain.GateInput, error) {
-	rows, err := s.loadStageSnapshots(ctx, db, runID)
-	if err != nil {
-		return nil, nil, err
-	}
-	inputs := make([]domain.GateInput, 0, len(rows))
-	for i := range rows {
-		inputs = append(inputs, domain.GateInput{
-			StagePosition: int(rows[i].StagePosition),
-			State:         domain.StageReviewState(rows[i].State),
-			HighestFound:  domain.Severity(rows[i].HighestSeverity),
-		})
-	}
-	return rows, inputs, nil
 }
 
 // stagedCoverageIncomplete reports whether any stage failed to establish

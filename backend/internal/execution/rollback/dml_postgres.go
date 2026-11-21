@@ -14,7 +14,6 @@ import (
 // - PostgreSQL < 18: in-transaction SELECT ... FOR UPDATE (pre-update lock and before-image) + RETURNING * (INSERT/DELETE/UPDATE after-image).
 func ExecuteAndCapturePostgresDML(
 	ctx context.Context,
-	adapter database.Adapter,
 	pool *database.PurposePool,
 	tx database.DMLTransaction,
 	ordinal int,
@@ -69,11 +68,8 @@ func executePG18DMLWithReturning(
 		if err != nil {
 			return classifyPGStatementFailure(started, err), nil, nil
 		}
-		if len(combinedRows) > maxRows {
-			return nil, nil, &CapabilityError{
-				Reason:  "affected_rows_exceed_rollback_limit",
-				Message: fmt.Sprintf("statement UPDATE modified %d rows, exceeding rollback capture limit %d", len(combinedRows), maxRows),
-			}
+		if err := checkRollbackRowLimit("UPDATE modified", len(combinedRows), maxRows); err != nil {
+			return nil, nil, err
 		}
 		beforeRows := make([]database.RollbackRow, 0, len(combinedRows))
 		afterRows := make([]database.RollbackRow, 0, len(combinedRows))
@@ -96,25 +92,8 @@ func executePG18DMLWithReturning(
 		if err != nil {
 			return nil, nil, err
 		}
-		res := &database.StatementResult{
-			StartedAt:       started,
-			FinishedAt:      time.Now().UTC(),
-			AffectedRows:    int64(len(combinedRows)),
-			EngineCodeClass: database.ClassSuccess,
-			Outcome:         database.OutcomeSuccess,
-			SendBoundary:    database.SendBoundarySent,
-		}
-		return res, &StatementEvidence{
-			Ordinal:            ordinal,
-			OriginalSQL:        parsed.RawSQL,
-			Kind:               KindUpdate,
-			SchemaName:         meta.SchemaName,
-			TableName:          meta.TableName,
-			IdentityKeyColumns: append([]string(nil), meta.IdentityKeyColumns...),
-			BeforeRows:         beforeRows,
-			AfterRows:          afterRows,
-			InverseStatements:  inverseStmts,
-		}, nil
+		res, ev := buildPGSuccessResultAndEvidence(started, ordinal, parsed, meta, len(combinedRows), beforeRows, afterRows, inverseStmts)
+		return res, ev, nil
 
 	case KindInsert:
 		proj := buildQuotedColumnProjection("postgresql", meta.Columns, `"__yr_new"`)
@@ -124,34 +103,15 @@ func executePG18DMLWithReturning(
 		if err != nil {
 			return classifyPGStatementFailure(started, err), nil, nil
 		}
-		if len(afterRows) > maxRows {
-			return nil, nil, &CapabilityError{
-				Reason:  "affected_rows_exceed_rollback_limit",
-				Message: fmt.Sprintf("statement INSERT inserted %d rows, exceeding rollback capture limit %d", len(afterRows), maxRows),
-			}
+		if err := checkRollbackRowLimit("INSERT inserted", len(afterRows), maxRows); err != nil {
+			return nil, nil, err
 		}
 		inverseStmts, err := buildInverseInsertStatements("postgresql", meta, afterRows)
 		if err != nil {
 			return nil, nil, err
 		}
-		res := &database.StatementResult{
-			StartedAt:       started,
-			FinishedAt:      time.Now().UTC(),
-			AffectedRows:    int64(len(afterRows)),
-			EngineCodeClass: database.ClassSuccess,
-			Outcome:         database.OutcomeSuccess,
-			SendBoundary:    database.SendBoundarySent,
-		}
-		return res, &StatementEvidence{
-			Ordinal:            ordinal,
-			OriginalSQL:        parsed.RawSQL,
-			Kind:               KindInsert,
-			SchemaName:         meta.SchemaName,
-			TableName:          meta.TableName,
-			IdentityKeyColumns: append([]string(nil), meta.IdentityKeyColumns...),
-			AfterRows:          afterRows,
-			InverseStatements:  inverseStmts,
-		}, nil
+		res, ev := buildPGSuccessResultAndEvidence(started, ordinal, parsed, meta, len(afterRows), nil, afterRows, inverseStmts)
+		return res, ev, nil
 
 	case KindDelete:
 		proj := buildQuotedColumnProjection("postgresql", meta.Columns, `"__yr_old"`)
@@ -161,34 +121,15 @@ func executePG18DMLWithReturning(
 		if err != nil {
 			return classifyPGStatementFailure(started, err), nil, nil
 		}
-		if len(beforeRows) > maxRows {
-			return nil, nil, &CapabilityError{
-				Reason:  "affected_rows_exceed_rollback_limit",
-				Message: fmt.Sprintf("statement DELETE deleted %d rows, exceeding rollback capture limit %d", len(beforeRows), maxRows),
-			}
+		if err := checkRollbackRowLimit("DELETE deleted", len(beforeRows), maxRows); err != nil {
+			return nil, nil, err
 		}
 		inverseStmts, err := buildInverseDeleteStatements("postgresql", meta, beforeRows)
 		if err != nil {
 			return nil, nil, err
 		}
-		res := &database.StatementResult{
-			StartedAt:       started,
-			FinishedAt:      time.Now().UTC(),
-			AffectedRows:    int64(len(beforeRows)),
-			EngineCodeClass: database.ClassSuccess,
-			Outcome:         database.OutcomeSuccess,
-			SendBoundary:    database.SendBoundarySent,
-		}
-		return res, &StatementEvidence{
-			Ordinal:            ordinal,
-			OriginalSQL:        parsed.RawSQL,
-			Kind:               KindDelete,
-			SchemaName:         meta.SchemaName,
-			TableName:          meta.TableName,
-			IdentityKeyColumns: append([]string(nil), meta.IdentityKeyColumns...),
-			BeforeRows:         beforeRows,
-			InverseStatements:  inverseStmts,
-		}, nil
+		res, ev := buildPGSuccessResultAndEvidence(started, ordinal, parsed, meta, len(beforeRows), beforeRows, nil, inverseStmts)
+		return res, ev, nil
 
 	default:
 		return nil, nil, &CapabilityError{Reason: "unsupported_pg_dml_kind", Message: "unsupported PostgreSQL DML kind"}
@@ -204,7 +145,6 @@ func executePrePG18DMLWithCapture(
 	maxRows int,
 ) (*database.StatementResult, *StatementEvidence, error) {
 	selectCols := buildQuotedColumnProjection("postgresql", meta.Columns, "")
-	orderByPK := buildQuotedOrderBy("postgresql", meta.IdentityKeyColumns, "")
 
 	switch parsed.Kind {
 	case KindUpdate:
@@ -227,11 +167,8 @@ func executePrePG18DMLWithCapture(
 		if err != nil {
 			return classifyPGStatementFailure(started, err), nil, nil
 		}
-		if len(beforeRows) > maxRows {
-			return nil, nil, &CapabilityError{
-				Reason:  "affected_rows_exceed_rollback_limit",
-				Message: fmt.Sprintf("statement UPDATE matched %d rows, exceeding rollback capture limit %d", len(beforeRows), maxRows),
-			}
+		if err := checkRollbackRowLimit("UPDATE matched", len(beforeRows), maxRows); err != nil {
+			return nil, nil, err
 		}
 
 		returningCols := buildQuotedColumnProjection("postgresql", meta.Columns, tablePrefix)
@@ -250,25 +187,8 @@ func executePrePG18DMLWithCapture(
 		if err != nil {
 			return nil, nil, err
 		}
-		res := &database.StatementResult{
-			StartedAt:       started,
-			FinishedAt:      time.Now().UTC(),
-			AffectedRows:    int64(len(afterRows)),
-			EngineCodeClass: database.ClassSuccess,
-			Outcome:         database.OutcomeSuccess,
-			SendBoundary:    database.SendBoundarySent,
-		}
-		return res, &StatementEvidence{
-			Ordinal:            ordinal,
-			OriginalSQL:        parsed.RawSQL,
-			Kind:               KindUpdate,
-			SchemaName:         meta.SchemaName,
-			TableName:          meta.TableName,
-			IdentityKeyColumns: append([]string(nil), meta.IdentityKeyColumns...),
-			BeforeRows:         beforeRows,
-			AfterRows:          afterRows,
-			InverseStatements:  inverseStmts,
-		}, nil
+		res, ev := buildPGSuccessResultAndEvidence(started, ordinal, parsed, meta, len(afterRows), beforeRows, afterRows, inverseStmts)
+		return res, ev, nil
 
 	case KindInsert:
 		insSQL := fmt.Sprintf("%s RETURNING %s", parsed.TrimmedSQL, selectCols)
@@ -277,34 +197,15 @@ func executePrePG18DMLWithCapture(
 		if err != nil {
 			return classifyPGStatementFailure(started, err), nil, nil
 		}
-		if len(afterRows) > maxRows {
-			return nil, nil, &CapabilityError{
-				Reason:  "affected_rows_exceed_rollback_limit",
-				Message: fmt.Sprintf("statement INSERT inserted %d rows, exceeding rollback capture limit %d", len(afterRows), maxRows),
-			}
+		if err := checkRollbackRowLimit("INSERT inserted", len(afterRows), maxRows); err != nil {
+			return nil, nil, err
 		}
 		inverseStmts, err := buildInverseInsertStatements("postgresql", meta, afterRows)
 		if err != nil {
 			return nil, nil, err
 		}
-		res := &database.StatementResult{
-			StartedAt:       started,
-			FinishedAt:      time.Now().UTC(),
-			AffectedRows:    int64(len(afterRows)),
-			EngineCodeClass: database.ClassSuccess,
-			Outcome:         database.OutcomeSuccess,
-			SendBoundary:    database.SendBoundarySent,
-		}
-		return res, &StatementEvidence{
-			Ordinal:            ordinal,
-			OriginalSQL:        parsed.RawSQL,
-			Kind:               KindInsert,
-			SchemaName:         meta.SchemaName,
-			TableName:          meta.TableName,
-			IdentityKeyColumns: append([]string(nil), meta.IdentityKeyColumns...),
-			AfterRows:          afterRows,
-			InverseStatements:  inverseStmts,
-		}, nil
+		res, ev := buildPGSuccessResultAndEvidence(started, ordinal, parsed, meta, len(afterRows), nil, afterRows, inverseStmts)
+		return res, ev, nil
 
 	case KindDelete:
 		tablePrefix := ""
@@ -317,39 +218,61 @@ func executePrePG18DMLWithCapture(
 		if err != nil {
 			return classifyPGStatementFailure(started, err), nil, nil
 		}
-		if len(beforeRows) > maxRows {
-			return nil, nil, &CapabilityError{
-				Reason:  "affected_rows_exceed_rollback_limit",
-				Message: fmt.Sprintf("statement DELETE deleted %d rows, exceeding rollback capture limit %d", len(beforeRows), maxRows),
-			}
+		if err := checkRollbackRowLimit("DELETE deleted", len(beforeRows), maxRows); err != nil {
+			return nil, nil, err
 		}
-		_ = orderByPK
 		inverseStmts, err := buildInverseDeleteStatements("postgresql", meta, beforeRows)
 		if err != nil {
 			return nil, nil, err
 		}
-		res := &database.StatementResult{
-			StartedAt:       started,
-			FinishedAt:      time.Now().UTC(),
-			AffectedRows:    int64(len(beforeRows)),
-			EngineCodeClass: database.ClassSuccess,
-			Outcome:         database.OutcomeSuccess,
-			SendBoundary:    database.SendBoundarySent,
-		}
-		return res, &StatementEvidence{
-			Ordinal:            ordinal,
-			OriginalSQL:        parsed.RawSQL,
-			Kind:               KindDelete,
-			SchemaName:         meta.SchemaName,
-			TableName:          meta.TableName,
-			IdentityKeyColumns: append([]string(nil), meta.IdentityKeyColumns...),
-			BeforeRows:         beforeRows,
-			InverseStatements:  inverseStmts,
-		}, nil
+		res, ev := buildPGSuccessResultAndEvidence(started, ordinal, parsed, meta, len(beforeRows), beforeRows, nil, inverseStmts)
+		return res, ev, nil
 
 	default:
 		return nil, nil, &CapabilityError{Reason: "unsupported_pg_dml_kind", Message: "unsupported PostgreSQL DML kind"}
 	}
+}
+
+func checkRollbackRowLimit(actionDesc string, count, maxRows int) error {
+	if count <= maxRows {
+		return nil
+	}
+	return &CapabilityError{
+		Reason:  "affected_rows_exceed_rollback_limit",
+		Message: fmt.Sprintf("statement %s %d rows, exceeding rollback capture limit %d", actionDesc, count, maxRows),
+	}
+}
+
+func buildPGSuccessResultAndEvidence(
+	started time.Time,
+	ordinal int,
+	parsed *ParsedStatement,
+	meta *database.TableRollbackMetadata,
+	affected int,
+	beforeRows []database.RollbackRow,
+	afterRows []database.RollbackRow,
+	inverseStmts []string,
+) (*database.StatementResult, *StatementEvidence) {
+	res := &database.StatementResult{
+		StartedAt:       started,
+		FinishedAt:      time.Now().UTC(),
+		AffectedRows:    int64(affected),
+		EngineCodeClass: database.ClassSuccess,
+		Outcome:         database.OutcomeSuccess,
+		SendBoundary:    database.SendBoundarySent,
+	}
+	ev := &StatementEvidence{
+		Ordinal:            ordinal,
+		OriginalSQL:        parsed.RawSQL,
+		Kind:               parsed.Kind,
+		SchemaName:         meta.SchemaName,
+		TableName:          meta.TableName,
+		IdentityKeyColumns: append([]string(nil), meta.IdentityKeyColumns...),
+		BeforeRows:         beforeRows,
+		AfterRows:          afterRows,
+		InverseStatements:  inverseStmts,
+	}
+	return res, ev
 }
 
 func buildPG18OldNewProjection(cols []database.RollbackColumnMeta) string {

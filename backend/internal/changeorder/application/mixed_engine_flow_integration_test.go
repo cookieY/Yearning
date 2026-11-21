@@ -106,9 +106,8 @@ func TestSubmitRejectsLegacyMixedEngineFlow(t *testing.T) {
 	fx.seedGrant(t, submitter, flowID)
 
 	draftID := fx.seedReadyDraft(t, flowID, submitter)
-	fx.seedReadyRun(t, draftID, flowID)
 
-	_, err := fx.submitAs(t, draftID, submitter, "me-submit")
+	_, err := fx.submitReadyDraftAs(t, draftID, flowID, submitter, "me-submit")
 	if err == nil {
 		t.Fatal("mixed-engine flow must be rejected at submit, got nil error")
 	}
@@ -149,9 +148,8 @@ func TestSubmitAcceptsSameEngineMultiStage(t *testing.T) {
 	fx.seedGrant(t, submitter, flowID)
 
 	draftID := fx.seedReadyDraft(t, flowID, submitter)
-	fx.seedReadyRun(t, draftID, flowID)
 
-	view, err := fx.submitAs(t, draftID, submitter, "me-ok-submit")
+	view, err := fx.submitReadyDraftAs(t, draftID, flowID, submitter, "me-ok-submit")
 	if err != nil {
 		t.Fatalf("same-engine multi-stage must be accepted, got %v", err)
 	}
@@ -172,9 +170,8 @@ func TestSubmitAcceptsSameEngineDifferentDatasources(t *testing.T) {
 	fx.seedGrant(t, submitter, flowID)
 
 	draftID := fx.seedReadyDraft(t, flowID, submitter)
-	fx.seedReadyRun(t, draftID, flowID)
 
-	if _, err := fx.submitAs(t, draftID, submitter, "me-ok2-submit"); err != nil {
+	if _, err := fx.submitReadyDraftAs(t, draftID, flowID, submitter, "me-ok2-submit"); err != nil {
 		t.Fatalf("same engine+mode on different datasources must be accepted, got %v", err)
 	}
 }
@@ -191,9 +188,8 @@ func TestSubmitRejectsDifferentEngineSameMode(t *testing.T) {
 	fx.seedGrant(t, submitter, flowID)
 
 	draftID := fx.seedReadyDraft(t, flowID, submitter)
-	fx.seedReadyRun(t, draftID, flowID)
 
-	_, err := fx.submitAs(t, draftID, submitter, "me-eng-submit")
+	_, err := fx.submitReadyDraftAs(t, draftID, flowID, submitter, "me-eng-submit")
 	var de *domain.Error
 	if !errors.As(err, &de) {
 		t.Fatalf("want domain gate error, got %v", err)
@@ -214,9 +210,8 @@ func TestSubmitRejectsCompatibilityModeMismatch(t *testing.T) {
 	fx.seedGrant(t, submitter, flowID)
 
 	draftID := fx.seedReadyDraft(t, flowID, submitter)
-	fx.seedReadyRun(t, draftID, flowID)
 
-	_, err := fx.submitAs(t, draftID, submitter, "me-mode-submit")
+	_, err := fx.submitReadyDraftAs(t, draftID, flowID, submitter, "me-mode-submit")
 	var de *domain.Error
 	if !errors.As(err, &de) {
 		t.Fatalf("want domain gate error, got %v", err)

@@ -18,6 +18,7 @@ import {
 import { ScrollArea } from "@/shared/components/ui/scroll-area";
 import { ClipboardCopy, Eye, ShieldAlert } from "lucide-react";
 import { describeError } from "@/shared/api/error-display";
+import { unwrapApi } from "@/shared/api/mutator";
 import { formatWatermark } from "@/shared/lib/timezones";
 
 /**
@@ -55,9 +56,7 @@ export function EvidenceSheet({ findings, open, onOpenChange }: EvidenceSheetPro
     queryKey: ["review-finding-evidence", findingIds.join(",")],
     queryFn: async () =>
       Promise.all(
-        findingIds.map(async (id) =>
-          (await listReviewFindingEvidence(id)) as unknown as ReviewEvidence[],
-        ),
+        findingIds.map((id) => unwrapApi(listReviewFindingEvidence(id))),
       ),
     enabled: open && findingIds.length > 0,
   });
@@ -88,13 +87,8 @@ export function EvidenceSheet({ findings, open, onOpenChange }: EvidenceSheetPro
 
   const revealMutation = useMutation({
     mutationFn: (evidenceId: string) =>
-      revealRawReviewEvidence(evidenceId, { purpose: "review-evidence" }),
-    onSuccess: (data, evidenceId) => {
-      const payload = data as unknown as {
-        raw_payload: unknown;
-        watermark: string;
-        reveal_id: string;
-      };
+      unwrapApi(revealRawReviewEvidence(evidenceId, { purpose: "review-evidence" })),
+    onSuccess: (payload, evidenceId) => {
       setRevealed((previous) => ({
         ...previous,
         [evidenceId]: {

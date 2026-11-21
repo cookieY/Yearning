@@ -1,7 +1,5 @@
-// NegotiateOutputMode negotiates the output mode at probe time (section 18.76-A): tries strict first,
-// and only on HTTP 400 replays the same Probe with json_object (same Schema and decode path). Returns
-// the effective mode; if both fail, returns the error from the json_object attempt — which reflects the
-// true failure cause under the fallback mode (e.g. a non-existent model name fails for the same reason in both modes).
+// Package persistence provides GORM v2 table models for the Review bounded context matching
+// gorm-model-registry.json and postgresql-column-catalog.json without AutoMigrate or JSON tags.
 package persistence
 
 import (
@@ -9,7 +7,7 @@ import (
 	"time"
 )
 
-// N11: payload copy strips system_prompt (already carried on the system channel, avoiding duplicate tokens).
+// EncodeTextArray encodes a Go string slice into a PostgreSQL text[] literal.
 func EncodeTextArray(items []string) string {
 	if len(items) == 0 {
 		return "{}"
@@ -21,8 +19,7 @@ func EncodeTextArray(items []string) string {
 	return "{" + strings.Join(parts, ",") + "}"
 }
 
-// Output validation failed: this HTTP call is recorded as schema_failed, while reported usage is
-// preserved in the call record (S008 Usage-02: neither treated as free nor discarded).
+// DecodeTextArray decodes a PostgreSQL text[] literal into a Go string slice.
 func DecodeTextArray(raw string) []string {
 	raw = strings.TrimSpace(raw)
 	if len(raw) < 2 || raw[0] != '{' || raw[len(raw)-1] != '}' {
@@ -46,7 +43,7 @@ func DecodeTextArray(raw string) []string {
 				b.WriteByte(inner[i])
 			}
 			out = append(out, b.String())
-			rest := inner[minInt(i+1, len(inner)):]
+			rest := inner[min(i+1, len(inner)):]
 			inner = strings.TrimPrefix(rest, ",")
 		} else {
 			end := strings.IndexByte(inner, ',')
@@ -62,24 +59,15 @@ func DecodeTextArray(raw string) []string {
 	return out
 }
 
-func minInt(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
-}
-
-// PRD 9.2: at most 1 schema repair request is permitted on invalid Schema.
+// ChangeDraftModel corresponds to change_drafts (mutable_aggregate).
 type ChangeDraftModel struct {
-	ID              string `gorm:"column:id;primaryKey"`
-	OwnerUserID     string `gorm:"column:owner_user_id"`
-	FlowID          string `gorm:"column:flow_id"`
-	FlowVersionSeen int64  `gorm:"column:flow_version_seen"`
-	Title           string `gorm:"column:title"`
-	Description     string `gorm:"column:description"`
-	// markLastCallOutcome rewrites the Outcome of the last call record to the specified value
-	// (the HTTP layer records ok; output validation failure reclassifies it as schema_failed at the structured layer).
-	RequestedScheduledFor *time.Time `gorm:"column:requested_scheduled_for"`
+	ID                    string     `gorm:"column:id;primaryKey"`
+	OwnerUserID           string     `gorm:"column:owner_user_id"`
+	FlowID                string     `gorm:"column:flow_id"`
+	FlowVersionSeen       int64      `gorm:"column:flow_version_seen"`
+	Title                 string     `gorm:"column:title"`
+	Description           string     `gorm:"column:description"`
+	RequestedScheduledFor *time.Time `gorm:"column:requested_scheduled_for"` // Advisory requested schedule time copied onto submitted orders.
 	RollbackEnabled       bool       `gorm:"column:rollback_enabled"`
 	TicketType            string     `gorm:"column:ticket_type"`
 	SourceOrderID         *string    `gorm:"column:source_order_id"`
@@ -93,11 +81,7 @@ type ChangeDraftModel struct {
 
 func (ChangeDraftModel) TableName() string { return "change_drafts" }
 
-// decodeStructured performs strict decoding + validation (rejecting unknown fields; SEC-0038: rejecting
-// duplicate object keys and trailing JSON content). Provider output is untrusted input:
-// encoding/json defaults to last-wins on duplicate keys and Decoder only decodes the first value —
-// a malicious or buggy Provider could overwrite validated fields via duplicate keys or append a second
-// value to bypass the "reject unknown" output contract, so unambiguous scanning runs before decoding.
+// DraftSQLPayloadModel corresponds to draft_sql_payloads (AEAD-sealed raw draft SQL payload).
 type DraftSQLPayloadModel struct {
 	DraftID        string    `gorm:"column:draft_id;primaryKey"`
 	SQLCiphertext  []byte    `gorm:"column:sql_ciphertext"`
@@ -112,7 +96,7 @@ type DraftSQLPayloadModel struct {
 
 func (DraftSQLPayloadModel) TableName() string { return "draft_sql_payloads" }
 
-// Single JSON value: only whitespace is allowed after the first value (multiple values / trailing garbage rejected).
+// ReviewRunModel corresponds to review_runs (mutable until reaching a terminal review state).
 type ReviewRunModel struct {
 	ID                            string     `gorm:"column:id;primaryKey"`
 	DraftID                       string     `gorm:"column:draft_id"`
@@ -137,9 +121,7 @@ type ReviewRunModel struct {
 
 func (ReviewRunModel) TableName() string { return "review_runs" }
 
-// rejectDuplicateKeys scans the entire document using json.Decoder's token stream and rejects
-// duplicate keys within the same object (self-implemented, no third-party dependency). Performs only
-// structural scanning without building a value tree; invalid JSON is reported by Decoder.
+// SQLStatementModel corresponds to sql_statements (per-statement structural metadata without raw SQL).
 type SQLStatementModel struct {
 	ID                       string `gorm:"column:id;primaryKey"`
 	ReviewRunID              string `gorm:"column:review_run_id"`
@@ -162,7 +144,7 @@ type SQLStatementModel struct {
 
 func (SQLStatementModel) TableName() string { return "sql_statements" }
 
-// Top-level first value; containers push onto the stack, while scalars are covered by the trailing check.
+// SQLFingerprintGroupModel corresponds to sql_fingerprint_groups (aggregated statement groups per Run).
 type SQLFingerprintGroupModel struct {
 	ID                        string `gorm:"column:id;primaryKey"`
 	ReviewRunID               string `gorm:"column:review_run_id"`
@@ -179,7 +161,7 @@ type SQLFingerprintGroupModel struct {
 
 func (SQLFingerprintGroupModel) TableName() string { return "sql_fingerprint_groups" }
 
-// A nested container inside an object is a value: the next token after it completes is a key.
+// StageReviewSnapshotModel corresponds to stage_review_snapshots (immutable per-stage review snapshot).
 type StageReviewSnapshotModel struct {
 	ID                            string     `gorm:"column:id;primaryKey"`
 	ReviewRunID                   string     `gorm:"column:review_run_id"`
@@ -201,7 +183,7 @@ type StageReviewSnapshotModel struct {
 
 func (StageReviewSnapshotModel) TableName() string { return "stage_review_snapshots" }
 
-// number/bool/null: treated as a value when inside an object.
+// EvidenceFactModel corresponds to evidence_facts (insert-only normalized tool fact records).
 type EvidenceFactModel struct {
 	ID                       string    `gorm:"column:id;primaryKey"`
 	StageReviewID            string    `gorm:"column:stage_review_id"`
@@ -217,8 +199,7 @@ type EvidenceFactModel struct {
 
 func (EvidenceFactModel) TableName() string { return "evidence_facts" }
 
-// retryableStatus timeouts, rate limits, and 5xx responses are eligible for automatic retry (PRD 9.2);
-// authentication failures and deterministic 4xx rejections are not retried.
+// EvidenceRawPayloadModel corresponds to evidence_raw_payloads (insert-only encrypted raw target payloads with 7d TTL).
 type EvidenceRawPayloadModel struct {
 	ID                   string    `gorm:"column:id;primaryKey"`
 	EvidenceFactID       string    `gorm:"column:evidence_fact_id"`
@@ -233,9 +214,7 @@ type EvidenceRawPayloadModel struct {
 
 func (EvidenceRawPayloadModel) TableName() string { return "evidence_raw_payloads" }
 
-// postBounded performs bounded retries: initial attempt + up to 2 backoff retries, only for retryable categories.
-// S008: every real HTTP attempt (including 429/5xx retries) produces its own CallRecord —
-// serving as input to the per-call reference ledger without merging into the logical request.
+// ReviewFindingModel corresponds to review_findings (insert-only review findings).
 type ReviewFindingModel struct {
 	ID                 string    `gorm:"column:id;primaryKey"`
 	StageReviewID      string    `gorm:"column:stage_review_id"`
@@ -251,7 +230,7 @@ type ReviewFindingModel struct {
 
 func (ReviewFindingModel) TableName() string { return "review_findings" }
 
-// Exponential backoff: 1s, 2s (bounded by ctx).
+// ReviewFindingEvidenceModel corresponds to review_finding_evidence (finding-to-evidence join table).
 type ReviewFindingEvidenceModel struct {
 	FindingID      string `gorm:"column:finding_id;primaryKey"`
 	EvidenceFactID string `gorm:"column:evidence_fact_id;primaryKey"`
@@ -259,8 +238,7 @@ type ReviewFindingEvidenceModel struct {
 
 func (ReviewFindingEvidenceModel) TableName() string { return "review_finding_evidence" }
 
-// R1 C-1: only real HTTP attempts produce records — construction failures (marshal/URL/
-// request build) never sent a request, so zero-value records are not appended.
+// ReviewToolCallModel corresponds to review_tool_calls (insert-only tool invocation and injection audit rows).
 type ReviewToolCallModel struct {
 	ID            string    `gorm:"column:id;primaryKey"`
 	ReviewRunID   string    `gorm:"column:review_run_id"`
@@ -277,9 +255,8 @@ type ReviewToolCallModel struct {
 
 func (ReviewToolCallModel) TableName() string { return "review_tool_calls" }
 
-// statusError carries the HTTP status code and a length-capped upstream response body snapshot (section 18.75-A: operators
-// need to see the real upstream rejection reason in the form — immediately recognizable errors like
-// "model does not exist" or "json_schema not supported"; the snapshot strips Authorization and the caller caps length).
+// ReviewIdentifierMappingModel declares the contract schema anchor for review_identifier_mappings
+// (managed via raw SQL in review/application/identifiermapping.go without AutoMigrate).
 type ReviewIdentifierMappingModel struct {
 	ID                          string    `gorm:"column:id;primaryKey"`
 	ReviewRunID                 string    `gorm:"column:review_run_id"`
@@ -294,7 +271,8 @@ type ReviewIdentifierMappingModel struct {
 
 func (ReviewIdentifierMappingModel) TableName() string { return "review_identifier_mappings" }
 
-// upstreamSnapshot compacts an upstream error response body into a single-line, length-capped snapshot (section 18.75-A).
+// AIProviderRateVersionModel declares the contract schema anchor for ai_provider_rate_versions
+// (append-only pricing versions managed via raw SQL in review/application/pricing.go).
 type AIProviderRateVersionModel struct {
 	ID              string     `gorm:"column:id;primaryKey"`
 	ProviderID      string     `gorm:"column:provider_id"`
@@ -310,9 +288,8 @@ type AIProviderRateVersionModel struct {
 
 func (AIProviderRateVersionModel) TableName() string { return "ai_provider_rate_versions" }
 
-// post executes a single HTTP POST; non-2xx responses determine retryability by error category.
-// S008: returns the CallRecord for this real HTTP attempt (sent timestamp = server UTC clock;
-// construction failures where no request was sent produce no record).
+// AIProviderRateWindowModel declares the contract schema anchor for ai_provider_rate_windows
+// (same-day [start,end) pricing windows managed via raw SQL in review/application/pricing.go).
 type AIProviderRateWindowModel struct {
 	ID               string  `gorm:"column:id;primaryKey"`
 	RateVersionID    string  `gorm:"column:rate_version_id"`
@@ -326,7 +303,8 @@ type AIProviderRateWindowModel struct {
 
 func (AIProviderRateWindowModel) TableName() string { return "ai_provider_rate_windows" }
 
-// Generation parameter snapshot: configured values are recorded with the call (zero value = omitted / not sent).
+// AICallUsageModel declares the contract schema anchor for ai_call_usage
+// (append-only per-HTTP-call usage ledger managed via raw SQL in review/application/pricing.go).
 type AICallUsageModel struct {
 	ID               string    `gorm:"column:id;primaryKey"`
 	ReviewRunID      string    `gorm:"column:review_run_id"`

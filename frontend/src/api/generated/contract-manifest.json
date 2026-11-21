@@ -23,21 +23,17 @@
     "version": "8.27.0",
     "version_source": "package.json",
     "lockfile": "pnpm-lock.yaml",
-    "lockfile_sha256": "4d6530c5d87d8410d204a12c22696dc9bf88834bc8ef7c5a45f269d4a6eedaf5"
+    "lockfile_sha256": "2512c906f02047f7c2cb087233c3af3caff9aa357ad87fc72a5af71d80b279d5"
   },
   "generation_command": "pnpm api:generate",
   "outputs": {
     "typescript_client": {
       "path": "src/api/generated/client",
-      "sha256": "8ac23552f4ac005f8cf9adb5e38280b8dd1f5ba128e396510225242a1f781283"
+      "sha256": "8d34bc87b8f85dcaba8822cb49776320c8cdc990d16fdc4a8b0a3602246963d1"
     },
     "zod_runtime_schemas": {
       "path": "src/api/generated/zod",
       "sha256": "07cd54ca9a53c0e41433db68ab2f3478e46723ba9575d996f37a37d5915bf8ae"
-    },
-    "tanstack_query_hooks": {
-      "path": "src/api/generated/hooks",
-      "sha256": "76e0f94dbb37eed6689e48cb34253e96ec5a378eb6e3e7c078c3547e602f5453"
     },
     "msw_mock_handlers": {
       "path": "src/api/generated/mocks",
@@ -57,5 +53,5 @@
     }
   },
   "authorization_policy_generated": false,
-  "generated_at": "2026-11-20T13:16:26.956Z"
+  "generated_at": "2026-11-21T11:35:39.573Z"
 }

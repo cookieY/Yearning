@@ -22,7 +22,11 @@ const (
 	datasourceBootstrapTimeout   = 5 * time.Second
 )
 
-var errFrozenDatasourceTarget = errors.New("review: frozen datasource target unavailable")
+var (
+	errFrozenDatasourceTarget = errors.New("review: frozen datasource target unavailable")
+	// errInputsDrift indicates frozen inputs have drifted (converging run -> outdated).
+	errInputsDrift = errors.New("review: frozen inputs drifted")
+)
 
 // frozenDatasourceTarget is the encrypted, immutable connection target for a
 // review stage. Raw endpoint and database identifiers remain local to the
@@ -194,25 +198,6 @@ func (s *Services) ensureFlowStagesIdentity(ctx context.Context, actorUserID, fl
 			where id = ? and enabled = true and (identity_fingerprint is null or identity_fingerprint = '')`,
 			fp, st.DatasourceID).Error
 	}
-}
-
-func (s *Services) ensureDraftFlowStagesIdentity(ctx context.Context, actorUserID, draftID string) {
-	if s == nil || s.DB == nil || s.Crypter == nil || s.DatasourceIdentityProbe != nil {
-		return
-	}
-	if _, err := uuid.Parse(actorUserID); err != nil {
-		return
-	}
-	if _, err := uuid.Parse(draftID); err != nil {
-		return
-	}
-	var flowID string
-	if err := s.DB.WithContext(ctx).Raw(
-		`select flow_id::text from change_drafts where id = ? and owner_user_id = ?`,
-		draftID, actorUserID).Scan(&flowID).Error; err != nil || flowID == "" {
-		return
-	}
-	s.ensureFlowStagesIdentity(ctx, actorUserID, flowID)
 }
 
 func (s *Services) probeFrozenDatasourceTarget(

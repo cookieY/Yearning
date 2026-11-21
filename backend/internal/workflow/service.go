@@ -5,10 +5,8 @@ package workflow
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"sort"
-	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -18,6 +16,7 @@ import (
 	"github.com/cookieY/YearningX/backend/internal/authorization/auditlog"
 	"github.com/cookieY/YearningX/backend/internal/authorization/bizerr"
 	"github.com/cookieY/YearningX/backend/internal/crypto"
+	"github.com/cookieY/YearningX/backend/internal/platform/txutil"
 	reviewapp "github.com/cookieY/YearningX/backend/internal/review/application"
 )
 
@@ -202,10 +201,12 @@ func validateFlowWrite(w *FlowWrite) error {
 		if len(s.Actors) < 1 {
 			return bizerr.ErrValidationFailed
 		}
+		seen := map[string]bool{}
 		for _, a := range s.Actors {
-			if a.UserID == "" {
+			if a.UserID == "" || seen[a.UserID] {
 				return bizerr.ErrValidationFailed
 			}
+			seen[a.UserID] = true
 		}
 	}
 	dsSeen := map[string]bool{}
@@ -445,7 +446,7 @@ func (s *Service) CreateFlow(ctx context.Context, actor AdminActor, w *FlowWrite
 	}
 	flowID := uuid.NewString()
 	now := time.Now().UTC()
-	err := s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+	err := txutil.Serializable(ctx, s.db, func(tx *gorm.DB) error {
 		if err := lockReferences(ctx, tx, users, datasources, ruleSet); err != nil {
 			return err
 		}
@@ -465,7 +466,7 @@ func (s *Service) CreateFlow(ctx context.Context, actor AdminActor, w *FlowWrite
 			return err
 		}
 		return s.writeFlowGraph(ctx, tx, flowID, w)
-	}, &sql.TxOptions{Isolation: sql.LevelSerializable})
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -491,7 +492,7 @@ func (s *Service) ReplaceFlow(ctx context.Context, actor AdminActor, flowID stri
 	if err := s.validateChangeFlowSingleEngine(ctx, s.db, w); err != nil {
 		return nil, err
 	}
-	err := s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+	err := txutil.Serializable(ctx, s.db, func(tx *gorm.DB) error {
 		var row FlowModel
 		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
 			Where("id = ?", flowID).First(&row).Error; err != nil {
@@ -548,7 +549,7 @@ func (s *Service) ReplaceFlow(ctx context.Context, actor AdminActor, flowID stri
 		return s.audit.Emit(ctx, tx, "flow.updated", "flow:"+flowID,
 			auditlog.Actor{Kind: "user", UserID: actor.UserID, Username: actor.Username},
 			map[string]any{"flow_id": flowID})
-	}, &sql.TxOptions{Isolation: sql.LevelSerializable})
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -599,7 +600,7 @@ func deleteAllFlowMaskingRules(ctx context.Context, tx *gorm.DB, flowID string) 
 // DeleteFlow performs physical deletion only when there are zero references; returns 1106 if referenced by
 // drafts, query access requests, or permission group grants (in which case the flow can only be disabled).
 func (s *Service) DeleteFlow(ctx context.Context, actor AdminActor, flowID string, expectVersion int64, meta RequestMeta) error {
-	err := s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+	err := txutil.Serializable(ctx, s.db, func(tx *gorm.DB) error {
 		var row FlowModel
 		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
 			Where("id = ?", flowID).First(&row).Error; err != nil {
@@ -697,13 +698,9 @@ func (s *Service) List(ctx context.Context, limit int, after, search, flowType s
 	if hasMore {
 		rows = rows[:limit]
 	}
-	views := make([]FlowView, 0, len(rows))
-	for i := range rows {
-		v, err := s.viewOf(ctx, &rows[i])
-		if err != nil {
-			return nil, nil, err
-		}
-		views = append(views, *v)
+	views, err := s.viewsOf(ctx, rows)
+	if err != nil {
+		return nil, nil, err
 	}
 	var next *string
 	if hasMore && len(rows) > 0 {
@@ -713,122 +710,174 @@ func (s *Service) List(ctx context.Context, limit int, after, search, flowType s
 }
 
 func (s *Service) viewOf(ctx context.Context, row *FlowModel) (*FlowView, error) {
-	view := FlowView{
-		ID: row.ID, FlowWrite: FlowWrite{
-			Name: row.Name, FlowType: row.FlowType, Enabled: row.Status == "enabled",
-			RuleSetID: row.RuleSetID,
-		},
-		// F12 No.004: minItems 1 arrays (stages, approval_steps,
-		// query_capabilities) always omit the key when empty -- serializing [] violates minItems,
-		// and omitempty already handles omission (previous empty-slice initialization was dead code and has been removed).
-		Status: row.Status, Version: row.Version,
-		CreatedAt: row.CreatedAt, UpdatedAt: row.UpdatedAt,
+	views, err := s.viewsOf(ctx, []FlowModel{*row})
+	if err != nil {
+		return nil, err
 	}
+	return &views[0], nil
+}
+
+func (s *Service) viewsOf(ctx context.Context, rows []FlowModel) ([]FlowView, error) {
+	if len(rows) == 0 {
+		return []FlowView{}, nil
+	}
+	flowIDs := make([]string, len(rows))
+	for i := range rows {
+		flowIDs[i] = rows[i].ID
+	}
+
 	var stages []FlowStageModel
-	if err := s.db.WithContext(ctx).Where("flow_id = ?", row.ID).
+	if err := s.db.WithContext(ctx).Where("flow_id in ?", flowIDs).
 		Order("position asc").Find(&stages).Error; err != nil {
 		return nil, err
 	}
-	// Join stage datasource catalog names (resolved in a single batch query, falling back to datasource_id if missing).
-	stageDSNames := map[string]string{}
-	dsIDs := map[string]bool{}
+
+	stageIDs := make([]string, 0, len(stages))
+	dsIDSet := make(map[string]bool, len(stages))
+	dsIDs := make([]string, 0, len(stages))
+	stagesByFlow := make(map[string][]FlowStageModel, len(rows))
 	for i := range stages {
-		dsIDs[stages[i].DatasourceID] = true
-	}
-	if len(dsIDs) > 0 {
-		ids := make([]string, 0, len(dsIDs))
-		for id := range dsIDs {
-			ids = append(ids, id)
+		st := stages[i]
+		stageIDs = append(stageIDs, st.ID)
+		if !dsIDSet[st.DatasourceID] {
+			dsIDSet[st.DatasourceID] = true
+			dsIDs = append(dsIDs, st.DatasourceID)
 		}
+		stagesByFlow[st.FlowID] = append(stagesByFlow[st.FlowID], st)
+	}
+
+	// Join stage datasource catalog names in a single batch query (falling back to datasource_id if missing).
+	stageDSNames := make(map[string]string, len(dsIDs))
+	if len(dsIDs) > 0 {
 		var nameRows []struct {
 			ID   string `gorm:"column:id"`
 			Name string `gorm:"column:name"`
 		}
 		if err := s.db.WithContext(ctx).Raw(
-			`select id::text as id, name from datasources where id in ?`, ids).Scan(&nameRows).Error; err != nil {
+			`select id::text as id, name from datasources where id in ?`, dsIDs).Scan(&nameRows).Error; err != nil {
 			return nil, err
 		}
 		for _, r := range nameRows {
 			stageDSNames[r.ID] = r.Name
 		}
 	}
+
 	var steps []FlowApprovalStepModel
-	if err := s.db.WithContext(ctx).Where("flow_id = ?", row.ID).
+	if err := s.db.WithContext(ctx).Where("flow_id in ?", flowIDs).
 		Order("position asc").Find(&steps).Error; err != nil {
 		return nil, err
 	}
-	stepActors := map[string][]string{}
-	for _, st := range steps {
-		var actors []FlowApprovalStepActorModel
-		if err := s.db.WithContext(ctx).Where("step_id = ?", st.ID).Find(&actors).Error; err != nil {
-			return nil, err
-		}
-		ids := make([]string, 0, len(actors))
-		for _, a := range actors {
-			ids = append(ids, a.UserID)
-		}
-		stepActors[st.ID] = ids
-	}
-	for i := range stages {
-		st := &stages[i]
-		stageView := StageView{
-			StageWrite: StageWrite{
-				Position: st.Position, DatasourceID: st.DatasourceID,
-				// An invalidated flow may have an empty execution actor set; serialize as [] rather than null per OpenAPI required array.
-				ApprovalSteps:   []ApprovalStepWrite{},
-				ExecutionActors: []ActorRef{},
-			},
-		}
-		if name, ok := stageDSNames[st.DatasourceID]; ok && name != "" {
-			stageView.DatasourceName = name
+
+	stepIDs := make([]string, len(steps))
+	stepsByStage := make(map[string][]FlowApprovalStepModel, len(stages))
+	flowStepsByFlow := make(map[string][]FlowApprovalStepModel, len(rows))
+	for i := range steps {
+		sp := steps[i]
+		stepIDs[i] = sp.ID
+		if sp.StageID != nil {
+			stepsByStage[*sp.StageID] = append(stepsByStage[*sp.StageID], sp)
 		} else {
-			stageView.DatasourceName = st.DatasourceID
+			flowStepsByFlow[sp.FlowID] = append(flowStepsByFlow[sp.FlowID], sp)
 		}
-		for _, sp := range steps {
-			if sp.StageID != nil && *sp.StageID == st.ID {
-				stageView.ApprovalSteps = append(stageView.ApprovalSteps, ApprovalStepWrite{
-					Position: sp.Position, Actors: toActorRefs(stepActors[sp.ID]),
-				})
-			}
-		}
-		var execActors []FlowExecutionActorModel
-		if err := s.db.WithContext(ctx).Where("stage_id = ?", st.ID).Find(&execActors).Error; err != nil {
+	}
+
+	stepActors := make(map[string][]string, len(steps))
+	if len(stepIDs) > 0 {
+		var actorRows []FlowApprovalStepActorModel
+		if err := s.db.WithContext(ctx).Where("step_id in ?", stepIDs).
+			Order("step_id asc, user_id asc").Find(&actorRows).Error; err != nil {
 			return nil, err
 		}
-		for _, a := range execActors {
-			stageView.ExecutionActors = append(stageView.ExecutionActors, ActorRef{UserID: a.UserID})
-		}
-		view.Stages = append(view.Stages, stageView)
-	}
-	for _, sp := range steps {
-		if sp.StageID == nil {
-			view.ApprovalSteps = append(view.ApprovalSteps, ApprovalStepWrite{
-				Position: sp.Position, Actors: toActorRefs(stepActors[sp.ID]),
-			})
+		for _, a := range actorRows {
+			stepActors[a.StepID] = append(stepActors[a.StepID], a.UserID)
 		}
 	}
+
+	stageExecActors := make(map[string][]ActorRef, len(stages))
+	if len(stageIDs) > 0 {
+		var execRows []FlowExecutionActorModel
+		if err := s.db.WithContext(ctx).Where("stage_id in ?", stageIDs).
+			Order("stage_id asc, user_id asc").Find(&execRows).Error; err != nil {
+			return nil, err
+		}
+		for _, a := range execRows {
+			stageExecActors[a.StageID] = append(stageExecActors[a.StageID], ActorRef{UserID: a.UserID})
+		}
+	}
+
 	var caps []struct {
+		FlowID         string `gorm:"column:flow_id"`
 		DatasourceID   string `gorm:"column:datasource_id"`
 		DatasourceName string `gorm:"column:datasource_name"`
 		CanQuery       bool   `gorm:"column:can_query"`
 		CanExport      bool   `gorm:"column:can_export"`
 	}
 	if err := s.db.WithContext(ctx).Raw(`
-		select c.datasource_id::text as datasource_id, d.name as datasource_name,
-		       c.can_query, c.can_export
+		select c.flow_id::text as flow_id, c.datasource_id::text as datasource_id,
+		       d.name as datasource_name, c.can_query, c.can_export
 		from flow_query_capabilities c
 		join datasources d on d.id = c.datasource_id
-		where c.flow_id = ?
-		order by c.datasource_id`, row.ID).Scan(&caps).Error; err != nil {
+		where c.flow_id in ?
+		order by c.datasource_id`, flowIDs).Scan(&caps).Error; err != nil {
 		return nil, err
 	}
+	capsByFlow := make(map[string][]QueryCapabilityView, len(rows))
 	for _, q := range caps {
-		view.QueryCapabilities = append(view.QueryCapabilities, QueryCapabilityView{
+		capsByFlow[q.FlowID] = append(capsByFlow[q.FlowID], QueryCapabilityView{
 			DatasourceID: q.DatasourceID, DatasourceName: q.DatasourceName,
 			CanQuery: q.CanQuery, CanExport: q.CanExport,
 		})
 	}
-	return &view, nil
+
+	views := make([]FlowView, len(rows))
+	for i := range rows {
+		row := &rows[i]
+		view := FlowView{
+			ID: row.ID, FlowWrite: FlowWrite{
+				Name: row.Name, FlowType: row.FlowType, Enabled: row.Status == "enabled",
+				RuleSetID: row.RuleSetID,
+			},
+			// F12 No.004: minItems 1 arrays (stages, approval_steps,
+			// query_capabilities) always omit the key when empty -- serializing [] violates minItems,
+			// and omitempty already handles omission.
+			Status: row.Status, Version: row.Version,
+			CreatedAt: row.CreatedAt, UpdatedAt: row.UpdatedAt,
+		}
+		for _, st := range stagesByFlow[row.ID] {
+			stageView := StageView{
+				StageWrite: StageWrite{
+					Position: st.Position, DatasourceID: st.DatasourceID,
+					// An invalidated flow may have an empty execution actor set; serialize as [] rather than null per OpenAPI required array.
+					ApprovalSteps:   []ApprovalStepWrite{},
+					ExecutionActors: []ActorRef{},
+				},
+			}
+			if name, ok := stageDSNames[st.DatasourceID]; ok && name != "" {
+				stageView.DatasourceName = name
+			} else {
+				stageView.DatasourceName = st.DatasourceID
+			}
+			for _, sp := range stepsByStage[st.ID] {
+				stageView.ApprovalSteps = append(stageView.ApprovalSteps, ApprovalStepWrite{
+					Position: sp.Position, Actors: toActorRefs(stepActors[sp.ID]),
+				})
+			}
+			if ea := stageExecActors[st.ID]; len(ea) > 0 {
+				stageView.ExecutionActors = ea
+			}
+			view.Stages = append(view.Stages, stageView)
+		}
+		for _, sp := range flowStepsByFlow[row.ID] {
+			view.ApprovalSteps = append(view.ApprovalSteps, ApprovalStepWrite{
+				Position: sp.Position, Actors: toActorRefs(stepActors[sp.ID]),
+			})
+		}
+		if qc := capsByFlow[row.ID]; len(qc) > 0 {
+			view.QueryCapabilities = qc
+		}
+		views[i] = view
+	}
+	return views, nil
 }
 
 // CurrentUserFlows returns currently enabled flows authorized for the user via permission groups
@@ -864,13 +913,9 @@ func (s *Service) CurrentUserFlows(ctx context.Context, userID, flowType string,
 	if hasMore {
 		rows = rows[:limit]
 	}
-	views := make([]FlowView, 0, len(rows))
-	for i := range rows {
-		v, err := s.viewOf(ctx, &rows[i])
-		if err != nil {
-			return nil, nil, err
-		}
-		views = append(views, *v)
+	views, err := s.viewsOf(ctx, rows)
+	if err != nil {
+		return nil, nil, err
 	}
 	var next *string
 	if hasMore && len(rows) > 0 {
@@ -900,12 +945,4 @@ func toActorRefs(ids []string) []ActorRef {
 	return out
 }
 
-func isUniqueErr(err error) bool {
-	if err == nil {
-		return false
-	}
-	if errors.Is(err, gorm.ErrDuplicatedKey) {
-		return true
-	}
-	return strings.Contains(err.Error(), "23505")
-}
+func isUniqueErr(err error) bool { return txutil.IsUniqueViolation(err) }

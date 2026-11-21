@@ -1,4 +1,5 @@
-// HighestSeverityOf returns the highest severity among a list of findings.
+// openai.go implements the OpenAI-compatible Chat Completions adapter with structured output
+// mode negotiation, duplicate-key/trailing-content rejection, bounded retries, and per-call recording.
 package provider
 
 import (
@@ -15,13 +16,13 @@ import (
 	"github.com/cookieY/YearningX/backend/internal/review/promptprofile"
 )
 
-// run.go defines the review_runs.state lifecycle (schema 000002 + ai-review-runtime-contract). Terminal Run states are immutable; submitted reviews are never recomputed (R003).
+// OpenAIAdapter sends structured review requests to an OpenAI-compatible endpoint.
 type OpenAIAdapter struct {
 	Endpoint Endpoint
 	Client   *HTTPClient
 }
 
-// RunState is the controlled enum for review_runs.state.
+// Supported structured output mode identifiers stored under Endpoint.Configuration.
 const (
 	OutputModeJSONSchema = "json_schema"
 	OutputModeJSONObject = "json_object"
@@ -35,7 +36,7 @@ func configuredOutputMode(cfg map[string]any) string {
 	return OutputModeJSONSchema
 }
 
-// ValidRunState reports whether s is a valid contract state.
+// jsonObjectPromptSuffix embeds the output schema and required "json" keyword for json_object endpoints.
 func jsonObjectPromptSuffix() string {
 	b, err := json.Marshal(compileOutputSchema())
 	if err != nil {
@@ -51,7 +52,7 @@ func jsonObjectPromptSuffix() string {
 		"Keep internal reasoning concise so the JSON output is never truncated:\n" + string(b)
 }
 
-// RunTerminal reports whether s is a terminal Run state (immutable).
+// NewOpenAIAdapter constructs an OpenAIAdapter after validating ep and initializing an SSRF-safe client.
 func NewOpenAIAdapter(ep Endpoint, hc *HTTPClient) (*OpenAIAdapter, error) {
 	if err := ep.Validate(); err != nil {
 		return nil, err
@@ -71,7 +72,7 @@ type sanWireRequest struct {
 	AllowedToolDescriptors    []ToolDescriptor        `json:"allowed_tool_descriptors"`
 }
 
-// RunTrigger is a lifecycle trigger for a Run.
+// chatRequest is the JSON body serialized to POST /chat/completions.
 type chatRequest struct {
 	Model           string          `json:"model"`
 	Messages        []chatMessage   `json:"messages"`
@@ -109,11 +110,11 @@ type chatResponse struct {
 		Code    any    `json:"code"`
 		Message string `json:"message"`
 	} `json:"error,omitempty"`
-	// RunEventStarted indicates a worker claimed the task and started execution.
+	// Usage is decoded lazily per field via parseUsageDetail so partial vendor fields retain valid numbers.
 	Usage json.RawMessage `json:"usage,omitempty"`
 }
 
-// RunEventCompleted indicates all stages passed (gate passed).
+// Usage aggregates input and output token counts from one structured call outcome.
 type Usage struct {
 	InputTokens  int64
 	OutputTokens int64
@@ -126,18 +127,18 @@ func (a *OpenAIAdapter) probeRequest() Request {
 	return ProbeRequest()
 }
 
-// RunEventFailed indicates the run failed (parse/fingerprint/anonymization/internal error, fail closed).
+// ValidateConfiguration runs a structured probe request to verify connectivity and schema conformance.
 func (a *OpenAIAdapter) ValidateConfiguration(ctx context.Context) error {
 	_, err := a.ReviewStructured(ctx, a.probeRequest())
 	return err
 }
 
-// RunEventIncomplete indicates some stages did not complete (timeout/cancellation/budget/partial failure).
+// Health verifies endpoint reachability and structured output responsiveness.
 func (a *OpenAIAdapter) Health(ctx context.Context) error {
 	return a.ValidateConfiguration(ctx)
 }
 
-// RunEventFailed indicates the run failed (parse/fingerprint/anonymization/internal error, fail closed).
+// ReviewStructured dispatches a structured review call, falling back once to json_object only on format rejection.
 func (a *OpenAIAdapter) ReviewStructured(ctx context.Context, req Request) (CallOutcome, error) {
 	mode := configuredOutputMode(a.Endpoint.Configuration)
 	out, err := a.reviewStructuredMode(ctx, req, mode)
@@ -165,7 +166,7 @@ func isFormatStatusError(err error) bool {
 	return isRelayFormatError(se)
 }
 
-// RunEventInputsChanged indicates a draft revision or workflow configuration change invalidated the Run.
+// NegotiateOutputMode tries strict json_schema first during provider setup and falls back to json_object on unsupported endpoints.
 func (a *OpenAIAdapter) NegotiateOutputMode(ctx context.Context) (string, error) {
 	probe := a.probeRequest()
 	if _, err := a.reviewStructuredMode(ctx, probe, OutputModeJSONSchema); err == nil {
@@ -228,7 +229,7 @@ func (a *OpenAIAdapter) reviewStructuredMode(ctx context.Context, req Request, m
 			},
 		}
 	}
-	// Terminal Runs transition uniformly to outdated when draft revision or workflow configuration changes (R003 reuse precondition: a reused conclusion must belong to the current revision).
+	// Strip SystemPrompt from the serialized JSON user message since it is already sent on the system channel.
 	var payloadBytes []byte
 	var err error
 	if isSAN {
@@ -277,12 +278,11 @@ func (a *OpenAIAdapter) reviewStructuredMode(ctx context.Context, req Request, m
 	if decodeErr == nil {
 		return CallOutcome{Response: out, Usage: usage, Calls: calls}, nil
 	}
-	// RunTransition returns the target state for trigger on s. Result terminal states (ready/blocked/partial/failed/outdated) cannot advance further; the sole exception is inputs_changed invalidation: a reused conclusion must belong to the current revision and workflow configuration, so input changes rewrite any non-outdated terminal state to outdated.
+	// Preserve reported usage on schema_failed records (Usage-02), then attempt at most one schema repair turn.
 	markLastCallOutcome(calls, CallOutcomeSchemaFailed)
 	if remainingBudget <= 0 {
 		return CallOutcome{Calls: calls}, fmt.Errorf("%w: %v", ErrSchemaInvalid, decodeErr)
 	}
-	// RunOutcomeFailedStates is the set of terminal states that mark a Run as failed (Run-side mapping of submission_gate.block_outcomes).
 	repair := cr
 	if len(repair.Messages) == 2 {
 		repair.Messages = append(repair.Messages,
@@ -357,7 +357,6 @@ func (a *OpenAIAdapter) postWithOverflowRetry(ctx context.Context, cr chatReques
 	return nil, Usage{}, calls, cr.MaxTokens, false, err
 }
 
-// StageReviewState is the controlled enum for stage_review_snapshots.state.
 func markLastCallOutcome(calls []CallRecord, outcome string) {
 	if len(calls) > 0 {
 		calls[len(calls)-1].Outcome = outcome
@@ -385,7 +384,7 @@ func unwrapJSONEnvelope(body []byte) []byte {
 	return trimmed
 }
 
-// ValidStageReviewState reports whether s is a valid contract state.
+// decodeStructured validates strict single-value JSON without duplicate object keys or unknown fields (SEC-0038).
 func decodeStructured(body []byte, expectRunID string) (*Response, error) {
 	body = unwrapJSONEnvelope(body)
 	if err := rejectDuplicateKeys(body); err != nil {
@@ -397,7 +396,7 @@ func decodeStructured(body []byte, expectRunID string) (*Response, error) {
 	if err := dec.Decode(&out); err != nil {
 		return nil, err
 	}
-	// StageTerminal reports whether a stage snapshot has reached a terminal state.
+	// Reject any trailing JSON value or non-whitespace content after the first object.
 	if _, err := dec.Token(); err != io.EOF {
 		return nil, fmt.Errorf("%w: trailing JSON content", ErrSchemaInvalid)
 	}
@@ -407,7 +406,7 @@ func decodeStructured(body []byte, expectRunID string) (*Response, error) {
 	return &out, nil
 }
 
-// Severity is the finding severity level, ordered none<low<medium<high<critical. Provider-emitted info is normalized to low before persistence (DB CHECK has no info).
+// rejectDuplicateKeys performs a streaming token scan over JSON objects to reject duplicate keys before decode.
 func rejectDuplicateKeys(data []byte) error {
 	dec := json.NewDecoder(bytes.NewReader(data))
 	dec.UseNumber()
@@ -426,7 +425,7 @@ func rejectDuplicateKeys(data []byte) error {
 			return err
 		}
 		if len(stack) == 0 {
-			// SeverityInfo represents informational severity (F12 #009, owner ruling A): both machine contract ai-review-output.schema.json and the max_severity ladder include info — it never blocks the gate or raises the stage highest severity (rank=0.5 rounds to tier 0, keeping highest at none).
+			// Push root container frame onto the scanner stack.
 			if d, ok := tok.(json.Delim); ok {
 				switch d {
 				case '{':
@@ -442,7 +441,6 @@ func rejectDuplicateKeys(data []byte) error {
 		case json.Delim:
 			switch t {
 			case '{':
-				// SeverityRank returns the sort weight (-1 for unknown values). info shares tier 0 with none — an info finding does not change highest_severity (the contract stage enum has no info, keeping none + finding_count>0 self-consistent).
 				top.nextIsKey = true
 				stack = append(stack, frame{object: true, seen: map[string]struct{}{}, nextIsKey: true})
 			case '[':
@@ -462,7 +460,6 @@ func rejectDuplicateKeys(data []byte) error {
 				top.nextIsKey = true
 			}
 		default:
-			// MaxSeverity returns the higher of two severity levels.
 			top.nextIsKey = true
 		}
 	}
@@ -472,23 +469,21 @@ func rejectDuplicateKeys(data []byte) error {
 	return nil
 }
 
-// BlockSeverityThreshold is the submission blocking threshold: high and above block submission (ai-review-runtime submission_gate.block_severities).
+// retryableStatus reports whether status is eligible for transient backoff retries (429 and 5xx).
 func retryableStatus(code int) bool {
 	return code == http.StatusTooManyRequests || code >= 500
 }
 
-// maxHTTPRequestsPerStructuredCall caps the total upstream HTTP requests issued by a single
-// reviewStructuredMode call across 429/5xx transient retries (at most 3 attempts per postBounded),
-// context-overflow self-healing (at most 1 retry), and schema/EOF repair (at most 1 retry): hard cap <= 4.
+// maxHTTPRequestsPerStructuredCall caps upstream HTTP requests across transient backoff,
+// overflow self-healing, and schema repair retries within a single reviewStructuredMode call.
 const maxHTTPRequestsPerStructuredCall = 4
 
-// statemachine_test.go provides full-coverage state machine tests (state-machine-test-policy): 100% expansion of legal edges; 100% enumeration of illegal (state, trigger) pairs; terminal states reject all triggers; pure functions have no side effects.
+// postBounded issues at most 3 attempts with linear/exponential backoff for retryable upstream failures.
 func (a *OpenAIAdapter) postBounded(ctx context.Context, cr chatRequest, remaining *int) ([]byte, Usage, []CallRecord, error) {
 	var calls []CallRecord
 	var lastErr error
 	for attempt := 0; attempt < 3 && *remaining > 0; attempt++ {
 		if attempt > 0 {
-			// TestDraftMachineLegalEdges expands every declared edge.
 			select {
 			case <-ctx.Done():
 				return nil, Usage{}, calls, ctx.Err()
@@ -497,7 +492,6 @@ func (a *OpenAIAdapter) postBounded(ctx context.Context, cr chatRequest, remaini
 		}
 		*remaining--
 		body, usage, rec, err := a.post(ctx, cr)
-		// RCP-20261101-EPHEMERAL-PRECHECK: direct submission from draft (validity is carried by the materialized Run).
 		if rec.ProviderID != "" {
 			calls = append(calls, rec)
 		}
@@ -514,7 +508,6 @@ func (a *OpenAIAdapter) postBounded(ctx context.Context, cr chatRequest, remaini
 	return nil, Usage{}, calls, lastErr
 }
 
-// Coverage check: every declared edge is present in draftEdges (reverse verification).
 type statusError struct {
 	code     int
 	snapshot string
@@ -539,7 +532,6 @@ func (e *statusError) bodyText() string {
 	return e.snapshot
 }
 
-// TestDraftMachineIllegalPairs enumerates all pairs: undeclared combinations are rejected and state remains unchanged.
 func upstreamSnapshot(body []byte) string {
 	return UpstreamSnapshot(body)
 }
@@ -552,27 +544,24 @@ func boundedErrorBody(body []byte) string {
 	return string(body)
 }
 
-// Legal edges are already verified by LegalEdges
+// post executes one HTTP POST /chat/completions call and records a CallRecord for every sent request.
 func (a *OpenAIAdapter) post(ctx context.Context, cr chatRequest) ([]byte, Usage, CallRecord, error) {
 	raw, err := json.Marshal(cr)
 	if err != nil {
 		return nil, Usage{}, CallRecord{}, err
 	}
-	u, err := ParseBaseURL(a.Endpoint.BaseURL)
+	endpoint, err := ChatCompletionsURL(a.Endpoint.BaseURL)
 	if err != nil {
 		return nil, Usage{}, CallRecord{}, err
 	}
-	endpoint := strings.TrimRight(u.String(), "/") + "/chat/completions"
-	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(raw))
+	httpReq, err := NewChatCompletionsHTTPRequest(ctx, endpoint, a.Endpoint.APIKey, raw)
 	if err != nil {
 		return nil, Usage{}, CallRecord{}, err
 	}
-	httpReq.Header.Set("Content-Type", "application/json")
-	httpReq.Header.Set("Authorization", "Bearer "+a.Endpoint.APIKey)
 	rec := CallRecord{
-		ProviderID: a.Endpoint.ProviderID, ModelName: a.Endpoint.ModelName,
-		SentAt: now().UTC(),
-		// TestDraftTerminalCases verifies that all triggers on terminal states are rejected.
+		ProviderID:      a.Endpoint.ProviderID,
+		ModelName:       a.Endpoint.ModelName,
+		SentAt:          now().UTC(),
 		ReasoningEffort: cr.ReasoningEffort,
 		MaxTokens:       cr.MaxTokens,
 		Temperature:     cr.Temperature,
@@ -584,17 +573,12 @@ func (a *OpenAIAdapter) post(ctx context.Context, cr chatRequest) ([]byte, Usage
 	}
 	defer resp.Body.Close()
 	rec.HTTPStatus = resp.StatusCode
-	body, err := io.ReadAll(io.LimitReader(resp.Body, MaxResponseByte+1))
+	body, err := ReadBoundedResponseBody(resp.Body)
 	if err != nil {
 		rec.Outcome = CallOutcomeError
 		return nil, Usage{}, rec, err
 	}
-	if len(body) > MaxResponseByte {
-		rec.Outcome = CallOutcomeError
-		return nil, Usage{}, rec, errors.New("provider: response exceeds 4MiB")
-	}
 	if resp.StatusCode == http.StatusUnauthorized || resp.StatusCode == http.StatusForbidden {
-		// TestRunMachineLegalEdges tests declared edges of the run state machine.
 		rec.Outcome = CallOutcomeError
 		return nil, Usage{}, rec, fmt.Errorf("%w: status %d: %s", ErrRejected, resp.StatusCode, upstreamSnapshot(body))
 	}
@@ -611,7 +595,6 @@ func (a *OpenAIAdapter) post(ctx context.Context, cr chatRequest) ([]byte, Usage
 		rec.Outcome = CallOutcomeError
 		return nil, Usage{}, rec, fmt.Errorf("%w: %v", ErrSchemaInvalid, err)
 	}
-	// TestRunMachineIllegalPairs enumerates illegal pairs; outdated is an absolute terminal state.
 	detail := parseUsageDetail(cr2.Usage)
 	rec.Detail = detail
 	usage := Usage{}
@@ -625,7 +608,6 @@ func (a *OpenAIAdapter) post(ctx context.Context, cr chatRequest) ([]byte, Usage
 	}
 	if cr2.Error != nil {
 		rec.Outcome = CallOutcomeError
-		// Triggers other than inputs_changed on result terminal states are rejected as terminal.
 		msg := cr2.Error.Message
 		if len(msg) > 300 {
 			msg = msg[:300]
@@ -641,7 +623,7 @@ func (a *OpenAIAdapter) post(ctx context.Context, cr chatRequest) ([]byte, Usage
 	return []byte(content), usage, rec, nil
 }
 
-// TestRunImmutableResults verifies that result terminal states (except invalidation) cannot advance.
+// parseUsageDetail parses vendor usage fields into tri-state pointers (nil = unknown/invalid).
 func parseUsageDetail(raw json.RawMessage) *UsageDetail {
 	if len(raw) == 0 || string(raw) == "null" {
 		return nil
@@ -716,7 +698,6 @@ func firstNonNilInt64(nums ...*json.Number) *int64 {
 	return nil
 }
 
-// TestGateEvaluation tests submission gate evaluation.
 func nonNegativeInt64(n *json.Number) *int64 {
 	if n == nil {
 		return nil
@@ -727,7 +708,6 @@ func nonNegativeInt64(n *json.Number) *int64 {
 	return nil
 }
 
-// Multi-stage: any blocked stage blocks the overall gate.
 func configString(cfg map[string]any, key string) string {
 	if cfg == nil {
 		return ""
@@ -740,7 +720,7 @@ func configString(cfg map[string]any, key string) string {
 	return ""
 }
 
-// TestSeverityOrder tests severity level ordering.
+// compileOutputSchema returns the strict JSON Schema enforced on model review outputs.
 func compileOutputSchema() any {
 	sev := map[string]any{"type": "string", "enum": []string{"info", "low", "medium", "high", "critical"}}
 	cat := map[string]any{"type": "string", "enum": []string{"correctness", "performance", "availability", "security", "governance", "compatibility", "operability"}}
@@ -791,7 +771,6 @@ func compileOutputSchema() any {
 	}
 }
 
-// ScopeType defines the three scope levels.
 func configFloatPtr(cfg map[string]any, key string) *float64 {
 	if cfg == nil {
 		return nil

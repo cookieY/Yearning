@@ -26,7 +26,53 @@ import (
 	"github.com/cookieY/YearningX/backend/internal/review/fingerprint"
 )
 
-const timeFormatRFC3339 = "2006-01-02T15:04:05.000Z07:00"
+const (
+	timeFormatRFC3339 = "2006-01-02T15:04:05.000Z07:00"
+
+	defaultSessionTitleEN = "New Chat"
+	// Localized zh-CN equivalent of "New Chat" (kept Unicode-escaped per Go pure-English rule;
+	// matches frontend i18n key assistant.newSessionDefaultTitle).
+	defaultSessionTitleZH = "\u65b0\u5bf9\u8bdd"
+
+	missingDatasourceClarifyEN = "### Please Select a Target Datasource\n\nPlease select a **Target Datasource** (along with schema and table) at the top of the panel so the assistant can inspect authorized table metadata."
+	// Localized zh-CN equivalent prompting the user to select a Target Datasource and schema/table first.
+	missingDatasourceClarifyZH = "### \u8bf7\u5148\u9009\u62e9\u76ee\u6807\u6570\u636e\u6e90\n\n\u8bf7\u5148\u5728\u9762\u677f\u9876\u90e8\u9009\u62e9**\u76ee\u6807\u6570\u636e\u6e90**\uff08\u4ee5\u53ca\u76ee\u6807\u5e93/Schema \u548c\u8868\u540d\uff09\uff0c\u4ee5\u4fbf\u52a9\u624b\u5728\u60a8\u7684\u6388\u6743\u8303\u56f4\u5185\u8bfb\u53d6\u8868\u7ed3\u6784\u5e76\u751f\u6210\u6216\u5206\u6790 SQL\u3002"
+)
+
+// zhChangeActionKeywords holds Chinese DML/DDL intent verbs ("insert", "add", "write", "update",
+// "modify", "delete", "create table", "add column", "add field", "create index", "submit order")
+// kept Unicode-escaped to preserve pure-English Go source files.
+var zhChangeActionKeywords = []string{
+	"\u63d2\u5165",
+	"\u65b0\u589e",
+	"\u5199\u5165",
+	"\u66f4\u65b0",
+	"\u4fee\u6539",
+	"\u5220\u9664",
+	"\u5efa\u8868",
+	"\u52a0\u5b57\u6bb5",
+	"\u65b0\u589e\u5b57\u6bb5",
+	"\u521b\u5efa\u7d22\u5f15",
+	"\u63d0\u4ea4\u5de5\u5355",
+}
+
+func defaultSessionTitle(outputLocale string) string {
+	if isEnglishLocale(outputLocale) {
+		return defaultSessionTitleEN
+	}
+	return defaultSessionTitleZH
+}
+
+func isDefaultSessionTitle(title string) bool {
+	return title == defaultSessionTitleZH || title == defaultSessionTitleEN || title == ""
+}
+
+func missingDatasourceClarifyMarkdown(outputLocale string) string {
+	if isEnglishLocale(outputLocale) {
+		return missingDatasourceClarifyEN
+	}
+	return missingDatasourceClarifyZH
+}
 
 type activeStreamEntry struct {
 	sessionID string
@@ -85,10 +131,6 @@ func NewServices(
 		Crypter: crypter,
 		Catalog: catalog,
 	}
-	var fallbackSynth Synthesizer
-	if reviewSvc == nil {
-		fallbackSynth = &DeterministicSynthesizer{}
-	}
 	return &Services{
 		DB:            db,
 		Crypter:       crypter,
@@ -96,7 +138,7 @@ func NewServices(
 		ReviewAgent:   reviewAgent,
 		Orders:        orderSvc,
 		Authorizer:    auth,
-		Synthesizer:   NewProviderSynthesizer(db, crypter, fallbackSynth),
+		Synthesizer:   NewProviderSynthesizer(db, crypter, nil),
 		BudgetConfig:  ContextBudgetConfig{}.withDefaults(),
 		activeStreams: make(map[string]*activeStreamEntry),
 	}, nil
@@ -132,11 +174,7 @@ func (s *Services) CreateSession(ctx context.Context, actor domain.Actor, in Cre
 
 	title := strings.TrimSpace(in.Title)
 	if title == "" {
-		if isEnglishLocale(in.OutputLocale) {
-			title = "New Chat"
-		} else {
-			title = "\u65b0\u5bf9\u8bdd"
-		}
+		title = defaultSessionTitle(in.OutputLocale)
 	}
 	if len([]rune(title)) > 120 {
 		title = string([]rune(title)[:120])
@@ -420,10 +458,7 @@ func summarizeLatestSessionTitle(modelTitle, latestUserMessage, previousTitle, o
 	if previousTitle != "" && uuid.Validate(previousTitle) != nil {
 		return previousTitle
 	}
-	if isEnglishLocale(outputLocale) {
-		return "New Chat"
-	}
-	return "\u65b0\u5bf9\u8bdd"
+	return defaultSessionTitle(outputLocale)
 }
 
 func (in SendMessageInput) emit(event string, data any) {
@@ -752,9 +787,9 @@ func (s *Services) SendMessage(ctx context.Context, actor domain.Actor, in SendM
 	// If this is the first user message and the session title is still default, derive the session title from the first 36 characters (without credentials).
 	currentTitle, err := s.openSessionTitle(sess)
 	if err != nil {
-		currentTitle = "New Chat"
+		currentTitle = defaultSessionTitleEN
 	}
-	if msgCount == 0 && (currentTitle == "\u65b0\u5bf9\u8bdd" || currentTitle == "New Chat" || currentTitle == "") {
+	if msgCount == 0 && isDefaultSessionTitle(currentTitle) {
 		cand := strings.ReplaceAll(content, "\n", " ")
 		if len([]rune(cand)) > 36 {
 			cand = string([]rune(cand)[:36])
@@ -809,54 +844,14 @@ func (s *Services) SendMessage(ctx context.Context, actor domain.Actor, in SendM
 			RawHistory:        retainRawHistory(existingHistory, anonHistory),
 			RawSummary:        anonSummary,
 		}
-		if lerr := scrubAndAssertSynthesizeInput(priv, &synthIn); lerr != nil {
-			return nil, lerr
+		turnRes, turnErr := s.executeSynthesizeTurn(runCtx, priv, in, assistantMsgID, capKind, content, currentTitle, &synthIn, "")
+		if turnErr != nil {
+			return nil, turnErr
 		}
-		outboundBytes, merr := json.Marshal(synthIn)
-		if merr != nil {
-			return nil, domain.ErrAnonymizationFailed("marshal_synthesize_input_failed")
-		}
-		in.emit("tool", map[string]any{"tool": "privacy_session.anonymize_and_gate", "status": "completed", "capability": string(capKind)})
-		reservedMinor, budgetDay, budgetCurrency, berr := s.reserveDailyBudget(runCtx, int64(len(outboundBytes))/3+256)
-		if berr != nil {
-			return nil, berr
-		}
-		in.emit("reasoning", map[string]any{"status": "running"})
-		onDelta, onSANDelta, flushDelta := makeTurnDeltaHandlers(priv, in.emit)
-		synthIn.OnDelta = onDelta
-		synthIn.OnSANDelta = onSANDelta
-		synthOut, serr := s.Synthesizer.Synthesize(runCtx, synthIn)
-		s.releaseDailyBudget(runCtx, budgetDay, budgetCurrency, reservedMinor)
-		if serr != nil {
-			if errors.Is(serr, context.Canceled) {
-				return nil, domain.ErrInvalidState("Generation request cancelled")
-			}
-			var ade *domain.Error
-			if errors.As(serr, &ade) {
-				return nil, ade
-			}
-			return nil, domain.ErrProviderFailed(serr.Error())
-		}
-		if synthOut.OutOfScope || synthOut.ResolvedCapability == string(domain.CapabilityOutOfScope) {
-			msg := strings.TrimSpace(synthOut.AssistantReply)
-			if msg == "" {
-				msg = "The Database AI Assistant only supports Platform Usage Help, Natural Language SQL Generation, and SQL Analysis & Optimization; non-database requests are out of scope"
-			}
-			return nil, domain.ErrOutOfScope(msg)
-		}
-		in.emit("reasoning", map[string]any{"status": "completed"})
-		replyText := synthOut.AssistantReply
-		rawTitle := synthOut.SessionTitle
-		if !synthOut.UsedSANProfile {
-			replyText = priv.RestoreTextTokens(replyText)
-			rawTitle = priv.RestoreTextTokens(rawTitle)
-		}
-		currentTitle = summarizeLatestSessionTitle(rawTitle, content, currentTitle, in.OutputLocale)
-		flushDelta(replyText)
-		in.emit("progress", map[string]any{"phase": "validating_and_restoring"})
-		citations := help.ResolveCitationsWithLocale(actor, synthOut.CitedArticleIDs, content, in.OutputLocale)
+		currentTitle = turnRes.NextTitle
+		citations := help.ResolveCitationsWithLocale(actor, turnRes.Out.CitedArticleIDs, content, in.OutputLocale)
 		return s.persistTurnOutcome(runCtx, actor, sess, currentTitle, content, capKind,
-			persistedMessagePayload{Content: replyText, Citations: citations},
+			persistedMessagePayload{Content: turnRes.RestoredReply, Citations: citations},
 			nil, compactedNow, assistantMsgID)
 	}
 
@@ -884,48 +879,14 @@ func (s *Services) SendMessage(ctx context.Context, actor domain.Actor, in SendM
 			Actor:             actor,
 			RawPrompt:         content,
 		}
-		if _, merr := json.Marshal(synthIn); merr != nil {
-			return nil, domain.ErrAnonymizationFailed("marshal_synthesize_input_failed")
+		fallbackClarify := missingDatasourceClarifyMarkdown(in.OutputLocale)
+		turnRes, turnErr := s.executeSynthesizeTurn(runCtx, priv, in, assistantMsgID, capKind, content, currentTitle, &synthIn, fallbackClarify)
+		if turnErr != nil {
+			return nil, turnErr
 		}
-		if lerr := scrubAndAssertSynthesizeInput(priv, &synthIn); lerr != nil {
-			return nil, lerr
-		}
-		in.emit("tool", map[string]any{"tool": "privacy_session.anonymize_and_gate", "status": "completed", "capability": string(capKind)})
-		in.emit("reasoning", map[string]any{"status": "running"})
-		onDelta, onSANDelta, flushDelta := makeTurnDeltaHandlers(priv, in.emit)
-		synthIn.OnDelta = onDelta
-		synthIn.OnSANDelta = onSANDelta
-		synthOut, serr := s.Synthesizer.Synthesize(runCtx, synthIn)
-		if serr != nil {
-			return nil, domain.ErrProviderFailed(serr.Error())
-		}
-		if synthOut.OutOfScope || synthOut.ResolvedCapability == string(domain.CapabilityOutOfScope) {
-			msg := strings.TrimSpace(synthOut.AssistantReply)
-			if msg == "" {
-				msg = "The Database AI Assistant only supports Platform Usage Help, Natural Language SQL Generation, and SQL Analysis & Optimization; non-database requests are out of scope"
-			}
-			return nil, domain.ErrOutOfScope(msg)
-		}
-		in.emit("reasoning", map[string]any{"status": "completed"})
-		rawClarify := synthOut.AssistantReply
-		rawClarifyTitle := synthOut.SessionTitle
-		if !synthOut.UsedSANProfile {
-			rawClarify = priv.RestoreTextTokens(rawClarify)
-			rawClarifyTitle = priv.RestoreTextTokens(rawClarifyTitle)
-		}
-		clarifyMsg := strings.TrimSpace(rawClarify)
-		if clarifyMsg == "" {
-			if isEnglishLocale(in.OutputLocale) {
-				clarifyMsg = "### Please Select a Target Datasource\n\nPlease select a **Target Datasource** (along with schema and table) at the top of the panel so the assistant can inspect authorized table metadata."
-			} else {
-				clarifyMsg = "### \u8bf7\u5148\u9009\u62e9\u76ee\u6807\u6570\u636e\u6e90\n\n\u8bf7\u5148\u5728\u9762\u677f\u9876\u90e8\u9009\u62e9**\u76ee\u6807\u6570\u636e\u6e90**\uff08\u4ee5\u53ca\u76ee\u6807\u5e93/Schema \u548c\u8868\u540d\uff09\uff0c\u4ee5\u4fbf\u52a9\u624b\u5728\u60a8\u7684\u6388\u6743\u8303\u56f4\u5185\u8bfb\u53d6\u8868\u7ed3\u6784\u5e76\u751f\u6210\u6216\u5206\u6790 SQL\u3002"
-			}
-		}
-		currentTitle = summarizeLatestSessionTitle(rawClarifyTitle, content, currentTitle, in.OutputLocale)
-		flushDelta(clarifyMsg)
-		in.emit("progress", map[string]any{"phase": "validating_and_restoring"})
+		currentTitle = turnRes.NextTitle
 		return s.persistTurnOutcome(runCtx, actor, sess, currentTitle, content, capKind,
-			persistedMessagePayload{Content: clarifyMsg},
+			persistedMessagePayload{Content: turnRes.RestoredReply},
 			nil, false, assistantMsgID)
 	}
 
@@ -1053,57 +1014,14 @@ func (s *Services) SendMessage(ctx context.Context, actor domain.Actor, in SendM
 		RawSummary:         anonSummary,
 	}
 
-	// 8. Enforce zero-leak assertion on the entire outbound payload before sending to any model (6003 Fail Closed).
-	if err := scrubAndAssertSynthesizeInput(priv, &synthIn); err != nil {
-		return nil, err
-	}
-	outboundBytes, err := json.Marshal(synthIn)
-	if err != nil {
-		return nil, domain.ErrAnonymizationFailed("marshal_synthesize_input_failed")
-	}
-	in.emit("tool", map[string]any{"tool": "privacy_session.anonymize_and_gate", "status": "completed", "capability": string(capKind)})
-
-	// 9. Reserve global daily AI budget (shared ai_daily_budget_usage, returning 2010 when exhausted).
-	reservedMinor, budgetDay, budgetCurrency, err := s.reserveDailyBudget(runCtx, int64(len(outboundBytes))/3+256)
+	// 8–9. Zero-leak outbound check, daily AI budget reservation, synthesis execution, settlement, and token restoration.
+	turnRes, err := s.executeSynthesizeTurn(runCtx, priv, in, assistantMsgID, capKind, content, currentTitle, &synthIn, "")
 	if err != nil {
 		return nil, err
 	}
-
-	in.emit("reasoning", map[string]any{"status": "running"})
-	onDelta, onSANDelta, flushDelta := makeTurnDeltaHandlers(priv, in.emit)
-	synthIn.OnDelta = onDelta
-	synthIn.OnSANDelta = onSANDelta
-	synthOut, err := s.Synthesizer.Synthesize(runCtx, synthIn)
-	if err != nil {
-		s.releaseDailyBudget(runCtx, budgetDay, budgetCurrency, reservedMinor)
-		if errors.Is(err, context.Canceled) {
-			return nil, domain.ErrInvalidState("Generation request cancelled")
-		}
-		var ade *domain.Error
-		if errors.As(err, &ade) {
-			return nil, ade
-		}
-		return nil, domain.ErrProviderFailed(err.Error())
-	}
-	s.releaseDailyBudget(runCtx, budgetDay, budgetCurrency, reservedMinor)
-
-	if synthOut.OutOfScope || synthOut.ResolvedCapability == string(domain.CapabilityOutOfScope) {
-		msg := strings.TrimSpace(synthOut.AssistantReply)
-		if msg == "" {
-			msg = "The Database AI Assistant only supports Platform Usage Help, Natural Language SQL Generation, and SQL Analysis & Optimization; non-database requests are out of scope"
-		}
-		return nil, domain.ErrOutOfScope(msg)
-	}
-	in.emit("reasoning", map[string]any{"status": "completed"})
-	restoredReply := synthOut.AssistantReply
-	rawSessionTitle := synthOut.SessionTitle
-	if !synthOut.UsedSANProfile {
-		restoredReply = priv.RestoreTextTokens(restoredReply)
-		rawSessionTitle = priv.RestoreTextTokens(rawSessionTitle)
-	}
-	currentTitle = summarizeLatestSessionTitle(rawSessionTitle, content, currentTitle, in.OutputLocale)
-	flushDelta(restoredReply)
-	in.emit("progress", map[string]any{"phase": "validating_and_restoring"})
+	synthOut := turnRes.Out
+	restoredReply := turnRes.RestoredReply
+	currentTitle = turnRes.NextTitle
 
 	// 10. If the model returned an SQL draft, run ValidateRawAssistantSQL (for SAN) or ValidateAndRestoreSQL (for default)
 	// for dialect parsing, statement boundary, authorized object, and parameter binding verification before structured restoration (6004).
@@ -1119,20 +1037,6 @@ func (s *Services) SendMessage(ctx context.Context, actor domain.Actor, in SendM
 			restored, rerr = privacy.ValidateRawAssistantSQL(synthOut.AnonymizedSQL, profile, rawScope)
 		} else {
 			restored, rerr = privacy.ValidateAndRestoreSQL(priv, synthOut.AnonymizedSQL, profile)
-			if rerr != nil {
-				// If an external provider returned anonymized SQL with minor token format drift, attempt fallback SQL draft synthesis via DeterministicSynthesizer.
-				if _, isProvider := s.Synthesizer.(*ProviderSynthesizer); isProvider {
-					fbIn := synthIn
-					fbIn.OnDelta = nil
-					fbIn.OnSANDelta = nil
-					if fbOut, fberr := (&DeterministicSynthesizer{}).Synthesize(runCtx, fbIn); fberr == nil && fbOut != nil && strings.TrimSpace(fbOut.AnonymizedSQL) != "" {
-						if fbRestored, fbrerr := privacy.ValidateAndRestoreSQL(priv, fbOut.AnonymizedSQL, profile); fbrerr == nil {
-							restored = fbRestored
-							rerr = nil
-						}
-					}
-				}
-			}
 		}
 		if rerr != nil {
 			return nil, rerr
@@ -1182,6 +1086,87 @@ func (s *Services) SendMessage(ctx context.Context, actor domain.Actor, in SendM
 	return s.persistTurnOutcome(runCtx, actor, sess, currentTitle, content, capKind,
 		persistedMessagePayload{Content: restoredReply},
 		draftSpec, compactedNow, assistantMsgID)
+}
+
+type executedSynthesizeTurn struct {
+	Out           *SynthesizeOutput
+	RestoredReply string
+	NextTitle     string
+}
+
+// executeSynthesizeTurn runs the shared outbound zero-leak check, daily AI budget reserve/settle/release,
+// stream delta handling, out-of-scope gate, and session-local token restoration for all SendMessage branches.
+func (s *Services) executeSynthesizeTurn(
+	runCtx context.Context,
+	priv *privacy.TurnPrivacySession,
+	in SendMessageInput,
+	assistantMsgID string,
+	capKind domain.Capability,
+	userContent string,
+	currentTitle string,
+	synthIn *SynthesizeInput,
+	fallbackEmptyReply string,
+) (*executedSynthesizeTurn, error) {
+	if err := scrubAndAssertSynthesizeInput(priv, synthIn); err != nil {
+		return nil, err
+	}
+	outboundBytes, err := json.Marshal(synthIn)
+	if err != nil {
+		return nil, domain.ErrAnonymizationFailed("marshal_synthesize_input_failed")
+	}
+	in.emit("tool", map[string]any{"tool": "privacy_session.anonymize_and_gate", "status": "completed", "capability": string(capKind)})
+	reservedMinor, budgetDay, budgetCurrency, budgetSettings, err := s.reserveDailyBudgetWithSettings(runCtx, int64(len(outboundBytes))/3+256)
+	if err != nil {
+		return nil, err
+	}
+	in.emit("reasoning", map[string]any{"status": "running"})
+	onDelta, onSANDelta, flushDelta := makeTurnDeltaHandlers(priv, in.emit)
+	synthIn.OnDelta = onDelta
+	synthIn.OnSANDelta = onSANDelta
+	synthOut, err := s.Synthesizer.Synthesize(runCtx, *synthIn)
+	if err != nil {
+		s.releaseDailyBudget(context.WithoutCancel(runCtx), budgetDay, budgetCurrency, reservedMinor)
+		if errors.Is(err, context.Canceled) {
+			return nil, domain.ErrInvalidState("Generation request cancelled")
+		}
+		var ade *domain.Error
+		if errors.As(err, &ade) {
+			return nil, ade
+		}
+		return nil, domain.ErrProviderFailed(err.Error())
+	}
+	if bserr := s.settleDailyBudget(runCtx, assistantMsgID, budgetDay, budgetCurrency, reservedMinor, budgetSettings, synthOut); bserr != nil {
+		return nil, bserr
+	}
+	if synthOut.OutOfScope || synthOut.ResolvedCapability == string(domain.CapabilityOutOfScope) {
+		msg := strings.TrimSpace(synthOut.AssistantReply)
+		if msg == "" {
+			msg = "The Database AI Assistant only supports Platform Usage Help, Natural Language SQL Generation, and SQL Analysis & Optimization; non-database requests are out of scope"
+		}
+		return nil, domain.ErrOutOfScope(msg)
+	}
+	in.emit("reasoning", map[string]any{"status": "completed"})
+	reply := synthOut.AssistantReply
+	rawTitle := synthOut.SessionTitle
+	if !synthOut.UsedSANProfile {
+		reply = priv.RestoreTextTokens(reply)
+		rawTitle = priv.RestoreTextTokens(rawTitle)
+	}
+	if fallbackEmptyReply != "" {
+		if trimmed := strings.TrimSpace(reply); trimmed != "" {
+			reply = trimmed
+		} else {
+			reply = fallbackEmptyReply
+		}
+	}
+	nextTitle := summarizeLatestSessionTitle(rawTitle, userContent, currentTitle, in.OutputLocale)
+	flushDelta(reply)
+	in.emit("progress", map[string]any{"phase": "validating_and_restoring"})
+	return &executedSynthesizeTurn{
+		Out:           synthOut,
+		RestoredReply: reply,
+		NextTitle:     nextTitle,
+	}, nil
 }
 
 type newDraftSpec struct {
@@ -1689,12 +1674,20 @@ func (s *Services) computeSQLHMAC(sqlText string) ([]byte, string, error) {
 }
 
 func (s *Services) reserveDailyBudget(ctx context.Context, estTokens int64) (int64, string, string, error) {
+	amt, day, cur, _, err := s.reserveDailyBudgetWithSettings(ctx, estTokens)
+	return amt, day, cur, err
+}
+
+func (s *Services) reserveDailyBudgetWithSettings(ctx context.Context, estTokens int64) (int64, string, string, application.BudgetSettings, error) {
 	if s.Review == nil {
-		return 0, "", "", nil
+		return 0, "", "", application.BudgetSettings{}, nil
 	}
 	settings, err := s.Review.LoadBudgetSettings(ctx, s.DB)
-	if err != nil || !settings.Enforced {
-		return 0, "", "", nil
+	if err != nil {
+		return 0, "", "", settings, err
+	}
+	if !settings.Enforced {
+		return 0, "", "", settings, nil
 	}
 	amountMinor := int64(1)
 	if settings.InputPricePerMillionMinor > 0 {
@@ -1703,14 +1696,63 @@ func (s *Services) reserveDailyBudget(ctx context.Context, estTokens int64) (int
 			amountMinor = calc
 		}
 	}
-	day := time.Now().UTC().Format("2006-01-02")
+	day := s.Review.BudgetDay(time.Now())
 	if err := s.Review.Reserve(ctx, s.DB, day, settings.Currency, settings, amountMinor); err != nil {
 		if errors.Is(err, application.ErrBudgetExhausted) {
-			return 0, "", "", domain.ErrBudgetExhausted()
+			return 0, "", "", settings, domain.ErrBudgetExhausted()
 		}
-		return 0, "", "", err
+		return 0, "", "", settings, err
 	}
-	return amountMinor, day, settings.Currency, nil
+	return amountMinor, day, settings.Currency, settings, nil
+}
+
+func (s *Services) settleDailyBudget(
+	ctx context.Context,
+	turnID string,
+	day string,
+	currency string,
+	reservedMinor int64,
+	settings application.BudgetSettings,
+	out *SynthesizeOutput,
+) error {
+	if s.Review == nil || !settings.Enforced || reservedMinor <= 0 || day == "" {
+		return nil
+	}
+	var inTokens, outTokens int64
+	providerID := uuid.Nil.String()
+	modelName := "assistant"
+	if out != nil {
+		inTokens = out.InputTokens
+		outTokens = out.OutputTokens
+		if parsed, err := uuid.Parse(strings.TrimSpace(out.ProviderID)); err == nil {
+			providerID = parsed.String()
+		}
+		if strings.TrimSpace(out.ModelName) != "" {
+			modelName = strings.TrimSpace(out.ModelName)
+		}
+	}
+	actualMinor := application.TokenBasedAmount(
+		inTokens, outTokens,
+		settings.InputPricePerMillionMinor, settings.OutputPricePerMillionMinor,
+		reservedMinor,
+	)
+	settleCtx := context.WithoutCancel(ctx)
+	if err := s.DB.WithContext(settleCtx).Transaction(func(tx *gorm.DB) error {
+		if err := s.Review.Settle(
+			settleCtx, tx, turnID, providerID, modelName,
+			1, inTokens, outTokens, actualMinor, currency, day, "succeeded",
+		); err != nil {
+			return err
+		}
+		if rem := reservedMinor - actualMinor; rem > 0 {
+			return s.Review.Release(settleCtx, tx, day, currency, rem)
+		}
+		return nil
+	}); err != nil {
+		_ = s.Review.Release(settleCtx, s.DB, day, currency, reservedMinor)
+		return err
+	}
+	return nil
 }
 
 func (s *Services) releaseDailyBudget(ctx context.Context, day, currency string, amountMinor int64) {
@@ -1795,12 +1837,18 @@ func (s *Services) draftView(
 	}
 }
 
+var enChangeActionKeywords = []string{
+	"insert", "update", "delete", "create", "alter", "drop", "truncate",
+}
+
 func requiresChangeFlowPermission(capKind domain.Capability, prompt, inputSQL string) bool {
 	combined := strings.ToLower(prompt + " " + inputSQL)
-	for _, kw := range []string{
-		"insert", "update", "delete", "create", "alter", "drop", "truncate",
-		"\u63d2\u5165", "\u65b0\u589e", "\u5199\u5165", "\u66f4\u65b0", "\u4fee\u6539", "\u5220\u9664", "\u5efa\u8868", "\u52a0\u5b57\u6bb5", "\u65b0\u589e\u5b57\u6bb5", "\u521b\u5efa\u7d22\u5f15", "\u63d0\u4ea4\u5de5\u5355",
-	} {
+	for _, kw := range enChangeActionKeywords {
+		if strings.Contains(combined, kw) {
+			return true
+		}
+	}
+	for _, kw := range zhChangeActionKeywords {
 		if strings.Contains(combined, kw) {
 			return true
 		}

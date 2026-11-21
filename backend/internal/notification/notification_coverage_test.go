@@ -135,15 +135,13 @@ func TestNotificationCoverageValidationAndHelpers(t *testing.T) {
 }
 
 func TestNotificationCoverageTemplatesAndWorkerHelpers(t *testing.T) {
-	// RenderEvent across all event types and locales
+	// DefaultPlaceholderTemplate across all event types and locales
 	for _, evType := range EventVocabulary {
 		for _, loc := range []string{"zh-CN", "en-US", "fr-FR"} {
-			_ = RenderEvent(evType, loc, "YR-2026-0001", "EXEC_ERROR")
-			_ = RenderEvent(evType, loc, "YR-2026-0001", "invalid lower reason")
+			if got := DefaultPlaceholderTemplate(evType, loc); got == "" {
+				t.Fatalf("expected non-empty placeholder template for %s (%s)", evType, loc)
+			}
 		}
-	}
-	if RenderEvent("unknown.event", "en-US", "YR-1", "") != "" {
-		t.Fatal("expected empty string for unknown event")
 	}
 
 	// RenderTemplateString edge cases

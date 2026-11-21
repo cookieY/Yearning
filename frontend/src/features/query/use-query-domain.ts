@@ -21,20 +21,20 @@ import {
   listQueryOrders,
   relinquishQueryGrant,
   revokeQueryGrant,
-  withdrawQueryAccessRequest,
 } from "@/api/generated/client/query-access/query-access";
 import {
   listQuerySessionColumns,
   listQuerySessionSchemas,
   listQuerySessionTables,
 } from "@/api/generated/client/query-sessions/query-sessions";
+import { listCurrentUserFlows } from "@/api/generated/client/change-drafts/change-drafts";
+import { ifMatchHeader, unwrapApi } from "@/shared/api/mutator";
 import type {
   ApprovalDecisionRequest,
   PageInfo,
   CreateQueryAccessRequest as CreateQueryAccessRequestBody,
   CreateQuerySession as CreateQuerySessionBody,
   DatasourceColumn,
-  DatasourceSchema,
   DatasourceTable,
   ExecuteQueryRequest,
   Flow,
@@ -59,10 +59,6 @@ function newIdempotencyKey(): string {
   return `idem-${String(Date.now())}-${Math.random().toString(16).slice(2)}`;
 }
 
-function ifMatch(version: number | undefined): Record<string, string> {
-  return { "If-Match": `"${String(version ?? 1)}"` };
-}
-
 function itemsOf<T>(data: { items?: T[] } | undefined | null): T[] {
   return data?.items ?? [];
 }
@@ -79,15 +75,8 @@ function useSessionUserKey(): string {
 export function useMyQueryFlows(enabled: boolean) {
   return useQuery({
     queryKey: ["query", "actor", useSessionUserKey(), "my-flows"],
-    queryFn: async () => {
-      const { listCurrentUserFlows } = await import(
-        "@/api/generated/client/change-drafts/change-drafts"
-      );
-      const response = (await listCurrentUserFlows({ flow_type: "query_access" })) as unknown as {
-        items?: Flow[];
-      };
-      return itemsOf<Flow>(response);
-    },
+    queryFn: async () =>
+      itemsOf<Flow>(await unwrapApi(listCurrentUserFlows({ flow_type: "query_access" }))),
     enabled,
     staleTime: 5 * 60_000,
     refetchOnWindowFocus: false,
@@ -109,17 +98,16 @@ export function useMyAccessRequests(
       // §18.82: server-side cursor paging (default 20/page) — consumers
       // read {items, page}; table pages render the footer from page.
       // RCP-20261021: state filtered server-side (approvals pending view).
-      const response = (await listQueryAccessRequests({
-        limit: paging?.limit,
-        after: paging?.after || undefined,
-        state: paging?.state || undefined,
-      })) as unknown as {
-        items?: QueryAccessRequest[];
-        page?: { has_more: boolean; next_cursor: string | null };
-      };
+      const response = await unwrapApi(
+        listQueryAccessRequests({
+          limit: paging?.limit,
+          after: paging?.after || undefined,
+          state: paging?.state || undefined,
+        }),
+      );
       return {
         items: itemsOf<QueryAccessRequest>(response),
-        page: response.page ?? { has_more: false, next_cursor: null },
+        page: response.page,
       };
     },
     enabled,
@@ -133,12 +121,7 @@ export function useMyAccessRequests(
 export function useMyGrants(enabled: boolean) {
   return useQuery({
     queryKey: ["query", "actor", useSessionUserKey(), "grants"],
-    queryFn: async () => {
-      const response = (await listQueryGrants({ limit: 100 })) as unknown as {
-        items?: QueryGrant[];
-      };
-      return itemsOf<QueryGrant>(response);
-    },
+    queryFn: async () => itemsOf<QueryGrant>(await unwrapApi(listQueryGrants({ limit: 100 }))),
     enabled,
   });
 }
@@ -146,29 +129,12 @@ export function useMyGrants(enabled: boolean) {
 export function useCreateAccessRequest() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (body: CreateQueryAccessRequestBody) => {
-      return (await createQueryAccessRequest(body, {
-        headers: { "Idempotency-Key": newIdempotencyKey() },
-      })) as unknown as QueryAccessRequest;
-    },
-    onSettled: () => {
-      void queryClient.invalidateQueries({ queryKey: ["query"] });
-      void queryClient.invalidateQueries({ queryKey: ["dashboard"] });
-    },
-  });
-}
-
-export function useWithdrawAccessRequest() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: async (input: { requestId: string; version: number; reason: string }) => {
-      return (await withdrawQueryAccessRequest(input.requestId, { reason: input.reason }, {
-        headers: {
-          "Idempotency-Key": newIdempotencyKey(),
-          ...ifMatch(input.version),
-        },
-      })) as unknown as QueryAccessRequest;
-    },
+    mutationFn: (body: CreateQueryAccessRequestBody) =>
+      unwrapApi(
+        createQueryAccessRequest(body, {
+          headers: { "Idempotency-Key": newIdempotencyKey() },
+        }),
+      ),
     onSettled: () => {
       void queryClient.invalidateQueries({ queryKey: ["query"] });
       void queryClient.invalidateQueries({ queryKey: ["dashboard"] });
@@ -179,18 +145,18 @@ export function useWithdrawAccessRequest() {
 export function useDecideAccessRequest() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (input: {
+    mutationFn: (input: {
       requestId: string;
       version: number;
       body: ApprovalDecisionRequest;
-    }) => {
-      return (await decideQueryAccess(input.requestId, input.body, {
-        headers: {
-          "Idempotency-Key": newIdempotencyKey(),
-          ...ifMatch(input.version),
-        },
-      })) as unknown as QueryAccessRequest;
-    },
+    }) =>
+      unwrapApi(
+        decideQueryAccess(
+          input.requestId,
+          input.body,
+          ifMatchHeader(input.version, { "Idempotency-Key": newIdempotencyKey() }),
+        ),
+      ),
     onSettled: () => {
       void queryClient.invalidateQueries({ queryKey: ["query"] });
       void queryClient.invalidateQueries({ queryKey: ["dashboard"] });
@@ -201,14 +167,14 @@ export function useDecideAccessRequest() {
 export function useRevokeGrant() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (input: { grantId: string; version: number; reason: string }) => {
-      return (await revokeQueryGrant(input.grantId, { reason: input.reason }, {
-        headers: {
-          "Idempotency-Key": newIdempotencyKey(),
-          ...ifMatch(input.version),
-        },
-      })) as unknown as QueryGrant;
-    },
+    mutationFn: (input: { grantId: string; version: number; reason: string }) =>
+      unwrapApi(
+        revokeQueryGrant(
+          input.grantId,
+          { reason: input.reason },
+          ifMatchHeader(input.version, { "Idempotency-Key": newIdempotencyKey() }),
+        ),
+      ),
     onSettled: () => {
       void queryClient.invalidateQueries({ queryKey: ["query"] });
       void queryClient.invalidateQueries({ queryKey: ["dashboard"] });
@@ -219,14 +185,14 @@ export function useRevokeGrant() {
 export function useRelinquishGrant() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (input: { grantId: string; version: number; reason: string }) => {
-      return (await relinquishQueryGrant(input.grantId, { reason: input.reason }, {
-        headers: {
-          "Idempotency-Key": newIdempotencyKey(),
-          ...ifMatch(input.version),
-        },
-      })) as unknown as QueryGrant;
-    },
+    mutationFn: (input: { grantId: string; version: number; reason: string }) =>
+      unwrapApi(
+        relinquishQueryGrant(
+          input.grantId,
+          { reason: input.reason },
+          ifMatchHeader(input.version, { "Idempotency-Key": newIdempotencyKey() }),
+        ),
+      ),
     onSettled: () => {
       void queryClient.invalidateQueries({ queryKey: ["query"] });
       void queryClient.invalidateQueries({ queryKey: ["dashboard"] });
@@ -244,16 +210,15 @@ export function useQueryOrders(enabled: boolean, paging?: { limit?: number; afte
       paging?.after ?? "", paging?.limit ?? 0,
     ],
     queryFn: async () => {
-      const response = (await listQueryOrders({
-        limit: paging?.limit,
-        after: paging?.after || undefined,
-      })) as unknown as {
-        items?: QueryOrderEntry[];
-        page?: { has_more: boolean; next_cursor: string | null };
-      };
+      const response = await unwrapApi(
+        listQueryOrders({
+          limit: paging?.limit,
+          after: paging?.after || undefined,
+        }),
+      );
       return {
         items: itemsOf<QueryOrderEntry>(response),
-        page: response.page ?? { has_more: false, next_cursor: null },
+        page: response.page,
       };
     },
     enabled,
@@ -273,16 +238,15 @@ export function useMySessions(enabled: boolean, paging?: { limit?: number; after
       paging?.after ?? "", paging?.limit ?? 0,
     ],
     queryFn: async () => {
-      const response = (await listQuerySessions({
-        limit: paging?.limit,
-        after: paging?.after || undefined,
-      })) as unknown as {
-        items?: QuerySession[];
-        page?: { has_more: boolean; next_cursor: string | null };
-      };
+      const response = await unwrapApi(
+        listQuerySessions({
+          limit: paging?.limit,
+          after: paging?.after || undefined,
+        }),
+      );
       return {
         items: itemsOf<QuerySession>(response),
-        page: response.page ?? { has_more: false, next_cursor: null },
+        page: response.page,
       };
     },
     enabled,
@@ -294,9 +258,7 @@ export function useMySessions(enabled: boolean, paging?: { limit?: number; after
 export function useQuerySession(sessionId: string, enabled: boolean) {
   return useQuery({
     queryKey: ["query", "session", sessionId],
-    queryFn: async () => {
-      return (await getQuerySession(sessionId)) as unknown as QuerySession;
-    },
+    queryFn: () => unwrapApi(getQuerySession(sessionId)),
     enabled: enabled && sessionId !== "",
     retry: false,
   });
@@ -305,9 +267,7 @@ export function useQuerySession(sessionId: string, enabled: boolean) {
 export function useCreateSession() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (body: CreateQuerySessionBody) => {
-      return (await createQuerySession(body)) as unknown as QuerySession;
-    },
+    mutationFn: (body: CreateQuerySessionBody) => unwrapApi(createQuerySession(body)),
     onSettled: () => {
       void queryClient.invalidateQueries({ queryKey: ["query"] });
       void queryClient.invalidateQueries({ queryKey: ["dashboard"] });
@@ -318,11 +278,12 @@ export function useCreateSession() {
 export function useCloseSession() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (input: { sessionId: string; reason: string }) => {
-      return (await closeQuerySession(input.sessionId, { reason: input.reason }, {
-        headers: { "Idempotency-Key": newIdempotencyKey() },
-      })) as unknown as QuerySession;
-    },
+    mutationFn: (input: { sessionId: string; reason: string }) =>
+      unwrapApi(
+        closeQuerySession(input.sessionId, { reason: input.reason }, {
+          headers: { "Idempotency-Key": newIdempotencyKey() },
+        }),
+      ),
     onSettled: () => {
       void queryClient.invalidateQueries({ queryKey: ["query"] });
       void queryClient.invalidateQueries({ queryKey: ["dashboard"] });
@@ -339,9 +300,11 @@ export function useSessionSchemas(sessionId: string, datasourceId: string, enabl
     queryKey: ["query", "session", sessionId, "schemas", datasourceId],
     queryFn: async () => {
       // F12 RCP-20261017 Direction A (#010 family): metadata read surface is an {items} envelope.
-      const response = (await listQuerySessionSchemas(sessionId, {
-        datasource_id: datasourceId,
-      })) as unknown as { items: DatasourceSchema[] };
+      const response = await unwrapApi(
+        listQuerySessionSchemas(sessionId, {
+          datasource_id: datasourceId,
+        }),
+      );
       return response.items;
     },
     enabled: enabled && sessionId !== "" && datasourceId !== "",
@@ -359,10 +322,12 @@ export function useSessionTables(
     queryKey: ["query", "session", sessionId, "tables", datasourceId, schemaName],
     queryFn: async () => {
       // F12 RCP-20261017 Direction A (#010 family): metadata read surface is an {items} envelope.
-      const response = (await listQuerySessionTables(sessionId, {
-        datasource_id: datasourceId,
-        schema_name: schemaName,
-      })) as unknown as { items: DatasourceTable[] };
+      const response = await unwrapApi(
+        listQuerySessionTables(sessionId, {
+          datasource_id: datasourceId,
+          schema_name: schemaName,
+        }),
+      );
       return response.items;
     },
     enabled: enabled && sessionId !== "" && datasourceId !== "" && schemaName !== "",
@@ -381,11 +346,13 @@ export function useSessionColumns(
     queryKey: ["query", "session", sessionId, "columns", datasourceId, schemaName, tableName],
     queryFn: async () => {
       // F12 RCP-20261017 Direction A (#010 family): metadata read surface is an {items} envelope.
-      const response = (await listQuerySessionColumns(sessionId, {
-        datasource_id: datasourceId,
-        schema_name: schemaName,
-        table_name: tableName,
-      })) as unknown as { items: DatasourceColumn[] };
+      const response = await unwrapApi(
+        listQuerySessionColumns(sessionId, {
+          datasource_id: datasourceId,
+          schema_name: schemaName,
+          table_name: tableName,
+        }),
+      );
       return response.items;
     },
     enabled:
@@ -536,10 +503,12 @@ export function useSessionCompletionCatalog(
         return await queryClient.query({
           queryKey: ["query", "session", sessionId, "tables", datasourceId, schemaName],
           queryFn: async () => {
-            const response = (await listQuerySessionTables(sessionId, {
-              datasource_id: datasourceId,
-              schema_name: schemaName,
-            })) as unknown as { items: DatasourceTable[] };
+            const response = await unwrapApi(
+              listQuerySessionTables(sessionId, {
+                datasource_id: datasourceId,
+                schema_name: schemaName,
+              }),
+            );
             return response.items;
           },
           staleTime: METADATA_STALE_TIME,
@@ -573,11 +542,13 @@ export function useSessionCompletionCatalog(
         return await queryClient.query({
           queryKey: ["query", "session", sessionId, "columns", datasourceId, schemaName, tableName],
           queryFn: async () => {
-            const response = (await listQuerySessionColumns(sessionId, {
-              datasource_id: datasourceId,
-              schema_name: schemaName,
-              table_name: tableName,
-            })) as unknown as { items: DatasourceColumn[] };
+            const response = await unwrapApi(
+              listQuerySessionColumns(sessionId, {
+                datasource_id: datasourceId,
+                schema_name: schemaName,
+                table_name: tableName,
+              }),
+            );
             return response.items;
           },
           staleTime: METADATA_STALE_TIME,
@@ -743,14 +714,14 @@ export function useSessionCompletionCatalog(
 export const DISPLAY_PAGE_SIZE = 1000;
 export const EXPORT_PAGE_SIZE = 1000;
 
-export async function runSelect(
+export function runSelect(
   sessionId: string,
   body: ExecuteQueryRequest,
 ): Promise<QueryResultPage> {
-  return (await executeSelect(sessionId, body)) as unknown as QueryResultPage;
+  return unwrapApi(executeSelect(sessionId, body));
 }
 
-export async function fetchPage(
+export function fetchPage(
   executionId: string,
   cursor: string,
   purpose: "display" | "export",
@@ -760,11 +731,13 @@ export async function fetchPage(
   // applies to this and subsequent fetches server-side); omit it to keep
   // the size the cursor was opened with (display pages 500, export pages
   // opened small — see the workspace export SEC-0031 note).
-  return (await fetchQueryResultPage(executionId, {
-    cursor,
-    purpose,
-    page_size: pageSize,
-  })) as unknown as QueryResultPage;
+  return unwrapApi(
+    fetchQueryResultPage(executionId, {
+      cursor,
+      purpose,
+      page_size: pageSize,
+    }),
+  );
 }
 
 /** Page-info helper for callers that only need the continuation token. */

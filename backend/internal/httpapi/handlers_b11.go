@@ -54,21 +54,18 @@ func b11Actor(c *gin.Context) queryapp.Actor {
 // SEC-0030: meta.detail can only come from stable classification names in query/application.adapterDetail
 // (gated by database.SanitizedError type); raw driver messages never leave this boundary.
 func writeQueryErr(c *gin.Context, err error) bool {
+	if err == nil {
+		return true
+	}
 	var de *domain.Error
-	switch {
-	case err == nil:
-		return true
-	case errors.As(err, &de):
-		var meta map[string]any
-		if de.Detail != "" {
-			meta = map[string]any{"detail": de.Detail}
-		}
-		WriteBusinessError(c, &BusinessError{Code: int(de.Code), Name: de.Name,
-			Message: "Query request rejected", Meta: meta})
-		return true
-	default:
+	if !errors.As(err, &de) {
 		return false
 	}
+	var meta map[string]any
+	if de.Detail != "" {
+		meta = map[string]any{"detail": de.Detail}
+	}
+	return writeDomainCodedError(c, int(de.Code), de.Name, "Query request rejected", meta)
 }
 
 // writeQueryProblem records a sanitized internal error marker on c.Errors (S18.75-B) while
@@ -152,8 +149,10 @@ func (d *B11Deps) HandleReplaceFlowMaskingRule(c *gin.Context) {
 func (d *B11Deps) HandleListQueryOrders(c *gin.Context) {
 	limit, after := limitAfter(c)
 	items, next, err := d.Query.ListQueryOrders(c.Request.Context(), b11Actor(c), limit, after)
-	if !writeQueryErr(c, err) {
-		writeQueryProblem(c, err)
+	if err != nil {
+		if !writeQueryErr(c, err) {
+			writeQueryProblem(c, err)
+		}
 		return
 	}
 	writePage(c, items, next)
@@ -170,8 +169,10 @@ func (d *B11Deps) HandleListQueryAccessRequests(c *gin.Context) {
 		return
 	}
 	items, next, _, err := d.Query.ListAccessRequests(c.Request.Context(), b11Actor(c), limit, after, state)
-	if !writeQueryErr(c, err) {
-		writeQueryProblem(c, err)
+	if err != nil {
+		if !writeQueryErr(c, err) {
+			writeQueryProblem(c, err)
+		}
 		return
 	}
 	// F12 #005/#016: query domain lists use contract PageInfo envelope (reusing writePage).
@@ -330,8 +331,10 @@ func (d *B11Deps) HandleWithdrawQueryAccessRequest(c *gin.Context) {
 func (d *B11Deps) HandleListQueryGrants(c *gin.Context) {
 	limit, after := limitAfter(c)
 	items, next, err := d.Query.ListGrants(c.Request.Context(), b11Actor(c), limit, after)
-	if !writeQueryErr(c, err) {
-		writeQueryProblem(c, err)
+	if err != nil {
+		if !writeQueryErr(c, err) {
+			writeQueryProblem(c, err)
+		}
 		return
 	}
 	// F12 #005/#016: query domain lists use contract PageInfo envelope (reusing writePage).
@@ -467,8 +470,10 @@ func (d *B11Deps) HandleRenewQueryGrant(c *gin.Context) {
 func (d *B11Deps) HandleListQuerySessions(c *gin.Context) {
 	limit, after := limitAfter(c)
 	items, next, err := d.Query.ListSessions(c.Request.Context(), b11Actor(c), limit, after)
-	if !writeQueryErr(c, err) {
-		writeQueryProblem(c, err)
+	if err != nil {
+		if !writeQueryErr(c, err) {
+			writeQueryProblem(c, err)
+		}
 		return
 	}
 	// F12 #005/#016: query domain lists use contract PageInfo envelope (reusing writePage).

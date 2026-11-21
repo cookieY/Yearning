@@ -4,7 +4,6 @@ import type {
   ChangeOrder,
   ExecutionAttempt,
   ExecutionSchedule,
-  ExecutionStatement,
   ExecutionVerificationRequest,
   OscOverrides,
 } from "@/api/generated/client/yearningV4HTTPAPI.schemas";
@@ -17,7 +16,8 @@ import {
   getExecutionAttempt,
   listExecutionAttemptStatements,
 } from "@/api/generated/client/change-orders/change-orders";
-import { useDomainEvent } from "@/shared/events/review-event-client";
+import { ifMatchHeader, unwrapApi } from "@/shared/api/mutator";
+import { matchesEntitySubject, useSseEvent } from "@/shared/events/sse-event-bus";
 import { isAttemptTerminalState } from "@/features/orders/order-state";
 import { randomUUID } from "@/shared/lib/uuid";
 
@@ -42,7 +42,7 @@ export function useExecutionAttempt(attemptId: string, orderId: string, enabled:
   const queryClient = useQueryClient();
   const query = useQuery({
     queryKey: ["execution-attempt", attemptId],
-    queryFn: async () => (await getExecutionAttempt(attemptId)) as unknown as ExecutionAttempt,
+    queryFn: () => unwrapApi(getExecutionAttempt(attemptId)),
     enabled: enabled && attemptId !== "",
     refetchInterval: (queryInstance) => {
       const state = queryInstance.state.data?.state;
@@ -81,10 +81,12 @@ export function useExecutionAttempt(attemptId: string, orderId: string, enabled:
 
   // Events are notifications: the attempt and its statements re-read on every
   // execution fact published for the order (backend emitOrderEvent subject).
-  useDomainEvent(
-    orderId === "" ? null : `change-orders/${orderId}`,
-    "any",
-    () => {
+  useSseEvent(
+    orderId === "" ? null : "*",
+    (event) => {
+      if (!matchesEntitySubject(event.subject, "change-orders", "order", orderId)) {
+        return;
+      }
       void queryClient.invalidateQueries({ queryKey: ["execution-attempt", attemptId] });
       void queryClient.invalidateQueries({ queryKey: ["execution-statements", attemptId] });
     },
@@ -100,9 +102,7 @@ export function useExecutionStatements(attemptId: string, enabled: boolean, poll
   return useQuery({
     queryKey: ["execution-statements", attemptId],
     queryFn: async () => {
-      const page = (await listExecutionAttemptStatements(attemptId, { limit: 100 })) as unknown as {
-        items: ExecutionStatement[];
-      };
+      const page = await unwrapApi(listExecutionAttemptStatements(attemptId, { limit: 100 }));
       return page.items;
     },
     enabled: enabled && attemptId !== "",
@@ -110,11 +110,10 @@ export function useExecutionStatements(attemptId: string, enabled: boolean, poll
   });
 }
 
-function orderActionHeaders(order: ChangeOrder | null | undefined): Record<string, string> {
-  return {
-    "If-Match": `"${String(order?.version ?? 1)}"`,
+function orderActionRequestInit(order: ChangeOrder | null | undefined): RequestInit {
+  return ifMatchHeader(order?.version, {
     "Idempotency-Key": `execution-${randomUUID()}`,
-  };
+  });
 }
 
 export function useCreateExecutionAttempt(
@@ -123,14 +122,14 @@ export function useCreateExecutionAttempt(
 ) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (input: { ddl_execution_mode?: "gh_ost" | "online_ddl"; osc_overrides?: OscOverrides }) => {
-      const attempt = (await createExecutionAttempt(
-        order?.id as string,
-        Object.keys(input).length > 0 ? input : undefined,
-        { headers: orderActionHeaders(order) },
-      )) as unknown as ExecutionAttempt;
-      return attempt;
-    },
+    mutationFn: (input: { ddl_execution_mode?: "gh_ost" | "online_ddl"; osc_overrides?: OscOverrides }) =>
+      unwrapApi(
+        createExecutionAttempt(
+          order?.id as string,
+          Object.keys(input).length > 0 ? input : undefined,
+          orderActionRequestInit(order),
+        ),
+      ),
     onSuccess: (attempt) => {
       onCreated(attempt.id);
       void queryClient.invalidateQueries({ queryKey: ["change-order", order?.id] });
@@ -149,12 +148,9 @@ export function useCancelExecutionAttempt(
       cancelExecutionAttempt(
         attempt?.id as string,
         { reason },
-        {
-          headers: {
-            "If-Match": `"${String(attempt?.version ?? 1)}"`,
-            "Idempotency-Key": `execution-cancel-${randomUUID()}`,
-          },
-        },
+        ifMatchHeader(attempt?.version, {
+          "Idempotency-Key": `execution-cancel-${randomUUID()}`,
+        }),
       ),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["change-order", orderId] });
@@ -174,15 +170,12 @@ export function useCreateExecutionVerification(
       createExecutionVerification(
         attempt?.id as string,
         input,
-        {
-          headers: {
-            // If-Match guards the attempt version (backend verifyOnce), the
-            // idempotency key makes the verdict retry-safe (execution_verify
-            // profile).
-            "If-Match": `"${String(attempt?.version ?? 1)}"`,
-            "Idempotency-Key": `execution-verify-${randomUUID()}`,
-          },
-        },
+        ifMatchHeader(attempt?.version, {
+          // If-Match guards the attempt version (backend verifyOnce), the
+          // idempotency key makes the verdict retry-safe (execution_verify
+          // profile).
+          "Idempotency-Key": `execution-verify-${randomUUID()}`,
+        }),
       ),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["change-order", orderId] });
@@ -195,13 +188,14 @@ export function useCreateExecutionVerification(
 export function useCreateExecutionSchedule(order: ChangeOrder | null) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (scheduledFor: string): Promise<ExecutionSchedule> => {
-      return (await createExecutionSchedule(
-        order?.id as string,
-        { scheduled_for: scheduledFor },
-        { headers: orderActionHeaders(order) },
-      )) as unknown as ExecutionSchedule;
-    },
+    mutationFn: (scheduledFor: string): Promise<ExecutionSchedule> =>
+      unwrapApi(
+        createExecutionSchedule(
+          order?.id as string,
+          { scheduled_for: scheduledFor },
+          orderActionRequestInit(order),
+        ),
+      ),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["change-order", order?.id] });
       void queryClient.invalidateQueries({ queryKey: ["change-order-timeline", order?.id] });
@@ -215,11 +209,8 @@ export function useCreateExecutionSchedule(order: ChangeOrder | null) {
 export function useCancelExecutionSchedule(order: ChangeOrder | null) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (): Promise<ExecutionSchedule> => {
-      return (await cancelExecutionSchedule(order?.id as string, {
-        headers: orderActionHeaders(order),
-      })) as unknown as ExecutionSchedule;
-    },
+    mutationFn: (): Promise<ExecutionSchedule> =>
+      unwrapApi(cancelExecutionSchedule(order?.id as string, orderActionRequestInit(order))),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["change-order", order?.id] });
       void queryClient.invalidateQueries({ queryKey: ["change-order-timeline", order?.id] });

@@ -3,6 +3,7 @@ package database
 import (
 	"context"
 	"database/sql"
+	"database/sql/driver"
 	"errors"
 	"os"
 	"strings"
@@ -260,5 +261,58 @@ func TestValidateCursorStatementDangerousCalls(t *testing.T) {
 	// Lexical failure fails closed (unterminated string literal).
 	if err := validateCursorStatement("select 'unterminated", false); err == nil {
 		t.Error("unparsable statement accepted")
+	}
+}
+
+type failingExecConnector struct {
+	err error
+}
+
+func (c *failingExecConnector) Connect(context.Context) (driver.Conn, error) {
+	return &failingExecConn{err: c.err}, nil
+}
+func (c *failingExecConnector) Driver() driver.Driver { return ctxStreamDriver{} }
+
+type failingExecConn struct {
+	err error
+}
+
+func (c *failingExecConn) Prepare(string) (driver.Stmt, error) {
+	return nil, errors.New("unused prepare")
+}
+func (c *failingExecConn) Close() error              { return nil }
+func (c *failingExecConn) Begin() (driver.Tx, error) { return noopTx{}, nil }
+func (c *failingExecConn) ExecContext(context.Context, string, []driver.NamedValue) (driver.Result, error) {
+	return nil, c.err
+}
+func (c *failingExecConn) QueryContext(context.Context, string, []driver.NamedValue) (driver.Rows, error) {
+	return nil, errors.New("query must not run when schema/search_path setup fails")
+}
+
+func TestInspectTableRollbackMetadataFailsClosedOnSchemaErrors(t *testing.T) {
+	setupErr := errors.New("simulated schema apply failure")
+	openFakePool := func(engine string) *PurposePool {
+		sqlDB := sql.OpenDB(&failingExecConnector{err: setupErr})
+		t.Cleanup(func() { _ = sqlDB.Close() })
+		return &PurposePool{engine: engine, purpose: PurposeExecution, db: sqlDB}
+	}
+
+	pgPool := openFakePool("postgresql")
+	if _, err := InspectTableRollbackMetadata(context.Background(), pgPool, nil, "bad;schema", "orders"); err == nil {
+		t.Fatal("expected PostgreSQL invalid schema identifier error")
+	}
+	if _, err := InspectTableRollbackMetadata(WithRollbackSearchPath(context.Background(), []string{"app"}), pgPool, nil, "app", "orders"); err == nil {
+		t.Fatal("expected PostgreSQL search_path apply error to fail closed")
+	}
+	if _, err := InspectTableRollbackMetadata(context.Background(), pgPool, nil, "app", "orders"); err == nil {
+		t.Fatal("expected PostgreSQL schema apply error to fail closed")
+	}
+
+	mysqlPool := openFakePool("mysql")
+	if _, err := InspectTableRollbackMetadata(context.Background(), mysqlPool, nil, "bad;schema", "orders"); err == nil {
+		t.Fatal("expected MySQL invalid schema identifier error")
+	}
+	if _, err := InspectTableRollbackMetadata(context.Background(), mysqlPool, nil, "app_db", "orders"); err == nil {
+		t.Fatal("expected MySQL USE schema failure to fail closed")
 	}
 }

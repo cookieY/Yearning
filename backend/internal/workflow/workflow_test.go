@@ -57,12 +57,13 @@ func TestValidateFlowWriteStructureRules(t *testing.T) {
 		"step 11":                      func(w *FlowWrite) { w.Stages[0].ApprovalSteps = make([]ApprovalStepWrite, 11) },
 		"step no actor":                func(w *FlowWrite) { w.Stages[0].ApprovalSteps[0].Actors = nil },
 		"step duplicate actor":         func(w *FlowWrite) { w.Stages[0].ApprovalSteps[0].Actors = []ActorRef{{UserID: "u"}, {UserID: "u"}} },
+		"query step duplicate actor":   func(w *FlowWrite) { w.ApprovalSteps[0].Actors = []ActorRef{{UserID: "u"}, {UserID: "u"}} },
 		"unknown type":                 func(w *FlowWrite) { w.FlowType = "hybrid" },
 		"empty name":                   func(w *FlowWrite) { w.Name = "" },
 	}
 	for name, mutate := range cases {
 		base := changeFlow()
-		if name == "query with rule set" || name == "query with stages" || name == "query zero steps" || name == "query zero capability" {
+		if name == "query with rule set" || name == "query with stages" || name == "query zero steps" || name == "query zero capability" || name == "query step duplicate actor" {
 			base = queryFlow()
 		}
 		mutate(base)

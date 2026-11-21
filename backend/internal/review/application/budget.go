@@ -85,7 +85,9 @@ func (s *Services) LoadBudgetSettings(ctx context.Context, db *gorm.DB) (BudgetS
 // defaults to Asia/Shanghai; corrupted configuration falls back to default).
 func (s *Services) budgetDay(now time.Time) string {
 	var tzName *string
-	_ = s.DB.Raw(`select settings->>'system_timezone' as tz from system_settings where namespace = 'general'`).Scan(&tzName).Error
+	if s != nil && s.DB != nil {
+		_ = s.DB.Raw(`select settings->>'system_timezone' as tz from system_settings where namespace = 'general'`).Scan(&tzName).Error
+	}
 	name := "Asia/Shanghai"
 	if tzName != nil && *tzName != "" {
 		name = *tzName
@@ -98,6 +100,9 @@ func (s *Services) budgetDay(now time.Time) string {
 	}
 	return now.In(tz).Format("2006-01-02")
 }
+
+// BudgetDay resolves the current budget calendar date under general.system_timezone.
+func (s *Services) BudgetDay(now time.Time) string { return s.budgetDay(now) }
 
 // Reserve performs an atomic reservation: single-row conditional UPDATE (amount + reserved <= budget),
 // with version CAS retry handled by row-lock semantics; failure = budget exhausted.

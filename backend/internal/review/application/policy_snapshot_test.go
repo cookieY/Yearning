@@ -2,11 +2,9 @@ package application
 
 import (
 	"encoding/json"
-	"errors"
 	"strings"
 	"testing"
 
-	"github.com/cookieY/YearningX/backend/internal/crypto"
 	"github.com/cookieY/YearningX/backend/internal/review/knowledge"
 )
 
@@ -125,145 +123,6 @@ func TestCanonicalReviewPolicyIdentityCoversEveryFrozenPolicySurface(t *testing.
 	}
 }
 
-func TestPolicySnapshotSealVerifyRoundTrip(t *testing.T) {
-	crypter := newSealTestCrypter(t)
-	policy := reviewPolicySnapshotFixture()
-	input, err := sealReviewPolicySnapshot(
-		crypter,
-		"run-policy-001",
-		PolicySnapshotPurposeReview,
-		policy,
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
-	// Mutating the caller's source object after sealing must not alter the
-	// worker-visible policy. This is the in-memory barrier for the persistence
-	// race covered by the later integration test.
-	policy.PromptTools[0].Definition.KnowledgeText = "mutated after StartRun"
-	policy.KnowledgeEntries[0].Definition.KnowledgeText = "mutated after StartRun"
-	input.ReviewRunID = "run-policy-001"
-	raw, err := json.Marshal(input)
-	if err != nil {
-		t.Fatal(err)
-	}
-	var roundTripped TaskInput
-	if err := json.Unmarshal(raw, &roundTripped); err != nil {
-		t.Fatal(err)
-	}
-	get, err := (&Services{Crypter: crypter}).VerifyAndDecodePolicySnapshot(
-		t.Context(),
-		nil,
-		roundTripped,
-		PolicySnapshotPurposeReview,
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
-	gotID, _, err := canonicalReviewPolicyIdentity(*get)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if gotID != input.PolicySnapshotHash {
-		t.Fatalf("verified snapshot identity = %s, want %s", gotID, input.PolicySnapshotHash)
-	}
-	if get.PromptTools[1].Definition.KnowledgeText != "reject statements above {{max_rows}} rows" {
-		t.Fatal("prompt tool definition changed after the policy was sealed")
-	}
-	if get.KnowledgeEntries[1].Definition.KnowledgeText != "analytic updates require a lock review" {
-		t.Fatal("knowledge definition changed after the policy was sealed")
-	}
-}
-
-func TestPolicySnapshotVerificationFailsClosed(t *testing.T) {
-	crypter := newSealTestCrypter(t)
-	valid, err := sealReviewPolicySnapshot(
-		crypter,
-		"run-policy-002",
-		PolicySnapshotPurposeReview,
-		reviewPolicySnapshotFixture(),
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
-	valid.ReviewRunID = "run-policy-002"
-
-	unsupported := valid
-	unsupportedPlain, err := json.Marshal(reviewPolicySnapshotFixture())
-	if err != nil {
-		t.Fatal(err)
-	}
-	unsupportedPlain = []byte(strings.Replace(
-		string(unsupportedPlain),
-		`"schema_version":"review-policy-v1"`,
-		`"schema_version":"review-policy-v999"`,
-		1,
-	))
-	unsupportedEnv, err := crypter.Seal(
-		crypto.PurposePayload,
-		unsupportedPlain,
-		policySnapshotAAD(crypter, "run-policy-002", PolicySnapshotPurposeReview),
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
-	unsupported.PolicySnapshotCiphertext = unsupportedEnv.Ciphertext
-	unsupported.PolicySnapshotNonce = unsupportedEnv.Nonce
-	unsupported.PolicySnapshotKeyID = unsupportedEnv.KeyID
-	unsupported.PolicySnapshotAlgorithm = unsupportedEnv.Algorithm
-	unsupported.PolicySnapshotHash = sha256Hex(unsupportedPlain)
-
-	tampered := valid
-	tampered.PolicySnapshotCiphertext = append([]byte(nil), valid.PolicySnapshotCiphertext...)
-	tampered.PolicySnapshotCiphertext[0] ^= 0xff
-
-	wrongHash := valid
-	wrongHash.PolicySnapshotHash = strings.Repeat("0", 64)
-
-	wrongFrozenHash := valid
-	wrongFrozenHash.ToolConfigHash = strings.Repeat("0", 64)
-
-	missing := valid
-	missing.PolicySnapshotKeyID = ""
-
-	malformed := valid
-	malformed.PolicySnapshotAlgorithm = "plaintext"
-
-	for _, tc := range []struct {
-		name    string
-		input   TaskInput
-		purpose PolicySnapshotPurpose
-	}{
-		{name: "missing envelope", input: missing, purpose: PolicySnapshotPurposeReview},
-		{name: "malformed envelope", input: malformed, purpose: PolicySnapshotPurposeReview},
-		{name: "tampered ciphertext", input: tampered, purpose: PolicySnapshotPurposeReview},
-		{name: "unsupported schema", input: unsupported, purpose: PolicySnapshotPurposeReview},
-		{name: "wrong canonical hash", input: wrongHash, purpose: PolicySnapshotPurposeReview},
-		{name: "wrong frozen column hash", input: wrongFrozenHash, purpose: PolicySnapshotPurposeReview},
-		{name: "wrong purpose", input: valid, purpose: "other-purpose"},
-		{
-			name: "wrong run",
-			input: func() TaskInput {
-				v := valid
-				v.ReviewRunID = "run-policy-other"
-				return v
-			}(),
-			purpose: PolicySnapshotPurposeReview,
-		},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			if _, err := (&Services{Crypter: crypter}).VerifyAndDecodePolicySnapshot(
-				t.Context(),
-				nil,
-				tc.input,
-				tc.purpose,
-			); !errorsIsPolicySnapshotInvalid(err) {
-				t.Fatalf("verification error = %v, want ErrPolicySnapshotInvalid", err)
-			}
-		})
-	}
-}
-
 func TestEffectiveFrozenPolicyToolHashMatchesSubmissionContract(t *testing.T) {
 	got := effectiveFrozenPolicyToolHash(FrozenReviewPolicy{
 		PromptTools: []FrozenPromptTool{
@@ -279,10 +138,6 @@ func TestEffectiveFrozenPolicyToolHashMatchesSubmissionContract(t *testing.T) {
 	if got != want {
 		t.Fatalf("effective frozen policy tool hash = %s, want %s", got, want)
 	}
-}
-
-func errorsIsPolicySnapshotInvalid(err error) bool {
-	return errors.Is(err, ErrPolicySnapshotInvalid)
 }
 
 func reviewPolicySnapshotFixture() FrozenReviewPolicy {

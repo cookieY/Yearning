@@ -15,47 +15,6 @@ import (
 	reviewapp "github.com/cookieY/YearningX/backend/internal/review/application"
 )
 
-func TestDecodeStageSnapshotPostgresSearchPathPlain(t *testing.T) {
-	t.Parallel()
-	plain := []byte(`{
-		"accepted_summary":"existing",
-		"postgres_search_path":{
-			"version":1,
-			"current_user":"writer",
-			"configured":"app, public",
-			"explicit":["app","public"],
-			"effective":["pg_catalog","app","public"],
-			"creation_schema":"app"
-		}
-	}`)
-	path, ok := decodeStageSnapshotPostgresSearchPathPlain(plain)
-	if !ok {
-		t.Fatal("valid frozen path was rejected")
-	}
-	if path.CurrentUser != "writer" || path.CreationSchema != "app" ||
-		len(path.Explicit) != 2 || len(path.Effective) != 3 {
-		t.Fatalf("unexpected decoded path: %+v", path)
-	}
-}
-
-func TestDecodeStageSnapshotPostgresSearchPathPlainFailsClosed(t *testing.T) {
-	t.Parallel()
-	for name, plain := range map[string][]byte{
-		"missing":   []byte(`{"accepted_summary":"existing"}`),
-		"malformed": []byte(`{"postgres_search_path":{"version":1}}`),
-		"unknown": []byte(`{"postgres_search_path":{"version":1,"current_user":"writer",` +
-			`"configured":"public","explicit":["public"],"effective":["pg_catalog","public"],` +
-			`"creation_schema":"public","extra":true}}`),
-	} {
-		t.Run(name, func(t *testing.T) {
-			t.Parallel()
-			if _, ok := decodeStageSnapshotPostgresSearchPathPlain(plain); ok {
-				t.Fatal("invalid frozen path was accepted")
-			}
-		})
-	}
-}
-
 func TestProbeSubmitPostgresSearchPathUsesExecutionSnapshot(t *testing.T) {
 	t.Parallel()
 	databaseName := "analytics"
@@ -281,12 +240,12 @@ func TestPostgresSearchPathSubmitDecodeFailuresRemainOutdated(t *testing.T) {
 	t.Parallel()
 	crypter := newSearchPathTestCrypter(t)
 	const runID = "00000000-0000-4000-8000-000000000499"
-	if _, ok := decodeStageSnapshotPostgresSearchPath(
+	if _, ok := decodeStageSnapshotPostgresReviewContext(
 		crypter, runID, 1, stageSnapRow{},
 	); ok {
 		t.Fatal("missing normalized context was accepted")
 	}
-	if _, ok := decodeStageSnapshotPostgresSearchPath(
+	if _, ok := decodeStageSnapshotPostgresReviewContext(
 		crypter, runID, 1, stageSnapRow{
 			NormalizedContext: []byte("invalid"),
 			NormalizedKeyID:   "payload-1",
@@ -294,7 +253,7 @@ func TestPostgresSearchPathSubmitDecodeFailuresRemainOutdated(t *testing.T) {
 	); ok {
 		t.Fatal("unreadable normalized context was accepted")
 	}
-	if _, ok := decodeStageSnapshotPostgresSearchPathPlain(
+	if _, ok := reviewapp.DecodeFrozenPostgresReviewContext(
 		[]byte(`{`),
 	); ok {
 		t.Fatal("malformed normalized context JSON was accepted")

@@ -54,6 +54,10 @@ type ServeDeps struct {
 	// BLK-20261017 Decision A: enabled by default in serve; kept false in test wiring to avoid
 	// background polling goroutines in test processes.
 	StartBackgroundLoops bool
+	// StrictWiring disables lazy domain derivation inside NewServeRouter when deps are pre-assembled by BuildServeDeps.
+	StrictWiring bool
+	// LifecycleCtx carries shutdown cancellation into background loops (defaults to context.Background() when nil).
+	LifecycleCtx context.Context
 	// MaxRequestBodyBytes unified request body limit (SEC-0023); <=0 uses
 	// DefaultMaxRequestBodyBytes (64MiB, 2x margin over the 32MiB business batch boundary).
 	MaxRequestBodyBytes int64
@@ -135,36 +139,30 @@ func NewServeRouter(deps ServeDeps) *gin.Engine {
 		HandleStreamDomainEvents(deps.RealtimeHub),
 	)
 
-	// B6 is derived from B3 platform dependencies (cmd wiring is outside B6 allowed_paths,
-	// with an equivalent dependency set; see review-implementation-notes.md). Must complete
+	// B6 is derived from B3 platform dependencies in non-strict test wiring. Must complete
 	// before mountB3Routes: B3 task route registration depends on whether deps.B6 is present,
 	// and registering the same method+path twice would cause gin to panic.
-	if deps.B3 != nil && deps.B6 == nil {
+	if !deps.StrictWiring && deps.B3 != nil && deps.B6 == nil {
 		if b6, err := buildB6FromB3(deps.B3); err == nil {
 			deps.B6 = b6
-		} else {
+		} else if deps.Logger != nil {
 			deps.Logger.Error("review services unavailable", zap.Error(err))
 		}
 	}
 	if deps.B3 != nil {
 		mountB3Routes(engine, deps)
 	}
-	// B13 settings domain is derived from B3 dependencies (B12 delivered the application service
-	// without route wiring, mounted here following the B6/B7 derivation pattern).
-	if deps.B3 != nil && deps.B13 == nil {
+	// B13 settings domain is derived from B3 dependencies in non-strict test wiring.
+	if !deps.StrictWiring && deps.B3 != nil && deps.B13 == nil {
 		deps.B13 = &B13Deps{Settings: settings.New(deps.B3.DB, deps.B3.Crypter)}
 	}
-	if deps.B13 != nil {
+	if deps.B13 != nil && deps.B3 != nil {
 		admin := engine.Group("/api/v4")
 		guard := func(op string) gin.HandlerFunc { return RequireOperation(op, deps.B3.Sessions) }
 		registerSettingsRoutes(admin, deps.B13, guard)
 	}
-	// S17.6-5: dashboard (including announcements and audit read) and notification domain
-	// RegisterRoutes were delivered in B12 without router wiring -- mounted here using the same
-	// derivation pattern as B13. Guard = RequireOperation (policy check + mutation CSRF double-submit):
-	// /dashboard/me, /announcements/current, and /admin/dashboard/operations are open to
-	// authenticated-session per S18.71, while remaining admin surfaces use builtin-admin-management.
-	if deps.B3 != nil {
+	// S17.6-5: dashboard (including announcements and audit read) and notification domain routing.
+	if !deps.StrictWiring && deps.B3 != nil {
 		if deps.Dashboard == nil {
 			deps.Dashboard = &dashboard.Deps{
 				Service: dashboard.New(deps.B3.DB, deps.B3.Crypter),
@@ -187,8 +185,7 @@ func NewServeRouter(deps ServeDeps) *gin.Engine {
 	if deps.Notification != nil {
 		notification.RegisterRoutes(engine.Group("/api/v4"), deps.Notification)
 	}
-	if deps.B6 != nil && deps.B7 == nil {
-		// B7 is derived from B6 dependencies (same pattern as B6; cmd wiring belongs to later package).
+	if !deps.StrictWiring && deps.B6 != nil && deps.B7 == nil {
 		deps.B7 = buildB7FromB6(deps.B6)
 	}
 	if deps.B6 != nil {
@@ -197,40 +194,37 @@ func NewServeRouter(deps ServeDeps) *gin.Engine {
 	if deps.B7 != nil {
 		mountB7Routes(engine, deps)
 	}
-	if deps.B6 != nil && deps.B9 == nil {
-		// B9 is derived from B6 dependencies (cmd wiring belongs to later package, same pattern as B6/B7).
+	if !deps.StrictWiring && deps.B6 != nil && deps.B9 == nil {
 		if b9, err := buildB9FromB6(deps.B6); err == nil {
 			deps.B9 = b9
-		} else {
+		} else if deps.Logger != nil {
 			deps.Logger.Error("changeorder services unavailable", zap.Error(err))
 		}
 	}
 	if deps.B9 != nil {
 		mountB9Routes(engine, deps)
 	}
-	if deps.B9 != nil && deps.B10 == nil {
-		// B10 is derived from B9 dependencies (cmd wiring belongs to later package, same pattern as B6/B7).
+	if !deps.StrictWiring && deps.B9 != nil && deps.B10 == nil {
 		if b10, err := buildB10FromB9(deps.B9); err == nil {
 			deps.B10 = b10
-		} else {
+		} else if deps.Logger != nil {
 			deps.Logger.Error("execution services unavailable", zap.Error(err))
 		}
 	}
 	if deps.B10 != nil {
 		mountB10Routes(engine, deps)
 	}
-	if deps.B10 != nil && deps.B11 == nil {
-		// B11 is derived from B10 dependencies (cmd wiring belongs to later package, same pattern as prior domains).
+	if !deps.StrictWiring && deps.B10 != nil && deps.B11 == nil {
 		if b11, err := buildB11FromB10(deps.B10); err == nil {
 			deps.B11 = b11
-		} else {
+		} else if deps.Logger != nil {
 			deps.Logger.Error("query services unavailable", zap.Error(err))
 		}
 	}
 	if deps.B11 != nil {
 		mountB11Routes(engine, deps)
 	}
-	if deps.B3 != nil && deps.B6 != nil && deps.B9 != nil && deps.Assistant == nil {
+	if !deps.StrictWiring && deps.B3 != nil && deps.B6 != nil && deps.B9 != nil && deps.Assistant == nil {
 		if asst, err := buildAssistantDeps(deps.B3, deps.B6, deps.B9); err == nil {
 			deps.Assistant = asst
 		} else if deps.Logger != nil {
@@ -240,7 +234,7 @@ func NewServeRouter(deps ServeDeps) *gin.Engine {
 	if deps.Assistant != nil {
 		mountAssistantRoutes(engine, deps)
 	}
-	if deps.B3 != nil && deps.Diagnostics == nil {
+	if !deps.StrictWiring && deps.B3 != nil && deps.Diagnostics == nil {
 		if diag, err := buildDiagnosticsDeps(deps.B3, deps.B6, deps.B9); err == nil {
 			deps.Diagnostics = diag
 		} else if deps.Logger != nil {
@@ -304,6 +298,10 @@ func attachRealtimeHub(deps ServeDeps) {
 // exposing loop health -- if derivation fails, loops are skipped along with the corresponding domain routes.
 // owner uses instance identifier for idempotency isolation.
 func startBackgroundLoops(deps *ServeDeps) {
+	bgCtx := deps.LifecycleCtx
+	if bgCtx == nil {
+		bgCtx = context.Background()
+	}
 	owner := "serve-" + uuid.NewString()[:8]
 	if deps.B10 != nil && deps.B10.Exec != nil {
 		w := tasks.NewWorker(deps.B10.Exec.DB, owner,
@@ -312,8 +310,10 @@ func startBackgroundLoops(deps *ServeDeps) {
 			task *tasks.ClaimedTask, fenceGuard func() error, beat func(completed, total int64)) error {
 			return deps.B10.Runner.Execute(ctx, db, task.Input, fenceGuard, beat)
 		})
-		go w.Run(context.Background())
-		deps.Logger.Info("background stage_execution worker started", zap.String("owner", owner))
+		go w.Run(bgCtx)
+		if deps.Logger != nil {
+			deps.Logger.Info("background stage_execution worker started", zap.String("owner", owner))
+		}
 	}
 	var execSvc *execapp.Services
 	if deps.B10 != nil {
@@ -323,10 +323,20 @@ func startBackgroundLoops(deps *ServeDeps) {
 	if deps.B11 != nil {
 		querySvc = deps.B11.Query
 	}
-	if execSvc != nil || querySvc != nil {
-		s := scheduler.New(deps.B3.DB, execSvc, querySvc, 5*time.Second)
-		go s.Run(context.Background())
-		deps.Logger.Info("background scheduler started")
+	var schedDB *gorm.DB
+	if deps.B3 != nil {
+		schedDB = deps.B3.DB
+	} else if execSvc != nil {
+		schedDB = execSvc.DB
+	} else if querySvc != nil {
+		schedDB = querySvc.DB
+	}
+	if (execSvc != nil || querySvc != nil) && schedDB != nil {
+		s := scheduler.New(schedDB, execSvc, querySvc, 5*time.Second)
+		go s.Run(bgCtx)
+		if deps.Logger != nil {
+			deps.Logger.Info("background scheduler started")
+		}
 	}
 	if deps.B3 != nil {
 		nw := notification.NewWorker(deps.B3.DB, deps.B3.Crypter, 10*time.Second)
@@ -334,7 +344,7 @@ func startBackgroundLoops(deps *ServeDeps) {
 		if auditor, aerr := auditlog.NewRecorder(deps.B3.DB); aerr == nil {
 			auditor.SetRealtimeHub(deps.RealtimeHub)
 			nw.SetAuditor(auditor)
-		} else {
+		} else if deps.Logger != nil {
 			deps.Logger.Warn("notification suppression auditor unavailable", zap.Error(aerr))
 		}
 		// S007/R1 M6: structured log for explainable skips.
@@ -342,38 +352,62 @@ func startBackgroundLoops(deps *ServeDeps) {
 		// S007: callback link base URL in notifications comes from general.public_base_url (controlled setting;
 		// degrades to empty on read failure -- omits link rather than guessing from request Host).
 		settingsSvc := settings.New(deps.B3.DB, deps.B3.Crypter)
-		if view, gerr := settingsSvc.Get(context.Background(), "general"); gerr == nil {
+		if view, gerr := settingsSvc.Get(bgCtx, "general"); gerr == nil {
 			if u, ok := view.Settings["public_base_url"].(string); ok {
 				nw.SetPublicBaseURL(u)
 			}
 			if l, ok := view.Settings["default_locale"].(string); ok {
 				nw.SetLocale(l)
 			}
-		} else {
+		} else if deps.Logger != nil {
 			deps.Logger.Warn("notification worker settings read failed; links disabled", zap.Error(gerr))
 		}
-		go nw.Run(context.Background())
-		deps.Logger.Info("background notification worker started")
+		go nw.Run(bgCtx)
+		if deps.Logger != nil {
+			deps.Logger.Info("background notification worker started")
+		}
 	}
 	if deps.Diagnostics != nil && deps.Diagnostics.Diagnostics != nil {
-		go deps.Diagnostics.Diagnostics.RunCollectionLoop(context.Background())
-		deps.Logger.Info("background diagnostics collector started")
+		go deps.Diagnostics.Diagnostics.RunCollectionLoop(bgCtx)
+		if deps.Logger != nil {
+			deps.Logger.Info("background diagnostics collector started")
+		}
 	}
 	// RCP-20261020: background refresh for release snapshot (fetches immediately on startup, then daily).
 	// Retains existing DB snapshot on fetch failure without exiting loop; disabled when URL is empty (test wiring).
 	if deps.Dashboard != nil && deps.Dashboard.ReleaseFeedURL != "" {
-		go deps.Dashboard.Service.RunReleaseRefreshLoop(context.Background(),
+		go deps.Dashboard.Service.RunReleaseRefreshLoop(bgCtx,
 			deps.Dashboard.ReleaseFeedURL, deps.Logger)
-		deps.Logger.Info("background release feed refresher started",
-			zap.String("source", deps.Dashboard.ReleaseFeedURL))
+		if deps.Logger != nil {
+			deps.Logger.Info("background release feed refresher started",
+				zap.String("source", deps.Dashboard.ReleaseFeedURL))
+		}
 	}
 }
 
-// mountB11Routes mounts B11 query and schedule routes (guard = authenticated + CSRF; query
+func businessSessions(deps ServeDeps) *identity.SessionStore {
+	if deps.B6 != nil && deps.B6.Sessions != nil {
+		return deps.B6.Sessions
+	}
+	if deps.B9 != nil && deps.B9.Sessions != nil {
+		return deps.B9.Sessions
+	}
+	if deps.B10 != nil && deps.B10.Sessions != nil {
+		return deps.B10.Sessions
+	}
+	if deps.B3 != nil {
+		return deps.B3.Sessions
+	}
+	return nil
+}
+
+// mountB11Routes mounts B11 query and schedule routes (guard = RequireBusinessOperation + CSRF; query
 // actor relationships and schedule eligibility are verified in the application layer against frozen snapshots; export audited per page).
 func mountB11Routes(engine *gin.Engine, deps ServeDeps) {
 	b11 := deps.B11
-	guard := deps.B6.requireB6User
+	guard := func(op string) gin.HandlerFunc {
+		return RequireBusinessOperation(op, businessSessions(deps))
+	}
 	api := engine.Group("/api/v4")
 
 	// Flow sensitive column vocabulary belongs to builtin-admin-management; operationId matches OpenAPI/
@@ -426,11 +460,13 @@ func mountB11Routes(engine *gin.Engine, deps ServeDeps) {
 		guard("cancelExecutionSchedule"), b11.HandleCancelExecutionSchedule)
 }
 
-// mountB10Routes mounts B10 execution domain routes (guard = authenticated + CSRF; execution
+// mountB10Routes mounts B10 execution domain routes (guard = RequireBusinessOperation + CSRF; execution
 // eligibility is verified in the application layer against frozen executor snapshots).
 func mountB10Routes(engine *gin.Engine, deps ServeDeps) {
 	b10 := deps.B10
-	guard := deps.B6.requireB6User
+	guard := func(op string) gin.HandlerFunc {
+		return RequireBusinessOperation(op, businessSessions(deps))
+	}
 
 	api := engine.Group("/api/v4")
 	orders := api.Group("/change-orders")
@@ -443,11 +479,13 @@ func mountB10Routes(engine *gin.Engine, deps ServeDeps) {
 	attempts.POST("/:attempt_id/verifications", guard("createExecutionVerification"), b10.HandleCreateExecutionVerification)
 }
 
-// mountB9Routes mounts B9 change order domain routes (guard = authenticated + CSRF; actor relationships
+// mountB9Routes mounts B9 change order domain routes (guard = RequireBusinessOperation + CSRF; actor relationships
 // verified in application layer; submitter pre-check for withdraw/void/copy rejects with 403 at handler layer).
 func mountB9Routes(engine *gin.Engine, deps ServeDeps) {
 	b9 := deps.B9
-	guard := deps.B6.requireB6User
+	guard := func(op string) gin.HandlerFunc {
+		return RequireBusinessOperation(op, businessSessions(deps))
+	}
 
 	api := engine.Group("/api/v4")
 	// RCP-20261101-EPHEMERAL-PRECHECK: submission moves to payload-carrying v2 endpoint; draft-scoped
@@ -530,12 +568,14 @@ func mountB7Routes(engine *gin.Engine, deps ServeDeps) {
 }
 
 // mountB6Routes mounts B6 domain routes (drafts / Runs / findings / evidence / task reads).
-// Guard enforces authentication and CSRF prerequisites for change-draft-owner and related rules
-// (actor relationships verified in application layer); getTask is mounted here with task-reader semantics,
-// replacing B3 admin-only assumption.
+// Guard enforces RequireBusinessOperation (default-deny operation registration, session authentication,
+// and CSRF prerequisites; actor relationships verified in application layer); getTask is mounted here with
+// task-reader semantics, replacing B3 admin-only assumption.
 func mountB6Routes(engine *gin.Engine, deps ServeDeps) {
 	b6 := deps.B6
-	guard := b6.requireB6User
+	guard := func(op string) gin.HandlerFunc {
+		return RequireBusinessOperation(op, businessSessions(deps))
+	}
 
 	api := engine.Group("/api/v4")
 	drafts := api.Group("/change-drafts")

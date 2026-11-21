@@ -13,8 +13,10 @@
 package application
 
 import (
+	"bytes"
 	"context"
 	"encoding/hex"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -28,11 +30,43 @@ import (
 	"github.com/cookieY/YearningX/backend/internal/review/privacy"
 )
 
-// ephemeralMaxPerUser caps concurrent ephemeral Runs per user (reusing maxUserActiveRuns).
+// maxUserActiveRuns caps concurrent active Runs per user; exceeding it triggers capacity rate limiting.
+const maxUserActiveRuns = 10
+
+// ephemeralMaxPerUser caps concurrent ephemeral Runs per user.
 const ephemeralMaxPerUser = maxUserActiveRuns
 
 // ephemeralMemoryIdemTTL is the ephemeral idempotency memory window (prevents double-click double-runs only, without DB persistence).
 const ephemeralMemoryIdemTTL = 10 * time.Minute
+
+const (
+	// ephemeralSyncSyntaxCheckMaxBytes caps synchronous syntax validation in StartEphemeralRun;
+	// larger batches validate asynchronously inside the single streaming grouping pass.
+	ephemeralSyncSyntaxCheckMaxBytes = 256 * 1024
+
+	// ephemeralMaxActiveSQLBytes caps total uncommitted raw SQL held across queued/grouping ephemeral Runs.
+	ephemeralMaxActiveSQLBytes int64 = 256 << 20
+
+	// ephemeralMaxTerminalRuns caps retained terminal ephemeral Runs per instance.
+	ephemeralMaxTerminalRuns = 200
+
+	// ephemeralInlineStatementLimit keeps per-statement DB models in memory only for small batches;
+	// larger batches reconstruct rows incrementally at submit materialization time.
+	ephemeralInlineStatementLimit = 500
+)
+
+// compactStmtValidityRef points to an interned StatementValidity and its group index in 8 pointer-free bytes.
+type compactStmtValidityRef struct {
+	validityIdx uint32
+	groupIdx    uint16
+}
+
+type ephemeralGroupMeta struct {
+	RepKind      string
+	RepOperation string
+	SizeMax      int64
+	RepOrdinal   int32
+}
 
 // EphemeralRun holds the complete in-memory state of an ephemeral precheck: rows that the existing pipeline
 // would persist to the DB are kept here as constructed, unwritten model structs and batch-inserted under
@@ -57,6 +91,10 @@ type EphemeralRun struct {
 	FlowVersionSeen        int64
 	Profile                fingerprint.Profile
 	ExpectedStatementCount int
+	syntaxValidated        bool
+	bulkSQL                bool
+	skipStmtMaterialize    bool
+	sqlReservedBytes       int64 // Guarded exclusively by EphemeralStore.mu
 
 	mu      sync.RWMutex
 	state   domain.RunState
@@ -64,10 +102,16 @@ type EphemeralRun struct {
 	ErrCode int32
 	Failure string
 
-	Statements []persistence.SQLStatementModel
-	Groups     []persistence.SQLFingerprintGroupModel
-	Snapshots  []persistence.StageReviewSnapshotModel
-	Mapper     *privacy.RunMapper
+	analyzedStatementCount int32
+	Statements             []persistence.SQLStatementModel
+	Groups                 []persistence.SQLFingerprintGroupModel
+	groupMeta              map[string]ephemeralGroupMeta
+	repOrdinalToStmtID     map[int32]string
+	repSQLByGroup          map[string]string
+	validityTable          []fingerprint.StatementValidity
+	validityRefs           []compactStmtValidityRef
+	Snapshots              []persistence.StageReviewSnapshotModel
+	Mapper                 *privacy.RunMapper
 
 	// Stage commits (produced by commitStageMem, column-for-column isomorphic to the DB path).
 	Facts            []ephemeralFact
@@ -118,6 +162,13 @@ func (er *EphemeralRun) TerminalState() bool {
 	return domain.RunTerminal(er.State())
 }
 
+func (er *EphemeralRun) trackedStatementCountLocked() int64 {
+	if len(er.Statements) > 0 {
+		return int64(len(er.Statements))
+	}
+	return int64(er.analyzedStatementCount)
+}
+
 // terminalExpiredAt atomically inspects both expiresAt and state under er.mu.RLock
 // so concurrent ephemeralFinish updates never race with EphemeralStore.Get / Take / sweepNow.
 func (er *EphemeralRun) terminalExpiredAt(now time.Time) bool {
@@ -131,6 +182,10 @@ type EphemeralStore struct {
 	mu   sync.Mutex
 	runs map[string]*EphemeralRun
 	idem map[string]ephemeralIdemEntry
+
+	activeSQLBytes    int64
+	maxActiveSQLBytes int64
+	maxTerminalRuns   int
 
 	ttl       time.Duration
 	sweepOnce sync.Once
@@ -147,7 +202,14 @@ func NewEphemeralStore(ttl time.Duration) *EphemeralStore {
 	if ttl <= 0 {
 		ttl = 30 * time.Minute
 	}
-	return &EphemeralStore{runs: map[string]*EphemeralRun{}, idem: map[string]ephemeralIdemEntry{}, ttl: ttl, stop: make(chan struct{})}
+	return &EphemeralStore{
+		runs:              map[string]*EphemeralRun{},
+		idem:              map[string]ephemeralIdemEntry{},
+		maxActiveSQLBytes: ephemeralMaxActiveSQLBytes,
+		maxTerminalRuns:   ephemeralMaxTerminalRuns,
+		ttl:               ttl,
+		stop:              make(chan struct{}),
+	}
 }
 
 // TTL returns the terminal retention window (shared by test seam and finish).
@@ -174,8 +236,13 @@ func (st *EphemeralStore) sweep() {
 func (st *EphemeralStore) sweepNow(now time.Time) {
 	st.mu.Lock()
 	defer st.mu.Unlock()
+	st.sweepLocked(now)
+}
+
+func (st *EphemeralStore) sweepLocked(now time.Time) {
 	for id, run := range st.runs {
 		if run.terminalExpiredAt(now) {
+			st.releaseSQLBytesLocked(run)
 			delete(st.runs, id)
 		}
 	}
@@ -184,6 +251,109 @@ func (st *EphemeralStore) sweepNow(now time.Time) {
 			delete(st.idem, k)
 		}
 	}
+}
+
+func (st *EphemeralStore) releaseSQLBytes(er *EphemeralRun) {
+	if er == nil {
+		return
+	}
+	st.mu.Lock()
+	defer st.mu.Unlock()
+	st.releaseSQLBytesLocked(er)
+}
+
+func (st *EphemeralStore) releaseSQLBytesLocked(er *EphemeralRun) {
+	if er == nil || er.sqlReservedBytes <= 0 {
+		return
+	}
+	st.activeSQLBytes -= er.sqlReservedBytes
+	if st.activeSQLBytes < 0 {
+		st.activeSQLBytes = 0
+	}
+	er.sqlReservedBytes = 0
+}
+
+func (st *EphemeralStore) enforceTerminalCap() {
+	st.mu.Lock()
+	defer st.mu.Unlock()
+	st.enforceTerminalCapLocked(time.Now())
+}
+
+func (st *EphemeralStore) enforceTerminalCapLocked(now time.Time) {
+	st.sweepLocked(now)
+	capLimit := st.maxTerminalRuns
+	if capLimit <= 0 {
+		capLimit = ephemeralMaxTerminalRuns
+	}
+	type candidate struct {
+		id         string
+		ready      bool
+		finishedAt time.Time
+	}
+	var term []candidate
+	for id, r := range st.runs {
+		r.mu.RLock()
+		state := r.state
+		fin := r.CreatedAt
+		if r.FinishedAt != nil {
+			fin = *r.FinishedAt
+		}
+		r.mu.RUnlock()
+		if domain.RunTerminal(state) {
+			term = append(term, candidate{
+				id:         id,
+				ready:      state == domain.RunStateReady,
+				finishedAt: fin,
+			})
+		}
+	}
+	if len(term) <= capLimit {
+		return
+	}
+	// Evict oldest non-ready terminal runs first, then oldest ready terminal runs.
+	sort.Slice(term, func(i, j int) bool {
+		if term[i].ready != term[j].ready {
+			return !term[i].ready
+		}
+		return term[i].finishedAt.Before(term[j].finishedAt)
+	})
+	toEvict := len(term) - capLimit
+	for i := 0; i < toEvict; i++ {
+		id := term[i].id
+		if r, ok := st.runs[id]; ok {
+			st.releaseSQLBytesLocked(r)
+			delete(st.runs, id)
+		}
+	}
+}
+
+func (st *EphemeralStore) admit(er *EphemeralRun, maxActivePerUser int) error {
+	if er == nil {
+		return nil
+	}
+	now := time.Now()
+	st.mu.Lock()
+	defer st.mu.Unlock()
+	if st.runs == nil {
+		st.runs = map[string]*EphemeralRun{}
+	}
+	st.sweepLocked(now)
+	if st.activeOfUserLocked(er.OwnerUserID) >= maxActivePerUser {
+		return &domain.Error{Code: 1012, Name: "SYSTEM_CAPACITY_EXHAUSTED"}
+	}
+	maxBytes := st.maxActiveSQLBytes
+	if maxBytes <= 0 {
+		maxBytes = ephemeralMaxActiveSQLBytes
+	}
+	need := int64(len(er.SQLPlaintext))
+	if need > 0 && st.activeSQLBytes+need > maxBytes {
+		return &domain.Error{Code: 1012, Name: "SYSTEM_CAPACITY_EXHAUSTED"}
+	}
+	er.sqlReservedBytes = need
+	st.activeSQLBytes += need
+	st.runs[er.ID] = er
+	st.enforceTerminalCapLocked(now)
+	return nil
 }
 
 // Get reads a Run after ownership verification; non-existent / expired / non-owner uniformly returns ErrNotFound
@@ -204,8 +374,13 @@ func (st *EphemeralStore) Get(runID, ownerUserID string) *EphemeralRun {
 	return run
 }
 
-// Take consumes a Run for submission: retrieves and removes it (once materialized on submit, the in-memory
-// copy is no longer readable — read surfaces switch to the materialized DB rows). Returns nil on ownership mismatch.
+func (er *EphemeralRun) readyAndUnexpiredAt(now time.Time) bool {
+	er.mu.RLock()
+	defer er.mu.RUnlock()
+	return er.state == domain.RunStateReady && !er.expiresAt.Before(now)
+}
+
+// Take consumes a Run: retrieves and removes it (test/internal helper). Returns nil on ownership mismatch or expiry.
 func (st *EphemeralStore) Take(runID, ownerUserID string) *EphemeralRun {
 	st.mu.Lock()
 	defer st.mu.Unlock()
@@ -216,6 +391,24 @@ func (st *EphemeralStore) Take(runID, ownerUserID string) *EphemeralRun {
 	if run.terminalExpiredAt(time.Now()) {
 		return nil
 	}
+	st.releaseSQLBytesLocked(run)
+	delete(st.runs, runID)
+	return run
+}
+
+// TakeReady atomically verifies ownership, ready state, and TTL before removing a Run for submission.
+// Non-ready runs stay untouched in st.runs with their activeSQLBytes reservation intact.
+func (st *EphemeralStore) TakeReady(runID, ownerUserID string) *EphemeralRun {
+	st.mu.Lock()
+	defer st.mu.Unlock()
+	run, ok := st.runs[runID]
+	if !ok || run.OwnerUserID != ownerUserID {
+		return nil
+	}
+	if !run.readyAndUnexpiredAt(time.Now()) {
+		return nil
+	}
+	st.releaseSQLBytesLocked(run)
 	delete(st.runs, runID)
 	return run
 }
@@ -223,12 +416,41 @@ func (st *EphemeralStore) Take(runID, ownerUserID string) *EphemeralRun {
 func (st *EphemeralStore) put(run *EphemeralRun) {
 	st.mu.Lock()
 	defer st.mu.Unlock()
+	if st.runs == nil {
+		st.runs = map[string]*EphemeralRun{}
+	}
 	st.runs[run.ID] = run
+}
+
+// putBack restores a Run after a failed submission transaction, re-accounting any unreserved SQL bytes
+// and enforcing the terminal run cap under strict lock ordering (st.mu -> run.mu).
+func (st *EphemeralStore) putBack(run *EphemeralRun) {
+	if run == nil {
+		return
+	}
+	st.mu.Lock()
+	defer st.mu.Unlock()
+	if st.runs == nil {
+		st.runs = map[string]*EphemeralRun{}
+	}
+	run.mu.RLock()
+	sqlLen := int64(len(run.SQLPlaintext))
+	run.mu.RUnlock()
+	if run.sqlReservedBytes == 0 && sqlLen > 0 {
+		run.sqlReservedBytes = sqlLen
+		st.activeSQLBytes += sqlLen
+	}
+	st.runs[run.ID] = run
+	st.enforceTerminalCapLocked(time.Now())
 }
 
 func (st *EphemeralStore) activeOfUser(ownerUserID string) int {
 	st.mu.Lock()
 	defer st.mu.Unlock()
+	return st.activeOfUserLocked(ownerUserID)
+}
+
+func (st *EphemeralStore) activeOfUserLocked(ownerUserID string) int {
 	n := 0
 	for _, run := range st.runs {
 		if run.OwnerUserID == ownerUserID && !domain.RunTerminal(run.State()) {
@@ -355,7 +577,7 @@ func (s *Services) StartEphemeralRun(ctx context.Context, actor Actor, runner *A
 					}
 					matched := strings.EqualFold(expectedHMAC, hex.EncodeToString(rawMAC))
 					if !matched {
-						trimmedMAC, terr := s.Crypter.HMAC(sqlHMACPurpose, []byte(strings.TrimSpace(string(in.SQL))))
+						trimmedMAC, terr := s.Crypter.HMAC(sqlHMACPurpose, bytes.TrimSpace(in.SQL))
 						if terr != nil {
 							return terr
 						}
@@ -383,15 +605,22 @@ func (s *Services) StartEphemeralRun(ctx context.Context, actor Actor, runner *A
 	if err != nil {
 		return "", err
 	}
-	statementCnt, cntErr := s.countAndValidateStatements(in.SQL, profile)
-	if cntErr != nil {
-		return "", cntErr
-	}
-	if statementCnt < 1 || statementCnt > 100000 {
+	var (
+		statementCnt    int
+		syntaxValidated bool
+	)
+	if len(in.SQL) <= ephemeralSyncSyntaxCheckMaxBytes {
+		cnt, cntErr := s.countAndValidateStatements(in.SQL, profile)
+		if cntErr != nil {
+			return "", cntErr
+		}
+		if cnt < 1 || cnt > 100000 {
+			return "", domain.ErrBatchTooLarge
+		}
+		statementCnt = cnt
+		syntaxValidated = true
+	} else if len(bytes.TrimSpace(in.SQL)) == 0 {
 		return "", domain.ErrBatchTooLarge
-	}
-	if s.Ephemeral.activeOfUser(actor.UserID) >= ephemeralMaxPerUser {
-		return "", &domain.Error{Code: 1012, Name: "SYSTEM_CAPACITY_EXHAUSTED"}
 	}
 	sqlHMACBytes, hmacErr := s.Crypter.HMAC(sqlHMACPurpose, in.SQL)
 	if hmacErr != nil {
@@ -407,6 +636,8 @@ func (s *Services) StartEphemeralRun(ctx context.Context, actor Actor, runner *A
 		Policy: policy, FlowHash: flowHash, RuleHash: ruleHash, ToolHash: toolHash,
 		FlowVersion: flow.Version, FlowVersionSeen: flowVersionSeen,
 		Profile: profile, ExpectedStatementCount: statementCnt,
+		syntaxValidated: syntaxValidated,
+		bulkSQL:         len(in.SQL) > 1<<20,
 		// The queued state already carries a minimal Run model: the very first poll tick before grouping completes
 		// can still read a real id/created_at rather than zero values (overwritten as a whole when grouping completes).
 		Run: persistence.ReviewRunModel{
@@ -420,7 +651,9 @@ func (s *Services) StartEphemeralRun(ctx context.Context, actor Actor, runner *A
 		ContextEnvelopes: map[string]crypto.Envelope{},
 		CreatedAt:        now,
 	}
-	s.Ephemeral.put(er)
+	if err := s.Ephemeral.admit(er, ephemeralMaxPerUser); err != nil {
+		return "", err
+	}
 	s.Ephemeral.rememberIdem(actor.UserID, in.IdempotencyKey, er.ID)
 	s.Ephemeral.sweep()
 	go runner.ExecuteEphemeralRun(context.Background(), er)
@@ -504,15 +737,15 @@ func (s *Services) EphemeralPutBack(er *EphemeralRun) {
 	if er == nil {
 		return
 	}
-	s.Ephemeral.put(er)
+	s.Ephemeral.putBack(er)
 }
 
 // EphemeralTTL returns the terminal retention window (used at finish).
 func (s *Services) EphemeralTTL() time.Duration { return s.Ephemeral.ttl }
 
-// EphemeralTake consumes an ephemeral Run for submission (changeorder submit v2 entry; ownership check built in).
+// EphemeralTake consumes a ready ephemeral Run for submission (changeorder submit v2 entry; ownership and ready-state checks built in).
 func (s *Services) EphemeralTake(runID, ownerUserID string) *EphemeralRun {
-	return s.Ephemeral.Take(runID, ownerUserID)
+	return s.Ephemeral.TakeReady(runID, ownerUserID)
 }
 
 // StatementCount returns the number of submitted statements (used by submit v2 when writing the payload).
@@ -535,11 +768,12 @@ func (s *Services) SeedEphemeralRunForTest(runID, ownerUserID, flowID string, st
 	er := &EphemeralRun{
 		ID: runID, OwnerUserID: ownerUserID, FlowID: flowID,
 		SQLPlaintext: sqlText, SQLHMAC: hex.EncodeToString(mac),
-		state: state, Mapper: privacy.NewRunMapper(),
+		skipStmtMaterialize: true,
+		state:               state, Mapper: privacy.NewRunMapper(),
 		Facts: []ephemeralFact{}, ToolCalls: []persistence.ReviewToolCallModel{},
 		Findings: []ephemeralFinding{}, ContextEnvelopes: map[string]crypto.Envelope{},
 		Run: persistence.ReviewRunModel{
-			ID: runID, State: string(state), Version: 1, CreatedAt: now,
+			ID: runID, State: string(state), BudgetDay: now.Format("2006-01-02"), Version: 1, CreatedAt: now,
 			StatementCount: 1, FingerprintGroupCount: 1,
 		},
 		CreatedAt: now, expiresAt: now.Add(s.Ephemeral.TTL()),
@@ -549,6 +783,30 @@ func (s *Services) SeedEphemeralRunForTest(runID, ownerUserID, flowID string, st
 		er.FinishedAt = &now
 	}
 	s.Ephemeral.put(er)
+	return er, nil
+}
+
+// SeedSubmitReadyEphemeralRunForTest directly inserts a ready ephemeral Run populated with
+// frozen policy hashes and stage snapshots for changeorder submit v2 integration tests.
+func (s *Services) SeedSubmitReadyEphemeralRunForTest(
+	runID, ownerUserID, flowID string, flowVersion int64,
+	flowHash, ruleHash, toolHash, providerPlanHash string,
+	sqlText []byte, snapshots []persistence.StageReviewSnapshotModel,
+) (*EphemeralRun, error) {
+	er, err := s.SeedEphemeralRunForTest(runID, ownerUserID, flowID, domain.RunStateReady, sqlText)
+	if err != nil {
+		return nil, err
+	}
+	er.mu.Lock()
+	defer er.mu.Unlock()
+	er.FlowVersion = flowVersion
+	er.Run.FlowSnapshotHash = flowHash
+	er.Run.RuleConfigHash = ruleHash
+	er.Run.ToolConfigHash = toolHash
+	er.Run.ProviderPlanHash = providerPlanHash
+	er.Run.FingerprintAlgorithmVersion = "v1"
+	er.Run.AnonymizationAlgorithmVersion = "v1"
+	er.Snapshots = snapshots
 	return er, nil
 }
 
@@ -562,3 +820,23 @@ func (er *EphemeralRun) IDForTest() string { return er.ID }
 
 // TerminalForTest is a terminal-state read seam.
 func (er *EphemeralRun) TerminalForTest() bool { return er.TerminalState() }
+
+// PrepareStreamingSubmitForTest configures a ready EphemeralRun as a streaming (>500 statement)
+// batch with dropped SQLPlaintext/Statements and representative statement ID mappings for submit tests.
+func (er *EphemeralRun) PrepareStreamingSubmitForTest(
+	profile fingerprint.Profile,
+	stmtCount int32,
+	groups []persistence.SQLFingerprintGroupModel,
+	repOrdinalToStmtID map[int32]string,
+) {
+	er.mu.Lock()
+	defer er.mu.Unlock()
+	er.Profile = profile
+	er.skipStmtMaterialize = false
+	er.SQLPlaintext = nil
+	er.Statements = nil
+	er.Run.StatementCount = stmtCount
+	er.Run.FingerprintGroupCount = int32(len(groups))
+	er.Groups = groups
+	er.repOrdinalToStmtID = repOrdinalToStmtID
+}

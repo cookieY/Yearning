@@ -34,44 +34,6 @@ func writeB7Err(c *gin.Context, err error) bool {
 	return true
 }
 
-// MapReviewError maps review domain errors to BusinessError (shared by B6 and B7).
-// domain.Error.Detail (upstream rejection reason snapshot, S18.75-A) is passed through meta.detail to the UI;
-// Fields (field-level rejection reasons, RCP-20261102-S008) is passed through meta.fields for form field targeting.
-func MapReviewError(err error) *BusinessError {
-	var de *domain.Error
-	switch {
-	case err == nil:
-		return nil
-	case errors.As(err, &de):
-		be := &BusinessError{Code: de.Code, Name: de.Name, Message: de.Name}
-		if de.Detail != "" || len(de.Fields) > 0 {
-			meta := map[string]any{}
-			if de.Detail != "" {
-				meta["detail"] = de.Detail
-			}
-			if len(de.Fields) > 0 {
-				meta["fields"] = de.Fields
-			}
-			be.Meta = meta
-		}
-		return be
-	case errors.Is(err, application.ErrNotFound), errors.Is(err, knowledge.ErrNotFound):
-		return &BusinessError{Code: bizerr.CodeResourceNotFound, Name: "NOT_FOUND", Message: "Resource not found"}
-	case errors.Is(err, application.ErrVersionConflict), errors.Is(err, knowledge.ErrVersionConflict):
-		return &BusinessError{Code: bizerr.CodeVersionConflict, Name: "VERSION_CONFLICT", Message: "Resource version conflict; please refresh and retry"}
-	case errors.Is(err, application.ErrConcurrent), errors.Is(err, knowledge.ErrConcurrent):
-		return &BusinessError{Code: bizerr.CodeConcurrentModification, Name: "CONCURRENT_MODIFICATION", Message: "Concurrent modification conflict; please retry"}
-	case errors.Is(err, application.ErrReferencedTool), errors.Is(err, knowledge.ErrReferenced):
-		return &BusinessError{Code: bizerr.CodeResourceReferenced, Name: "REFERENCED", Message: "Resource is referenced and cannot be deleted"}
-	case errors.Is(err, application.ErrRuleSetReferenced):
-		return &BusinessError{Code: bizerr.CodeResourceReferenced, Name: "REFERENCED", Message: "Resource is referenced and cannot be deleted"}
-	case errors.Is(err, knowledge.ErrValidation):
-		return &BusinessError{Code: bizerr.CodeValidationFailed, Name: "VALIDATION_FAILED", Message: "Invalid request parameters"}
-	default:
-		return nil
-	}
-}
-
 // ---- Prompt Tool (review skill) ----
 
 type promptToolWriteRequest struct {

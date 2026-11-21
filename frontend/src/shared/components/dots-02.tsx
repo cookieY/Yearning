@@ -1,6 +1,6 @@
-import { useEffect, useRef, useState } from "react";
-import { motion, useReducedMotion } from "motion/react";
+import { motion } from "motion/react";
 import { cn } from "@/shared/lib/utils";
+import { DOT_BASE_SIZE, DOT_EYE_SPRING, useDotEyeMotion } from "@/shared/components/use-dot-eye-motion";
 
 /**
  * Shadcn Dashboard `dots-02`: a warm amber character with two top ear-like bumps
@@ -12,13 +12,6 @@ import { cn } from "@/shared/lib/utils";
  * `useReducedMotion()` provides a static fallback.
  */
 
-const spring = { type: "spring", stiffness: 220, damping: 18 } as const;
-
-const BASE_SIZE = 96;
-
-const randomBetween = (min: number, max: number) =>
-  Math.random() * (max - min) + min;
-
 export interface DotProps {
   className?: string;
   followCursor?: boolean;
@@ -29,71 +22,12 @@ export interface DotProps {
 export function Dot({
   className,
   followCursor = false,
-  size = BASE_SIZE,
+  size = DOT_BASE_SIZE,
   "aria-label": ariaLabel = "Animated dot",
 }: DotProps) {
-  const reduceMotion = useReducedMotion();
-  const ref = useRef<HTMLDivElement>(null);
-  const [look, setLook] = useState({ x: 0, y: 0 });
-  const [blink, setBlink] = useState(false);
+  const { ref, reduceMotion, look, blink } = useDotEyeMotion(followCursor);
 
-  useEffect(() => {
-    if (reduceMotion || followCursor) return;
-    let timer: ReturnType<typeof setTimeout>;
-    const glance = () => {
-      const center = Math.random() < 0.25;
-      setLook(
-        center
-          ? { x: 0, y: 0 }
-          : { x: randomBetween(-1, 1), y: randomBetween(-0.7, 0.7) },
-      );
-      timer = setTimeout(glance, randomBetween(1200, 2800));
-    };
-    timer = setTimeout(glance, 800);
-    return () => {
-      clearTimeout(timer);
-    };
-  }, [reduceMotion, followCursor]);
-
-  useEffect(() => {
-    if (reduceMotion || !followCursor) return;
-    const onMove = (event: PointerEvent) => {
-      const rect = ref.current?.getBoundingClientRect();
-      if (!rect) return;
-      const dx = event.clientX - (rect.left + rect.width / 2);
-      const dy = event.clientY - (rect.top + rect.height / 2);
-      const distance = Math.hypot(dx, dy) || 1;
-      const strength = Math.min(distance / 160, 1);
-      setLook({ x: (dx / distance) * strength, y: (dy / distance) * strength });
-    };
-    window.addEventListener("pointermove", onMove);
-    return () => {
-      window.removeEventListener("pointermove", onMove);
-    };
-  }, [reduceMotion, followCursor]);
-
-  useEffect(() => {
-    if (reduceMotion) return;
-    let timer: ReturnType<typeof setTimeout>;
-    const schedule = () => {
-      timer = setTimeout(
-        () => {
-          setBlink(true);
-          timer = setTimeout(() => {
-            setBlink(false);
-            schedule();
-          }, 140);
-        },
-        randomBetween(2000, 5000),
-      );
-    };
-    schedule();
-    return () => {
-      clearTimeout(timer);
-    };
-  }, [reduceMotion]);
-
-  const jump = (size / BASE_SIZE) * 10;
+  const jump = (size / DOT_BASE_SIZE) * 10;
   const bodyAnimation = reduceMotion ? undefined : { y: [0, -jump, 0] };
   const bodyTransition = {
     duration: 0.45,
@@ -127,7 +61,7 @@ export function Dot({
           "pt-2",
         )}
         style={{
-          transform: `translate(-50%, -50%) scale(${String(size / BASE_SIZE)})`,
+          transform: `translate(-50%, -50%) scale(${String(size / DOT_BASE_SIZE)})`,
         }}
       >
         <motion.div
@@ -137,7 +71,7 @@ export function Dot({
             y: look.y * 5,
             scaleY: blink ? 0.1 : 1,
           }}
-          transition={{ ...spring, scaleY: { duration: 0.1 } }}
+          transition={{ ...DOT_EYE_SPRING, scaleY: { duration: 0.1 } }}
         >
           <div className="bg-assistant-mascot-eye size-2.5 rounded-full" />
           <div className="bg-assistant-mascot-eye size-2.5 rounded-full" />

@@ -206,7 +206,7 @@ func TestPostgresRollbackExplicitSchemaAndSearchPathResolution(t *testing.T) {
 		_, _ = adapter.RollbackDMLTransaction(ctx, txExpDML)
 		t.Fatalf("AnalyzeStatement explicit UPDATE: %v", err)
 	}
-	_, _, _, _, err = rollback.ExecuteAndCapturePostgresDML(ctx, adapter, pool, txExpDML, 1, parsedUpdExp, 100)
+	_, _, _, _, err = rollback.ExecuteAndCapturePostgresDML(ctx, pool, txExpDML, 1, parsedUpdExp, 100)
 	_, _ = adapter.RollbackDMLTransaction(ctx, txExpDML)
 	var capErr *rollback.CapabilityError
 	if !errors.As(err, &capErr) || capErr.Reason != "target_table_not_found" {
@@ -229,7 +229,7 @@ func TestPostgresRollbackExplicitSchemaAndSearchPathResolution(t *testing.T) {
 		_, _ = adapter.RollbackDMLTransaction(ctx, txShadow)
 		t.Fatalf("AnalyzeStatement shadow UPDATE: %v", err)
 	}
-	_, _, _, _, err = rollback.ExecuteAndCapturePostgresDML(ctx, adapter, pool, txShadow, 1, parsedShadow, 100)
+	_, _, _, _, err = rollback.ExecuteAndCapturePostgresDML(ctx, pool, txShadow, 1, parsedShadow, 100)
 	_, _ = adapter.RollbackDMLTransaction(ctx, txShadow)
 	if !errors.As(err, &capErr) || capErr.Reason != "target_table_not_found" {
 		t.Fatalf("expected target_table_not_found when view shadows table on search_path, got %v", err)
@@ -251,7 +251,7 @@ func TestPostgresRollbackExplicitSchemaAndSearchPathResolution(t *testing.T) {
 		_, _ = adapter.RollbackDMLTransaction(ctx, txUnqDML)
 		t.Fatalf("AnalyzeStatement unqualified UPDATE: %v", err)
 	}
-	resUnq, evUnq, _, _, err := rollback.ExecuteAndCapturePostgresDML(ctx, adapter, pool, txUnqDML, 1, parsedUpdUnq, 100)
+	resUnq, evUnq, _, _, err := rollback.ExecuteAndCapturePostgresDML(ctx, pool, txUnqDML, 1, parsedUpdUnq, 100)
 	_, _ = adapter.RollbackDMLTransaction(ctx, txUnqDML)
 	if err != nil || resUnq == nil || evUnq == nil {
 		t.Fatalf("unqualified search_path UPDATE failed: res=%+v ev=%+v err=%v", resUnq, evUnq, err)

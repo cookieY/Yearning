@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
-import type { ReleaseSnapshot } from "@/api/generated/client/yearningV4HTTPAPI.schemas";
+import { getLatestRelease } from "@/api/generated/client/dashboard/dashboard";
+import { unwrapApi } from "@/shared/api/mutator";
 
 /**
  * Latest release snapshot served by this instance's backend (startup + daily
@@ -9,12 +10,7 @@ import type { ReleaseSnapshot } from "@/api/generated/client/yearningV4HTTPAPI.s
 export function useLatestReleaseQuery(enabled: boolean) {
   return useQuery({
     queryKey: ["releases", "latest"],
-    queryFn: async () => {
-      const { getLatestRelease } = await import(
-        "@/api/generated/client/dashboard/dashboard"
-      );
-      return (await getLatestRelease()) as unknown as ReleaseSnapshot | null;
-    },
+    queryFn: () => unwrapApi(getLatestRelease()),
     enabled,
     // Backend snapshot refreshes daily server-side; retain a 6-hour client
     // stale window without window-focus refetches so the shell fetches once.

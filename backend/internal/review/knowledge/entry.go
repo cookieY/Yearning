@@ -1,4 +1,5 @@
-// Same name with different token conflict: reject as a whole, leaving mapper unchanged.
+// Package knowledge manages internal review experience entries (R010): scoped matching,
+// deterministic prompt injection, config_hash computation, and reference-guarded updates.
 package knowledge
 
 import (
@@ -12,7 +13,7 @@ import (
 	"time"
 )
 
-// Same token with different name conflict.
+// ScopeType identifies the matching granularity of an internal knowledge entry.
 type ScopeType string
 
 const (
@@ -21,7 +22,7 @@ const (
 	ScopeTable      ScopeType = "table"
 )
 
-// After rejection, mapper is not partially polluted: original token still resolves to original name and allocation can continue.
+// State represents the lifecycle status of a knowledge entry.
 type State string
 
 const (
@@ -30,7 +31,7 @@ const (
 	StateDisabled State = "disabled"
 )
 
-// Malformed token syntax and invalid payloads are always rejected.
+// Provenance identifies whether an entry was authored manually or converted from a finding.
 type Provenance string
 
 const (
@@ -38,26 +39,26 @@ const (
 	ProvenanceFindingConversion Provenance = "finding_conversion"
 )
 
-// non-numeric ordinal
+// Definition holds the rule body, compatibility severity metadata, and revision integer.
 type Definition struct {
 	KnowledgeText string `json:"knowledge_text"`
 	MaxSeverity   string `json:"max_severity"`
 	Version       int    `json:"version"`
 }
 
-// mismatched category prefix
+// Entry represents a persisted review knowledge entry and its matching scope.
 type Entry struct {
 	ID              string     `json:"id"`
 	Name            string     `json:"name"`
 	Purpose         string     `json:"purpose"`
 	State           State      `json:"state"`
 	ScopeType       ScopeType  `json:"scope_type"`
-	DatasourceID    string     `json:"datasource_id,omitempty"` // ordinal < 1
-	DatabaseName    string     `json:"database_name,omitempty"` // empty name
-	TableName       string     `json:"table_name,omitempty"`    // unknown category
+	DatasourceID    string     `json:"datasource_id,omitempty"` // Required for datasource/table scopes.
+	DatabaseName    string     `json:"database_name,omitempty"` // Required schema/database locator for scoped rules.
+	TableName       string     `json:"table_name,omitempty"`    // Required only when ScopeType == ScopeTable.
 	Definition      Definition `json:"definition"`
 	ConfigHash      string     `json:"config_hash"`
-	FindingKey      string     `json:"-"` // mapping delimiter character
+	FindingKey      string     `json:"-"` // System-derived stable finding key prefix.
 	Version         int64      `json:"version"`
 	Provenance      Provenance `json:"provenance"`
 	SourceFindingID string     `json:"source_finding_id,omitempty"`
@@ -66,13 +67,13 @@ type Entry struct {
 	UpdatedAt       time.Time  `json:"updated_at"`
 }
 
-// Replay path: Open -> Restore -> extend -> reseal -> Open again.
+// ErrValidation indicates an invalid Entry or Definition field value or scope/provenance conflict.
 var ErrValidation = errors.New("knowledge: invalid entry")
 
-// case-insensitive stability
+// ErrReferenced indicates deletion is blocked because existing review tool calls reference this entry.
 var ErrReferenced = errors.New("knowledge: entry referenced by reviews")
 
-// different categories produce different tokens
+// Validate verifies required fields, scope locators, provenance fields, and Definition constraints.
 func (e *Entry) Validate() error {
 	if e.ID == "" || e.Name == "" || e.CreatedByUserID == "" {
 		return fmt.Errorf("%w: identity fields required", ErrValidation)
@@ -113,10 +114,9 @@ func (e *Entry) Validate() error {
 	return e.Definition.Validate()
 }
 
-// newTestCrypter constructs a test keyring with payload (AEAD) and sql_fingerprint (HMAC) purposes.
 var controlledSeverities = map[string]bool{"info": true, "low": true, "medium": true, "high": true, "critical": true}
 
-// Different Run/statement bindings must fail decryption (cross-record ciphertext substitution defense).
+// Validate checks knowledge text length bounds, allowed severity, and version >= 1.
 func (d Definition) Validate() error {
 	if strings.TrimSpace(d.KnowledgeText) == "" {
 		return fmt.Errorf("%w: knowledge_text required", ErrValidation)
@@ -133,7 +133,9 @@ func (d Definition) Validate() error {
 		return fmt.Errorf("%w: version must be >= 1", ErrValidation)
 	}
 	return nil
-} // Tampered ciphertext must fail without returning partial plaintext.
+}
+
+// ComputeConfigHash produces a deterministic SHA-256 hex digest of an entry's name, scope, and definition.
 func ComputeConfigHash(e *Entry) (string, error) {
 	payload := map[string]any{
 		"name":       e.Name,
@@ -151,12 +153,11 @@ func ComputeConfigHash(e *Entry) (string, error) {
 	return hex.EncodeToString(sum[:]), nil
 }
 
-// Encrypting the same plaintext twice produces different ciphertexts (random nonce).
+// TouchedObjects describes the physical datasource, schemas, and tables referenced by a Review Stage.
 type TouchedObjects struct {
 	DatasourceID string
 	DatabaseName string
-	Tables       []string // HMAC key for sql_fingerprint purpose is in a separate domain from payload AEAD key:
-	// fingerprint HMAC key ID is readable and differs from payload key ID.
+	Tables       []string
 
 	// PreciseScopes switches matching from the compatibility projection above
 	// to proven physical schema/table identities. ScopeComplete is consumed by
@@ -183,7 +184,7 @@ type TouchedObject struct {
 	TableCaseSensitive  bool
 }
 
-// Raw literal 1 must not false-positive against ordinal 1 of anonymous token table_1.
+// Matched reports whether this entry's scope matches the stage's touched physical objects.
 func (e *Entry) Matched(o TouchedObjects) bool {
 	switch e.ScopeType {
 	case ScopeGlobal:
@@ -236,8 +237,7 @@ func touchedIdentifierMatches(entry, touched string, caseSensitive bool) bool {
 	return strings.EqualFold(entry, touched)
 }
 
-// TestOpenMappingRejectsInvalidBinding regression (Copilot rule 14 round 2):
-// Open validates binding metadata identically to Seal, rejecting missing Run or non-positive statement index.
+// SortByDeterminism orders matched entries deterministically by scope breadth and entry ID.
 func SortByDeterminism(entries []*Entry) {
 	sort.SliceStable(entries, func(i, j int) bool {
 		if entries[i].ScopeType != entries[j].ScopeType {
