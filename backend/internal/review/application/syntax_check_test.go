@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/cookieY/YearningX/backend/internal/review/changeset"
 	"github.com/cookieY/YearningX/backend/internal/review/domain"
 	"github.com/cookieY/YearningX/backend/internal/review/fingerprint"
 )
@@ -122,5 +123,55 @@ func TestCountAndValidateStatements_AcceptsValidDialectsAndCatchesLateBulkSyntax
 	}
 	if !strings.Contains(de.Detail, "statement #221") {
 		t.Fatalf("expected statement #221 in detail, got %q", de.Detail)
+	}
+}
+
+func TestQuickSyntaxShapeAndValidateStatementWithLexParity(t *testing.T) {
+	mysqlProfile, _ := fingerprint.ParseProfile("mysql/mysql")
+	pgProfile, _ := fingerprint.ParseProfile("postgresql/postgresql")
+
+	for _, tc := range []struct {
+		profile fingerprint.Profile
+		sql     string
+	}{
+		{mysqlProfile, "INSERT INTO `orders` (`id`, `note`) VALUES (1, 'hello'), (2, 'world')"},
+		{pgProfile, `UPDATE "app"."orders" SET amount = $1 WHERE id = 42 AND tag = $$abc$$`},
+	} {
+		raw := []byte(tc.sql)
+		want, ok := quickSyntaxShape(raw, tc.profile.Flags())
+		if !ok {
+			t.Fatalf("quickSyntaxShape(%q) failed", tc.sql)
+		}
+		lex, err := fingerprint.Tokenize(raw, tc.profile.Flags())
+		if err != nil {
+			t.Fatalf("Tokenize(%q): %v", tc.sql, err)
+		}
+		got := quickSyntaxShapeFromTokens(lex.Tokens)
+		if got != want {
+			t.Fatalf("quickSyntaxShapeFromTokens(%q) = %q, want %q", tc.sql, got, want)
+		}
+	}
+
+	// Bulk ValidateStatementWithLex catches bad statement past syntaxCheckDirectLimit.
+	v := newStatementSyntaxValidator([]byte("SELECT 1;\n"), pgProfile)
+	for i := 1; i <= syntaxCheckDirectLimit; i++ {
+		sql := []byte("INSERT INTO demo.logs (id, msg) VALUES (1, 'a')")
+		lex, err := fingerprint.Tokenize(sql, pgProfile.Flags())
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := v.ValidateStatementWithLex(i, changeset.Statement{SQL: sql}, &lex); err != nil {
+			t.Fatalf("stmt %d failed: %v", i, err)
+		}
+	}
+	dup := []byte("INSERT INTO demo.logs (id, msg) VALUES (999, 'dup')")
+	dupLex, _ := fingerprint.Tokenize(dup, pgProfile.Flags())
+	if err := v.ValidateStatementWithLex(syntaxCheckDirectLimit+1, changeset.Statement{SQL: dup}, &dupLex); err != nil {
+		t.Fatalf("duplicate bulk stmt failed: %v", err)
+	}
+	bad := []byte("CREATE TABLE broken_late")
+	badLex, _ := fingerprint.Tokenize(bad, pgProfile.Flags())
+	if err := v.ValidateStatementWithLex(syntaxCheckDirectLimit+2, changeset.Statement{SQL: bad}, &badLex); err == nil {
+		t.Fatal("expected late malformed statement with lex to fail")
 	}
 }

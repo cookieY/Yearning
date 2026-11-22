@@ -237,7 +237,8 @@ export function ResultGrid({ tab, continuationError }: ResultGridProps) {
             {/* v8 ignore stop */}
           </table>
         </ScrollArea>
-        <div className="flex flex-wrap items-center gap-2">
+        {/* Clear the full 120x120 fixed bottom-right Assistant FAB hitbox when the query workspace fills the viewport height. */}
+        <div className="flex flex-wrap items-center gap-2 md:pr-32">
           {/* Pure frontend paging (§18.50 follow-up): background draining
               grows the loaded rows; the pager never fetches. */}
           {tab.exhausted && (

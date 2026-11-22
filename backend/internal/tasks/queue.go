@@ -8,12 +8,35 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sync/atomic"
 	"time"
 
 	"gorm.io/gorm"
 
 	"github.com/cookieY/YearningX/backend/internal/review/domain"
 )
+
+// DefaultPendingMaximum is the contracted maximum number of pending (queued/running) tasks in async_tasks
+// (api/contracts/capacity-slo-contract.json: durable_async_queue_pending_maximum).
+const DefaultPendingMaximum int64 = 50000
+
+var pendingMaximumOverride atomic.Int64
+
+// PendingMaximum returns the active pending capacity cap (test override if positive, else DefaultPendingMaximum).
+func PendingMaximum() int64 {
+	if v := pendingMaximumOverride.Load(); v > 0 {
+		return v
+	}
+	return DefaultPendingMaximum
+}
+
+// SetPendingMaximumForTest overrides PendingMaximum for testing and returns a restore callback.
+func SetPendingMaximumForTest(limit int64) (restore func()) {
+	prev := pendingMaximumOverride.Swap(limit)
+	return func() {
+		pendingMaximumOverride.Store(prev)
+	}
+}
 
 // Task kinds (the Review-related subset of the controlled async_tasks.kind enum;
 // other kinds are defined in their respective packages).
@@ -38,6 +61,53 @@ var ErrNoTask = errors.New("tasks: no claimable task")
 
 // ErrFenceLost indicates a fence or lease mismatch; the caller must stop writing immediately.
 var ErrFenceLost = errors.New("tasks: fence or lease lost")
+
+// ErrQueueFull indicates the durable async_tasks pending count has reached the contracted maximum.
+var ErrQueueFull = errors.New("tasks: durable async queue pending maximum reached")
+
+const checkPendingCapacitySQL = `
+select count(*) from (
+    select 1 from async_tasks where state in ('queued', 'running') limit ?
+) as pending`
+
+// CheckPendingCapacity checks whether pending (queued/running) tasks are below PendingMaximum().
+func CheckPendingCapacity(ctx context.Context, db *gorm.DB) error {
+	return CheckPendingCapacityWithLimit(ctx, db, PendingMaximum())
+}
+
+// CheckPendingCapacityWithLimit checks whether pending (queued/running) tasks are strictly below limit
+// using a bounded index-only scan over async_tasks_claim_idx.
+func CheckPendingCapacityWithLimit(ctx context.Context, db *gorm.DB, limit int64) error {
+	if db == nil {
+		return errors.New("tasks: nil db")
+	}
+	if limit <= 0 {
+		return fmt.Errorf("tasks: pending limit must be positive")
+	}
+	var count int64
+	if err := db.WithContext(ctx).Raw(checkPendingCapacitySQL, limit).Scan(&count).Error; err != nil {
+		return err
+	}
+	if count >= limit {
+		return ErrQueueFull
+	}
+	return nil
+}
+
+// Enqueue checks durable pending capacity and inserts task into async_tasks.
+// Callers executing inside a transaction should invoke WakeKind post-commit.
+func Enqueue(ctx context.Context, db *gorm.DB, task *AsyncTaskModel) error {
+	if db == nil {
+		return errors.New("tasks: nil db")
+	}
+	if task == nil {
+		return errors.New("tasks: nil task")
+	}
+	if err := CheckPendingCapacity(ctx, db); err != nil {
+		return err
+	}
+	return db.WithContext(ctx).Create(task).Error
+}
 
 // claimSQL atomically claims a task: selects one queued or lease-expired running task,
 // increments fence_token, and writes the new lease. Reclaiming an expired lease is safe only for

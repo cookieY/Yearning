@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { unzipSync } from "fflate";
 import type { QueryResultPage } from "@/api/generated/client/yearningV4HTTPAPI.schemas";
 import {
@@ -7,6 +7,11 @@ import {
   downloadXlsx,
   exportExecutionToXlsx,
 } from "@/features/query/xlsx-export";
+import {
+  createXlsxWorkerHandler,
+  type XlsxWorkerRequest,
+  type XlsxWorkerResponse,
+} from "@/features/query/xlsx-export.worker";
 
 /**
  * Browser XLSX generation tests (Q006 gate: generate XLSX in frontend, server does not store export
@@ -261,5 +266,293 @@ describe("review R1 fix H-3: export dialog reset", () => {
     );
     expect(downloads).toBe(2);
     expect(fetcher).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe("streaming Zip + ZipDeflate OOXML serializer (PERF-0011)", () => {
+  it("streams 5,250 rows across 5 pages into a valid compressed XLSX archive", () => {
+    const sheet = createXlsxSheet('Ops "Q&A"');
+    const pages = 5;
+    const rowsPerPage = 1050;
+    for (let pageIndex = 0; pageIndex < pages; pageIndex += 1) {
+      const rows: unknown[][] = [];
+      for (let offset = 0; offset < rowsPerPage; offset += 1) {
+        const id = pageIndex * rowsPerPage + offset + 1;
+        rows.push([id, `user-${String(id)}@example.test`]);
+      }
+      sheet.appendPage(
+        pageOf(rows, pageIndex + 1 < pages, pageIndex + 1 < pages ? `c-${String(pageIndex)}` : null),
+      );
+    }
+
+    expect(sheet.rowCount()).toBe(5250);
+    const archive = sheet.finish();
+    const files = unzipSync(archive);
+    expect(Object.keys(files).sort()).toEqual([
+      "[Content_Types].xml",
+      "_rels/.rels",
+      "xl/_rels/workbook.xml.rels",
+      "xl/workbook.xml",
+      "xl/worksheets/sheet1.xml",
+    ]);
+
+    const decoder = new TextDecoder();
+    const workbookXml = decoder.decode(files["xl/workbook.xml"] ?? new Uint8Array());
+    expect(workbookXml).toContain('name="Ops &quot;Q&amp;A&quot;"');
+
+    const sheetContent = decoder.decode(files["xl/worksheets/sheet1.xml"] ?? new Uint8Array());
+    expect(sheetContent).toContain('<c r="A1" t="inlineStr"><is><t xml:space="preserve">id</t></is></c>');
+    expect(sheetContent).toContain('<c r="A2" t="n"><v>1</v></c>');
+    expect(sheetContent).toContain('<c r="A5251" t="n"><v>5250</v></c>');
+    expect(sheetContent).toContain(
+      '<c r="B5251" t="inlineStr"><is><t xml:space="preserve">user-5250@example.test</t></is></c>',
+    );
+  });
+
+  it("produces an empty valid workbook and guards against writes after finish", () => {
+    const empty = createXlsxSheet();
+    empty.appendPage({
+      execution_id: "exec-empty",
+      columns: [],
+      rows: [],
+      page: { next_cursor: null, has_more: false },
+      elapsed_ms: 1,
+    });
+    expect(empty.rowCount()).toBe(0);
+    const bytes = empty.finish();
+    expect(sheetXml(bytes)).toContain("<sheetData></sheetData>");
+    expect(() => {
+      empty.appendPage(pageOf([[1, "x"]], false, null));
+    }).toThrow("xlsx sheet already finished");
+    expect(() => empty.finish()).toThrow("xlsx sheet already finished");
+  });
+});
+
+describe("createXlsxWorkerHandler (PERF-0011)", () => {
+  it("streams pages, transfers an ArrayBuffer on finish, and guards uninitialized states", () => {
+    const responses: Array<{ message: XlsxWorkerResponse; transfer?: Transferable[] }> = [];
+    const handler = createXlsxWorkerHandler((message, transfer) => {
+      responses.push({ message, transfer });
+    });
+
+    handler({ type: "page", page: pageOf([[1, "a"]], false, null) });
+    handler({ type: "finish" });
+    expect(responses[0]?.message).toEqual({
+      type: "error",
+      message: "XLSX export worker is not initialized",
+    });
+    expect(responses[1]?.message).toEqual({
+      type: "error",
+      message: "XLSX export worker is not initialized",
+    });
+
+    handler({ type: "init", sheetName: "Results" });
+    handler({ type: "page", page: pageOf([[1, "a@example.test"], [2, "b@example.test"]], true, "c1") });
+    handler({ type: "page", page: pageOf([[3, "c@example.test"]], false, null) });
+    handler({ type: "finish" });
+
+    expect(responses[2]?.message).toEqual({ type: "pageAck", rowCount: 2 });
+    expect(responses[3]?.message).toEqual({ type: "pageAck", rowCount: 3 });
+
+    const doneEntry = responses[4];
+    expect(doneEntry?.message.type).toBe("done");
+    if (doneEntry?.message.type !== "done") throw new Error("expected done message");
+    expect(doneEntry.message.rowCount).toBe(3);
+    expect(doneEntry.transfer).toEqual([doneEntry.message.buffer]);
+
+    const xml = sheetXml(new Uint8Array(doneEntry.message.buffer));
+    expect(xml).toContain("c@example.test");
+
+    // Once finished, the sheet reference is cleared until the next init.
+    handler({ type: "finish" });
+    expect(responses[5]?.message).toEqual({
+      type: "error",
+      message: "XLSX export worker is not initialized",
+    });
+  });
+
+  it("reports thrown exceptions from malformed pages as error messages", () => {
+    const responses: XlsxWorkerResponse[] = [];
+    const handler = createXlsxWorkerHandler((message) => {
+      responses.push(message);
+    });
+    handler({ type: "init" });
+    handler({
+      type: "page",
+      page: {
+        execution_id: "broken",
+        columns: [],
+        rows: null as unknown as unknown[][],
+        page: { next_cursor: null, has_more: false },
+        elapsed_ms: 1,
+      },
+    });
+    expect(responses).toHaveLength(1);
+    expect(responses[0]?.type).toBe("error");
+  });
+});
+
+describe("exportExecutionToXlsx Worker dispatch (PERF-0011)", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  function installMockWorker(options?: {
+    overrideResponse?: (
+      request: XlsxWorkerRequest,
+      instance: {
+        onmessage: ((event: MessageEvent<XlsxWorkerResponse>) => void) | null;
+        onerror: ((event: ErrorEvent) => void) | null;
+      },
+    ) => boolean;
+  }) {
+    const instances: Array<{
+      url: string | URL;
+      options?: WorkerOptions;
+      terminated: boolean;
+      posted: XlsxWorkerRequest[];
+    }> = [];
+
+    class MockWorker {
+      onmessage: ((event: MessageEvent<XlsxWorkerResponse>) => void) | null = null;
+      onerror: ((event: ErrorEvent) => void) | null = null;
+      private readonly record: {
+        url: string | URL;
+        options?: WorkerOptions;
+        terminated: boolean;
+        posted: XlsxWorkerRequest[];
+      };
+      private readonly handle = createXlsxWorkerHandler((message) => {
+        queueMicrotask(() => {
+          if (this.record.terminated || this.onmessage === null) return;
+          this.onmessage({ data: message } as MessageEvent<XlsxWorkerResponse>);
+        });
+      });
+
+      constructor(url: string | URL, workerOptions?: WorkerOptions) {
+        this.record = { url, options: workerOptions, terminated: false, posted: [] };
+        instances.push(this.record);
+      }
+
+      postMessage(request: XlsxWorkerRequest): void {
+        this.record.posted.push(request);
+        if (options?.overrideResponse?.(request, this) === true) {
+          return;
+        }
+        this.handle(request);
+      }
+
+      terminate(): void {
+        this.record.terminated = true;
+      }
+    }
+
+    vi.stubGlobal("Worker", MockWorker);
+    return instances;
+  }
+
+  it("uses a same-origin module Worker with Transferable ArrayBuffer output and terminates on finish", async () => {
+    const instances = installMockWorker();
+    const progress: Array<{ pagesRead: number; rowsExported: number }> = [];
+    const outputs: Array<{ bytes: Uint8Array; rows: number }> = [];
+
+    await exportExecutionToXlsx(
+      pageOf([[1, "first@example.test"]], true, "cursor-2"),
+      () => Promise.resolve(pageOf([[2, "second@example.test"]], false, null)),
+      {
+        onProgress: (p) => progress.push({ pagesRead: p.pagesRead, rowsExported: p.rowsExported }),
+        onDone: (bytes, rows) => {
+          outputs.push({ bytes, rows });
+        },
+        onFailure: (message) => {
+          throw new Error(`unexpected failure: ${message}`);
+        },
+      },
+      () => false,
+    );
+
+    expect(instances).toHaveLength(1);
+    const worker = instances[0];
+    if (!worker) throw new Error("expected mock worker instance");
+    expect(String(worker.url)).toContain("xlsx-export.worker");
+    expect(worker.options).toEqual({ type: "module" });
+    expect(worker.posted.map((r) => r.type)).toEqual(["init", "page", "page", "finish"]);
+    expect(worker.terminated).toBe(true);
+    expect(progress).toEqual([
+      { pagesRead: 1, rowsExported: 1 },
+      { pagesRead: 2, rowsExported: 2 },
+    ]);
+    expect(outputs).toHaveLength(1);
+    const done = outputs[0];
+    if (!done) throw new Error("expected output bytes");
+    expect(done.rows).toBe(2);
+    expect(sheetXml(done.bytes)).toContain("second@example.test");
+  });
+
+  it("terminates the worker immediately when cancelled mid-export", async () => {
+    const instances = installMockWorker();
+    let cancelled = false;
+    const onDone = vi.fn();
+    const onFailure = vi.fn();
+
+    await exportExecutionToXlsx(
+      pageOf([[1, "a"]], true, "c-2"),
+      () => {
+        cancelled = true;
+        return Promise.resolve(pageOf([[2, "b"]], false, null));
+      },
+      { onProgress: () => {}, onDone, onFailure },
+      () => cancelled,
+    );
+
+    expect(onDone).not.toHaveBeenCalled();
+    expect(onFailure).toHaveBeenCalledWith("cancelled", 1);
+    expect(instances[0]?.terminated).toBe(true);
+  });
+
+  it("surfaces worker protocol error messages and onerror events cleanly", async () => {
+    installMockWorker({
+      overrideResponse: (request, instance) => {
+        if (request.type === "page") {
+          queueMicrotask(() => {
+            instance.onmessage?.({
+              data: { type: "error", message: "worker zip failed" },
+            } as MessageEvent<XlsxWorkerResponse>);
+          });
+          return true;
+        }
+        return false;
+      },
+    });
+    const onFailureA = vi.fn();
+    await exportExecutionToXlsx(
+      pageOf([[1, "a"]], false, null),
+      () => Promise.reject(new Error("unreachable")),
+      { onProgress: () => {}, onDone: vi.fn(), onFailure: onFailureA },
+      () => false,
+    );
+    expect(onFailureA).toHaveBeenCalledWith("worker zip failed", 0);
+
+    vi.unstubAllGlobals();
+    const crashedInstances = installMockWorker({
+      overrideResponse: (request, instance) => {
+        if (request.type === "finish") {
+          queueMicrotask(() => {
+            instance.onerror?.({ message: "worker crashed" } as ErrorEvent);
+          });
+          return true;
+        }
+        return false;
+      },
+    });
+    const onFailureB = vi.fn();
+    await exportExecutionToXlsx(
+      pageOf([[1, "a"]], false, null),
+      () => Promise.reject(new Error("unreachable")),
+      { onProgress: () => {}, onDone: vi.fn(), onFailure: onFailureB },
+      () => false,
+    );
+    expect(onFailureB).toHaveBeenCalledWith("worker crashed", 1);
+    expect(crashedInstances[0]?.terminated).toBe(true);
   });
 });

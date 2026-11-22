@@ -22,6 +22,7 @@ import {
 } from "@/shared/events/sse-event-bus";
 import { useSession } from "@/features/auth/session-provider";
 import { holdsSessionSlot } from "@/shared/dev/mock-super";
+import { activeExecutorStageFor } from "@/features/orders/order-state";
 import { randomUUID } from "@/shared/lib/uuid";
 
 /**
@@ -54,27 +55,20 @@ function activeFilters(filters: OrderListFilters): OrderListFilters {
 
 /** Presentation scope for the relation-scoped order read (F-UX-004):
  * - "submitter" (default, UI-spec §5.2 My Orders): only orders I submitted.
- * - "execution": orders awaiting MY execution — I am a frozen execution
- *   actor of an execution_pending stage and the order is
- *   stage_execution_pending/scheduled, mirroring the dashboard's
- *   pending_execution_count SQL. Both are presentation filters over the
- *   same relation-scoped read (submitter / frozen approver / frozen
- *   executor), never an authorization boundary. */
+ * - "execution": orders where the current user is a frozen executor of an active
+ *   execution stage (`stage_execution_pending`, `scheduled`, `running`, or
+ *   `result_unknown`), so non-approver self-executors retain a clickable route
+ *   to `/approvals/orders/:id` to execute, cancel a schedule or running attempt,
+ *   or manually verify `result_unknown`. Both are presentation filters over the
+ *   same relation-scoped read (submitter / frozen approver / frozen executor),
+ *   never an authorization boundary. */
 export type OrderListScope = "submitter" | "execution";
 
-/** "execution" scope predicate (F-UX-004): awaiting MY execution — I am a
- * frozen execution actor of an execution_pending stage and the order is
- * stage_execution_pending/scheduled, mirroring the dashboard's
- * pending_execution_count SQL. */
+/** "execution" scope predicate (F-UX-004): active or unverified execution
+ * stage (`stage_execution_pending`, `scheduled`, `running`, `result_unknown`)
+ * where the current user is one of its frozen execution actors. */
 function awaitingMyExecution(order: ChangeOrder, me: string): boolean {
-  return (
-    (order.state === "stage_execution_pending" || order.state === "scheduled") &&
-    order.stages.some(
-      (stage) =>
-        stage.state === "execution_pending" &&
-        stage.execution_actors.some((actor) => actor.id === me),
-    )
-  );
+  return activeExecutorStageFor(order, me) !== null;
 }
 
 export function useMyChangeOrders(

@@ -2,7 +2,12 @@ import { useState } from "react";
 import { Link, useLocation, useParams } from "react-router";
 import { useTranslation } from "react-i18next";
 import { OrderStateBadge, StageStateBadge } from "@/features/orders/order-state-badge";
-import { activeApprovalStepFor, canVoid, withdrawOutcome } from "@/features/orders/order-state";
+import {
+  activeApprovalStepFor,
+  activeExecutorStageFor,
+  canVoid,
+  withdrawOutcome,
+} from "@/features/orders/order-state";
 import { stageApprovalSteps } from "@/features/orders/approval-steps";
 import { ApprovalDecisionCard, ApprovalStepStateBadge } from "@/features/orders/approval-decision-card";
 import { ApprovalProgress } from "@/features/orders/approval-progress";
@@ -68,17 +73,20 @@ export default function OrderDetailPage() {
   // reviewers/executors can read the order but never see the lifecycle
   // buttons (the backend keeps the authoritative 403).
   const isSubmitter = holdsSessionSlot(order?.submitter_user_id ?? "", session.user?.id) && order !== null;
-  // owner ruling 2026-10-31 (self-review/self-execute button split): when the same user is both submitter and
-  // current frozen reviewer, the action set is mutually exclusive by entry context — entering from the approval queue
-  // (/approvals/orders/:id) shows only Approve/Reject, while entering from My Orders
-  // (/changes/orders/:id) shows only Withdraw/Void. The URL carries the context so refreshes and
-  // deep links preserve it. Single-role users are unaffected: a pure submitter sees Withdraw/Void on both routes (not
-  // a reviewer, so the decision card never renders), and a pure reviewer sees the decision card on both routes.
+  // owner ruling 2026-10-31 + 2026-11-22 (self-review/self-execute button split): when the same user is
+  // both submitter and active reviewer or frozen executor, the action set is mutually exclusive by entry
+  // context — entering from the handler queue (/approvals/orders/:id) shows only Approve/Reject or
+  // Execute/Schedule/Cancel/Verify (hiding Withdraw/Void), while entering from My Orders (/changes/orders/:id) shows
+  // only Withdraw/Void (hiding ApprovalDecisionCard and ExecutionWorkspaceCard actions). Single-role
+  // handlers (not the submitter) remain unaffected on both routes.
   const approvalEntry = location.pathname.startsWith("/approvals/");
   const isActiveApprover =
     order !== null && activeApprovalStepFor(order, session.user?.id) !== null;
-  const showSubmitterActions = isSubmitter && !(approvalEntry && isActiveApprover);
+  const isActiveExecutor =
+    order !== null && activeExecutorStageFor(order, session.user?.id) !== null;
+  const showSubmitterActions = isSubmitter && !approvalEntry;
   const showApprovalCard = !(!approvalEntry && isSubmitter && isActiveApprover);
+  const showExecutionActions = !(!approvalEntry && isSubmitter && isActiveExecutor);
 
   const [dialog, setDialog] = useState<"withdraw" | "void" | null>(null);
   const [reason, setReason] = useState("");
@@ -248,7 +256,7 @@ export default function OrderDetailPage() {
                 pendingStage !== undefined &&
                 session.user !== null &&
                 pendingStage.execution_actors.some((actor) => holdsSessionSlot(actor.id, session.user?.id));
-              if (isExecutor || pendingStage === undefined) return null;
+              if ((isExecutor && showExecutionActions) || pendingStage === undefined) return null;
               const names = pendingStage.execution_actors.map((actor) => actor.display_name).join(t("common.listSeparator"));
               return (
                 <Card data-testid="execution-wait-note">
@@ -267,6 +275,7 @@ export default function OrderDetailPage() {
             attemptId={attemptId ?? order.latest_attempt_id ?? null}
             onAttemptCreated={setAttemptId}
             onRecover={() => void orderQuery.refetch()}
+            showActions={showExecutionActions}
           />
           {(order.state === "completed" ||
             order.ticket_type === "rollback" ||

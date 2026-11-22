@@ -13,6 +13,7 @@ import (
 	reviewapp "github.com/cookieY/YearningX/backend/internal/review/application"
 	reviewdomain "github.com/cookieY/YearningX/backend/internal/review/domain"
 	"github.com/cookieY/YearningX/backend/internal/review/knowledge"
+	"github.com/cookieY/YearningX/backend/internal/tasks"
 )
 
 // writeBizError maps domain errors uniformly; unrecognized errors are handled as internal errors (without leaking details).
@@ -108,11 +109,15 @@ func writeDomainError(c *gin.Context, err error, refCode int) bool {
 		})
 		return true
 	}
+	if errors.Is(err, tasks.ErrQueueFull) {
+		return writeDomainCodedError(c, 1012, "SYSTEM_CAPACITY_EXHAUSTED", "System capacity exhausted; please retry later", nil)
+	}
 	if errors.Is(err, datasource.ErrTestRateLimited) {
 		WriteProblem(c, 429, "connection test rate limited")
 		return true
 	}
-	if errors.Is(err, identity.ErrRateLimited) {
+	if errors.Is(err, identity.ErrRateLimited) || errors.Is(err, identity.ErrPasswordHashBusy) {
+		c.Header("Retry-After", "1")
 		WriteProblem(c, 429, "rate limited")
 		return true
 	}
@@ -160,12 +165,24 @@ func writeDomainCodedError(c *gin.Context, code int, name, message string, meta 
 	if message == "" {
 		message = "Business operation failed"
 	}
-	WriteBusinessError(c, &BusinessError{
+	be := &BusinessError{
 		Code:    code,
 		Name:    name,
 		Message: message,
 		Meta:    meta,
-	})
+	}
+	if code == 1012 {
+		be.Retryable = true
+		cloned := make(map[string]any, len(meta)+1)
+		for k, v := range meta {
+			cloned[k] = v
+		}
+		if _, ok := cloned["retry_after_ms"]; !ok {
+			cloned["retry_after_ms"] = 1000
+		}
+		be.Meta = cloned
+	}
+	WriteBusinessError(c, be)
 	return true
 }
 

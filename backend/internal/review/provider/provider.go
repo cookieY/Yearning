@@ -64,6 +64,7 @@ type AnonymizedObjectReference struct {
 	ParentToken            string                  `json:"parent_token,omitempty"`
 	StatementOrdinal       int32                   `json:"statement_ordinal"`
 	StatementOrdinalRanges []StatementOrdinalRange `json:"statement_ordinal_ranges"`
+	OrdinalRangesTruncated bool                    `json:"-"`
 }
 
 // NormalizedEvidenceRef carries a bounded, normalized tool evidence fact into the model context.

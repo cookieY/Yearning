@@ -11,75 +11,40 @@
  * (yearning-ui-design-spec.md §4); every value must keep WCAG 2.1 AA text
  * contrast against --card in both themes, enforced by scripts/check-token-contrast.mjs.
  */
-@import "tailwindcss";
+@import "tailwindcss" source("../../");
 @import "tw-animate-css";
 @import "./shadcn-tailwind.css";
 
-/* Tooling sources are not UI. `scripts/scan-motion.mjs` talks *about* class names
- * (regexes, report strings), and Tailwind's extractor cannot tell that from usage —
- * it happily emits the catch-all transition utility (and its arbitrary-value
- * spelling) for a file that only forbids them. Exclude the directory so the gate
- * documents the rule without smuggling the utilities it bans into the bundle. */
-@source not "../../../scripts";
-/* AGENTS.md documents the motion rules and therefore *names* the utilities they
- * forbid; documenting a rule must not emit the rule's own counter-example. */
-@source not "../../../AGENTS.md";
+/* Non-UI / test / mock / codegen paths inside src/ that must not leak utilities into the bundle. */
+@source not "../../test";
+@source not "../../shared/mock";
+@source not "../../api/generated";
+@source not "../../shared/i18n";
+@source not "../../**/*.test.ts";
+@source not "../../**/*.test.tsx";
+@source not "../../**/*.spec.ts";
+@source not "../../**/*.spec.tsx";
+@source not "../../shared/components/ui/bubble.tsx";
+@source not "../../shared/components/ui/accordion.tsx";
+@source not "../../shared/components/ui/resizable.tsx";
 
 @custom-variant dark (&:is(.dark *));
 
-@font-face {
-  font-family: "Geist";
-  src: url("/fonts/geist-sans/Geist-Variable.woff2") format("woff2");
-  font-weight: 100 900;
-  font-style: normal;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: "Geist Mono";
-  src: url("/fonts/geist-mono/GeistMono-Variable.woff2") format("woff2");
-  font-weight: 100 900;
-  font-style: normal;
-  font-display: swap;
-}
-
 @theme {
-  --shadow-lg: 0 1rem 3rem rgba(0, 0, 0, 0.175);
-  --shadow-sm: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
-  --shadow-md: 0 1px 4px rgba(133, 146, 173, 0.2);
-  --shadow-btn-shadow: 0 9px 17.5px rgba(0, 0, 0, 0.05);
-
-  /*
-   * Motion (FE-F11-MOTION-POLISH). Curves live here instead of component files
-   * so the shared UI layer keeps one easing vocabulary and never hard-codes
-   * cubic-bezier() literals. Both names are additive: Tailwind's built-in
-   * --ease-out (cubic-bezier(0, 0, 0.2, 1)) starts too flat at 100-200ms, and
-   * no component under src/ used it before this token existed (grep: 0 call
-   * sites). --ease-out is the general enter/exit curve; --ease-sheet is the
-   * drawer curve that leaves fast and settles slowly.
-   */
   --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
   --ease-sheet: cubic-bezier(0.32, 0.72, 0, 1);
-  /* Data curves are deliberately flatter than --ease-out. --ease-out is an expo
-     curve: it dumps ~78% of the distance into the first 100ms, which is right
-     for a popover (the eye is watching for it to appear) and wrong for a chart
-     or a counting number (the eye needs to read the value as it travels).
-     Owner 2026-10-23, twice: "the animation is too fast... it finishes before the eye can react". */
   --ease-data: cubic-bezier(0.25, 0.46, 0.45, 0.94);
 
-  /* Chart entrance vocabulary (owner report 2026-10-23: "charts have no animation").
-     Transform-only so the compositor owns both: bars scale from the baseline
-     and the completion arc draws itself. Keyframes live outside @theme below
-     so a future component can reuse them without re-declaring a curve.
-     --animate-bar-grow is the histogram (14 bars, ~1.1s with the stagger);
-     --animate-bar-rise is the 20-dot state strip, where a long sweep would be
-     noise rather than information. Same keyframe, different budget. */
   --animate-bar-rise: bar-rise 400ms var(--ease-out) both;
   --animate-bar-grow: bar-rise 900ms var(--ease-data) both;
   --animate-ring-draw: ring-draw 900ms var(--ease-data) both;
 }
 
 @theme inline {
+  --shadow-lg: var(--shadow-token-lg);
+  --shadow-sm: var(--shadow-token-sm);
+  --shadow-md: var(--shadow-token-md);
+  --shadow-btn-shadow: var(--shadow-token-btn);
   --font-sans: var(--font-geist);
   --font-mono: var(--font-geist-mono);
   --color-background: var(--background);
@@ -97,13 +62,6 @@
   --color-chart-series-1: var(--chart-1);
   --color-chart-series-2: var(--chart-2);
   --color-chart-series-user: var(--chart-series-user);
-  /* Brand-adjacent chart accents (owner request 2026-10-23: the monochrome
-     charts read flat — hues sit beside the violet wordmark instead of the
-     template's unrelated orange/teal defaults). */
-  /* Status hues (owner request 2026-10-23: one state, one colour). Ten tones,
-     declared per theme so dark holds luminous hues on the dark surface and
-     light holds deeper ones on white — never one palette reused across both.
-     AA text contrast is enforced by scripts/check-token-contrast.mjs. */
   --color-tone-emerald: var(--tone-emerald);
   --color-tone-teal: var(--tone-teal);
   --color-tone-sky: var(--tone-sky);
@@ -111,7 +69,6 @@
   --color-tone-violet: var(--tone-violet);
   --color-tone-amber: var(--tone-amber);
   --color-tone-orange: var(--tone-orange);
-  /* Waiting tone (owner page feedback 2026-11-04: use #F59145 for all waiting states). */
   --color-tone-waiting: var(--tone-waiting);
   --color-tone-rose: var(--tone-rose);
   --color-tone-red: var(--tone-red);
@@ -158,7 +115,30 @@
   --radius-4xl: calc(var(--radius) + 16px);
 }
 
+@font-face {
+  font-family: "Geist";
+  src: url("/fonts/geist-sans/Geist-Variable.woff2") format("woff2");
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Geist Mono";
+  src: url("/fonts/geist-mono/GeistMono-Variable.woff2") format("woff2");
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
 :root {
+  --shadow-token-lg: 0 1rem 3rem rgba(0, 0, 0, 0.175);
+  --shadow-token-sm: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+  --shadow-token-md: 0 1px 4px rgba(133, 146, 173, 0.2);
+  --shadow-token-btn: 0 9px 17.5px rgba(0, 0, 0, 0.05);
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-sheet: cubic-bezier(0.32, 0.72, 0, 1);
+  --ease-data: cubic-bezier(0.25, 0.46, 0.45, 0.94);
   /* Geist has no CJK glyphs, so the stack names the Chinese face explicitly:
      without it the browser picks its own fallback per run and mixed zh/en
      lines drift in weight and width (owner report 2026-10-23). */
@@ -448,17 +428,6 @@ html[data-card-shadow="false"] [data-slot="card"] {
   @apply focus-visible:border-primary focus-visible:ring-[0px];
 }
 
-[data-slot="chart"] {
-  @apply h-72 w-full outline-none;
-}
-
-[data-slot="chart"] *,
-[data-slot="chart"] *:focus,
-[data-slot="chart"] *:focus-visible {
-  outline: none !important;
-  box-shadow: none !important;
-}
-
 /*
  * Sidebar icon-mode hover expansion (template mechanism, enabled by
  * <html data-sidebar-type="true">): while collapsed, the labels are removed
@@ -471,63 +440,6 @@ html[data-card-shadow="false"] [data-slot="card"] {
   .sidebar-box .hide-menu {
     display: none;
   }
-}
-
-/*
- * Login page color-shifting glow (owner ruling 2026-09-02): three large,
- * heavily blurred color fields (coral / teal) that blend seamlessly across
- * the panel top, bleed into the right column and radiate down onto the
- * slogan. Coprime loop periods + one reversed layer make the combined drift
- * read as random movement. Fully soft edges — every gradient fades to
- * transparent well inside its bounds. Static under prefers-reduced-motion
- * so screenshot baselines stay byte-stable.
- */
-@keyframes auth-glow-drift {
-  0% {
-    transform: translate3d(0, 0, 0) scale(1);
-    filter: hue-rotate(0deg);
-  }
-  25% {
-    transform: translate3d(9%, 7%, 0) scale(1.14);
-    filter: hue-rotate(95deg);
-  }
-  50% {
-    transform: translate3d(-7%, 12%, 0) scale(0.94);
-    filter: hue-rotate(205deg);
-  }
-  75% {
-    transform: translate3d(6%, -5%, 0) scale(1.1);
-    filter: hue-rotate(300deg);
-  }
-  100% {
-    transform: translate3d(0, 0, 0) scale(1);
-    filter: hue-rotate(360deg);
-  }
-}
-
-.auth-glow,
-.auth-glow-accent,
-.auth-glow-veil {
-  @apply pointer-events-none absolute rounded-full blur-3xl;
-}
-
-.auth-glow {
-  @apply -top-[28svh] left-[-18vw] h-[95svh] w-[95vw] opacity-80;
-  background: radial-gradient(closest-side, var(--chart-series-user), transparent 82%);
-  animation: auth-glow-drift 19s ease-in-out infinite;
-}
-
-.auth-glow-accent {
-  @apply -top-[30svh] left-[30vw] h-[90svh] w-[80vw] opacity-70;
-  background: radial-gradient(closest-side, var(--chart-2), transparent 82%);
-  animation: auth-glow-drift 26s ease-in-out infinite reverse;
-}
-
-.auth-glow-veil {
-  @apply top-[6svh] left-[4vw] h-[75svh] w-[78vw] opacity-60;
-  background: radial-gradient(closest-side, var(--chart-series-2), transparent 84%);
-  animation: auth-glow-drift 31s ease-in-out infinite;
-  animation-delay: -9s;
 }
 
 /*
@@ -938,148 +850,6 @@ html.light [data-slot="badge"].bg-muted.text-muted-foreground {
   background-color: var(--tone-stone-fill);
   color: var(--tone-stone);
   border-color: var(--border);
-}
-
-/* Recharts Brush dark/light theme alignment */
-[data-slot="chart"] .recharts-brush > rect {
-  fill: var(--muted) !important;
-  fill-opacity: 0.35 !important;
-  stroke: var(--border) !important;
-  rx: 4px;
-}
-[data-slot="chart"] .recharts-brush-slide {
-  fill: var(--primary) !important;
-  fill-opacity: 0.16 !important;
-}
-[data-slot="chart"] .recharts-brush-traveller rect {
-  fill: var(--muted-foreground) !important;
-  stroke: var(--border) !important;
-  rx: 2px;
-}
-[data-slot="chart"] .recharts-brush-traveller line {
-  stroke: var(--background) !important;
-}
-[data-slot="chart"] .recharts-brush-texts text {
-  fill: var(--muted-foreground) !important;
-  font-size: 10px;
-}
-
-/* Precheck dialog progress bar: smooth state-gradient transitions via @property
-   plus a compositor-only flowing sheen while precheck stages are in flight. */
-@property --precheck-grad-start {
-  syntax: "<color>";
-  inherits: true;
-  initial-value: transparent;
-}
-@property --precheck-grad-mid {
-  syntax: "<color>";
-  inherits: true;
-  initial-value: transparent;
-}
-@property --precheck-grad-end {
-  syntax: "<color>";
-  inherits: true;
-  initial-value: transparent;
-}
-
-@keyframes precheck-progress-sheen {
-  from {
-    transform: translateX(-100%);
-  }
-  to {
-    transform: translateX(100%);
-  }
-}
-
-.precheck-progress {
-  --precheck-grad-start: var(--tone-sky);
-  --precheck-grad-mid: var(--primary);
-  --precheck-grad-end: var(--tone-indigo);
-}
-
-.precheck-progress[data-progress-tone="starting"] {
-  --precheck-grad-start: var(--tone-sky);
-  --precheck-grad-mid: var(--primary);
-  --precheck-grad-end: var(--tone-indigo);
-}
-
-.precheck-progress[data-progress-tone="queued"] {
-  --precheck-grad-start: var(--tone-waiting);
-  --precheck-grad-mid: var(--tone-amber);
-  --precheck-grad-end: var(--tone-orange);
-}
-
-.precheck-progress[data-progress-tone="running"] {
-  --precheck-grad-start: var(--tone-sky);
-  --precheck-grad-mid: var(--primary);
-  --precheck-grad-end: var(--tone-violet);
-}
-
-.precheck-progress[data-progress-tone="finalizing"] {
-  --precheck-grad-start: var(--primary);
-  --precheck-grad-mid: var(--tone-indigo);
-  --precheck-grad-end: var(--tone-teal);
-}
-
-.precheck-progress[data-progress-tone="passed"] {
-  --precheck-grad-start: var(--tone-teal);
-  --precheck-grad-mid: var(--tone-emerald);
-  --precheck-grad-end: var(--risk-safe);
-}
-
-.precheck-progress[data-progress-tone="warning"] {
-  --precheck-grad-start: var(--tone-amber);
-  --precheck-grad-mid: var(--tone-waiting);
-  --precheck-grad-end: var(--tone-orange);
-}
-
-.precheck-progress[data-progress-tone="blocked"] {
-  --precheck-grad-start: var(--tone-orange);
-  --precheck-grad-mid: var(--tone-rose);
-  --precheck-grad-end: var(--risk-critical);
-}
-
-.precheck-progress [data-slot="progress-track"] {
-  height: 0.5rem;
-}
-
-.precheck-progress [data-slot="progress-indicator"] {
-  position: relative;
-  overflow: hidden;
-  border-radius: 9999px;
-  background-color: transparent;
-  background-image: linear-gradient(
-    90deg,
-    var(--precheck-grad-start) 0%,
-    var(--precheck-grad-mid) 52%,
-    var(--precheck-grad-end) 100%
-  );
-  transition:
-    scale 420ms var(--ease-data),
-    --precheck-grad-start 400ms var(--ease-out),
-    --precheck-grad-mid 400ms var(--ease-out),
-    --precheck-grad-end 400ms var(--ease-out);
-}
-
-.precheck-progress[data-progress-active="true"] [data-slot="progress-indicator"]::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background-image: linear-gradient(
-    90deg,
-    transparent 0%,
-    color-mix(in oklch, var(--primary-foreground) 42%, transparent) 50%,
-    transparent 100%
-  );
-  animation: precheck-progress-sheen 1.5s linear infinite;
-  pointer-events: none;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .precheck-progress[data-progress-active="true"] [data-slot="progress-indicator"]::after {
-    animation: none;
-    opacity: 0;
-  }
 }
 
 

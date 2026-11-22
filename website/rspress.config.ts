@@ -1,8 +1,15 @@
+import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { defineConfig } from '@rspress/core';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const zhNav = JSON.parse(
+  fs.readFileSync(path.join(__dirname, 'docs/zh/_nav.json'), 'utf8'),
+);
+const enNav = JSON.parse(
+  fs.readFileSync(path.join(__dirname, 'docs/en/_nav.json'), 'utf8'),
+);
 const base = process.env.DOCS_BASE || '/';
 const normalizedBase = base.endsWith('/') ? base : `${base}/`;
 if (
@@ -101,6 +108,10 @@ const enSidebar = [
       { text: 'Error Codes & Troubleshooting', link: '/en/reference/error-codes' },
       { text: 'Architecture & Privacy Pipeline', link: '/en/guide/architecture' },
       { text: 'License & Security Policy', link: '/en/about/license' },
+      { text: 'Pricing & Pro Licensing', link: '/en/about/pricing' },
+      { text: 'Terms of Service', link: '/en/about/terms' },
+      { text: 'Refund Policy', link: '/en/about/refund-policy' },
+      { text: 'Privacy Policy', link: '/en/about/privacy' },
     ],
   },
 ];
@@ -147,6 +158,18 @@ export default defineConfig({
   ],
   themeConfig: {
     darkMode: 'dark' as unknown as boolean,
+    locales: [
+      {
+        lang: 'zh',
+        label: '简体中文',
+        nav: zhNav,
+      },
+      {
+        lang: 'en',
+        label: 'English',
+        nav: enNav,
+      },
+    ],
     socialLinks: [
       {
         icon: 'github',

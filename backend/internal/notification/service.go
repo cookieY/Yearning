@@ -14,6 +14,7 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/cookieY/YearningX/backend/internal/crypto"
+	"github.com/cookieY/YearningX/backend/internal/tasks"
 )
 
 // ErrValidation / ErrNotFound are stable domain errors (mapped to 1001/1002).
@@ -501,6 +502,9 @@ func sanitizeToken(token string) string {
 // nor mutates business state; kind=notification_test_delivery is polled and executed by the Worker).
 func (s *Service) CreateTestDelivery(ctx context.Context, channelID string) (string, error) {
 	if _, err := s.loadChannel(ctx, channelID); err != nil {
+		return "", err
+	}
+	if err := tasks.CheckPendingCapacity(ctx, s.DB); err != nil {
 		return "", err
 	}
 	input, _ := json.Marshal(map[string]string{"channel_id": channelID})

@@ -318,6 +318,32 @@ export function scheduledStageFor(
   return stage.execution_actors.some((actor) => holdsSessionSlot(actor.id, userId)) ? stage : null;
 }
 
+/** The active or unverified execution stage (`stage_execution_pending`, `scheduled`,
+ * `running`, or `result_unknown`) when the given user is one of its frozen executors.
+ * Used for both entry-route action splitting and execution-scope queue reachability. */
+export function activeExecutorStageFor(
+  order: ChangeOrder,
+  userId: string | undefined,
+): (typeof order.stages)[number] | null {
+  if (userId === undefined) return null;
+  const pendingStage = frozenExecutorStageFor(order, userId);
+  if (pendingStage !== null) return pendingStage;
+  const scheduledStage = scheduledStageFor(order, userId);
+  if (scheduledStage !== null) return scheduledStage;
+  if (order.state === "running" || order.state === "result_unknown") {
+    const activeStage =
+      order.stages.find((candidate) => candidate.state === order.state) ??
+      (order.current_stage_position !== null
+        ? order.stages.find((candidate) => candidate.position === order.current_stage_position)
+        : undefined);
+    if (activeStage === undefined) return null;
+    return activeStage.execution_actors.some((actor) => holdsSessionSlot(actor.id, userId))
+      ? activeStage
+      : null;
+  }
+  return null;
+}
+
 /** Terminal execution-attempt states (backend domain.AttemptState.Terminal) —
  * the shared truth for "attempt is live" across the polling hooks and the
  * workspace cards. */

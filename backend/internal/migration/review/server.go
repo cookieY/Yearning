@@ -46,7 +46,11 @@ const (
 
 // maxLoginGuardKeys bounds the number of keys in the failure table (NEW-AUTH-02) so random username spraying
 // cannot grow memory without bound. When full, expired keys are swept first, then the entry with the oldest failure timestamp is evicted.
-const maxLoginGuardKeys = 1000
+const (
+	maxLoginGuardKeys = 1000
+	maxLoginGuardIPs  = 4096
+	maxFailuresPerIP  = 20
+)
 
 type loginFailState struct {
 	count       int
@@ -57,8 +61,9 @@ type loginFailState struct {
 }
 
 type loginGuard struct {
-	mu     sync.Mutex
-	failed map[string]loginFailState
+	mu       sync.Mutex
+	failed   map[string]loginFailState
+	ipFailed map[string][]time.Time
 	// saturated is set when the table is full and cannot safely evict any entry because active locks exist.
 	// While saturated, all new login attempts fail closed until at least one lock expires and is swept;
 	// otherwise evicting locked entries would let an attacker spray 1000 usernames to evict a target's active lock (NEW-AUTH-07).
@@ -66,7 +71,10 @@ type loginGuard struct {
 }
 
 func newLoginGuard() *loginGuard {
-	return &loginGuard{failed: map[string]loginFailState{}}
+	return &loginGuard{
+		failed:   map[string]loginFailState{},
+		ipFailed: map[string][]time.Time{},
+	}
 }
 
 // normalizeLoginGuardKey normalizes a username into a canonical lockout key (NEW-AUTH-02): lowercase + trimmed
@@ -170,6 +178,64 @@ func (g *loginGuard) recordSuccess(username string) {
 	delete(g.failed, normalizeLoginGuardKey(username))
 }
 
+func (g *loginGuard) pruneIPLocked(ip string, now time.Time) []time.Time {
+	if g.ipFailed == nil {
+		return nil
+	}
+	kept := g.ipFailed[ip][:0]
+	for _, t := range g.ipFailed[ip] {
+		if now.Sub(t) < loginLockWindow {
+			kept = append(kept, t)
+		}
+	}
+	if len(kept) == 0 {
+		delete(g.ipFailed, ip)
+		return nil
+	}
+	g.ipFailed[ip] = kept
+	return kept
+}
+
+// allowIP reports whether clientIP is below the per-IP failure threshold within loginLockWindow.
+func (g *loginGuard) allowIP(ip string, now time.Time) bool {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	ip = strings.TrimSpace(ip)
+	kept := g.pruneIPLocked(ip, now)
+	return len(kept) < maxFailuresPerIP
+}
+
+// recordIPFailure records a failed authentication attempt against clientIP, bounding ipFailed capacity.
+func (g *loginGuard) recordIPFailure(ip string, now time.Time) {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	if g.ipFailed == nil {
+		g.ipFailed = map[string][]time.Time{}
+	}
+	ip = strings.TrimSpace(ip)
+	kept := g.pruneIPLocked(ip, now)
+	if len(kept) == 0 && len(g.ipFailed) >= maxLoginGuardIPs {
+		for k := range g.ipFailed {
+			g.pruneIPLocked(k, now)
+		}
+		if len(g.ipFailed) >= maxLoginGuardIPs {
+			var oldestIP string
+			var oldestAt time.Time
+			first := true
+			for k, ts := range g.ipFailed {
+				last := ts[len(ts)-1]
+				if first || last.Before(oldestAt) {
+					oldestIP, oldestAt, first = k, last, false
+				}
+			}
+			if !first {
+				delete(g.ipFailed, oldestIP)
+			}
+		}
+	}
+	g.ipFailed[ip] = append(g.ipFailed[ip], now)
+}
+
 // NewRouter constructs the Gin router for migration review mode.
 func NewRouter(s *Server) *gin.Engine {
 	gin.SetMode(gin.ReleaseMode)
@@ -223,9 +289,13 @@ func (s *Server) handleLogin(c *gin.Context) {
 		httpapi.WriteBusinessError(c, &httpapi.BusinessError{Code: 1001, Name: "VALIDATION_FAILED", Message: "username and password required"})
 		return
 	}
-	// SEC-0043: reject immediately during an active lockout window without reaching password verification (preventing online brute force).
-	if s.loginGuard.locked(req.Username, time.Now()) {
+	now := time.Now()
+	clientIP := strings.TrimSpace(c.ClientIP())
+	// SEC-0043 / POSTFIX-05: reject immediately on per-IP failure threshold or active account lockout
+	// before querying DB, verifying password, or mutating username lockout state.
+	if !s.loginGuard.allowIP(clientIP, now) || s.loginGuard.locked(req.Username, now) {
 		s.auditLoginOutcome(req.Username, c, "locked")
+		c.Header("Retry-After", "60")
 		httpapi.WriteProblem(c, http.StatusTooManyRequests, "login locked; retry later")
 		return
 	}
@@ -234,7 +304,9 @@ func (s *Server) handleLogin(c *gin.Context) {
 	err := s.DB.Raw(`select id::text, coalesce(password_hash,''), is_builtin_admin from users where lower(username)=lower($1) and is_builtin_admin`, req.Username).
 		Row().Scan(&id, &hash, &isAdmin)
 	if err != nil || !legacy.VerifyDjangoHash(req.Password, hash) {
-		s.loginGuard.recordFailure(req.Username, time.Now())
+		failNow := time.Now()
+		s.loginGuard.recordFailure(req.Username, failNow)
+		s.loginGuard.recordIPFailure(clientIP, failNow)
 		s.auditLoginOutcome(req.Username, c, "failed")
 		httpapi.WriteProblem(c, http.StatusUnauthorized, "invalid credentials")
 		return

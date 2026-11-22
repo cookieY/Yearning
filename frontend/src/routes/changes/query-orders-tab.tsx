@@ -231,7 +231,7 @@ export function QueryOrdersTab() {
                   </TableCell>
                   <TableCell className="max-w-72 truncate font-mono font-semibold text-foreground">
                     {row.kind === "request"
-                      ? row.request.datasource_ids.join(" · ")
+                      ? formatRequestDatasources(row.request)
                       : row.session.capabilities.map((capability) => capability.datasource_name).join(" · ")}
                   </TableCell>
                   <TableCell>
@@ -289,7 +289,7 @@ export function QueryOrdersTab() {
                       <Badge variant="secondary">{t(`query.request.state.${detail.request.state}`)}</Badge>
                     </DetailRow>
                     <DetailRow label={t("orders.query.detail.datasources")}>
-                      <span className="font-mono text-xs break-all">{detail.request.datasource_ids.join(" · ")}</span>
+                      <span className="font-mono text-xs break-all">{formatRequestDatasources(detail.request)}</span>
                     </DetailRow>
                     <DetailRow label={t("orders.query.detail.createdAt")}>
                       {formatTimestamp(detail.request.created_at)}
@@ -342,6 +342,14 @@ export function QueryOrdersTab() {
       </Sheet>
     </Card>
   );
+}
+
+function formatRequestDatasources(request: QueryAccessRequest): string {
+  const labels =
+    request.datasource_names !== undefined && request.datasource_names.length > 0
+      ? request.datasource_names
+      : request.datasource_ids;
+  return labels.join(" · ");
 }
 
 function DetailRow({ label, children }: { label: string; children: React.ReactNode }) {

@@ -13,13 +13,13 @@ export const FOOTER_TEXT = "AGPL-3.0 Licensed | Copyright © 2017-present Henry 
 export function AppFooter() {
   const { t } = useTranslation();
   const linkClass =
-    "text-sm text-muted-foreground no-underline hover:no-underline hover:text-muted-foreground "
+    "whitespace-nowrap text-sm text-muted-foreground no-underline hover:no-underline hover:text-muted-foreground "
     + "visited:text-muted-foreground focus-visible:text-muted-foreground transition-none";
   return (
     <footer className="pt-6 md:pr-36">
-      <div className="flex flex-col items-center justify-between gap-3 text-center md:flex-row">
+      <div className="flex flex-col items-center justify-between gap-3 text-center lg:flex-row">
         <p className="text-sm text-muted-foreground">{FOOTER_TEXT}</p>
-        <div className="flex items-center gap-4">
+        <div className="flex shrink-0 items-center gap-4">
           <a href={__SOURCE_URL__} target="_blank" rel="noreferrer noopener" className={linkClass}>
             {t("shell.footer.source")}
           </a>

@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"database/sql/driver"
 	"errors"
+	"io"
 	"strings"
 	"testing"
 	"time"
@@ -14,6 +15,7 @@ import (
 	gormlogger "gorm.io/gorm/logger"
 
 	"github.com/cookieY/YearningX/backend/internal/authorization/bizerr"
+	"github.com/cookieY/YearningX/backend/internal/tasks"
 )
 
 func TestResolveCapabilitiesMatrix(t *testing.T) {
@@ -195,6 +197,7 @@ type asyncTaskFailFx struct {
 	execQueries []string
 	execArgs    [][]driver.NamedValue
 	queryErr    error
+	pendingCnt  int64
 }
 
 func (f *asyncTaskFailFx) Connect(context.Context) (driver.Conn, error) { return f, nil }
@@ -215,8 +218,27 @@ func (f *asyncTaskFailFx) ExecContext(_ context.Context, query string, args []dr
 	f.execArgs = append(f.execArgs, args)
 	return driver.RowsAffected(1), nil
 }
-func (f *asyncTaskFailFx) QueryContext(_ context.Context, _ string, _ []driver.NamedValue) (driver.Rows, error) {
+func (f *asyncTaskFailFx) QueryContext(_ context.Context, query string, _ []driver.NamedValue) (driver.Rows, error) {
+	if strings.Contains(strings.ToLower(query), "from async_tasks") {
+		return &asyncTaskCountRows{val: f.pendingCnt}, nil
+	}
 	return nil, f.queryErr
+}
+
+type asyncTaskCountRows struct {
+	val  int64
+	done bool
+}
+
+func (r *asyncTaskCountRows) Columns() []string { return []string{"count"} }
+func (r *asyncTaskCountRows) Close() error      { return nil }
+func (r *asyncTaskCountRows) Next(dest []driver.Value) error {
+	if r.done {
+		return io.EOF
+	}
+	r.done = true
+	dest[0] = r.val
+	return nil
 }
 
 func TestTestAndCapabilitiesFinishesAsyncTaskFailedOnEarlyError(t *testing.T) {
@@ -245,5 +267,35 @@ func TestTestAndCapabilitiesFinishesAsyncTaskFailedOnEarlyError(t *testing.T) {
 	}
 	if len(fx.execQueries) < 2 || !strings.Contains(strings.ToLower(fx.execQueries[1]), `update "async_tasks" set`) {
 		t.Fatalf("expected deferred UPDATE on async_tasks, got %v", fx.execQueries)
+	}
+}
+
+func TestTestAndCapabilitiesReturnsErrQueueFullBeforeProbeRateLimit(t *testing.T) {
+	defer tasks.SetPendingMaximumForTest(3)()
+	fx := &asyncTaskFailFx{pendingCnt: 3, queryErr: errors.New("should not query datasources")}
+	sqlDB := sql.OpenDB(fx)
+	t.Cleanup(func() { _ = sqlDB.Close() })
+	db, err := gorm.Open(gormpostgres.New(gormpostgres.Config{
+		Conn:             sqlDB,
+		WithoutReturning: true,
+	}), &gorm.Config{Logger: gormlogger.Discard, SkipDefaultTransaction: true})
+	if err != nil {
+		t.Fatalf("gorm open: %v", err)
+	}
+
+	svc := &Service{db: db}
+	dsID := "0198d9cc-0000-7000-8000-000000000456"
+	_, task, err := svc.TestAndCapabilities(context.Background(), dsID, "review")
+	if !errors.Is(err, tasks.ErrQueueFull) {
+		t.Fatalf("TestAndCapabilities err = %v, want tasks.ErrQueueFull", err)
+	}
+	if task != nil {
+		t.Fatalf("expected nil task when queue full, got %+v", task)
+	}
+	if len(fx.execQueries) != 0 {
+		t.Fatalf("expected zero async_tasks inserts when queue full, got %v", fx.execQueries)
+	}
+	if _, stored := svc.probeMu.Load(dsID); stored {
+		t.Fatal("probeMu must not be updated when TestAndCapabilities rejects due to queue capacity")
 	}
 }

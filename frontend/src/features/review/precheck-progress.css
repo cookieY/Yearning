@@ -1,0 +1,110 @@
+/* Precheck dialog progress bar: smooth state-gradient transitions via @property
+   plus a compositor-only flowing sheen while precheck stages are in flight. */
+@import "./precheck-sheen.css";
+
+@property --precheck-grad-start {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: transparent;
+}
+@property --precheck-grad-mid {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: transparent;
+}
+@property --precheck-grad-end {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: transparent;
+}
+
+.precheck-progress {
+  --precheck-grad-start: var(--tone-sky);
+  --precheck-grad-mid: var(--primary);
+  --precheck-grad-end: var(--tone-indigo);
+}
+
+.precheck-progress[data-progress-tone="starting"] {
+  --precheck-grad-start: var(--tone-sky);
+  --precheck-grad-mid: var(--primary);
+  --precheck-grad-end: var(--tone-indigo);
+}
+
+.precheck-progress[data-progress-tone="queued"] {
+  --precheck-grad-start: var(--tone-waiting);
+  --precheck-grad-mid: var(--tone-amber);
+  --precheck-grad-end: var(--tone-orange);
+}
+
+.precheck-progress[data-progress-tone="running"] {
+  --precheck-grad-start: var(--tone-sky);
+  --precheck-grad-mid: var(--primary);
+  --precheck-grad-end: var(--tone-violet);
+}
+
+.precheck-progress[data-progress-tone="finalizing"] {
+  --precheck-grad-start: var(--primary);
+  --precheck-grad-mid: var(--tone-indigo);
+  --precheck-grad-end: var(--tone-teal);
+}
+
+.precheck-progress[data-progress-tone="passed"] {
+  --precheck-grad-start: var(--tone-teal);
+  --precheck-grad-mid: var(--tone-emerald);
+  --precheck-grad-end: var(--risk-safe);
+}
+
+.precheck-progress[data-progress-tone="warning"] {
+  --precheck-grad-start: var(--tone-amber);
+  --precheck-grad-mid: var(--tone-waiting);
+  --precheck-grad-end: var(--tone-orange);
+}
+
+.precheck-progress[data-progress-tone="blocked"] {
+  --precheck-grad-start: var(--tone-orange);
+  --precheck-grad-mid: var(--tone-rose);
+  --precheck-grad-end: var(--risk-critical);
+}
+
+.precheck-progress [data-slot="progress-track"] {
+  height: 0.5rem;
+}
+
+.precheck-progress [data-slot="progress-indicator"] {
+  position: relative;
+  overflow: hidden;
+  border-radius: 9999px;
+  background-color: transparent;
+  background-image: linear-gradient(
+    90deg,
+    var(--precheck-grad-start) 0%,
+    var(--precheck-grad-mid) 52%,
+    var(--precheck-grad-end) 100%
+  );
+  transition:
+    scale 420ms var(--ease-data),
+    --precheck-grad-start 400ms var(--ease-out),
+    --precheck-grad-mid 400ms var(--ease-out),
+    --precheck-grad-end 400ms var(--ease-out);
+}
+
+.precheck-progress[data-progress-active="true"] [data-slot="progress-indicator"]::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image: linear-gradient(
+    90deg,
+    transparent 0%,
+    color-mix(in oklch, var(--primary-foreground) 42%, transparent) 50%,
+    transparent 100%
+  );
+  animation: precheck-progress-sheen 1.5s linear infinite;
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .precheck-progress[data-progress-active="true"] [data-slot="progress-indicator"]::after {
+    animation: none;
+    opacity: 0;
+  }
+}

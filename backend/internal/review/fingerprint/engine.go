@@ -130,12 +130,24 @@ func (e *Engine) Analyze(profile Profile, sql []byte, mapper *privacy.RunMapper)
 	if len(sql) > e.opts.MaxStatementBytes {
 		return Result{}, &Failure{Code: ErrNameBatchTooLarge, Detail: fmt.Sprintf("statement %d bytes exceeds %d", len(sql), e.opts.MaxStatementBytes)}
 	}
-	if mapper == nil {
-		mapper = privacy.NewRunMapper()
-	}
 	lex, err := Tokenize(sql, profile.Flags())
 	if err != nil {
 		return Result{}, &Failure{Code: ErrNameParseFailed, Detail: "lexical proof failed: " + err.Error()}
+	}
+	return e.AnalyzeLexed(profile, sql, lex, mapper)
+}
+
+// AnalyzeLexed analyzes a pre-tokenized single statement (without trailing semicolon).
+// Callers must pass lex produced by Tokenize(sql, profile.Flags()).
+func (e *Engine) AnalyzeLexed(profile Profile, sql []byte, lex LexOutput, mapper *privacy.RunMapper) (Result, error) {
+	if err := profile.Validate(); err != nil {
+		return Result{}, &Failure{Code: ErrNameParseFailed, Detail: "dialect_profile_unknown"}
+	}
+	if len(sql) > e.opts.MaxStatementBytes {
+		return Result{}, &Failure{Code: ErrNameBatchTooLarge, Detail: fmt.Sprintf("statement %d bytes exceeds %d", len(sql), e.opts.MaxStatementBytes)}
+	}
+	if mapper == nil {
+		mapper = privacy.NewRunMapper()
 	}
 	if len(lex.Tokens) == 0 {
 		return Result{}, &Failure{Code: ErrNameParseFailed, Detail: "empty statement"}

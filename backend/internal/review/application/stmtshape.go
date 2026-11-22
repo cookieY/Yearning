@@ -9,6 +9,7 @@
 package application
 
 import (
+	"bytes"
 	"regexp"
 	"strconv"
 	"strings"
@@ -77,23 +78,11 @@ var sqlKeywordSet = map[string]bool{
 // extractStmtFacts extracts structural facts from a single statement (containing no plaintext identifiers).
 func extractStmtFacts(sql []byte, op, class string) stmtFacts {
 	var f stmtFacts
-	s := string(sql)
 	if class == "dml" {
-		switch op {
-		case "update", "delete":
-			f.set("dml_has_limit", reWordLimit.MatchString(s))
-			f.set("dml_has_order_by", reWordOrderBy.MatchString(s))
-			f.set("dml_has_subselect", reSubSelect.MatchString(s))
-			f.set("where_literal_null", reNullLiteral.MatchString(s))
-		case "insert":
-			f.set("insert_has_columns", reInsertCols.MatchString(s))
-			f.set("insert_has_null_literal", reInsertNull.MatchString(s))
-			f.set("dml_has_subselect", reSubSelect.MatchString(s))
-		case "replace":
-			f.set("dml_has_subselect", reSubSelect.MatchString(s))
-		}
+		mergeStmtFactsInto(&f, sql, op, class)
 		return f
 	}
+	s := string(sql)
 	// DDL family.
 	switch {
 	case reCreateView.MatchString(s):
@@ -284,6 +273,97 @@ func extractColumnDef(s, column string) string {
 		end++
 	}
 	return s[loc[1]:end]
+}
+
+// mergeStmtFactsInto extracts structural facts for a statement directly into dst, avoiding
+// per-statement map allocations and string copies on DML statements.
+func mergeStmtFactsInto(dst *stmtFacts, sql []byte, op, class string) {
+	if class != "dml" {
+		mergeFactsInto(dst, extractStmtFacts(sql, op, class))
+		return
+	}
+	if op != "update" && op != "delete" && op != "insert" && op != "replace" {
+		return
+	}
+	if dst.m == nil {
+		dst.m = make(map[string]any, 4)
+	}
+	mergeBool := func(key string, match func() bool) {
+		if cur, ok := dst.m[key].(bool); ok && cur {
+			return
+		}
+		dst.m[key] = match()
+	}
+	switch op {
+	case "update", "delete":
+		mergeBool("dml_has_limit", func() bool {
+			return hasASCIIFold(sql, "limit") && reWordLimit.Match(sql)
+		})
+		mergeBool("dml_has_order_by", func() bool {
+			return hasASCIIFold(sql, "order") && hasASCIIFold(sql, "by") && reWordOrderBy.Match(sql)
+		})
+		mergeBool("dml_has_subselect", func() bool {
+			return hasASCIIFold(sql, "select") && reSubSelect.Match(sql)
+		})
+		mergeBool("where_literal_null", func() bool {
+			return hasASCIIFold(sql, "null") &&
+				(bytes.IndexByte(sql, '=') >= 0 || bytes.IndexByte(sql, '<') >= 0 || bytes.IndexByte(sql, '>') >= 0) &&
+				reNullLiteral.Match(sql)
+		})
+	case "insert":
+		mergeBool("insert_has_columns", func() bool {
+			return bytes.IndexByte(sql, '(') >= 0 && hasASCIIFold(sql, "insert") && hasASCIIFold(sql, "into") && reInsertCols.Match(sql)
+		})
+		mergeBool("insert_has_null_literal", func() bool {
+			return hasASCIIFold(sql, "null") && hasASCIIFold(sql, "values") && reInsertNull.Match(sql)
+		})
+		mergeBool("dml_has_subselect", func() bool {
+			return hasASCIIFold(sql, "select") && reSubSelect.Match(sql)
+		})
+	case "replace":
+		mergeBool("dml_has_subselect", func() bool {
+			return hasASCIIFold(sql, "select") && reSubSelect.Match(sql)
+		})
+	}
+}
+
+func hasASCIIFold(haystack []byte, lowerNeedle string) bool {
+	n := len(lowerNeedle)
+	if n == 0 {
+		return true
+	}
+	if len(haystack) < n {
+		return false
+	}
+	firstLower := lowerNeedle[0]
+	firstUpper := firstLower
+	if firstLower >= 'a' && firstLower <= 'z' {
+		firstUpper = firstLower - ('a' - 'A')
+	}
+	limit := len(haystack) - n
+	for i := 0; i <= limit; i++ {
+		b := haystack[i]
+		if b != firstLower && b != firstUpper {
+			continue
+		}
+		matched := true
+		for j := 1; j < n; j++ {
+			hb := haystack[i+j]
+			nb := lowerNeedle[j]
+			if hb == nb {
+				continue
+			}
+			if nb >= 'a' && nb <= 'z' && hb == nb-('a'-'A') {
+				continue
+			}
+			matched = false
+			break
+		}
+		if matched {
+			return true
+		}
+	}
+	return false
 }
 
 // mergeFactsInto aggregates facts across a group: logical OR for booleans, maximum for counts/lengths,

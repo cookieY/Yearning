@@ -78,8 +78,9 @@ type loginRateLimiter struct {
 }
 
 const (
-	rateWindow   = time.Minute
-	rateMaxFails = 10
+	rateWindow        = time.Minute
+	rateMaxFails      = 10
+	rateMaxFailsPerIP = 30
 )
 
 func newLoginRateLimiter() *loginRateLimiter {
@@ -89,10 +90,7 @@ func newLoginRateLimiter() *loginRateLimiter {
 // maxBuckets is the threshold triggering a full sweep to prevent attackers from growing the map unboundedly with distinct keys.
 const maxBuckets = 8192
 
-func (l *loginRateLimiter) allow(key string) bool {
-	l.mu.Lock()
-	defer l.mu.Unlock()
-	now := time.Now()
+func (l *loginRateLimiter) pruneLocked(key string, now time.Time) []time.Time {
 	kept := l.buckets[key][:0]
 	for _, t := range l.buckets[key] {
 		if now.Sub(t) < rateWindow {
@@ -102,20 +100,49 @@ func (l *loginRateLimiter) allow(key string) bool {
 	if len(kept) == 0 {
 		// Evict expired window entries on the fly so the map does not grow unboundedly with the keyspace.
 		delete(l.buckets, key)
-	} else {
-		l.buckets[key] = kept
+		return nil
 	}
-	if len(l.buckets) > maxBuckets {
-		for k, ts := range l.buckets {
-			if len(ts) == 0 || now.Sub(ts[len(ts)-1]) >= rateWindow {
-				delete(l.buckets, k)
-			}
+	l.buckets[key] = kept
+	return kept
+}
+
+func (l *loginRateLimiter) sweepIfNeededLocked(now time.Time) {
+	if len(l.buckets) <= maxBuckets {
+		return
+	}
+	for k, ts := range l.buckets {
+		if len(ts) == 0 || now.Sub(ts[len(ts)-1]) >= rateWindow {
+			delete(l.buckets, k)
 		}
 	}
-	if kept := l.buckets[key]; len(kept) >= rateMaxFails {
+}
+
+func (l *loginRateLimiter) allow(key string) bool {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	now := time.Now()
+	kept := l.pruneLocked(key, now)
+	l.sweepIfNeededLocked(now)
+	if len(kept) >= rateMaxFails {
 		return false
 	}
 	l.buckets[key] = append(l.buckets[key], now)
+	return true
+}
+
+// allowLogin checks both the per-(username, IP) bucket and the per-IP spray bucket atomically.
+func (l *loginRateLimiter) allowLogin(userIPKey, ipKey string) bool {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	now := time.Now()
+	userKept := l.pruneLocked(userIPKey, now)
+	ipKept := l.pruneLocked(ipKey, now)
+	l.sweepIfNeededLocked(now)
+	if len(userKept) >= rateMaxFails || len(ipKept) >= rateMaxFailsPerIP {
+		return false
+	}
+	l.buckets[userIPKey] = append(l.buckets[userIPKey], now)
+	l.buckets[ipKey] = append(l.buckets[ipKey], now)
 	return true
 }
 
@@ -126,6 +153,33 @@ func (l *loginRateLimiter) success(key string) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	delete(l.buckets, key)
+}
+
+func (l *loginRateLimiter) popLastLocked(key string) {
+	if ts := l.buckets[key]; len(ts) <= 1 {
+		delete(l.buckets, key)
+	} else {
+		l.buckets[key] = ts[:len(ts)-1]
+	}
+}
+
+// loginSuccess clears the per-(username, IP) failure bucket and removes one entry from the per-IP bucket
+// so repeated legitimate logins from a shared IP are never throttled.
+func (l *loginRateLimiter) loginSuccess(userIPKey, ipKey string) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	delete(l.buckets, userIPKey)
+	l.popLastLocked(ipKey)
+}
+
+// loginCapacityUndo reverts the optimistic attempt slot appended by allowLogin when verification
+// aborts due to Argon2id semaphore saturation (ErrPasswordHashBusy), preserving prior genuine failures
+// without prematurely burning a caller's failure quota during concurrency bursts.
+func (l *loginRateLimiter) loginCapacityUndo(userIPKey, ipKey string) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	l.popLastLocked(userIPKey)
+	l.popLastLocked(ipKey)
 }
 
 // AllowLoginAttempt checks the failed-login rate limit for external identities (LDAP/OIDC)
@@ -180,7 +234,8 @@ func (s *Service) LoginLocal(ctx context.Context, username, password string, met
 	// (existing accounts return 429 while non-existent accounts always return "invalid username or password");
 	// checking the rate limit first makes existing and non-existent accounts behave identically.
 	key := strings.ToLower(username) + "|" + meta.SourceIP
-	if !s.limit.allow(key) {
+	ipKey := "login-ip:" + meta.SourceIP
+	if !s.limit.allowLogin(key, ipKey) {
 		return nil, ErrRateLimited
 	}
 	var user UserModel
@@ -188,7 +243,10 @@ func (s *Service) LoginLocal(ctx context.Context, username, password string, met
 		Where("lower(username) = lower(?)", username).First(&user).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		// Constant-time path: perform a dummy password verification before rejecting so account existence is indistinguishable.
-		_, _, _ = VerifyPassword(password, "$argon2id$v=19$m=65536,t=3,p=2$AAAAAAAAAAAAAAAAAAAAAA$AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA")
+		if _, _, verr := VerifyPasswordCtx(ctx, password, "$argon2id$v=19$m=65536,t=3,p=2$AAAAAAAAAAAAAAAAAAAAAA$AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"); errors.Is(verr, ErrPasswordHashBusy) {
+			s.limit.loginCapacityUndo(key, ipKey)
+			return nil, ErrRateLimited
+		}
 		return nil, bizerr.ErrInvalidCredentials
 	}
 	if err != nil {
@@ -196,16 +254,24 @@ func (s *Service) LoginLocal(ctx context.Context, username, password string, met
 	}
 	if user.IsBuiltinAdmin {
 		if err := s.adminLocalLogin(ctx, &user, password, meta); err != nil {
+			if errors.Is(err, ErrPasswordHashBusy) {
+				s.limit.loginCapacityUndo(key, ipKey)
+				return nil, ErrRateLimited
+			}
 			return nil, err
 		}
-		s.limit.success(key)
+		s.limit.loginSuccess(key, ipKey)
 	} else {
-		ok, upgrade, err := VerifyPassword(password, derefString(user.PasswordHash))
+		ok, upgrade, err := VerifyPasswordCtx(ctx, password, derefString(user.PasswordHash))
+		if errors.Is(err, ErrPasswordHashBusy) {
+			s.limit.loginCapacityUndo(key, ipKey)
+			return nil, ErrRateLimited
+		}
 		if err != nil || !ok {
 			s.auditLogin(ctx, "user", &user.ID, user.Username, "login_local", "failed", meta)
 			return nil, bizerr.ErrInvalidCredentials
 		}
-		s.limit.success(key)
+		s.limit.loginSuccess(key, ipKey)
 		if err := s.upgradeHashIfNeeded(ctx, &user, password, upgrade); err != nil {
 			return nil, err
 		}
@@ -238,7 +304,11 @@ func (s *Service) adminLocalLogin(ctx context.Context, user *UserModel, password
 			bizErr = bizerr.AdminLockedError{}
 			return nil
 		}
-		ok, upgrade, err := VerifyPassword(password, derefString(user.PasswordHash))
+		ok, upgrade, err := VerifyPasswordCtx(ctx, password, derefString(user.PasswordHash))
+		if errors.Is(err, ErrPasswordHashBusy) {
+			// Roll back without incrementing admin lockout failure count when Argon2id capacity is saturated.
+			return ErrPasswordHashBusy
+		}
 		if err != nil || !ok {
 			sec.FailedAttempts++
 			sec.UpdatedAt = time.Now().UTC()
@@ -284,7 +354,7 @@ func (s *Service) upgradeHashIfNeeded(ctx context.Context, user *UserModel, pass
 	if !needsUpgrade {
 		return nil
 	}
-	hash, err := HashPassword(password)
+	hash, err := HashPasswordCtx(ctx, password)
 	if err != nil {
 		return err
 	}
@@ -371,7 +441,7 @@ func (s *Service) createUserRow(ctx context.Context, username, displayName, emai
 
 // createUserRowWithRole creates a user with the specified management role ('user' | 'admin').
 func (s *Service) createUserRowWithRole(ctx context.Context, username, displayName, email, password, role string) (*UserModel, error) {
-	hash, err := HashPassword(password)
+	hash, err := HashPasswordCtx(ctx, password)
 	if err != nil {
 		return nil, err
 	}
@@ -471,7 +541,7 @@ func (s *Service) ResetAdminPassword(ctx context.Context, newPassword string, me
 	if len(newPassword) < 12 {
 		return bizerr.ErrValidationFailed
 	}
-	hash, err := HashPassword(newPassword)
+	hash, err := HashPasswordCtx(ctx, newPassword)
 	if err != nil {
 		return err
 	}
@@ -545,36 +615,56 @@ func (s *Service) ChangeMyPassword(ctx context.Context, userID, oldPassword, new
 	if oldPassword == "" || len(newPassword) < 12 {
 		return bizerr.ErrValidationFailed
 	}
-	newHash, err := HashPassword(newPassword)
+	var user UserModel
+	if err := s.db.WithContext(ctx).Where("id = ?", userID).First(&user).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return bizerr.ErrNotFound
+		}
+		return err
+	}
+	var external int64
+	if err := s.db.WithContext(ctx).Model(&ExternalIdentityModel{}).
+		Where("user_id = ?", userID).Count(&external).Error; err != nil {
+		return err
+	}
+	if external > 0 {
+		return bizerr.ErrPasswordManagedByIdentitySource
+	}
+	if user.PasswordHash == nil {
+		return bizerr.ErrInvalidCredentials
+	}
+	oldStoredHash := *user.PasswordHash
+	ok, _, err := VerifyPasswordCtx(ctx, oldPassword, oldStoredHash)
+	if err != nil {
+		// Malformed hash or ErrPasswordHashBusy: return before opening any row lock or hashing newPassword.
+		return err
+	}
+	if !ok {
+		return bizerr.ErrInvalidCredentials
+	}
+	newHash, err := HashPasswordCtx(ctx, newPassword)
 	if err != nil {
 		return err
 	}
 	return s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		var user UserModel
+		var locked UserModel
 		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
-			Where("id = ?", userID).First(&user).Error; err != nil {
+			Where("id = ?", userID).First(&locked).Error; err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
 				return bizerr.ErrNotFound
 			}
 			return err
 		}
-		var external int64
+		var lockedExternal int64
 		if err := tx.Model(&ExternalIdentityModel{}).
-			Where("user_id = ?", userID).Count(&external).Error; err != nil {
+			Where("user_id = ?", userID).Count(&lockedExternal).Error; err != nil {
 			return err
 		}
-		if external > 0 {
+		if lockedExternal > 0 {
 			return bizerr.ErrPasswordManagedByIdentitySource
 		}
-		if user.PasswordHash == nil {
-			return bizerr.ErrInvalidCredentials
-		}
-		ok, _, err := VerifyPassword(oldPassword, *user.PasswordHash)
-		if err != nil {
-			// Malformed hash: treat as an internal error rather than surfacing it as an incorrect old password.
-			return err
-		}
-		if !ok {
+		// Reject concurrent password rotation without holding FOR UPDATE across Argon2id verification.
+		if locked.PasswordHash == nil || *locked.PasswordHash != oldStoredHash {
 			return bizerr.ErrInvalidCredentials
 		}
 		if err := tx.Model(&UserModel{}).Where("id = ?", userID).
@@ -586,8 +676,8 @@ func (s *Service) ChangeMyPassword(ctx context.Context, userID, oldPassword, new
 		}
 		return s.audit.Audit(ctx, tx, auditlog.AuditInput{
 			EventType: "user.password_changed", ActorKind: "user",
-			ActorID: &user.ID, ActorUsername: &user.Username,
-			ResourceType: "user", ResourceID: &user.ID,
+			ActorID: &locked.ID, ActorUsername: &locked.Username,
+			ResourceType: "user", ResourceID: &locked.ID,
 			Action: "change_password", Outcome: "succeeded",
 			RequestID: strPtr(meta.RequestID),
 		})
@@ -600,7 +690,7 @@ func (s *Service) BootstrapAdmin(ctx context.Context, password string) error {
 	if len(password) < 12 {
 		return bizerr.ErrValidationFailed
 	}
-	hash, err := HashPassword(password)
+	hash, err := HashPasswordCtx(ctx, password)
 	if err != nil {
 		return err
 	}

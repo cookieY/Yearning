@@ -355,7 +355,7 @@ export function AssistantPanel({
           const remaining = sessions.filter((item) => item.id !== deletingId);
           setSelectedSessionId(remaining[0]?.id ?? null);
           setSelectedDraftId(null);
-          appToast.success(t("assistant.deleteSession"));
+          appToast.success(t("assistant.sessionDeleted"));
         },
         onError: (err) => {
           const display = describeError(err, "deleteAssistantSession");

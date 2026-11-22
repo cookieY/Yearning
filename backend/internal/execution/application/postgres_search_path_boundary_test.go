@@ -445,3 +445,127 @@ func TestPostgresBoundaryOpenContextRejectsMissingFrozenValues(
 		t, err, "postgres_search_path_snapshot_unreadable",
 	)
 }
+
+func TestPostgresBoundaryUniformRelationsPassAndDrift(t *testing.T) {
+	t.Parallel()
+	path := testPostgresBoundaryPath()
+	binding := testPostgresBoundaryBinding(path)
+	binding.UniformRelations = map[string]reviewapp.FrozenPostgresObjectBinding{
+		"table_1": {
+			TableName: "orders", Schema: "app", Kind: "table",
+			OID: 101, Present: true, Supported: true,
+		},
+	}
+	binding.Relations["2:table_2"] = reviewapp.FrozenPostgresObjectBinding{
+		TableName: "orders", Schema: "app", Kind: "table",
+		OID: 101, Present: true, Supported: true,
+	}
+
+	names, err := reviewedPostgresRelationNames(binding, 2)
+	if err != nil {
+		t.Fatalf("reviewedPostgresRelationNames failed: %v", err)
+	}
+	if len(names) != 1 || names[0] != "orders" {
+		t.Fatalf("reviewedPostgresRelationNames = %v, want deduplicated [orders]", names)
+	}
+
+	matchingLookup := []database.PostgresRelationLookup{{
+		Relation:        "orders",
+		PresentBySchema: map[string]database.PostgresRelationKind{"app": database.PostgresRelationTable},
+		OIDBySchema:     map[string]uint32{"app": 101},
+	}}
+	if err := verifyPostgresInspection(path, binding, 2, matchingLookup); err != nil {
+		t.Fatalf("verifyPostgresInspection failed on matching uniform lookup: %v", err)
+	}
+
+	// Drift in OID or missing lookup must reject with postgres_search_path_changed.
+	driftedLookup := []database.PostgresRelationLookup{{
+		Relation:        "orders",
+		PresentBySchema: map[string]database.PostgresRelationKind{"app": database.PostgresRelationTable},
+		OIDBySchema:     map[string]uint32{"app": 999},
+	}}
+	requirePostgresBoundaryFailure(t, verifyPostgresInspection(path, binding, 2, driftedLookup), "postgres_search_path_changed")
+	requirePostgresBoundaryFailure(t, verifyPostgresInspection(path, binding, 2, nil), "postgres_search_path_changed")
+
+	// Unsupported relation in UniformRelations must reject with postgres_search_path_changed.
+	unsupported := testPostgresBoundaryBinding(path)
+	unsupported.UniformRelations = map[string]reviewapp.FrozenPostgresObjectBinding{
+		"table_1": {TableName: "orders", Schema: "app", Kind: "view", OID: 101, Present: true, Supported: false},
+	}
+	_, err = reviewedPostgresRelationNames(unsupported, 1)
+	requirePostgresBoundaryFailure(t, err, "postgres_search_path_changed")
+	requirePostgresBoundaryFailure(t, verifyPostgresObjectBindings(context.Background(), nil, path, unsupported, 1), "postgres_search_path_changed")
+	requirePostgresBoundaryFailure(t, verifyPostgresInspection(path, unsupported, 1, matchingLookup), "postgres_search_path_changed")
+
+	// Overlapping UniformRelations and Relations token must reject with snapshot_invalid.
+	overlap := testPostgresBoundaryBinding(path)
+	overlap.UniformRelations = map[string]reviewapp.FrozenPostgresObjectBinding{
+		"table_1": {TableName: "orders", Schema: "app", Kind: "table", OID: 101, Present: true, Supported: true},
+	}
+	overlap.Relations = map[string]reviewapp.FrozenPostgresObjectBinding{
+		"2:table_1": {TableName: "orders", Schema: "app", Kind: "table", OID: 101, Present: true, Supported: true},
+	}
+	_, err = reviewedPostgresRelationNames(overlap, 2)
+	requirePostgresBoundaryFailure(t, err, "postgres_search_path_snapshot_invalid")
+	requirePostgresBoundaryFailure(t, verifyPostgresInspection(path, overlap, 2, matchingLookup), "postgres_search_path_snapshot_invalid")
+}
+
+func TestPostgresBoundaryOneShotCreateDropNotCheckedAtSubsequentDDL(t *testing.T) {
+	t.Parallel()
+	path := testPostgresBoundaryPath()
+	binding := testPostgresBoundaryBinding(path)
+	// Orders is uniform across all ordinals; new_tbl was created at ordinal 1 only
+	// and demoted out of UniformRelations into Relations["1:table_new"].
+	binding.UniformRelations = map[string]reviewapp.FrozenPostgresObjectBinding{
+		"table_orders": {
+			TableName: "orders", Schema: "app", Kind: "table",
+			OID: 101, Present: true, Supported: true,
+		},
+	}
+	binding.Relations["1:table_new"] = reviewapp.FrozenPostgresObjectBinding{
+		TableName: "new_tbl", Schema: "app", Kind: "table",
+		OID: 0, Present: false, Supported: true,
+	}
+
+	// At ordinal 1, new_tbl is expected absent while orders is expected present.
+	lookupOrd1 := []database.PostgresRelationLookup{
+		{
+			Relation:        "orders",
+			PresentBySchema: map[string]database.PostgresRelationKind{"app": database.PostgresRelationTable},
+			OIDBySchema:     map[string]uint32{"app": 101},
+		},
+		{
+			Relation:        "new_tbl",
+			PresentBySchema: map[string]database.PostgresRelationKind{},
+			OIDBySchema:     map[string]uint32{},
+		},
+	}
+	if err := verifyPostgresInspection(path, binding, 1, lookupOrd1); err != nil {
+		t.Fatalf("ordinal 1 inspection failed: %v", err)
+	}
+
+	// After ordinal 1 creates new_tbl, ordinal 2 checks only UniformRelations (orders) and ordinal-2
+	// relations; live new_tbl existing now must NOT cause false drift failure.
+	lookupOrd2 := []database.PostgresRelationLookup{
+		{
+			Relation:        "orders",
+			PresentBySchema: map[string]database.PostgresRelationKind{"app": database.PostgresRelationTable},
+			OIDBySchema:     map[string]uint32{"app": 101},
+		},
+		{
+			Relation:        "new_tbl",
+			PresentBySchema: map[string]database.PostgresRelationKind{"app": database.PostgresRelationTable},
+			OIDBySchema:     map[string]uint32{"app": 202},
+		},
+	}
+	namesOrd2, err := reviewedPostgresRelationNames(binding, 2)
+	if err != nil {
+		t.Fatalf("reviewedPostgresRelationNames(2) failed: %v", err)
+	}
+	if len(namesOrd2) != 1 || namesOrd2[0] != "orders" {
+		t.Fatalf("reviewedPostgresRelationNames(2) = %v, want [orders]", namesOrd2)
+	}
+	if err := verifyPostgresInspection(path, binding, 2, lookupOrd2); err != nil {
+		t.Fatalf("ordinal 2 inspection falsely failed due to ordinal-1 new_tbl creation: %v", err)
+	}
+}

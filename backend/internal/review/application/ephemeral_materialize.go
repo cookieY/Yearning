@@ -7,13 +7,14 @@ package application
 import (
 	"bytes"
 	"context"
-	"strings"
 	"time"
 
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 
 	"github.com/cookieY/YearningX/backend/internal/review/changeset"
 	"github.com/cookieY/YearningX/backend/internal/review/domain"
+	"github.com/cookieY/YearningX/backend/internal/review/fingerprint"
 	"github.com/cookieY/YearningX/backend/internal/review/persistence"
 )
 
@@ -53,15 +54,19 @@ func (s *Services) MaterializeEphemeralRunTxWithSQL(ctx context.Context, tx *gor
 		return err
 	}
 	if len(er.Statements) > 0 {
-		if err := tx.WithContext(ctx).CreateInBatches(er.Statements, 512).Error; err != nil {
+		if err := insertSQLStatementsBulkTx(ctx, tx, er.Statements); err != nil {
 			return err
 		}
 	} else if er.Run.StatementCount > 0 && !er.skipStmtMaterialize {
 		if len(sqlBytes) == 0 || s.Engine == nil {
 			return domain.ErrCoverageIncomplete
 		}
+		if err := er.Profile.Validate(); err != nil {
+			return domain.ErrCoverageIncomplete
+		}
+		dialectFlags := er.Profile.Flags()
 		split := changeset.NewSplitter(bytes.NewReader(sqlBytes), er.Profile, 0)
-		batch := make([]persistence.SQLStatementModel, 0, 512)
+		batch := make([]persistence.SQLStatementModel, 0, sqlStatementBulkBatchSize)
 		var ordinal int32
 		for {
 			st, done, serr := split.Next()
@@ -72,11 +77,15 @@ func (s *Services) MaterializeEphemeralRunTxWithSQL(ctx context.Context, tx *gor
 				break
 			}
 			ordinal++
-			res, aerr := s.Engine.Analyze(er.Profile, st.SQL, er.Mapper)
+			tokens, lexErr := fingerprint.Tokenize(st.SQL, dialectFlags)
+			if lexErr != nil {
+				return domain.ErrCoverageIncomplete
+			}
+			res, aerr := s.Engine.AnalyzeLexed(er.Profile, st.SQL, tokens, er.Mapper)
 			if aerr != nil {
 				return domain.ErrCoverageIncomplete
 			}
-			op := strings.ToLower(operationOf(st.SQL))
+			op := operationLower(st.SQL)
 			stmtID := er.repOrdinalToStmtID[ordinal]
 			if stmtID == "" {
 				stmtID = newID()
@@ -89,8 +98,8 @@ func (s *Services) MaterializeEphemeralRunTxWithSQL(ctx context.Context, tx *gor
 				return berr
 			}
 			batch = append(batch, rowModel)
-			if len(batch) == 512 {
-				if err := tx.WithContext(ctx).CreateInBatches(batch, 512).Error; err != nil {
+			if len(batch) == sqlStatementBulkBatchSize {
+				if err := insertSQLStatementsBulkTx(ctx, tx, batch); err != nil {
 					return err
 				}
 				batch = batch[:0]
@@ -100,7 +109,7 @@ func (s *Services) MaterializeEphemeralRunTxWithSQL(ctx context.Context, tx *gor
 			return domain.ErrCoverageIncomplete
 		}
 		if len(batch) > 0 {
-			if err := tx.WithContext(ctx).CreateInBatches(batch, 512).Error; err != nil {
+			if err := insertSQLStatementsBulkTx(ctx, tx, batch); err != nil {
 				return err
 			}
 		}
@@ -187,4 +196,142 @@ func (s *Services) PersistDraftSQLPayloadTx(ctx context.Context, tx *gorm.DB, dr
 		return "", err
 	}
 	return mac, nil
+}
+
+const sqlStatementBulkBatchSize = 2048
+
+// pgRawArrayArg prevents GORM's default reflect.Slice expansion into ($1, $2, ...)
+// so Go slices pass through as single PostgreSQL array bind parameters to pgx/v5.
+type pgRawArrayArg struct{ val any }
+
+func (a pgRawArrayArg) Build(builder clause.Builder) {
+	if stmt, ok := builder.(*gorm.Statement); ok {
+		stmt.Vars = append(stmt.Vars, a.val)
+		stmt.DB.Dialector.BindVarTo(stmt, stmt, a.val)
+	}
+}
+
+const insertSQLStatementsUnnestSQL = `
+INSERT INTO sql_statements (
+	id, review_run_id, ordinal, statement_kind, operation, size_bytes,
+	algorithm_version, dialect_profile, fingerprint_quality, fingerprint_key_id,
+	canonical_fingerprint_hmac, dialect_fingerprint_hmac, execution_shape_hmac,
+	typed_shape, literal_type_counts, tuple_count, parameter_count
+)
+SELECT u1::uuid, u2::uuid, u3, u4, u5, u6,
+       u7, u8, u9, u10,
+       u11, u12, u13,
+       u14, u15, u16, u17
+FROM unnest(
+	?::text[], ?::text[], ?::int4[], ?::text[], ?::text[], ?::int4[],
+	?::text[], ?::text[], ?::text[], ?::text[],
+	?::text[], ?::text[], ?::text[],
+	?::jsonb[], ?::jsonb[], ?::int4[], ?::int4[]
+) AS t(u1, u2, u3, u4, u5, u6, u7, u8, u9, u10, u11, u12, u13, u14, u15, u16, u17)`
+
+func insertSQLStatementsBulkTx(ctx context.Context, tx *gorm.DB, rows []persistence.SQLStatementModel) error {
+	if len(rows) == 0 {
+		return nil
+	}
+	if tx.Dialector == nil || tx.Dialector.Name() != "postgres" {
+		return tx.WithContext(ctx).CreateInBatches(rows, 512).Error
+	}
+	capHint := len(rows)
+	if capHint > sqlStatementBulkBatchSize {
+		capHint = sqlStatementBulkBatchSize
+	}
+	ids := make([]string, 0, capHint)
+	runIDs := make([]string, 0, capHint)
+	ordinals := make([]int32, 0, capHint)
+	kinds := make([]string, 0, capHint)
+	ops := make([]string, 0, capHint)
+	sizeBytes := make([]int32, 0, capHint)
+	algVersions := make([]string, 0, capHint)
+	profiles := make([]string, 0, capHint)
+	qualities := make([]string, 0, capHint)
+	keyIDs := make([]string, 0, capHint)
+	canonHMACs := make([]string, 0, capHint)
+	dialectHMACs := make([]string, 0, capHint)
+	shapeHMACs := make([]string, 0, capHint)
+	typedShapes := make([]string, 0, capHint)
+	literalCounts := make([]string, 0, capHint)
+	tupleCounts := make([]int32, 0, capHint)
+	paramCounts := make([]int32, 0, capHint)
+
+	for start := 0; start < len(rows); start += sqlStatementBulkBatchSize {
+		end := start + sqlStatementBulkBatchSize
+		if end > len(rows) {
+			end = len(rows)
+		}
+		chunk := rows[start:end]
+		ids = ids[:0]
+		runIDs = runIDs[:0]
+		ordinals = ordinals[:0]
+		kinds = kinds[:0]
+		ops = ops[:0]
+		sizeBytes = sizeBytes[:0]
+		algVersions = algVersions[:0]
+		profiles = profiles[:0]
+		qualities = qualities[:0]
+		keyIDs = keyIDs[:0]
+		canonHMACs = canonHMACs[:0]
+		dialectHMACs = dialectHMACs[:0]
+		shapeHMACs = shapeHMACs[:0]
+		typedShapes = typedShapes[:0]
+		literalCounts = literalCounts[:0]
+		tupleCounts = tupleCounts[:0]
+		paramCounts = paramCounts[:0]
+
+		for i := range chunk {
+			r := &chunk[i]
+			ids = append(ids, r.ID)
+			runIDs = append(runIDs, r.ReviewRunID)
+			ordinals = append(ordinals, r.Ordinal)
+			kinds = append(kinds, r.StatementKind)
+			ops = append(ops, r.Operation)
+			sizeBytes = append(sizeBytes, r.SizeBytes)
+			algVersions = append(algVersions, r.AlgorithmVersion)
+			profiles = append(profiles, r.DialectProfile)
+			qualities = append(qualities, r.FingerprintQuality)
+			keyIDs = append(keyIDs, r.FingerprintKeyID)
+			canonHMACs = append(canonHMACs, r.CanonicalFingerprintHMAC)
+			dialectHMACs = append(dialectHMACs, r.DialectFingerprintHMAC)
+			shapeHMACs = append(shapeHMACs, r.ExecutionShapeHMAC)
+			if len(r.TypedShape) > 0 {
+				typedShapes = append(typedShapes, string(r.TypedShape))
+			} else {
+				typedShapes = append(typedShapes, "{}")
+			}
+			if len(r.LiteralTypeCounts) > 0 {
+				literalCounts = append(literalCounts, string(r.LiteralTypeCounts))
+			} else {
+				literalCounts = append(literalCounts, "{}")
+			}
+			tupleCounts = append(tupleCounts, r.TupleCount)
+			paramCounts = append(paramCounts, r.ParameterCount)
+		}
+		if err := tx.WithContext(ctx).Exec(
+			insertSQLStatementsUnnestSQL,
+			pgRawArrayArg{ids},
+			pgRawArrayArg{runIDs},
+			pgRawArrayArg{ordinals},
+			pgRawArrayArg{kinds},
+			pgRawArrayArg{ops},
+			pgRawArrayArg{sizeBytes},
+			pgRawArrayArg{algVersions},
+			pgRawArrayArg{profiles},
+			pgRawArrayArg{qualities},
+			pgRawArrayArg{keyIDs},
+			pgRawArrayArg{canonHMACs},
+			pgRawArrayArg{dialectHMACs},
+			pgRawArrayArg{shapeHMACs},
+			pgRawArrayArg{typedShapes},
+			pgRawArrayArg{literalCounts},
+			pgRawArrayArg{tupleCounts},
+			pgRawArrayArg{paramCounts},
+		).Error; err != nil {
+			return err
+		}
+	}
+	return nil
 }

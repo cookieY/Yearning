@@ -80,16 +80,17 @@ function seedOrder(overrides: Record<string, unknown> = {}): string {
   return id;
 }
 
-function renderDetail(orderId: string) {
+function renderDetail(orderId: string, entry: "changes" | "approvals" = "changes") {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   });
   return render(
     <QueryClientProvider client={queryClient}>
       <SessionProvider>
-      <MemoryRouter initialEntries={[`/changes/orders/${orderId}`]}>
+      <MemoryRouter initialEntries={[`/${entry}/orders/${orderId}`]}>
         <Routes>
           <Route path="/changes/orders/:orderId" element={<OrderDetailPage />} />
+          <Route path="/approvals/orders/:orderId" element={<OrderDetailPage />} />
         </Routes>
       </MemoryRouter>
     </SessionProvider>
@@ -381,9 +382,20 @@ describe("execution wait note for non-executors (§18.57)", () => {
 
   it("shows no wait note for the frozen executor (the action card owns the view)", async () => {
     const id = executionPendingOrder(FIXTURE_OWNER_ID);
-    renderDetail(id);
+    renderDetail(id, "approvals");
     await screen.findByTestId("execution-action-card");
     expect(screen.queryByTestId("execution-wait-note")).toBeNull();
+    expect(screen.queryByTestId("withdraw-order")).toBeNull();
+    expect(screen.queryByTestId("void-order")).toBeNull();
+  });
+
+  it("shows wait note and submitter actions without execution actions when a self-executor opens from My Orders", async () => {
+    const id = executionPendingOrder(FIXTURE_OWNER_ID);
+    renderDetail(id, "changes");
+    await screen.findByTestId("withdraw-order");
+    expect(screen.getByTestId("void-order")).toBeVisible();
+    expect(await screen.findByTestId("execution-wait-note")).toBeVisible();
+    expect(screen.queryByTestId("execution-action-card")).toBeNull();
   });
 
   it("displays rollback SQL and generates a rollback draft on completed orders", async () => {

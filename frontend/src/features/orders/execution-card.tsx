@@ -667,10 +667,11 @@ function OscProgress({ osc }: { osc: OscExecutionDetails }) {
 /** Manual verification for result_unknown (E005): four fixed verdicts, reason
  * and database-side evidence are mandatory; only frozen executors see the
  * form, and the manual-confirmation marker persists afterwards. */
-function VerificationCard({ order, attempt, onRecover }: {
+function VerificationCard({ order, attempt, onRecover, showActions }: {
   order: ChangeOrder;
   attempt: ExecutionAttempt;
   onRecover: () => void;
+  showActions: boolean;
 }) {
   const { t } = useTranslation();
   const session = useSession();
@@ -690,7 +691,7 @@ function VerificationCard({ order, attempt, onRecover }: {
   const stageOfAttempt = order.stages.find((candidate) => candidate.id === attempt.stage_id) ?? null;
   const isExecutor = stageOfAttempt?.execution_actors.some((actor) => holdsSessionSlot(actor.id, session.user?.id)) ?? false;
 
-  if (!isExecutor || stageOfAttempt === null) {
+  if (!showActions || !isExecutor || stageOfAttempt === null) {
     return (
       <Alert data-testid="verification-waiting">
         <ShieldQuestion className="size-4" aria-hidden />
@@ -828,10 +829,11 @@ function VerificationCard({ order, attempt, onRecover }: {
 
 /** The known attempt: progress, cancel (any frozen executor may request it),
  * statement ledger, OSC surface and the verification form. */
-function ExecutionAttemptCard({ order, attemptId, onRecover }: {
+function ExecutionAttemptCard({ order, attemptId, onRecover, showActions }: {
   order: ChangeOrder;
   attemptId: string;
   onRecover: () => void;
+  showActions: boolean;
 }) {
   const { t } = useTranslation();
   const session = useSession();
@@ -918,9 +920,9 @@ function ExecutionAttemptCard({ order, attemptId, onRecover }: {
         {attempt.osc != null && <OscProgress osc={attempt.osc} />}
         <StatementLedger attemptId={attempt.id} live={live} />
         {attempt.state === "result_unknown" && (
-          <VerificationCard order={order} attempt={attempt} onRecover={onRecover} />
+          <VerificationCard order={order} attempt={attempt} onRecover={onRecover} showActions={showActions} />
         )}
-        {isExecutor && attempt.state === "running" && (
+        {showActions && isExecutor && attempt.state === "running" && (
           <Button
             variant="outline"
             className="self-start"
@@ -934,7 +936,7 @@ function ExecutionAttemptCard({ order, attemptId, onRecover }: {
         )}
       </CardContent>
 
-      <Dialog open={cancelOpen} onOpenChange={(open) => { if (!open) { setCancelOpen(false); setCancelError(null); } }}>
+      <Dialog open={showActions && cancelOpen} onOpenChange={(open) => { if (!open) { setCancelOpen(false); setCancelError(null); } }}>
         <DialogContent data-testid="execution-cancel-dialog">
           <DialogHeader>
             <DialogTitle>{t("orders.execution.cancelTitle")}</DialogTitle>
@@ -1106,20 +1108,27 @@ function CopyDraftCard({ order }: { order: ChangeOrder }) {
   );
 }
 
-export function ExecutionWorkspaceCard({ order, attemptId, onAttemptCreated, onRecover }: {
+export function ExecutionWorkspaceCard({ order, attemptId, onAttemptCreated, onRecover, showActions = true }: {
   order: ChangeOrder;
   attemptId: string | null;
   onAttemptCreated: (attemptId: string) => void;
   onRecover: () => void;
+  showActions?: boolean;
 }) {
   return (
     // Every child returns null for most order states; an empty wrapper would
     // still be a flex item of the page column and add a second 30px gap.
+    // Conditional mounting by order.state also resets ExecutionActionCard's
+    // transient schedule confirmation hint when a schedule is cancelled.
     <div className="flex flex-col gap-[30px] empty:hidden">
-      <ExecutionActionCard order={order} onAttemptCreated={onAttemptCreated} />
-      <ScheduledCard order={order} />
+      {showActions && order.state === "stage_execution_pending" && (
+        <ExecutionActionCard order={order} onAttemptCreated={onAttemptCreated} />
+      )}
+      {showActions && order.state === "scheduled" && (
+        <ScheduledCard order={order} />
+      )}
       {attemptId !== null && (
-        <ExecutionAttemptCard order={order} attemptId={attemptId} onRecover={onRecover} />
+        <ExecutionAttemptCard order={order} attemptId={attemptId} onRecover={onRecover} showActions={showActions} />
       )}
       <CopyDraftCard order={order} />
     </div>

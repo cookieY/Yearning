@@ -262,7 +262,7 @@ func (s *Services) fetchMetadataCached(
 		)
 		defer cancel()
 
-		adapter, pool, err := s.openQueryPool(fetchCtx, scope.ds, timeoutMS)
+		adapter, pool, err := s.openMetadataPool(fetchCtx, scope.ds, timeoutMS)
 		if err != nil {
 			if errors.Is(err, errQueryPoolBusy) {
 				// SEC-0027: global pool budget backpressure -- return structured "system busy" (1012 family).

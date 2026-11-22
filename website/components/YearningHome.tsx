@@ -838,6 +838,15 @@ export function YearningHome() {
               <p className="yn-legal-note">
                 v4.0 Public Beta · AGPL-3.0-or-later · Go 1.25 · React 19 · PostgreSQL 14–18
               </p>
+              {isEn ? (
+                <nav className="yn-legal-links" aria-label="Pricing and legal links">
+                  <a href={withBase('/en/about/pricing')}>Pricing</a>
+                  <a href={withBase('/en/about/terms')}>Terms of Service</a>
+                  <a href={withBase('/en/about/refund-policy')}>Refund Policy</a>
+                  <a href={withBase('/en/about/privacy')}>Privacy Policy</a>
+                  <a href={withBase('/en/about/license')}>License</a>
+                </nav>
+              ) : null}
             </div>
           </div>
         </div>

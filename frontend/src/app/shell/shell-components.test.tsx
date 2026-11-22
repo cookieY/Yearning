@@ -49,7 +49,10 @@ describe("AppFooter", () => {
     render(<AppFooter />);
     expect(screen.getByText(FOOTER_TEXT)).toBeVisible();
     expect(FOOTER_TEXT).toBe("AGPL-3.0 Licensed | Copyright © 2017-present Henry Yee");
+    const layoutRow = screen.getByText(FOOTER_TEXT).parentElement;
+    expect(layoutRow).toHaveClass("lg:flex-row");
     const sourceLink = screen.getByRole("link", { name: "\u6e90\u7801" });
+    expect(sourceLink).toHaveClass("whitespace-nowrap");
     expect(sourceLink).toHaveAttribute("href", "https://source.example/");
     expect(sourceLink).toHaveAttribute("rel", "noreferrer noopener");
   });

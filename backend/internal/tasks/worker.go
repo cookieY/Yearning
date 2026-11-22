@@ -7,11 +7,38 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgconn"
 	"gorm.io/gorm"
 )
+
+const defaultMaxIdlePoll = 15 * time.Second
+
+var wakeRegistry = struct {
+	mu        sync.RWMutex
+	listeners map[string]map[*Worker]struct{}
+}{
+	listeners: map[string]map[*Worker]struct{}{},
+}
+
+// WakeKind sends a non-blocking wakeup signal to every active Worker registered for kind.
+func WakeKind(kind string) {
+	wakeRegistry.mu.RLock()
+	set := wakeRegistry.listeners[kind]
+	var targets []*Worker
+	if len(set) > 0 {
+		targets = make([]*Worker, 0, len(set))
+		for w := range set {
+			targets = append(targets, w)
+		}
+	}
+	wakeRegistry.mu.RUnlock()
+	for _, w := range targets {
+		w.Wake()
+	}
+}
 
 // Handler executes a claimed task once. It must return promptly when ctx is cancelled;
 // completed local idempotent steps may be safely replayed. Returned errors map to task failure.
@@ -27,15 +54,59 @@ type Worker struct {
 	owner        string
 	lease        time.Duration
 	pollInterval time.Duration
+	maxIdlePoll  time.Duration
+	wakeCh       chan struct{}
 	handlers     map[string]Handler
 }
 
 // NewWorker constructs a Worker; owner must be unique within a deployment (instance ID).
 func NewWorker(db *gorm.DB, owner string, kinds []string, lease, poll time.Duration) *Worker {
+	maxIdle := defaultMaxIdlePoll
+	if maxIdle < poll {
+		maxIdle = poll
+	}
 	return &Worker{
 		db: db, kinds: kinds, owner: owner,
-		lease: lease, pollInterval: poll,
+		lease: lease, pollInterval: poll, maxIdlePoll: maxIdle,
+		wakeCh:   make(chan struct{}, 1),
 		handlers: map[string]Handler{},
+	}
+}
+
+// WithMaxIdlePoll sets the upper bound for idle exponential backoff (clamped >= pollInterval).
+func (w *Worker) WithMaxIdlePoll(d time.Duration) *Worker {
+	if d < w.pollInterval {
+		d = w.pollInterval
+	}
+	w.maxIdlePoll = d
+	return w
+}
+
+// Wake sends a non-blocking wakeup signal so an idle Worker polls immediately without waiting for its backoff timer.
+func (w *Worker) Wake() {
+	if w == nil || w.wakeCh == nil {
+		return
+	}
+	select {
+	case w.wakeCh <- struct{}{}:
+	default:
+	}
+}
+
+// Close removes this Worker from the WakeKind registry. Run calls Close automatically on exit.
+func (w *Worker) Close() {
+	if w == nil {
+		return
+	}
+	wakeRegistry.mu.Lock()
+	defer wakeRegistry.mu.Unlock()
+	for kind := range w.handlers {
+		if set := wakeRegistry.listeners[kind]; set != nil {
+			delete(set, w)
+			if len(set) == 0 {
+				delete(wakeRegistry.listeners, kind)
+			}
+		}
 	}
 }
 
@@ -45,6 +116,14 @@ func (w *Worker) Register(kind string, h Handler) {
 		panic("tasks: duplicate handler for kind " + kind)
 	}
 	w.handlers[kind] = h
+	wakeRegistry.mu.Lock()
+	set := wakeRegistry.listeners[kind]
+	if set == nil {
+		set = map[*Worker]struct{}{}
+		wakeRegistry.listeners[kind] = set
+	}
+	set[w] = struct{}{}
+	wakeRegistry.mu.Unlock()
 }
 
 // RunOnce claims and executes at most one task; returns ErrNoTask when the queue is empty.
@@ -140,35 +219,97 @@ func runGuarded(ctx context.Context, handler Handler, db *gorm.DB, task *Claimed
 	return handler(ctx, db, task, fenceGuard, beat)
 }
 
-// Run polls continuously until ctx is cancelled, backing off and retrying on poll errors (database unavailable).
+// nextIdleInterval doubles cur up to max without overflowing.
+func nextIdleInterval(cur, max time.Duration) time.Duration {
+	if cur <= 0 {
+		return max
+	}
+	next := cur * 2
+	if next <= 0 || next > max {
+		return max
+	}
+	return next
+}
+
+// Run polls continuously until ctx is cancelled, applying exponential idle backoff up to maxIdlePoll
+// with instant Wake/WakeKind wakeups and retrying with backoff on poll errors (database unavailable).
 func (w *Worker) Run(ctx context.Context) {
-	backoff := time.Second
+	w.runLoop(ctx, w.RunOnce)
+}
+
+func (w *Worker) runLoop(ctx context.Context, step func(context.Context) error) {
+	defer w.Close()
+	errBackoff := time.Second
+	basePoll := w.pollInterval
+	if basePoll <= 0 {
+		basePoll = time.Millisecond
+	}
+	maxIdle := w.maxIdlePoll
+	if maxIdle < basePoll {
+		maxIdle = basePoll
+	}
+	idleWait := basePoll
 	for {
 		select {
 		case <-ctx.Done():
 			return
 		default:
 		}
-		err := w.RunOnce(ctx)
+		err := step(ctx)
 		switch {
 		case errors.Is(err, ErrNoTask):
-			backoff = time.Second
+			errBackoff = time.Second
+			timer := time.NewTimer(idleWait)
 			select {
 			case <-ctx.Done():
+				if !timer.Stop() {
+					select {
+					case <-timer.C:
+					default:
+					}
+				}
 				return
-			case <-time.After(w.pollInterval):
+			case <-w.wakeCh:
+				if !timer.Stop() {
+					select {
+					case <-timer.C:
+					default:
+					}
+				}
+				idleWait = basePoll
+			case <-timer.C:
+				idleWait = nextIdleInterval(idleWait, maxIdle)
 			}
 		case err != nil:
+			timer := time.NewTimer(errBackoff)
 			select {
 			case <-ctx.Done():
+				if !timer.Stop() {
+					select {
+					case <-timer.C:
+					default:
+					}
+				}
 				return
-			case <-time.After(backoff):
+			case <-w.wakeCh:
+				if !timer.Stop() {
+					select {
+					case <-timer.C:
+					default:
+					}
+				}
+				idleWait = basePoll
+			case <-timer.C:
 			}
-			if backoff < 30*time.Second {
-				backoff *= 2
+			if errBackoff < 30*time.Second {
+				errBackoff *= 2
+				if errBackoff > 30*time.Second {
+					errBackoff = 30 * time.Second
+				}
 			}
 		default:
-			backoff = time.Second
+			errBackoff = time.Second
+			idleWait = basePoll
 		}
 	}
 }

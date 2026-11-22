@@ -373,7 +373,7 @@ func (d *B3Deps) HandleChangeMyPassword(c *gin.Context) {
 	}
 	if err := d.Identity.ChangeMyPassword(c.Request.Context(), id.UserID,
 		req.OldPassword, req.NewPassword, requestMeta(c)); err != nil {
-		if !writeBizError(c, err) {
+		if !writeDomainError(c, err, 0) {
 			WriteProblem(c, http.StatusInternalServerError, "internal error")
 		}
 		return

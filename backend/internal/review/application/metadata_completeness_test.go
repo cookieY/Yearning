@@ -217,3 +217,71 @@ func TestIndexMetadataMustBeObservedForSQLIndexReference(t *testing.T) {
 		t.Fatal("complete scoped index profile was ignored")
 	}
 }
+
+func TestBindPostgresGroupMetadataExplicitSchemaReference(t *testing.T) {
+	binding, mapper, tableToken, _, publicToken := testPostgresOrdinalBinding(t)
+	secretToken, err := mapper.Token(privacy.KindSchema, "secret")
+	if err != nil {
+		t.Fatal(err)
+	}
+	tempToken, err := mapper.Token(privacy.KindSchema, "pg_temp_3")
+	if err != nil {
+		t.Fatal(err)
+	}
+	catalogToken, err := mapper.Token(privacy.KindSchema, "pg_catalog")
+	if err != nil {
+		t.Fatal(err)
+	}
+	binding.postgres.Path.Effective = []string{"pg_catalog", "pg_temp_3", "app", "public"}
+
+	// Allowed schema reference + table in same schema remains complete and adds schema to scope.
+	validGroups := []provider.AnonymizedGroup{{
+		GroupID:                     "pg-ref-ok",
+		RepresentativeAnonymizedSQL: "UPDATE public.orders SET amount = 1",
+		MetadataContextComplete:     true,
+		Objects: []provider.AnonymizedObjectReference{
+			{Kind: "schema", Token: publicToken, Relation: "reference"},
+			{Kind: "table", Token: tableToken, SchemaToken: publicToken, Relation: "target", StatementOrdinal: 2, StatementOrdinalRanges: []provider.StatementOrdinalRange{{Start: 2, End: 2}}},
+		},
+	}}
+	out, scope, complete := bindPostgresGroupMetadata(validGroups, binding, mapper)
+	if !complete || !out[0].MetadataContextComplete || !scope.schemas[publicToken] {
+		t.Fatalf("allowed postgres schema reference failed: complete=%v out=%+v scope=%+v", complete, out, scope)
+	}
+
+	// pg_catalog in Effective (non-temp) is allowed as reference token.
+	catGroups := []provider.AnonymizedGroup{{
+		GroupID:                     "pg-ref-cat",
+		RepresentativeAnonymizedSQL: "SELECT 1 FROM pg_catalog.pg_class",
+		MetadataContextComplete:     true,
+		Objects: []provider.AnonymizedObjectReference{
+			{Kind: "schema", Token: catalogToken, Relation: "reference"},
+		},
+	}}
+	outCat, scopeCat, completeCat := bindPostgresGroupMetadata(catGroups, binding, mapper)
+	if !completeCat || !outCat[0].MetadataContextComplete || !scopeCat.schemas[catalogToken] {
+		t.Fatalf("pg_catalog reference rejected: complete=%v out=%+v", completeCat, outCat)
+	}
+
+	// Out-of-path schema, pg_temp_* schema, and non-reference schema relations must remain incomplete.
+	for name, obj := range map[string]provider.AnonymizedObjectReference{
+		"out_of_path": {Kind: "schema", Token: secretToken, Relation: "reference"},
+		"pg_temp":     {Kind: "schema", Token: tempToken, Relation: "reference"},
+		"non_ref":     {Kind: "schema", Token: publicToken, Relation: "target"},
+		"empty_rel":   {Kind: "schema", Token: publicToken},
+		"unknown_tok": {Kind: "schema", Token: "schema_999", Relation: "reference"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			groups := []provider.AnonymizedGroup{{
+				GroupID:                     "pg-bad-" + name,
+				RepresentativeAnonymizedSQL: "SELECT 1",
+				MetadataContextComplete:     true,
+				Objects:                     []provider.AnonymizedObjectReference{obj},
+			}}
+			got, _, ok := bindPostgresGroupMetadata(groups, binding, mapper)
+			if ok || got[0].MetadataContextComplete {
+				t.Fatalf("%s unexpectedly accepted as complete: ok=%v got=%+v", name, ok, got)
+			}
+		})
+	}
+}

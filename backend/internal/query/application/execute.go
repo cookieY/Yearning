@@ -58,6 +58,7 @@ type liveCursor struct {
 	maxDisplayRows  int
 	expiresAt       time.Time
 	absolute        time.Time
+	lastAccessed    time.Time
 }
 
 // ExecuteSelectInput holds parameters for executing a SELECT query.
@@ -447,6 +448,12 @@ func (s *Services) FetchPage(ctx context.Context, in FetchPageInput) (*QueryResu
 	if session.UserIDSnapshot != in.Actor.UserID {
 		return nil, domain.ErrNotFound()
 	}
+	// Refresh LRU activity immediately after ownership/auth checks pass so concurrent idle eviction
+	// cannot target this active continuation while capability/audit/DB renewal work runs.
+	if !s.registryTouchIf(tokenHash, live, s.now()) {
+		s.expireCursorRow(ctx, row.ID)
+		return nil, domain.ErrCursorExpired()
+	}
 	cap, err := s.refreshCapability(ctx, live.sessionID, live.dsID)
 	if err != nil {
 		return nil, err
@@ -469,9 +476,14 @@ func (s *Services) FetchPage(ctx context.Context, in FetchPageInput) (*QueryResu
 		`update query_cursors set expires_at = ? where id = ?`, newIdle, row.ID).Error; err != nil {
 		return nil, err
 	}
-	live.expiresAt = newIdle
+	s.registrySetExpires(tokenHash, newIdle)
 	// M6: serialize concurrent page fetches for the same token via per-entry mutex (a cursor/connection cannot be read concurrently).
 	live.mu.Lock()
+	if !s.registryTouchIf(tokenHash, live, s.now()) {
+		live.mu.Unlock()
+		s.expireCursorRow(ctx, row.ID)
+		return nil, domain.ErrCursorExpired()
+	}
 	fetchSize := in.PageSize
 	if in.Purpose == "display" && live.maxDisplayRows > 0 {
 		remaining := live.maxDisplayRows - live.rowsRead
@@ -518,15 +530,7 @@ func (s *Services) FetchPage(ctx context.Context, in FetchPageInput) (*QueryResu
 	if err != nil {
 		s.terminateEntry(live)
 		s.expireCursorRow(ctx, row.ID)
-		if errors.Is(err, database.ErrPageBudgetExceeded) {
-			// SEC-0027: single row exceeds page byte budget -- cursor is terminated (terminateEntry
-			// closes the pool and releases the slot), returning a structured capacity error (1012 family).
-			return nil, domain.ErrSystem()
-		}
-		if isTimeout(ctx, err) {
-			return nil, domain.ErrQueryTimeout()
-		}
-		return nil, statementRejected()
+		return nil, mapCursorFetchError(ctx, err)
 	}
 	// M5: post-fetch guard (symmetric with ExecuteSelect): if revocation, relinquish, close, or expiration
 	// occurred during the fetch window, discard the page without returning it to the frontend.
@@ -550,6 +554,9 @@ func (s *Services) FetchPage(ctx context.Context, in FetchPageInput) (*QueryResu
 		update query_executions set streamed_row_count = streamed_row_count + ? where id = ?`,
 		streamed, in.ExecutionID).Error; err != nil {
 		return nil, err
+	}
+	if page.HasMore {
+		s.registryTouch(tokenHash, s.now())
 	}
 	view := &QueryResultPageView{
 		ExecutionID: in.ExecutionID,
@@ -677,13 +684,37 @@ func (s *Services) maskingVocabulary(ctx context.Context, flowID, dsID string) (
 }
 
 // openQueryPool opens a query-purpose connection pool (one pool per execution: per-request timeout + dedicated
-// connection cursor contract) by delegating encrypted credential/TLS loading to datasource.ResolveCredential
-// and datasource.ResolveTLSMaterial.
-// SEC-0027: acquires a global pool slot before opening and binds release to the pool's first Close (covering execution,
-// pagination, and metadata close paths); budget exhaustion returns errQueryPoolBusy (mapped by callers to
-// the 1012 family "system busy" error, distinct from datasource unavailable).
+// connection cursor contract) under the query pool budget. When the budget is exhausted, it first sweeps expired
+// cursors and, if still full, evicts the least-recently-used idle cursor before rejecting with errQueryPoolBusy.
 func (s *Services) openQueryPool(ctx context.Context, ds *datasource.DatasourceModel, timeoutMS int) (database.Adapter, *database.PurposePool, error) {
-	release, aerr := acquireQueryPoolSlot()
+	return s.openPoolWithSlot(ctx, ds, timeoutMS, func() (func(), error) {
+		if release, err := acquireQueryPoolSlot(); err == nil {
+			return release, nil
+		}
+		s.SweepCursors(ctx)
+		if release, err := acquireQueryPoolSlot(); err == nil {
+			return release, nil
+		}
+		s.evictLRUIdleCursor(ctx)
+		return acquireQueryPoolSlot()
+	})
+}
+
+// openMetadataPool opens a short-lived query-purpose connection pool for metadata browsing using the
+// isolated metadataPoolSlots budget so 32 open user cursors never block schema/table/column lookups.
+func (s *Services) openMetadataPool(ctx context.Context, ds *datasource.DatasourceModel, timeoutMS int) (database.Adapter, *database.PurposePool, error) {
+	return s.openPoolWithSlot(ctx, ds, timeoutMS, acquireMetadataPoolSlot)
+}
+
+// openPoolWithSlot acquires a pool budget slot via acquire, resolves credentials/TLS (or invokes PoolFactory),
+// opens the PurposePool, and binds slot release to the pool's first Close.
+func (s *Services) openPoolWithSlot(
+	ctx context.Context,
+	ds *datasource.DatasourceModel,
+	timeoutMS int,
+	acquire func() (func(), error),
+) (database.Adapter, *database.PurposePool, error) {
+	release, aerr := acquire()
 	if aerr != nil {
 		return nil, nil, errQueryPoolBusy
 	}
@@ -878,11 +909,16 @@ func (s *Services) finishExecutionTx(ctx context.Context, tx *gorm.DB, execID, s
 func (s *Services) detachEntry(e *liveCursor) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
-	_ = e.pool.Close()
+	if e.pool != nil {
+		_ = e.pool.Close()
+	}
 	s.registryDrop(e.tokenHash)
 }
 
 func (s *Services) expireCursorRow(ctx context.Context, cursorID string) {
+	if s.DB == nil || cursorID == "" {
+		return
+	}
 	_ = s.DB.WithContext(ctx).Exec(
 		`update query_cursors set consumed_at = now() where id = ? and consumed_at is null`, cursorID)
 }
@@ -930,6 +966,9 @@ func (s *Services) registryAdd(e *liveCursor) {
 	if s.registry == nil {
 		s.registry = map[string]*liveCursor{}
 	}
+	if e.lastAccessed.IsZero() {
+		e.lastAccessed = s.now()
+	}
 	s.registry[e.tokenHash] = e
 }
 
@@ -937,6 +976,33 @@ func (s *Services) registryGet(tokenHash string) *liveCursor {
 	s.regMu.Lock()
 	defer s.regMu.Unlock()
 	return s.registry[tokenHash]
+}
+
+func (s *Services) registryTouch(tokenHash string, at time.Time) {
+	s.regMu.Lock()
+	defer s.regMu.Unlock()
+	if e := s.registry[tokenHash]; e != nil {
+		e.lastAccessed = at
+	}
+}
+
+func (s *Services) registryTouchIf(tokenHash string, expected *liveCursor, at time.Time) bool {
+	s.regMu.Lock()
+	defer s.regMu.Unlock()
+	e := s.registry[tokenHash]
+	if e == nil || e != expected {
+		return false
+	}
+	e.lastAccessed = at
+	return true
+}
+
+func (s *Services) registrySetExpires(tokenHash string, expiresAt time.Time) {
+	s.regMu.Lock()
+	defer s.regMu.Unlock()
+	if e := s.registry[tokenHash]; e != nil {
+		e.expiresAt = expiresAt
+	}
 }
 
 func (s *Services) registryDrop(tokenHash string) {
@@ -947,8 +1013,27 @@ func (s *Services) registryDrop(tokenHash string) {
 
 // dropLive closes both the cursor and its pool (used when the first page already exhausts the cursor).
 func (s *Services) dropLive(adapter database.Adapter, pool *database.PurposePool, cur *database.SelectCursor) {
-	_ = adapter.CloseCursor(context.Background(), pool, cur)
-	_ = pool.Close()
+	if adapter != nil {
+		_ = adapter.CloseCursor(context.Background(), pool, cur)
+	}
+	if pool != nil {
+		_ = pool.Close()
+	}
+}
+
+func mapCursorFetchError(ctx context.Context, err error) error {
+	if errors.Is(err, database.ErrCursorExpired) {
+		return domain.ErrCursorExpired()
+	}
+	if errors.Is(err, database.ErrPageBudgetExceeded) {
+		// SEC-0027: single row exceeds page byte budget -- cursor is terminated (terminateEntry
+		// closes the pool and releases the slot), returning a structured capacity error (1012 family).
+		return domain.ErrSystem()
+	}
+	if isTimeout(ctx, err) {
+		return domain.ErrQueryTimeout()
+	}
+	return statementRejected()
 }
 
 // terminateEntry terminates a live cursor entry (cancels context, closes pool, and unregisters; mutually exclusive
@@ -956,9 +1041,48 @@ func (s *Services) dropLive(adapter database.Adapter, pool *database.PurposePool
 func (s *Services) terminateEntry(e *liveCursor) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
-	_ = e.adapter.CancelQuery(context.Background(), e.pool, e.cursor)
-	_ = e.pool.Close()
+	if e.adapter != nil {
+		_ = e.adapter.CancelQuery(context.Background(), e.pool, e.cursor)
+	}
+	if e.pool != nil {
+		_ = e.pool.Close()
+	}
 	s.registryDrop(e.tokenHash)
+}
+
+// evictLRUIdleCursor selects and terminates the single least-recently-used idle cursor whose
+// idle duration meets cursorEvictMinIdle and whose per-cursor mutex is not currently held.
+// Lock order safety: TryLock + immediate Unlock while holding regMu, then release regMu BEFORE
+// calling terminateEntry(victim) so e.mu -> regMu inside registryDrop can never deadlock.
+func (s *Services) evictLRUIdleCursor(ctx context.Context) bool {
+	now := s.now()
+	minIdle := s.effectiveCursorEvictMinIdle()
+	s.regMu.Lock()
+	var victim *liveCursor
+	for _, e := range s.registry {
+		if now.Sub(e.lastAccessed) < minIdle {
+			continue
+		}
+		if !e.mu.TryLock() {
+			continue
+		}
+		e.mu.Unlock()
+		if victim == nil || e.lastAccessed.Before(victim.lastAccessed) {
+			victim = e
+		}
+	}
+	if victim != nil {
+		delete(s.registry, victim.tokenHash)
+	}
+	s.regMu.Unlock()
+	if victim == nil {
+		return false
+	}
+	s.terminateEntry(victim)
+	if s.DB != nil && victim.rowID != "" {
+		s.expireCursorRow(ctx, victim.rowID)
+	}
+	return true
 }
 
 // terminateSessionsCursors terminates all live cursors belonging to a set of Sessions (session close
@@ -1017,10 +1141,12 @@ func (s *Services) SweepCursors(ctx context.Context) {
 		s.terminateEntry(e)
 		s.expireCursorRow(ctx, e.rowID)
 	}
-	_ = s.DB.WithContext(ctx).Exec(`
-		update query_cursors set consumed_at = now()
-		where consumed_at is null and owner_instance_id = ? and expires_at < now()`,
-		s.instance)
+	if s.DB != nil {
+		_ = s.DB.WithContext(ctx).Exec(`
+			update query_cursors set consumed_at = now()
+			where consumed_at is null and owner_instance_id = ? and expires_at < now()`,
+			s.instance)
+	}
 }
 
 // InstanceID returns this process's instance identifier (for tests and diagnostics).

@@ -12,12 +12,52 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strconv"
+	"sync"
 	"time"
 
+	"golang.org/x/sync/singleflight"
 	"gorm.io/gorm"
 
 	"github.com/cookieY/YearningX/backend/internal/crypto"
 )
+
+const defaultOpsCacheTTL = 5 * time.Second
+
+type opsCacheEntry struct {
+	view      *OperationsView
+	expiresAt time.Time
+}
+
+type opsCache struct {
+	mu      sync.RWMutex
+	entries map[int]opsCacheEntry
+	flight  singleflight.Group
+}
+
+func (c *opsCache) get(windowDays int, now time.Time) (*OperationsView, bool) {
+	c.mu.RLock()
+	entry, ok := c.entries[windowDays]
+	c.mu.RUnlock()
+	if !ok {
+		return nil, false
+	}
+	if !now.Before(entry.expiresAt) {
+		c.mu.Lock()
+		if cur, exists := c.entries[windowDays]; exists && !now.Before(cur.expiresAt) {
+			delete(c.entries, windowDays)
+		}
+		c.mu.Unlock()
+		return nil, false
+	}
+	return cloneOperationsView(entry.view), true
+}
+
+func (c *opsCache) set(windowDays int, view *OperationsView, expiresAt time.Time) {
+	c.mu.Lock()
+	c.entries[windowDays] = opsCacheEntry{view: view, expiresAt: expiresAt}
+	c.mu.Unlock()
+}
 
 // Service is the dashboard domain service.
 type Service struct {
@@ -27,11 +67,55 @@ type Service struct {
 	// ReleaseHTTPClient is the HTTP client for fetching release snapshots; nil uses the package default (with timeout).
 	// Tests inject a custom Transport here.
 	ReleaseHTTPClient *http.Client
+
+	opsMu          sync.Mutex
+	opsCache       *opsCache
+	opsCacheTTL    time.Duration
+	opsCacheTTLSet bool
 }
 
 // New constructs a Service.
 func New(db *gorm.DB, crypter *crypto.Crypter) *Service {
-	return &Service{DB: db, Crypter: crypter, Now: func() time.Time { return time.Now().UTC() }}
+	return &Service{
+		DB:             db,
+		Crypter:        crypter,
+		Now:            func() time.Time { return time.Now().UTC() },
+		opsCacheTTL:    defaultOpsCacheTTL,
+		opsCacheTTLSet: true,
+	}
+}
+
+// SetOperationsCacheTTLForTest overrides the OperationsDashboard cache TTL for testing; <= 0 disables caching.
+func (s *Service) SetOperationsCacheTTLForTest(d time.Duration) {
+	s.opsMu.Lock()
+	s.opsCacheTTL = d
+	s.opsCacheTTLSet = true
+	if s.opsCache != nil {
+		s.opsCache.mu.Lock()
+		clear(s.opsCache.entries)
+		s.opsCache.mu.Unlock()
+	}
+	s.opsMu.Unlock()
+}
+
+func (s *Service) getOpsCache() (*opsCache, time.Duration) {
+	s.opsMu.Lock()
+	defer s.opsMu.Unlock()
+	if s.opsCache == nil {
+		s.opsCache = &opsCache{entries: make(map[int]opsCacheEntry)}
+	}
+	ttl := s.opsCacheTTL
+	if !s.opsCacheTTLSet && ttl == 0 {
+		ttl = defaultOpsCacheTTL
+	}
+	return s.opsCache, ttl
+}
+
+func (s *Service) now() time.Time {
+	if s.Now == nil {
+		return time.Now().UTC()
+	}
+	return s.Now()
 }
 
 // MyDashboardView conforms to OpenAPI MyDashboard (counts scoped to the caller's own authorization).
@@ -184,14 +268,72 @@ type TrendPoint struct {
 	Value float64 `json:"value"`
 }
 
-// OperationsDashboard computes operational statistics (bounded aggregation; timezone from system settings).
+func cloneOperationsView(v *OperationsView) *OperationsView {
+	if v == nil {
+		return nil
+	}
+	cp := *v
+	if v.Meta.UnavailableMetricKeys != nil {
+		cp.Meta.UnavailableMetricKeys = make([]string, len(v.Meta.UnavailableMetricKeys))
+		copy(cp.Meta.UnavailableMetricKeys, v.Meta.UnavailableMetricKeys)
+	}
+	if v.OrderTrend != nil {
+		cp.OrderTrend = make([]TrendPoint, len(v.OrderTrend))
+		copy(cp.OrderTrend, v.OrderTrend)
+	}
+	if v.StateDistribution != nil {
+		cp.StateDistribution = make(StateDistribution, len(v.StateDistribution))
+		for k, val := range v.StateDistribution {
+			cp.StateDistribution[k] = val
+		}
+	}
+	return &cp
+}
+
+// OperationsDashboard computes operational statistics (bounded aggregation; timezone from system settings)
+// with short-TTL in-process caching and singleflight coalescing keyed by clamped windowDays.
 func (s *Service) OperationsDashboard(ctx context.Context, windowDays int) (*OperationsView, error) {
 	if windowDays <= 0 || windowDays > 90 {
 		windowDays = 30
 	}
+	cache, ttl := s.getOpsCache()
+	if ttl <= 0 {
+		return s.computeOperationsDashboard(ctx, windowDays)
+	}
+	if hit, ok := cache.get(windowDays, s.now()); ok {
+		return hit, nil
+	}
+
+	ch := cache.flight.DoChan(strconv.Itoa(windowDays), func() (any, error) {
+		if hit, ok := cache.get(windowDays, s.now()); ok {
+			return hit, nil
+		}
+		computeCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 30*time.Second)
+		defer cancel()
+		v, err := s.computeOperationsDashboard(computeCtx, windowDays)
+		if err != nil {
+			return nil, err
+		}
+		now := s.now()
+		cache.set(windowDays, cloneOperationsView(v), now.Add(ttl))
+		return v, nil
+	})
+
+	select {
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	case res := <-ch:
+		if res.Err != nil {
+			return nil, res.Err
+		}
+		return cloneOperationsView(res.Val.(*OperationsView)), nil
+	}
+}
+
+func (s *Service) computeOperationsDashboard(ctx context.Context, windowDays int) (*OperationsView, error) {
 	v := &OperationsView{OrderTrend: []TrendPoint{}, StateDistribution: NewStateDistribution()}
 	tz := s.systemTimezone(ctx)
-	now := s.Now()
+	now := s.now()
 	v.Meta = SnapshotMeta{
 		WindowStart:    now.AddDate(0, 0, -windowDays).Format("2006-01-02"),
 		WindowEnd:      now.Format("2006-01-02"),
@@ -206,11 +348,8 @@ func (s *Service) OperationsDashboard(ctx context.Context, windowDays int) (*Ope
 	// order could land in change_order_total but not state_distribution (or vice versa), breaking the invariant
 	// that the sum of state keys equals the total at boundary instants. A single windowStart anchors all queries to the same instant.
 	windowStart := now.Add(-time.Duration(windowDays) * 24 * time.Hour)
-	// Single snapshot: the 9 scalar queries, approval percentiles, trend, and state distribution below are separate
-	// statements; under autocommit, orders committed between statements would cause the sum of state_distribution
-	// keys to diverge from change_order_total at boundaries (PRD §4 requires exact equality). Wrapping them in a
-	// single REPEATABLE READ read-only transaction ensures all statements observe the same MVCC snapshot so the
-	// invariant holds under concurrency. Short read-only transaction holding no write locks.
+	// Single snapshot: scalar queries, statement kind aggregation, approval percentiles, trend, and state distribution
+	// run inside a single REPEATABLE READ read-only transaction so all statements observe the same MVCC snapshot.
 	tx := s.DB.WithContext(ctx).Begin(&sql.TxOptions{
 		Isolation: sql.LevelRepeatableRead,
 		ReadOnly:  true,
@@ -220,29 +359,34 @@ func (s *Service) OperationsDashboard(ctx context.Context, windowDays int) (*Ope
 	}
 	defer func() { _ = tx.Rollback() }()
 	counts := []struct {
-		dest   *int64
-		sql    string
-		window bool
+		dest *int64
+		sql  string
 	}{
-		{&v.ChangeOrderTotal, `select count(*) from change_orders where submitted_at > $1`, true},
-		{&v.CompletedTotal, `select count(*) from change_orders where state = 'completed' and submitted_at > $1`, true},
-		{&v.FailedTotal, `select count(*) from change_orders where state = 'failed' and submitted_at > $1`, true},
-		{&v.PartialFailedTotal, `select count(*) from change_orders where state = 'partial_failed' and submitted_at > $1`, true},
-		{&v.DdlStatementTotal, `select count(*) from sql_statements where statement_kind = 'ddl'`, false},
-		{&v.DmlStatementTotal, `select count(*) from sql_statements where statement_kind = 'dml'`, false},
-		{&v.QueryExecutionTotal, `select count(*) from query_executions`, false},
-		{&v.UserTotal, `select count(*) from users`, false},
-		{&v.DatasourceTotal, `select count(*) from datasources`, false},
+		{&v.QueryExecutionTotal, `select count(*) from query_executions`},
+		{&v.UserTotal, `select count(*) from users`},
+		{&v.DatasourceTotal, `select count(*) from datasources`},
 	}
 	for _, q := range counts {
-		var err error
-		if q.window {
-			err = tx.Raw(q.sql, windowStart).Scan(q.dest).Error
-		} else {
-			err = tx.Raw(q.sql).Scan(q.dest).Error
-		}
-		if err != nil {
+		if err := tx.Raw(q.sql).Scan(q.dest).Error; err != nil {
 			return nil, err
+		}
+	}
+	var stmtKinds []struct {
+		Kind string `gorm:"column:statement_kind"`
+		N    int64  `gorm:"column:n"`
+	}
+	if err := tx.Raw(`
+		select statement_kind, count(*)::bigint as n
+		from sql_statements
+		group by statement_kind`).Scan(&stmtKinds).Error; err != nil {
+		return nil, err
+	}
+	for _, row := range stmtKinds {
+		switch row.Kind {
+		case "ddl":
+			v.DdlStatementTotal = row.N
+		case "dml":
+			v.DmlStatementTotal = row.N
 		}
 	}
 	// Approval latency P50/P95 (percentile_cont bounded aggregation).
@@ -271,8 +415,9 @@ func (s *Service) OperationsDashboard(ctx context.Context, windowDays int) (*Ope
 	for _, t := range trend {
 		v.OrderTrend = append(v.OrderTrend, TrendPoint{Day: t.Day, Value: t.N})
 	}
-	// State distribution (RCP-20261023-HOME-METRICS-ALIGNMENT): shares the exact same window predicate as
-	// change_order_total, so the sum of all keys equals that scalar.
+	// State distribution (RCP-20261023-HOME-METRICS-ALIGNMENT): derive ChangeOrderTotal, CompletedTotal,
+	// FailedTotal, and PartialFailedTotal directly from the single grouped scan so sum(StateDistribution) == ChangeOrderTotal
+	// holds without 4 redundant change_orders count queries.
 	var distribution []struct {
 		State string `gorm:"column:state"`
 		N     int64  `gorm:"column:n"`
@@ -288,6 +433,14 @@ func (s *Service) OperationsDashboard(ctx context.Context, windowDays int) (*Ope
 		rows[row.State] = row.N
 	}
 	v.StateDistribution = StateDistributionFromRows(rows)
+	var orderTotal int64
+	for _, count := range v.StateDistribution {
+		orderTotal += count
+	}
+	v.ChangeOrderTotal = orderTotal
+	v.CompletedTotal = v.StateDistribution["completed"]
+	v.FailedTotal = v.StateDistribution["failed"]
+	v.PartialFailedTotal = v.StateDistribution["partial_failed"]
 	if err := tx.Commit().Error; err != nil {
 		return nil, err
 	}

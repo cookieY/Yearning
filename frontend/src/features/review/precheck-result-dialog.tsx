@@ -1,4 +1,5 @@
 import type { ReviewFinding, ReviewRun } from "@/api/generated/client/yearningV4HTTPAPI.schemas";
+import "./precheck-progress.css";
 import type { SqlDigest } from "@/features/review/bulk-import/sql-digest";
 import { FindingList, type FindingListState } from "@/features/review/finding-list";
 import { ReviewAllClear } from "@/features/review/review-all-clear";

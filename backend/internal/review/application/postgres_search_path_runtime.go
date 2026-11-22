@@ -60,7 +60,10 @@ func postgresStatementPathUnsafe(statementSQL string) bool {
 	if err != nil {
 		return true
 	}
-	tokens := lexed.Tokens
+	return postgresStatementPathUnsafeFromTokens(lexed.Tokens)
+}
+
+func postgresStatementPathUnsafeFromTokens(tokens []fingerprint.Token) bool {
 	if hasAdjacentUnrecognizedPostgresOperator(tokens) {
 		return true
 	}
@@ -456,39 +459,66 @@ func postgresRelationRequests(
 	stmts []postgresAnalyzedStatement,
 	mapper *privacy.RunMapper,
 ) ([]PostgresRelationRequest, error) {
-	if mapper == nil {
+	if mapper == nil || len(stmts) > 100000 {
 		return nil, ErrFactSourceUnavailable
 	}
-	seen := map[string]bool{}
-	requests := make([]PostgresRelationRequest, 0)
+	requests := make([]PostgresRelationRequest, 0, len(stmts))
+	tokenToName := make(map[string]string, 64)
+	uniqueNames := make(map[string]struct{}, 64)
 	for i := range stmts {
 		ordinal := int32(i + 1)
+		stmtStart := len(requests)
+		var seenLarge map[string]struct{}
 		for _, object := range stmts[i].objects {
 			if object.Kind != string(privacy.KindTable) || object.Token == "" {
 				continue
 			}
-			key := postgresObjectBindingKey(ordinal, object.Token)
-			if seen[key] {
+			duplicate := false
+			if seenLarge != nil {
+				_, duplicate = seenLarge[object.Token]
+			} else {
+				for k := stmtStart; k < len(requests); k++ {
+					if requests[k].TableToken == object.Token {
+						duplicate = true
+						break
+					}
+				}
+			}
+			if duplicate {
 				continue
 			}
-			kind, name, ok := mapper.Original(object.Token)
-			if !ok || kind != privacy.KindTable || name == "" {
-				return nil, ErrFactSourceUnavailable
+			name, cached := tokenToName[object.Token]
+			if !cached {
+				kind, orig, ok := mapper.Original(object.Token)
+				if !ok || kind != privacy.KindTable || orig == "" {
+					return nil, ErrFactSourceUnavailable
+				}
+				name = orig
+				tokenToName[object.Token] = name
+				uniqueNames[name] = struct{}{}
+				if len(uniqueNames) > postgresSearchPathMaxResolvedTables {
+					return nil, ErrFactSourceUnavailable
+				}
 			}
-			seen[key] = true
+			if seenLarge == nil && len(requests)-stmtStart >= 8 {
+				seenLarge = make(map[string]struct{}, len(requests)-stmtStart+4)
+				for k := stmtStart; k < len(requests); k++ {
+					seenLarge[requests[k].TableToken] = struct{}{}
+				}
+			}
+			if seenLarge != nil {
+				seenLarge[object.Token] = struct{}{}
+			}
 			requests = append(requests, PostgresRelationRequest{
 				Ordinal: ordinal, TableToken: object.Token, TableName: name,
 			})
 		}
-	}
-	sort.Slice(requests, func(i, j int) bool {
-		if requests[i].Ordinal != requests[j].Ordinal {
-			return requests[i].Ordinal < requests[j].Ordinal
+		if len(requests)-stmtStart > 1 {
+			stmtSlice := requests[stmtStart:]
+			sort.Slice(stmtSlice, func(a, b int) bool {
+				return stmtSlice[a].TableToken < stmtSlice[b].TableToken
+			})
 		}
-		return requests[i].TableToken < requests[j].TableToken
-	})
-	if len(requests) > postgresSearchPathMaxResolvedTables {
-		return nil, ErrFactSourceUnavailable
 	}
 	return requests, nil
 }
@@ -579,8 +609,8 @@ func (s *Services) freezePostgresStageBinding(
 			Ordinal:         request.Ordinal,
 			TableToken:      request.TableToken,
 			TableName:       request.TableName,
-			PresentBySchema: clonePostgresPresence(baseline.PresentBySchema),
-			OIDBySchema:     clonePostgresOIDs(baseline.OIDBySchema),
+			PresentBySchema: baseline.PresentBySchema,
+			OIDBySchema:     baseline.OIDBySchema,
 			Complete:        true,
 		})
 	}

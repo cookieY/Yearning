@@ -1,12 +1,15 @@
 package application
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"reflect"
 	"testing"
 
+	"github.com/cookieY/YearningX/backend/internal/database"
 	"github.com/cookieY/YearningX/backend/internal/review/fingerprint"
 	"github.com/cookieY/YearningX/backend/internal/review/knowledge"
 	"github.com/cookieY/YearningX/backend/internal/review/privacy"
@@ -474,5 +477,465 @@ func TestPostgresSchemaBoundSafeExplainRequiresFrozenPath(t *testing.T) {
 	}
 	if !pathAware.path.Equal(FrozenPostgresSearchPath{}) {
 		t.Fatal("temporary search_path must be rejected before reaching the fact source")
+	}
+}
+
+func TestPreparePostgresObjectBindingsUniformRelationsAndValidation(t *testing.T) {
+	path := testPostgresPath()
+	mapper := privacy.NewRunMapper()
+	ordersTok, err := mapper.Token(privacy.KindTable, "orders")
+	if err != nil {
+		t.Fatal(err)
+	}
+	tmpTok, err := mapper.Token(privacy.KindTable, "tmp_items")
+	if err != nil {
+		t.Fatal(err)
+	}
+	originalName := func(token string) (string, bool) {
+		_, orig, ok := mapper.Original(token)
+		return orig, ok
+	}
+
+	const total = 1500
+	stmts := make([]StatementValidityAtOrdinal, total)
+	lookups := make([]postgresRelationLookup, 0, total+2)
+	for i := 0; i < total; i++ {
+		ord := int32(i + 1)
+		switch ord {
+		case 1025:
+			stmts[i] = testStatement(ord, fingerprint.ValidityEffect{
+				Action: fingerprint.ValidityEffectCreate,
+				Object: fingerprint.ValidityObject{Kind: fingerprint.ValidityObjectTable, Token: tmpTok},
+			})
+			l1 := testTableLookup(ord, ordersTok, map[string]string{"app": "table"})
+			l1.TableName = "orders"
+			l2 := testTableLookup(ord, tmpTok, map[string]string{})
+			l2.TableName = "tmp_items"
+			lookups = append(lookups, l1, l2)
+		case 1026:
+			stmts[i] = testStatement(ord)
+			l1 := testTableLookup(ord, ordersTok, map[string]string{"app": "table"})
+			l1.TableName = "orders"
+			l2 := testTableLookup(ord, tmpTok, map[string]string{})
+			l2.TableName = "tmp_items"
+			lookups = append(lookups, l1, l2)
+		default:
+			stmts[i] = testStatement(ord)
+			l := testTableLookup(ord, ordersTok, map[string]string{"app": "table"})
+			l.TableName = "orders"
+			lookups = append(lookups, l)
+		}
+	}
+
+	binding, complete := preparePostgresObjectBindingsWithCallables(
+		path, stmts, lookups, nil, true, originalName,
+	)
+	if !complete || !binding.Complete {
+		t.Fatalf("uniform + non-uniform 1500-stmt binding failed: %+v", binding)
+	}
+	if len(binding.UniformRelations) != 1 {
+		t.Fatalf("UniformRelations len = %d, want 1", len(binding.UniformRelations))
+	}
+	if got, ok := binding.UniformRelations[ordersTok]; !ok || got.Schema != "app" || !got.Present || !got.Supported {
+		t.Fatalf("UniformRelations[orders] = %+v, ok=%v", got, ok)
+	}
+	if len(binding.Relations) != 2 {
+		t.Fatalf("Relations len = %d, want 2 non-uniform entries", len(binding.Relations))
+	}
+	if got := binding.Relations[postgresObjectBindingKey(1026, tmpTok)]; !got.Present || got.CreatedByOrdinal != 1025 {
+		t.Fatalf("non-uniform created binding = %+v", got)
+	}
+
+	// Round-trip decode and verify O(1) resolution even with OrdinalRangesTruncated=true.
+	decoded, ok := decodeFrozenPostgresPathBinding(binding)
+	if !ok || !reflect.DeepEqual(decoded.UniformRelations, binding.UniformRelations) {
+		t.Fatalf("decode roundtrip failed: ok=%v decoded=%+v", ok, decoded)
+	}
+	sb := &stageSchemaBinding{
+		defensible: true,
+		schemas:    map[string]bool{"app": true, "public": true},
+		postgres:   decoded,
+	}
+	if s, present, ok := sb.postgresObjectSchema(99999, ordersTok); !ok || !present || s != "app" {
+		t.Fatalf("uniform postgresObjectSchema = %q/%v/%v", s, present, ok)
+	}
+	if schemas := sb.postgresObjectSchemas(ordersTok); !reflect.DeepEqual(schemas, []string{"app"}) {
+		t.Fatalf("uniform postgresObjectSchemas = %v", schemas)
+	}
+	if s, ok := sb.postgresObjectSchemaForReference(provider.AnonymizedObjectReference{
+		Token:                  ordersTok,
+		Kind:                   "table",
+		StatementOrdinal:       1,
+		StatementOrdinalRanges: []provider.StatementOrdinalRange{{Start: 1, End: 512}},
+		OrdinalRangesTruncated: true,
+	}); !ok || s != "app" {
+		t.Fatalf("uniform truncated reference failed: schema=%q ok=%v", s, ok)
+	}
+	// Non-uniform token whose occurrences differ in presence with OrdinalRangesTruncated=true must fail closed.
+	if _, ok := sb.postgresObjectSchemaForReference(provider.AnonymizedObjectReference{
+		Token:                  tmpTok,
+		Kind:                   "table",
+		StatementOrdinal:       1025,
+		StatementOrdinalRanges: []provider.StatementOrdinalRange{{Start: 1025, End: 1026}},
+		OrdinalRangesTruncated: true,
+	}); ok {
+		t.Fatal("non-uniform truncated reference must fail closed")
+	}
+	// Policy catalog authorized schemas must include UniformRelations schemas.
+	sbNoSchemas := &stageSchemaBinding{defensible: true, postgres: decoded}
+	authSchemas, err := policyCatalogAuthorizedSchemas(sbNoSchemas)
+	if err != nil || !reflect.DeepEqual(authSchemas, []string{"app"}) {
+		t.Fatalf("policyCatalogAuthorizedSchemas = %v err=%v", authSchemas, err)
+	}
+
+	// decodeFrozenPostgresPathBinding rejection cases for UniformRelations.
+	badUniform := map[string]frozenPostgresPathBinding{
+		"empty_token": func() frozenPostgresPathBinding {
+			b := binding
+			b.UniformRelations = map[string]frozenPostgresObjectBinding{"": {TableName: "orders", Schema: "app", Kind: "table", OID: 1, Present: true, Supported: true}}
+			return b
+		}(),
+		"nonzero_created_by": func() frozenPostgresPathBinding {
+			b := binding
+			u := b.UniformRelations[ordersTok]
+			u.CreatedByOrdinal = 1
+			b.UniformRelations = map[string]frozenPostgresObjectBinding{ordersTok: u}
+			return b
+		}(),
+		"zero_oid_present": func() frozenPostgresPathBinding {
+			b := binding
+			u := b.UniformRelations[ordersTok]
+			u.OID = 0
+			b.UniformRelations = map[string]frozenPostgresObjectBinding{ordersTok: u}
+			return b
+		}(),
+		"overlap_with_relations": func() frozenPostgresPathBinding {
+			b := binding
+			b.UniformRelations = map[string]frozenPostgresObjectBinding{
+				ordersTok: b.UniformRelations[ordersTok],
+				tmpTok:    {TableName: "tmp_items", Schema: "app", Kind: "table", OID: 1, Present: true, Supported: true},
+			}
+			return b
+		}(),
+	}
+	for name, b := range badUniform {
+		if _, ok := decodeFrozenPostgresPathBinding(b); ok {
+			t.Fatalf("decodeFrozenPostgresPathBinding unexpectedly accepted %s", name)
+		}
+	}
+}
+
+func TestPostgresStreamingAndFreezeEndToEndAbove1024(t *testing.T) {
+	engine := newPerfTestEngine(t)
+	profile := fingerprint.Profile{Engine: "postgresql", Mode: "postgresql"}
+	mapper := privacy.NewRunMapper()
+
+	const count = 1500
+	var buf bytes.Buffer
+	for i := 1; i <= count; i++ {
+		fmt.Fprintf(&buf, "UPDATE public.orders SET amount = %d WHERE id = %d;\n", i, i)
+	}
+	analysis, err := analyzeRunStatementsStreaming(streamingAnalysisOptions{
+		runID:           "run-pg-uniform",
+		rawSQL:          buf.Bytes(),
+		profile:         profile,
+		mapper:          mapper,
+		engine:          engine,
+		expectedCount:   count,
+		validateSyntax:  true,
+		inlineLimit:     ephemeralInlineStatementLimit,
+		collectPostgres: true,
+	})
+	if err != nil {
+		t.Fatalf("streaming pg analysis failed: %v", err)
+	}
+	if len(analysis.postgresStatements) != count {
+		t.Fatalf("postgresStatements = %d, want %d", len(analysis.postgresStatements), count)
+	}
+
+	svc := &Services{
+		PostgresPathProbe: func(context.Context, PostgresSearchTarget) (FrozenPostgresSearchPath, error) {
+			return testPostgresPath(), nil
+		},
+		PostgresRelationBatchResolver: func(_ context.Context, _ PostgresSearchTarget, _ FrozenPostgresSearchPath, relations []string) ([]PostgresRelationBaseline, error) {
+			out := make([]PostgresRelationBaseline, 0, len(relations))
+			for _, name := range relations {
+				out = append(out, PostgresRelationBaseline{
+					TableName:       name,
+					PresentBySchema: map[string]string{"public": "table"},
+					OIDBySchema:     map[string]uint32{"public": 202},
+				})
+			}
+			return out, nil
+		},
+		PostgresCallableResolver: func(_ context.Context, _ PostgresSearchTarget, _ FrozenPostgresSearchPath, requests []database.PostgresCallableRequest) ([]database.PostgresCallableResolution, error) {
+			out := make([]database.PostgresCallableResolution, 0, len(requests))
+			for _, req := range requests {
+				out = append(out, database.PostgresCallableResolution{
+					Request: req,
+					Winners: []database.PostgresCallableWinner{{
+						Schema:     "pg_catalog",
+						Signature:  "int4,int4",
+						ResultType: "bool",
+						OID:        96,
+						PgCatalog:  true,
+					}},
+				})
+			}
+			return out, nil
+		},
+	}
+
+	binding, err := svc.freezePostgresStageBinding(
+		context.Background(),
+		frozenDatasourceTarget{CompatibilityMode: "postgresql"},
+		analysis.postgresStatements,
+		mapper,
+	)
+	if err != nil {
+		t.Fatalf("freezePostgresStageBinding failed: %v", err)
+	}
+	if !binding.Complete || !binding.CallablesSafe || len(binding.UniformRelations) != 1 || len(binding.Relations) != 0 {
+		t.Fatalf("unexpected frozen binding: complete=%v callablesSafe=%v uniform=%d relations=%d",
+			binding.Complete, binding.CallablesSafe, len(binding.UniformRelations), len(binding.Relations))
+	}
+
+	providerObjects := make([]provider.AnonymizedObjectReference, len(analysis.groups[0].objects))
+	for i, o := range analysis.groups[0].objects {
+		providerObjects[i] = provider.AnonymizedObjectReference{
+			Token:            o.Token,
+			Kind:             o.Kind,
+			Relation:         string(o.Relation),
+			SchemaToken:      o.SchemaToken,
+			ParentToken:      o.ParentToken,
+			StatementOrdinal: o.StatementOrdinal,
+		}
+		for _, r := range o.StatementOrdinalRanges {
+			providerObjects[i].StatementOrdinalRanges = append(providerObjects[i].StatementOrdinalRanges, provider.StatementOrdinalRange{
+				Start: r.Start, End: r.End,
+			})
+		}
+	}
+	stageBinding := &stageSchemaBinding{
+		defensible: true,
+		schemas:    map[string]bool{"app": true, "public": true},
+		postgres:   &binding,
+	}
+	bound, scope, complete := bindPostgresGroupMetadata([]provider.AnonymizedGroup{{
+		GroupID:                     "g-1",
+		RepresentativeAnonymizedSQL: analysis.groups[0].representativeAnonymizedSQL,
+		MetadataContextComplete:     analysis.groups[0].metadataContextComplete,
+		Objects:                     providerObjects,
+	}}, stageBinding, mapper)
+	if !complete || !bound[0].MetadataContextComplete || len(scope.objects) == 0 {
+		t.Fatalf("bindPostgresGroupMetadata failed on uniform explicit-schema batch: complete=%v bound=%+v scope=%+v",
+			complete, bound, scope)
+	}
+}
+
+func TestPreparePostgresObjectBindingsDemotesOneShotCreateDropFromUniform(t *testing.T) {
+	path := testPostgresPath()
+	mapper := privacy.NewRunMapper()
+	mustTok := func(name string) string {
+		tok, err := mapper.Token(privacy.KindTable, name)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return tok
+	}
+	createTok := mustTok("one_shot_create")
+	dropTok := mustTok("one_shot_drop")
+	ordersTok := mustTok("orders")
+	noopCreateTok := mustTok("noop_existing")
+	noopDropTok := mustTok("noop_missing")
+	originalName := func(token string) (string, bool) {
+		_, orig, ok := mapper.Original(token)
+		return orig, ok
+	}
+
+	const total = 1500
+	stmts := make([]StatementValidityAtOrdinal, total)
+	lookups := make([]postgresRelationLookup, 0, total+8)
+	for i := 0; i < total; i++ {
+		ord := int32(i + 1)
+		switch ord {
+		case 1:
+			stmts[i] = testStatement(ord, fingerprint.ValidityEffect{
+				Action: fingerprint.ValidityEffectCreate,
+				Object: fingerprint.ValidityObject{Kind: fingerprint.ValidityObjectTable, Token: createTok},
+			})
+			l := testTableLookup(ord, createTok, map[string]string{})
+			l.TableName = "one_shot_create"
+			lookups = append(lookups, l)
+		case 2:
+			stmts[i] = testStatement(ord, fingerprint.ValidityEffect{
+				Action: fingerprint.ValidityEffectDrop,
+				Object: fingerprint.ValidityObject{Kind: fingerprint.ValidityObjectTable, Token: dropTok},
+			})
+			l := testTableLookup(ord, dropTok, map[string]string{"app": "table"})
+			l.TableName = "one_shot_drop"
+			lookups = append(lookups, l)
+		case 3:
+			// No-op CREATE TABLE IF NOT EXISTS on already-existing table preserves catalog state.
+			stmts[i] = testStatement(ord, fingerprint.ValidityEffect{
+				Action: fingerprint.ValidityEffectCreate,
+				Object: fingerprint.ValidityObject{Kind: fingerprint.ValidityObjectTable, Token: noopCreateTok},
+			})
+			l := testTableLookup(ord, noopCreateTok, map[string]string{"app": "table"})
+			l.TableName = "noop_existing"
+			lookups = append(lookups, l)
+		case 4:
+			// No-op DROP TABLE IF EXISTS on missing table preserves catalog state.
+			stmts[i] = testStatement(ord, fingerprint.ValidityEffect{
+				Action: fingerprint.ValidityEffectDrop,
+				Object: fingerprint.ValidityObject{Kind: fingerprint.ValidityObjectTable, Token: noopDropTok},
+			})
+			l := testTableLookup(ord, noopDropTok, map[string]string{})
+			l.TableName = "noop_missing"
+			lookups = append(lookups, l)
+		case total:
+			// Mutate orders on its very last reference (DROP TABLE orders).
+			stmts[i] = testStatement(ord, fingerprint.ValidityEffect{
+				Action: fingerprint.ValidityEffectDrop,
+				Object: fingerprint.ValidityObject{Kind: fingerprint.ValidityObjectTable, Token: ordersTok},
+			})
+			l := testTableLookup(ord, ordersTok, map[string]string{"app": "table"})
+			l.TableName = "orders"
+			lookups = append(lookups, l)
+		default:
+			stmts[i] = testStatement(ord)
+			l := testTableLookup(ord, ordersTok, map[string]string{"app": "table"})
+			l.TableName = "orders"
+			lookups = append(lookups, l)
+		}
+	}
+
+	binding, complete := preparePostgresObjectBindingsWithCallables(
+		path, stmts, lookups, nil, true, originalName,
+	)
+	if !complete || !binding.Complete {
+		t.Fatalf("preparePostgresObjectBindings failed: complete=%v binding=%+v", complete, binding)
+	}
+	for _, mustDemote := range []string{createTok, dropTok, ordersTok} {
+		if _, inUniform := binding.UniformRelations[mustDemote]; inUniform {
+			t.Fatalf("mutated table token %s remained in UniformRelations", mustDemote)
+		}
+	}
+	if _, ok := binding.Relations[postgresObjectBindingKey(1, createTok)]; !ok {
+		t.Fatalf("missing exact ordinal 1 entry for one_shot_create")
+	}
+	if _, ok := binding.Relations[postgresObjectBindingKey(2, dropTok)]; !ok {
+		t.Fatalf("missing exact ordinal 2 entry for one_shot_drop")
+	}
+	if len(binding.UniformRelations) != 2 {
+		t.Fatalf("expected 2 non-mutating IF [NOT] EXISTS targets in UniformRelations, got %d", len(binding.UniformRelations))
+	}
+	if _, ok := decodeFrozenPostgresPathBinding(binding); !ok {
+		t.Fatal("decodeFrozenPostgresPathBinding rejected demoted mutated relations")
+	}
+}
+
+func TestPostgresObjectSchemaForReferenceTruncatedNonUniformParity(t *testing.T) {
+	path := testPostgresPath()
+	mapper := privacy.NewRunMapper()
+	ordersTok, err := mapper.Token(privacy.KindTable, "orders")
+	if err != nil {
+		t.Fatal(err)
+	}
+	otherTok, err := mapper.Token(privacy.KindTable, "items")
+	if err != nil {
+		t.Fatal(err)
+	}
+	originalName := func(token string) (string, bool) {
+		_, orig, ok := mapper.Original(token)
+		return orig, ok
+	}
+
+	// Case A: 513..1024-lookup interleaved batch (useUniform=false, UniformRelations=nil).
+	const midTotal = 900
+	midStmts := make([]StatementValidityAtOrdinal, midTotal)
+	midLookups := make([]postgresRelationLookup, 0, midTotal)
+	for i := 0; i < midTotal; i++ {
+		ord := int32(i + 1)
+		midStmts[i] = testStatement(ord)
+		if ord%2 == 1 || ord > 600 {
+			l := testTableLookup(ord, ordersTok, map[string]string{"app": "table"})
+			l.TableName = "orders"
+			midLookups = append(midLookups, l)
+		} else {
+			l := testTableLookup(ord, otherTok, map[string]string{"app": "table"})
+			l.TableName = "items"
+			midLookups = append(midLookups, l)
+		}
+	}
+	midBinding, midOK := preparePostgresObjectBindingsWithCallables(path, midStmts, midLookups, nil, true, originalName)
+	if !midOK || len(midBinding.UniformRelations) != 0 {
+		t.Fatalf("mid-size binding unexpected: ok=%v uniform=%d", midOK, len(midBinding.UniformRelations))
+	}
+	midSB := &stageSchemaBinding{
+		defensible: true,
+		schemas:    map[string]bool{"app": true, "public": true},
+		postgres:   &midBinding,
+	}
+	if gotSchema, ok := midSB.postgresObjectSchemaForReference(provider.AnonymizedObjectReference{
+		Token:                  ordersTok,
+		Kind:                   "table",
+		StatementOrdinal:       1,
+		StatementOrdinalRanges: []provider.StatementOrdinalRange{{Start: 1, End: 1}, {Start: 3, End: 3}},
+		OrdinalRangesTruncated: true,
+	}); !ok || gotSchema != "app" {
+		t.Fatalf("513..1024 truncated uniform Relations lookup = %q/%v, want app/true", gotSchema, ok)
+	}
+
+	// Case B: >1024-lookup batch where orders is demoted out of UniformRelations due to trailing DROP,
+	// yet all frozen Relations entries for orders share identical (Present=true, Schema="app").
+	const bigTotal = 1200
+	bigStmts := make([]StatementValidityAtOrdinal, bigTotal)
+	bigLookups := make([]postgresRelationLookup, 0, bigTotal)
+	for i := 0; i < bigTotal; i++ {
+		ord := int32(i + 1)
+		if ord == bigTotal {
+			bigStmts[i] = testStatement(ord, fingerprint.ValidityEffect{
+				Action: fingerprint.ValidityEffectDrop,
+				Object: fingerprint.ValidityObject{Kind: fingerprint.ValidityObjectTable, Token: ordersTok},
+			})
+		} else {
+			bigStmts[i] = testStatement(ord)
+		}
+		l := testTableLookup(ord, ordersTok, map[string]string{"app": "table"})
+		l.TableName = "orders"
+		bigLookups = append(bigLookups, l)
+	}
+	bigBinding, bigOK := preparePostgresObjectBindingsWithCallables(path, bigStmts, bigLookups, nil, true, originalName)
+	if !bigOK || len(bigBinding.UniformRelations) != 0 {
+		t.Fatalf("demoted big binding unexpected: ok=%v uniform=%d", bigOK, len(bigBinding.UniformRelations))
+	}
+	bigSB := &stageSchemaBinding{
+		defensible: true,
+		schemas:    map[string]bool{"app": true, "public": true},
+		postgres:   &bigBinding,
+	}
+	if gotSchema, ok := bigSB.postgresObjectSchemaForReference(provider.AnonymizedObjectReference{
+		Token:                  ordersTok,
+		Kind:                   "table",
+		StatementOrdinal:       1,
+		StatementOrdinalRanges: []provider.StatementOrdinalRange{{Start: 1, End: 1}},
+		OrdinalRangesTruncated: true,
+	}); !ok || gotSchema != "app" {
+		t.Fatalf("demoted truncated Relations lookup = %q/%v, want app/true", gotSchema, ok)
+	}
+
+	// Case C: Tail divergence in Relations outside visible StatementOrdinalRanges must fail closed.
+	bigBinding.Relations[postgresObjectBindingKey(bigTotal, ordersTok)] = frozenPostgresObjectBinding{
+		TableName: "orders", Schema: "public", Kind: "table", OID: 202, Present: true, Supported: true,
+	}
+	if _, ok := bigSB.postgresObjectSchemaForReference(provider.AnonymizedObjectReference{
+		Token:                  ordersTok,
+		Kind:                   "table",
+		StatementOrdinal:       1,
+		StatementOrdinalRanges: []provider.StatementOrdinalRange{{Start: 1, End: 1}},
+		OrdinalRangesTruncated: true,
+	}); ok {
+		t.Fatal("truncated reference with divergent tail schema must fail closed")
 	}
 }

@@ -68,3 +68,4 @@ func ErrIdemReused() *Error      { return err(CodeIdemReused, "IDEMPOTENCY_KEY_R
 func ErrIdemInProgress() *Error  { return err(CodeIdemInProgress, "IDEMPOTENCY_IN_PROGRESS") }
 func ErrIllegal() *Error         { return err(CodeIllegalTransition, "INVALID_STATE_TRANSITION") }
 func ErrNotFrozen() *Error       { return err(CodeNotFrozenActor, "NOT_FROZEN_ACTOR") }
+func ErrSystemCapacity() *Error  { return err(CodeSystemCapacity, "SYSTEM_CAPACITY_EXHAUSTED") }

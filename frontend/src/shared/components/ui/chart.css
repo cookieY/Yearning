@@ -1,0 +1,36 @@
+[data-slot="chart"] {
+  height: 18rem;
+  width: 100%;
+  outline: none;
+}
+
+[data-slot="chart"] *,
+[data-slot="chart"] *:focus,
+[data-slot="chart"] *:focus-visible {
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+/* Recharts Brush dark/light theme alignment */
+[data-slot="chart"] .recharts-brush > rect {
+  fill: var(--muted) !important;
+  fill-opacity: 0.35 !important;
+  stroke: var(--border) !important;
+  rx: 4px;
+}
+[data-slot="chart"] .recharts-brush-slide {
+  fill: var(--primary) !important;
+  fill-opacity: 0.16 !important;
+}
+[data-slot="chart"] .recharts-brush-traveller rect {
+  fill: var(--muted-foreground) !important;
+  stroke: var(--border) !important;
+  rx: 2px;
+}
+[data-slot="chart"] .recharts-brush-traveller line {
+  stroke: var(--background) !important;
+}
+[data-slot="chart"] .recharts-brush-texts text {
+  fill: var(--muted-foreground) !important;
+  font-size: 10px;
+}

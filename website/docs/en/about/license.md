@@ -14,6 +14,13 @@ If you discover a security vulnerability (privilege escalation, anonymizer leaka
 - **Email**: `henry@yearning.io`
 - **GitHub Security Advisories**: [cookieY/Yearning Security](https://github.com/cookieY/Yearning/security)
 
+## Related Pricing & Legal Policies
+
+- [Pricing & Licensing](/en/about/pricing)
+- [Terms of Service & Pro License](/en/about/terms)
+- [Refund Policy](/en/about/refund-policy)
+- [Privacy Policy](/en/about/privacy)
+
 ## Community
 
 - **Repository**: [github.com/cookieY/Yearning](https://github.com/cookieY/Yearning)

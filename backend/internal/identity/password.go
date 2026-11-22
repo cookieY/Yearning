@@ -1,13 +1,18 @@
 package identity
 
 import (
+	"context"
 	"crypto/rand"
 	"crypto/sha256"
 	"crypto/subtle"
 	"encoding/base64"
+	"errors"
 	"fmt"
+	"runtime"
 	"strconv"
 	"strings"
+	"sync/atomic"
+	"time"
 
 	"golang.org/x/crypto/argon2"
 	"golang.org/x/crypto/pbkdf2"
@@ -21,18 +26,97 @@ const (
 	argonThreads = 2
 	argonSaltLen = 16
 	argonKeyLen  = 32
+
+	defaultArgon2AcquireTimeout = 2 * time.Second
 )
+
+// ErrPasswordHashBusy indicates concurrent Argon2id verification/hashing slots are saturated.
+var ErrPasswordHashBusy = errors.New("identity: password verification capacity exhausted")
+
+type argon2Limiter struct {
+	sem     chan struct{}
+	timeout time.Duration
+}
+
+var activeArgon2Limiter atomic.Pointer[argon2Limiter]
+
+func defaultArgon2Slots() int {
+	p := runtime.GOMAXPROCS(0)
+	if p < 2 {
+		return 2
+	}
+	if p > 4 {
+		return 4
+	}
+	return p
+}
+
+func init() {
+	activeArgon2Limiter.Store(&argon2Limiter{
+		sem:     make(chan struct{}, defaultArgon2Slots()),
+		timeout: defaultArgon2AcquireTimeout,
+	})
+}
+
+// SetArgon2LimiterForTest overrides the Argon2id concurrency semaphore and wait timeout for tests.
+func SetArgon2LimiterForTest(slots int, timeout time.Duration) (restore func()) {
+	if slots < 1 {
+		slots = 1
+	}
+	prev := activeArgon2Limiter.Swap(&argon2Limiter{
+		sem:     make(chan struct{}, slots),
+		timeout: timeout,
+	})
+	return func() {
+		activeArgon2Limiter.Store(prev)
+	}
+}
+
+func acquireArgon2Slot(ctx context.Context) (func(), error) {
+	if err := ctx.Err(); err != nil {
+		return nil, ErrPasswordHashBusy
+	}
+	lim := activeArgon2Limiter.Load()
+	select {
+	case lim.sem <- struct{}{}:
+		return func() { <-lim.sem }, nil
+	default:
+	}
+	if lim.timeout <= 0 {
+		return nil, ErrPasswordHashBusy
+	}
+	timer := time.NewTimer(lim.timeout)
+	defer timer.Stop()
+	select {
+	case lim.sem <- struct{}{}:
+		return func() { <-lim.sem }, nil
+	case <-ctx.Done():
+		return nil, ErrPasswordHashBusy
+	case <-timer.C:
+		return nil, ErrPasswordHashBusy
+	}
+}
 
 // djangoMinIterations matches the migration allowlist: legacy hashes below this iteration count are rejected.
 const djangoMinIterations = 600000
 
 // HashPassword generates a PHC-formatted Argon2id password hash.
 func HashPassword(password string) (string, error) {
+	return HashPasswordCtx(context.Background(), password)
+}
+
+// HashPasswordCtx generates a PHC-formatted Argon2id password hash bounded by the Argon2id concurrency semaphore.
+func HashPasswordCtx(ctx context.Context, password string) (string, error) {
 	salt := make([]byte, argonSaltLen)
 	if _, err := rand.Read(salt); err != nil {
 		return "", fmt.Errorf("identity: salt source unavailable: %w", err)
 	}
+	release, err := acquireArgon2Slot(ctx)
+	if err != nil {
+		return "", err
+	}
 	key := argon2.IDKey([]byte(password), salt, argonTime, argonMemoryK, argonThreads, argonKeyLen)
+	release()
 	return fmt.Sprintf("$argon2id$v=19$m=%d,t=%d,p=%d$%s$%s",
 		argonMemoryK, argonTime, argonThreads,
 		base64.RawStdEncoding.EncodeToString(salt),
@@ -45,9 +129,14 @@ func HashPassword(password string) (string, error) {
 //
 // Malformed hashes return an error without panicking; match status and upgrade-needed flag are returned separately.
 func VerifyPassword(password, stored string) (ok bool, needsUpgrade bool, err error) {
+	return VerifyPasswordCtx(context.Background(), password, stored)
+}
+
+// VerifyPasswordCtx verifies a stored password hash while bounding concurrent Argon2id CPU/RAM usage via ctx.
+func VerifyPasswordCtx(ctx context.Context, password, stored string) (ok bool, needsUpgrade bool, err error) {
 	switch {
 	case strings.HasPrefix(stored, "$argon2id$"):
-		ok, err := verifyArgon2id(password, stored)
+		ok, err := verifyArgon2idCtx(ctx, password, stored)
 		return ok, false, err
 	case strings.HasPrefix(stored, "pbkdf2_sha256$"):
 		ok, err := verifyDjangoPBKDF2(password, stored)
@@ -57,7 +146,7 @@ func VerifyPassword(password, stored string) (ok bool, needsUpgrade bool, err er
 	}
 }
 
-func verifyArgon2id(password, stored string) (bool, error) {
+func verifyArgon2idCtx(ctx context.Context, password, stored string) (bool, error) {
 	parts := strings.Split(stored, "$")
 	// ["", "argon2id", "v=19", "m=..,t=..,p=..", salt, hash]
 	if len(parts) != 6 || parts[1] != "argon2id" || parts[2] != "v=19" {
@@ -117,7 +206,12 @@ func verifyArgon2id(password, stored string) (bool, error) {
 	if err != nil || len(want) == 0 || len(want) > 1024 {
 		return false, fmt.Errorf("identity: malformed argon2id digest")
 	}
+	release, err := acquireArgon2Slot(ctx)
+	if err != nil {
+		return false, err
+	}
 	got := argon2.IDKey([]byte(password), salt, t, m, p, uint32(len(want)))
+	release()
 	if len(got) != len(want) {
 		return false, nil
 	}

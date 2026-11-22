@@ -107,7 +107,10 @@ func postgresCallableRefs(statementSQL string) ([]postgresCallableRef, bool) {
 	if err != nil {
 		return nil, false
 	}
-	tokens := lexed.Tokens
+	return postgresCallableRefsFromTokens(lexed.Tokens)
+}
+
+func postgresCallableRefsFromTokens(tokens []fingerprint.Token) ([]postgresCallableRef, bool) {
 	refs := make([]postgresCallableRef, 0, 8)
 	seen := map[string]bool{}
 	add := func(kind database.PostgresCallableKind, name string) bool {

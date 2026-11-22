@@ -2,7 +2,7 @@ import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { SessionProvider } from "@/features/auth/session-provider";
-import { MemoryRouter, Route, Routes } from "react-router";
+import { MemoryRouter, Route, Routes, useLocation } from "react-router";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { HttpResponse, http } from "msw";
 import { server } from "@/test/msw/server";
@@ -55,6 +55,11 @@ function seedOrder(overrides: Record<string, unknown> = {}): void {
   });
 }
 
+function LocationProbe() {
+  const location = useLocation();
+  return <output data-testid="location-pathname">{location.pathname}</output>;
+}
+
 function renderMine(entry = "/changes/mine") {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false } },
@@ -63,10 +68,12 @@ function renderMine(entry = "/changes/mine") {
     <QueryClientProvider client={queryClient}>
       <SessionProvider>
       <MemoryRouter initialEntries={[entry]}>
+        <LocationProbe />
         <Routes>
           <Route path="/changes/mine" element={<MinePage />} />
           <Route path="/changes/drafts/:draftId" element={<p data-testid="draft-target" />} />
           <Route path="/changes/orders/:orderId" element={<OrderDetailPage />} />
+          <Route path="/approvals/orders/:orderId" element={<OrderDetailPage />} />
         </Routes>
       </MemoryRouter>
     </SessionProvider>
@@ -181,16 +188,105 @@ describe("MinePage", () => {  it("renders draft and order sections separated, or
       ],
     });
     // Default scope (My Orders = submitter view): not submitted by current user -> invisible (empty state).
-    renderMine();
-    expect(await screen.findByTestId("orders-empty")).toBeVisible();
-    expect(screen.queryByTestId("mine-orders-table")).toBeNull();
+    const submitterView = renderMine();
+    expect(await submitterView.findByTestId("orders-empty")).toBeVisible();
+    expect(submitterView.queryByTestId("mine-orders-table")).toBeNull();
+    submitterView.unmount();
 
-    // Executor arrival path (workspace "Pending My Execution" card carries ?scope=execution): visible.
-    renderMine("/changes/mine?scope=execution");
-    expect(await screen.findByTestId("mine-orders-table")).toBeVisible();
-    const rows = screen.getAllByTestId("mine-order-row");
+    // Executor arrival path (workspace "Pending My Execution" card carries ?scope=execution): visible,
+    // and clicking the row navigates to /approvals/orders/:id.
+    const exec = renderMine("/changes/mine?scope=execution");
+    expect(await exec.findByTestId("mine-orders-table")).toBeVisible();
+    const rows = exec.getAllByTestId("mine-order-row");
     expect(rows).toHaveLength(1);
     expect(rows[0]?.textContent).toContain("YR-20261030-000001");
+    await userEvent.click(rows[0] as HTMLElement);
+    expect(await exec.findByTestId("execution-action-card")).toBeVisible();
+    expect(exec.getByTestId("location-pathname")).toHaveTextContent(`/approvals/orders/${EXEC_PENDING_ID}`);
+    expect(exec.queryByTestId("withdraw-order")).toBeNull();
+    expect(exec.queryByTestId("void-order")).toBeNull();
+    exec.unmount();
+  });
+
+  it("keeps self-executor orders reachable in ?scope=execution (including result_unknown) and isolates My Orders vs execution actions", async () => {
+    const SELF_PENDING_ID = "9b6f1a2b-0000-4000-8000-00000000ee02";
+    const SELF_UNKNOWN_ID = "9b6f1a2b-0000-4000-8000-00000000ee03";
+    const executorActor = [
+      {
+        id: FIXTURE_OWNER_ID,
+        username: "henry",
+        display_name: "henry",
+        email: null,
+        is_builtin_admin: true,
+        version: 1,
+        created_at: "2026-08-01T00:00:00Z",
+        updated_at: "2026-08-01T00:00:00Z",
+      },
+    ];
+    seedOrder({
+      id: SELF_PENDING_ID,
+      display_number: "YR-20261122-000101",
+      submitter_user_id: FIXTURE_OWNER_ID,
+      title: "self pending execution",
+      state: "stage_execution_pending",
+      submitted_at: "2026-11-22T09:00:00Z",
+      stages: [
+        {
+          id: `${SELF_PENDING_ID}-s1`,
+          position: 1,
+          datasource_name: "prod-pg",
+          state: "execution_pending",
+          approval_steps: [],
+          execution_actors: executorActor,
+        },
+      ],
+    });
+    seedOrder({
+      id: SELF_UNKNOWN_ID,
+      display_number: "YR-20261122-000102",
+      submitter_user_id: FIXTURE_OWNER_ID,
+      title: "self unknown verification",
+      state: "result_unknown",
+      submitted_at: "2026-11-22T08:00:00Z",
+      stages: [
+        {
+          id: `${SELF_UNKNOWN_ID}-s1`,
+          position: 1,
+          datasource_name: "prod-pg",
+          state: "result_unknown",
+          approval_steps: [],
+          execution_actors: executorActor,
+        },
+      ],
+    });
+
+    const exec = renderMine("/changes/mine?scope=execution");
+    expect(await exec.findByTestId("mine-orders-table")).toBeVisible();
+    const execRows = exec.getAllByTestId("mine-order-row");
+    expect(execRows).toHaveLength(2);
+    expect(exec.getByTestId("mine-orders-table").textContent).toContain("YR-20261122-000101");
+    expect(exec.getByTestId("mine-orders-table").textContent).toContain("YR-20261122-000102");
+    const execPendingRow = execRows.find((row) => row.textContent.includes("YR-20261122-000101"));
+    expect(execPendingRow).toBeDefined();
+    await userEvent.click(execPendingRow as HTMLElement);
+    expect(await exec.findByTestId("execution-action-card")).toBeVisible();
+    expect(exec.getByTestId("location-pathname")).toHaveTextContent(`/approvals/orders/${SELF_PENDING_ID}`);
+    expect(exec.queryByTestId("withdraw-order")).toBeNull();
+    expect(exec.queryByTestId("void-order")).toBeNull();
+    exec.unmount();
+
+    const mine = renderMine("/changes/mine");
+    expect(await mine.findByTestId("mine-orders-table")).toBeVisible();
+    const mineRows = mine.getAllByTestId("mine-order-row");
+    const minePendingRow = mineRows.find((row) => row.textContent.includes("YR-20261122-000101"));
+    expect(minePendingRow).toBeDefined();
+    await userEvent.click(minePendingRow as HTMLElement);
+    expect(await mine.findByTestId("withdraw-order")).toBeVisible();
+    expect(mine.getByTestId("void-order")).toBeVisible();
+    expect(await mine.findByTestId("execution-wait-note")).toBeVisible();
+    expect(mine.getByTestId("location-pathname")).toHaveTextContent(`/changes/orders/${SELF_PENDING_ID}`);
+    expect(mine.queryByTestId("execution-action-card")).toBeNull();
+    mine.unmount();
   });
 
   it("deletes a saved draft through the drafts inbox popover and confirm dialog (owner ruling 2026-10-24)", async () => {
@@ -437,5 +533,74 @@ describe("MinePage", () => {  it("renders draft and order sections separated, or
     } finally {
       server.events.removeListener("request:start", recordRequest);
     }
+  });
+
+  it("renders human-readable datasource_names for query access requests and falls back to raw IDs", async () => {
+    const user = userEvent.setup();
+    const rawIdNamed = "3c38b5a6-2a34-475a-9fd9-9cb6fb182fdc";
+    const rawIdFallback = "4d49c6b7-3b45-486b-0ae0-0dc7fc293ged";
+    server.use(
+      http.get("*/query/orders", () =>
+        HttpResponse.json({
+          err_code: 0,
+          err_message: "ok",
+          data: {
+            items: [
+              {
+                kind: "access_request",
+                id: "qreq-named",
+                created_at: "2026-11-22T17:38:46Z",
+                request: {
+                  id: "qreq-named",
+                  requester_user_id: FIXTURE_OWNER_ID,
+                  state: "grant_active",
+                  datasource_ids: [rawIdNamed],
+                  datasource_names: ["f12-pg-target"],
+                  grant_id: null,
+                  version: 1,
+                  created_at: "2026-11-22T17:38:46Z",
+                  reason: "qa",
+                  requested_until: null,
+                  terminal_at: null,
+                },
+              },
+              {
+                kind: "access_request",
+                id: "qreq-fallback",
+                created_at: "2026-11-22T17:37:32Z",
+                request: {
+                  id: "qreq-fallback",
+                  requester_user_id: FIXTURE_OWNER_ID,
+                  state: "rejected",
+                  datasource_ids: [rawIdFallback],
+                  grant_id: null,
+                  version: 1,
+                  created_at: "2026-11-22T17:37:32Z",
+                  reason: "qa",
+                  requested_until: null,
+                  terminal_at: "2026-11-22T17:37:50Z",
+                },
+              },
+            ],
+            page: { limit: 20, next_cursor: null, has_more: false },
+          },
+        }),
+      ),
+    );
+
+    renderMine();
+    await user.click(await screen.findByRole("tab", { name: "\u67e5\u8be2\u5de5\u5355" }));
+
+    const namedRow = await screen.findByTestId("orders-query-row-qreq-named");
+    expect(within(namedRow).getByText("f12-pg-target")).toBeVisible();
+    expect(within(namedRow).queryByText(rawIdNamed)).toBeNull();
+
+    const fallbackRow = screen.getByTestId("orders-query-row-qreq-fallback");
+    expect(within(fallbackRow).getByText(rawIdFallback)).toBeVisible();
+
+    await user.click(namedRow);
+    const sheet = await screen.findByTestId("orders-query-detail");
+    expect(within(sheet).getByText("f12-pg-target")).toBeVisible();
+    expect(within(sheet).queryByText(rawIdNamed)).toBeNull();
   });
 });

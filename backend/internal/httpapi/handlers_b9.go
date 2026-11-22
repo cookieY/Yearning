@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
@@ -164,8 +165,48 @@ func (d *B9Deps) HandleListOrders(c *gin.Context) {
 	if !ok {
 		return
 	}
+	var filter application.OrderListFilter
+	if rawState := strings.TrimSpace(c.Query("state")); rawState != "" {
+		if !domain.ValidOrderState(domain.OrderState(rawState)) {
+			WriteBusinessError(c, &BusinessError{Code: bizerr.CodeValidationFailed, Name: "VALIDATION_FAILED", Message: "Invalid order state filter"})
+			return
+		}
+		filter.State = rawState
+	}
+	if q := strings.TrimSpace(c.Query("q")); q != "" {
+		if utf8.RuneCountInString(q) > 128 {
+			WriteBusinessError(c, &BusinessError{Code: bizerr.CodeValidationFailed, Name: "VALIDATION_FAILED", Message: "Invalid search keyword filter"})
+			return
+		}
+		filter.Q = q
+	}
+	if ds := strings.TrimSpace(c.Query("datasource")); ds != "" {
+		if utf8.RuneCountInString(ds) > 128 {
+			WriteBusinessError(c, &BusinessError{Code: bizerr.CodeValidationFailed, Name: "VALIDATION_FAILED", Message: "Invalid datasource filter"})
+			return
+		}
+		filter.Datasource = ds
+	}
+	if rawFrom := strings.TrimSpace(c.Query("submitted_from")); rawFrom != "" {
+		parsed, err := time.Parse(time.DateOnly, rawFrom)
+		if err != nil {
+			WriteBusinessError(c, &BusinessError{Code: bizerr.CodeValidationFailed, Name: "VALIDATION_FAILED", Message: "Invalid submitted_from date filter"})
+			return
+		}
+		t := parsed.UTC()
+		filter.SubmittedFrom = &t
+	}
+	if rawTo := strings.TrimSpace(c.Query("submitted_to")); rawTo != "" {
+		parsed, err := time.Parse(time.DateOnly, rawTo)
+		if err != nil {
+			WriteBusinessError(c, &BusinessError{Code: bizerr.CodeValidationFailed, Name: "VALIDATION_FAILED", Message: "Invalid submitted_to date filter"})
+			return
+		}
+		t := parsed.UTC().AddDate(0, 0, 1)
+		filter.SubmittedToExclusive = &t
+	}
 	items, next, err := d.Orders.ListOrders(c.Request.Context(), b9Actor(c),
-		intQuery(c, "limit", 50), after)
+		intQuery(c, "limit", 50), after, filter)
 	if err != nil {
 		if !writeOrderErr(c, err) {
 			WriteProblem(c, http.StatusInternalServerError, "internal error")

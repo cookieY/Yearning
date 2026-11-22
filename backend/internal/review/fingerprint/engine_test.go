@@ -299,3 +299,49 @@ func TestMappingDelimiterIdentifierFailsClosed(t *testing.T) {
 		t.Fatalf("normal identifier must pass: %v", err)
 	}
 }
+
+func TestAnalyzeLexedParityAndValidation(t *testing.T) {
+	e := testEngine(t)
+	cases := []struct {
+		profile Profile
+		sql     string
+	}{
+		{Profile{Engine: "mysql", Mode: "mysql"}, "UPDATE orders SET status = 'ok', amount = amount + 1 WHERE id IN (1, 2, 3)"},
+		{Profile{Engine: "postgresql", Mode: "postgresql"}, `INSERT INTO "app"."orders" ("id", "note") VALUES (1, 'hello')`},
+		{Profile{Engine: "postgresql", Mode: "postgresql"}, "CHECKPOINT"},
+	}
+	for _, tc := range cases {
+		raw := []byte(tc.sql)
+		want, err := e.Analyze(tc.profile, raw, privacy.NewRunMapper())
+		if err != nil {
+			t.Fatalf("Analyze(%q): %v", tc.sql, err)
+		}
+		lex, err := Tokenize(raw, tc.profile.Flags())
+		if err != nil {
+			t.Fatalf("Tokenize(%q): %v", tc.sql, err)
+		}
+		got, err := e.AnalyzeLexed(tc.profile, raw, lex, privacy.NewRunMapper())
+		if err != nil {
+			t.Fatalf("AnalyzeLexed(%q): %v", tc.sql, err)
+		}
+		if got.CanonicalFingerprintHMAC != want.CanonicalFingerprintHMAC ||
+			got.DialectFingerprintHMAC != want.DialectFingerprintHMAC ||
+			got.ExecutionShapeHMAC != want.ExecutionShapeHMAC ||
+			got.AnonymizedSQL != want.AnonymizedSQL ||
+			got.Quality != want.Quality ||
+			got.MetadataContextComplete != want.MetadataContextComplete ||
+			len(got.Objects) != len(want.Objects) {
+			t.Fatalf("AnalyzeLexed mismatch for %q:\n got  = %+v\n want = %+v", tc.sql, got, want)
+		}
+	}
+	// Invalid profile, oversized SQL, and empty tokens fail closed.
+	if _, err := e.AnalyzeLexed(Profile{Engine: "oracle", Mode: "mysql"}, []byte("SELECT 1"), LexOutput{}, nil); err == nil {
+		t.Fatal("expected unknown profile error")
+	}
+	if _, err := e.AnalyzeLexed(Profile{Engine: "mysql", Mode: "mysql"}, make([]byte, DefaultStatementBytes+1), LexOutput{}, nil); err == nil {
+		t.Fatal("expected oversized statement error")
+	}
+	if _, err := e.AnalyzeLexed(Profile{Engine: "mysql", Mode: "mysql"}, []byte("   "), LexOutput{}, nil); err == nil {
+		t.Fatal("expected empty token error")
+	}
+}

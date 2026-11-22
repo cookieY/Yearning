@@ -166,9 +166,16 @@ func bindPostgresGroupMetadata(
 				}
 				scope.objects[schemaToken][object.Token] = true
 			case "schema":
-				// Standalone schema discovery is not a supported fact even
-				// when SQL explicitly names a schema in the frozen path.
-				groupComplete = false
+				if object.Relation != "reference" {
+					// Standalone schema discovery or DDL targets have no complete catalog fact.
+					groupComplete = false
+					continue
+				}
+				if !binding.postgresAllowsSchemaToken(mapper, object.Token) {
+					groupComplete = false
+					continue
+				}
+				objectSchemas[object.Token] = true
 			case "index", "constraint":
 				// These require an exact observed table parent. Relation
 				// path proof alone does not provide that additional profile.

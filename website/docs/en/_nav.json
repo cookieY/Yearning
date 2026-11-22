@@ -22,7 +22,12 @@
   {
     "text": "API & Errors",
     "link": "/en/integration/agent-skill-openapi",
-    "activeMatch": "^/en/(integration|reference|about)/"
+    "activeMatch": "^/en/(integration|reference|about/license)"
+  },
+  {
+    "text": "Pricing",
+    "link": "/en/about/pricing",
+    "activeMatch": "^/en/about/(pricing|terms|refund-policy|privacy)"
   },
   {
     "text": "Live Demo",

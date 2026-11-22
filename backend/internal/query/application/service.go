@@ -48,6 +48,10 @@ type Services struct {
 	instance string
 	// cursorIdle is the cursor idle timeout (defaults to 10 minutes; injectable for tests).
 	cursorIdle time.Duration
+	// cursorEvictMinIdle is the minimum idle duration before an open cursor is eligible for LRU eviction
+	// when the query pool budget is exhausted (defaults to 30 seconds; injectable for tests).
+	cursorEvictMinIdle    time.Duration
+	cursorEvictMinIdleSet bool
 	// nowFunc is an injectable clock for tests.
 	nowFunc func() time.Time
 	// In-process live cursor registry (Pod-affine; lost cursors expire without replay).
@@ -59,6 +63,8 @@ type Services struct {
 	metaCacheTTL time.Duration
 }
 
+const defaultCursorEvictMinIdle = 30 * time.Second
+
 // NewServices constructs the Query domain application services.
 func NewServices(db *gorm.DB, crypter *crypto.Crypter, recorder *auditlog.Recorder) (*Services, error) {
 	if db == nil || crypter == nil || recorder == nil {
@@ -67,16 +73,31 @@ func NewServices(db *gorm.DB, crypter *crypto.Crypter, recorder *auditlog.Record
 	host, _ := os.Hostname()
 	return &Services{
 		DB: db, Crypter: crypter, Recorder: recorder,
-		MaskingSource: databaseMaskingSource{},
-		instance:      fmt.Sprintf("%s/%d", host, os.Getpid()),
-		cursorIdle:    10 * time.Minute,
-		metaCacheTTL:  defaultMetadataCacheTTL,
-		nowFunc:       func() time.Time { return time.Now().UTC() },
+		MaskingSource:         databaseMaskingSource{},
+		instance:              fmt.Sprintf("%s/%d", host, os.Getpid()),
+		cursorIdle:            10 * time.Minute,
+		cursorEvictMinIdle:    defaultCursorEvictMinIdle,
+		cursorEvictMinIdleSet: true,
+		metaCacheTTL:          defaultMetadataCacheTTL,
+		nowFunc:               func() time.Time { return time.Now().UTC() },
 	}, nil
 }
 
 // SetCursorIdleForTest injects the cursor idle timeout for testing; called only in test builds.
 func (s *Services) SetCursorIdleForTest(d time.Duration) { s.cursorIdle = d }
+
+// SetCursorEvictMinIdleForTest injects the minimum idle duration before LRU cursor eviction for testing.
+func (s *Services) SetCursorEvictMinIdleForTest(d time.Duration) {
+	s.cursorEvictMinIdle = d
+	s.cursorEvictMinIdleSet = true
+}
+
+func (s *Services) effectiveCursorEvictMinIdle() time.Duration {
+	if !s.cursorEvictMinIdleSet && s.cursorEvictMinIdle == 0 {
+		return defaultCursorEvictMinIdle
+	}
+	return s.cursorEvictMinIdle
+}
 
 // SetMetadataCacheTTLForTest overrides the metadata cache TTL for testing; 0 disables caching.
 func (s *Services) SetMetadataCacheTTLForTest(d time.Duration) {
@@ -93,7 +114,12 @@ func (s *Services) SetClockForTest(fn func() time.Time) { s.nowFunc = fn }
 
 func newID() string { return uuid.NewString() }
 
-func (s *Services) now() time.Time { return s.nowFunc().UTC() }
+func (s *Services) now() time.Time {
+	if s.nowFunc == nil {
+		return time.Now().UTC()
+	}
+	return s.nowFunc().UTC()
+}
 
 func (s *Services) serializable(ctx context.Context, fn func(tx *gorm.DB) error) error {
 	return txutil.Serializable(ctx, s.DB, fn)

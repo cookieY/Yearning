@@ -23,6 +23,7 @@ import {
   streamAssistantMessageSSE,
 } from "./use-assistant";
 import { describeError } from "@/shared/api/error-display";
+import { appToast } from "@/shared/components/shadcn-dashboard/sonner/sonner-08";
 import { BusinessError, TransportError } from "@/shared/api/mutator";
 import i18n from "@/shared/i18n";
 
@@ -1331,11 +1332,17 @@ describe("Database AI Assistant (FE-F13-AI-ASSISTANT)", () => {
       expect(assistantApi.createAssistantSession).toHaveBeenCalled();
     });
 
-    // Delete current session
-    fireEvent.click(screen.getByTestId("assistant-delete-session-button"));
-    await waitFor(() => {
-      expect(assistantApi.deleteAssistantSession).toHaveBeenCalled();
-    });
+    // Delete current session and verify dedicated assistant.sessionDeleted toast on success
+    const toastSuccessSpy = vi.spyOn(appToast, "success");
+    try {
+      fireEvent.click(screen.getByTestId("assistant-delete-session-button"));
+      await waitFor(() => {
+        expect(assistantApi.deleteAssistantSession).toHaveBeenCalled();
+        expect(toastSuccessSpy).toHaveBeenCalledWith(i18n.t("assistant.sessionDeleted"));
+      });
+    } finally {
+      toastSuccessSpy.mockRestore();
+    }
 
     // Test mobile viewport AssistantWidget
     const origInnerWidth = window.innerWidth;

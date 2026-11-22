@@ -3,8 +3,11 @@ package notification
 import (
 	"bytes"
 	"context"
+	"database/sql"
+	"database/sql/driver"
 	"encoding/json"
 	"errors"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -12,8 +15,12 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	gormpostgres "gorm.io/driver/postgres"
+	"gorm.io/gorm"
+	gormlogger "gorm.io/gorm/logger"
 
 	"github.com/cookieY/YearningX/backend/internal/identity/session"
+	"github.com/cookieY/YearningX/backend/internal/tasks"
 )
 
 func TestNotificationCoverageValidationAndHelpers(t *testing.T) {
@@ -325,7 +332,7 @@ func TestNotificationCoverageHTTPHandlers(t *testing.T) {
 	}
 
 	// 3. writeErr / writeDeleteErr error mapping coverage
-	errs := []error{nil, ErrNotFound, ErrConflict, ErrChannelReferenced, ErrValidation, errors.New("boom")}
+	errs := []error{nil, ErrNotFound, ErrConflict, ErrChannelReferenced, ErrValidation, tasks.ErrQueueFull, errors.New("boom")}
 	for _, e := range errs {
 		w := httptest.NewRecorder()
 		c, _ := gin.CreateTestContext(w)
@@ -336,5 +343,101 @@ func TestNotificationCoverageHTTPHandlers(t *testing.T) {
 	}
 	if parseVersion(`"42"`) != 42 {
 		t.Fatal("expected parseVersion 42")
+	}
+
+	// 4. Verify writeErr emits exact 1012 BusinessErrorResponse shape on tasks.ErrQueueFull
+	wCap := httptest.NewRecorder()
+	cCap, _ := gin.CreateTestContext(wCap)
+	cCap.Set("request_id", "req-cap-1012")
+	writeErr(cCap, tasks.ErrQueueFull)
+	if wCap.Code != http.StatusOK {
+		t.Fatalf("writeErr(ErrQueueFull) status = %d, want 200", wCap.Code)
+	}
+	var capBody struct {
+		ErrCode   int            `json:"err_code"`
+		Message   string         `json:"message"`
+		Data      any            `json:"data"`
+		RequestID string         `json:"request_id"`
+		Retryable bool           `json:"retryable"`
+		Meta      map[string]any `json:"meta"`
+	}
+	if err := json.Unmarshal(wCap.Body.Bytes(), &capBody); err != nil {
+		t.Fatalf("unmarshal 1012 body: %v", err)
+	}
+	if capBody.ErrCode != 1012 || !capBody.Retryable || capBody.Data != nil || capBody.RequestID != "req-cap-1012" {
+		t.Fatalf("unexpected 1012 body: %+v", capBody)
+	}
+	if capBody.Meta == nil || capBody.Meta["retry_after_ms"] != float64(1000) {
+		t.Fatalf("expected meta.retry_after_ms=1000, got %+v", capBody.Meta)
+	}
+}
+
+type notifQueueStubFx struct {
+	pendingCnt  int64
+	execQueries []string
+}
+
+func (f *notifQueueStubFx) Connect(context.Context) (driver.Conn, error) { return f, nil }
+func (f *notifQueueStubFx) Driver() driver.Driver                        { return notifQueueStubDriver{} }
+
+type notifQueueStubDriver struct{}
+
+func (notifQueueStubDriver) Open(string) (driver.Conn, error) { return nil, errors.New("unused") }
+func (f *notifQueueStubFx) Prepare(string) (driver.Stmt, error) {
+	return nil, errors.New("unused")
+}
+func (f *notifQueueStubFx) Close() error              { return nil }
+func (f *notifQueueStubFx) Begin() (driver.Tx, error) { return nil, errors.New("unused") }
+func (f *notifQueueStubFx) ExecContext(_ context.Context, query string, _ []driver.NamedValue) (driver.Result, error) {
+	f.execQueries = append(f.execQueries, query)
+	return driver.RowsAffected(1), nil
+}
+func (f *notifQueueStubFx) QueryContext(_ context.Context, query string, _ []driver.NamedValue) (driver.Rows, error) {
+	if strings.Contains(strings.ToLower(query), "from async_tasks") {
+		return &notifSingleRow{cols: []string{"count"}, vals: []driver.Value{f.pendingCnt}}, nil
+	}
+	now := time.Now().UTC()
+	return &notifSingleRow{
+		cols: []string{"id", "kind", "name", "enabled", "configuration", "version", "created_by_user_id", "created_at", "updated_at"},
+		vals: []driver.Value{"0198da00-0000-7000-8000-000000000010", "email", "ops", true, []byte(`{}`), int64(1), "u-1", now, now},
+	}, nil
+}
+
+type notifSingleRow struct {
+	cols []string
+	vals []driver.Value
+	done bool
+}
+
+func (r *notifSingleRow) Columns() []string { return r.cols }
+func (r *notifSingleRow) Close() error      { return nil }
+func (r *notifSingleRow) Next(dest []driver.Value) error {
+	if r.done {
+		return io.EOF
+	}
+	r.done = true
+	copy(dest, r.vals)
+	return nil
+}
+
+func TestCreateTestDeliveryRejectsWhenQueueFull(t *testing.T) {
+	defer tasks.SetPendingMaximumForTest(2)()
+	fx := &notifQueueStubFx{pendingCnt: 2}
+	sqlDB := sql.OpenDB(fx)
+	t.Cleanup(func() { _ = sqlDB.Close() })
+	db, err := gorm.Open(gormpostgres.New(gormpostgres.Config{
+		Conn:                 sqlDB,
+		PreferSimpleProtocol: true,
+		WithoutReturning:     true,
+	}), &gorm.Config{Logger: gormlogger.Discard, SkipDefaultTransaction: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	svc := NewService(db, nil)
+	if _, err := svc.CreateTestDelivery(context.Background(), "0198da00-0000-7000-8000-000000000010"); !errors.Is(err, tasks.ErrQueueFull) {
+		t.Fatalf("CreateTestDelivery err = %v, want tasks.ErrQueueFull", err)
+	}
+	if len(fx.execQueries) != 0 {
+		t.Fatalf("expected zero inserts when queue full, got %v", fx.execQueries)
 	}
 }

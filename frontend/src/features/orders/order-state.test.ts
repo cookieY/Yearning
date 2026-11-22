@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { ChangeOrder } from "@/api/generated/client/yearningV4HTTPAPI.schemas";
 import {
   activeApprovalStepFor,
+  activeExecutorStageFor,
   approvalStepTone,
   executionAttemptTone,
   frozenExecutorStageFor,
@@ -270,5 +271,89 @@ describe("scheduledStageFor", () => {
         FIXTURE_OWNER_ID,
       ),
     ).toBeNull();
+  });
+});
+
+describe("activeExecutorStageFor", () => {
+  it("matches frozen executors across stage_execution_pending, scheduled, running, and result_unknown", () => {
+    expect(activeExecutorStageFor(orderWithExecutor({ state: "stage_execution_pending" }), FIXTURE_OWNER_ID)?.id).toBe(
+      "aa6f1a2b-0000-4000-8000-00000000aa11",
+    );
+
+    const scheduled = orderWithExecutor({ state: "scheduled" });
+    if (scheduled.stages[0] === undefined) throw new Error("seed stage missing");
+    scheduled.stages[0].state = "scheduled";
+    expect(activeExecutorStageFor(scheduled, FIXTURE_OWNER_ID)?.id).toBe(
+      "aa6f1a2b-0000-4000-8000-00000000aa11",
+    );
+
+    const pendingScheduled = orderWithExecutor({ state: "scheduled" });
+    expect(activeExecutorStageFor(pendingScheduled, FIXTURE_OWNER_ID)?.id).toBe(
+      "aa6f1a2b-0000-4000-8000-00000000aa11",
+    );
+
+    const running = orderWithExecutor({ state: "running", current_stage_position: 1 });
+    if (running.stages[0] === undefined) throw new Error("seed stage missing");
+    running.stages[0].state = "running";
+    expect(activeExecutorStageFor(running, FIXTURE_OWNER_ID)?.id).toBe(
+      "aa6f1a2b-0000-4000-8000-00000000aa11",
+    );
+
+    const unknown = orderWithExecutor({ state: "result_unknown", current_stage_position: 1 });
+    if (unknown.stages[0] === undefined) throw new Error("seed stage missing");
+    unknown.stages[0].state = "result_unknown";
+    expect(activeExecutorStageFor(unknown, FIXTURE_OWNER_ID)?.id).toBe(
+      "aa6f1a2b-0000-4000-8000-00000000aa11",
+    );
+
+    expect(activeExecutorStageFor(running, undefined)).toBeNull();
+    expect(activeExecutorStageFor(running, "1111d9cc-e65d-7b9d-a8aa-3c81945f99ac")).toBeNull();
+  });
+
+  it("isolates active stage executors in multi-stage orders and returns null in terminal states", () => {
+    const otherExecutorId = "1111d9cc-e65d-7b9d-a8aa-3c81945f99ac";
+    const user = (id: string) => ({
+      id,
+      username: "u",
+      display_name: "u",
+      email: null,
+      is_builtin_admin: false,
+      version: 1,
+      created_at: "2026-08-01T00:00:00Z",
+      updated_at: "2026-08-01T00:00:00Z",
+    });
+    const multiStage = {
+      ...orderWithExecutor({ state: "running", current_stage_position: 2 }),
+      stages: [
+        {
+          id: "aa6f1a2b-0000-4000-8000-00000000aa11",
+          position: 1,
+          datasource_name: "stage-1-pg",
+          state: "succeeded",
+          approval_steps: [],
+          execution_actors: [user(FIXTURE_OWNER_ID)],
+        },
+        {
+          id: "aa6f1a2b-0000-4000-8000-00000000aa12",
+          position: 2,
+          datasource_name: "stage-2-pg",
+          state: "running",
+          approval_steps: [],
+          execution_actors: [user(otherExecutorId)],
+        },
+      ],
+    } as unknown as ChangeOrder;
+
+    expect(activeExecutorStageFor(multiStage, FIXTURE_OWNER_ID)).toBeNull();
+    expect(activeExecutorStageFor(multiStage, otherExecutorId)?.id).toBe(
+      "aa6f1a2b-0000-4000-8000-00000000aa12",
+    );
+
+    for (const terminalState of ["completed", "failed", "withdrawn"] as const) {
+      const done = orderWithExecutor({ state: terminalState });
+      if (done.stages[0] === undefined) throw new Error("seed stage missing");
+      done.stages[0].state = "succeeded";
+      expect(activeExecutorStageFor(done, FIXTURE_OWNER_ID)).toBeNull();
+    }
   });
 });

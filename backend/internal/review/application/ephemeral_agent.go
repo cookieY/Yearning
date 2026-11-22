@@ -207,6 +207,9 @@ func (r *AgentRunner) ephemeralGrouping(ctx context.Context, er *EphemeralRun) e
 			"values_row_count_max":          g.valMax,
 			"unbounded_mutation":            g.unbounded,
 		}
+		if g.objectRangesTruncated {
+			shape["object_ranges_truncated"] = true
+		}
 		for k, v := range g.facts.m {
 			shape[k] = v
 		}
@@ -675,11 +678,12 @@ func ephemeralStageGroups(er *EphemeralRun, datasourceID string) []provider.Anon
 			}
 		}
 		var metadata struct {
-			SQL           string                               `json:"representative_anonymized_sql"`
-			Objects       []provider.AnonymizedObjectReference `json:"objects"`
-			Complete      bool                                 `json:"metadata_context_complete"`
-			Ordinal       int32                                `json:"statement_ordinal"`
-			OrdinalRanges []provider.StatementOrdinalRange     `json:"statement_ordinal_ranges"`
+			SQL                   string                               `json:"representative_anonymized_sql"`
+			Objects               []provider.AnonymizedObjectReference `json:"objects"`
+			Complete              bool                                 `json:"metadata_context_complete"`
+			Ordinal               int32                                `json:"statement_ordinal"`
+			OrdinalRanges         []provider.StatementOrdinalRange     `json:"statement_ordinal_ranges"`
+			ObjectRangesTruncated bool                                 `json:"object_ranges_truncated"`
 		}
 		if err := json.Unmarshal(g.TypedShape, &metadata); err != nil {
 			continue
@@ -689,6 +693,12 @@ func ephemeralStageGroups(er *EphemeralRun, datasourceID string) []provider.Anon
 		delete(stats, "metadata_context_complete")
 		delete(stats, "statement_ordinal")
 		delete(stats, "statement_ordinal_ranges")
+		delete(stats, "object_ranges_truncated")
+		if metadata.ObjectRangesTruncated {
+			for i := range metadata.Objects {
+				metadata.Objects[i].OrdinalRangesTruncated = true
+			}
+		}
 		stats["max_statement_bytes"] = sizeMax
 		shape := fmt.Sprintf("kind=%v op=%v where=%v",
 			repKind, repOp, !boolValue(stats["unbounded_mutation"]))

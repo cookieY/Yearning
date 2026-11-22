@@ -65,7 +65,7 @@ export function FullLayout() {
               The header card uses the same 1536px measure, so both edges line
               up from 1440 through ultrawide instead of the body being capped
               while the bar kept spanning the full inset. */}
-          <div className="mx-auto flex min-h-full w-full max-w-[1536px] flex-col">
+          <div className="mx-auto flex min-h-full w-full max-w-[1536px] flex-col pb-24">
             {/* Page-switch motion (owner ruling 2026-10-24): every route
              * change — including the settings tab navigation, whose five tabs
              * are route-level — runs a short rise+fade through a keyed

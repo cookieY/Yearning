@@ -89,12 +89,31 @@ func TestPostgresRuntimeBoundsRelationsAndRejectsDuplicateBaseline(t *testing.T)
 	if err != nil {
 		t.Fatal(err)
 	}
-	statements := make([]postgresAnalyzedStatement, postgresSearchPathMaxResolvedTables+1)
+	// 100k statements referencing one distinct table must succeed.
+	statements := make([]postgresAnalyzedStatement, 100000)
 	for i := range statements {
 		statements[i].objects = []fingerprint.ObjectReference{{Kind: string(privacy.KindTable), Token: token}}
 	}
-	if got, err := postgresRelationRequests(statements, mapper); !errors.Is(err, ErrFactSourceUnavailable) || got != nil {
-		t.Fatalf("oversized relations accepted: count=%d err=%v", len(got), err)
+	if got, err := postgresRelationRequests(statements, mapper); err != nil || len(got) != 100000 {
+		t.Fatalf("100k single-table statements rejected: count=%d err=%v", len(got), err)
+	}
+	// >100k statements must fail closed.
+	tooManyStmts := make([]postgresAnalyzedStatement, 100001)
+	tooManyStmts[0].objects = []fingerprint.ObjectReference{{Kind: string(privacy.KindTable), Token: token}}
+	if got, err := postgresRelationRequests(tooManyStmts, mapper); !errors.Is(err, ErrFactSourceUnavailable) || got != nil {
+		t.Fatalf("oversized statement batch accepted: count=%d err=%v", len(got), err)
+	}
+	// >50k distinct table names must fail closed.
+	manyRefs := make([]fingerprint.ObjectReference, 0, postgresSearchPathMaxResolvedTables+1)
+	for i := 0; i <= postgresSearchPathMaxResolvedTables; i++ {
+		tok, terr := mapper.Token(privacy.KindTable, "tbl_"+string(rune('a'+i%26))+"_"+string(rune('0'+(i/26)%10))+"_"+string(rune('a'+(i/260)%26))+"_"+string(rune('a'+(i/6760)%26)))
+		if terr != nil {
+			t.Fatal(terr)
+		}
+		manyRefs = append(manyRefs, fingerprint.ObjectReference{Kind: string(privacy.KindTable), Token: tok})
+	}
+	if got, err := postgresRelationRequests([]postgresAnalyzedStatement{{objects: manyRefs}}, mapper); !errors.Is(err, ErrFactSourceUnavailable) || got != nil {
+		t.Fatalf("oversized distinct tables accepted: count=%d err=%v", len(got), err)
 	}
 	values := []PostgresRelationBaseline{{TableName: "one", PresentBySchema: map[string]string{}}, {TableName: "one", PresentBySchema: map[string]string{}}}
 	if got, err := validatePostgresRelationBaselines(testPostgresPath(), []string{"one", "two"}, values); !errors.Is(err, ErrFactSourceUnavailable) || got != nil {

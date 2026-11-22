@@ -295,7 +295,7 @@
     "close": "关闭",
     "actions": "操作",
     "clear": "清空",
-    "createdToast": "用户已创建。",
+    "createdToast": "已创建。",
     "savedToast": "已保存。",
     "showPlaintext": "显示明文",
     "hidePlaintext": "隐藏明文",
@@ -723,7 +723,9 @@
         "nodeInvalidated": "冻结审批/执行节点无存活候选者，工单转入invalid"
       },
       "withdraw": "撤回",
+      "withdrawAction": "工单已撤回。",
       "void": "作废",
+      "voidAction": "工单已作废。",
       "withdrawTitle": "撤回工单",
       "withdrawDescription": "当前阶段尚未开始执行，撤回后工单终止为「已撤回」；冻结人员与既有记录保留。",
       "withdrawPartialDescription": "已有阶段开始执行或结果未知，撤回将记录为「部分执行后撤回」。",
@@ -2434,6 +2436,7 @@
     "newSession": "新建对话",
     "newSessionDefaultTitle": "新建数据库助手会话",
     "deleteSession": "删除当前会话",
+    "sessionDeleted": "会话已删除。",
     "historySelectLabel": "选择历史会话",
     "intents": {
       "platform_help": "平台使用",

@@ -1382,7 +1382,7 @@ export default function SubmissionWizard({ mode }: { mode: "create" | "draft" })
 
         {/* Left: one continuous form. Right: sticky live summary. */}
         <div className="grid grid-cols-12 items-start gap-[30px]">
-          <main
+          <section
             ref={mainColumnRef}
             className="col-span-12 flex min-w-0 flex-col gap-[30px] lg:col-span-8"
             aria-label={t("precheck.wizard.pageTitle")}
@@ -1390,7 +1390,7 @@ export default function SubmissionWizard({ mode }: { mode: "create" | "draft" })
             {renderFlowSection()}
             {renderMetaSection()}
             {renderSqlSection()}
-          </main>
+          </section>
           <aside
             className="col-span-12 flex flex-col gap-[30px] lg:col-span-4 lg:sticky lg:top-0"
             aria-label={t("precheck.wizard.summaryTitle")}

@@ -401,22 +401,9 @@ func verifyPostgresObjectBindings(
 		}
 		return verifyPostgresBaseline(path, binding.Baseline, lookups)
 	}
-	expected := []reviewapp.FrozenPostgresObjectBinding{}
-	for key, relation := range binding.Relations {
-		currentOrdinal, _, ok := strings.Cut(key, ":")
-		if !ok {
-			return domain.ErrPreflightFailed("postgres_search_path_snapshot_invalid")
-		}
-		value, err := strconv.ParseInt(currentOrdinal, 10, 32)
-		if err != nil || value <= 0 {
-			return domain.ErrPreflightFailed("postgres_search_path_snapshot_invalid")
-		}
-		if int32(value) == ordinal {
-			if !relation.Supported {
-				return domain.ErrPreflightFailed("postgres_search_path_changed")
-			}
-			expected = append(expected, relation)
-		}
+	expected, err := expectedPostgresBindingsAtOrdinal(binding, ordinal)
+	if err != nil {
+		return err
 	}
 	if len(expected) == 0 {
 		return nil
@@ -538,6 +525,50 @@ func verifyPostgresCallablesOnPool(
 	return verifyPostgresCallables(binding, resolutions)
 }
 
+func expectedPostgresBindingsAtOrdinal(
+	binding reviewapp.FrozenPostgresPathBinding,
+	ordinal int32,
+) ([]reviewapp.FrozenPostgresObjectBinding, error) {
+	if ordinal <= 0 {
+		return nil, domain.ErrPreflightFailed(
+			"postgres_search_path_snapshot_invalid",
+		)
+	}
+	expected := make([]reviewapp.FrozenPostgresObjectBinding, 0, len(binding.UniformRelations))
+	for token, relation := range binding.UniformRelations {
+		if token == "" || relation.CreatedByOrdinal != 0 {
+			return nil, domain.ErrPreflightFailed(
+				"postgres_search_path_snapshot_invalid",
+			)
+		}
+		if !relation.Supported {
+			return nil, domain.ErrPreflightFailed("postgres_search_path_changed")
+		}
+		expected = append(expected, relation)
+	}
+	for key, relation := range binding.Relations {
+		current, token, ok := strings.Cut(key, ":")
+		value, err := strconv.ParseInt(current, 10, 32)
+		if !ok || token == "" || err != nil || value <= 0 {
+			return nil, domain.ErrPreflightFailed(
+				"postgres_search_path_snapshot_invalid",
+			)
+		}
+		if _, overlap := binding.UniformRelations[token]; overlap {
+			return nil, domain.ErrPreflightFailed(
+				"postgres_search_path_snapshot_invalid",
+			)
+		}
+		if int32(value) == ordinal {
+			if !relation.Supported {
+				return nil, domain.ErrPreflightFailed("postgres_search_path_changed")
+			}
+			expected = append(expected, relation)
+		}
+	}
+	return expected, nil
+}
+
 func reviewedPostgresRelationNames(
 	binding reviewapp.FrozenPostgresPathBinding,
 	ordinal int32,
@@ -556,32 +587,12 @@ func reviewedPostgresRelationNames(
 		}
 		return names, nil
 	}
-	if ordinal < 0 {
-		return nil, domain.ErrPreflightFailed(
-			"postgres_search_path_snapshot_invalid",
-		)
+	expected, err := expectedPostgresBindingsAtOrdinal(binding, ordinal)
+	if err != nil {
+		return nil, err
 	}
-	for key, relation := range binding.Relations {
-		current, _, ok := strings.Cut(key, ":")
-		if !ok {
-			return nil, domain.ErrPreflightFailed(
-				"postgres_search_path_snapshot_invalid",
-			)
-		}
-		value, err := strconv.ParseInt(current, 10, 32)
-		if err != nil || value <= 0 {
-			return nil, domain.ErrPreflightFailed(
-				"postgres_search_path_snapshot_invalid",
-			)
-		}
-		if int32(value) == ordinal {
-			if !relation.Supported {
-				return nil, domain.ErrPreflightFailed(
-					"postgres_search_path_changed",
-				)
-			}
-			add(relation.TableName)
-		}
+	for _, relation := range expected {
+		add(relation.TableName)
 	}
 	return names, nil
 }
@@ -598,21 +609,9 @@ func verifyPostgresInspection(
 	if ordinal == 0 {
 		return verifyPostgresBaseline(path, binding.Baseline, lookups)
 	}
-	expected := make([]reviewapp.FrozenPostgresObjectBinding, 0)
-	for key, relation := range binding.Relations {
-		current, _, ok := strings.Cut(key, ":")
-		value, err := strconv.ParseInt(current, 10, 32)
-		if !ok || err != nil || value <= 0 {
-			return domain.ErrPreflightFailed(
-				"postgres_search_path_snapshot_invalid",
-			)
-		}
-		if int32(value) == ordinal {
-			if !relation.Supported {
-				return domain.ErrPreflightFailed("postgres_search_path_changed")
-			}
-			expected = append(expected, relation)
-		}
+	expected, err := expectedPostgresBindingsAtOrdinal(binding, ordinal)
+	if err != nil {
+		return err
 	}
 	if len(expected) == 0 {
 		return nil

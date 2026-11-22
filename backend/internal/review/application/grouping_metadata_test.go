@@ -1,12 +1,17 @@
 package application
 
 import (
+	"bytes"
 	"encoding/json"
+	"fmt"
 	"reflect"
 	"strconv"
+	"strings"
 	"testing"
 
 	"github.com/cookieY/YearningX/backend/internal/review/fingerprint"
+	"github.com/cookieY/YearningX/backend/internal/review/persistence"
+	"github.com/cookieY/YearningX/backend/internal/review/privacy"
 	"github.com/cookieY/YearningX/backend/internal/review/provider"
 )
 
@@ -383,4 +388,211 @@ func distinctObjectRefsAtOrdinal(start, count int, ordinal int32) []fingerprint.
 		})
 	}
 	return refs
+}
+
+func TestAppendStatementOrdinalRangeTrackedDecouplesDisplayCap(t *testing.T) {
+	var ranges []statementOrdinalRange
+	for i := 0; i < maxStatementOrdinalRanges+8; i++ {
+		ordinal := int32(2*i + 1)
+		var valid, truncated bool
+		ranges, valid, truncated = appendStatementOrdinalRangeTracked(ranges, ordinal)
+		if !valid {
+			t.Fatalf("ordinal %d unexpectedly reported invalid", ordinal)
+		}
+		if i < maxStatementOrdinalRanges && truncated {
+			t.Fatalf("ordinal %d prematurely truncated", ordinal)
+		}
+		if i >= maxStatementOrdinalRanges && !truncated {
+			t.Fatalf("ordinal %d expected truncated=true past 512 ranges", ordinal)
+		}
+	}
+	if len(ranges) != maxStatementOrdinalRanges {
+		t.Fatalf("ranges len = %d, want %d", len(ranges), maxStatementOrdinalRanges)
+	}
+	if _, valid, _ := appendStatementOrdinalRangeTracked(ranges, 0); valid {
+		t.Fatal("ordinal < 1 must fail closed")
+	}
+	if _, valid, _ := appendStatementOrdinalRangeTracked(ranges, 5); valid {
+		t.Fatal("non-monotonic ordinal must fail closed")
+	}
+}
+
+func TestMergeObjectsTrackedDecouplesRangeCapsFromCompleteness(t *testing.T) {
+	// Per-object range cap truncates display list while keeping objectsComplete=true.
+	state := newObjectMergeState()
+	budget := &objectContextBudget{}
+	var objects []fingerprint.ObjectReference
+	for i := 0; i <= maxObjectOrdinalRanges; i++ {
+		var complete, truncated bool
+		objects, complete, truncated = mergeObjectsTracked(objects, state, []fingerprint.ObjectReference{{
+			Token:            "table_1",
+			Kind:             "table",
+			Relation:         fingerprint.RelationTarget,
+			StatementOrdinal: int32(2*i + 1),
+		}}, budget)
+		if !complete {
+			t.Fatalf("step %d must keep objectsComplete=true", i)
+		}
+		if i == maxObjectOrdinalRanges && !truncated {
+			t.Fatal("513th range must set rangesTruncated=true")
+		}
+	}
+	if len(objects[0].StatementOrdinalRanges) != maxObjectOrdinalRanges {
+		t.Fatalf("bounded ranges = %d, want %d", len(objects[0].StatementOrdinalRanges), maxObjectOrdinalRanges)
+	}
+
+	// Per-group range cap records new distinct object identity with bounded empty range list.
+	groupState := newObjectMergeState()
+	groupBudget := &objectContextBudget{}
+	var groupObjects []fingerprint.ObjectReference
+	for occ := int32(1); occ <= maxObjectOrdinalRangesPerGroup; occ++ {
+		ref := fingerprint.ObjectReference{
+			Token:            "table_" + strconv.Itoa(int((occ-1)/maxObjectOrdinalRanges+1)),
+			Kind:             "table",
+			Relation:         fingerprint.RelationTarget,
+			StatementOrdinal: 2*occ - 1,
+		}
+		var complete bool
+		groupObjects, complete, _ = mergeObjectsTracked(groupObjects, groupState, []fingerprint.ObjectReference{ref}, groupBudget)
+		if !complete {
+			t.Fatalf("group range %d unexpectedly incomplete", occ)
+		}
+	}
+	var complete, truncated bool
+	groupObjects, complete, truncated = mergeObjectsTracked(groupObjects, groupState, []fingerprint.ObjectReference{{
+		Token: "table_extra", Kind: "table", Relation: fingerprint.RelationTarget, StatementOrdinal: maxObjectOrdinalRangesPerGroup + 1,
+	}}, groupBudget)
+	if !complete || !truncated || len(groupObjects) != 9 || len(groupObjects[8].StatementOrdinalRanges) != 0 {
+		t.Fatalf("new distinct object at group range cap: complete=%v truncated=%v len=%d ranges=%v",
+			complete, truncated, len(groupObjects), groupObjects[len(groupObjects)-1].StatementOrdinalRanges)
+	}
+
+	// Distinct object limit per group still fails closed.
+	fullObjs, complete, _ := mergeObjectsTracked(nil, newObjectMergeState(), distinctObjectRefs(0, maxObjectReferencesPerGroup), &objectContextBudget{})
+	if !complete {
+		t.Fatal("exact per-group object limit must remain complete")
+	}
+	_, complete, _ = mergeObjectsTracked(fullObjs, &objectMergeState{index: func() map[string]int {
+		m := make(map[string]int, len(fullObjs))
+		for i, o := range fullObjs {
+			m[objectReferenceKey(o)] = i
+		}
+		return m
+	}()}, distinctObjectRefs(maxObjectReferencesPerGroup, 1), &objectContextBudget{})
+	if complete {
+		t.Fatal("exceeding maxObjectReferencesPerGroup must fail closed")
+	}
+
+	// Malformed/non-monotonic ranges still fail closed.
+	if _, complete, _ := mergeObjectsTracked(nil, nil, []fingerprint.ObjectReference{{
+		Token: "table_bad", Kind: "table", Relation: fingerprint.RelationTarget, StatementOrdinal: 0,
+	}}, nil); complete {
+		t.Fatal("ordinal 0 must fail closed")
+	}
+	if _, complete, _ := mergeObjectsTracked(objects, state, []fingerprint.ObjectReference{{
+		Token: "table_1", Kind: "table", Relation: fingerprint.RelationTarget, StatementOrdinal: 1,
+	}}, budget); complete {
+		t.Fatal("non-monotonic ordinal must fail closed")
+	}
+}
+
+func TestEphemeralGroupingAndStageGroupsPreserveCompletenessAndHideTruncatedFlag(t *testing.T) {
+	engine := newPerfTestEngine(t)
+	profile := fingerprint.Profile{Engine: "mysql", Mode: "mysql"}
+	var buf bytes.Buffer
+	for i := 1; i <= 520; i++ {
+		fmt.Fprintf(&buf, "UPDATE orders SET amount = %d WHERE id = %d;\n", i, i)
+		fmt.Fprintf(&buf, "INSERT INTO audit_log (id, note) VALUES (%d, 'ok');\n", i)
+	}
+	mapper := privacy.NewRunMapper()
+	analysis, err := analyzeRunStatementsStreaming(streamingAnalysisOptions{
+		runID:          "run-perf-0004",
+		rawSQL:         buf.Bytes(),
+		profile:        profile,
+		mapper:         mapper,
+		engine:         engine,
+		expectedCount:  1040,
+		validateSyntax: false,
+		inlineLimit:    ephemeralInlineStatementLimit,
+	})
+	if err != nil {
+		t.Fatalf("streaming analysis failed: %v", err)
+	}
+	if len(analysis.groups) != 2 {
+		t.Fatalf("groups len = %d, want 2", len(analysis.groups))
+	}
+	for i, g := range analysis.groups {
+		if !g.metadataContextComplete || !g.objectRangesTruncated {
+			t.Fatalf("group %d complete=%v truncated=%v, want true/true", i, g.metadataContextComplete, g.objectRangesTruncated)
+		}
+		if g.count != 520 || len(g.statementOrdinalRanges) != maxStatementOrdinalRanges {
+			t.Fatalf("group %d count=%d ranges=%d", i, g.count, len(g.statementOrdinalRanges))
+		}
+		if len(g.objects) == 0 || len(g.objects[0].StatementOrdinalRanges) != maxObjectOrdinalRanges {
+			t.Fatalf("group %d object ranges=%d", i, len(g.objects[0].StatementOrdinalRanges))
+		}
+	}
+
+	er := &EphemeralRun{
+		ID:        "run-perf-0004",
+		groupMeta: map[string]ephemeralGroupMeta{},
+	}
+	for i := range analysis.groups {
+		g := analysis.groups[i]
+		gid := fmt.Sprintf("g-%d", i+1)
+		shape := map[string]any{
+			"algorithm_version":             fingerprint.AlgorithmVersion,
+			"representative_anonymized_sql": g.representativeAnonymizedSQL,
+			"statement_ordinal":             g.representativeOrdinal,
+			"statement_ordinal_ranges":      g.statementOrdinalRanges,
+			"objects":                       g.objects,
+			"metadata_context_complete":     g.metadataContextComplete,
+			"in_value_count_max":            g.inMax,
+			"values_row_count_max":          g.valMax,
+			"unbounded_mutation":            g.unbounded,
+		}
+		if g.objectRangesTruncated {
+			shape["object_ranges_truncated"] = true
+		}
+		typed, merr := jsonMarshal(shape)
+		if merr != nil {
+			t.Fatal(merr)
+		}
+		er.Groups = append(er.Groups, persistence.SQLFingerprintGroupModel{
+			ID:             gid,
+			ReviewRunID:    er.ID,
+			TypedShape:     typed,
+			StatementCount: int32(g.count),
+		})
+		er.groupMeta[gid] = ephemeralGroupMeta{
+			RepKind:      g.repKind,
+			RepOperation: g.repOperation,
+			SizeMax:      g.sizeMax,
+			RepOrdinal:   g.representativeOrdinal,
+		}
+	}
+	decoded := ephemeralStageGroups(er, "ds-1")
+	if len(decoded) != 2 {
+		t.Fatalf("ephemeralStageGroups len = %d, want 2", len(decoded))
+	}
+	for i, grp := range decoded {
+		if !grp.MetadataContextComplete {
+			t.Fatalf("decoded group %d must remain MetadataContextComplete=true", i)
+		}
+		if _, leaked := grp.Statistics["object_ranges_truncated"]; leaked {
+			t.Fatalf("object_ranges_truncated leaked into Statistics: %+v", grp.Statistics)
+		}
+		for _, obj := range grp.Objects {
+			if !obj.OrdinalRangesTruncated {
+				t.Fatalf("decoded object %+v missing OrdinalRangesTruncated=true", obj)
+			}
+		}
+	}
+	rawReq, err := json.Marshal(provider.Request{AnonymizedStatementGroups: decoded})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(rawReq), "object_ranges_truncated") || strings.Contains(string(rawReq), "OrdinalRangesTruncated") {
+		t.Fatalf("internal truncation flag leaked into provider JSON: %s", rawReq)
+	}
 }

@@ -1,0 +1,22 @@
+@keyframes auth-glow-drift {
+  0% {
+    transform: translate3d(0, 0, 0) scale(1);
+    filter: hue-rotate(0deg);
+  }
+  25% {
+    transform: translate3d(9%, 7%, 0) scale(1.14);
+    filter: hue-rotate(95deg);
+  }
+  50% {
+    transform: translate3d(-7%, 12%, 0) scale(0.94);
+    filter: hue-rotate(205deg);
+  }
+  75% {
+    transform: translate3d(6%, -5%, 0) scale(1.1);
+    filter: hue-rotate(300deg);
+  }
+  100% {
+    transform: translate3d(0, 0, 0) scale(1);
+    filter: hue-rotate(360deg);
+  }
+}

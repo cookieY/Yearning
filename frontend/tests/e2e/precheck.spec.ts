@@ -188,7 +188,7 @@ for (const locale of ["zh-CN", "en-US"] as const) {
     }
 
     await expect(page.getByTestId("wizard-summary-precheck")).toContainText(
-      locale === "zh-CN" ? "\u5ba1\u6838\u4e2d" : "Reviewing",
+      locale === "zh-CN" ? "\u5ba1\u6838\u4e2d" : "Checking",
       { timeout: 4_000 },
     );
 

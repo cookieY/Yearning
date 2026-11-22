@@ -1,4 +1,5 @@
 import { useState, type SyntheticEvent } from "react";
+import "./login-glow.css";
 import { useTranslation } from "react-i18next";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { SESSION_QUERY_KEY, useSession } from "@/features/auth/session-provider";

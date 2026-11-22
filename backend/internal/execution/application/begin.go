@@ -204,6 +204,8 @@ func (s *Services) Begin(ctx context.Context, in BeginInput) (view *AttemptView,
 		}
 		return nil, false, committedFailure
 	}
+	// Post-commit in-process wakeup so idle stage_execution workers claim immediately without waiting for backoff.
+	tasks.WakeKind(KindStageExecution)
 	raw, merr := json.Marshal(out)
 	if merr != nil {
 		return nil, false, merr
@@ -401,12 +403,15 @@ func (s *Services) beginCore(ctx context.Context, tx *gorm.DB, order *orderRow, 
 		return nil, err
 	}
 	aggType := AggregateTypeExecutionAttempt
-	if err := tx.WithContext(ctx).Create(&tasks.AsyncTaskModel{
+	if err := tasks.Enqueue(ctx, tx, &tasks.AsyncTaskModel{
 		ID: newID(), Kind: KindStageExecution, State: "queued",
 		AggregateType: &aggType, AggregateID: &attemptID,
 		Input: input, ProgressUnit: "statements", ProgressTotal: int64(len(plan.Statements)),
 		FenceToken: 1, CreatedAt: now, UpdatedAt: now,
-	}).Error; err != nil {
+	}); err != nil {
+		if errors.Is(err, tasks.ErrQueueFull) {
+			return nil, domain.ErrSystemCapacity()
+		}
 		return nil, err
 	}
 	return s.buildAttemptView(ctx, tx, attemptID)

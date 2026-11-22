@@ -170,8 +170,9 @@ describe("ResultGrid", () => {
         continuationError={null}
       />,
     );
-    // Client-side pager over the loaded rows (no fabricated total).
+    // Client-side pager over the loaded rows (no fabricated total) with FAB clearance on desktop.
     expect(screen.getByTestId("query-result-pagination")).toBeVisible();
+    expect(screen.getByTestId("query-result-pagination").parentElement?.parentElement).toHaveClass("md:pr-32");
     expect(screen.getByTestId("query-result-page").textContent).toContain("1");
     // Drag-resize handles exist for every column with a screen-reader label.
     for (const name of ["id", "email"]) {

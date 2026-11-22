@@ -187,4 +187,9 @@ func TestExecutionApplicationUnitHelpers(t *testing.T) {
 	}); err == nil {
 		t.Fatal("expected error on corrupted ciphertext in openOrderSQL")
 	}
+
+	capErr := domain.ErrSystemCapacity()
+	if capErr.Code != domain.CodeSystemCapacity || capErr.Name != "SYSTEM_CAPACITY_EXHAUSTED" {
+		t.Fatalf("ErrSystemCapacity = %+v, want 1012 SYSTEM_CAPACITY_EXHAUSTED", capErr)
+	}
 }

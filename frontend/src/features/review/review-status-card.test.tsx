@@ -251,7 +251,7 @@ describe("ReviewStatusCard", () => {
 
     await i18n.changeLanguage("en-US");
 
-    expect(screen.getByText("AI review summary")).toBeInTheDocument();
+    expect(screen.getByText("AI Review Summary")).toBeInTheDocument();
     expect(screen.getByText(summary)).toHaveAttribute("lang", "zh-CN");
   });
 

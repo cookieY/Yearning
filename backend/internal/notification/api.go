@@ -12,6 +12,7 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/cookieY/YearningX/backend/internal/identity/session"
+	"github.com/cookieY/YearningX/backend/internal/tasks"
 )
 
 // Deps holds HTTP dependencies for the notification domain. Guard is injected by the wiring package
@@ -74,6 +75,15 @@ func writeErr(c *gin.Context, err error) {
 		bizErr(c, 1006, "Channel is still referenced by notification rules; update or delete those rules first")
 	case errors.Is(err, ErrValidation):
 		bizErr(c, 1001, "Invalid request parameters")
+	case errors.Is(err, tasks.ErrQueueFull):
+		c.JSON(http.StatusOK, gin.H{
+			"err_code":   1012,
+			"message":    "System capacity exhausted; please retry later",
+			"data":       nil,
+			"request_id": c.GetString("request_id"),
+			"retryable":  true,
+			"meta":       gin.H{"retry_after_ms": 1000},
+		})
 	default:
 		c.JSON(http.StatusInternalServerError, gin.H{"message": "internal error"})
 	}

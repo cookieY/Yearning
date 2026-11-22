@@ -5,8 +5,8 @@ package application
 import (
 	"bytes"
 	"encoding/hex"
-	"encoding/json"
 	"errors"
+	"strconv"
 	"strings"
 
 	"github.com/cookieY/YearningX/backend/internal/crypto"
@@ -66,26 +66,38 @@ func appendStatementOrdinalRange(
 	ranges []statementOrdinalRange,
 	ordinal int32,
 ) ([]statementOrdinalRange, bool) {
+	out, valid, truncated := appendStatementOrdinalRangeTracked(ranges, ordinal)
+	return out, valid && !truncated
+}
+
+// appendStatementOrdinalRangeTracked compresses monotonically increasing statement ordinals within a group
+// into closed intervals. Malformed or non-monotonic ordinals return valid=false (fail closed); exceeding the
+// display cap retains the first 512 intervals and reports valid=true, truncated=true so group metadata
+// completeness is decoupled from the prompt display range cap.
+func appendStatementOrdinalRangeTracked(
+	ranges []statementOrdinalRange,
+	ordinal int32,
+) ([]statementOrdinalRange, bool, bool) {
 	if ordinal < 1 {
-		return ranges, false
+		return ranges, false, false
 	}
 	if len(ranges) > 0 {
 		last := &ranges[len(ranges)-1]
 		if ordinal < last.Start {
-			return ranges, false
+			return ranges, false, false
 		}
 		if ordinal <= last.End {
-			return ranges, true
+			return ranges, true, false
 		}
 		if ordinal == last.End+1 {
 			last.End = ordinal
-			return ranges, true
+			return ranges, true, false
 		}
 	}
 	if len(ranges) >= maxStatementOrdinalRanges {
-		return ranges, false
+		return ranges, true, true
 	}
-	return append(ranges, statementOrdinalRange{Start: ordinal, End: ordinal}), true
+	return append(ranges, statementOrdinalRange{Start: ordinal, End: ordinal}), true, false
 }
 
 // objectContextBudget bounds the complete Provider object context for a Run.
@@ -171,6 +183,271 @@ func mergeObjects(
 		budget.ranges += added
 	}
 	return dst, complete
+}
+
+// mergeObjectsTracked merges object references by semantic identity while decoupling
+// statement range display caps (512/4096/16384) from metadata completeness. It returns
+// objectsComplete=false only when a range is malformed/out-of-order or when a distinct
+// object identity cannot be recorded due to maxObjectReferencesPerGroup or maxObjectReferencesPerRun.
+func mergeObjectsTracked(
+	dst []fingerprint.ObjectReference,
+	state *objectMergeState,
+	refs []fingerprint.ObjectReference,
+	budget *objectContextBudget,
+) ([]fingerprint.ObjectReference, bool, bool) {
+	if state == nil {
+		state = newObjectMergeState()
+	}
+	if state.index == nil {
+		state.index = map[string]int{}
+	}
+	if budget == nil {
+		budget = &objectContextBudget{}
+	}
+	if dst == nil {
+		dst = []fingerprint.ObjectReference{}
+	}
+	objectsComplete := true
+	rangesTruncated := false
+	for _, ref := range refs {
+		ranges, valid, normTruncated, owned := normalizedObjectRangesTracked(ref)
+		if !valid {
+			objectsComplete = false
+			continue
+		}
+		if ref.StatementOrdinal < 1 {
+			ref.StatementOrdinal = ranges[0].Start
+		}
+		key := objectReferenceKey(ref)
+		if index, exists := state.index[key]; exists {
+			if normTruncated {
+				rangesTruncated = true
+			}
+			existing := dst[index]
+			if len(ranges) == 1 {
+				next := ranges[0]
+				if len(existing.StatementOrdinalRanges) > 0 {
+					last := &existing.StatementOrdinalRanges[len(existing.StatementOrdinalRanges)-1]
+					if next.Start < last.Start {
+						objectsComplete = false
+						continue
+					}
+					if next.Start <= last.End {
+						if next.End > last.End {
+							last.End = next.End
+						}
+						continue
+					}
+					if next.Start == last.End+1 {
+						last.End = next.End
+						continue
+					}
+				}
+				if len(existing.StatementOrdinalRanges) < maxObjectOrdinalRanges &&
+					state.ranges < maxObjectOrdinalRangesPerGroup &&
+					budget.ranges < maxObjectOrdinalRangesPerRun {
+					existing.StatementOrdinalRanges = append(existing.StatementOrdinalRanges, next)
+					dst[index] = existing
+					state.ranges++
+					budget.ranges++
+				} else {
+					rangesTruncated = true
+				}
+				continue
+			}
+			maxAdd := maxObjectOrdinalRanges - len(existing.StatementOrdinalRanges)
+			if rem := maxObjectOrdinalRangesPerGroup - state.ranges; rem < maxAdd {
+				maxAdd = rem
+			}
+			if rem := maxObjectOrdinalRangesPerRun - budget.ranges; rem < maxAdd {
+				maxAdd = rem
+			}
+			if maxAdd < 0 {
+				maxAdd = 0
+			}
+			merged, added, validMerge, mergeTruncated := mergeObjectOrdinalRangesTracked(
+				existing.StatementOrdinalRanges,
+				ranges,
+				len(existing.StatementOrdinalRanges)+maxAdd,
+			)
+			if !validMerge {
+				objectsComplete = false
+				continue
+			}
+			if mergeTruncated {
+				rangesTruncated = true
+			}
+			existing.StatementOrdinalRanges = merged
+			dst[index] = existing
+			state.ranges += added
+			budget.ranges += added
+			continue
+		}
+		if len(dst) >= maxObjectReferencesPerGroup || budget.objects >= maxObjectReferencesPerRun {
+			objectsComplete = false
+			continue
+		}
+		if normTruncated {
+			rangesTruncated = true
+		}
+		avail := maxObjectOrdinalRanges
+		if rem := maxObjectOrdinalRangesPerGroup - state.ranges; rem < avail {
+			avail = rem
+		}
+		if rem := maxObjectOrdinalRangesPerRun - budget.ranges; rem < avail {
+			avail = rem
+		}
+		if avail < 0 {
+			avail = 0
+		}
+		if len(ranges) > avail {
+			if avail == 0 {
+				ranges = []fingerprint.StatementOrdinalRange{}
+			} else if owned {
+				ranges = ranges[:avail]
+			} else {
+				copied := make([]fingerprint.StatementOrdinalRange, avail)
+				copy(copied, ranges[:avail])
+				ranges = copied
+			}
+			owned = true
+			rangesTruncated = true
+		} else if !owned {
+			copied := make([]fingerprint.StatementOrdinalRange, len(ranges))
+			copy(copied, ranges)
+			ranges = copied
+			owned = true
+		}
+		ref.StatementOrdinalRanges = ranges
+		added := len(ranges)
+		state.index[key] = len(dst)
+		dst = append(dst, ref)
+		state.ranges += added
+		budget.objects++
+		budget.ranges += added
+	}
+	return dst, objectsComplete, rangesTruncated
+}
+
+func normalizedObjectRangesTracked(
+	ref fingerprint.ObjectReference,
+) ([]fingerprint.StatementOrdinalRange, bool, bool, bool) {
+	if len(ref.StatementOrdinalRanges) == 0 {
+		if ref.StatementOrdinal < 1 {
+			return nil, false, false, false
+		}
+		return []fingerprint.StatementOrdinalRange{{
+			Start: ref.StatementOrdinal,
+			End:   ref.StatementOrdinal,
+		}}, true, false, true
+	}
+	if len(ref.StatementOrdinalRanges) == 1 {
+		r := ref.StatementOrdinalRanges[0]
+		if r.Start < 1 || r.End < r.Start {
+			return nil, false, false, false
+		}
+		return ref.StatementOrdinalRanges, true, false, false
+	}
+	capHint := len(ref.StatementOrdinalRanges)
+	if capHint > maxObjectOrdinalRanges {
+		capHint = maxObjectOrdinalRanges
+	}
+	out := make([]fingerprint.StatementOrdinalRange, 0, capHint)
+	var last fingerprint.StatementOrdinalRange
+	hasLast := false
+	truncated := false
+	for _, next := range ref.StatementOrdinalRanges {
+		if next.Start < 1 || next.End < next.Start {
+			return nil, false, false, false
+		}
+		if hasLast && next.Start < last.Start {
+			return nil, false, false, false
+		}
+		last = next
+		hasLast = true
+		if truncated {
+			continue
+		}
+		var ok, itemTruncated bool
+		out, ok, itemTruncated = appendObjectOrdinalRangeTracked(out, next, maxObjectOrdinalRanges)
+		if !ok {
+			return nil, false, false, false
+		}
+		if itemTruncated {
+			truncated = true
+		}
+	}
+	return out, true, truncated, true
+}
+
+func mergeObjectOrdinalRangesTracked(
+	existing []fingerprint.StatementOrdinalRange,
+	incoming []fingerprint.StatementOrdinalRange,
+	limit int,
+) ([]fingerprint.StatementOrdinalRange, int, bool, bool) {
+	out := make([]fingerprint.StatementOrdinalRange, len(existing), len(existing)+len(incoming))
+	copy(out, existing)
+	added := 0
+	truncated := false
+	var lastSeen fingerprint.StatementOrdinalRange
+	hasLastSeen := len(out) > 0
+	if hasLastSeen {
+		lastSeen = out[len(out)-1]
+	}
+	for _, next := range incoming {
+		if next.Start < 1 || next.End < next.Start {
+			return append([]fingerprint.StatementOrdinalRange{}, existing...), 0, false, false
+		}
+		if hasLastSeen && next.Start < lastSeen.Start {
+			return append([]fingerprint.StatementOrdinalRange{}, existing...), 0, false, false
+		}
+		lastSeen = next
+		hasLastSeen = true
+		if truncated {
+			continue
+		}
+		before := len(out)
+		var valid, itemTruncated bool
+		out, valid, itemTruncated = appendObjectOrdinalRangeTracked(out, next, limit)
+		if !valid {
+			return append([]fingerprint.StatementOrdinalRange{}, existing...), 0, false, false
+		}
+		if itemTruncated {
+			truncated = true
+		}
+		added += len(out) - before
+	}
+	return out, added, true, truncated
+}
+
+func appendObjectOrdinalRangeTracked(
+	ranges []fingerprint.StatementOrdinalRange,
+	next fingerprint.StatementOrdinalRange,
+	limit int,
+) ([]fingerprint.StatementOrdinalRange, bool, bool) {
+	if next.Start < 1 || next.End < next.Start {
+		return ranges, false, false
+	}
+	if len(ranges) > 0 {
+		last := &ranges[len(ranges)-1]
+		if next.Start < last.Start {
+			return ranges, false, false
+		}
+		if next.Start <= last.End {
+			if next.End > last.End {
+				last.End = next.End
+			}
+			return ranges, true, false
+		}
+		if next.Start == last.End+1 {
+			last.End = next.End
+			return ranges, true, false
+		}
+	}
+	if len(ranges) >= limit {
+		return ranges, true, true
+	}
+	return append(ranges, next), true, false
 }
 
 func normalizedObjectRanges(
@@ -278,6 +555,58 @@ func appendIfMissing(list []string, v string) []string {
 // operationOf extracts the first SQL word from statement text as the operation name (uppercase).
 // Deterministic operation summary for FakeRunner; replaced by structured analysis in the B7 real engine.
 func operationOf(sql []byte) string {
+	raw := firstOperationSlice(sql)
+	if len(raw) == 0 {
+		return "UNKNOWN"
+	}
+	return strings.ToUpper(string(raw))
+}
+
+// operationLower extracts the lowercase first SQL verb matching strings.ToLower(operationOf(sql))
+// without double uppercase/lowercase allocations on the 100k hot path.
+func operationLower(sql []byte) string {
+	raw := firstOperationSlice(sql)
+	if len(raw) == 0 {
+		return "unknown"
+	}
+	if len(raw) == 1 && raw[0] >= 0x80 {
+		return strings.ToLower(string(raw))
+	}
+	var stack [16]byte
+	if len(raw) <= len(stack) {
+		for i, b := range raw {
+			if b >= 'A' && b <= 'Z' {
+				b += 'a' - 'A'
+			}
+			stack[i] = b
+		}
+		switch string(stack[:len(raw)]) {
+		case "select":
+			return "select"
+		case "insert":
+			return "insert"
+		case "update":
+			return "update"
+		case "delete":
+			return "delete"
+		case "create":
+			return "create"
+		case "alter":
+			return "alter"
+		case "drop":
+			return "drop"
+		case "truncate":
+			return "truncate"
+		case "with":
+			return "with"
+		default:
+			return string(stack[:len(raw)])
+		}
+	}
+	return strings.ToLower(string(raw))
+}
+
+func firstOperationSlice(sql []byte) []byte {
 	i := 0
 	n := len(sql)
 	for i < n {
@@ -307,12 +636,12 @@ func operationOf(sql []byte) string {
 				i++
 			}
 			if i == start {
-				return strings.ToUpper(string(sql[start : start+1]))
+				return sql[start : start+1]
 			}
-			return strings.ToUpper(string(sql[start:i]))
+			return sql[start:i]
 		}
 	}
-	return "UNKNOWN"
+	return nil
 }
 
 // statementClassOf classifies statement head -> DDL/DML (schema CHECK ddl|dml;
@@ -420,6 +749,7 @@ type aggregatedGroup struct {
 	sizeMax                     int64
 	objects                     []fingerprint.ObjectReference
 	objectState                 *objectMergeState
+	objectRangesTruncated       bool
 	statementOrdinalRanges      []statementOrdinalRange
 	metadataContextComplete     bool
 	count                       int
@@ -428,6 +758,23 @@ type aggregatedGroup struct {
 	facts                       stmtFacts // Statement structural facts within the group (no plaintext identifiers)
 }
 
+// sqlStatementTypedShape matches the exact JSON schema and alphabetical field order of sql_statements.typed_shape.
+type sqlStatementTypedShape struct {
+	AnonymizedSQL           string                        `json:"anonymized_sql"`
+	DialectProfile          string                        `json:"dialect_profile"`
+	ExecutionValidity       fingerprint.StatementValidity `json:"execution_validity"`
+	Kind                    string                        `json:"kind"`
+	MetadataContextComplete bool                          `json:"metadata_context_complete"`
+	Objects                 []fingerprint.ObjectReference `json:"objects"`
+	Operation               string                        `json:"operation"`
+	ParameterCount          int                           `json:"parameter_count"`
+	Quality                 string                        `json:"quality"`
+	StatementOrdinal        int32                         `json:"statement_ordinal"`
+	TupleCount              int                           `json:"tuple_count"`
+}
+
+var emptyJSONObjectBytes = []byte("{}")
+
 func buildSQLStatementModel(
 	runID, stmtID string,
 	ordinal int32,
@@ -435,25 +782,30 @@ func buildSQLStatementModel(
 	op, class string,
 	objects []fingerprint.ObjectReference,
 ) (persistence.SQLStatementModel, error) {
-	typed, merr := jsonMarshal(map[string]any{
-		"kind":                      res.StatementKind,
-		"operation":                 op,
-		"dialect_profile":           res.DialectProfile,
-		"quality":                   res.Quality,
-		"tuple_count":               res.TupleCount,
-		"parameter_count":           res.ParameterCount,
-		"anonymized_sql":            res.AnonymizedSQL,
-		"objects":                   objects,
-		"statement_ordinal":         ordinal,
-		"metadata_context_complete": res.MetadataContextComplete,
-		"execution_validity":        res.Validity,
+	typed, merr := jsonMarshal(sqlStatementTypedShape{
+		AnonymizedSQL:           res.AnonymizedSQL,
+		DialectProfile:          res.DialectProfile,
+		ExecutionValidity:       res.Validity,
+		Kind:                    res.StatementKind,
+		MetadataContextComplete: res.MetadataContextComplete,
+		Objects:                 objects,
+		Operation:               op,
+		ParameterCount:          res.ParameterCount,
+		Quality:                 res.Quality,
+		StatementOrdinal:        ordinal,
+		TupleCount:              res.TupleCount,
 	})
 	if merr != nil {
 		return persistence.SQLStatementModel{}, merr
 	}
-	lit, merr := jsonMarshal(res.LiteralTypeCounts)
-	if merr != nil {
-		return persistence.SQLStatementModel{}, merr
+	var lit []byte
+	if res.LiteralTypeCounts != nil && len(res.LiteralTypeCounts) == 0 {
+		lit = emptyJSONObjectBytes
+	} else {
+		lit, merr = jsonMarshal(res.LiteralTypeCounts)
+		if merr != nil {
+			return persistence.SQLStatementModel{}, merr
+		}
 	}
 	return persistence.SQLStatementModel{
 		ID:                       stmtID,
@@ -499,10 +851,60 @@ type streamedRunAnalysis struct {
 	postgresStatements []postgresAnalyzedStatement
 }
 
+func appendLenString(buf []byte, s string) []byte {
+	buf = strconv.AppendInt(buf, int64(len(s)), 10)
+	buf = append(buf, ':')
+	return append(buf, s...)
+}
+
+func appendValidityObjectKey(buf []byte, o fingerprint.ValidityObject) []byte {
+	buf = appendLenString(buf, string(o.Kind))
+	buf = appendLenString(buf, o.Token)
+	buf = appendLenString(buf, o.SchemaToken)
+	return appendLenString(buf, o.ParentToken)
+}
+
+func appendValidityKey(buf []byte, v fingerprint.StatementValidity) []byte {
+	if v.Complete {
+		buf = append(buf, '1')
+	} else {
+		buf = append(buf, '0')
+	}
+	if v.DefinitionsComplete {
+		buf = append(buf, '1')
+	} else {
+		buf = append(buf, '0')
+	}
+	buf = appendLenString(buf, string(v.Operation))
+	buf = appendLenString(buf, v.Unsupported)
+	buf = strconv.AppendInt(buf, int64(len(v.Requirements)), 10)
+	buf = append(buf, ';')
+	for _, req := range v.Requirements {
+		buf = appendValidityObjectKey(buf, req.Object)
+		buf = appendLenString(buf, string(req.State))
+		buf = appendLenString(buf, string(req.Condition))
+	}
+	buf = strconv.AppendInt(buf, int64(len(v.Effects)), 10)
+	buf = append(buf, ';')
+	for _, eff := range v.Effects {
+		buf = appendLenString(buf, string(eff.Action))
+		buf = appendValidityObjectKey(buf, eff.Object)
+		if eff.Replacement == nil {
+			buf = append(buf, '0')
+		} else {
+			buf = append(buf, '1')
+			buf = appendValidityObjectKey(buf, *eff.Replacement)
+		}
+		buf = appendLenString(buf, string(eff.Condition))
+	}
+	return buf
+}
+
 func analyzeRunStatementsStreaming(opts streamingAnalysisOptions) (*streamedRunAnalysis, error) {
 	if opts.engine == nil {
 		return nil, &domain.Error{Code: 2011, Name: "AI_PROVIDER_FAILED"}
 	}
+	profileFlags := opts.profile.Flags()
 	split := changeset.NewSplitter(bytes.NewReader(opts.rawSQL), opts.profile, 0)
 	var validator *statementSyntaxValidator
 	if opts.validateSyntax {
@@ -514,6 +916,7 @@ func analyzeRunStatementsStreaming(opts streamingAnalysisOptions) (*streamedRunA
 	validityIndex := map[string]uint32{}
 	var validityTable []fingerprint.StatementValidity
 	var validityRefs []compactStmtValidityRef
+	valKeyBuf := make([]byte, 0, 256)
 	var inlineStatements []persistence.SQLStatementModel
 	if opts.inlineLimit > 0 {
 		capInit := opts.inlineLimit
@@ -547,16 +950,25 @@ func analyzeRunStatementsStreaming(opts streamingAnalysisOptions) (*streamedRunA
 		if ordinal > 100000 {
 			return nil, domain.ErrBatchTooLarge
 		}
+		lex, lexErr := fingerprint.Tokenize(st.SQL, profileFlags)
+		if lexErr != nil {
+			if validator != nil {
+				if err := validator.ValidateStatement(ordinal, st); err != nil {
+					return nil, err
+				}
+			}
+			return nil, domain.FailureFromFingerprintCode(fingerprint.ErrNameParseFailed)
+		}
 		if validator != nil {
-			if err := validator.ValidateStatement(ordinal, st); err != nil {
+			if err := validator.ValidateStatementWithLex(ordinal, st, &lex); err != nil {
 				return nil, err
 			}
 		}
-		res, aerr := opts.engine.Analyze(opts.profile, st.SQL, opts.mapper)
+		res, aerr := opts.engine.AnalyzeLexed(opts.profile, st.SQL, lex, opts.mapper)
 		if aerr != nil {
 			return nil, domain.FailureFromFingerprintCode(fingerprintFailureName(aerr))
 		}
-		op := strings.ToLower(operationOf(st.SQL))
+		op := operationLower(st.SQL)
 		class := statementClassOf(op)
 		noWhere := (op == "update" || op == "delete") && !hasWhereClause(st.SQL)
 		statementObjects := objectsAtStatementOrdinal(res.Objects, int32(ordinal))
@@ -589,22 +1001,25 @@ func analyzeRunStatementsStreaming(opts streamingAnalysisOptions) (*streamedRunA
 		if int64(res.ByteLen) > aggs[idx].sizeMax {
 			aggs[idx].sizeMax = int64(res.ByteLen)
 		}
-		var ordinalRangeComplete bool
-		aggs[idx].statementOrdinalRanges, ordinalRangeComplete = appendStatementOrdinalRange(
+		var ordinalValid bool
+		aggs[idx].statementOrdinalRanges, ordinalValid, _ = appendStatementOrdinalRangeTracked(
 			aggs[idx].statementOrdinalRanges,
 			int32(ordinal),
 		)
-		var objectContextComplete bool
-		aggs[idx].objects, objectContextComplete = mergeObjects(
+		var objectsComplete, objRangesTruncated bool
+		aggs[idx].objects, objectsComplete, objRangesTruncated = mergeObjectsTracked(
 			aggs[idx].objects,
 			aggs[idx].objectState,
 			statementObjects,
 			objectBudget,
 		)
+		if objRangesTruncated {
+			aggs[idx].objectRangesTruncated = true
+		}
 		aggs[idx].metadataContextComplete = mergeMetadataContextComplete(
 			aggs[idx].metadataContextComplete,
 			res.MetadataContextComplete,
-		) && ordinalRangeComplete && objectContextComplete
+		) && ordinalValid && objectsComplete
 		if noWhere {
 			aggs[idx].unbounded = true
 		}
@@ -616,17 +1031,13 @@ func analyzeRunStatementsStreaming(opts streamingAnalysisOptions) (*streamedRunA
 		if res.TupleCount > aggs[idx].valMax {
 			aggs[idx].valMax = res.TupleCount
 		}
-		mergeFactsInto(&aggs[idx].facts, extractStmtFacts(st.SQL, op, class))
+		mergeStmtFactsInto(&aggs[idx].facts, st.SQL, op, class)
 
-		valKeyBytes, verr := json.Marshal(res.Validity)
-		if verr != nil {
-			return nil, verr
-		}
-		valKey := string(valKeyBytes)
-		vIdx, exists := validityIndex[valKey]
+		valKeyBuf = appendValidityKey(valKeyBuf[:0], res.Validity)
+		vIdx, exists := validityIndex[string(valKeyBuf)]
 		if !exists {
 			vIdx = uint32(len(validityTable))
-			validityIndex[valKey] = vIdx
+			validityIndex[string(valKeyBuf)] = vIdx
 			validityTable = append(validityTable, res.Validity)
 		}
 		validityRefs = append(validityRefs, compactStmtValidityRef{
@@ -652,12 +1063,11 @@ func analyzeRunStatementsStreaming(opts streamingAnalysisOptions) (*streamedRunA
 		}
 
 		if opts.collectPostgres {
-			rawStmt := string(st.SQL)
-			callables, callablesOK := postgresCallableRefs(rawStmt)
+			callables, callablesOK := postgresCallableRefsFromTokens(lex.Tokens)
 			postgresStatements = append(postgresStatements, postgresAnalyzedStatement{
 				result:      fingerprint.Result{Validity: res.Validity},
 				objects:     statementObjects,
-				pathUnsafe:  postgresStatementPathUnsafe(rawStmt),
+				pathUnsafe:  postgresStatementPathUnsafeFromTokens(lex.Tokens),
 				callables:   callables,
 				callablesOK: callablesOK,
 			})
@@ -698,6 +1108,7 @@ func analyzeRunStatements(split *changeset.Splitter, profile fingerprint.Profile
 	groupIndex := map[string]int{}
 	var aggs []aggregatedGroup
 	objectBudget := &objectContextBudget{}
+	profileFlags := profile.Flags()
 	ordinal := 0
 	for {
 		st, done, ferr := split.Next()
@@ -708,17 +1119,22 @@ func analyzeRunStatements(split *changeset.Splitter, profile fingerprint.Profile
 			break
 		}
 		ordinal++
-		res, aerr := engine.Analyze(profile, st.SQL, mapper)
+		lex, lexErr := fingerprint.Tokenize(st.SQL, profileFlags)
+		if lexErr != nil {
+			return nil, nil, domain.FailureFromFingerprintCode(fingerprint.ErrNameParseFailed)
+		}
+		res, aerr := engine.AnalyzeLexed(profile, st.SQL, lex, mapper)
 		if aerr != nil {
 			return nil, nil, domain.FailureFromFingerprintCode(fingerprintFailureName(aerr))
 		}
-		op := strings.ToLower(operationOf(st.SQL))
+		op := operationLower(st.SQL)
+		class := statementClassOf(op)
 		statementObjects := objectsAtStatementOrdinal(res.Objects, int32(ordinal))
-		callables, callablesOK := postgresCallableRefs(string(st.SQL))
+		callables, callablesOK := postgresCallableRefsFromTokens(lex.Tokens)
 		stmts = append(stmts, analyzedStatement{
-			res: res, operation: op, class: statementClassOf(op),
+			res: res, operation: op, class: class,
 			noWhere: (op == "update" || op == "delete") && !hasWhereClause(st.SQL),
-			objects: statementObjects, pathUnsafe: postgresStatementPathUnsafe(string(st.SQL)),
+			objects: statementObjects, pathUnsafe: postgresStatementPathUnsafeFromTokens(lex.Tokens),
 			callables: callables, callableOK: callablesOK,
 		})
 		key := res.CanonicalFingerprintHMAC + "\x00" + res.DialectFingerprintHMAC
@@ -737,22 +1153,25 @@ func analyzeRunStatements(split *changeset.Splitter, profile fingerprint.Profile
 			})
 		}
 		aggs[idx].count++
-		var ordinalRangeComplete bool
-		aggs[idx].statementOrdinalRanges, ordinalRangeComplete = appendStatementOrdinalRange(
+		var ordinalValid bool
+		aggs[idx].statementOrdinalRanges, ordinalValid, _ = appendStatementOrdinalRangeTracked(
 			aggs[idx].statementOrdinalRanges,
 			int32(ordinal),
 		)
-		var objectContextComplete bool
-		aggs[idx].objects, objectContextComplete = mergeObjects(
+		var objectsComplete, objRangesTruncated bool
+		aggs[idx].objects, objectsComplete, objRangesTruncated = mergeObjectsTracked(
 			aggs[idx].objects,
 			aggs[idx].objectState,
 			statementObjects,
 			objectBudget,
 		)
+		if objRangesTruncated {
+			aggs[idx].objectRangesTruncated = true
+		}
 		aggs[idx].metadataContextComplete = mergeMetadataContextComplete(
 			aggs[idx].metadataContextComplete,
 			res.MetadataContextComplete,
-		) && ordinalRangeComplete && objectContextComplete
+		) && ordinalValid && objectsComplete
 		if stmts[len(stmts)-1].noWhere {
 			aggs[idx].unbounded = true
 		}
@@ -764,7 +1183,7 @@ func analyzeRunStatements(split *changeset.Splitter, profile fingerprint.Profile
 		if res.TupleCount > aggs[idx].valMax {
 			aggs[idx].valMax = res.TupleCount
 		}
-		mergeFactsInto(&aggs[idx].facts, extractStmtFacts(st.SQL, op, stmts[len(stmts)-1].class))
+		mergeStmtFactsInto(&aggs[idx].facts, st.SQL, op, class)
 		if beat != nil && ordinal%5000 == 0 {
 			beat(int64(ordinal), int64(expectedCount))
 		}

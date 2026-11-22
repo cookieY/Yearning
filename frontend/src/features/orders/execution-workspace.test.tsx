@@ -115,16 +115,17 @@ function executionOrder(overrides: Partial<FixtureOrder> = {}): FixtureOrder {
   };
 }
 
-function renderDetail(orderId: string) {
+function renderDetail(orderId: string, entry: "approvals" | "changes" = "approvals") {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   });
   return render(
     <QueryClientProvider client={queryClient}>
       <SessionProvider>
-        <MemoryRouter initialEntries={[`/changes/orders/${orderId}`]}>
+        <MemoryRouter initialEntries={[`/${entry}/orders/${orderId}`]}>
           <Routes>
             <Route path="/changes/orders/:orderId" element={<OrderDetailPage />} />
+            <Route path="/approvals/orders/:orderId" element={<OrderDetailPage />} />
           </Routes>
         </MemoryRouter>
       </SessionProvider>
@@ -180,6 +181,222 @@ describe("execution workspace rendering", () => {
     await waitFor(() => {
       expect(screen.queryByTestId("execution-action-card")).toBeNull();
     });
+  });
+
+  // owner ruling 2026-10-31 + 2026-11-22 (self-review/self-execute button split): when the same user is
+  // both submitter and frozen executor, /changes/orders/:id shows only Withdraw/Void + wait note while
+  // /approvals/orders/:id shows only ExecutionActionCard (never simultaneously showing execute and withdraw/void).
+  it("scopes self-executor actions by entry route and keeps single-role executor routes intact", async () => {
+    const selfOrder = executionOrder({ id: "ee6f1a2b-0000-4000-8000-00000000f981" });
+    seedFixtureOrder(selfOrder);
+
+    const mineView = renderDetail(selfOrder.id, "changes");
+    expect(await mineView.findByTestId("withdraw-order")).toBeVisible();
+    expect(mineView.getByTestId("void-order")).toBeVisible();
+    expect(mineView.getByTestId("execution-wait-note")).toBeVisible();
+    expect(mineView.queryByTestId("execution-action-card")).toBeNull();
+    mineView.unmount();
+
+    const execView = renderDetail(selfOrder.id, "approvals");
+    expect(await execView.findByTestId("execution-action-card")).toBeVisible();
+    expect(execView.getByTestId("execution-start")).toBeVisible();
+    expect(execView.queryByTestId("withdraw-order")).toBeNull();
+    expect(execView.queryByTestId("void-order")).toBeNull();
+    execView.unmount();
+
+    const pureExecutorOrder = executionOrder({
+      id: "ee6f1a2b-0000-4000-8000-00000000f982",
+      submitter_user_id: "1111d9cc-e65d-7b9d-a8aa-3c81945f99ac",
+    });
+    seedFixtureOrder(pureExecutorOrder);
+    const pureView = renderDetail(pureExecutorOrder.id, "changes");
+    expect(await pureView.findByTestId("execution-action-card")).toBeVisible();
+    expect(pureView.queryByTestId("withdraw-order")).toBeNull();
+    expect(pureView.queryByTestId("void-order")).toBeNull();
+    pureView.unmount();
+  });
+
+  it("enforces self-executor entry split in running and result_unknown while preserving pure executors", async () => {
+    const setupAttemptScenario = (
+      orderId: string,
+      attemptId: string,
+      stageId: string,
+      orderState: "running" | "result_unknown",
+      submitterUserId: string,
+    ): void => {
+      const order = executionOrder({
+        id: orderId,
+        submitter_user_id: submitterUserId,
+        state: orderState,
+        stages: [
+          {
+            id: stageId,
+            position: 1,
+            datasource_name: "orders-mysql",
+            state: orderState,
+            approval_steps: [],
+            execution_actors: [
+              {
+                id: FIXTURE_OWNER_ID,
+                username: "henry",
+                display_name: "henry",
+                email: null,
+                is_builtin_admin: true,
+                version: 1,
+                created_at: "2026-08-01T00:00:00Z",
+                updated_at: "2026-08-01T00:00:00Z",
+              },
+            ],
+          },
+        ],
+      });
+      seedFixtureOrder(order);
+      server.use(
+        http.get(`*/change-orders/${orderId}`, () =>
+          HttpResponse.json({
+            err_code: 0,
+            message: "ok",
+            data: {
+              id: order.id,
+              display_number: order.display_number,
+              submitter_user_id: order.submitter_user_id,
+              submitter_username: "henry",
+              submitter_display_name: "henry",
+              title: order.title,
+              state: order.state,
+              current_stage_position: order.current_stage_position,
+              requested_scheduled_for: null,
+              stages: order.stages,
+              has_sql: order.has_sql,
+              sql_hash: order.sql_hash,
+              snapshot_hash: order.snapshot_hash,
+              manually_verified: false,
+              has_ddl: false,
+              osc_choice_available: false,
+              version: order.version,
+              submitted_at: order.submitted_at,
+              terminal_at: null,
+              latest_attempt_id: attemptId,
+            },
+            request_id: FIXTURE_OWNER_ID,
+          }),
+        ),
+        http.get(`*/execution-attempts/${attemptId}`, () =>
+          HttpResponse.json({
+            err_code: 0,
+            message: "ok",
+            data: {
+              id: attemptId,
+              stage_id: stageId,
+              execution_kind: "dml",
+              state: orderState,
+              send_boundary: "sent",
+              osc: null,
+              version: 1,
+              created_at: "2026-11-22T08:00:00Z",
+            },
+            request_id: FIXTURE_OWNER_ID,
+          }),
+        ),
+        http.get(`*/execution-attempts/${attemptId}/statements`, () =>
+          HttpResponse.json({
+            err_code: 0,
+            message: "ok",
+            data: {
+              items: [
+                {
+                  id: `${attemptId}-stmt-1`,
+                  ordinal: 1,
+                  statement_kind: "dml",
+                  state: orderState === "running" ? "sent" : "unknown",
+                  affected_row_count: null,
+                  failure_name: null,
+                  started_at: "2026-11-22T08:00:01Z",
+                  finished_at: null,
+                },
+              ],
+              page: { next_cursor: null, has_more: false },
+            },
+            request_id: FIXTURE_OWNER_ID,
+          }),
+        ),
+      );
+    };
+
+    // Running state: self-executor sees withdraw without execution-cancel on /changes/orders/:id,
+    // and sees execution-cancel without withdraw/void on /approvals/orders/:id.
+    const selfRunningId = "ee6f1a2b-0000-4000-8000-00000000f983";
+    setupAttemptScenario(
+      selfRunningId,
+      "ee6f1a2b-0000-4000-8000-00000000a983",
+      "ee6f1a2b-0000-4000-8000-000000000983",
+      "running",
+      FIXTURE_OWNER_ID,
+    );
+    const selfRunningChanges = renderDetail(selfRunningId, "changes");
+    expect(await selfRunningChanges.findByTestId("withdraw-order")).toBeVisible();
+    expect(await selfRunningChanges.findByTestId("execution-statement-1")).toBeVisible();
+    expect(selfRunningChanges.queryByTestId("execution-cancel")).toBeNull();
+    selfRunningChanges.unmount();
+
+    const selfRunningApprovals = renderDetail(selfRunningId, "approvals");
+    expect(await selfRunningApprovals.findByTestId("execution-cancel")).toBeVisible();
+    expect(selfRunningApprovals.queryByTestId("withdraw-order")).toBeNull();
+    expect(selfRunningApprovals.queryByTestId("void-order")).toBeNull();
+    selfRunningApprovals.unmount();
+
+    const pureRunningId = "ee6f1a2b-0000-4000-8000-00000000f984";
+    setupAttemptScenario(
+      pureRunningId,
+      "ee6f1a2b-0000-4000-8000-00000000a984",
+      "ee6f1a2b-0000-4000-8000-000000000984",
+      "running",
+      "1111d9cc-e65d-7b9d-a8aa-3c81945f99ac",
+    );
+    const pureRunningChanges = renderDetail(pureRunningId, "changes");
+    expect(await pureRunningChanges.findByTestId("execution-cancel")).toBeVisible();
+    expect(pureRunningChanges.queryByTestId("withdraw-order")).toBeNull();
+    pureRunningChanges.unmount();
+
+    // result_unknown state: self-executor sees withdraw + void + verification-waiting on /changes/orders/:id,
+    // and sees verification-form + verification-submit without withdraw/void on /approvals/orders/:id.
+    const selfUnknownId = "ee6f1a2b-0000-4000-8000-00000000f985";
+    setupAttemptScenario(
+      selfUnknownId,
+      "ee6f1a2b-0000-4000-8000-00000000a985",
+      "ee6f1a2b-0000-4000-8000-000000000985",
+      "result_unknown",
+      FIXTURE_OWNER_ID,
+    );
+    const selfUnknownChanges = renderDetail(selfUnknownId, "changes");
+    expect(await selfUnknownChanges.findByTestId("withdraw-order")).toBeVisible();
+    expect(selfUnknownChanges.getByTestId("void-order")).toBeVisible();
+    expect(await selfUnknownChanges.findByTestId("verification-waiting")).toBeVisible();
+    expect(selfUnknownChanges.queryByTestId("verification-form")).toBeNull();
+    expect(selfUnknownChanges.queryByTestId("verification-submit")).toBeNull();
+    selfUnknownChanges.unmount();
+
+    const selfUnknownApprovals = renderDetail(selfUnknownId, "approvals");
+    expect(await selfUnknownApprovals.findByTestId("verification-form")).toBeVisible();
+    expect(selfUnknownApprovals.getByTestId("verification-submit")).toBeInTheDocument();
+    expect(selfUnknownApprovals.queryByTestId("verification-waiting")).toBeNull();
+    expect(selfUnknownApprovals.queryByTestId("withdraw-order")).toBeNull();
+    expect(selfUnknownApprovals.queryByTestId("void-order")).toBeNull();
+    selfUnknownApprovals.unmount();
+
+    const pureUnknownId = "ee6f1a2b-0000-4000-8000-00000000f986";
+    setupAttemptScenario(
+      pureUnknownId,
+      "ee6f1a2b-0000-4000-8000-00000000a986",
+      "ee6f1a2b-0000-4000-8000-000000000986",
+      "result_unknown",
+      "1111d9cc-e65d-7b9d-a8aa-3c81945f99ac",
+    );
+    const pureUnknownChanges = renderDetail(pureUnknownId, "changes");
+    expect(await pureUnknownChanges.findByTestId("verification-form")).toBeVisible();
+    expect(pureUnknownChanges.queryByTestId("withdraw-order")).toBeNull();
+    expect(pureUnknownChanges.queryByTestId("void-order")).toBeNull();
+    pureUnknownChanges.unmount();
   });
 });
 
@@ -750,6 +967,31 @@ describe("execution schedule cancel (owner ruling 2026-10-30)", () => {
     await waitFor(() => {
       expect(screen.getByTestId("order-timeline")).toHaveTextContent("\u53d6\u6d88\u9884\u7ea6");
     });
+  }, 15_000);
+
+  it("clears the schedule confirmation note after transitioning through scheduled and back via cancel", async () => {
+    const user = userEvent.setup();
+    const requested = new Date(Date.now() + 2 * 3600 * 1000).toISOString().replace(/\.\d{3}Z$/, "Z");
+    const order = executionOrder({
+      id: "ee6f1a2b-0000-4000-8000-00000000f983",
+      requested_scheduled_for: requested,
+    });
+    seedFixtureOrder(order);
+    renderDetail(order.id, "approvals");
+
+    await waitFor(() => {
+      expect(screen.getByTestId("execution-schedule-submit")).toBeEnabled();
+    });
+    await user.click(screen.getByTestId("execution-schedule-submit"));
+    await waitFor(() => {
+      expect(screen.getByTestId("execution-scheduled-card")).toBeVisible();
+    });
+    await user.click(screen.getByTestId("execution-schedule-cancel"));
+    await user.click(screen.getByTestId("execution-schedule-cancel-confirm"));
+    await waitFor(() => {
+      expect(screen.getByTestId("execution-action-card")).toBeVisible();
+    });
+    expect(screen.queryByTestId("execution-schedule-note")).toBeNull();
   }, 15_000);
 
   it("hides the scheduled card from non-executors", async () => {

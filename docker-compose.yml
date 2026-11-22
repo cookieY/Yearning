@@ -213,7 +213,7 @@ services:
 
   # 3. One-shot Schema Migration Job (mounts only CA & migrate config; zero keyring access)
   migrate:
-    image: ${YEARNING_IMAGE:-ghcr.io/cookiey/yearning:v4.0.0-rc.5}
+    image: ${YEARNING_IMAGE:-ghcr.io/cookiey/yearning:v4.0.0-rc.6}
     restart: "no"
     depends_on:
       postgres:
@@ -242,7 +242,7 @@ services:
 
   # 4. Yearning v4 All-in-One Control Plane + Embedded Web UI
   yearning:
-    image: ${YEARNING_IMAGE:-ghcr.io/cookiey/yearning:v4.0.0-rc.5}
+    image: ${YEARNING_IMAGE:-ghcr.io/cookiey/yearning:v4.0.0-rc.6}
     restart: unless-stopped
     depends_on:
       postgres:

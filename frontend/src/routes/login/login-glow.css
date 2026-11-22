@@ -1,0 +1,50 @@
+@import "./login-drift.css";
+
+/*
+ * Login page color-shifting glow (owner ruling 2026-09-02): three large,
+ * heavily blurred color fields (coral / teal) that blend seamlessly across
+ * the panel top, bleed into the right column and radiate down onto the
+ * slogan. Coprime loop periods + one reversed layer make the combined drift
+ * read as random movement. Fully soft edges — every gradient fades to
+ * transparent well inside its bounds. Static under prefers-reduced-motion
+ * so screenshot baselines stay byte-stable.
+ */
+.auth-glow,
+.auth-glow-accent,
+.auth-glow-veil {
+  pointer-events: none;
+  position: absolute;
+  border-radius: 9999px;
+  filter: blur(64px);
+}
+
+.auth-glow {
+  top: -28svh;
+  left: -18vw;
+  height: 95svh;
+  width: 95vw;
+  opacity: 0.8;
+  background: radial-gradient(closest-side, var(--chart-series-user), transparent 82%);
+  animation: auth-glow-drift 19s ease-in-out infinite;
+}
+
+.auth-glow-accent {
+  top: -30svh;
+  left: 30vw;
+  height: 90svh;
+  width: 80vw;
+  opacity: 0.7;
+  background: radial-gradient(closest-side, var(--chart-2), transparent 82%);
+  animation: auth-glow-drift 26s ease-in-out infinite reverse;
+}
+
+.auth-glow-veil {
+  top: 6svh;
+  left: 4vw;
+  height: 75svh;
+  width: 78vw;
+  opacity: 0.6;
+  background: radial-gradient(closest-side, var(--chart-series-2), transparent 84%);
+  animation: auth-glow-drift 31s ease-in-out infinite;
+  animation-delay: -9s;
+}

@@ -141,13 +141,16 @@ function DraftRow({
   );
 }
 
-function OrderRow({ order }: { order: ChangeOrder }) {
+function OrderRow({ order, detailBasePath }: {
+  order: ChangeOrder;
+  detailBasePath: "/changes/orders" | "/approvals/orders";
+}) {
   const { t } = useTranslation();
   const navigate = useNavigate();
   return (
     <TableRow
       className="cursor-pointer"
-      onClick={() => { void navigate(`/changes/orders/${order.id}`); }}
+      onClick={() => { void navigate(`${detailBasePath}/${order.id}`); }}
       data-testid="mine-order-row"
       data-row-key={order.id}
     >
@@ -175,7 +178,7 @@ function OrderRow({ order }: { order: ChangeOrder }) {
           aria-label={t("orders.list.open")}
           onClick={(event) => {
             event.stopPropagation();
-            void navigate(`/changes/orders/${order.id}`);
+            void navigate(`${detailBasePath}/${order.id}`);
           }}
           data-testid={`open-order-${order.display_number}`}
         >
@@ -567,7 +570,11 @@ export default function MinePage() {
                       </TableHeader>
                       <TableBody ref={ordersBodyRef} stale={ordersStale}>
                         {orderItems.map((order) => (
-                          <OrderRow key={order.id} order={order} />
+                          <OrderRow
+                            key={order.id}
+                            order={order}
+                            detailBasePath={orderScope === "execution" ? "/approvals/orders" : "/changes/orders"}
+                          />
                         ))}
                       </TableBody>
                     </Table>

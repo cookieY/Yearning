@@ -16,6 +16,7 @@ import (
 	orderdomain "github.com/cookieY/YearningX/backend/internal/changeorder/domain"
 	"github.com/cookieY/YearningX/backend/internal/execution/domain"
 	"github.com/cookieY/YearningX/backend/internal/execution/persistence"
+	"github.com/cookieY/YearningX/backend/internal/tasks"
 )
 
 // Schedule window constants (frozen values from settings-namespaces execution.fixed_constants).
@@ -475,6 +476,9 @@ func (s *Services) claimDueSchedule(ctx context.Context, row dueScheduleRow) (du
 		}
 	})
 	if txErr == nil {
+		if outcome == dueClaimed {
+			tasks.WakeKind(KindStageExecution)
+		}
 		return outcome, nil
 	}
 	var de *domain.Error
@@ -487,7 +491,7 @@ func (s *Services) claimDueSchedule(ctx context.Context, row dueScheduleRow) (du
 				return dueSkipped, berr
 			}
 			return dueBlocked, nil
-		case domain.CodeConcurrent, domain.CodeNotFound:
+		case domain.CodeConcurrent, domain.CodeNotFound, domain.CodeSystemCapacity:
 			return dueSkipped, nil
 		}
 		// Other Preflight failures (schema drift / closed window / OSC unavailable, etc.):

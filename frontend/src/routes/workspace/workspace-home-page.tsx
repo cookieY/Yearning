@@ -969,7 +969,17 @@ export default function WorkspaceHomePage() {
             </div>
 
             <div className="flex flex-col gap-4">
-              <h3 className="text-lg font-semibold">{t("home.distribution.legendTitle")}</h3>
+              {/* Place the View-all CTA in the section header so initial scroll y=0 clears the fixed bottom-right Assistant FAB. */}
+              <div className="flex items-center justify-between gap-3">
+                <h3 className="text-lg font-semibold">{t("home.distribution.legendTitle")}</h3>
+                <Link
+                  to="/changes/mine"
+                  className={cn(buttonVariants({ className: "h-9 shrink-0 px-4" }))}
+                >
+                  {t("home.distribution.cta")}
+                  <ArrowRight className="size-4" aria-hidden />
+                </Link>
+              </div>
               <p className="text-muted-foreground text-sm leading-relaxed">
                 {ops === undefined
                   ? t("home.distribution.descriptionUnknown")
@@ -1023,13 +1033,6 @@ export default function WorkspaceHomePage() {
                     />
                   ))}
                 </div>
-                <Link
-                  to="/changes/mine"
-                  className={cn(buttonVariants({ className: "h-9 px-4" }))}
-                >
-                  {t("home.distribution.cta")}
-                  <ArrowRight className="size-4" aria-hidden />
-                </Link>
               </div>
             </div>
           </Panel>

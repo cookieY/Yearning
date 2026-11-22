@@ -21,6 +21,7 @@ import (
 	"github.com/cookieY/YearningX/backend/internal/crypto"
 	"github.com/cookieY/YearningX/backend/internal/platform/addrguard"
 	"github.com/cookieY/YearningX/backend/internal/platform/txutil"
+	"github.com/cookieY/YearningX/backend/internal/tasks"
 )
 
 // View is the API response view; credential_status expresses only Presence and never contains secrets.
@@ -967,6 +968,9 @@ func (s *Service) TestAndCapabilities(ctx context.Context, id, purpose string) (
 			return nil, nil, ErrTestRateLimited
 		}
 	}
+	if err := tasks.CheckPendingCapacity(ctx, s.db); err != nil {
+		return nil, nil, err
+	}
 	s.probeMu.Store(id, time.Now())
 
 	task := AsyncTaskModel{
@@ -1140,6 +1144,9 @@ const testInterval = 5 * time.Second
 
 // ErrTestRateLimited indicates connection testing is rate-limited.
 var ErrTestRateLimited = errors.New("datasource: connection test rate limited")
+
+// ErrCapacityExhausted indicates the durable async_tasks queue has reached its pending limit.
+var ErrCapacityExhausted = tasks.ErrQueueFull
 
 // ErrConnectionFailed indicates a connection probe failure (mapped to 3010 DATASOURCE_UNAVAILABLE).
 type ErrConnectionFailed struct{}

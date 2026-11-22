@@ -48,12 +48,21 @@ func newStatementSyntaxValidator(sql []byte, profile fingerprint.Profile) *state
 }
 
 func (v *statementSyntaxValidator) ValidateStatement(ordinal int, st changeset.Statement) error {
+	return v.ValidateStatementWithLex(ordinal, st, nil)
+}
+
+func (v *statementSyntaxValidator) ValidateStatementWithLex(ordinal int, st changeset.Statement, lex *fingerprint.LexOutput) error {
 	if !v.isMySQLFamily && !v.isPGFamily {
 		return nil
 	}
-	stmtText := strings.TrimSpace(string(st.SQL))
-	if stmtText == "" {
+	if len(bytes.TrimSpace(st.SQL)) == 0 {
 		return nil
+	}
+	shapeFor := func() (string, bool) {
+		if lex != nil {
+			return quickSyntaxShapeFromTokens(lex.Tokens), true
+		}
+		return quickSyntaxShape(st.SQL, v.profile.Flags())
 	}
 	shouldValidate := ordinal <= syntaxCheckDirectLimit
 	if !shouldValidate {
@@ -61,7 +70,7 @@ func (v *statementSyntaxValidator) ValidateStatement(ordinal int, st changeset.S
 			v.seenShapes = make(map[string]struct{}, 64)
 		}
 		if len(v.seenShapes) < syntaxCheckMaxUniqueShapes {
-			shape, ok := quickSyntaxShape(st.SQL, v.profile.Flags())
+			shape, ok := shapeFor()
 			if !ok {
 				shouldValidate = true
 			} else if _, exists := v.seenShapes[shape]; !exists {
@@ -71,13 +80,14 @@ func (v *statementSyntaxValidator) ValidateStatement(ordinal int, st changeset.S
 		}
 	} else if ordinal == syntaxCheckDirectLimit {
 		// Seed shape map once crossing into bulk mode so subsequent duplicate rows skip redundant parses.
-		if shape, ok := quickSyntaxShape(st.SQL, v.profile.Flags()); ok {
+		if shape, ok := shapeFor(); ok {
 			v.seenShapes = map[string]struct{}{shape: {}}
 		}
 	}
 	if !shouldValidate {
 		return nil
 	}
+	stmtText := strings.TrimSpace(string(st.SQL))
 	var parseErr error
 	if v.isMySQLFamily {
 		parseErr = validateMySQLStatementSyntax(v.mysqlParser, stmtText)
@@ -170,9 +180,15 @@ func quickSyntaxShape(stmt []byte, flags fingerprint.DialectFlags) (string, bool
 	if err != nil {
 		return "", false
 	}
+	return quickSyntaxShapeFromTokens(lex.Tokens), true
+}
+
+func quickSyntaxShapeFromTokens(tokens []fingerprint.Token) string {
 	var b strings.Builder
-	b.Grow(len(stmt))
-	for i, tok := range lex.Tokens {
+	if len(tokens) > 0 {
+		b.Grow(len(tokens) * 5)
+	}
+	for i, tok := range tokens {
 		if i > 0 {
 			b.WriteByte(' ')
 		}
@@ -194,5 +210,5 @@ func quickSyntaxShape(stmt []byte, flags fingerprint.DialectFlags) (string, bool
 			b.WriteString(tok.Text)
 		}
 	}
-	return b.String(), true
+	return b.String()
 }

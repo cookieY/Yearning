@@ -2,6 +2,7 @@ package application
 
 import (
 	"encoding/json"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -102,4 +103,48 @@ func containsFold(haystack, needle string) bool {
 		}
 	}
 	return false
+}
+
+func TestMergeStmtFactsIntoDMLAndDDLParity(t *testing.T) {
+	batches := [][]struct {
+		sql   string
+		op    string
+		class string
+	}{
+		{
+			{sql: "UPDATE orders SET amount = 1 WHERE id = 1", op: "update", class: "dml"},
+			{sql: "UPDATE orders SET amount = 2 WHERE id = 2 AND status = NULL ORDER BY id LIMIT 10", op: "update", class: "dml"},
+			{sql: "UPDATE orders SET amount = 3 WHERE id IN (SELECT id FROM other)", op: "update", class: "dml"},
+		},
+		{
+			{sql: "DELETE FROM orders WHERE id = 1", op: "delete", class: "dml"},
+			{sql: "DELETE FROM orders WHERE id = 2 ORDER BY id LIMIT 5", op: "delete", class: "dml"},
+		},
+		{
+			{sql: "INSERT INTO orders VALUES (1, 'a')", op: "insert", class: "dml"},
+			{sql: "INSERT INTO orders (id, note) VALUES (2, NULL)", op: "insert", class: "dml"},
+			{sql: "INSERT INTO orders (id, note) SELECT id, note FROM archive", op: "insert", class: "dml"},
+		},
+		{
+			{sql: "REPLACE INTO orders VALUES (1, 'a')", op: "replace", class: "dml"},
+			{sql: "REPLACE INTO orders SELECT id, note FROM archive", op: "replace", class: "dml"},
+		},
+		{
+			{sql: "SELECT id FROM orders WHERE id = 1", op: "select", class: "dml"},
+		},
+		{
+			{sql: "CREATE TABLE t (id INT PRIMARY KEY)", op: "create", class: "ddl"},
+		},
+	}
+
+	for bIdx, batch := range batches {
+		var got, want stmtFacts
+		for _, item := range batch {
+			mergeStmtFactsInto(&got, []byte(item.sql), item.op, item.class)
+			mergeFactsInto(&want, extractStmtFacts([]byte(item.sql), item.op, item.class))
+		}
+		if got.incomplete != want.incomplete || !reflect.DeepEqual(got.m, want.m) {
+			t.Fatalf("batch %d mismatch:\n got  = %#v\n want = %#v", bIdx, got, want)
+		}
+	}
 }

@@ -1493,6 +1493,30 @@ html.dark .yn-home::before {
   color: var(--yn-dim);
 }
 
+/* Homepage Footer Pricing & Compliance Links */
+.yn-legal-links {
+  flex: 1 0 100%;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 18px;
+  padding-top: 14px;
+  border-top: 1px solid var(--yn-border);
+  font-family: var(--yn-font-mono);
+  font-size: 0.76rem;
+}
+
+.yn-legal-links a {
+  color: var(--yn-dim);
+  text-decoration: none;
+  transition: color 150ms var(--yn-ease);
+}
+
+.yn-legal-links a:hover {
+  color: var(--yn-ink);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
 /* MDX Doc Screenshot Figure */
 .yn-doc-shot {
   margin: 24px 0;

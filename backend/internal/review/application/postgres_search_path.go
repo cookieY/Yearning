@@ -13,6 +13,7 @@ import (
 	"github.com/cookieY/YearningX/backend/internal/crypto"
 	"github.com/cookieY/YearningX/backend/internal/database"
 	"github.com/cookieY/YearningX/backend/internal/review/fingerprint"
+	"github.com/cookieY/YearningX/backend/internal/review/privacy"
 	"github.com/cookieY/YearningX/backend/internal/review/provider"
 )
 
@@ -296,6 +297,7 @@ type frozenPostgresPathBinding struct {
 	Callables          map[string]frozenPostgresCallable         `json:"callables,omitempty"`
 	Baseline           map[string]frozenPostgresBaselineRelation `json:"baseline"`
 	Relations          map[string]frozenPostgresObjectBinding    `json:"relations"`
+	UniformRelations   map[string]frozenPostgresObjectBinding    `json:"uniform_relations,omitempty"`
 }
 
 // Exported aliases define the encrypted review/execution contract while
@@ -311,6 +313,18 @@ func postgresObjectBindingKey(ordinal int32, token string) string {
 func (b *stageSchemaBinding) postgresObjectSchema(ordinal int32, token string) (string, bool, bool) {
 	if b == nil || b.postgres == nil || !b.postgres.Complete || token == "" {
 		return "", false, false
+	}
+	if resolution, ok := b.postgres.UniformRelations[token]; ok {
+		if !resolution.Supported {
+			return "", false, false
+		}
+		if !resolution.Present {
+			return b.postgres.Path.CreationSchema, false, true
+		}
+		if database.ValidateIdentifier(resolution.Schema) != nil {
+			return "", false, false
+		}
+		return resolution.Schema, true, true
 	}
 	resolution, ok := b.postgres.Relations[postgresObjectBindingKey(ordinal, token)]
 	if !ok || !resolution.Supported {
@@ -330,6 +344,11 @@ func (b *stageSchemaBinding) postgresObjectSchemas(token string) []string {
 		return nil
 	}
 	schemas := map[string]bool{}
+	if resolution, ok := b.postgres.UniformRelations[token]; ok {
+		if resolution.Supported && resolution.Present {
+			schemas[resolution.Schema] = true
+		}
+	}
 	for key, resolution := range b.postgres.Relations {
 		parts := strings.SplitN(key, ":", 2)
 		if len(parts) == 2 && parts[1] == token && resolution.Supported && resolution.Present {
@@ -358,25 +377,130 @@ func (b *stageSchemaBinding) postgresObjectSchemaAt(
 	return b.postgresObjectSchema(ordinal, token)
 }
 
+// postgresRelationsUniformSchema verifies every frozen relation entry in
+// b.postgres.Relations for token agrees on Supported, valid schema identity,
+// and (expectedSchema, expectedPresent). Used when OrdinalRangesTruncated
+// prevents scanning every statement ordinal from StatementOrdinalRanges alone.
+func (b *stageSchemaBinding) postgresRelationsUniformSchema(
+	token string,
+	expectedSchema string,
+	expectedPresent bool,
+) bool {
+	if b == nil || b.postgres == nil || !b.postgres.Complete || token == "" || expectedSchema == "" {
+		return false
+	}
+	matched := 0
+	for key, resolution := range b.postgres.Relations {
+		_, tok, ok := strings.Cut(key, ":")
+		if !ok || tok != token {
+			continue
+		}
+		if !resolution.Supported {
+			return false
+		}
+		var schema string
+		if !resolution.Present {
+			schema = b.postgres.Path.CreationSchema
+		} else {
+			schema = resolution.Schema
+		}
+		if schema == "" || database.ValidateIdentifier(schema) != nil {
+			return false
+		}
+		if schema != expectedSchema || resolution.Present != expectedPresent {
+			return false
+		}
+		matched++
+	}
+	return matched > 0
+}
+
 // postgresObjectSchemaForReference applies postgresObjectSchemaAt to every
 // statement occurrence represented by an anonymized object reference.
 func (b *stageSchemaBinding) postgresObjectSchemaForReference(
 	object provider.AnonymizedObjectReference,
 ) (string, bool) {
-	ordinals := postgresReferenceOrdinals(object)
-	if len(ordinals) == 0 {
+	if b == nil || b.postgres == nil || !b.postgres.Complete || object.Token == "" {
 		return "", false
+	}
+	if resolution, ok := b.postgres.UniformRelations[object.Token]; ok {
+		if len(object.StatementOrdinalRanges) == 0 {
+			if object.StatementOrdinal <= 0 {
+				return "", false
+			}
+		} else {
+			for _, span := range object.StatementOrdinalRanges {
+				if span.Start <= 0 || span.End < span.Start {
+					return "", false
+				}
+			}
+		}
+		if !resolution.Supported {
+			return "", false
+		}
+		if !resolution.Present {
+			if database.ValidateIdentifier(b.postgres.Path.CreationSchema) != nil {
+				return "", false
+			}
+			return b.postgres.Path.CreationSchema, true
+		}
+		if database.ValidateIdentifier(resolution.Schema) != nil {
+			return "", false
+		}
+		return resolution.Schema, true
 	}
 	schema := ""
 	present := false
-	for i, ordinal := range ordinals {
-		next, nextPresent, complete := b.postgresObjectSchemaAt(ordinal, object.Token)
-		if !complete || next == "" || (i > 0 && (next != schema || nextPresent != present)) {
+	seen := false
+	if len(object.StatementOrdinalRanges) == 0 {
+		if object.StatementOrdinal <= 0 {
 			return "", false
 		}
-		schema, present = next, nextPresent
+		next, nextPresent, complete := b.postgresObjectSchemaAt(object.StatementOrdinal, object.Token)
+		if !complete || next == "" {
+			return "", false
+		}
+		schema, present, seen = next, nextPresent, true
+	} else {
+		for _, span := range object.StatementOrdinalRanges {
+			if span.Start <= 0 || span.End < span.Start {
+				return "", false
+			}
+			for ordinal := span.Start; ordinal <= span.End; ordinal++ {
+				next, nextPresent, complete := b.postgresObjectSchemaAt(ordinal, object.Token)
+				if !complete || next == "" || (seen && (next != schema || nextPresent != present)) {
+					return "", false
+				}
+				schema, present, seen = next, nextPresent, true
+			}
+		}
+	}
+	if !seen {
+		return "", false
+	}
+	if object.OrdinalRangesTruncated && !b.postgresRelationsUniformSchema(object.Token, schema, present) {
+		return "", false
 	}
 	return schema, true
+}
+
+func (b *stageSchemaBinding) postgresAllowsSchemaToken(mapper *privacy.RunMapper, token string) bool {
+	if b == nil || b.postgres == nil || mapper == nil || token == "" {
+		return false
+	}
+	kind, original, found := mapper.Original(token)
+	if !found || kind != privacy.KindSchema || original == "" || database.ValidateIdentifier(original) != nil {
+		return false
+	}
+	if strings.HasPrefix(original, "pg_temp_") {
+		return false
+	}
+	for _, candidate := range b.postgres.Path.Effective {
+		if candidate == original {
+			return true
+		}
+	}
+	return false
 }
 
 func postgresReferenceOrdinals(object provider.AnonymizedObjectReference) []int32 {
@@ -488,16 +612,25 @@ func preparePostgresObjectBindingsWithCallables(
 		}
 		sort.Strings(out.CallablesRequested)
 	}
-	if !out.Complete || len(statements) == 0 || len(lookups) > postgresSearchPathMaxResolvedTables {
+	if !out.Complete || len(statements) == 0 || len(statements) > 100000 {
+		if len(statements) > 100000 {
+			out.Complete = false
+		}
 		return out, false
 	}
 	pathSchemas := map[string]bool{}
 	for _, schema := range path.Effective {
 		pathSchemas[schema] = true
 	}
-	lookupByKey := map[string]postgresRelationLookup{}
+	type ordinalTokenKey struct {
+		ordinal int32
+		token   string
+	}
+	lookupByKey := make(map[ordinalTokenKey]postgresRelationLookup, len(lookups))
+	lookupsByOrdinal := make(map[int32][]postgresRelationLookup, len(statements))
 	initialState := map[string]map[string]string{}
 	initialOIDs := map[string]map[string]uint32{}
+	checkedTokens := map[string]string{}
 	for _, lookup := range lookups {
 		if lookup.Ordinal <= 0 || lookup.TableToken == "" || !lookup.Complete ||
 			lookup.TableName == "" || len(lookup.PresentBySchema) > postgresSearchPathMaxSchemas+3 {
@@ -505,18 +638,50 @@ func preparePostgresObjectBindingsWithCallables(
 			return out, false
 		}
 		if originalName != nil {
-			name, ok := originalName(lookup.TableToken)
-			if !ok || name != lookup.TableName {
-				out.Complete = false
-				return out, false
+			if cachedName, cached := checkedTokens[lookup.TableToken]; cached {
+				if cachedName != lookup.TableName {
+					out.Complete = false
+					return out, false
+				}
+			} else {
+				name, ok := originalName(lookup.TableToken)
+				if !ok || name != lookup.TableName {
+					out.Complete = false
+					return out, false
+				}
+				checkedTokens[lookup.TableToken] = name
 			}
 		}
-		key := postgresObjectBindingKey(lookup.Ordinal, lookup.TableToken)
+		key := ordinalTokenKey{ordinal: lookup.Ordinal, token: lookup.TableToken}
 		if _, duplicate := lookupByKey[key]; duplicate {
 			out.Complete = false
 			return out, false
 		}
 		lookupByKey[key] = lookup
+		lookupsByOrdinal[lookup.Ordinal] = append(lookupsByOrdinal[lookup.Ordinal], lookup)
+		if prior, seen := initialState[lookup.TableName]; seen {
+			priorOIDs := initialOIDs[lookup.TableName]
+			if len(lookup.PresentBySchema) != len(prior) {
+				out.Complete = false
+				return out, false
+			}
+			for schema, kind := range lookup.PresentBySchema {
+				if !pathSchemas[schema] || kind == "" || prior[schema] != kind {
+					out.Complete = false
+					return out, false
+				}
+				oid := lookup.OIDBySchema[schema]
+				if oid == 0 || priorOIDs[schema] != oid {
+					out.Complete = false
+					return out, false
+				}
+			}
+			continue
+		}
+		if len(initialState) >= postgresSearchPathMaxResolvedTables {
+			out.Complete = false
+			return out, false
+		}
 		presence := make(map[string]string, len(lookup.PresentBySchema))
 		oids := make(map[string]uint32, len(lookup.PresentBySchema))
 		for schema, kind := range lookup.PresentBySchema {
@@ -531,14 +696,6 @@ func preparePostgresObjectBindingsWithCallables(
 				return out, false
 			}
 			oids[schema] = oid
-		}
-		if prior, seen := initialState[lookup.TableName]; seen &&
-			(!equalPostgresPresence(prior, presence) ||
-				!equalPostgresOIDs(initialOIDs[lookup.TableName], oids)) {
-			// The live catalog changed between statement-ordered probes. No
-			// later effect simulation can recover a single defensible state.
-			out.Complete = false
-			return out, false
 		}
 		initialState[lookup.TableName] = presence
 		initialOIDs[lookup.TableName] = oids
@@ -561,6 +718,98 @@ func preparePostgresObjectBindingsWithCallables(
 		virtualOID[name] = clonePostgresOIDs(initialOIDs[name])
 		virtualCreatedBy[name] = map[string]int32{}
 	}
+	useUniform := len(lookups) > 1024
+	var (
+		uniformCandidate     map[string]frozenPostgresObjectBinding
+		uniformOrdinals      map[string][]int32
+		nonUniformTokens     map[string]bool
+		mutatedTables        map[string]bool
+		uniformTokensByTable map[string][]string
+	)
+	if useUniform {
+		uniformCandidate = make(map[string]frozenPostgresObjectBinding, len(initialState))
+		uniformOrdinals = make(map[string][]int32, len(initialState))
+		nonUniformTokens = make(map[string]bool)
+		mutatedTables = make(map[string]bool)
+		uniformTokensByTable = make(map[string][]string, len(initialState))
+	}
+	markTokenNonUniform := func(token string) {
+		if !useUniform || token == "" || nonUniformTokens[token] {
+			return
+		}
+		nonUniformTokens[token] = true
+		cand, seen := uniformCandidate[token]
+		if !seen {
+			return
+		}
+		prevOrdinals := uniformOrdinals[token]
+		delete(uniformOrdinals, token)
+		delete(uniformCandidate, token)
+		if len(out.Relations)+len(prevOrdinals) > postgresSearchPathMaxResolvedTables {
+			out.Complete = false
+			return
+		}
+		for _, prevOrd := range prevOrdinals {
+			out.Relations[postgresObjectBindingKey(prevOrd, token)] = cand
+		}
+	}
+	// Any table whose presence changes via CREATE/DROP (or RENAME) cannot remain
+	// in UniformRelations even if never referenced again later in the batch,
+	// because execution checks every UniformRelations entry at every DDL ordinal.
+	markTableNonUniform := func(tableName string, triggerToken string) {
+		if !useUniform {
+			return
+		}
+		if tableName != "" {
+			mutatedTables[tableName] = true
+			for _, tok := range uniformTokensByTable[tableName] {
+				markTokenNonUniform(tok)
+			}
+			delete(uniformTokensByTable, tableName)
+		}
+		markTokenNonUniform(triggerToken)
+	}
+	recordRelation := func(ordinal int32, token string, resolution frozenPostgresObjectBinding) {
+		if !useUniform {
+			out.Relations[postgresObjectBindingKey(ordinal, token)] = resolution
+			return
+		}
+		if nonUniformTokens[token] || mutatedTables[resolution.TableName] {
+			markTokenNonUniform(token)
+			if !out.Complete || len(out.Relations) >= postgresSearchPathMaxResolvedTables {
+				out.Complete = false
+				return
+			}
+			out.Relations[postgresObjectBindingKey(ordinal, token)] = resolution
+			return
+		}
+		cand, seen := uniformCandidate[token]
+		if !seen {
+			if resolution.CreatedByOrdinal == 0 {
+				uniformCandidate[token] = resolution
+				uniformOrdinals[token] = append(uniformOrdinals[token], ordinal)
+				uniformTokensByTable[resolution.TableName] = append(uniformTokensByTable[resolution.TableName], token)
+				return
+			}
+			nonUniformTokens[token] = true
+			if len(out.Relations) >= postgresSearchPathMaxResolvedTables {
+				out.Complete = false
+				return
+			}
+			out.Relations[postgresObjectBindingKey(ordinal, token)] = resolution
+			return
+		}
+		if resolution == cand {
+			uniformOrdinals[token] = append(uniformOrdinals[token], ordinal)
+			return
+		}
+		markTokenNonUniform(token)
+		if !out.Complete || len(out.Relations) >= postgresSearchPathMaxResolvedTables {
+			out.Complete = false
+			return
+		}
+		out.Relations[postgresObjectBindingKey(ordinal, token)] = resolution
+	}
 	parserComplete := true
 	unsafeByOrdinal := map[int32]bool{}
 	if len(unsafeStatements) > 0 && unsafeStatements[0] != nil {
@@ -575,10 +824,7 @@ func preparePostgresObjectBindingsWithCallables(
 		if pathUnsafe {
 			parserComplete = false
 		}
-		for _, lookup := range lookups {
-			if lookup.Ordinal != statement.Ordinal {
-				continue
-			}
+		for _, lookup := range lookupsByOrdinal[statement.Ordinal] {
 			presence := virtualKind[lookup.TableName]
 			if presence == nil {
 				// A replacement token may first appear in a rename. Rename
@@ -595,9 +841,7 @@ func preparePostgresObjectBindingsWithCallables(
 			}
 			if pathUnsafe {
 				resolution.Supported = false
-				out.Relations[postgresObjectBindingKey(
-					lookup.Ordinal, lookup.TableToken,
-				)] = resolution
+				recordRelation(lookup.Ordinal, lookup.TableToken, resolution)
 				continue
 			}
 			targetSchema, explicit, targetKnown := statementTableTargetSchema(
@@ -667,7 +911,7 @@ func preparePostgresObjectBindingsWithCallables(
 					resolution.Schema = path.CreationSchema
 				}
 			}
-			out.Relations[postgresObjectBindingKey(lookup.Ordinal, lookup.TableToken)] = resolution
+			recordRelation(lookup.Ordinal, lookup.TableToken, resolution)
 		}
 
 		if pathUnsafe {
@@ -680,9 +924,9 @@ func preparePostgresObjectBindingsWithCallables(
 				}
 				continue
 			}
-			lookup, found := lookupByKey[postgresObjectBindingKey(
-				statement.Ordinal, effect.Object.Token,
-			)]
+			lookup, found := lookupByKey[ordinalTokenKey{
+				ordinal: statement.Ordinal, token: effect.Object.Token,
+			}]
 			if !found {
 				parserComplete = false
 				continue
@@ -715,6 +959,7 @@ func preparePostgresObjectBindingsWithCallables(
 					presence[targetSchema] = "table"
 					delete(virtualOID[lookup.TableName], targetSchema)
 					virtualCreatedBy[lookup.TableName][targetSchema] = statement.Ordinal
+					markTableNonUniform(lookup.TableName, effect.Object.Token)
 				}
 				// CREATE TABLE IF NOT EXISTS is a no-op for an existing
 				// relation. An existing non-table relation remains visible as
@@ -733,15 +978,28 @@ func preparePostgresObjectBindingsWithCallables(
 					delete(presence, targetSchema)
 					delete(virtualOID[lookup.TableName], targetSchema)
 					delete(virtualCreatedBy[lookup.TableName], targetSchema)
+					markTableNonUniform(lookup.TableName, effect.Object.Token)
 				}
 			case fingerprint.ValidityEffectRename:
 				// A rename changes the future name-to-schema identity. The
 				// current token graph does not carry an executable rename
 				// closure for every relation kind, so later binding is
 				// intentionally partial.
+				markTableNonUniform(lookup.TableName, effect.Object.Token)
 				parserComplete = false
 			}
 			virtualKind[lookup.TableName] = presence
+		}
+	}
+	if useUniform {
+		if len(uniformCandidate) > postgresSearchPathMaxResolvedTables ||
+			len(out.Relations) > postgresSearchPathMaxResolvedTables {
+			out.Complete = false
+		} else if len(uniformCandidate) > 0 {
+			out.UniformRelations = make(map[string]frozenPostgresObjectBinding, len(uniformCandidate))
+			for token, cand := range uniformCandidate {
+				out.UniformRelations[token] = cand
+			}
 		}
 	}
 	out.Complete = parserComplete && out.Complete
@@ -927,6 +1185,7 @@ func decodeFrozenPostgresPathBinding(value any) (*frozenPostgresPathBinding, boo
 		binding.Path.Validate() != nil ||
 		binding.Baseline == nil ||
 		len(binding.Relations) > postgresSearchPathMaxResolvedTables ||
+		len(binding.UniformRelations) > postgresSearchPathMaxResolvedTables ||
 		!validFrozenPostgresCallables(binding) {
 		return nil, false
 	}
@@ -937,6 +1196,18 @@ func decodeFrozenPostgresPathBinding(value any) (*frozenPostgresPathBinding, boo
 	for tableName, baseline := range binding.Baseline {
 		if database.ValidateIdentifier(tableName) != nil ||
 			baseline.PresentBySchema == nil || !validPostgresBaseline(binding.Path, baseline) {
+			return nil, false
+		}
+	}
+	for token, relation := range binding.UniformRelations {
+		if token == "" ||
+			relation.CreatedByOrdinal != 0 ||
+			database.ValidateIdentifier(relation.TableName) != nil ||
+			(relation.Present && (database.ValidateIdentifier(relation.Schema) != nil ||
+				!validPostgresRelationKind(relation.Kind) ||
+				!pathSchemas[relation.Schema] ||
+				relation.OID == 0)) ||
+			(!relation.Present && database.ValidateIdentifier(relation.Schema) != nil) {
 			return nil, false
 		}
 	}
@@ -953,6 +1224,9 @@ func decodeFrozenPostgresPathBinding(value any) (*frozenPostgresPathBinding, boo
 						relation.CreatedByOrdinal >= int32(ordinal))) ||
 				(relation.OID != 0 && relation.CreatedByOrdinal != 0))) ||
 			(!relation.Present && database.ValidateIdentifier(relation.Schema) != nil) {
+			return nil, false
+		}
+		if _, overlap := binding.UniformRelations[token]; overlap {
 			return nil, false
 		}
 	}

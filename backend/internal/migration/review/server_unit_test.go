@@ -3,7 +3,13 @@
 package review
 
 import (
+	"bytes"
+	"context"
+	"database/sql"
+	"database/sql/driver"
+	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -11,6 +17,9 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
+	gormpostgres "gorm.io/driver/postgres"
+	"gorm.io/gorm"
+	gormlogger "gorm.io/gorm/logger"
 )
 
 func unitRouter() *gin.Engine {
@@ -249,5 +258,135 @@ func TestLoginGuardPartialCountNotEvictedWhenActiveLocksExist(t *testing.T) {
 	}
 	if !g.locked("unseen-user", now.Add(3*time.Second)) {
 		t.Fatal("guard must fail closed when saturated by active locks")
+	}
+}
+
+type migLoginStubFx struct{}
+
+func (f *migLoginStubFx) Connect(context.Context) (driver.Conn, error) { return f, nil }
+func (f *migLoginStubFx) Driver() driver.Driver                        { return migLoginStubDriver{} }
+
+type migLoginStubDriver struct{}
+
+func (migLoginStubDriver) Open(string) (driver.Conn, error) { return nil, errors.New("unused") }
+func (f *migLoginStubFx) Prepare(string) (driver.Stmt, error) {
+	return nil, errors.New("unused")
+}
+func (f *migLoginStubFx) Close() error              { return nil }
+func (f *migLoginStubFx) Begin() (driver.Tx, error) { return nil, errors.New("unused") }
+func (f *migLoginStubFx) ExecContext(context.Context, string, []driver.NamedValue) (driver.Result, error) {
+	return driver.RowsAffected(0), nil
+}
+func (f *migLoginStubFx) QueryContext(context.Context, string, []driver.NamedValue) (driver.Rows, error) {
+	return &migLoginEmptyRows{}, nil
+}
+
+type migLoginEmptyRows struct{}
+
+func (*migLoginEmptyRows) Columns() []string {
+	return []string{"id", "password_hash", "is_builtin_admin"}
+}
+func (*migLoginEmptyRows) Close() error              { return nil }
+func (*migLoginEmptyRows) Next([]driver.Value) error { return io.EOF }
+
+func TestLoginGuardIPTierPreventsUsernameSpray(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	sqlDB := sql.OpenDB(&migLoginStubFx{})
+	t.Cleanup(func() { _ = sqlDB.Close() })
+	db, err := gorm.Open(gormpostgres.New(gormpostgres.Config{
+		Conn:                 sqlDB,
+		PreferSimpleProtocol: true,
+		WithoutReturning:     true,
+	}), &gorm.Config{Logger: gormlogger.Discard, SkipDefaultTransaction: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	srv := &Server{DB: db, Logger: zap.NewNop(), loginGuard: newLoginGuard()}
+	r := NewRouter(srv)
+
+	// One IP sprays maxFailuresPerIP (20) distinct usernames with bad credentials.
+	for i := 0; i < maxFailuresPerIP; i++ {
+		body := fmt.Sprintf(`{"username":"spray-%03d","password":"bad-password"}`, i)
+		req := httptest.NewRequest(http.MethodPost, "/api/v4/auth/login", bytes.NewBufferString(body))
+		req.Header.Set("Content-Type", "application/json")
+		req.RemoteAddr = "203.0.113.10:12345"
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+		if w.Code != http.StatusUnauthorized {
+			t.Fatalf("spray attempt %d status = %d, want 401", i+1, w.Code)
+		}
+	}
+
+	// 21st attempt from the same IP with an unseen username is rejected at the IP tier (429 + Retry-After: 60)
+	// WITHOUT inserting the unseen username into g.failed.
+	reqBlocked := httptest.NewRequest(http.MethodPost, "/api/v4/auth/login", bytes.NewBufferString(`{"username":"spray-unseen","password":"bad-password"}`))
+	reqBlocked.Header.Set("Content-Type", "application/json")
+	reqBlocked.RemoteAddr = "203.0.113.10:54321"
+	wBlocked := httptest.NewRecorder()
+	r.ServeHTTP(wBlocked, reqBlocked)
+	if wBlocked.Code != http.StatusTooManyRequests {
+		t.Fatalf("21st spray attempt status = %d, want 429", wBlocked.Code)
+	}
+	if got := wBlocked.Header().Get("Retry-After"); got != "60" {
+		t.Fatalf("Retry-After = %q, want 60", got)
+	}
+	srv.loginGuard.mu.Lock()
+	_, inserted := srv.loginGuard.failed[normalizeLoginGuardKey("spray-unseen")]
+	srv.loginGuard.mu.Unlock()
+	if inserted {
+		t.Fatal("IP-blocked request must not insert username into g.failed")
+	}
+
+	// A different IP can still reach authentication without being blocked.
+	reqOtherIP := httptest.NewRequest(http.MethodPost, "/api/v4/auth/login", bytes.NewBufferString(`{"username":"admin","password":"bad-password"}`))
+	reqOtherIP.Header.Set("Content-Type", "application/json")
+	reqOtherIP.RemoteAddr = "203.0.113.20:12345"
+	wOther := httptest.NewRecorder()
+	r.ServeHTTP(wOther, reqOtherIP)
+	if wOther.Code != http.StatusUnauthorized {
+		t.Fatalf("other IP status = %d, want 401 (must not be blocked by attacker IP)", wOther.Code)
+	}
+
+	// Username lockout also sets Retry-After: 60.
+	for i := 0; i < loginFailureThreshold; i++ {
+		srv.loginGuard.recordFailure("locked-admin", time.Now())
+	}
+	reqLocked := httptest.NewRequest(http.MethodPost, "/api/v4/auth/login", bytes.NewBufferString(`{"username":"locked-admin","password":"bad-password"}`))
+	reqLocked.Header.Set("Content-Type", "application/json")
+	reqLocked.RemoteAddr = "203.0.113.30:12345"
+	wLocked := httptest.NewRecorder()
+	r.ServeHTTP(wLocked, reqLocked)
+	if wLocked.Code != http.StatusTooManyRequests || wLocked.Header().Get("Retry-After") != "60" {
+		t.Fatalf("username lockout = (%d, Retry-After=%q), want (429, 60)", wLocked.Code, wLocked.Header().Get("Retry-After"))
+	}
+}
+
+func TestLoginGuardIPTableBoundedAndExpires(t *testing.T) {
+	g := newLoginGuard()
+	now := time.Now()
+	for i := 0; i < maxLoginGuardIPs; i++ {
+		g.recordIPFailure(fmt.Sprintf("198.51.100.%d", i), now.Add(time.Duration(i)*time.Microsecond))
+	}
+	if len(g.ipFailed) != maxLoginGuardIPs {
+		t.Fatalf("ipFailed len = %d, want %d", len(g.ipFailed), maxLoginGuardIPs)
+	}
+	// Overflow evicts the oldest IP rather than growing unboundedly.
+	g.recordIPFailure("198.51.200.1", now.Add(time.Second))
+	if len(g.ipFailed) > maxLoginGuardIPs {
+		t.Fatalf("ipFailed grew beyond cap: %d", len(g.ipFailed))
+	}
+	if _, ok := g.ipFailed["198.51.100.0"]; ok {
+		t.Fatal("oldest IP must be evicted on overflow")
+	}
+
+	// Expired IP entries recover after loginLockWindow.
+	for i := 0; i < maxFailuresPerIP; i++ {
+		g.recordIPFailure("192.0.2.99", now)
+	}
+	if g.allowIP("192.0.2.99", now.Add(time.Second)) {
+		t.Fatal("IP should be blocked within window")
+	}
+	if !g.allowIP("192.0.2.99", now.Add(loginLockWindow+time.Second)) {
+		t.Fatal("IP should recover after loginLockWindow")
 	}
 }
