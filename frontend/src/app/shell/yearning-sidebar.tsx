@@ -13,7 +13,7 @@ import {
   SidebarMenuButton,
   useSidebar,
 } from "@/shared/components/ui/sidebar";
-import { filterNavGroups, NAV_GROUPS, type NavGroup } from "./nav-model";
+import { filterNavGroups, isNavItemActive, NAV_GROUPS, type NavGroup } from "./nav-model";
 import { sessionRoleFromCurrentUser } from "@/shared/session/session";
 import { useSession } from "@/features/auth/session-provider";
 import { BrandLogo } from "./brand-logo";
@@ -30,7 +30,7 @@ function SidebarGroupSection({ group }: { group: NavGroup }) {
             <SidebarMenuItem key={item.to}>
               <SidebarMenuButton
                 render={<Link to={item.to} />}
-                isActive={pathname === item.to}
+                isActive={isNavItemActive(item, pathname)}
               >
                 <item.icon />
                 {/* hide-menu lets the icon-mode hover expansion re-show the label */}

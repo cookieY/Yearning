@@ -2,20 +2,52 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { describe, expect, it } from "vitest";
+import { HttpResponse, http } from "msw";
+import { beforeEach, describe, expect, it } from "vitest";
 import "@/shared/i18n";
+import { server } from "@/test/msw/server";
 import { SidebarProvider } from "@/shared/components/ui/sidebar";
 import { SessionProvider } from "@/features/auth/session-provider";
 import { YearningSidebar } from "./yearning-sidebar";
 import { AppFooter, FOOTER_TEXT } from "./app-footer";
 import { UserMenu } from "./user-menu";
 
-function renderWithShellProviders(ui: React.ReactElement) {
+function stubCurrentUser(canAccessAdmin: boolean): Promise<void> {
+  let resolveProbe!: () => void;
+  const settled = new Promise<void>((resolve) => {
+    resolveProbe = resolve;
+  });
+  server.use(
+    http.get("*/users/me", () => {
+      queueMicrotask(resolveProbe);
+      return HttpResponse.json({
+        err_code: 0,
+        message: "ok",
+        data: {
+          id: "0198d9cc-e65d-7b9d-a8aa-3c81945f99ad",
+          username: canAccessAdmin ? "admin" : "henry",
+          display_name: canAccessAdmin ? "admin" : "henry",
+          email: null,
+          is_builtin_admin: canAccessAdmin,
+          version: 1,
+          created_at: "2026-08-28T08:00:00Z",
+          updated_at: "2026-08-28T08:00:00Z",
+          can_access_admin: canAccessAdmin,
+          auth_provider: "local",
+        },
+        request_id: "0198d9cc-e65d-7b9d-a8aa-3c81945f99ad",
+      });
+    }),
+  );
+  return settled;
+}
+
+function renderWithShellProviders(ui: React.ReactElement, initialEntry = "/workspace") {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   });
   return render(
-    <MemoryRouter initialEntries={["/workspace"]}>
+    <MemoryRouter initialEntries={[initialEntry]}>
       <QueryClientProvider client={queryClient}>
         <SessionProvider>
           <SidebarProvider>{ui}</SidebarProvider>
@@ -26,6 +58,11 @@ function renderWithShellProviders(ui: React.ReactElement) {
 }
 
 describe("YearningSidebar", () => {
+  // Drain unawaited /users/me 401 probes from earlier synchronous renders before mounting new session probes.
+  beforeEach(async () => {
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  });
+
   it("renders the workspace, audit and query groups for the placeholder user", () => {
     renderWithShellProviders(<YearningSidebar />);
     expect(screen.getByText("\u5de5\u4f5c\u53f0")).toBeVisible();
@@ -42,6 +79,36 @@ describe("YearningSidebar", () => {
     const active = screen.getByText("\u9996\u9875").closest("[data-active]");
     expect(active).not.toBeNull();
   });
+
+  it.each<[string, string]>([
+    ["/changes/orders/ord-1", "/changes/mine"],
+    ["/changes/drafts/drf-1", "/changes/new"],
+    ["/approvals/query-access", "/approvals/changes"],
+    ["/approvals/orders/ord-1", "/approvals/changes"],
+    ["/query/sessions/qs-1", "/query"],
+  ])("keeps parent sidebar item highlighted on user sub-route %s", async (pathname, expectedHref) => {
+    const settled = stubCurrentUser(false);
+    const { container } = renderWithShellProviders(<YearningSidebar />, pathname);
+    await settled;
+    const activeHrefs = [...container.querySelectorAll("a[data-active]")].map((el) =>
+      el.getAttribute("href"),
+    );
+    expect(activeHrefs).toEqual([expectedHref]);
+  });
+
+  it.each(["/admin/settings/general", "/admin/settings/execution", "/admin/identity-providers"])(
+    "keeps Settings highlighted on admin sub-route %s",
+    async (pathname) => {
+      const settled = stubCurrentUser(true);
+      const { container } = renderWithShellProviders(<YearningSidebar />, pathname);
+      await settled;
+      await screen.findByText("\u7cfb\u7edf\u8bbe\u7f6e");
+      const activeHrefs = [...container.querySelectorAll("a[data-active]")].map((el) =>
+        el.getAttribute("href"),
+      );
+      expect(activeHrefs).toEqual(["/admin/settings"]);
+    },
+  );
 });
 
 describe("AppFooter", () => {
@@ -79,8 +146,6 @@ describe("UserMenu", () => {
 
 describe("UserMenu sign-out resilience", () => {
   it("still returns to a clean state when the logout request itself fails", async () => {
-    const { server } = await import("@/test/msw/server");
-    const { HttpResponse, http } = await import("msw");
     server.use(
       http.post("*/auth/logout", () => new HttpResponse(null, { status: 500 })),
     );
@@ -96,29 +161,7 @@ describe("UserMenu sign-out resilience", () => {
 
 describe("UserMenu profile navigation closes the sheet (§18.53)", () => {
   it("closes the account sheet when navigating to the profile page", async () => {
-    const { server } = await import("@/test/msw/server");
-    const { HttpResponse, http } = await import("msw");
-    server.use(
-      http.get("*/users/me", () =>
-        HttpResponse.json({
-          err_code: 0,
-          message: "ok",
-          data: {
-            id: "0198d9cc-e65d-7b9d-a8aa-3c81945f99ac",
-            username: "henry",
-            display_name: "henry",
-            email: null,
-            is_builtin_admin: false,
-            version: 1,
-            created_at: "2026-08-28T08:00:00Z",
-            updated_at: "2026-08-28T08:00:00Z",
-            can_access_admin: false,
-            auth_provider: "local",
-          },
-          request_id: "0198d9cc-e65d-7b9d-a8aa-3c81945f99ac",
-        }),
-      ),
-    );
+    const settled = stubCurrentUser(false);
     const queryClient = new QueryClient({
       defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
     });
@@ -136,6 +179,7 @@ describe("UserMenu profile navigation closes the sheet (§18.53)", () => {
         </QueryClientProvider>
       </MemoryRouter>,
     );
+    await settled;
     const user = userEvent.setup();
     await user.click(screen.getByRole("button", { name: "\u8d26\u6237\u83dc\u5355" }));
     await user.click(await screen.findByTestId("user-menu-profile"));

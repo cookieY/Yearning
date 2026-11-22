@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { filterNavGroups, NAV_GROUPS } from "./nav-model";
+import { filterNavGroups, isNavItemActive, NAV_GROUPS } from "./nav-model";
 
 describe("navigation IA baseline (spec §5.1)", () => {
   it("declares exactly the five authority groups in order", () => {
@@ -65,5 +65,51 @@ describe("filterNavGroups", () => {
       { labelKey: "nav.group.admin", items: adminGroup.items },
     ];
     expect(filterNavGroups(singleAdminGroup, "user")).toEqual([]);
+  });
+});
+
+describe("isNavItemActive", () => {
+  const allItems = NAV_GROUPS.flatMap((group) => group.items);
+
+  it.each<[string, string]>([
+    ["/workspace", "nav.home"],
+    ["/changes/mine", "nav.myOrders"],
+    ["/changes/orders/ord-1", "nav.myOrders"],
+    ["/changes/new", "nav.orderSubmit"],
+    ["/changes/drafts/drf-1", "nav.orderSubmit"],
+    ["/approvals/changes", "nav.orderApprovals"],
+    ["/approvals/query-access", "nav.orderApprovals"],
+    ["/approvals/orders/ord-1", "nav.orderApprovals"],
+    ["/records", "nav.auditRecords"],
+    ["/query", "nav.query"],
+    ["/query/sessions/qs-1", "nav.query"],
+    ["/admin/settings", "nav.admin.settings"],
+    ["/admin/settings/general", "nav.admin.settings"],
+    ["/admin/settings/execution/", "nav.admin.settings"],
+    ["/admin/identity-providers", "nav.admin.settings"],
+    ["/admin/identity-providers/oidc-1", "nav.admin.settings"],
+    ["/admin/review-engine/ai-budget", "nav.reviewEngine.aiBudget"],
+    ["/admin/rule-sets", "nav.reviewEngine.ruleSets"],
+  ])("highlights exactly %s -> %s", (pathname, expectedLabelKey) => {
+    const activeKeys = allItems
+      .filter((item) => isNavItemActive(item, pathname))
+      .map((item) => item.labelKey);
+    expect(activeKeys).toEqual([expectedLabelKey]);
+  });
+
+  it.each([
+    "/",
+    "/profile",
+    "/admin/settings-extra",
+    "/admin/identity-providers-v2",
+    "/query-other",
+    "/records-backup",
+    "/approvals-extra",
+    "/changes/orders-old",
+  ])("does not false-match sibling path %s on segment boundaries", (pathname) => {
+    const activeKeys = allItems
+      .filter((item) => isNavItemActive(item, pathname))
+      .map((item) => item.labelKey);
+    expect(activeKeys).toEqual([]);
   });
 });

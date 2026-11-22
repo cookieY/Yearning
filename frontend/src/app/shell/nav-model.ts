@@ -39,6 +39,8 @@ export interface NavItem {
   to: string;
   icon: LucideIcon;
   visibility: NavVisibility;
+  /** Additional route prefixes (outside `to` sub-paths) that keep this entry highlighted. */
+  activePrefixes?: readonly string[];
 }
 
 export interface NavGroup {
@@ -52,9 +54,27 @@ export const NAV_GROUPS: NavGroup[] = [
     labelKey: "nav.group.workspace",
     items: [
       { labelKey: "nav.home", to: "/workspace", icon: House, visibility: "all" },
-      { labelKey: "nav.myOrders", to: "/changes/mine", icon: FileStack, visibility: "all" },
-      { labelKey: "nav.orderSubmit", to: "/changes/new", icon: FilePlus2, visibility: "all" },
-      { labelKey: "nav.orderApprovals", to: "/approvals/changes", icon: Stamp, visibility: "all" },
+      {
+        labelKey: "nav.myOrders",
+        to: "/changes/mine",
+        activePrefixes: ["/changes/orders"],
+        icon: FileStack,
+        visibility: "all",
+      },
+      {
+        labelKey: "nav.orderSubmit",
+        to: "/changes/new",
+        activePrefixes: ["/changes/drafts"],
+        icon: FilePlus2,
+        visibility: "all",
+      },
+      {
+        labelKey: "nav.orderApprovals",
+        to: "/approvals/changes",
+        activePrefixes: ["/approvals"],
+        icon: Stamp,
+        visibility: "all",
+      },
     ],
   },
   {
@@ -78,7 +98,13 @@ export const NAV_GROUPS: NavGroup[] = [
       { labelKey: "nav.admin.flows", to: "/admin/flows", icon: Workflow, visibility: "admin" },
       { labelKey: "nav.admin.permissionGroups", to: "/admin/permission-groups", icon: ShieldCheck, visibility: "admin" },
       { labelKey: "nav.admin.announcements", to: "/admin/announcements", icon: Megaphone, visibility: "admin" },
-      { labelKey: "nav.admin.settings", to: "/admin/settings", icon: Settings, visibility: "admin" },
+      {
+        labelKey: "nav.admin.settings",
+        to: "/admin/settings",
+        activePrefixes: ["/admin/identity-providers"],
+        icon: Settings,
+        visibility: "admin",
+      },
     ],
   },
   {
@@ -95,6 +121,33 @@ export const NAV_GROUPS: NavGroup[] = [
 ];
 
 export type SessionRole = "admin" | "user";
+
+function normalizePathname(pathname: string): string {
+  return pathname.replace(/\/+$/, "") || "/";
+}
+
+function matchesRoutePrefix(pathname: string, prefix: string): boolean {
+  const normalizedPath = normalizePathname(pathname);
+  const normalizedPrefix = normalizePathname(prefix);
+  if (normalizedPrefix === "/") {
+    return normalizedPath === "/";
+  }
+  return (
+    normalizedPath === normalizedPrefix ||
+    normalizedPath.startsWith(`${normalizedPrefix}/`)
+  );
+}
+
+/** Match the item's own sub-paths and any configured sibling route prefixes on path segment boundaries. */
+export function isNavItemActive(
+  item: Pick<NavItem, "to" | "activePrefixes">,
+  pathname: string,
+): boolean {
+  const candidates = item.activePrefixes
+    ? [item.to, ...item.activePrefixes]
+    : [item.to];
+  return candidates.some((prefix) => matchesRoutePrefix(pathname, prefix));
+}
 
 export function filterNavGroups(groups: NavGroup[], role: SessionRole): NavGroup[] {
   return groups
