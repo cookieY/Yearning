@@ -39,8 +39,14 @@ func BuildServeDeps(ctx context.Context, deps ServeDeps) (ServeDeps, error) {
 		deps.B13 = &B13Deps{Settings: settings.New(deps.B3.DB, deps.B3.Crypter)}
 	}
 	if deps.Dashboard == nil {
+		dashSvc := dashboard.New(deps.B3.DB, deps.B3.Crypter)
+		relClient, rerr := dashboard.NewReleaseHTTPClient(deps.ReleaseFeedProxy)
+		if rerr != nil {
+			return ServeDeps{}, fmt.Errorf("httpapi: build release feed client: %w", rerr)
+		}
+		dashSvc.ReleaseHTTPClient = relClient
 		deps.Dashboard = &dashboard.Deps{
-			Service:        dashboard.New(deps.B3.DB, deps.B3.Crypter),
+			Service:        dashSvc,
 			Guard:          func(op string) gin.HandlerFunc { return RequireOperation(op, deps.B3.Sessions) },
 			ReleaseFeedURL: deps.ReleaseFeedURL,
 		}

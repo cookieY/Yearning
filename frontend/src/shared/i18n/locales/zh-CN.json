@@ -945,7 +945,12 @@
         "statement_timeout": "语句执行超时",
         "query_cancelled": "语句执行已取消",
         "driver_error": "目标数据库返回执行错误",
-        "capability_target_unsupported": "目标数据库版本或引擎不支持该操作"
+        "capability_target_unsupported": "目标数据库版本或引擎不支持该操作",
+        "OSC_MASTER_NOT_REGISTERED": "目标库是副本，在线改表需要连接其主库，但该主库未登记为 Yearning 数据源，出于安全原因已停止执行，未对数据库做任何修改。请联系管理员登记主库数据源（主库地址已记录于审计日志），或直接对主库提交工单。",
+        "OSC_MASTER_ADDRESS_FORBIDDEN": "目标库复制配置中的主库地址指向受保护地址，已拒绝连接，未对数据库做任何修改。请联系 DBA 核对该库的复制配置。",
+        "OSC_TARGET_ADDRESS_FORBIDDEN": "目标库地址解析结果指向受保护地址，已拒绝连接，未对数据库做任何修改。请联系管理员核对数据源地址和 DNS。",
+        "OSC_REPLICATION_NOT_RUNNING": "目标库是副本，但复制线程未运行，无法确定主库，未对数据库做任何修改。请联系 DBA 恢复复制后重试。",
+        "OSC_TOPOLOGY_CHECK_FAILED": "无法查询目标库的复制状态（可能缺少 REPLICATION CLIENT 权限或连接异常），未对数据库做任何修改。请联系管理员核对执行账号权限。"
       }
     },
     "attemptState": {

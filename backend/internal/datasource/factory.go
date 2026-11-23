@@ -92,7 +92,11 @@ func (f *Factory) Probe(ctx context.Context, ds *DatasourceModel, cred *Datasour
 	default:
 		return nil, ErrUnsupportedCapability
 	}
-	if err := addrguard.ValidateHost(ctx, ds.Host, nil); err != nil {
+	effectiveDB := derefString(ds.DatabaseName)
+	if effectiveDB == "" {
+		effectiveDB = payload.Username
+	}
+	if err := addrguard.ValidateEndpointFor(ctx, addrguard.PurposeDatasource, ds.Host, ds.Port, effectiveDB, nil); err != nil {
 		return nil, fmt.Errorf("datasource: %w", err)
 	}
 	adapter := adapterForMode(ds)

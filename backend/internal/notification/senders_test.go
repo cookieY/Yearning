@@ -75,6 +75,24 @@ func TestSendEmailAllowPathWithBypass(t *testing.T) {
 	if err := SendEmail(context.Background(), cfg, "secret", "to@example.com", "hello", "body"); err != nil {
 		t.Fatalf("SendEmail through bypass + stub server = %v; want nil", err)
 	}
+
+	if host, addr := smtpDialAddr(" fd00::25 ", 25); host != "fd00::25" || addr != "[fd00::25]:25" {
+		t.Fatalf("smtpDialAddr unbracketed IPv6 = (%q, %q); want (\"fd00::25\", \"[fd00::25]:25\")", host, addr)
+	}
+	if host, addr := smtpDialAddr("[fd00::25]", 587); host != "fd00::25" || addr != "[fd00::25]:587" {
+		t.Fatalf("smtpDialAddr bracketed IPv6 = (%q, %q); want (\"fd00::25\", \"[fd00::25]:587\")", host, addr)
+	}
+	if ln6, err := net.Listen("tcp6", "[::1]:0"); err == nil {
+		t.Cleanup(func() { _ = ln6.Close() })
+		go serveStubSMTP(t, ln6)
+		cfg6 := EmailConfig{
+			Host: "::1", Port: ln6.Addr().(*net.TCPAddr).Port,
+			FromAddress: "noreply@example.com",
+		}
+		if err := SendEmail(context.Background(), cfg6, "secret", "to@example.com", "hello6", "body6"); err != nil {
+			t.Fatalf("SendEmail unbracketed IPv6 loopback = %v; want nil", err)
+		}
+	}
 }
 
 // serveStubSMTP runs a minimal SMTP dialog: plain greeting without extensions (client does not attempt STARTTLS),

@@ -118,5 +118,5 @@ func main() {
 			tables, structure[:12], seed.SchemaTableCount, seed.SchemaStructureSHA[:12])
 		os.Exit(1)
 	}
-	fmt.Printf("assert ok: schema anchor stable (tables=%d structure=%s...)\n", tables, structure[:12])
+	fmt.Printf("assert ok: schema anchor stable (tables=%d structure=%s)\n", tables, structure)
 }

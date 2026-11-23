@@ -148,7 +148,11 @@ func (s *Services) bootstrapSingleDatasourceIdentity(ctx context.Context, ds *da
 	if s.IdentityProbe != nil {
 		identity, err = s.IdentityProbe(probeCtx, ds, dbCred, tlsMat)
 	} else {
-		if err = addrguard.ValidateHost(probeCtx, ds.Host, nil); err != nil {
+		effectiveDB := derefString(ds.DatabaseName)
+		if effectiveDB == "" {
+			effectiveDB = plain.Username
+		}
+		if err = addrguard.ValidateEndpointFor(probeCtx, addrguard.PurposeDatasource, ds.Host, ds.Port, effectiveDB, nil); err != nil {
 			return
 		}
 		ep := database.Endpoint{

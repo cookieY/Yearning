@@ -87,7 +87,7 @@ func BuildMySQLConfig(ep Endpoint, cred Credential, mat *TLSMaterial, dialTimeou
 	cfg.User = cred.Username
 	cfg.Passwd = cred.Password
 	cfg.Net = "tcp"
-	if err := addrguard.CheckEndpoint(ep.Host, ep.Port); err != nil {
+	if err := addrguard.CheckEndpointForDatabase(addrguard.PurposeDatasource, ep.Host, ep.Port, ep.DatabaseName); err != nil {
 		return nil, nil, err
 	}
 	cfg.Addr = net.JoinHostPort(ep.Host, fmt.Sprintf("%d", ep.Port))
@@ -96,7 +96,7 @@ func BuildMySQLConfig(ep Endpoint, cred Credential, mat *TLSMaterial, dialTimeou
 	}
 	cfg.Timeout = dialTimeout
 	// SEC-0009/T05: validate actual resolved address before dialing (guard fails closed in Control callback).
-	cfg.DialFunc = addrguard.DialFunc(dialTimeout)
+	cfg.DialFunc = addrguard.DialFuncForDatabase(addrguard.PurposeDatasource, ep.DatabaseName, dialTimeout)
 	// Do not set ReadTimeout/WriteTimeout: cursors and long statements rely on context and statement_timeout control.
 	// Charset uses the driver's SET NAMES (Config.Params["charset"] would be interpolated as
 	// SET charset=..., which is not a valid MySQL variable); collation is left to the server default.
@@ -132,7 +132,11 @@ func BuildPostgresConfig(ctx context.Context, ep Endpoint, cred Credential, mat 
 	if dialTimeout <= 0 {
 		dialTimeout = ConnectTimeout
 	}
-	if err := addrguard.CheckEndpoint(ep.Host, ep.Port); err != nil {
+	effectiveDB := ep.DatabaseName
+	if effectiveDB == "" {
+		effectiveDB = cred.Username
+	}
+	if err := addrguard.CheckEndpointForDatabase(addrguard.PurposeDatasource, ep.Host, ep.Port, effectiveDB); err != nil {
 		return nil, err
 	}
 	base := ""
@@ -171,7 +175,7 @@ func BuildPostgresConfig(ctx context.Context, ep Endpoint, cred Credential, mat 
 	cfg.Database = ep.DatabaseName
 	cfg.ConnectTimeout = dialTimeout
 	// SEC-0009/T05: validate actual resolved address before dialing (including Unix socket path rejection).
-	cfg.DialFunc = addrguard.DialFunc(dialTimeout)
+	cfg.DialFunc = addrguard.DialFuncForDatabase(addrguard.PurposeDatasource, effectiveDB, dialTimeout)
 	if mat == nil {
 		// After SEC-0057, the material-less path no longer uses pgx's prefer default (whose TLS config
 		// varies with process PG* environment variables and is implemented with InsecureSkipVerify, violating

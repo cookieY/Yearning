@@ -945,7 +945,12 @@
         "statement_timeout": "Statement timed out on target DB",
         "query_cancelled": "Statement canceled on target DB",
         "driver_error": "Target DB returned execution error",
-        "capability_target_unsupported": "Unsupported on target DB engine/version"
+        "capability_target_unsupported": "Unsupported on target DB engine/version",
+        "OSC_MASTER_NOT_REGISTERED": "Target database is a replica whose discovered primary is not registered as an enabled Yearning MySQL datasource. Stopped before execution with zero database changes; ask an administrator to register the primary (endpoint recorded in audit log) or target the primary directly.",
+        "OSC_MASTER_ADDRESS_FORBIDDEN": "Replication primary address resolved to a protected destination; stopped before execution with zero database changes. Ask a DBA to check replication settings.",
+        "OSC_TARGET_ADDRESS_FORBIDDEN": "Target datasource address resolved to a protected destination; stopped before execution with zero database changes. Ask an administrator to verify datasource host and DNS.",
+        "OSC_REPLICATION_NOT_RUNNING": "Target database is a replica whose replication threads are not running, so the primary cannot be verified. Stopped before execution with zero database changes; restore replication and retry.",
+        "OSC_TOPOLOGY_CHECK_FAILED": "Unable to query replication topology (execution credential may lack REPLICATION CLIENT privilege). Stopped before execution with zero database changes."
       }
     },
     "attemptState": {

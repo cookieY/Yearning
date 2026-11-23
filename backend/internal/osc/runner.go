@@ -77,14 +77,16 @@ type Hooks struct {
 
 // Job defines the input for a single process execution. Password is piped via stdin and never enters argv/env.
 type Job struct {
-	BinaryPath   string
-	BinarySHA256 string // 64-character hex string; verified before spawn
-	ToolVersion  string
-	Tool         Tool     // gh-ost|pt-osc (cancellation signal and progress semantics depend on tool)
-	Argv         []string // Output of Build*Argv
-	Dir          string   // 0700 attempt directory
-	ServeSocket  string
-	Password     string
+	BinaryPath           string
+	BinarySHA256         string // 64-character hex string; verified before spawn
+	ToolVersion          string
+	Tool                 Tool     // gh-ost|pt-osc (cancellation signal and progress semantics depend on tool)
+	Argv                 []string // Output of Build*Argv
+	PinnedHost           string   // Validated IP literal pinned by preflight (never re-resolved inside gh-ost)
+	AssumeMasterHostname string   // Explicit ip:port disabling gh-ost SHOW SLAVE STATUS master discovery
+	Dir                  string   // 0700 attempt directory
+	ServeSocket          string
+	Password             string
 	// When Inspector is nil, residual state defaults to not_checked (acceptable only on the success path).
 	Inspector         ResidualInspector
 	Database          string

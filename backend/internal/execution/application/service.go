@@ -27,6 +27,7 @@ import (
 	"github.com/cookieY/YearningX/backend/internal/execution/domain"
 	"github.com/cookieY/YearningX/backend/internal/execution/persistence"
 	"github.com/cookieY/YearningX/backend/internal/osc"
+	"github.com/cookieY/YearningX/backend/internal/platform/addrguard"
 	"github.com/cookieY/YearningX/backend/internal/platform/txutil"
 )
 
@@ -61,6 +62,10 @@ type Services struct {
 	// SearchPathProbe is a test seam after opening an execution-purpose
 	// connection; nil performs the fixed real PostgreSQL environment probe.
 	SearchPathProbe SearchPathProbe
+	// OscResolver overrides DNS resolution during OSC topology preflight in tests; nil uses addrguard.DefaultResolver.
+	OscResolver addrguard.Resolver
+	// OscReplicaStatusProbe overrides SHOW REPLICA STATUS probing in tests; nil queries the guarded target pool.
+	OscReplicaStatusProbe func(ctx context.Context, target *stageTarget) (*database.MySQLReplicaStatus, error)
 	// cancelDelayOverride injects the cancel watchdog delay for tests (0 = production 30s).
 	cancelDelayOverride time.Duration
 	// instanceOwner identifies this process's execution worker (for lease ownership).

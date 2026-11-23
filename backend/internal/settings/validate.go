@@ -239,7 +239,7 @@ func validateValue(key string, spec fieldSpec, v any) (any, error) {
 		}
 		tool, _ := m["tool"].(string)
 		switch tool {
-		case "none", "gh-ost", "pt-osc":
+		case "none", "gh-ost":
 		default:
 			return nil, fmt.Errorf("%w: %s tool", ErrValidation, key)
 		}

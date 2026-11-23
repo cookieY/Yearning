@@ -135,6 +135,23 @@ func writeDomainError(c *gin.Context, err error, refCode int) bool {
 		})
 		return true
 	}
+	var endpointForbidden datasource.ErrEndpointForbidden
+	if errors.As(err, &endpointForbidden) {
+		detail := endpointForbidden.Error()
+		if len(detail) > 300 {
+			detail = detail[:300]
+		}
+		WriteBusinessError(c, &BusinessError{
+			Code:    bizerr.CodeValidationFailed,
+			Name:    "VALIDATION_FAILED",
+			Message: "Invalid request parameters",
+			Meta: map[string]any{
+				"detail": detail,
+				"fields": map[string][]string{"host": {detail}},
+			},
+		})
+		return true
+	}
 	var connFailed datasource.ErrConnectionFailed
 	if errors.As(err, &connFailed) || errors.Is(err, datasource.ErrUnsupportedCapability) ||
 		errors.Is(err, datasource.ErrCredentialMissing) {

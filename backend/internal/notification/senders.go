@@ -50,19 +50,22 @@ func SendEmail(ctx context.Context, cfg EmailConfig, secret, to, subject, body s
 	// SEC-0009: run shape validation first (CheckEndpoint: immediate rejection of Unix socket paths,
 	// empty hosts, and disallowed IP literals + port bounds) so path-like hosts never enter slow DNS
 	// resolution; resolved IPs for hostnames are guarded at dial time by the Control hook below.
-	if err := addrguard.CheckEndpoint(cfg.Host, cfg.Port); err != nil {
+	if err := addrguard.CheckEndpointFor(addrguard.PurposeSMTP, cfg.Host, cfg.Port); err != nil {
 		return fmt.Errorf("%s", FailDial)
 	}
-	addr := fmt.Sprintf("%s:%d", cfg.Host, cfg.Port)
+	cleanHost, addr := smtpDialAddr(cfg.Host, cfg.Port)
 	// SEC-0009: outbound connection dials through addrguard; guard rejections return only bounded failure names.
-	d := addrguard.GuardedDialer(10 * time.Second)
+	d := addrguard.GuardedDialerFor(addrguard.PurposeSMTP, 10*time.Second)
 	conn, err := d.DialContext(ctx, "tcp", addr)
 	if err != nil {
 		return fmt.Errorf("%s", FailDial)
 	}
 	deadline := time.Now().Add(15 * time.Second)
 	_ = conn.SetDeadline(deadline)
-	host, _, _ := net.SplitHostPort(addr)
+	host := cleanHost
+	if h, _, serr := net.SplitHostPort(addr); serr == nil {
+		host = h
+	}
 	client, err := smtp.NewClient(conn, host)
 	if err != nil {
 		_ = conn.Close()
@@ -108,6 +111,11 @@ func SendEmail(ctx context.Context, cfg EmailConfig, secret, to, subject, body s
 		return fmt.Errorf("%s", FailMail)
 	}
 	return nil
+}
+
+func smtpDialAddr(rawHost string, port int) (cleanHost, addr string) {
+	cleanHost = strings.Trim(strings.TrimSpace(rawHost), "[]")
+	return cleanHost, net.JoinHostPort(cleanHost, strconv.Itoa(port))
 }
 
 // buildMime constructs a minimal MIME message (UTF-8 body with RFC 2047 B-encoded subject).
@@ -221,9 +229,10 @@ func SendSlack(ctx context.Context, webhookURL, text string) error {
 // webhookClient constructs an HTTP client dialing through addrguard (shared across all IM webhook senders).
 func webhookClient() *http.Client {
 	return &http.Client{
-		Timeout: 10 * time.Second,
+		Timeout:       10 * time.Second,
+		CheckRedirect: addrguard.RedirectPolicy(0, false),
 		Transport: &http.Transport{
-			DialContext: addrguard.DialFunc(10 * time.Second),
+			DialContext: addrguard.DialFuncFor(addrguard.PurposeWebhook, 10*time.Second),
 		},
 	}
 }

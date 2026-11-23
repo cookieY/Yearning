@@ -180,15 +180,28 @@ func ParseBaseURL(raw string) (*url.URL, error) {
 	case "https":
 		return u, nil
 	case "http":
+		port := 80
+		if p := u.Port(); p != "" {
+			parsed, perr := strconv.Atoi(p)
+			if perr != nil || parsed < 1 || parsed > 65535 {
+				return nil, errors.New("https URL required (invalid port)")
+			}
+			port = parsed
+		}
 		if ip := net.ParseIP(host); ip != nil {
 			if isRFC1918IP(ip) || ip.IsLoopback() {
-				if verr := addrguard.ValidateIP(ip); verr == nil {
-					return u, nil
+				if verr := addrguard.ValidateIPFor(addrguard.PurposeAIProvider, ip); verr == nil {
+					if serr := addrguard.CheckSelfTargetFor(addrguard.PurposeAIProvider, ip, port, ""); serr == nil {
+						return u, nil
+					}
 				}
 			}
 		} else if strings.EqualFold(host, "localhost") {
-			if verr := addrguard.ValidateIP(net.IPv4(127, 0, 0, 1)); verr == nil {
-				return u, nil
+			loop := net.IPv4(127, 0, 0, 1)
+			if verr := addrguard.ValidateIPFor(addrguard.PurposeAIProvider, loop); verr == nil {
+				if serr := addrguard.CheckSelfTargetFor(addrguard.PurposeAIProvider, loop, port, ""); serr == nil {
+					return u, nil
+				}
 			}
 		}
 		return nil, errors.New("https URL required (plain http permitted only for RFC1918 private IPs or authorized loopback)")
@@ -316,12 +329,10 @@ type HTTPClient struct {
 // NewHTTPClient constructs an SSRF-guarded HTTPClient for AI Provider requests.
 func NewHTTPClient() *HTTPClient {
 	return &HTTPClient{Inner: &http.Client{
-		Timeout: MaxTimeout,
-		CheckRedirect: func(_ *http.Request, _ []*http.Request) error {
-			return http.ErrUseLastResponse
-		},
+		Timeout:       MaxTimeout,
+		CheckRedirect: addrguard.RedirectPolicy(0, false),
 		Transport: &http.Transport{
-			DialContext:         addrguard.DialFunc(MaxTimeout),
+			DialContext:         addrguard.DialFuncFor(addrguard.PurposeAIProvider, MaxTimeout),
 			TLSHandshakeTimeout: MaxTimeout,
 			ForceAttemptHTTP2:   true,
 		},

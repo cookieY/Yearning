@@ -17,9 +17,10 @@ import (
 
 // Server wraps http.Server with context-driven graceful shutdown.
 type Server struct {
-	srv    *http.Server
-	grace  time.Duration
-	actual atomic.Value
+	srv      *http.Server
+	grace    time.Duration
+	actual   atomic.Value
+	OnListen func(net.Addr)
 }
 
 // Addr returns the bound listener address; when configured with port :0, returns the kernel-assigned port after Run starts.
@@ -53,6 +54,9 @@ func (s *Server) Run(ctx context.Context) error {
 		return fmt.Errorf("listen %s: %w", s.srv.Addr, err)
 	}
 	s.actual.Store(listener.Addr().String())
+	if s.OnListen != nil {
+		s.OnListen(listener.Addr())
+	}
 	serveErr := make(chan error, 1)
 	go func() { serveErr <- s.srv.Serve(listener) }()
 

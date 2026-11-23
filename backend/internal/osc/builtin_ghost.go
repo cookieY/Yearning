@@ -7,8 +7,10 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"net"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -19,6 +21,8 @@ import (
 	"github.com/github/gh-ost/go/metrics"
 	"github.com/github/gh-ost/go/sql"
 	"github.com/openark/golib/log"
+
+	"github.com/cookieY/YearningX/backend/internal/platform/addrguard"
 )
 
 // BuiltinGhOstVersion identifies the embedded github.com/github/gh-ost library version.
@@ -237,6 +241,9 @@ func (r *Runner) runInProcessGhOst(ctx context.Context, job *Job, hooks Hooks) (
 		return nil, fmt.Errorf("osc: invalid in-process gh-ost config: %w", err)
 	}
 	password = ""
+	if err := validateInProcessGhOstDestinations(migrationContext); err != nil {
+		return nil, err
+	}
 
 	if metricsClient, merr := metrics.NewClient("", nil, "gh_ost."); merr == nil {
 		defer func() { _ = metricsClient.Close() }()
@@ -456,6 +463,12 @@ func applyJobToMigrationContext(migrationContext *base.MigrationContext, job *Jo
 	if migrationContext.OriginalTableName == "" {
 		migrationContext.OriginalTableName = job.Table
 	}
+	if strings.TrimSpace(job.PinnedHost) != "" {
+		migrationContext.InspectorConnectionConfig.Key.Hostname = strings.TrimSpace(job.PinnedHost)
+	}
+	if strings.TrimSpace(job.AssumeMasterHostname) != "" {
+		migrationContext.AssumeMasterHostname = strings.TrimSpace(job.AssumeMasterHostname)
+	}
 	migrationContext.CliPassword = password
 
 	if postponeCutOverFlagFile != "" && base.FileExists(postponeCutOverFlagFile) {
@@ -537,4 +550,41 @@ func applyJobToMigrationContext(migrationContext *base.MigrationContext, job *Jo
 	migrationContext.ApplyCredentials()
 	migrationContext.SetConnectionCharset("utf8mb4,utf8,latin1")
 	return migrationContext.SetConnectionConfig("innodb")
+}
+
+// validateInProcessGhOstDestinations enforces defense-in-depth before gh-ost opens any TCP/binlog socket:
+// both the target inspector host and AssumeMasterHostname must be IP literals validated by addrguard,
+// guaranteeing gh-ost neither re-resolves hostnames nor discovers an arbitrary Master_Host via SHOW SLAVE STATUS.
+func validateInProcessGhOstDestinations(mctx *base.MigrationContext) error {
+	targetHost := strings.TrimSpace(mctx.InspectorConnectionConfig.Key.Hostname)
+	targetIP := net.ParseIP(strings.Trim(targetHost, "[]"))
+	if targetIP == nil {
+		return fmt.Errorf("osc: unpinned target hostname rejected")
+	}
+	if err := addrguard.ValidateIPFor(addrguard.PurposeOSC, targetIP); err != nil {
+		return fmt.Errorf("osc: target address forbidden: %w", err)
+	}
+	if err := addrguard.CheckSelfTargetFor(addrguard.PurposeOSC, targetIP, mctx.InspectorConnectionConfig.Key.Port, ""); err != nil {
+		return fmt.Errorf("osc: target address forbidden: %w", err)
+	}
+	assumeRaw := strings.TrimSpace(mctx.AssumeMasterHostname)
+	if assumeRaw == "" {
+		return fmt.Errorf("osc: assume_master_hostname must be pinned before launch")
+	}
+	assumeHost, assumePortStr, err := net.SplitHostPort(assumeRaw)
+	if err != nil {
+		return fmt.Errorf("osc: assume_master_hostname must be ip:port")
+	}
+	assumePort, perr := strconv.Atoi(assumePortStr)
+	assumeIP := net.ParseIP(strings.Trim(assumeHost, "[]"))
+	if perr != nil || assumePort < 1 || assumePort > 65535 || assumeIP == nil {
+		return fmt.Errorf("osc: assume_master_hostname must contain a valid ip:port")
+	}
+	if err := addrguard.ValidateIPFor(addrguard.PurposeOSC, assumeIP); err != nil {
+		return fmt.Errorf("osc: master address forbidden: %w", err)
+	}
+	if err := addrguard.CheckSelfTargetFor(addrguard.PurposeOSC, assumeIP, assumePort, ""); err != nil {
+		return fmt.Errorf("osc: master address forbidden: %w", err)
+	}
+	return nil
 }

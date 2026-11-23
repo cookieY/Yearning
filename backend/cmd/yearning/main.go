@@ -14,9 +14,11 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"net"
 	"os"
 	"os/signal"
 	"runtime"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -32,6 +34,7 @@ import (
 	"github.com/cookieY/YearningX/backend/internal/identity"
 	"github.com/cookieY/YearningX/backend/internal/identity/session"
 	"github.com/cookieY/YearningX/backend/internal/migration/legacy"
+	"github.com/cookieY/YearningX/backend/internal/platform/addrguard"
 	"github.com/cookieY/YearningX/backend/internal/platform/buildinfo"
 	"github.com/cookieY/YearningX/backend/internal/platform/database"
 	"github.com/cookieY/YearningX/backend/internal/platform/httpserver"
@@ -128,6 +131,12 @@ func runServe(ctx context.Context, args []string) error {
 		return lerr
 	}
 	applyInstanceDefaults(&cfg)
+	addrguard.SetAllowLoopbackDatasource(cfg.Outbound.AllowLoopbackDatasource)
+	if dbPort, perr := strconv.Atoi(strings.TrimSpace(cfg.Database.Port)); perr == nil && dbPort > 0 {
+		addrguard.RegisterMetadataDB(ctx, cfg.Database.Host, dbPort, cfg.Database.DBName)
+	}
+	addrguard.RegisterClusterInfraFromEnv()
+	addrguard.RegisterSelfListener(cfg.Server.ListenAddress)
 	logger := logging.New(cfg.Logging, cfg.Observability)
 	// #3 (effective 2026-11-01 fix): zap.L() inside workers/goroutines (structured logs for
 	// review policy compile failure, provider failure, transient Run terminal state, etc.) was previously a no-op —
@@ -317,7 +326,8 @@ func runServe(ctx context.Context, args []string) error {
 		// and notification worker in-process within serve (BLK-20261017 ruling A).
 		StartBackgroundLoops: true,
 		// RCP-20261020: release snapshot source (config release_feed.upstream_url).
-		ReleaseFeedURL: cfg.ReleaseFeed.UpstreamURL,
+		ReleaseFeedURL:   cfg.ReleaseFeed.UpstreamURL,
+		ReleaseFeedProxy: cfg.Outbound.ReleaseFeedProxy,
 		// NEW-AUTH-01: trusted proxy CIDRs (empty/nil = trust no proxies, direct-connection semantics).
 		TrustedProxies: cfg.TrustedProxies,
 		RealtimeHub:    hub,
@@ -342,6 +352,9 @@ func runServe(ctx context.Context, args []string) error {
 		zap.String("environment", cfg.Environment),
 	)
 	server := httpserver.New(router, cfg.Server)
+	server.OnListen = func(a net.Addr) {
+		addrguard.RegisterSelfListener(a.String())
+	}
 	err = server.Run(ctx)
 	logger.Info("serve stopped")
 	return err

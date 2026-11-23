@@ -4,6 +4,8 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"net"
+	"strconv"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -11,6 +13,8 @@ import (
 
 	"github.com/github/gh-ost/go/base"
 	_ "github.com/go-sql-driver/mysql"
+
+	"github.com/cookieY/YearningX/backend/internal/platform/addrguard"
 )
 
 type fakeInspector struct {
@@ -144,18 +148,21 @@ func TestInProcessGhOstLiveMySQLMigration(t *testing.T) {
 		t.Fatalf("BuildGhOstArgv: %v", err)
 	}
 
+	t.Cleanup(addrguard.SetLoopbackBypassForTest(true))
 	var beats, progs int64
 	job := &Job{
-		BinaryPath:   BuiltinInProcessGhOstPath,
-		BinarySHA256: BuiltinInProcessGhOstSHA256,
-		ToolVersion:  BuiltinGhOstVersion,
-		Tool:         ToolGhOst,
-		Argv:         argv,
-		Dir:          dir,
-		Password:     pass,
-		Inspector:    &fakeInspector{},
-		Database:     db,
-		Table:        table,
+		BinaryPath:           BuiltinInProcessGhOstPath,
+		BinarySHA256:         BuiltinInProcessGhOstSHA256,
+		ToolVersion:          BuiltinGhOstVersion,
+		Tool:                 ToolGhOst,
+		Argv:                 argv,
+		PinnedHost:           host,
+		AssumeMasterHostname: net.JoinHostPort(host, strconv.Itoa(port)),
+		Dir:                  dir,
+		Password:             pass,
+		Inspector:            &fakeInspector{},
+		Database:             db,
+		Table:                table,
 	}
 
 	out, err := NewRunner().Run(context.Background(), job, Hooks{

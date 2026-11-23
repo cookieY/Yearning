@@ -74,10 +74,19 @@ func (c *OIDCConfiguration) Validate() error {
 // loopback/link-local/cloud metadata outbound targets and defending against DNS rebinding);
 // Client.Timeout bounds the total request duration.
 func (c *OIDCConfiguration) oidcHTTPClient() *http.Client {
+	return c.oidcClientWithRedirect(addrguard.RedirectPolicy(3, true))
+}
+
+func (c *OIDCConfiguration) oidcTokenHTTPClient() *http.Client {
+	return c.oidcClientWithRedirect(addrguard.RedirectPolicy(3, false))
+}
+
+func (c *OIDCConfiguration) oidcClientWithRedirect(checkRedirect func(*http.Request, []*http.Request) error) *http.Client {
 	return &http.Client{
-		Timeout: time.Duration(c.RequestTimeoutMS) * time.Millisecond,
+		Timeout:       time.Duration(c.RequestTimeoutMS) * time.Millisecond,
+		CheckRedirect: checkRedirect,
 		Transport: &http.Transport{
-			DialContext: addrguard.DialFunc(time.Duration(c.ConnectTimeoutMS) * time.Millisecond),
+			DialContext: addrguard.DialFuncFor(addrguard.PurposeOIDC, time.Duration(c.ConnectTimeoutMS)*time.Millisecond),
 			TLSClientConfig: &tls.Config{
 				MinVersion: tls.VersionTLS12,
 				RootCAs:    systemAndEnvRootCAs(),
@@ -311,10 +320,10 @@ func (p *OIDCProviderClient) FinishLogin(ctx context.Context, c *crypto.Crypter,
 	if payload.ProviderKey != providerKey {
 		return nil, errors.New("identity: oidc state provider mismatch")
 	}
-	ctx = oidc.ClientContext(ctx, p.cfg.oidcHTTPClient())
-	ctx, cancel := context.WithTimeout(ctx, time.Duration(p.cfg.RequestTimeoutMS)*time.Millisecond)
+	baseCtx, cancel := context.WithTimeout(ctx, time.Duration(p.cfg.RequestTimeoutMS)*time.Millisecond)
 	defer cancel()
-	token, err := p.oauth.Exchange(ctx, code,
+	tokenCtx := oidc.ClientContext(baseCtx, p.cfg.oidcTokenHTTPClient())
+	token, err := p.oauth.Exchange(tokenCtx, code,
 		oauth2.SetAuthURLParam("code_verifier", payload.Verifier),
 		oauth2.SetAuthURLParam("redirect_uri", payload.RedirectURI),
 	)
@@ -325,7 +334,8 @@ func (p *OIDCProviderClient) FinishLogin(ctx context.Context, c *crypto.Crypter,
 	if !ok || rawIDToken == "" {
 		return nil, errors.New("identity: oidc id_token missing")
 	}
-	idToken, err := p.verifier.Verify(ctx, rawIDToken)
+	verifyCtx := oidc.ClientContext(baseCtx, p.cfg.oidcHTTPClient())
+	idToken, err := p.verifier.Verify(verifyCtx, rawIDToken)
 	if err != nil {
 		return nil, errors.New("identity: oidc id_token verification failed")
 	}

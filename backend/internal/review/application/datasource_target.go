@@ -170,7 +170,11 @@ func (s *Services) ensureFlowStagesIdentity(ctx context.Context, actorUserID, fl
 			continue
 		}
 		probeCtx, cancel := context.WithTimeout(ctx, datasourceBootstrapTimeout)
-		if err := addrguard.ValidateHost(probeCtx, st.Host, nil); err != nil {
+		dbName := ""
+		if st.DatabaseName != nil {
+			dbName = *st.DatabaseName
+		}
+		if err := addrguard.ValidateEndpointFor(probeCtx, addrguard.PurposeDatasource, st.Host, st.Port, dbName, nil); err != nil {
 			cancel()
 			continue
 		}

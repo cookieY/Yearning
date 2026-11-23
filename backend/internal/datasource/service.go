@@ -522,9 +522,9 @@ func (s *Service) replaceTLSMaterials(ctx context.Context, tx *gorm.DB, dsID str
 // (rejecting loopback/link-local/metadata/unspecified/broadcast/Unix sockets) and checks each resolved IP
 // when DNS resolution succeeds (DNS failure does not reject — preserving create-before-test semantics while
 // dial-layer addrguard remains the authoritative defense). Private network datasource targets are allowed.
-func (s *Service) validateHostAddress(ctx context.Context, host string) error {
-	if err := addrguard.ValidateHost(ctx, host, nil); err != nil {
-		return fmt.Errorf("%w: %v", ErrConnectionFailed{}, err)
+func (s *Service) validateTargetEndpoint(ctx context.Context, host string, port int, dbName string) error {
+	if err := addrguard.ValidateEndpointFor(ctx, addrguard.PurposeDatasource, host, port, dbName, nil); err != nil {
+		return ErrEndpointForbidden{Err: err}
 	}
 	return nil
 }
@@ -534,7 +534,7 @@ func (s *Service) Create(ctx context.Context, actor ActorRef, in *WriteInput, me
 	if err := validateWrite(in); err != nil {
 		return nil, err
 	}
-	if err := s.validateHostAddress(ctx, in.Host); err != nil {
+	if err := s.validateTargetEndpoint(ctx, in.Host, in.Port, derefString(in.DatabaseName)); err != nil {
 		return nil, err
 	}
 	now := time.Now().UTC()
@@ -582,7 +582,7 @@ func (s *Service) Replace(ctx context.Context, actor ActorRef, id string, expect
 	if err := validateWrite(in); err != nil {
 		return nil, err
 	}
-	if err := s.validateHostAddress(ctx, in.Host); err != nil {
+	if err := s.validateTargetEndpoint(ctx, in.Host, in.Port, derefString(in.DatabaseName)); err != nil {
 		return nil, err
 	}
 	err := s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
@@ -1152,6 +1152,23 @@ var ErrCapacityExhausted = tasks.ErrQueueFull
 type ErrConnectionFailed struct{}
 
 func (ErrConnectionFailed) Error() string { return "datasource: connection failed" }
+
+// ErrEndpointForbidden indicates a datasource endpoint failed create/replace address guard checks
+// (mapped to declared 1001 VALIDATION_FAILED with safe diagnostic detail and host field metadata).
+type ErrEndpointForbidden struct {
+	Err error
+}
+
+func (e ErrEndpointForbidden) Error() string {
+	if e.Err != nil {
+		return e.Err.Error()
+	}
+	return "datasource: target address forbidden"
+}
+
+func (e ErrEndpointForbidden) Unwrap() []error {
+	return []error{bizerr.ErrValidationFailed, e.Err}
+}
 
 // auditMeta carries request context metadata (isomorphic to identity.RequestMeta to avoid circular imports).
 type auditMeta struct {

@@ -496,6 +496,7 @@ function DatasourceFormDialog({
   const createMutation = useCreateDatasource();
   const replaceMutation = useReplaceDatasource();
   const [errorKey, setErrorKey] = useState<string | null>(null);
+  const [errorDetail, setErrorDetail] = useState<string | null>(null);
   const [errorRequestId, setErrorRequestId] = useState<string | null>(null);
   const [versionConstraintTouched, setVersionConstraintTouched] = useState(false);
 
@@ -571,6 +572,7 @@ function DatasourceFormDialog({
 
   const submit = () => {
     setErrorKey(null);
+    setErrorDetail(null);
     setErrorRequestId(null);
     const credentials: CredentialWrite[] = [];
     const storedStatus = editing?.credential_status ?? null;
@@ -678,8 +680,12 @@ function DatasourceFormDialog({
     const onWriteError = (operationId: string) => (error: unknown) => {
       const display = describeError(error, operationId);
       setErrorKey(display.messageKey);
+      setErrorDetail(display.detail);
       setErrorRequestId(display.requestId);
-      appToast.error(t(display.messageKey));
+      appToast.error(
+        t(display.messageKey),
+        display.detail !== null ? { description: display.detail } : undefined,
+      );
     };
     if (editing === null) {
       createMutation.mutate(write, {
@@ -709,7 +715,10 @@ function DatasourceFormDialog({
 
   return (
     <Dialog open onOpenChange={(next) => { if (!next) onClose(); }}>
-      <DialogContent className="sm:max-w-2xl">
+      <DialogContent
+        className="sm:max-w-2xl"
+        viewportClassName={errorKey !== null ? "max-h-[calc(500px-16.5rem)]" : undefined}
+      >
         <DialogHeader>
           <DialogTitle>
             {editing === null ? t("admin.datasources.createTitle") : t("admin.datasources.editTitle")}
@@ -928,14 +937,6 @@ function DatasourceFormDialog({
             wasVerified={editing !== null && editing.tls_verified}
             onChange={(next) => { setForm({ ...form, tls: next }); }}
           />
-          {errorKey !== null ? (
-            <Alert variant="destructive" data-testid="ds-form-error">
-              <AlertTitle>{t(errorKey)}</AlertTitle>
-              <AlertDescription>
-                {errorRequestId !== null ? `request_id: ${errorRequestId}` : null}
-              </AlertDescription>
-            </Alert>
-          ) : null}
           {!formValid ? (
             <p className="text-destructive text-xs font-medium" data-testid="ds-form-invalid-hint">
               {missingItems.length > 0
@@ -944,13 +945,28 @@ function DatasourceFormDialog({
             </p>
           ) : null}
         </div>
-        <DialogFooter>
-          <Button variant="outline" onClick={onClose}>
-            {t("common.cancel")}
-          </Button>
-          <PendingButton pending={submitting} disabled={!formValid} onClick={submit} data-testid="ds-submit">
-            {t("common.save")}
-          </PendingButton>
+        <DialogFooter className="flex-col items-stretch gap-3 sm:flex-col">
+          {errorKey !== null ? (
+            <Alert variant="destructive" data-testid="ds-form-error">
+              <AlertTitle>{t(errorKey)}</AlertTitle>
+              {errorDetail !== null || errorRequestId !== null ? (
+                <AlertDescription className="space-y-1">
+                  {errorDetail !== null ? (
+                    <p data-testid="ds-form-error-detail">{errorDetail}</p>
+                  ) : null}
+                  {errorRequestId !== null ? <p>{`request_id: ${errorRequestId}`}</p> : null}
+                </AlertDescription>
+              ) : null}
+            </Alert>
+          ) : null}
+          <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+            <Button variant="outline" onClick={onClose}>
+              {t("common.cancel")}
+            </Button>
+            <PendingButton pending={submitting} disabled={!formValid} onClick={submit} data-testid="ds-submit">
+              {t("common.save")}
+            </PendingButton>
+          </div>
         </DialogFooter>
       </DialogContent>
     </Dialog>

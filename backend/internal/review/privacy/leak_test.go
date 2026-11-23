@@ -2,6 +2,7 @@ package privacy
 
 import (
 	"fmt"
+	"math"
 	"reflect"
 	"regexp"
 	"strings"
@@ -196,5 +197,41 @@ func TestAssertNoLeakAndValuesRegexParity(t *testing.T) {
 		if err := AssertNoLeakValues(vals, nil); err != nil {
 			t.Fatalf("AssertNoLeakValues(%v, nil) unexpected err: %v", vals, err)
 		}
+	}
+}
+
+func TestComparisonTokenCapHintAndLargeInputLeakDetection(t *testing.T) {
+	cases := []struct {
+		n    int
+		want int
+	}{
+		{-10, 0},
+		{0, 0},
+		{1, 1},
+		{12, 3},
+		{maxComparisonTokenHintBytes - 1, (maxComparisonTokenHintBytes-1)/6 + 1},
+		{maxComparisonTokenHintBytes, maxComparisonTokenCapHint},
+		{maxComparisonTokenHintBytes * 10, maxComparisonTokenCapHint},
+		{math.MaxInt, maxComparisonTokenCapHint},
+	}
+	for _, tc := range cases {
+		if got := comparisonTokenCapHint(tc.n); got != tc.want {
+			t.Errorf("comparisonTokenCapHint(%d) = %d; want %d", tc.n, got, tc.want)
+		}
+	}
+
+	padding := strings.Repeat("safe_tok ", maxComparisonTokenHintBytes/len("safe_tok ")+32)
+	payload := padding + "secret_orders_table"
+	forbidden := []Forbidden{{Value: "secret_orders_table", What: "table_name"}}
+
+	tokens := ExtractComparisonTokens(payload)
+	if len(tokens) == 0 || tokens[len(tokens)-1] != "secret_orders_table" {
+		t.Fatalf("ExtractComparisonTokens did not preserve trailing token on large input (len=%d)", len(tokens))
+	}
+	if err := AssertNoLeakValues([]string{payload}, forbidden); err == nil {
+		t.Fatal("AssertNoLeakValues missed leak beyond cap hint boundary")
+	}
+	if err := AssertNoLeak(payload, forbidden); err == nil {
+		t.Fatal("AssertNoLeak missed leak beyond cap hint boundary")
 	}
 }

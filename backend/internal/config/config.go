@@ -9,7 +9,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/url"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -38,7 +40,14 @@ type Config struct {
 	Session        SessionConfig       `yaml:"session"`
 	KeyProvider    KeyProviderConfig   `yaml:"key_provider"`
 	ReleaseFeed    ReleaseFeedConfig   `yaml:"release_feed"`
+	Outbound       OutboundConfig      `yaml:"outbound"`
 	TrustedProxies []string            `yaml:"trusted_proxies"`
+}
+
+// OutboundConfig configures intranet-first SSRF and explicit egress proxy controls.
+type OutboundConfig struct {
+	AllowLoopbackDatasource bool   `yaml:"allow_loopback_datasource"`
+	ReleaseFeedProxy        string `yaml:"release_feed_proxy"`
 }
 
 // RetentionConfig holds connection settings for retention cleanup (SEC-0040/NEW-QUERY-02).
@@ -287,6 +296,25 @@ func Validate(mode Mode, cfg Config) error {
 	if cfg.Environment == "production" {
 		if bypass := strings.ToLower(strings.TrimSpace(os.Getenv(addrguard.LoopbackBypassEnv))); bypass == "1" || bypass == "true" {
 			add("environment production must not enable %s (addrguard loopback bypass is development-only)", addrguard.LoopbackBypassEnv)
+		}
+	}
+	if rawProxy := strings.TrimSpace(cfg.Outbound.ReleaseFeedProxy); rawProxy != "" {
+		u, perr := url.Parse(rawProxy)
+		scheme := ""
+		if u != nil {
+			scheme = strings.ToLower(u.Scheme)
+		}
+		if perr != nil || (scheme != "http" && scheme != "https") || u.Hostname() == "" {
+			add("outbound.release_feed_proxy must be an http or https URL with a non-empty host")
+		} else {
+			if portStr := u.Port(); portStr != "" {
+				if port, convErr := strconv.Atoi(portStr); convErr != nil || port < 1 || port > 65535 {
+					add("outbound.release_feed_proxy port out of range")
+				}
+			}
+			if verr := addrguard.ValidateHostFormFor(addrguard.PurposeReleaseFeed, u.Hostname()); verr != nil {
+				add("outbound.release_feed_proxy host forbidden: %v", verr)
+			}
 		}
 	}
 

@@ -25,10 +25,27 @@ var AnonTokenPattern = regexp.MustCompile(`^` + AnonTokenBodyPattern + `$`)
 // Hash characters (#) remain permitted for PostgreSQL JSON path operators (#>, #>>, #-).
 var anonymizedForbiddenChars = []string{"'", `"`, "`", "--", "/*", "$$"}
 
+// maxComparisonTokenCapHint bounds initial slice/map preallocation hints for comparison token
+// scanning so large inputs never over-allocate upfront or trigger allocation-size overflow checks.
+const (
+	maxComparisonTokenCapHint   = 1024
+	maxComparisonTokenHintBytes = maxComparisonTokenCapHint * 6
+)
+
+func comparisonTokenCapHint(byteLen int) int {
+	if byteLen <= 0 {
+		return 0
+	}
+	if byteLen >= maxComparisonTokenHintBytes {
+		return maxComparisonTokenCapHint
+	}
+	return byteLen/6 + 1
+}
+
 // ExtractComparisonTokens splits anonymized output into lowercase comparable tokens while skipping
 // anonymous tokens, typed literal placeholders, and collapse markers.
 func ExtractComparisonTokens(anonymized string) []string {
-	out := make([]string, 0, len(anonymized)/6+1)
+	out := make([]string, 0, comparisonTokenCapHint(len(anonymized)))
 	scanComparisonTokens(anonymized, func(tok string) {
 		out = append(out, tok)
 	})
@@ -177,7 +194,7 @@ func AssertNoLeakValues(values []string, forbidden []Forbidden) error {
 		if v == "" {
 			continue
 		}
-		set := make(map[string]struct{}, len(v)/6+1)
+		set := make(map[string]struct{}, comparisonTokenCapHint(len(v)))
 		scanComparisonTokens(v, func(tok string) {
 			set[tok] = struct{}{}
 		})
@@ -216,7 +233,7 @@ func AssertNoLeak(anonymized string, forbidden []Forbidden) error {
 	if len(forbidden) == 0 {
 		return nil
 	}
-	set := make(map[string]struct{}, len(anonymized)/6+1)
+	set := make(map[string]struct{}, comparisonTokenCapHint(len(anonymized)))
 	scanComparisonTokens(anonymized, func(tok string) {
 		set[tok] = struct{}{}
 	})

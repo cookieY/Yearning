@@ -14,13 +14,11 @@ import (
 type FakeAdapter struct {
 	Endpoint Endpoint
 	Respond  func(req Request) (body []byte, status int, err error)
-	client   *http.Client
-	base     string
 }
 
 // NewLocalFakeAdapter constructs a FakeAdapter bound to ep and its response callback.
 func NewLocalFakeAdapter(ep Endpoint, respond func(Request) ([]byte, int, error)) *FakeAdapter {
-	return &FakeAdapter{Endpoint: ep, Respond: respond, client: http.DefaultClient}
+	return &FakeAdapter{Endpoint: ep, Respond: respond}
 }
 
 // ValidateConfiguration runs a synthetic probe against the callback to verify structured output handling.

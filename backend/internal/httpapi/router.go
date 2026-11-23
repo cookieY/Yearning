@@ -48,7 +48,8 @@ type ServeDeps struct {
 	RealtimeHub   *realtime.Hub
 	// ReleaseFeedURL upstream release snapshot feed URL (RCP-20261020); empty string disables
 	// the background refresh loop (disabled by default in test wiring).
-	ReleaseFeedURL string
+	ReleaseFeedURL   string
+	ReleaseFeedProxy string
 	// StartBackgroundLoops starts the in-process background loops for the ADR-0001 modular monolith
 	// (stage_execution worker / scheduler / notification worker).
 	// BLK-20261017 Decision A: enabled by default in serve; kept false in test wiring to avoid
@@ -164,8 +165,12 @@ func NewServeRouter(deps ServeDeps) *gin.Engine {
 	// S17.6-5: dashboard (including announcements and audit read) and notification domain routing.
 	if !deps.StrictWiring && deps.B3 != nil {
 		if deps.Dashboard == nil {
+			dashSvc := dashboard.New(deps.B3.DB, deps.B3.Crypter)
+			if client, cerr := dashboard.NewReleaseHTTPClient(deps.ReleaseFeedProxy); cerr == nil {
+				dashSvc.ReleaseHTTPClient = client
+			}
 			deps.Dashboard = &dashboard.Deps{
-				Service: dashboard.New(deps.B3.DB, deps.B3.Crypter),
+				Service: dashSvc,
 				Guard:   func(op string) gin.HandlerFunc { return RequireOperation(op, deps.B3.Sessions) },
 				// RCP-20261020: release snapshot feed source (config release_feed.upstream_url);
 				// empty string disables the background refresh loop.

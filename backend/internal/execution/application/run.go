@@ -1323,6 +1323,15 @@ func (r *Runner) runOsc(ctx context.Context, in TaskInput, at *persistence.Execu
 			ReasonCode: int(domain.CodePreflightFailed), FailureName: "OSC_PLAN_UNREADABLE",
 		}, actor)
 	}
+	// Pre-spawn SSRF & replication topology guard (runs before rollback/send-boundary checks so
+	// forbidden targets or unregistered replica primaries fail cleanly with BoundaryNotStarted).
+	pinnedIP, assumeMaster, topoFailFacts, topoErr := s.preflightOscTopologyAndPin(ctx, in, at, tool, actor)
+	if topoErr != nil {
+		return topoErr
+	}
+	if topoFailFacts != nil {
+		return s.applyResult(ctx, in.AttemptID, fence, *topoFailFacts, actor)
+	}
 	// Pre-spawn rollback capability / precondition check (runs before entering the sending boundary).
 	rbCtx, ddlParsed, ddlPreMeta, rbFailFacts, rbErr := s.prepareOscRollbackBeforeSpawn(ctx, in, planDoc.Database)
 	if rbErr != nil {
@@ -1359,7 +1368,9 @@ func (r *Runner) runOsc(ctx context.Context, in TaskInput, at *persistence.Execu
 	}
 	job := &osc.Job{
 		BinaryPath: bin.Path, BinarySHA256: derefStr(at.OSCBinarySHA256),
-		Tool: tool, Argv: planDoc.Argv, Dir: planDoc.Dir,
+		Tool: tool, Argv: rewriteArgvHost(planDoc.Argv, pinnedIP),
+		PinnedHost: pinnedIP, AssumeMasterHostname: assumeMaster,
+		Dir:      planDoc.Dir,
 		Password: password, Inspector: inspector,
 		Database: planDoc.Database, Table: planDoc.Table,
 	}

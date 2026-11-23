@@ -47,10 +47,10 @@ func openRetentionPool(dsn string) (*gorm.DB, func() error, error) {
 	}
 	// Endpoint shape validation: IP literals are checked immediately (loopback requires explicit bypass);
 	// Unix socket paths are rejected outright; hostnames are guarded at dial time by DialFunc below.
-	if err := addrguard.CheckEndpoint(pgCfg.Host, port); err != nil {
+	if err := addrguard.CheckEndpointFor(addrguard.PurposeRetentionDB, pgCfg.Host, port); err != nil {
 		return nil, nil, fmt.Errorf("retention: %w", err)
 	}
-	pgCfg.DialFunc = addrguard.DialFunc(retentionConnectTimeout)
+	pgCfg.DialFunc = addrguard.DialFuncFor(addrguard.PurposeRetentionDB, retentionConnectTimeout)
 
 	sqlDB := stdlib.OpenDB(*pgCfg)
 	sqlDB.SetMaxOpenConns(2)

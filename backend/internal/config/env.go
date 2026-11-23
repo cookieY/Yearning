@@ -75,6 +75,8 @@ func applyEnv(cfg *Config) error {
 	set(EnvPrefix+"_KEY_PROVIDER_PATH", &cfg.KeyProvider.Path)
 
 	set(EnvPrefix+"_RELEASE_FEED_UPSTREAM_URL", &cfg.ReleaseFeed.UpstreamURL)
+	setBool(EnvPrefix+"_OUTBOUND_ALLOW_LOOPBACK_DATASOURCE", &cfg.Outbound.AllowLoopbackDatasource)
+	set(EnvPrefix+"_OUTBOUND_RELEASE_FEED_PROXY", &cfg.Outbound.ReleaseFeedProxy)
 
 	if raw, ok := os.LookupEnv(EnvPrefix + "_TRUSTED_PROXIES"); ok {
 		cfg.TrustedProxies = splitCSV(raw)

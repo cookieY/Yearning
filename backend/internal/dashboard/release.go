@@ -9,13 +9,19 @@ package dashboard
 
 import (
 	"context"
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
+	"strconv"
+	"strings"
 	"time"
 
 	"go.uber.org/zap"
+
+	"github.com/cookieY/YearningX/backend/internal/platform/addrguard"
 )
 
 const (
@@ -31,8 +37,50 @@ const (
 	releaseBodyLimit = 32 << 10
 )
 
-// releaseHTTPClient dedicated HTTP client with timeout; tests may swap its Transport.
-var releaseHTTPClient = &http.Client{Timeout: 15 * time.Second}
+// NewReleaseHTTPClient builds an SSRF-guarded HTTP client for upstream release feed fetches.
+// It explicitly disables environment proxy variables (ProxyFromEnvironment is never used) and
+// optionally routes through an operator-configured proxy URL validated by addrguard.
+func NewReleaseHTTPClient(proxyURL string) (*http.Client, error) {
+	var proxyFunc func(*http.Request) (*url.URL, error)
+	if trimmed := strings.TrimSpace(proxyURL); trimmed != "" {
+		u, err := url.Parse(trimmed)
+		scheme := ""
+		if u != nil {
+			scheme = strings.ToLower(u.Scheme)
+		}
+		if err != nil || (scheme != "http" && scheme != "https") || u.Hostname() == "" {
+			return nil, fmt.Errorf("release feed: invalid proxy URL")
+		}
+		if portStr := u.Port(); portStr != "" {
+			if port, perr := strconv.Atoi(portStr); perr != nil || port < 1 || port > 65535 {
+				return nil, fmt.Errorf("release feed: invalid proxy port")
+			}
+		}
+		if err := addrguard.ValidateHostFormFor(addrguard.PurposeReleaseFeed, u.Hostname()); err != nil {
+			return nil, fmt.Errorf("release feed: proxy %w", err)
+		}
+		proxyFunc = http.ProxyURL(u)
+	}
+	return &http.Client{
+		Timeout:       15 * time.Second,
+		CheckRedirect: addrguard.RedirectPolicy(3, true),
+		Transport: &http.Transport{
+			Proxy:               proxyFunc,
+			DialContext:         addrguard.DialFuncFor(addrguard.PurposeReleaseFeed, 10*time.Second),
+			TLSHandshakeTimeout: 10 * time.Second,
+			TLSClientConfig:     &tls.Config{MinVersion: tls.VersionTLS12},
+		},
+	}, nil
+}
+
+// releaseHTTPClient dedicated SSRF-guarded HTTP client; tests may swap Service.ReleaseHTTPClient.
+var releaseHTTPClient = func() *http.Client {
+	c, err := NewReleaseHTTPClient("")
+	if err != nil {
+		panic(err)
+	}
+	return c
+}()
 
 // UpstreamReleaseModel maps to upstream_release (instance-wide singleton snapshot row).
 type UpstreamReleaseModel struct {

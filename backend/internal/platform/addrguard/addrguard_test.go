@@ -1,8 +1,8 @@
 // addrguard_test.go T05 address guard unit verification: table-driven rejection of forbidden IPs, Unix sockets,
 // and mixed resolution results (using a fake Resolver without real DNS queries).
 // Bypass matrix: when YEARNING_ALLOW_LOOPBACK_TARGETS is active, only loopback is allowed,
-// while metadata, link-local, CGNAT (100.64/10), ULA (fc00::/7), unspecified, broadcast,
-// multicast, and Unix sockets remain rejected.
+// while metadata, link-local, unspecified, broadcast, multicast, and Unix sockets remain rejected.
+// Non-metadata CGNAT (100.64/10) and ULA (fc00::/7) are permitted under intranet-first posture.
 package addrguard
 
 import (
@@ -32,13 +32,13 @@ func bypassOff(t *testing.T) {
 	SetLoopbackBypassForTest(false)
 }
 
-// TestValidateIPRejects verifies the T05 rejection surface: loopback, link-local (including metadata),
-// unspecified, broadcast, multicast, CGNAT shared space, and ULA across IPv4, IPv6, and IPv4-mapped IPv6 forms
+// TestValidateIPRejects verifies the T05 rejection surface: loopback, link-local, exact cloud metadata
+// endpoints (including inside CGNAT/ULA ranges), unspecified, broadcast, multicast, and IPv4-mapped forms
 // (with loopback bypass disabled).
 func TestValidateIPRejects(t *testing.T) {
 	bypassOff(t)
 	cases := []string{
-		"127.0.0.1", "127.1.2.3", "127.255.255.255", // v4 loopback
+		"127.0.0.1", "127.1.2.3", "127.255.255.254", // v4 loopback
 		"::1",                                               // v6 loopback
 		"169.254.169.254", "169.254.0.1", "169.254.255.254", // IPv4 link-local (cloud metadata)
 		"fe80::1", "fe80::", "febf::1", // v6 link-local
@@ -46,16 +46,14 @@ func TestValidateIPRejects(t *testing.T) {
 		"255.255.255.255",        // IPv4 broadcast
 		"224.0.0.1", "239.1.1.1", // IPv4 multicast
 		"ff00::1", "ff02::1", "ff0e::1", // IPv6 multicast
-		"224.0.0.251",                   // IPv4 link-local multicast
-		"::ffff:127.0.0.1",              // 4-in-6 loopback
-		"::ffff:169.254.169.254",        // 4-in-6 link-local
-		"::ffff:0.0.0.0",                // 4-in-6 unspecified
-		"100.100.100.200",               // SEC-0009: Alibaba Cloud metadata (inside CGNAT range)
-		"100.64.1.1", "100.127.255.254", // Inside CGNAT range boundaries (full 100.64/10 block)
-		"fc00::1", "fd00:ec2::254", // ULA: AWS IMDSv6, etc.
-		"fd20:ce::254",           // GCP metadata (inside ULA range)
-		"fdff::1",                // Inside ULA /7 upper boundary
-		"::ffff:100.100.100.200", // IPv4-mapped IPv6 CGNAT
+		"224.0.0.251",            // IPv4 link-local multicast
+		"::ffff:127.0.0.1",       // 4-in-6 loopback
+		"::ffff:169.254.169.254", // 4-in-6 link-local
+		"::ffff:0.0.0.0",         // 4-in-6 unspecified
+		"100.100.100.200",        // Alibaba Cloud metadata (exact host inside CGNAT)
+		"fd00:ec2::254",          // AWS IMDSv6 (exact host inside ULA)
+		"fd20:ce::254",           // GCP metadata (exact host inside ULA)
+		"::ffff:100.100.100.200", // IPv4-mapped IPv6 cloud metadata
 	}
 	for _, c := range cases {
 		if err := ValidateIP(mustIP(t, c)); !errors.Is(err, ErrAddressForbidden) {
@@ -67,11 +65,13 @@ func TestValidateIPRejects(t *testing.T) {
 	}
 }
 
-// TestValidateIPAllows verifies the allowed surface: RFC1918 private unicast (normal internal target DBs
-// are not SSRF) and public unicast; 100.x addresses outside CGNAT/ULA ranges remain allowed (public unicast outside /10).
+// TestValidateIPAllows verifies the allowed surface under intranet-first posture: RFC1918 private unicast,
+// non-metadata CGNAT (Tailscale/CGNAT/Docker/LAN gateways), non-metadata ULA IPv6, and public unicast.
 func TestValidateIPAllows(t *testing.T) {
 	cases := []string{
 		"10.0.0.1", "172.16.0.1", "172.31.255.254", "192.168.1.10", // RFC1918 private network
+		"100.64.1.1", "100.127.255.254", // Non-metadata CGNAT (100.64/10 minus 100.100.100.200)
+		"fc00::1", "fd00::1", "fdff::1", // Non-metadata ULA (fc00::/7 minus cloud metadata)
 		"8.8.8.8",         // Public IPv4
 		"1.1.1.1",         // Public IPv4
 		"100.63.255.254",  // Outside CGNAT range (public unicast)
@@ -238,12 +238,11 @@ func TestLoopbackBypassMatrix(t *testing.T) {
 		t.Errorf("bypass: controlGuard(::1) = %v; want allowed", err)
 	}
 
-	// Never allowed even under bypass: metadata, link-local, CGNAT, ULA, unspecified, broadcast,
-	// and multicast (SEC-0009: 100.64/10 and fc00::/7 host cloud metadata and must never be exempted by the bypass).
+	// Never allowed even under bypass: metadata, link-local, unspecified, broadcast, and multicast.
 	stillForbidden := []string{
 		"169.254.169.254", "169.254.0.1", "fe80::1", // metadata/link-local
-		"100.100.100.200", "100.64.1.1", // CGNAT range (Alibaba Cloud metadata, etc.)
-		"fd00:ec2::254", "fd20:ce::254", "fd00::1", // ULA range (AWS/GCP metadata, etc.)
+		"100.100.100.200",               // Alibaba Cloud metadata
+		"fd00:ec2::254", "fd20:ce::254", // AWS/GCP IPv6 metadata
 		"0.0.0.0", "::", // unspecified
 		"255.255.255.255",      // Broadcast
 		"224.0.0.1", "ff02::1", // Multicast

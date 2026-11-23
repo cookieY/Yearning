@@ -95,7 +95,7 @@ func ldapDial(c *LDAPConfiguration) (*ldap.Conn, error) {
 		RootCAs:    systemAndEnvRootCAs(),
 	}
 	addr := fmt.Sprintf("%s:%d", c.Host, c.Port)
-	dialer := addrguard.GuardedDialer(time.Duration(c.ConnectTimeoutMS) * time.Millisecond)
+	dialer := addrguard.GuardedDialerFor(addrguard.PurposeLDAP, time.Duration(c.ConnectTimeoutMS)*time.Millisecond)
 	switch c.Transport {
 	case "ldaps":
 		return ldap.DialURL("ldaps://"+addr, ldap.DialWithTLSDialer(tlsCfg, dialer))
