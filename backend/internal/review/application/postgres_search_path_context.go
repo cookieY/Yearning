@@ -30,7 +30,7 @@ func (b *frozenPostgresPathBinding) containsAllowedSchema(schema string) bool {
 }
 
 func postgresAllowedSchemaSet(effective, extra []string) map[string]bool {
-	out := make(map[string]bool, len(effective)+len(extra))
+	out := make(map[string]bool)
 	for _, schema := range effective {
 		out[schema] = true
 	}

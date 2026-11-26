@@ -115,13 +115,18 @@ func IsDisallowedPostgresSystemSchema(schema string) bool {
 }
 
 func mergePostgresLookupSchemas(path PostgresSearchPath, extraSchemas []string) ([]string, error) {
-	out := make([]string, 0, len(path.Effective)+len(extraSchemas))
-	seen := make(map[string]bool, len(path.Effective)+len(extraSchemas))
+	const maxSchemas = maxPostgresSearchPathSchemas + 3
+	out := []string{}
+	seen := make(map[string]bool)
 	for _, schema := range path.Effective {
-		if !seen[schema] {
-			seen[schema] = true
-			out = append(out, schema)
+		if seen[schema] {
+			continue
 		}
+		if len(out) >= maxSchemas {
+			return nil, ErrPostgresRelationUnresolved
+		}
+		seen[schema] = true
+		out = append(out, schema)
 	}
 	for _, schema := range extraSchemas {
 		if ValidateIdentifier(schema) != nil || IsDisallowedPostgresSystemSchema(schema) {
@@ -130,11 +135,11 @@ func mergePostgresLookupSchemas(path PostgresSearchPath, extraSchemas []string) 
 		if seen[schema] {
 			continue
 		}
+		if len(out) >= maxSchemas {
+			return nil, ErrPostgresRelationUnresolved
+		}
 		seen[schema] = true
 		out = append(out, schema)
-	}
-	if len(out) > maxPostgresSearchPathSchemas+3 {
-		return nil, ErrPostgresRelationUnresolved
 	}
 	return out, nil
 }

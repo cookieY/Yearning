@@ -6,6 +6,7 @@ import (
 	"database/sql/driver"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"strings"
 	"testing"
 )
@@ -911,4 +912,72 @@ func TestLookupPostgresRelationsAndSchemasVisibleExtraSchemas(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestMergePostgresLookupSchemasBounds(t *testing.T) {
+	t.Parallel()
+
+	const maxSchemas = maxPostgresSearchPathSchemas + 3
+	basePath := PostgresSearchPath{
+		Effective: []string{"pg_catalog", "public", "pg_catalog"},
+	}
+
+	t.Run("deduplicates preserving order", func(t *testing.T) {
+		t.Parallel()
+		got, err := mergePostgresLookupSchemas(basePath, []string{"analytics", "public", "analytics", "reporting"})
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		want := []string{"pg_catalog", "public", "analytics", "reporting"}
+		if strings.Join(got, ",") != strings.Join(want, ",") {
+			t.Fatalf("got = %v, want %v", got, want)
+		}
+	})
+
+	t.Run("allows exact max schemas plus duplicates", func(t *testing.T) {
+		t.Parallel()
+		extra := make([]string, 0, maxSchemas)
+		for i := 0; i < maxSchemas-2; i++ {
+			extra = append(extra, fmt.Sprintf("schema_%d", i))
+		}
+		extra = append(extra, "public", "schema_0")
+		got, err := mergePostgresLookupSchemas(basePath, extra)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if len(got) != maxSchemas {
+			t.Fatalf("len(got) = %d, want %d", len(got), maxSchemas)
+		}
+	})
+
+	t.Run("rejects overflow via extraSchemas", func(t *testing.T) {
+		t.Parallel()
+		extra := make([]string, 0, maxSchemas)
+		for i := 0; i < maxSchemas-1; i++ {
+			extra = append(extra, fmt.Sprintf("extra_%d", i))
+		}
+		if _, err := mergePostgresLookupSchemas(basePath, extra); !errors.Is(err, ErrPostgresRelationUnresolved) {
+			t.Fatalf("error = %v, want %v", err, ErrPostgresRelationUnresolved)
+		}
+	})
+
+	t.Run("rejects overflow via Effective", func(t *testing.T) {
+		t.Parallel()
+		effective := make([]string, 0, maxSchemas+1)
+		for i := 0; i <= maxSchemas; i++ {
+			effective = append(effective, fmt.Sprintf("eff_%d", i))
+		}
+		if _, err := mergePostgresLookupSchemas(PostgresSearchPath{Effective: effective}, nil); !errors.Is(err, ErrPostgresRelationUnresolved) {
+			t.Fatalf("error = %v, want %v", err, ErrPostgresRelationUnresolved)
+		}
+	})
+
+	t.Run("rejects disallowed system schema or invalid identifier in extraSchemas", func(t *testing.T) {
+		t.Parallel()
+		for _, bad := range []string{"pg_catalog", "bad schema!", ""} {
+			if _, err := mergePostgresLookupSchemas(basePath, []string{bad}); !errors.Is(err, ErrPostgresRelationUnresolved) {
+				t.Fatalf("schema %q error = %v, want %v", bad, err, ErrPostgresRelationUnresolved)
+			}
+		}
+	})
 }

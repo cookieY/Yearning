@@ -238,7 +238,7 @@ func resolvePostgresStageBinding(
 			unavailableReason: reason,
 		}
 	}
-	pathSet := make(map[string]bool, len(binding.Path.Explicit)+len(binding.ExplicitSchemas))
+	pathSet := make(map[string]bool)
 	for _, schema := range binding.Path.Explicit {
 		pathSet[schema] = true
 	}
@@ -267,7 +267,7 @@ func resolveMySQLStageBinding(
 		return &stageSchemaBinding{unavailableReason: "datasource_database_required"}
 	}
 	check := inspectMySQLGroupObjects(groups, mapper)
-	schemas := make(map[string]bool, len(check.ValidSchemas)+1)
+	schemas := make(map[string]bool)
 	if defaultDB != "" {
 		schemas[defaultDB] = true
 	}
