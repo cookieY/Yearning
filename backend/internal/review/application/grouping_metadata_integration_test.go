@@ -7,9 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"os"
 	"reflect"
-	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -17,6 +15,7 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/cookieY/YearningX/backend/internal/database"
+	"github.com/cookieY/YearningX/backend/internal/platform/testenv"
 	"github.com/cookieY/YearningX/backend/internal/review/fingerprint"
 	"github.com/cookieY/YearningX/backend/internal/review/privacy"
 )
@@ -301,20 +300,17 @@ func TestGroupingRepresentativeStatementMatchesCanonicalAndDialect(t *testing.T)
 		b.flowID).Error; err != nil {
 		t.Fatal(err)
 	}
-	port, err := strconv.Atoi(itestEnv("YEARNING_TEST_DATABASE_PORT", "54330"))
-	if err != nil {
-		t.Fatal(err)
-	}
+	cfg := testenv.RequireMetaPG(t)
 	adapter := database.NewPostgreSQLAdapter(database.Endpoint{
-		Host:             itestEnv("YEARNING_TEST_DATABASE_HOST", "localhost"),
-		Port:             port,
-		DatabaseName:     itestEnv("YEARNING_TEST_DATABASE_DBNAME", "yearning_v4"),
+		Host:             cfg.Host,
+		Port:             cfg.Port,
+		DatabaseName:     cfg.DBName,
 		CompatibilityMod: "postgresql",
 	}, database.AdapterOptions{})
 	t.Cleanup(func() { _ = adapter.Close() })
 	reviewPool, err := adapter.OpenPurposePool(ctx, database.PurposeReview, database.Credential{
-		Username: itestEnv("YEARNING_TEST_DATABASE_USER", "yearning"),
-		Password: os.Getenv("YEARNING_TEST_DATABASE_PASSWORD"),
+		Username: cfg.User,
+		Password: cfg.Password,
 	}, nil)
 	if err != nil {
 		t.Fatalf("open real review pool: %v", err)

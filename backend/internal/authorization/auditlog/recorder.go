@@ -84,6 +84,21 @@ type Actor struct {
 	Username string `json:"username,omitempty"`
 }
 
+// UserActor constructs a domain-event Actor for an authenticated user with Kind forced to "user".
+func UserActor(userID, username string) Actor {
+	return Actor{Kind: "user", UserID: userID, Username: username}
+}
+
+// SystemActor constructs a domain-event Actor for platform/system background actions with Kind forced to "system".
+func SystemActor(userID, username string) Actor {
+	return Actor{Kind: "system", UserID: userID, Username: username}
+}
+
+// WorkerActor constructs a domain-event Actor for background worker actions with Kind forced to "worker".
+func WorkerActor(username string) Actor {
+	return Actor{Kind: "worker", Username: username}
+}
+
 // AuditInput is the input for a single audit event. Metadata must never contain secrets, SQL text, or query results.
 type AuditInput struct {
 	EventType     string
@@ -167,9 +182,28 @@ func (r *Recorder) Audit(ctx context.Context, tx *gorm.DB, in AuditInput) error 
 	return nil
 }
 
+// EmitPayload marshals an arbitrary JSON-serializable struct/map payload into map[string]any and calls Emit.
+func (r *Recorder) EmitPayload(ctx context.Context, tx *gorm.DB, eventType, subject string, actor Actor, data any) error {
+	if m, ok := data.(map[string]any); ok {
+		return r.Emit(ctx, tx, eventType, subject, actor, m)
+	}
+	raw, err := json.Marshal(data)
+	if err != nil {
+		return fmt.Errorf("auditlog: event payload encode: %w", err)
+	}
+	m := map[string]any{}
+	if err := json.Unmarshal(raw, &m); err != nil {
+		return fmt.Errorf("auditlog: event payload map decode: %w", err)
+	}
+	return r.Emit(ctx, tx, eventType, subject, actor, m)
+}
+
 // Emit writes domain_events and outbox_events within the same transaction.
 // Sequence numbers are allocated per subject (MAX+1) with brief retries on unique constraint conflicts.
 func (r *Recorder) Emit(ctx context.Context, tx *gorm.DB, eventType, subject string, actor Actor, data map[string]any) error {
+	if strings.TrimSpace(actor.Kind) == "" {
+		return errors.New("auditlog: actor.kind must be non-empty")
+	}
 	payload, err := json.Marshal(data)
 	if err != nil {
 		return fmt.Errorf("auditlog: event data encode: %w", err)
@@ -208,7 +242,7 @@ func (r *Recorder) Emit(ctx context.Context, tx *gorm.DB, eventType, subject str
 		}
 		if err := writer.WithContext(ctx).Create(&evt).Error; err != nil {
 			lastErr = err
-			if isUniqueViolation(err) {
+			if txutil.IsUniqueViolation(err) {
 				continue
 			}
 			return err
@@ -564,8 +598,6 @@ func extractEventState(data map[string]any) string {
 	}
 	return ""
 }
-
-func isUniqueViolation(err error) bool { return txutil.IsUniqueViolation(err) }
 
 // HMACFingerprint computes a hex HMAC over arbitrary bytes using the payload purpose (for non-sensitive integrity checks).
 func HMACFingerprint(c *crypto.Crypter, purpose string, data []byte) (string, error) {

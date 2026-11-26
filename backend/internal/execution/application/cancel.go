@@ -7,7 +7,6 @@ package application
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"time"
@@ -17,6 +16,8 @@ import (
 	"github.com/cookieY/YearningX/backend/internal/authorization/auditlog"
 	orderdomain "github.com/cookieY/YearningX/backend/internal/changeorder/domain"
 	"github.com/cookieY/YearningX/backend/internal/execution/domain"
+	"github.com/cookieY/YearningX/backend/internal/platform/ptr"
+	"github.com/cookieY/YearningX/backend/internal/platform/txutil"
 )
 
 // CancelTimeout upper bound for waiting on target driver cancellation confirmation (PRD §11: 30s).
@@ -48,50 +49,33 @@ type CancelInput struct {
 // Cancel requests cancellation of an Attempt (idempotent). Returns the Attempt view.
 func (s *Services) Cancel(ctx context.Context, in CancelInput, runnerCancel func(attemptID string) bool) (view *AttemptView, replayed bool, err error) {
 	route := "POST:/execution-attempts/{attempt_id}/cancellation"
-	reqHash := idemRequestHash(in.Actor.UserID, in.AttemptID)
-	claimed, replay, cerr := s.idemClaim(ctx, in.Actor.UserID, route, in.AttemptID, in.IdempotencyKey, reqHash)
-	if cerr != nil {
-		return nil, false, cerr
-	}
-	if !claimed {
-		var v AttemptView
-		if err := json.Unmarshal(replay, &v); err != nil {
-			return nil, false, err
+	reqHash := txutil.RequestHash(in.Actor.UserID, in.AttemptID)
+	return txutil.RunIdempotent(ctx, s.idemStore(), in.Actor.UserID, route, in.AttemptID, in.IdempotencyKey, reqHash, func() (*AttemptView, error) {
+		var out *AttemptView
+		var triggerCancel bool
+		txErr := s.serializable(ctx, func(tx *gorm.DB) error {
+			triggerCancel = false
+			v, startedCancel, cerr := s.cancelOnce(ctx, tx, in)
+			if cerr != nil {
+				return cerr
+			}
+			out = v
+			triggerCancel = startedCancel
+			return nil
+		})
+		if txErr != nil {
+			return nil, txErr
 		}
-		return &v, true, nil
-	}
-	var out *AttemptView
-	var triggerCancel bool
-	txErr := s.serializable(ctx, func(tx *gorm.DB) error {
-		triggerCancel = false
-		v, startedCancel, cerr := s.cancelOnce(ctx, tx, in)
-		if cerr != nil {
-			return cerr
+		// Trigger in-process driver/context cancellation and start watchdog only after transaction commit
+		// so rolled-back 40001 retries never abort live DB execution or leak duplicate watchdogs.
+		if triggerCancel {
+			if runnerCancel != nil {
+				runnerCancel(in.AttemptID)
+			}
+			go s.cancelWatchdog(context.WithoutCancel(ctx), in.AttemptID, s.cancelWatchdogDelay())
 		}
-		out = v
-		triggerCancel = startedCancel
-		return nil
+		return out, nil
 	})
-	if txErr != nil {
-		_ = s.idemRelease(ctx, in.Actor.UserID, route, in.AttemptID, in.IdempotencyKey)
-		return nil, false, txErr
-	}
-	// Trigger in-process driver/context cancellation and start watchdog only after transaction commit
-	// so rolled-back 40001 retries never abort live DB execution or leak duplicate watchdogs.
-	if triggerCancel {
-		if runnerCancel != nil {
-			runnerCancel(in.AttemptID)
-		}
-		go s.cancelWatchdog(context.WithoutCancel(ctx), in.AttemptID, s.cancelWatchdogDelay())
-	}
-	raw, merr := json.Marshal(out)
-	if merr != nil {
-		return nil, false, merr
-	}
-	if cerr := s.idemComplete(ctx, in.Actor.UserID, route, in.AttemptID, in.IdempotencyKey, raw); cerr != nil {
-		return nil, false, cerr
-	}
-	return out, false, nil
 }
 
 // cancelOnce marks the Attempt as cancelling and returns true when a new cancellation was initiated;
@@ -133,8 +117,8 @@ func (s *Services) cancelOnce(ctx context.Context, tx *gorm.DB, in CancelInput) 
 	// Record cancellation reason in audit log (audit surface outside domain_events; excluded from domain event payload).
 	if rerr := s.Recorder.Audit(ctx, tx, auditlog.AuditInput{
 		EventType: "execution.cancel_requested", ActorKind: "user",
-		ActorID: strPtr(in.Actor.UserID), ActorUsername: strPtr(in.Actor.Username),
-		ResourceType: "execution_attempt", ResourceID: strPtr(at.ID),
+		ActorID: ptr.To(in.Actor.UserID), ActorUsername: ptr.To(in.Actor.Username),
+		ResourceType: "execution_attempt", ResourceID: ptr.To(at.ID),
 		Action: "cancel", Outcome: "succeeded",
 		Metadata: map[string]any{"reason": in.Reason},
 	}); rerr != nil {

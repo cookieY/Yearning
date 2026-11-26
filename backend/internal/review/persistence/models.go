@@ -69,6 +69,7 @@ type ChangeDraftModel struct {
 	Description           string     `gorm:"column:description"`
 	RequestedScheduledFor *time.Time `gorm:"column:requested_scheduled_for"` // Advisory requested schedule time copied onto submitted orders.
 	RollbackEnabled       bool       `gorm:"column:rollback_enabled"`
+	TargetDatabase        *string    `gorm:"column:target_database"`
 	TicketType            string     `gorm:"column:ticket_type"`
 	SourceOrderID         *string    `gorm:"column:source_order_id"`
 	RollbackEvidenceID    *string    `gorm:"column:rollback_evidence_id"`

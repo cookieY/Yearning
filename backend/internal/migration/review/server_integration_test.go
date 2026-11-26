@@ -13,58 +13,17 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http/httptest"
-	"os"
 	"strings"
-	"syscall"
 	"testing"
 	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"go.uber.org/zap"
-	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
-	gormlogger "gorm.io/gorm/logger"
+
+	"github.com/cookieY/YearningX/backend/internal/platform/testkit"
 )
-
-func envOr(key, fallback string) string {
-	if v := os.Getenv(key); v != "" {
-		return v
-	}
-	return fallback
-}
-
-func testDSN(t *testing.T) string {
-	t.Helper()
-	password := os.Getenv("YEARNING_TEST_DATABASE_PASSWORD")
-	if password == "" {
-		t.Skip("integration PostgreSQL not configured: set YEARNING_TEST_DATABASE_PASSWORD")
-	}
-	return fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=%s",
-		envOr("YEARNING_TEST_DATABASE_HOST", "localhost"),
-		envOr("YEARNING_TEST_DATABASE_PORT", "54330"),
-		envOr("YEARNING_TEST_DATABASE_USER", "yearning"),
-		password,
-		envOr("YEARNING_TEST_DATABASE_DBNAME", "yearning_v4"),
-		envOr("YEARNING_TEST_DATABASE_SSLMODE", "disable"))
-}
-
-// acquireLock shares the same flock file as httpapi so cross-package integration tests serialize access to the shared DB.
-func acquireLock(t *testing.T) {
-	t.Helper()
-	f, err := os.OpenFile(os.TempDir()+"/yearningx-itest-shared.lock", os.O_CREATE|os.O_RDWR, 0o600)
-	if err != nil {
-		return
-	}
-	if err := syscall.Flock(int(f.Fd()), syscall.LOCK_EX); err != nil {
-		_ = f.Close()
-		return
-	}
-	t.Cleanup(func() {
-		_ = syscall.Flock(int(f.Fd()), syscall.LOCK_UN)
-		_ = f.Close()
-	})
-}
 
 type reviewHarness struct {
 	server *Server
@@ -77,14 +36,8 @@ type reviewHarness struct {
 
 func newReviewHarness(t *testing.T) *reviewHarness {
 	t.Helper()
-	acquireLock(t)
 	gin.SetMode(gin.TestMode)
-	db, err := gorm.Open(postgres.Open(testDSN(t)), &gorm.Config{Logger: gormlogger.Discard})
-	if err != nil {
-		t.Fatalf("postgres connect: %v", err)
-	}
-	sqlDB, _ := db.DB()
-	t.Cleanup(func() { _ = sqlDB.Close() })
+	db := testkit.OpenPG(t)
 
 	// users_single_builtin_admin unique index: temporarily take over the existing builtin admin row
 	// and clean up on test completion.

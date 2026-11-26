@@ -110,13 +110,17 @@ func (t frozenDatasourceTarget) matchesConfig(row datasourceTargetRow) bool {
 	if row.DatabaseName != nil {
 		databaseName = *row.DatabaseName
 	}
+	dbMatched := databaseName == t.DatabaseName
+	if t.CompatibilityMode == "postgresql" && databaseName == "" {
+		dbMatched = true
+	}
 	return row.Enabled &&
 		row.ID == t.DatasourceID &&
 		row.Engine == t.Engine &&
 		row.CompatibilityMode == t.CompatibilityMode &&
 		row.Host == t.Host &&
 		row.Port == t.Port &&
-		databaseName == t.DatabaseName &&
+		dbMatched &&
 		identityFP == t.ConfiguredIdentityFP
 }
 
@@ -233,6 +237,11 @@ func (s *Services) probeFrozenDatasourceTarget(
 	if row.DatabaseName != nil {
 		databaseName = *row.DatabaseName
 	}
+	// PostgreSQL datasources may omit default database_name in configuration while probing
+	// current_database(); freeze the probed database name so identity matching and validate() stay consistent.
+	if row.CompatibilityMode == "postgresql" && databaseName == "" {
+		databaseName = identity.DatabaseName
+	}
 	target := frozenDatasourceTarget{
 		SchemaVersion:        stageDatasourceTargetVersion,
 		DatasourceID:         row.ID,
@@ -271,36 +280,6 @@ func (s *Services) verifyFrozenDatasourceConfig(
 		return err
 	}
 	if !target.matchesConfig(row) {
-		return errInputsDrift
-	}
-	return nil
-}
-
-func (s *Services) currentFrozenHashesForDraft(
-	ctx context.Context, db *gorm.DB, draftID string,
-) (string, string, string, error) {
-	var flow flowRow
-	if err := db.WithContext(ctx).Raw(`
-		select f.id, f.flow_type, f.status, f.rule_set_id::text as rule_set_id, f.version
-		from change_drafts d
-		join flows f on f.id = d.flow_id
-		where d.id = ?`, draftID).Scan(&flow).Error; err != nil {
-		return "", "", "", err
-	}
-	if flow.ID == "" {
-		return "", "", "", ErrNotFound
-	}
-	return s.frozenHashes(ctx, db, flow.ID, flow)
-}
-
-func (s *Services) verifyFrozenHashesForDraft(
-	ctx context.Context, db *gorm.DB, draftID, flowHash, ruleHash, toolHash string,
-) error {
-	currentFlow, currentRules, currentTools, err := s.currentFrozenHashesForDraft(ctx, db, draftID)
-	if err != nil {
-		return err
-	}
-	if currentFlow != flowHash || currentRules != ruleHash || currentTools != toolHash {
 		return errInputsDrift
 	}
 	return nil

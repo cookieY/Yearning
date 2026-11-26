@@ -23,6 +23,9 @@ const (
 	NsExecution = "execution"
 	NsAIBudget  = "ai-budget"
 	NsBranding  = "branding"
+
+	// DefaultSystemTimezone is the sole canonical default IANA timezone for general.system_timezone.
+	DefaultSystemTimezone = "Asia/Shanghai"
 )
 
 // ValidNamespace is the whitelist of valid settings namespaces.
@@ -50,7 +53,7 @@ type fieldSpec struct {
 var namespaces = map[string]map[string]fieldSpec{
 	NsGeneral: {
 		"registration_enabled": {kind: "bool", def: false, impact: "immediate"},
-		"system_timezone":      {kind: "iana_timezone", def: "Asia/Shanghai", impact: "next_operation"},
+		"system_timezone":      {kind: "iana_timezone", def: DefaultSystemTimezone, impact: "next_operation"},
 		"default_locale":       {kind: "enum", values: []string{"zh-CN", "en-US"}, def: "zh-CN", impact: "next_session"},
 		// S007: controlled public base URL of the system (sole source for callback links in notifications;
 		// empty string omits links from messages; never derived from request Host headers).

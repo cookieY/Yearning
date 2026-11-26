@@ -7,7 +7,7 @@ import { Languages, Palette, ShieldCheck, UserRound } from "lucide-react";
 import { useSession } from "@/features/auth/session-provider";
 import { changeMyPassword } from "@/api/generated/client/authentication/authentication";
 import { SESSION_EXPIRED_EVENT } from "@/shared/api/mutator";
-import { businessErrCodeByName, describeError } from "@/shared/api/error-display";
+import { describeError, isBusinessErrorCode } from "@/shared/api/error-display";
 import { setLocale as persistLocale, type Locale } from "@/shared/i18n";
 import { PageHeader, PageLayout } from "@/shared/components/page-layout";
 import { PendingButton } from "@/shared/components/pending-button";
@@ -202,7 +202,6 @@ function LocaleSelect({ locale, onChange }: { locale: string; onChange: (value: 
 }
 
 const MIN_PASSWORD_LENGTH = 12;
-const INVALID_CREDENTIALS_CODE = businessErrCodeByName("INVALID_CREDENTIALS");
 
 /**
  * Self-service password change (§18.52, POST /users/me/password). The server
@@ -229,10 +228,7 @@ function PasswordChangeForm() {
     onError: (err) => {
       const display = describeError(err, "changeMyPassword");
       const isWrongOld =
-        !display.contractViolation &&
-        INVALID_CREDENTIALS_CODE !== null &&
-        "err_code" in err &&
-        (err as { err_code: unknown }).err_code === INVALID_CREDENTIALS_CODE;
+        !display.contractViolation && isBusinessErrorCode(err, "INVALID_CREDENTIALS");
       toast.error(t(isWrongOld ? "profile.security.wrongOldPassword" : display.messageKey));
     },
   });
@@ -250,12 +246,7 @@ function PasswordChangeForm() {
   // 1101 in this operation means "old password wrong"; the shared catalog
   // copy is login-flavored, so this operation gives it its own sentence.
   const wrongOldPassword =
-    !errorDisplay?.contractViolation &&
-    INVALID_CREDENTIALS_CODE !== null &&
-    error !== null &&
-    typeof error === "object" &&
-    "err_code" in error &&
-    (error as { err_code: unknown }).err_code === INVALID_CREDENTIALS_CODE;
+    !errorDisplay?.contractViolation && isBusinessErrorCode(error, "INVALID_CREDENTIALS");
   const messageKey = errorDisplay === null
     ? null
     : wrongOldPassword

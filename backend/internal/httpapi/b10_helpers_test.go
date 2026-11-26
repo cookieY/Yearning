@@ -19,6 +19,7 @@ import (
 
 	"github.com/cookieY/YearningX/backend/internal/database"
 	execapp "github.com/cookieY/YearningX/backend/internal/execution/application"
+	"github.com/cookieY/YearningX/backend/internal/platform/testenv"
 	reviewapp "github.com/cookieY/YearningX/backend/internal/review/application"
 	"github.com/cookieY/YearningX/backend/internal/review/tool"
 )
@@ -390,45 +391,46 @@ func (fx *b10Fixture) b10Statements(t *testing.T, attemptID string) []stmtRow {
 	return out
 }
 
+func b10PGTarget() testenv.DBConfig {
+	cfg, _ := testenv.ResolveTargetPG(testenv.WithDefaultPort(54330))
+	return cfg
+}
+
+func b10MySQLTarget() testenv.DBConfig {
+	cfg, _ := testenv.ResolveTargetMySQL(testenv.WithDefaultPort(33306))
+	return cfg
+}
+
 // b10TargetQueryPG queries target PG database directly (exec_target schema).
 func (fx *b10Fixture) b10TargetQueryPG(t *testing.T, query string, args ...any) [][]string {
 	t.Helper()
+	cfg := b10PGTarget()
 	pw := fx.b10PGPassword(t)
-	db := openTargetPG(t, envOrB6("YEARNING_TEST_ADAPTER_PG_HOST", "localhost"), strconv.Itoa(b10PGPort()), "yearning_exec_target", b10PGUser(), pw)
+	db := openTargetPG(t, cfg.Host, strconv.Itoa(cfg.Port), "yearning_exec_target", cfg.User, pw)
 	defer func() { _ = db.Close() }()
 	return queryTarget(t, db, query, args...)
 }
 
 func b10PGPort() int {
-	if raw := envOrB6("YEARNING_TEST_ADAPTER_PG_PORT", ""); raw != "" {
-		if p, err := strconv.Atoi(raw); err == nil && p > 0 {
-			return p
-		}
-	}
-	return 54330
+	return b10PGTarget().Port
 }
 
 func b10PGUser() string {
-	return envOrB6("YEARNING_TEST_ADAPTER_PG_USER", "yearning")
+	return b10PGTarget().User
 }
 
 func b10MySQLPort() int {
-	if raw := envOrB6("YEARNING_TEST_ADAPTER_MYSQL_PORT", ""); raw != "" {
-		if p, err := strconv.Atoi(raw); err == nil && p > 0 {
-			return p
-		}
-	}
-	return 33306
+	return b10MySQLTarget().Port
 }
 
 func b10MySQLPassword(t *testing.T) string {
 	t.Helper()
-	if pw := envOrB6("YEARNING_TEST_ADAPTER_MYSQL_PASSWORD", ""); pw != "" {
-		return pw
+	if cfg, ok := testenv.ResolveTargetMySQL(); ok {
+		return cfg.Password
 	}
 	pw, err := dockerExecOutput("yearning-b10-mysql", "printenv", "MYSQL_ROOT_PASSWORD")
 	if err != nil || pw == "" {
-		t.Skip("mysql target container unavailable")
+		testenv.SkipOrFatal(t, "mysql target container unavailable")
 	}
 	return pw
 }
@@ -439,13 +441,13 @@ func (fx *b10Fixture) b10PGPassword(t *testing.T) string {
 	if fx.pgPW != "" {
 		return fx.pgPW
 	}
-	if pw := envOrB6("YEARNING_TEST_ADAPTER_PG_PASSWORD", ""); pw != "" {
-		fx.pgPW = pw
-		return pw
+	if cfg, ok := testenv.ResolveTargetPG(); ok {
+		fx.pgPW = cfg.Password
+		return cfg.Password
 	}
 	pw, err := dockerExecOutput("yearning-b2-pg", "printenv", "POSTGRES_PASSWORD")
 	if err != nil || pw == "" {
-		t.Skipf("target pg password unavailable: %v", err)
+		testenv.SkipOrFatal(t, "target pg password unavailable: %v", err)
 	}
 	fx.pgPW = pw
 	return pw
@@ -481,17 +483,18 @@ func (fx *b10Fixture) b10AttemptVersion(t *testing.T, attemptID string) int64 {
 // b10MySQLDatasource creates target MySQL datasource (native 8.0 -> gh-ost eligible).
 func (fx *b10Fixture) b10MySQLDatasource(t *testing.T, name string) string {
 	t.Helper()
+	cfg := b10MySQLTarget()
 	pw := b10MySQLPassword(t)
 	pgDB := mustOpenTargetPG(t, fx)
 	defer func() { _ = pgDB.Close() }()
 	execTarget(t, pgDB, `create table if not exists exec_target.items (id int primary key, val int)`)
-	mysqlDB := openTargetMySQL(t, fmt.Sprintf("root:%s@tcp(127.0.0.1:%d)/exec_target", pw, b10MySQLPort()))
+	mysqlDB := openTargetMySQL(t, fmt.Sprintf("%s:%s@tcp(%s:%d)/exec_target", cfg.User, pw, cfg.Host, cfg.Port))
 	defer func() { _ = mysqlDB.Close() }()
 	execTarget(t, mysqlDB, "DROP TABLE IF EXISTS `exec_target`.`items`")
 	execTarget(t, mysqlDB, "CREATE TABLE `exec_target`.`items` (`id` INT PRIMARY KEY, `val` INT NOT NULL DEFAULT 0)")
 	execTarget(t, mysqlDB, "INSERT INTO `exec_target`.`items` (`id`, `val`) VALUES (1, 10), (2, 20)")
-	return fx.b10ExecDatasource(t, name, "mysql", "127.0.0.1", b10MySQLPort(),
-		"exec_target", "root", pw, "8.0.x")
+	return fx.b10ExecDatasource(t, name, "mysql", cfg.Host, cfg.Port,
+		"exec_target", cfg.User, pw, "8.0.x")
 }
 
 // b10OscPolicy writes execution settings osc policy (admin settings API belongs to a later package;
@@ -556,9 +559,11 @@ type killProxy struct {
 func startKillProxy(t *testing.T, target string, markers ...string) *killProxy {
 	t.Helper()
 	if target == "127.0.0.1:54330" {
-		target = "127.0.0.1:" + strconv.Itoa(b10PGPort())
+		cfg := b10PGTarget()
+		target = net.JoinHostPort(cfg.Host, strconv.Itoa(cfg.Port))
 	} else if target == "127.0.0.1:33306" {
-		target = "127.0.0.1:" + strconv.Itoa(b10MySQLPort())
+		cfg := b10MySQLTarget()
+		target = net.JoinHostPort(cfg.Host, strconv.Itoa(cfg.Port))
 	}
 	l, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {

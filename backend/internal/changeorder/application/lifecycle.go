@@ -8,7 +8,6 @@ package application
 
 import (
 	"context"
-	"encoding/json"
 	"time"
 
 	"gorm.io/gorm"
@@ -16,6 +15,8 @@ import (
 	"github.com/cookieY/YearningX/backend/internal/authorization/auditlog"
 	"github.com/cookieY/YearningX/backend/internal/changeorder/domain"
 	"github.com/cookieY/YearningX/backend/internal/changeorder/persistence"
+	"github.com/cookieY/YearningX/backend/internal/platform/ptr"
+	"github.com/cookieY/YearningX/backend/internal/platform/txutil"
 )
 
 // LifecycleInput parameters for withdraw/void.
@@ -42,31 +43,10 @@ func (s *Services) Void(ctx context.Context, actor Actor, meta RequestMeta, in L
 
 func (s *Services) lifecycle(ctx context.Context, actor Actor, meta RequestMeta, in LifecycleInput,
 	route string, action domain.OrderTrigger, eventType string, reason string) (view *OrderView, replayed bool, err error) {
-	reqHash := idemRequestHash(actor.UserID, in.OrderID, string(action), in.Reason)
-	claimed, replay, err := s.idemClaim(ctx, actor.UserID, route, in.OrderID, in.IdempotencyKey, reqHash)
-	if err != nil {
-		return nil, false, err
-	}
-	if claimed == nil {
-		var v OrderView
-		if err := json.Unmarshal(replay, &v); err != nil {
-			return nil, false, err
-		}
-		return &v, true, nil
-	}
-	view, err = s.lifecycleTx(ctx, actor, meta, in, action, eventType, reason)
-	if err != nil {
-		_ = s.idemRelease(ctx, actor.UserID, route, in.OrderID, in.IdempotencyKey)
-		return nil, false, err
-	}
-	raw, err := json.Marshal(view)
-	if err != nil {
-		return nil, false, err
-	}
-	if err := s.idemComplete(ctx, actor.UserID, route, in.OrderID, in.IdempotencyKey, raw); err != nil {
-		return nil, false, err
-	}
-	return view, false, nil
+	reqHash := txutil.RequestHash(actor.UserID, in.OrderID, string(action), in.Reason)
+	return txutil.RunIdempotent(ctx, s.idemStore(), actor.UserID, route, in.OrderID, in.IdempotencyKey, reqHash, func() (*OrderView, error) {
+		return s.lifecycleTx(ctx, actor, meta, in, action, eventType, reason)
+	})
 }
 
 func (s *Services) lifecycleTx(ctx context.Context, actor Actor, meta RequestMeta, in LifecycleInput,
@@ -166,9 +146,9 @@ func (s *Services) lifecycleOnce(ctx context.Context, tx *gorm.DB, actor Actor, 
 	if err := s.restoreSourceOrderRollbackStatusOnAbort(ctx, tx, order, now); err != nil {
 		return nil, err
 	}
-	auditActor := auditlog.Actor{Kind: "user", UserID: actor.UserID, Username: actor.Username}
+	auditActor := auditlog.UserActor(actor.UserID, actor.Username)
 	if err := s.emitOrderEvent(ctx, tx, eventType, order.ID, auditActor, StateChangedPayload{
-		AggregateID: order.ID, From: strPtr(order.State), To: string(next),
+		AggregateID: order.ID, From: ptr.To(order.State), To: string(next),
 		ReasonCode: reason, AggregateVersion: nextVersion,
 	}); err != nil {
 		return nil, err
@@ -176,11 +156,11 @@ func (s *Services) lifecycleOnce(ctx context.Context, tx *gorm.DB, actor Actor, 
 	// Terminal command writes an audit record (with submitter reason; no SQL or sensitive content).
 	if err := s.Recorder.Audit(ctx, tx, auditlog.AuditInput{
 		EventType: "change_order." + string(action), ActorKind: "user",
-		ActorID: strPtrOrNil(actor.UserID), ActorUsername: strPtrOrNil(actor.Username),
-		ResourceType: "change_order", ResourceID: strPtrOrNil(order.ID),
+		ActorID: ptr.NonZero(actor.UserID), ActorUsername: ptr.NonZero(actor.Username),
+		ResourceType: "change_order", ResourceID: ptr.NonZero(order.ID),
 		Action: string(action), Outcome: "succeeded",
-		RequestID: strPtrOrNil(meta.RequestID), SourceIP: strPtrOrNil(meta.SourceIP),
-		UserAgent: strPtrOrNil(meta.UserAgent),
+		RequestID: ptr.NonZero(meta.RequestID), SourceIP: ptr.NonZero(meta.SourceIP),
+		UserAgent: ptr.NonZero(meta.UserAgent),
 		Metadata:  map[string]any{"reason": truncate(in.Reason, 256)},
 	}); err != nil {
 		return nil, err
@@ -250,8 +230,8 @@ func (s *Services) withdrawCancelLiveAttempts(ctx context.Context, tx *gorm.DB, 
 		}
 		if aerr := s.Recorder.Audit(ctx, tx, auditlog.AuditInput{
 			EventType: "execution.cancel_requested", ActorKind: "user",
-			ActorID: strPtrOrNil(actor.UserID), ActorUsername: strPtrOrNil(actor.Username),
-			ResourceType: "execution_attempt", ResourceID: strPtrOrNil(at.ID),
+			ActorID: ptr.NonZero(actor.UserID), ActorUsername: ptr.NonZero(actor.Username),
+			ResourceType: "execution_attempt", ResourceID: ptr.NonZero(at.ID),
 			Action: "cancel", Outcome: "succeeded",
 			Metadata: withdrawCancelAuditMetadata(reason),
 		}); aerr != nil {
@@ -355,9 +335,9 @@ func (s *Services) materializeInvalidIfNeeded(ctx context.Context, tx *gorm.DB,
 	// workflow.node_invalidated (routed event; outputs change_order.state_changed discriminated
 	// by affected_resource_type).
 	if err := s.emitOrderEvent(ctx, tx, EventNodeInvalidated, order.ID,
-		auditlog.Actor{Kind: "system"}, NodeInvalidatedPayload{
+		auditlog.SystemActor("", ""), NodeInvalidatedPayload{
 			AffectedResourceType: "change_order", AggregateID: order.ID,
-			From: strPtr(order.State), To: string(next),
+			From: ptr.To(order.State), To: string(next),
 			ReasonCode: "frozen_actor_set_became_empty", AggregateVersion: nextVersion,
 		}); err != nil {
 		return err
@@ -365,11 +345,4 @@ func (s *Services) materializeInvalidIfNeeded(ctx context.Context, tx *gorm.DB,
 	order.State = string(next)
 	order.Version = nextVersion
 	return nil
-}
-
-func strPtrOrNil(s string) *string {
-	if s == "" {
-		return nil
-	}
-	return &s
 }

@@ -141,6 +141,17 @@ export const OPERATION_ERROR_PROFILES: {
       "changeMyPassword"
     ]
   },
+  "admin_password_reset": {
+    "err_codes": [
+      1001,
+      1002,
+      1103,
+      1109
+    ],
+    "operations": [
+      "resetUserPassword"
+    ]
+  },
   "admin_create": {
     "err_codes": [
       1001,

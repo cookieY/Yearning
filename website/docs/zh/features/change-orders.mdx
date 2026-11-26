@@ -34,7 +34,7 @@ Yearning v4 实行**提交即冻结**：审批链、数据源身份、执行人�
 
 ## 3. MySQL 大表在线改表：进程内 `gh-ost` 18 项参数调优
 
-当系统设置 `execution.osc.tool = gh-ost` 且目标库为原生 **MySQL 5.7 / 8.0**、工单为 `ALTER TABLE` 时，点击 **执行** 弹窗会出现 **`ddl_execution_mode`** 选择框：
+当系统设置 `execution.osc.tool = gh-ost` 且目标库为原生 **MySQL 5.7+**（5.7 / 8.0 / 8.4 LTS）、工单为 `ALTER TABLE` 时，点击 **执行** 弹窗会出现 **`ddl_execution_mode`** 选择框：
 
 - **`online_ddl`**：直接走 MySQL 原生 `ALTER TABLE`（适合小表或瞬间完成的 `ALGORITHM=INSTANT` 加列）。
 - **`gh_ost`**：调用 Go 进程内嵌的 `gh-ost` 无锁改表引擎（无需安装外部二进制，`pt-osc` 已彻底退役），页面实时显示拷贝百分比与 ETA。

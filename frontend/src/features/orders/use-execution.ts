@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type {
   ChangeOrder,
   ExecutionAttempt,
@@ -16,10 +16,10 @@ import {
   getExecutionAttempt,
   listExecutionAttemptStatements,
 } from "@/api/generated/client/change-orders/change-orders";
-import { ifMatchHeader, unwrapApi } from "@/shared/api/mutator";
+import { useIdempotentMutation } from "@/shared/api/idempotency";
+import { ifMatchIdempotencyHeader, unwrapApi } from "@/shared/api/mutator";
 import { matchesEntitySubject, useSseEvent } from "@/shared/events/sse-event-bus";
 import { isAttemptTerminalState } from "@/features/orders/order-state";
-import { randomUUID } from "@/shared/lib/uuid";
 
 /**
  * Server-state hooks for the execution workspace (frontend PRD F8, W006,
@@ -45,6 +45,7 @@ export function useExecutionAttempt(attemptId: string, orderId: string, enabled:
     queryFn: () => unwrapApi(getExecutionAttempt(attemptId)),
     enabled: enabled && attemptId !== "",
     refetchInterval: (queryInstance) => {
+      if (queryInstance.state.status === "error") return false;
       const state = queryInstance.state.data?.state;
       return state !== undefined && !isAttemptTerminalState(state) ? LIVE_POLL_MS : false;
     },
@@ -55,7 +56,7 @@ export function useExecutionAttempt(attemptId: string, orderId: string, enabled:
   // live, every poll tick also refreshes the order aggregate so the page
   // converges on the terminal fate without relying on events.
   const attemptState = query.data?.state;
-  const live = attemptState !== undefined && !isAttemptTerminalState(attemptState);
+  const live = !query.isError && attemptState !== undefined && !isAttemptTerminalState(attemptState);
   useEffect(() => {
     if (!live) return;
     const timer = setInterval(() => {
@@ -106,13 +107,8 @@ export function useExecutionStatements(attemptId: string, enabled: boolean, poll
       return page.items;
     },
     enabled: enabled && attemptId !== "",
-    refetchInterval: poll && enabled && attemptId !== "" ? LIVE_POLL_MS : false,
-  });
-}
-
-function orderActionRequestInit(order: ChangeOrder | null | undefined): RequestInit {
-  return ifMatchHeader(order?.version, {
-    "Idempotency-Key": `execution-${randomUUID()}`,
+    refetchInterval: (query) =>
+      query.state.status === "error" ? false : poll && enabled && attemptId !== "" ? LIVE_POLL_MS : false,
   });
 }
 
@@ -121,13 +117,16 @@ export function useCreateExecutionAttempt(
   onCreated: (attemptId: string) => void,
 ) {
   const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: (input: { ddl_execution_mode?: "gh_ost" | "online_ddl"; osc_overrides?: OscOverrides }) =>
+  return useIdempotentMutation("execution", {
+    mutationFn: (
+      input: { ddl_execution_mode?: "gh_ost" | "online_ddl"; osc_overrides?: OscOverrides },
+      idempotencyKey,
+    ) =>
       unwrapApi(
         createExecutionAttempt(
           order?.id as string,
           Object.keys(input).length > 0 ? input : undefined,
-          orderActionRequestInit(order),
+          ifMatchIdempotencyHeader(order?.version, idempotencyKey),
         ),
       ),
     onSuccess: (attempt) => {
@@ -143,14 +142,12 @@ export function useCancelExecutionAttempt(
   orderId: string,
 ) {
   const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: (reason: string) =>
+  return useIdempotentMutation("execution-cancel", {
+    mutationFn: (reason: string, idempotencyKey) =>
       cancelExecutionAttempt(
         attempt?.id as string,
         { reason },
-        ifMatchHeader(attempt?.version, {
-          "Idempotency-Key": `execution-cancel-${randomUUID()}`,
-        }),
+        ifMatchIdempotencyHeader(attempt?.version, idempotencyKey),
       ),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["change-order", orderId] });
@@ -165,17 +162,15 @@ export function useCreateExecutionVerification(
   orderId: string,
 ) {
   const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: (input: ExecutionVerificationRequest) =>
+  return useIdempotentMutation("execution-verify", {
+    mutationFn: (input: ExecutionVerificationRequest, idempotencyKey) =>
       createExecutionVerification(
         attempt?.id as string,
         input,
-        ifMatchHeader(attempt?.version, {
-          // If-Match guards the attempt version (backend verifyOnce), the
-          // idempotency key makes the verdict retry-safe (execution_verify
-          // profile).
-          "Idempotency-Key": `execution-verify-${randomUUID()}`,
-        }),
+        // If-Match guards the attempt version (backend verifyOnce), the
+        // idempotency key makes the verdict retry-safe (execution_verify
+        // profile).
+        ifMatchIdempotencyHeader(attempt?.version, idempotencyKey),
       ),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["change-order", orderId] });
@@ -187,13 +182,13 @@ export function useCreateExecutionVerification(
 
 export function useCreateExecutionSchedule(order: ChangeOrder | null) {
   const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: (scheduledFor: string): Promise<ExecutionSchedule> =>
+  return useIdempotentMutation("execution", {
+    mutationFn: (scheduledFor: string, idempotencyKey): Promise<ExecutionSchedule> =>
       unwrapApi(
         createExecutionSchedule(
           order?.id as string,
           { scheduled_for: scheduledFor },
-          orderActionRequestInit(order),
+          ifMatchIdempotencyHeader(order?.version, idempotencyKey),
         ),
       ),
     onSuccess: () => {
@@ -208,9 +203,14 @@ export function useCreateExecutionSchedule(order: ChangeOrder | null) {
  * to stage_execution_pending — re-schedule or execute immediately. */
 export function useCancelExecutionSchedule(order: ChangeOrder | null) {
   const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: (): Promise<ExecutionSchedule> =>
-      unwrapApi(cancelExecutionSchedule(order?.id as string, orderActionRequestInit(order))),
+  return useIdempotentMutation<ExecutionSchedule>("execution", {
+    mutationFn: (_vars, idempotencyKey): Promise<ExecutionSchedule> =>
+      unwrapApi(
+        cancelExecutionSchedule(
+          order?.id as string,
+          ifMatchIdempotencyHeader(order?.version, idempotencyKey),
+        ),
+      ),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["change-order", order?.id] });
       void queryClient.invalidateQueries({ queryKey: ["change-order-timeline", order?.id] });

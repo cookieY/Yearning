@@ -113,7 +113,7 @@ test("revealed SQL and query results never reach storage, third parties or the c
   await page.addInitScript(() => {
     window.localStorage.setItem("yearning-mock-scenario", "query-session");
   });
-  await page.goto("/query/sessions/qs-fixture-active");
+  await page.goto("/query/sessions/6f0f2b3c-5555-4555-8555-000000000101");
   await expect(page.getByTestId("query-workspace")).toBeVisible();
   await page.getByTestId("query-schema-input").click();
       await page.getByRole("option", { name: "app" }).click();

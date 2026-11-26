@@ -12,7 +12,7 @@ Platform administrators (`builtin_admin` and `role = 'admin'`) govern all `/admi
 
 ## 1. Multi-Engine Datasource Registry (`/admin/datasources`)
 
-- Register **MySQL 5.7/8.0**, **PostgreSQL 14–18**, **TiDB**, **OceanBase**, and **PolarDB** instances with mandatory `version_constraint` checks and verified `identity_fingerprint`.
+- Register **MySQL 5.7+ (5.7 / 8.0 / 8.4 LTS)**, **PostgreSQL 14–18+**, **TiDB**, **OceanBase**, and **PolarDB** instances with mandatory `version_constraint` checks and verified `identity_fingerprint`.
 - Strictly separate **Read-Only (`review` & `query`)** credentials from **Execution (`execution`)** credentials; all passwords and TLS PEM blocks are AES-256-GCM encrypted and write-only.
 
 ## 2. Enterprise SSO: LDAP & OIDC (`/admin/settings/general`)

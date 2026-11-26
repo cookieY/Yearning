@@ -43,7 +43,7 @@ function detailOf(error: BusinessError): string | null {
 /** RCP-20261102-S008: field-level VALIDATION_FAILED reasons travel in
  * meta.fields (field name → string[]). Non-conforming shapes are dropped
  * key-by-key — the envelope never renders untyped data. */
-export function fieldsOf(error: BusinessError): Record<string, string[]> {
+function fieldsOf(error: BusinessError): Record<string, string[]> {
   const raw = error.meta?.["fields"];
   if (typeof raw !== "object" || raw === null) return {};
   const out: Record<string, string[]> = {};
@@ -132,6 +132,22 @@ export function businessErrCodeByName(name: string): number | null {
     if (entry.name === name) return Number(code);
   }
   return null;
+}
+
+/**
+ * Type guard checking whether `error` is a `BusinessError` matching the given
+ * catalog name (preferred) or numeric error code.
+ */
+export function isBusinessErrorCode(
+  error: unknown,
+  expectedNameOrCode: string | number,
+): error is BusinessError {
+  if (!(error instanceof BusinessError)) return false;
+  const expected =
+    typeof expectedNameOrCode === "number"
+      ? expectedNameOrCode
+      : businessErrCodeByName(expectedNameOrCode);
+  return expected !== null && error.err_code === expected;
 }
 
 export interface DescribeErrorTextOptions {

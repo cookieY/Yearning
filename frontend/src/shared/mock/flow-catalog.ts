@@ -148,7 +148,19 @@ export const CATALOG_FLOW_IDS: ReadonlySet<string> = new Set(CATALOG_FLOWS.map((
  * from the catalog directly. Approval-step actors and execution actors are
  * distinct identity slots (§18.44): reviewerId fills the frozen approval
  * slots, executorId the execution slots — never the submitter. */
-export function reviewCatalogFlowViews(reviewerId: string, executorId: string): Flow[] {
+export function reviewCatalogFlowViews(
+  reviewerId: string,
+  executorId: string,
+  extraAllRoleActorId?: string,
+): Flow[] {
+  const approvalActors =
+    extraAllRoleActorId === undefined
+      ? [{ user_id: reviewerId }]
+      : [{ user_id: reviewerId }, { user_id: extraAllRoleActorId }];
+  const executionActorsFor = (count: number) => [
+    ...Array.from({ length: count }, () => ({ user_id: executorId })),
+    ...(extraAllRoleActorId === undefined ? [] : [{ user_id: extraAllRoleActorId }]),
+  ];
   return CATALOG_FLOWS.map((spec) => ({
     id: spec.id,
     name: spec.name,
@@ -156,20 +168,22 @@ export function reviewCatalogFlowViews(reviewerId: string, executorId: string): 
     enabled: spec.enabled,
     status: spec.enabled ? "enabled" : "disabled",
     rule_set_id: null,
-    stages: spec.stages.map((entry, index) => ({
-      position: index + 1,
-      datasource_id: entry.datasource_id,
-      datasource_name:
-        CATALOG_DATASOURCES.find((candidate) => candidate.id === entry.datasource_id)?.name ??
-        entry.datasource_id,
-      approval_steps: Array.from({ length: entry.approvers }, (_, position) => ({
-        position: position + 1,
-        actors: [{ user_id: reviewerId }],
-      })),
-      execution_actors: Array.from({ length: entry.executors }, () => ({
-        user_id: executorId,
-      })),
-    })),
+    stages: spec.stages.map((entry, index) => {
+      const dsMeta = CATALOG_DATASOURCES.find((candidate) => candidate.id === entry.datasource_id);
+      return {
+        position: index + 1,
+        datasource_id: entry.datasource_id,
+        datasource_name: dsMeta?.name ?? entry.datasource_id,
+        datasource_engine: dsMeta?.engine,
+        datasource_compatibility_mode: dsMeta?.compatibility_mode,
+        datasource_database_name: dsMeta?.compatibility_mode === "postgresql" ? null : "public",
+        approval_steps: Array.from({ length: entry.approvers }, (_, position) => ({
+          position: position + 1,
+          actors: approvalActors,
+        })),
+        execution_actors: executionActorsFor(entry.executors),
+      };
+    }),
     version: 1,
     created_at: "2026-08-01T00:00:00Z",
     updated_at: "2026-08-01T00:00:00Z",

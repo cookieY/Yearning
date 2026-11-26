@@ -329,8 +329,9 @@ func runServe(ctx context.Context, args []string) error {
 		ReleaseFeedURL:   cfg.ReleaseFeed.UpstreamURL,
 		ReleaseFeedProxy: cfg.Outbound.ReleaseFeedProxy,
 		// NEW-AUTH-01: trusted proxy CIDRs (empty/nil = trust no proxies, direct-connection semantics).
-		TrustedProxies: cfg.TrustedProxies,
-		RealtimeHub:    hub,
+		TrustedProxies:   cfg.TrustedProxies,
+		DevViewAsEnabled: cfg.Environment == "development",
+		RealtimeHub:      hub,
 		B3: &httpapi.B3Deps{
 			Identity:     identitySvc,
 			Sessions:     sessionStore,

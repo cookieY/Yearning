@@ -6,11 +6,9 @@ package application
 
 import (
 	"context"
-	"strings"
 	"time"
 
-	"github.com/google/uuid"
-
+	"github.com/cookieY/YearningX/backend/internal/platform/pagecursor"
 	"github.com/cookieY/YearningX/backend/internal/query/domain"
 	"github.com/cookieY/YearningX/backend/internal/query/persistence"
 )
@@ -20,8 +18,8 @@ type QueryOrderEntry struct {
 	Kind      string             `json:"kind"` // access_request | session
 	ID        string             `json:"id"`
 	CreatedAt string             `json:"created_at"`
-	Request   *AccessRequestView `json:"request"`
-	Session   *SessionView       `json:"session"`
+	Request   *AccessRequestView `json:"request,omitempty"`
+	Session   *SessionView       `json:"session,omitempty"`
 }
 
 const queryOrdersKeysetBase = `select id, created_at, kind from (select id::text as id, created_at, 'access_request' as kind from query_access_requests
@@ -46,19 +44,12 @@ func (s *Services) ListQueryOrders(ctx context.Context, actor Actor, limit int, 
 	sql := queryOrdersKeysetBase
 	args := []interface{}{actor.UserID, actor.UserID, actor.UserID}
 	if after != "" {
-		sep := strings.LastIndex(after, "|")
-		if sep <= 0 {
-			return nil, nil, &domain.Error{Code: 1001, Name: "VALIDATION_FAILED"}
-		}
-		cursorTime, err := time.Parse(time.RFC3339Nano, after[:sep])
+		cursorTime, cursorID, err := pagecursor.DecodeUUID(after)
 		if err != nil {
 			return nil, nil, &domain.Error{Code: 1001, Name: "VALIDATION_FAILED"}
 		}
-		if _, err := uuid.Parse(after[sep+1:]); err != nil {
-			return nil, nil, &domain.Error{Code: 1001, Name: "VALIDATION_FAILED"}
-		}
 		sql += ` where (created_at, id) < (?, ?)`
-		args = append(args, cursorTime, after[sep+1:])
+		args = append(args, cursorTime, cursorID)
 	}
 	sql += ` order by created_at desc, id desc limit ?`
 	args = append(args, limit+1)
@@ -86,11 +77,16 @@ func (s *Services) ListQueryOrders(ctx context.Context, actor Actor, limit int, 
 			Where("id in ?", reqIDs).Find(&rows).Error; err != nil {
 			return nil, nil, err
 		}
+		canDecideByID, cerr := s.canDecideMap(ctx, s.DB, actor.UserID, rows)
+		if cerr != nil {
+			return nil, nil, cerr
+		}
 		for i := range rows {
 			v, verr := s.requestView(ctx, &rows[i])
 			if verr != nil {
 				return nil, nil, verr
 			}
+			v.CanDecide = canDecideByID[rows[i].ID]
 			reqViews[rows[i].ID] = v
 		}
 	}
@@ -122,7 +118,7 @@ func (s *Services) ListQueryOrders(ctx context.Context, actor Actor, limit int, 
 	if !hasMore || len(out) == 0 {
 		return out, nil, nil
 	}
-	last := out[len(out)-1]
-	next := last.CreatedAt + "|" + last.ID
+	last := keys[len(keys)-1]
+	next := pagecursor.Encode(last.CreatedAt, last.ID)
 	return out, &next, nil
 }

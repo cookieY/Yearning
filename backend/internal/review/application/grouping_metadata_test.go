@@ -540,21 +540,7 @@ func TestEphemeralGroupingAndStageGroupsPreserveCompletenessAndHideTruncatedFlag
 	for i := range analysis.groups {
 		g := analysis.groups[i]
 		gid := fmt.Sprintf("g-%d", i+1)
-		shape := map[string]any{
-			"algorithm_version":             fingerprint.AlgorithmVersion,
-			"representative_anonymized_sql": g.representativeAnonymizedSQL,
-			"statement_ordinal":             g.representativeOrdinal,
-			"statement_ordinal_ranges":      g.statementOrdinalRanges,
-			"objects":                       g.objects,
-			"metadata_context_complete":     g.metadataContextComplete,
-			"in_value_count_max":            g.inMax,
-			"values_row_count_max":          g.valMax,
-			"unbounded_mutation":            g.unbounded,
-		}
-		if g.objectRangesTruncated {
-			shape["object_ranges_truncated"] = true
-		}
-		typed, merr := jsonMarshal(shape)
+		typed, merr := buildGroupTypedShape(g)
 		if merr != nil {
 			t.Fatal(merr)
 		}

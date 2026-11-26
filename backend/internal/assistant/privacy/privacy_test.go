@@ -246,3 +246,366 @@ func TestTurnPrivacySession_QuotedAndUnquotedConsistencyAcrossTurns(t *testing.T
 		}
 	}
 }
+
+func TestTurnPrivacySession_NumberParameterizationBoundVsPlatformHelp(t *testing.T) {
+	t.Run("bound tables parameterize platform caps and single-digit business numbers", func(t *testing.T) {
+		sess := privacy.NewTurnPrivacySession()
+		defer sess.ZeroAndRelease()
+
+		_, _ = sess.RegisterSchema("shop")
+		_, _ = sess.RegisterTable("shop", "accounts")
+		_, _ = sess.RegisterColumn("shop", "accounts", "balance")
+		_, _ = sess.RegisterColumn("shop", "accounts", "tier")
+		_, _ = sess.RegisterColumn("shop", "accounts", "rate")
+
+		prompt := "Optimize SQL:\n2. SELECT balance, tier FROM accounts WHERE balance >= 500 AND tier >= 3 AND rate > 0.5 LIMIT 0, 20 (v4.0.0)"
+		anon, err := sess.AnonymizeNaturalLanguage(prompt)
+		if err != nil {
+			t.Fatalf("AnonymizeNaturalLanguage: %v", err)
+		}
+		// 500, 3, 0.5, 20 must all be parameterized; v4.0.0 and line-start "2. " must remain intact.
+		for _, leaked := range []string{"500", "0.5", " 3 ", " 20 "} {
+			if strings.Contains(anon, leaked) {
+				t.Fatalf("expected numeric literal %q to be parameterized in: %s", leaked, anon)
+			}
+		}
+		if !strings.Contains(anon, "v4.0.0") || !strings.Contains(anon, "\n2. ") {
+			t.Fatalf("expected version triple and list marker to stay intact, got: %s", anon)
+		}
+
+		// Model returns anonymized SQL using the bound placeholders and LIMIT 0, 20.
+		mysqlProf := fingerprint.Profile{Engine: "mysql", Mode: "mysql"}
+		res, err := privacy.ValidateAndRestoreSQL(
+			sess,
+			"SELECT column_1, column_2 FROM table_1 WHERE column_1 >= :val_int_1 AND column_2 >= :val_int_2 AND column_3 > :val_num_1 LIMIT 0, 20",
+			mysqlProf,
+			"zh-CN",
+		)
+		if err != nil {
+			t.Fatalf("ValidateAndRestoreSQL failed: %v", err)
+		}
+		if !strings.Contains(res.RestoredSQL, "`balance` >= 500") ||
+			!strings.Contains(res.RestoredSQL, "`tier` >= 3") ||
+			!strings.Contains(res.RestoredSQL, "`rate` > 0.5") ||
+			!strings.Contains(res.RestoredSQL, "LIMIT 0, 20") {
+			t.Fatalf("unexpected restored SQL: %s", res.RestoredSQL)
+		}
+	})
+
+	t.Run("platform_help without bound tables keeps public platform numbers and error codes", func(t *testing.T) {
+		sess := privacy.NewTurnPrivacySession()
+		defer sess.ZeroAndRelease()
+
+		prompt := "In YearningX v4.0.0, why does error 6004 happen with limit 500 or 100000 on port 3306?"
+		anon, err := sess.AnonymizeNaturalLanguage(prompt)
+		if err != nil {
+			t.Fatalf("AnonymizeNaturalLanguage: %v", err)
+		}
+		for _, kept := range []string{"v4.0.0", "6004", "500", "100000", "3306"} {
+			if !strings.Contains(anon, kept) {
+				t.Fatalf("expected platform_help constant %q to be preserved, got: %s", kept, anon)
+			}
+		}
+	})
+}
+
+func TestValidateAndRestoreSQL_OptimizeConstructsAndSecurityBoundaries(t *testing.T) {
+	sess := privacy.NewTurnPrivacySession()
+	defer sess.ZeroAndRelease()
+
+	_, _ = sess.RegisterSchema("app")
+	_, _ = sess.RegisterTable("app", "orders")
+	_, _ = sess.RegisterColumn("app", "orders", "id")
+	_, _ = sess.RegisterColumn("app", "orders", "balance")
+	_, _ = sess.RegisterColumn("app", "orders", "status")
+	_, _ = sess.RegisterValue(privacy.ValInt, "500")
+	_, _ = sess.RegisterValue(privacy.ValInt, "10")
+
+	mysqlProf := fingerprint.Profile{Engine: "mysql", Mode: "mysql"}
+	pgProf := fingerprint.Profile{Engine: "postgresql", Mode: "postgresql"}
+
+	allowed := []struct {
+		name    string
+		profile fingerprint.Profile
+		sql     string
+		wantSub string
+	}{
+		{
+			name:    "mysql_limit_offset_count_numbers",
+			profile: mysqlProf,
+			sql:     "SELECT column_1, column_2 FROM table_1 WHERE column_2 >= :val_int_1 LIMIT 0, 20",
+			wantSub: "LIMIT 0, 20",
+		},
+		{
+			name:    "mysql_limit_placeholder_offset_and_count",
+			profile: mysqlProf,
+			sql:     "SELECT column_1 FROM table_1 WHERE column_2 >= :val_int_1 LIMIT :val_int_2, 50",
+			wantSub: "LIMIT 10, 50",
+		},
+		{
+			name:    "create_index_with_new_name",
+			profile: mysqlProf,
+			sql:     "CREATE INDEX idx_orders_balance_status ON table_1 (column_2, column_3)",
+			wantSub: "CREATE INDEX `idx_orders_balance_status` ON `orders` (`balance`, `status`)",
+		},
+		{
+			name:    "create_unique_index_pg",
+			profile: pgProf,
+			sql:     "CREATE UNIQUE INDEX idx_orders_id_uniq ON table_1 (column_1)",
+			wantSub: `CREATE UNIQUE INDEX "idx_orders_id_uniq" ON "orders" ("id")`,
+		},
+		{
+			name:    "alter_table_add_index",
+			profile: mysqlProf,
+			sql:     "ALTER TABLE table_1 ADD INDEX idx_orders_bal (column_2)",
+			wantSub: "ALTER TABLE `orders` ADD INDEX `idx_orders_bal` (`balance`)",
+		},
+		{
+			name:    "drop_index_mysql",
+			profile: mysqlProf,
+			sql:     "DROP INDEX idx_legacy_bal ON table_1",
+			wantSub: "DROP INDEX `idx_legacy_bal` ON `orders`",
+		},
+		{
+			name:    "table_alias_and_derived_subquery_join",
+			profile: mysqlProf,
+			sql:     "SELECT a.column_1, a.column_2 FROM table_1 a JOIN (SELECT column_1 FROM table_1 WHERE column_2 >= :val_int_1 ORDER BY column_1 DESC LIMIT 0, 20) t ON a.column_1 = t.column_1",
+			wantSub: "ON `a`.`id` = `t`.`id`",
+		},
+		{
+			name:    "cte_with_alias_and_select_alias",
+			profile: pgProf,
+			sql:     "WITH high_balance AS (SELECT column_1, column_2 AS amt FROM table_1 WHERE column_2 >= :val_int_1) SELECT hb.column_1, hb.amt FROM high_balance AS hb ORDER BY hb.amt DESC FETCH NEXT 20 ROWS ONLY",
+			wantSub: `WITH "high_balance" AS`,
+		},
+		{
+			name:    "select_alias_unqualified_in_order_by",
+			profile: mysqlProf,
+			sql:     "SELECT column_1, column_2 AS amt FROM table_1 ORDER BY amt DESC LIMIT 0, 20",
+			wantSub: "ORDER BY `amt` DESC",
+		},
+	}
+
+	for _, tc := range allowed {
+		t.Run(tc.name, func(t *testing.T) {
+			res, err := privacy.ValidateAndRestoreSQL(sess, tc.sql, tc.profile, "zh-CN")
+			if err != nil {
+				t.Fatalf("expected valid SQL, got err=%v", err)
+			}
+			if !strings.Contains(res.RestoredSQL, tc.wantSub) {
+				t.Fatalf("restored SQL %q missing expected %q", res.RestoredSQL, tc.wantSub)
+			}
+		})
+	}
+
+	// Strict fail-closed security boundaries must reject unauthorized objects even with aliases/CTEs/indexes.
+	rejected := []struct {
+		name string
+		sql  string
+	}{
+		{
+			name: "table_alias_with_unmapped_column",
+			sql:  "SELECT a.secret_col FROM table_1 a",
+		},
+		{
+			name: "table_alias_name_collision_in_where",
+			sql:  "SELECT column_1 FROM table_1 AS secret_col WHERE secret_col = :val_int_1",
+		},
+		{
+			name: "cte_name_collision_in_column_pos",
+			sql:  "WITH secret_col AS (SELECT column_1 FROM table_1) SELECT secret_col FROM table_1",
+		},
+		{
+			name: "select_alias_collision_in_where",
+			sql:  "SELECT column_1 AS secret_col FROM table_1 WHERE secret_col = :val_int_1",
+		},
+		{
+			name: "index_name_collision_in_where",
+			sql:  "CREATE INDEX secret_col ON table_1 (column_1) WHERE secret_col = :val_int_1",
+		},
+		{
+			name: "cte_shadowed_by_table_alias",
+			sql:  "WITH a AS (SELECT column_1 AS secret_col FROM table_1) SELECT a.secret_col FROM table_1 a",
+		},
+		{
+			name: "join_unmapped_table",
+			sql:  "SELECT a.column_1 FROM table_1 a JOIN secret_table b ON a.column_1 = b.column_1",
+		},
+		{
+			name: "spoofed_unknown_table_token_as_alias",
+			sql:  "SELECT column_1 FROM table_1 AS table_99",
+		},
+		{
+			name: "create_index_on_unmapped_table",
+			sql:  "CREATE INDEX idx_bad ON secret_table (column_1)",
+		},
+		{
+			name: "non_limit_comma_number_still_forbidden",
+			sql:  "SELECT column_1 FROM table_1 WHERE column_2 IN (500, 999)",
+		},
+	}
+
+	for _, tc := range rejected {
+		t.Run("reject_"+tc.name, func(t *testing.T) {
+			_, err := privacy.ValidateAndRestoreSQL(sess, tc.sql, mysqlProf, "zh-CN")
+			var de *domain.Error
+			if !errors.As(err, &de) || de.Code != domain.CodeAssistantSQLRestorationInvalid {
+				t.Fatalf("expected 6004 ASSISTANT_SQL_RESTORATION_INVALID, got %v", err)
+			}
+		})
+	}
+}
+
+func TestValidateAndRestoreSQL_LocalizedSemanticWarnings(t *testing.T) {
+	sess := privacy.NewTurnPrivacySession()
+	defer sess.ZeroAndRelease()
+
+	_, _ = sess.RegisterTable("app", "users")
+	_, _ = sess.RegisterColumn("app", "users", "status")
+	_, _ = sess.RegisterValue(privacy.ValInt, "2")
+	mysqlProf := fingerprint.Profile{Engine: "mysql", Mode: "mysql"}
+
+	zhSel, err := privacy.ValidateAndRestoreSQL(sess, "SELECT * FROM table_1 LIMIT 10", mysqlProf, "zh-CN")
+	if err != nil {
+		t.Fatalf("zh select: %v", err)
+	}
+	if len(zhSel.SemanticWarnings) != 1 || !strings.Contains(zhSel.SemanticWarnings[0], "`SELECT *`") || strings.Contains(zhSel.SemanticWarnings[0], "Statement uses") {
+		t.Fatalf("expected localized zh-CN SELECT * warning, got: %v", zhSel.SemanticWarnings)
+	}
+
+	enSel, err := privacy.ValidateAndRestoreSQL(sess, "SELECT * FROM table_1 LIMIT 10", mysqlProf, "en-US")
+	if err != nil {
+		t.Fatalf("en select: %v", err)
+	}
+	if len(enSel.SemanticWarnings) != 1 || !strings.Contains(enSel.SemanticWarnings[0], "Statement uses `SELECT *`") {
+		t.Fatalf("expected localized en-US SELECT * warning, got: %v", enSel.SemanticWarnings)
+	}
+
+	zhUpd, err := privacy.ValidateAndRestoreSQL(sess, "UPDATE table_1 SET column_1 = :val_int_1", mysqlProf, "zh-CN")
+	if err != nil {
+		t.Fatalf("zh update: %v", err)
+	}
+	if len(zhUpd.SemanticWarnings) != 1 || strings.Contains(zhUpd.SemanticWarnings[0], "Statement has no WHERE") {
+		t.Fatalf("expected localized zh-CN no-WHERE warning, got: %v", zhUpd.SemanticWarnings)
+	}
+
+	enUpd, err := privacy.ValidateAndRestoreSQL(sess, "UPDATE table_1 SET column_1 = :val_int_1", mysqlProf, "en-US")
+	if err != nil {
+		t.Fatalf("en update: %v", err)
+	}
+	if len(enUpd.SemanticWarnings) != 1 || !strings.Contains(enUpd.SemanticWarnings[0], "Statement has no WHERE filter") {
+		t.Fatalf("expected localized en-US no-WHERE warning, got: %v", enUpd.SemanticWarnings)
+	}
+}
+
+func TestTurnPrivacySession_TrivialKeywordLiteralsBoundVsPlatformHelp(t *testing.T) {
+	t.Run("bound tables parameterize quoted and kv platform enum literals without AssertZeroLeak false positives", func(t *testing.T) {
+		sess := privacy.NewTurnPrivacySession()
+		defer sess.ZeroAndRelease()
+
+		_, _ = sess.RegisterSchema("app")
+		_, _ = sess.RegisterTable("app", "orders")
+		_, _ = sess.RegisterColumn("app", "orders", "status")
+		_, _ = sess.RegisterColumn("app", "orders", "engine")
+
+		prompt := "Optimize SELECT status, engine FROM orders WHERE status = 'failed' OR status = \"approved\" OR status = \u201cerror\u201d; check status = failed and engine = 'mysql', keep unquoted failed and mysql prose intact"
+		anon, err := sess.AnonymizeNaturalLanguage(prompt)
+		if err != nil {
+			t.Fatalf("AnonymizeNaturalLanguage: %v", err)
+		}
+		for _, leaked := range []string{"'failed'", `"approved"`, "\u201cerror\u201d", "status = failed", "'mysql'"} {
+			if strings.Contains(anon, leaked) {
+				t.Fatalf("expected literal/kv %q to be bound as :val_str_n in: %s", leaked, anon)
+			}
+		}
+		if err := sess.AssertZeroLeak(anon); err != nil {
+			t.Fatalf("AssertZeroLeak unexpectedly failed: %v", err)
+		}
+
+		// Model returns anonymized SQL referencing all bound placeholders (:val_str_1='failed', :val_str_2='approved', :val_str_3='error', :val_str_4='mysql').
+		mysqlProf := fingerprint.Profile{Engine: "mysql", Mode: "mysql"}
+		res, err := privacy.ValidateAndRestoreSQL(
+			sess,
+			"SELECT column_1, column_2 FROM table_1 WHERE column_1 IN (:val_str_1, :val_str_2, :val_str_3) AND column_2 = :val_str_4",
+			mysqlProf,
+			"zh-CN",
+		)
+		if err != nil {
+			t.Fatalf("ValidateAndRestoreSQL failed: %v", err)
+		}
+		for _, wantLit := range []string{"'failed'", "'approved'", "'error'", "'mysql'"} {
+			if !strings.Contains(res.RestoredSQL, wantLit) {
+				t.Fatalf("restored SQL %q missing expected literal %s", res.RestoredSQL, wantLit)
+			}
+		}
+	})
+
+	t.Run("platform_help without bound tables keeps trivial keyword literals unmasked", func(t *testing.T) {
+		sess := privacy.NewTurnPrivacySession()
+		defer sess.ZeroAndRelease()
+
+		anon, err := sess.AnonymizeNaturalLanguage("Why does 'failed' status show up on 'mysql' in 'draft' mode?")
+		if err != nil {
+			t.Fatalf("AnonymizeNaturalLanguage: %v", err)
+		}
+		for _, kept := range []string{"failed", "mysql", "draft"} {
+			if !strings.Contains(anon, kept) {
+				t.Fatalf("expected platform_help literal %q to stay unmasked, got: %s", kept, anon)
+			}
+		}
+		if strings.Contains(anon, ":val_str_") {
+			t.Fatalf("expected platform_help not to parameterize trivial keywords, got: %s", anon)
+		}
+	})
+}
+
+func TestTurnPrivacySession_AnonymizeKnowledgeEntryText(t *testing.T) {
+	sess := privacy.NewTurnPrivacySession()
+	defer sess.ZeroAndRelease()
+
+	schTok, err := sess.RegisterSchema("app")
+	if err != nil {
+		t.Fatalf("RegisterSchema: %v", err)
+	}
+	tblTok, err := sess.RegisterTable("app", "orders")
+	if err != nil {
+		t.Fatalf("RegisterTable: %v", err)
+	}
+	colTok, err := sess.RegisterColumn("app", "orders", "status")
+	if err != nil {
+		t.Fatalf("RegisterColumn: %v", err)
+	}
+
+	rawText := `Check {{ref:table:["app","orders"]}} and {{ref:column:["app","orders","status"]}} plus extra table secret_audit; avoid status = 'pending' and keep LIMIT <= 1000.`
+	anon, err := sess.AnonymizeKnowledgeEntryText(rawText, []string{"secret_audit"})
+	if err != nil {
+		t.Fatalf("AnonymizeKnowledgeEntryText: %v", err)
+	}
+	if !strings.Contains(anon, schTok+"."+tblTok) || !strings.Contains(anon, schTok+"."+tblTok+"."+colTok) {
+		t.Fatalf("expected policy refs resolved to anonymous tokens, got: %s", anon)
+	}
+	if strings.Contains(anon, "secret_audit") || !strings.Contains(anon, "[redacted_table]") {
+		t.Fatalf("expected un-described catalog table scrubbed to [redacted_table], got: %s", anon)
+	}
+	if strings.Contains(anon, ":val_") {
+		t.Fatalf("knowledge thresholds/literals must not register turn placeholders, got: %s", anon)
+	}
+	if err := sess.AssertZeroLeak(anon); err != nil {
+		t.Fatalf("AssertZeroLeak unexpectedly failed: %v", err)
+	}
+	if _, ok := sess.LookupValue(":val_str_1"); ok {
+		t.Fatal("knowledge anonymization must not register :val_str_1 in turn session")
+	}
+
+	// Out-of-scope table reference must return ErrKnowledgeRefOutOfScope.
+	if _, err := sess.AnonymizeKnowledgeEntryText(`See {{ref:table:["other_db","hidden_tbl"]}}`, nil); !errors.Is(err, privacy.ErrKnowledgeRefOutOfScope) {
+		t.Fatalf("expected ErrKnowledgeRefOutOfScope, got: %v", err)
+	}
+
+	// Credential leak must fail closed with 6003 ASSISTANT_ANONYMIZATION_FAILED.
+	_, err = sess.AnonymizeKnowledgeEntryText("Use api_key=sk-live-secret-token-1234567890 in app.orders", nil)
+	var de *domain.Error
+	if !errors.As(err, &de) || de.Code != domain.CodeAssistantAnonymizationFailed {
+		t.Fatalf("expected 6003 ASSISTANT_ANONYMIZATION_FAILED, got: %v", err)
+	}
+}

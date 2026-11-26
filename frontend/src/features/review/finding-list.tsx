@@ -19,16 +19,18 @@ import { Spinner } from "@/shared/components/ui/spinner";
 import { EmptyState } from "@/shared/components/status/empty-state";
 import { LoadingState } from "@/shared/components/status/loading-state";
 import { ErrorState } from "@/shared/components/status/status-components";
-import { ChevronDown, CircleAlert, Crosshair, FileSearch, Lightbulb, Link2, TriangleAlert } from "lucide-react";
+import { ChevronDown, CircleAlert, FileSearch, Lightbulb, Link2, TriangleAlert } from "lucide-react";
 import { useSeverityFilter } from "./use-draft-workspace";
 import { FindingText } from "./finding-text";
+import { knownFailureKey } from "./review-status-card";
+import { ReviewSummarySection, type ReviewStageSummary } from "./review-summary-section";
 import { SeverityDistribution } from "./severity-distribution";
 
 /**
  * Structured finding list (migration contract §4 item 5): severity filter,
- * stage/group context, suggestion, evidence and SQL locating. Only the
- * contract fields render — model reasoning is not part of the API surface
- * and never appears in the UI (PRD F4: do not display chain-of-thought).
+ * stage/group context, suggestion and evidence. Only the contract fields
+ * render — model reasoning is not part of the API surface and never appears
+ * in the UI (PRD F4: do not display chain-of-thought).
  *
  * owner page feedback 2026-11-04 (card hierarchy): no longer wraps itself in a Card — both
  * callers (frozen review results, submission wizard precheck) are already embedded inside an outer card, so the list itself is
@@ -58,16 +60,15 @@ export type FindingListState =
   | { status: "expired" }
   | { status: "loading" }
   | { status: "error"; error: unknown; operationId?: string }
-  | { status: "incomplete"; findings: ReviewFinding[] }
+  | { status: "incomplete"; findings: ReviewFinding[]; failureCode?: string | null }
   | { status: "ready"; findings: ReviewFinding[] };
 
 export interface FindingListProps {
   state: FindingListState;
+  summaries?: ReviewStageSummary[];
+  hideIncompleteNotice?: boolean;
   onOpenEvidence: (findings: ReviewFinding[]) => void;
-  onLocate?: (finding: ReviewFinding) => void;
   onRetry?: () => void;
-  /** Whether a quoted snippet currently exists in the editor text. */
-  locateInEditor?: (snippet: string) => boolean;
 }
 
 /** The closed category vocabulary from api/contracts/ai-review-output.schema.json. */
@@ -134,7 +135,13 @@ function buildUnits(findings: ReviewFinding[]): FindingUnit[] {
   return units;
 }
 
-export function FindingList({ state, onOpenEvidence, onLocate, onRetry, locateInEditor }: FindingListProps) {
+export function FindingList({
+  state,
+  summaries = [],
+  hideIncompleteNotice = false,
+  onOpenEvidence,
+  onRetry,
+}: FindingListProps) {
   const { t } = useTranslation();
   const { severity, setSeverity, visible } = useSeverityFilter();
   const findings =
@@ -174,6 +181,9 @@ export function FindingList({ state, onOpenEvidence, onLocate, onRetry, locateIn
           </Select>
         )}
       </div>
+      {summaries.length > 0 && (state.status === "ready" || state.status === "incomplete") && (
+        <ReviewSummarySection summaries={summaries} />
+      )}
       {findings !== null && findings.length > 0 && <SeverityDistribution findings={findings} />}
       <div className="flex flex-col gap-3">
         {state.status === "idle" && (
@@ -223,13 +233,36 @@ export function FindingList({ state, onOpenEvidence, onLocate, onRetry, locateIn
             />
           </div>
         )}
-        {state.status === "incomplete" && (
+        {state.status === "incomplete" && !hideIncompleteNotice && (
           <Alert data-testid="findings-incomplete">
             <TriangleAlert className="text-[var(--risk-warning)]" aria-hidden />
             <AlertTitle>{t("precheck.findings.incompleteTitle")}</AlertTitle>
-            <AlertDescription>{t("precheck.findings.incompleteDescription")}</AlertDescription>
+            <AlertDescription className="flex flex-col gap-1.5">
+              {state.failureCode != null && (
+                <p
+                  className="font-medium text-[var(--exec-failed)]"
+                  data-testid="findings-incomplete-reason"
+                >
+                  {t(`precheck.failure.${knownFailureKey(state.failureCode)}`)}
+                </p>
+              )}
+              <p>
+                {state.findings.length > 0
+                  ? t("precheck.findings.incompleteDescription")
+                  : t("precheck.findings.incompleteEmptyDescription")}
+              </p>
+            </AlertDescription>
           </Alert>
         )}
+        {state.status === "incomplete" &&
+          hideIncompleteNotice &&
+          state.findings.length === 0 &&
+          summaries.length === 0 && (
+            <EmptyState
+              title={t("precheck.findings.noneGeneratedTitle")}
+              testId="findings-none-generated"
+            />
+          )}
         {state.status === "ready" && state.findings.length === 0 && (
           <EmptyState
             title={t("precheck.findings.emptyAll")}
@@ -248,10 +281,10 @@ export function FindingList({ state, onOpenEvidence, onLocate, onRetry, locateIn
           ? buildUnits(visibleFindings).map((unit) => {
               const finding = unit.kind === "group" ? unit.primary : unit.finding;
               const badge = SEVERITY_BADGE[finding.severity];
-              const locateTarget =
-                onLocate !== undefined && (locateInEditor?.(locateSnippet(finding) ?? "") ?? true)
-                  ? locateSnippet(finding)
-                  : null;
+              const hasEvidence =
+                finding.evidence_ids.length > 0 ||
+                (unit.kind === "group" &&
+                  unit.others.some((sub) => sub.evidence_ids.length > 0));
               return (
                 <article
                   key={finding.id}
@@ -298,11 +331,6 @@ export function FindingList({ state, onOpenEvidence, onLocate, onRetry, locateIn
                       <div className="mt-1.5 space-y-2.5">
                         {unit.others.map((sub) => {
                           const subBadge = SEVERITY_BADGE[sub.severity];
-                          const subLocateTarget =
-                            onLocate !== undefined &&
-                            (locateInEditor?.(locateSnippet(sub) ?? "") ?? true)
-                              ? locateSnippet(sub)
-                              : null;
                           return (
                             <div
                               key={sub.id}
@@ -337,19 +365,6 @@ export function FindingList({ state, onOpenEvidence, onLocate, onRetry, locateIn
                                   <p className="mt-1 text-[13px] leading-relaxed break-words">
                                     <FindingText text={sub.message} />
                                   </p>
-                                  <footer className="mt-1.5 flex flex-wrap gap-2">
-                                    {onLocate !== undefined && subLocateTarget !== null && (
-                                      <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        onClick={() => { onLocate(sub); }}
-                                        data-testid={`locate-${sub.id}`}
-                                      >
-                                        <Crosshair className="size-3.5" aria-hidden />
-                                        {t("precheck.findings.locate")}
-                                      </Button>
-                                    )}
-                                  </footer>
                                 </CollapsibleContent>
                               </Collapsible>
                             </div>
@@ -358,10 +373,8 @@ export function FindingList({ state, onOpenEvidence, onLocate, onRetry, locateIn
                       </div>
                     </section>
                   )}
-                  <footer className="mt-2 flex flex-wrap gap-2">
-                    {(finding.evidence_ids.length > 0 ||
-                      (unit.kind === "group" &&
-                        unit.others.some((sub) => sub.evidence_ids.length > 0))) && (
+                  {hasEvidence && (
+                    <footer className="mt-2 flex flex-wrap gap-2">
                       <Button
                         variant="outline"
                         size="sm"
@@ -370,19 +383,8 @@ export function FindingList({ state, onOpenEvidence, onLocate, onRetry, locateIn
                         <FileSearch className="size-3.5" aria-hidden />
                         {t("precheck.evidence.open")}
                       </Button>
-                    )}
-                    {onLocate !== undefined && locateTarget !== null && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => { onLocate(finding); }}
-                        data-testid={`locate-${finding.id}`}
-                      >
-                        <Crosshair className="size-3.5" aria-hidden />
-                        {t("precheck.findings.locate")}
-                      </Button>
-                    )}
-                  </footer>
+                    </footer>
+                  )}
                 </article>
               );
             })
@@ -392,17 +394,6 @@ export function FindingList({ state, onOpenEvidence, onLocate, onRetry, locateIn
   );
 }
 
-/**
- * SQL locating is presentation-only: a finding can be located when its text
- * quotes an exact SQL snippet (backtick-delimited in the server message) and
- * that snippet exists in the editor. No backend coordinates are invented —
- * findings without a quoted, matching snippet offer no locate affordance.
- */
 function categoryKey(category: string): string {
   return CATEGORY_KEYS[category] ?? "precheck.category.other";
-}
-
-function locateSnippet(finding: ReviewFinding): string | null {
-  const match = /`([^`]+)`/.exec(finding.message);
-  return match?.[1] ?? null;
 }

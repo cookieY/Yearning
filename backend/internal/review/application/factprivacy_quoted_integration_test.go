@@ -8,13 +8,12 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
-	"os"
-	"strconv"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/cookieY/YearningX/backend/internal/database"
+	"github.com/cookieY/YearningX/backend/internal/platform/testenv"
 	"github.com/cookieY/YearningX/backend/internal/review/agent"
 	"github.com/cookieY/YearningX/backend/internal/review/fingerprint"
 	"github.com/cookieY/YearningX/backend/internal/review/privacy"
@@ -37,20 +36,13 @@ func (quotedFixtureSigner) HMACSHA256(data []byte) ([]byte, error) {
 // quoted SQL object graph and that the complete Provider request leaks no real
 // identifier.
 func TestQuotedPostgreSQLFactFingerprintTokensReachProviderRequest(t *testing.T) {
-	password := os.Getenv("YEARNING_TEST_ADAPTER_PG_PASSWORD")
-	if password == "" {
-		t.Skip("postgres quoted-token fixture not configured")
-	}
-	port, err := strconv.Atoi(itestEnv("YEARNING_TEST_ADAPTER_PG_PORT", "54331"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	host := itestEnv("YEARNING_TEST_ADAPTER_PG_HOST", "localhost")
-	user := itestEnv("YEARNING_TEST_ADAPTER_PG_USER", "yearning")
-	dbname := itestEnv("YEARNING_TEST_ADAPTER_PG_DB", "yearning")
-	admin, err := sql.Open("pgx", fmt.Sprintf(
-		"host=%s port=%d user=%s password=%s dbname=%s sslmode=disable",
-		host, port, user, password, dbname))
+	cfg := testenv.RequireTargetPG(t)
+	port := cfg.Port
+	host := cfg.Host
+	user := cfg.User
+	password := cfg.Password
+	dbname := cfg.DBName
+	admin, err := sql.Open("pgx", cfg.LibpqDSN())
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -284,4 +284,198 @@ func TestBindPostgresGroupMetadataExplicitSchemaReference(t *testing.T) {
 			}
 		})
 	}
+
+	// CREATE INDEX on an observed table binds its parent table schema and remains complete
+	// (enforcing index_metadata observation downstream); standalone index without ParentToken stays incomplete.
+	idxGroups := []provider.AnonymizedGroup{{
+		GroupID:                     "pg-create-index",
+		RepresentativeAnonymizedSQL: "CREATE INDEX idx_001 ON schema_001.tbl_001 (col_001)",
+		MetadataContextComplete:     true,
+		Objects: []provider.AnonymizedObjectReference{
+			{Kind: "index", Token: "idx_001", ParentToken: tableToken, Relation: "define"},
+			{Kind: "table", Token: tableToken, SchemaToken: publicToken, StatementOrdinal: 2, StatementOrdinalRanges: []provider.StatementOrdinalRange{{Start: 2, End: 2}}},
+		},
+	}}
+	outIdx, _, completeIdx := bindPostgresGroupMetadata(idxGroups, binding, mapper)
+	if !completeIdx || outIdx[0].Objects[0].SchemaToken != publicToken {
+		t.Fatalf("expected pg index with valid parent table to bind schema %q and stay complete: complete=%v out=%+v", publicToken, completeIdx, outIdx)
+	}
+	badIdxGroups := []provider.AnonymizedGroup{{
+		GroupID:                     "pg-orphan-index",
+		RepresentativeAnonymizedSQL: "CREATE INDEX idx_001 ON tbl_001 (col_001)",
+		MetadataContextComplete:     true,
+		Objects: []provider.AnonymizedObjectReference{
+			{Kind: "index", Token: "idx_001"},
+		},
+	}}
+	if outBad, _, ok := bindPostgresGroupMetadata(badIdxGroups, binding, mapper); ok || outBad[0].MetadataContextComplete {
+		t.Fatalf("expected pg index without parent table to stay incomplete: ok=%v out=%+v", ok, outBad)
+	}
+}
+
+func TestBindGroupMetadataWithReason(t *testing.T) {
+	t.Run("mysql explicit out-of-scope schema", func(t *testing.T) {
+		mapper := privacy.NewRunMapper()
+		otherSchema, err := mapper.ScopedToken(privacy.KindSchema, privacy.ScopeCaseSensitive, "devops")
+		if err != nil {
+			t.Fatal(err)
+		}
+		tableToken, err := mapper.ScopedToken(privacy.KindTable, "", "deploy_record")
+		if err != nil {
+			t.Fatal(err)
+		}
+		groups := []provider.AnonymizedGroup{{
+			GroupID:                     "g-mysql-out-of-scope",
+			RepresentativeAnonymizedSQL: "INSERT INTO devops.deploy_record (id) VALUES (?)",
+			MetadataContextComplete:     true,
+			Objects: []provider.AnonymizedObjectReference{{
+				Kind: "table", Token: tableToken, SchemaToken: otherSchema,
+			}},
+		}}
+		_, _, complete, reason := bindGroupMetadataWithReason(groups, bindingOf("demo"), mapper)
+		if complete || reason != "sql_schema_out_of_scope" {
+			t.Fatalf("got complete=%v reason=%q, want false/sql_schema_out_of_scope", complete, reason)
+		}
+	})
+
+	t.Run("mysql missing database_name", func(t *testing.T) {
+		mapper := privacy.NewRunMapper()
+		tableToken, err := mapper.Token(privacy.KindTable, "deploy_record")
+		if err != nil {
+			t.Fatal(err)
+		}
+		groups := []provider.AnonymizedGroup{{
+			GroupID:                     "g-mysql-missing-db",
+			RepresentativeAnonymizedSQL: "INSERT INTO deploy_record (id) VALUES (?)",
+			MetadataContextComplete:     true,
+			Objects:                     []provider.AnonymizedObjectReference{{Kind: "table", Token: tableToken}},
+		}}
+		binding := &stageSchemaBinding{defensible: false, unavailableReason: "datasource_database_required"}
+		_, _, complete, reason := bindGroupMetadataWithReason(groups, binding, mapper)
+		if complete || reason != "datasource_database_required" {
+			t.Fatalf("got complete=%v reason=%q, want false/datasource_database_required", complete, reason)
+		}
+	})
+
+	t.Run("postgres explicit out-of-scope schema", func(t *testing.T) {
+		binding, mapper, tableToken, _, _ := testPostgresOrdinalBinding(t)
+		otherSchema, err := mapper.Token(privacy.KindSchema, "external_schema")
+		if err != nil {
+			t.Fatal(err)
+		}
+		groups := []provider.AnonymizedGroup{{
+			GroupID:                     "pg-out-of-scope",
+			RepresentativeAnonymizedSQL: "INSERT INTO external_schema.orders (id) VALUES (?)",
+			MetadataContextComplete:     true,
+			Objects: []provider.AnonymizedObjectReference{
+				{Kind: "schema", Token: otherSchema, Relation: "reference"},
+				{Kind: "table", Token: tableToken, SchemaToken: otherSchema, Relation: "target", StatementOrdinal: 1, StatementOrdinalRanges: []provider.StatementOrdinalRange{{Start: 1, End: 1}}},
+			},
+		}}
+		_, _, complete, reason := bindGroupMetadataWithReason(groups, binding, mapper)
+		if complete || reason != "sql_schema_out_of_scope" {
+			t.Fatalf("got complete=%v reason=%q, want false/sql_schema_out_of_scope", complete, reason)
+		}
+	})
+
+	t.Run("postgres search_path unavailable", func(t *testing.T) {
+		mapper := privacy.NewRunMapper()
+		groups := []provider.AnonymizedGroup{{
+			GroupID:                     "pg-no-path",
+			RepresentativeAnonymizedSQL: "SELECT 1",
+			MetadataContextComplete:     true,
+		}}
+		binding := &stageSchemaBinding{
+			defensible:        false,
+			unavailableReason: "postgres_search_path_unavailable",
+		}
+		_, _, complete, reason := bindGroupMetadataWithReason(groups, binding, mapper)
+		if complete || reason != "postgres_search_path_unavailable" {
+			t.Fatalf("got complete=%v reason=%q, want false/postgres_search_path_unavailable", complete, reason)
+		}
+	})
+
+	t.Run("datasource database required with objectless sql", func(t *testing.T) {
+		mapper := privacy.NewRunMapper()
+		groups := []provider.AnonymizedGroup{{
+			GroupID:                     "mysql-no-db",
+			RepresentativeAnonymizedSQL: "SELECT 1",
+			MetadataContextComplete:     true,
+		}}
+		binding := &stageSchemaBinding{
+			defensible:        false,
+			unavailableReason: "datasource_database_required",
+		}
+		_, _, complete, reason := bindGroupMetadataWithReason(groups, binding, mapper)
+		if complete || reason != "datasource_database_required" {
+			t.Fatalf("got complete=%v reason=%q, want false/datasource_database_required", complete, reason)
+		}
+	})
+
+	t.Run("unqualified statement with defensible empty-default binding", func(t *testing.T) {
+		mapper := privacy.NewRunMapper()
+		tableToken, err := mapper.Token(privacy.KindTable, "orders")
+		if err != nil {
+			t.Fatal(err)
+		}
+		groups := []provider.AnonymizedGroup{{
+			GroupID:                     "mysql-mixed-missing-default",
+			RepresentativeAnonymizedSQL: "UPDATE orders SET status = :number",
+			MetadataContextComplete:     true,
+			Objects:                     []provider.AnonymizedObjectReference{{Kind: "table", Token: tableToken}},
+		}}
+		binding := &stageSchemaBinding{
+			defensible:           true,
+			schemas:              map[string]bool{"demo": true},
+			defaultSchemaName:    "",
+			defaultSchemaSet:     true,
+			hasSQLDerivedSchemas: true,
+		}
+		_, _, complete, reason := bindGroupMetadataWithReason(groups, binding, mapper)
+		if complete || reason != "datasource_database_required" {
+			t.Fatalf("got complete=%v reason=%q, want false/datasource_database_required", complete, reason)
+		}
+	})
+
+	t.Run("qualified statement with schema reference, alias, and unparented column passes with empty default", func(t *testing.T) {
+		mapper := privacy.NewRunMapper()
+		demoTok, err := mapper.ScopedToken(privacy.KindSchema, "", "demo")
+		if err != nil {
+			t.Fatal(err)
+		}
+		tblTok, err := mapper.ScopedToken(privacy.KindTable, "", "deploy_record")
+		if err != nil {
+			t.Fatal(err)
+		}
+		aliasTok, err := mapper.ScopedToken(privacy.KindAlias, "", "d")
+		if err != nil {
+			t.Fatal(err)
+		}
+		colTok, err := mapper.ScopedToken(privacy.KindColumn, "", "project_name")
+		if err != nil {
+			t.Fatal(err)
+		}
+		groups := []provider.AnonymizedGroup{{
+			GroupID:                     "mysql-qualified-schema-ref",
+			RepresentativeAnonymizedSQL: "SELECT col_1 FROM sch_1.tbl_1 AS al_1",
+			MetadataContextComplete:     true,
+			Objects: []provider.AnonymizedObjectReference{
+				{Kind: "schema", Token: demoTok, Relation: "reference"},
+				{Kind: "table", Token: tblTok, SchemaToken: demoTok, Relation: "read"},
+				{Kind: "alias", Token: aliasTok, Relation: "reference"},
+				{Kind: "column", Token: colTok, Relation: "read"},
+			},
+		}}
+		binding := &stageSchemaBinding{
+			defensible:           true,
+			schemas:              map[string]bool{"demo": true},
+			defaultSchemaName:    "",
+			defaultSchemaSet:     true,
+			hasSQLDerivedSchemas: true,
+		}
+		out, scope, complete, reason := bindGroupMetadataWithReason(groups, binding, mapper)
+		if !complete || reason != "" || !scope.objects[demoTok][tblTok] || out[0].Objects[0].SchemaToken != demoTok {
+			t.Fatalf("got complete=%v reason=%q scope=%+v obj0=%+v", complete, reason, scope, out[0].Objects[0])
+		}
+	})
 }

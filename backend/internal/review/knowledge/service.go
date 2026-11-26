@@ -12,6 +12,7 @@ import (
 
 	"gorm.io/gorm"
 
+	"github.com/cookieY/YearningX/backend/internal/platform/ptr"
 	"github.com/cookieY/YearningX/backend/internal/review/privacy"
 	"github.com/google/uuid"
 )
@@ -153,15 +154,15 @@ func (s *Service) Replace(ctx context.Context, id string, in ReplaceInput) (*Ent
 			}
 		}
 		e.ConfigHash = hash
-		defJSON, err := jsonMarshal(e.Definition)
+		defJSON, err := json.Marshal(e.Definition)
 		if err != nil {
 			return err
 		}
 		sets := map[string]any{
 			"name": e.Name, "purpose": e.Purpose, "state": string(e.State),
 			"scope_type":    string(e.ScopeType),
-			"datasource_id": strPtr(e.DatasourceID), "database_name": strPtr(e.DatabaseName),
-			"table_name": strPtr(e.TableName), "definition": defJSON,
+			"datasource_id": ptr.NonZero(e.DatasourceID), "database_name": ptr.NonZero(e.DatabaseName),
+			"table_name": ptr.NonZero(e.TableName), "definition": defJSON,
 			"config_hash": e.ConfigHash, "version": e.Version, "updated_at": e.UpdatedAt,
 		}
 		if err := s.Repo.UpdateVersioned(ctx, tx, e, oldVersion, map[string]any{
@@ -219,10 +220,12 @@ var injectionPatterns = []*regexp.Regexp{
 	regexp.MustCompile("(?i)</?(system|assistant|instruction|prompt)>"),
 }
 
-// RunEval evaluates schema subset validity, privacy leak checks, injection patterns, and severity bounds.
+// RunEval evaluates schema subset validity, privacy leak checks, injection patterns, and advisory severity bounds.
 func RunEval(e *Entry) EvalReport {
 	report := EvalReport{CheckedAt: time.Now().UTC().Format(time.RFC3339)}
-	if err := e.Definition.Validate(); err == nil {
+	if e.ScopeType == ScopeGlobal {
+		report.Findings = append(report.Findings, "scope: global scope is retired; select datasource or table scope")
+	} else if err := e.Definition.Validate(); err == nil {
 		report.SchemaSubsetOK = true
 	} else {
 		report.Findings = append(report.Findings, "definition: "+err.Error())
@@ -250,49 +253,45 @@ func RunEval(e *Entry) EvalReport {
 	if !strings.Contains(strings.Join(report.Findings, ";"), "injection:") {
 		report.InjectionOK = true
 	}
-	// Severity must belong to the controlled severity enum.
+	// Severity must belong to the non-blocking advisory severity enum (info/low/medium).
 	switch e.Definition.MaxSeverity {
-	case "info", "low", "medium", "high", "critical":
+	case "info", "low", "medium":
 		report.SeverityOK = true
 	default:
-		report.Findings = append(report.Findings, "severity: max_severity outside the enum")
+		report.Findings = append(report.Findings, "severity: max_severity must be info, low, or medium")
 	}
 	report.Pass = report.SchemaSubsetOK && report.PrivacyOK && report.InjectionOK && report.SeverityOK
 	return report
 }
 
-// RenderInjection renders e wrapped in <knowledge-entry> data delimiter tags for prompt assembly.
+// RenderInjection renders e wrapped in <knowledge-entry> data delimiter tags as non-blocking advisory guidance.
 func RenderInjection(e *Entry) string {
 	var b strings.Builder
 	b.WriteString("<knowledge-entry id=\"")
 	b.WriteString(e.ID)
 	b.WriteString("\" name=\"")
-	b.WriteString(escapeAttr(e.Name))
+	b.WriteString(EscapeXMLAttr(e.Name))
 	b.WriteString("\" purpose=\"")
-	b.WriteString(escapeAttr(e.Purpose))
+	b.WriteString(EscapeXMLAttr(e.Purpose))
 	b.WriteString("\">\n")
-	b.WriteString("rule: ")
+	b.WriteString("advisory_note: ")
 	b.WriteString(escapeBody(strings.TrimSpace(e.Definition.KnowledgeText)))
 	b.WriteString("\nfinding_key: ")
 	b.WriteString(e.FindingKey)
-	b.WriteString("\neffective_severity: critical (every actual violation of this mandatory rule is Critical)")
-	b.WriteString("\nlegacy_max_severity_compatibility: info..")
-	b.WriteString(e.Definition.MaxSeverity)
-	b.WriteString(" (compatibility metadata only; it does not lower or authorize a mandatory rule violation)")
+	b.WriteString("\nadvisory_max_severity: ")
+	b.WriteString(e.Definition.EffectiveAdvisorySeverity())
+	b.WriteString(" (non-blocking internal experience guidance; never exceed this severity or block submission)")
 	b.WriteString("\n</knowledge-entry>")
 	return b.String()
 }
 
-func escapeAttr(s string) string {
+// EscapeXMLAttr escapes `&`, `"`, and `<` for prompt XML attribute values.
+func EscapeXMLAttr(s string) string {
 	s = strings.ReplaceAll(s, "&", "&amp;")
 	s = strings.ReplaceAll(s, "\"", "&quot;")
 	s = strings.ReplaceAll(s, "<", "&lt;")
 	return s
 }
-
-func jsonMarshal(v any) ([]byte, error) { return json.Marshal(v) }
-
-func jsonUnmarshal(raw []byte, v any) error { return json.Unmarshal(raw, v) }
 
 // escapeBody neutralizes embedded <knowledge-entry> tags inside experience text.
 func escapeBody(s string) string {

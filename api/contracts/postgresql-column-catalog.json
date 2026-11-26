@@ -1773,6 +1773,13 @@
                     "database_type": "uuid",
                     "ordinal_position": 16,
                     "primary_key_position": 0
+                },
+                {
+                    "column": "target_database",
+                    "nullable": true,
+                    "database_type": "text",
+                    "ordinal_position": 17,
+                    "primary_key_position": 0
                 }
             ]
         },
@@ -7988,7 +7995,7 @@
         }
     ],
     "table_count": 93,
-    "column_count": 1055,
+    "column_count": 1056,
     "contract_version": 1,
     "postgresql_version": "18.6 (Debian 18.6-1.pgdg13+2)"
 }

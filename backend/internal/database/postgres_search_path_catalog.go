@@ -5,6 +5,9 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"fmt"
+	"slices"
+	"strings"
 	"time"
 )
 
@@ -70,6 +73,72 @@ const postgresRelationBatchLookupSQL = `
 	 GROUP BY relation, relation_ord
 	 ORDER BY relation_ord`
 
+const postgresSchemasVisibleSQL = `
+	WITH requested AS (
+		SELECT pg_catalog.jsonb_extract_path(
+		           $1::pg_catalog.jsonb, 'schemas') AS schemas,
+		       pg_catalog.jsonb_extract_path_text(
+		           $1::pg_catalog.jsonb, 'role') AS role
+	),
+	schema_names AS (
+		SELECT value AS name
+		  FROM requested,
+		       LATERAL pg_catalog.jsonb_array_elements_text(schemas) AS s(value)
+	),
+	resolved AS (
+		SELECT n.oid IS NOT NULL AS schema_exists,
+		       CASE WHEN n.oid IS NULL THEN false
+		            ELSE COALESCE(pg_catalog.has_schema_privilege(
+		                 requested.role::pg_catalog.name, n.oid, 'USAGE'), false)
+		       END AS usage
+		  FROM schema_names s
+		  CROSS JOIN requested
+		  LEFT JOIN pg_catalog.pg_namespace n ON n.nspname = s.name
+	)
+	SELECT COALESCE(pg_catalog.bool_and(schema_exists), false),
+	       COALESCE(pg_catalog.bool_and(usage), false)
+	  FROM resolved`
+
+// IsDisallowedPostgresSystemSchema reports whether schema is empty or names a built-in
+// PostgreSQL catalog, toast, or temporary schema disallowed for explicit overrides
+// and SQL-derived scope expansion.
+func IsDisallowedPostgresSystemSchema(schema string) bool {
+	trimmed := strings.TrimSpace(schema)
+	low := strings.ToLower(trimmed)
+	return trimmed == "" ||
+		postgresTemporarySchema(trimmed) ||
+		postgresTemporarySchema(low) ||
+		low == "pg_catalog" ||
+		low == "information_schema" ||
+		low == "pg_toast" ||
+		strings.HasPrefix(low, "pg_toast_")
+}
+
+func mergePostgresLookupSchemas(path PostgresSearchPath, extraSchemas []string) ([]string, error) {
+	out := make([]string, 0, len(path.Effective)+len(extraSchemas))
+	seen := make(map[string]bool, len(path.Effective)+len(extraSchemas))
+	for _, schema := range path.Effective {
+		if !seen[schema] {
+			seen[schema] = true
+			out = append(out, schema)
+		}
+	}
+	for _, schema := range extraSchemas {
+		if ValidateIdentifier(schema) != nil || IsDisallowedPostgresSystemSchema(schema) {
+			return nil, ErrPostgresRelationUnresolved
+		}
+		if seen[schema] {
+			continue
+		}
+		seen[schema] = true
+		out = append(out, schema)
+	}
+	if len(out) > maxPostgresSearchPathSchemas+3 {
+		return nil, ErrPostgresRelationUnresolved
+	}
+	return out, nil
+}
+
 // PostgresRelationLookup is a complete lookup for one exact relation name
 // across the frozen effective path. An absent map member proves that the name
 // is absent in that schema; any unreadable schema aborts the whole lookup.
@@ -107,16 +176,11 @@ func (a *baseAdapter) ExplainWithPostgresSearchPath(
 	)
 }
 
-// LookupPostgresRelations performs one fixed catalog query for all requested
-// names and every effective schema. It runs on the review-purpose connection
-// with pg_catalog as its own search path, so target-role functions, operators
-// and types cannot intercept the catalog read.
-func LookupPostgresRelations(
-	ctx context.Context,
+func validatePostgresCatalogAccess(
 	pool *PurposePool,
 	path PostgresSearchPath,
-	relations []string,
-) ([]PostgresRelationLookup, error) {
+	extraSchemas []string,
+) ([]string, error) {
 	if pool == nil || pool.engine != "postgresql" ||
 		(pool.purpose != PurposeReview && pool.purpose != PurposeExecution) {
 		return nil, ErrPostgresSearchPathUnavailable
@@ -124,42 +188,17 @@ func LookupPostgresRelations(
 	if err := path.Validate(); err != nil {
 		return nil, ErrPostgresSearchPathUnavailable
 	}
-	if len(relations) == 0 || len(relations) > maxPostgresRelationLookups {
-		return nil, ErrPostgresRelationUnresolved
-	}
-	uniqueRelations := make([]string, 0, len(relations))
-	seenRequested := make(map[string]bool, len(relations))
-	for _, relation := range relations {
-		if err := ValidateIdentifier(relation); err != nil {
-			return nil, ErrPostgresRelationUnresolved
-		}
-		if seenRequested[relation] {
-			continue
-		}
-		seenRequested[relation] = true
-		uniqueRelations = append(uniqueRelations, relation)
-	}
-	requestJSON, err := json.Marshal(postgresBatchLookupInput{
-		Relations: uniqueRelations,
-		Schemas:   path.Effective,
-		Role:      path.CurrentUser,
-	})
-	if err != nil {
-		return nil, ErrPostgresRelationUnresolved
-	}
-	lookups := make([]PostgresRelationLookup, len(uniqueRelations))
-	lookupByName := make(map[string]*PostgresRelationLookup, len(uniqueRelations))
-	for i, relation := range uniqueRelations {
-		lookups[i] = PostgresRelationLookup{
-			Relation: relation, PresentBySchema: map[string]PostgresRelationKind{},
-		}
-		lookupByName[relation] = &lookups[i]
-	}
-	expectedRows := len(uniqueRelations)
-	seenRows := make(map[string]bool, expectedRows)
+	return mergePostgresLookupSchemas(path, extraSchemas)
+}
+
+func withPostgresCatalogTx(
+	ctx context.Context,
+	pool *PurposePool,
+	fn func(ctx context.Context, tx *sql.Tx) error,
+) error {
 	lookupCtx, cancel := context.WithTimeout(ctx, postgresRelationResolutionTimeout)
 	defer cancel()
-	err = pool.withReadQueryer(lookupCtx, true, func(q queryer) error {
+	return pool.withReadQueryer(lookupCtx, true, func(q queryer) error {
 		tx, ok := q.(*sql.Tx)
 		if !ok {
 			return ErrPostgresSearchPathUnavailable
@@ -167,21 +206,137 @@ func LookupPostgresRelations(
 		if _, err := tx.ExecContext(lookupCtx, postgresCatalogSearchPath); err != nil {
 			return ErrPostgresSearchPathUnavailable
 		}
-		return scanPostgresRelationLookups(
-			lookupCtx, tx, path, string(requestJSON),
-			lookups, lookupByName, seenRows, expectedRows,
-		)
+		return fn(lookupCtx, tx)
+	})
+}
+
+func preparePostgresRelationBatchLookup(
+	relations []string,
+	allowedSchemas []string,
+	role string,
+) (
+	uniqueRelations []string,
+	requestJSON string,
+	lookups []PostgresRelationLookup,
+	lookupByName map[string]*PostgresRelationLookup,
+	err error,
+) {
+	uniqueRelations = make([]string, 0, len(relations))
+	seenRequested := make(map[string]bool, len(relations))
+	for _, relation := range relations {
+		if err := ValidateIdentifier(relation); err != nil {
+			return nil, "", nil, nil, ErrPostgresRelationUnresolved
+		}
+		if seenRequested[relation] {
+			continue
+		}
+		seenRequested[relation] = true
+		uniqueRelations = append(uniqueRelations, relation)
+	}
+	rawJSON, err := json.Marshal(postgresBatchLookupInput{
+		Relations: uniqueRelations,
+		Schemas:   allowedSchemas,
+		Role:      role,
 	})
 	if err != nil {
+		return nil, "", nil, nil, ErrPostgresRelationUnresolved
+	}
+	lookups = make([]PostgresRelationLookup, len(uniqueRelations))
+	lookupByName = make(map[string]*PostgresRelationLookup, len(uniqueRelations))
+	for i, relation := range uniqueRelations {
+		lookups[i] = PostgresRelationLookup{
+			Relation: relation, PresentBySchema: map[string]PostgresRelationKind{},
+		}
+		lookupByName[relation] = &lookups[i]
+	}
+	return uniqueRelations, string(rawJSON), lookups, lookupByName, nil
+}
+
+// LookupPostgresRelations performs one fixed catalog query for all requested
+// names across the frozen effective path and any explicitly qualified non-system
+// schemas. It runs on the review-purpose connection with pg_catalog as its own
+// search path, so target-role functions, operators and types cannot intercept the catalog read.
+func LookupPostgresRelations(
+	ctx context.Context,
+	pool *PurposePool,
+	path PostgresSearchPath,
+	relations []string,
+	extraSchemas ...string,
+) ([]PostgresRelationLookup, error) {
+	allowedSchemas, err := validatePostgresCatalogAccess(pool, path, extraSchemas)
+	if err != nil {
+		return nil, err
+	}
+	if len(relations) == 0 || len(relations) > maxPostgresRelationLookups {
+		return nil, ErrPostgresRelationUnresolved
+	}
+	uniqueRelations, requestJSON, lookups, lookupByName, err := preparePostgresRelationBatchLookup(
+		relations, allowedSchemas, path.CurrentUser,
+	)
+	if err != nil {
+		return nil, err
+	}
+	seenRows := make(map[string]bool, len(uniqueRelations))
+	if err := withPostgresCatalogTx(ctx, pool, func(lookupCtx context.Context, tx *sql.Tx) error {
+		return scanPostgresRelationLookups(
+			lookupCtx, tx, allowedSchemas, requestJSON,
+			lookups, lookupByName, seenRows, len(uniqueRelations),
+		)
+	}); err != nil {
 		return nil, err
 	}
 	return lookups, nil
 }
 
+// VerifyPostgresSchemasVisible verifies that every schema in path.Effective and
+// any extraSchemas exists and grants USAGE to path.CurrentUser.
+func VerifyPostgresSchemasVisible(
+	ctx context.Context,
+	pool *PurposePool,
+	path PostgresSearchPath,
+	extraSchemas ...string,
+) error {
+	allowedSchemas, err := validatePostgresCatalogAccess(pool, path, extraSchemas)
+	if err != nil {
+		return err
+	}
+	return withPostgresCatalogTx(ctx, pool, func(lookupCtx context.Context, tx *sql.Tx) error {
+		return verifyPostgresSchemasVisibleOnQueryer(lookupCtx, tx, path.CurrentUser, allowedSchemas)
+	})
+}
+
+func verifyPostgresSchemasVisibleOnQueryer(
+	ctx context.Context,
+	q queryer,
+	role string,
+	schemas []string,
+) error {
+	requestJSON, err := json.Marshal(postgresBatchLookupInput{
+		Schemas: schemas,
+		Role:    role,
+	})
+	if err != nil {
+		return ErrPostgresRelationUnresolved
+	}
+	var schemasExist, schemasVisible bool
+	if err := q.QueryRowContext(ctx, postgresSchemasVisibleSQL, string(requestJSON)).Scan(
+		&schemasExist, &schemasVisible,
+	); err != nil {
+		return ErrPostgresSearchPathUnavailable
+	}
+	if !schemasExist {
+		return fmt.Errorf("%w: %w", ErrPostgresSearchPathUnavailable, ErrPolicyCatalogSchemaUnavailable)
+	}
+	if !schemasVisible {
+		return fmt.Errorf("%w: %w", ErrPostgresSearchPathUnavailable, ErrMetadataVisibilityUnproven)
+	}
+	return nil
+}
+
 func scanPostgresRelationLookups(
 	ctx context.Context,
 	q queryer,
-	path PostgresSearchPath,
+	allowedSchemas []string,
 	requestJSON string,
 	lookups []PostgresRelationLookup,
 	lookupByName map[string]*PostgresRelationLookup,
@@ -210,8 +365,11 @@ func scanPostgresRelationLookups(
 			return ErrPostgresRelationUnresolved
 		}
 		seenRows[relation] = true
-		if !schemasExist || !schemasVisible {
-			return ErrPostgresSearchPathUnavailable
+		if !schemasExist {
+			return fmt.Errorf("%w: %w", ErrPostgresSearchPathUnavailable, ErrPolicyCatalogSchemaUnavailable)
+		}
+		if !schemasVisible {
+			return fmt.Errorf("%w: %w", ErrPostgresSearchPathUnavailable, ErrMetadataVisibilityUnproven)
 		}
 		rawEntries := map[string]json.RawMessage{}
 		if err := json.Unmarshal(presentBySchema, &rawEntries); err != nil {
@@ -224,7 +382,7 @@ func scanPostgresRelationLookups(
 			}
 			if err := json.Unmarshal(raw, &identity); err != nil ||
 				identity.Kind == "" || identity.OID == 0 ||
-				!containsString(path.Effective, schema) {
+				!slices.Contains(allowedSchemas, schema) {
 				return ErrPostgresRelationUnresolved
 			}
 			lookup.PresentBySchema[schema] = postgresRelationKind(identity.Kind)
@@ -254,13 +412,14 @@ func InspectPostgresDMLTransaction(
 	path PostgresSearchPath,
 	relations []string,
 	callables []PostgresCallableRequest,
+	extraSchemas ...string,
 ) (PostgresSearchPath, []PostgresRelationLookup, []PostgresCallableResolution, error) {
 	concrete, ok := tx.(*dmlTx)
 	if !ok || !concrete.open || pool == nil || concrete.pool != pool ||
 		pool.engine != "postgresql" {
 		return PostgresSearchPath{}, nil, nil, ErrPostgresSearchPathUnavailable
 	}
-	return inspectPostgresQueryer(ctx, concrete.tx, path, relations, callables)
+	return inspectPostgresQueryer(ctx, concrete.tx, path, relations, callables, extraSchemas...)
 }
 
 // InspectPostgresDDLConnection performs the same inspection on the dedicated
@@ -273,6 +432,7 @@ func InspectPostgresDDLConnection(
 	path PostgresSearchPath,
 	relations []string,
 	callables []PostgresCallableRequest,
+	extraSchemas ...string,
 ) (PostgresSearchPath, []PostgresRelationLookup, []PostgresCallableResolution, error) {
 	if conn == nil {
 		return PostgresSearchPath{}, nil, nil, ErrPostgresSearchPathUnavailable
@@ -282,7 +442,7 @@ func InspectPostgresDDLConnection(
 		return PostgresSearchPath{}, nil, nil, ErrPostgresSearchPathUnavailable
 	}
 	snapshot, lookups, resolutions, inspectErr := inspectPostgresQueryer(
-		ctx, tx, path, relations, callables,
+		ctx, tx, path, relations, callables, extraSchemas...,
 	)
 	if err := tx.Rollback(); err != nil && inspectErr == nil {
 		return PostgresSearchPath{}, nil, nil, ErrPostgresSearchPathUnavailable
@@ -296,15 +456,20 @@ func inspectPostgresQueryer(
 	path PostgresSearchPath,
 	relations []string,
 	callables []PostgresCallableRequest,
+	extraSchemas ...string,
 ) (PostgresSearchPath, []PostgresRelationLookup, []PostgresCallableResolution, error) {
 	if q == nil || path.Validate() != nil {
 		return PostgresSearchPath{}, nil, nil, ErrPostgresSearchPathUnavailable
+	}
+	allowedSchemas, err := mergePostgresLookupSchemas(path, extraSchemas)
+	if err != nil {
+		return PostgresSearchPath{}, nil, nil, err
 	}
 	snapshot, err := probePostgresQueryerSearchPath(ctx, q)
 	if err != nil || !path.Equal(snapshot) {
 		return PostgresSearchPath{}, nil, nil, ErrPostgresSearchPathUnavailable
 	}
-	if len(relations) == 0 && len(callables) == 0 {
+	if len(relations) == 0 && len(callables) == 0 && len(extraSchemas) == 0 {
 		return snapshot, []PostgresRelationLookup{}, nil, nil
 	}
 	normalizedCallables, err := NormalizePostgresCallableRequests(callables)
@@ -314,30 +479,11 @@ func inspectPostgresQueryer(
 	if len(relations) > maxPostgresRelationLookups {
 		return PostgresSearchPath{}, nil, nil, ErrPostgresRelationUnresolved
 	}
-	unique := make([]string, 0, len(relations))
-	seenRequested := map[string]bool{}
-	for _, relation := range relations {
-		if ValidateIdentifier(relation) != nil {
-			return PostgresSearchPath{}, nil, nil, ErrPostgresRelationUnresolved
-		}
-		if !seenRequested[relation] {
-			seenRequested[relation] = true
-			unique = append(unique, relation)
-		}
-	}
-	requestJSON, err := json.Marshal(postgresBatchLookupInput{
-		Relations: unique, Schemas: path.Effective, Role: path.CurrentUser,
-	})
+	unique, requestJSON, lookups, lookupByName, err := preparePostgresRelationBatchLookup(
+		relations, allowedSchemas, path.CurrentUser,
+	)
 	if err != nil {
-		return PostgresSearchPath{}, nil, nil, ErrPostgresRelationUnresolved
-	}
-	lookups := make([]PostgresRelationLookup, len(unique))
-	lookupByName := make(map[string]*PostgresRelationLookup, len(unique))
-	for i, relation := range unique {
-		lookups[i] = PostgresRelationLookup{
-			Relation: relation, PresentBySchema: map[string]PostgresRelationKind{},
-		}
-		lookupByName[relation] = &lookups[i]
+		return PostgresSearchPath{}, nil, nil, err
 	}
 	executor, ok := q.(execer)
 	if !ok {
@@ -348,9 +494,13 @@ func inspectPostgresQueryer(
 	}
 	if len(unique) != 0 {
 		if err := scanPostgresRelationLookups(
-			ctx, q, path, string(requestJSON), lookups, lookupByName,
+			ctx, q, allowedSchemas, requestJSON, lookups, lookupByName,
 			map[string]bool{}, len(unique),
 		); err != nil {
+			return PostgresSearchPath{}, nil, nil, err
+		}
+	} else if len(extraSchemas) != 0 {
+		if err := verifyPostgresSchemasVisibleOnQueryer(ctx, q, path.CurrentUser, allowedSchemas); err != nil {
 			return PostgresSearchPath{}, nil, nil, err
 		}
 	}

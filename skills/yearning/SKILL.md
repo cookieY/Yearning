@@ -108,11 +108,13 @@ python3 <skill_dir>/scripts/yearning_api.py create-draft \
   --sql "ALTER TABLE demo.users ADD COLUMN status VARCHAR(32) NOT NULL DEFAULT 'active';"
 
 # 4. Run automated + AI SQL review precheck bound to flow_id (polls until ready/blocked/partial/failed/outdated)
+#    Optional --target-database: for MySQL sets the default database override; for PostgreSQL sets an optional Target
+#    Schema within the connected Database (never switches Databases; leave unset when SQL qualifies schema.table).
 python3 <skill_dir>/scripts/yearning_api.py precheck \
   --flow-id <flow_id> \
   --sql "ALTER TABLE demo.users ADD COLUMN status VARCHAR(32) NOT NULL DEFAULT 'active';"
 
-# 5. Submit a governed change order bound to the passing precheck run_id
+# 5. Submit a governed change order bound to the passing precheck run_id (pass matching --target-database if used in precheck)
 python3 <skill_dir>/scripts/yearning_api.py submit-order \
   --flow-id <flow_id> \
   --run-id <run_id> \
@@ -199,7 +201,7 @@ python3 <skill_dir>/scripts/yearning_api.py raw PUT /api/v4/change-drafts/<draft
 2. **Double-Submit CSRF**: `POST /api/v4/auth/login` sets `yearning_session` and `yearning_csrf` cookies. Every `POST`/`PUT`/`PATCH`/`DELETE` request **must** include header `X-CSRF-Token: <yearning_csrf>`.
 3. **Idempotency**: Mutating endpoints require `Idempotency-Key: <UUIDv4>` preserved across retries of the same logical write.
 4. **Optimistic Concurrency (`If-Match`)**: `POST /api/v4/change-orders/{id}/{approval-decisions|withdrawal|voidance|execution-attempts|execution-schedules}` and `PUT /api/v4/change-drafts/{id}/sql` require `If-Match: "<version>"`.
-5. **Cursor Pagination**: List endpoints (`/change-orders`, `/change-drafts`, `/users/me/flows`, `/query-grants`, `/query-sessions`) use `?limit=50&after=<cursor>`.
+5. **Cursor Pagination & System-Timezone Day Boundaries**: List endpoints (`/change-orders`, `/change-drafts`, `/users/me/flows`, `/query-grants`, `/query-sessions`) use `?limit=50&after=<cursor>`. All `YYYY-MM-DD` day-boundary filters (`submitted_from` / `submitted_to` on `/change-orders`) and wall-clock `requested_until` timestamps (e.g. `Z`-suffixed digits on query access requests/renewals) are interpreted in the platform's configured `general.system_timezone` (default `Asia/Shanghai`, exposed via `GET /api/v4/users/me` `system_timezone`), taking effect immediately on the next operation after settings updates.
 6. **Explicit Audited SQL Reveal**: Order SQL and Draft SQL are stored encrypted; `GET /api/v4/change-orders/{id}` returns metadata only. Call `POST /api/v4/change-orders/{id}/sql-reveals` (`{"purpose": "order-review"}` or `{"purpose": "rollback-order-sql"}`) only when explicitly inspecting SQL text.
 7. **Real-Time Domain Event Stream (SSE)**: Authenticated clients can subscribe to `GET /api/v4/events/stream` (`Accept: text/event-stream`) using `yearning_session` cookie authentication to receive user-scoped `io.yearning.v4.*` change-order, approval, execution, query-access, query-grant, and query-session state notifications without polling.
 
@@ -210,3 +212,7 @@ python3 <skill_dir>/scripts/yearning_api.py raw PUT /api/v4/change-drafts/<draft
 1. **Never Bypass Precheck**: `submit-order` (`POST /api/v4/change-orders`) requires a valid `run_id` from `precheck` (`POST /api/v4/review-runs`) whose reviewed `sql` matches the submitted `sql` byte-for-byte.
 2. **Confirm Before State-Mutating Order Decisions**: Before executing `decide-order` (`approve`/`reject`), `execute-order`, or `withdraw-or-void`, confirm intent with the user unless explicitly instructed to execute autonomously.
 3. **Read-Only Query Isolation**: Only `SELECT` statements are permitted in `/api/v4/query-sessions/{id}/executions`. Use `precheck` + `submit-order` for all DDL/DML changes.
+4. **Review Skills vs. Internal Experience Boundaries**: Mandatory blocking rules (`critical`) are enforced by flow-bound Review Skills (Prompt Tools); `datasource`/`table`-scoped Internal Experience notes are non-blocking advisories (`info`/`low`/`medium`, with `global` scope retired) shared between AI Assistant (`sql_generate` / `sql_optimize`) and AI Review precheck.
+5. **Supported Engine & Capability Matrix**:
+   - **Class A (Full Live Container Parity)**: `MySQL 8.0`, `PostgreSQL 14–18+`.
+   - **Class B (Dialects Validated via Static Golden Corpus, Catalog Record/Replay & Runtime Probe Fail-Closed Checks)**: `MySQL 5.7`, `MySQL 8.4 LTS`, `MariaDB`, `TiDB` (MySQL mode), `OceanBase` (MySQL mode), `PolarDB` (MySQL/PostgreSQL mode). Passing `--ddl-execution-mode gh_ost` on non-native MySQL targets or cloud dialects fails closed (`osc_unsupported_target`), and cross-schema `RENAME TABLE` fails closed for rollback protection.

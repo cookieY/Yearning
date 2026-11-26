@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import { useRecordOrderSqlCopy, useRevealOrderSql, type OrderSqlReveal } from "@/features/orders/use-approvals";
 import { SqlFileViewer } from "@/features/orders/sql-file-viewer";
 import { describeError } from "@/shared/api/error-display";
+import { writeClipboardText } from "@/shared/lib/clipboard";
 import { formatTimestamp, formatWatermark } from "@/shared/lib/timezones";
 import { appToast } from "@/shared/components/shadcn-dashboard/sonner/sonner-08";
 import { PendingButton } from "@/shared/components/pending-button";
@@ -58,21 +59,20 @@ export function OrderSqlCard({ orderId, embedded = false }: { orderId: string; e
     // only after the plaintext actually reached the clipboard, and every
     // failure surfaces through the inline error alert (nothing is swallowed):
     // an unrecorded audit must never pass silently after a real copy.
-    void navigator.clipboard
-      .writeText(revealed.sql)
-      .then(() => {
-        appToast.success(t("orders.sql.copy"));
-        return copyAudit.mutateAsync(revealed.revealId).catch((auditError: unknown) => {
-          const display = describeError(auditError, "recordOrderSqlCopy");
-          const msg = `${t("orders.sql.copyAuditFailed", { detail: t(display.messageKey) })}${display.requestId !== null ? ` (${display.requestId})` : ""}`;
-          setError(msg);
-          appToast.error(msg);
-        });
-      })
-      .catch(() => {
+    void writeClipboardText(revealed.sql).then((ok) => {
+      if (!ok) {
         setError(t("orders.sql.copyFailed"));
         appToast.error(t("orders.sql.copyFailed"));
+        return;
+      }
+      appToast.success(t("orders.sql.copy"));
+      return copyAudit.mutateAsync(revealed.revealId).catch((auditError: unknown) => {
+        const display = describeError(auditError, "recordOrderSqlCopy");
+        const msg = `${t("orders.sql.copyAuditFailed", { detail: t(display.messageKey) })}${display.requestId !== null ? ` (${display.requestId})` : ""}`;
+        setError(msg);
+        appToast.error(msg);
       });
+    });
   };
 
   const body = (

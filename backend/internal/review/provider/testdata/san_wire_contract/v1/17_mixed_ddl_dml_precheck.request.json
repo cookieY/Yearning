@@ -1,0 +1,155 @@
+{
+  "request_schema_version": 1,
+  "review_run_id": "00000000-0000-4000-8000-000000000001",
+  "engine_profile": "mysql/mysql",
+  "anonymized_statement_groups": [
+    {
+      "group_id": "10000000-0000-4000-8000-000000000001",
+      "representative_shape": "kind=ddl op=alter where=true",
+      "representative_anonymized_sql": "ALTER TABLE shop.orders ADD COLUMN remark VARCHAR(128) NULL",
+      "objects": [
+        {
+          "token": "shop",
+          "kind": "schema",
+          "relation": "reference",
+          "schema_token": "shop",
+          "statement_ordinal": 1,
+          "statement_ordinal_ranges": [
+            {
+              "start": 1,
+              "end": 1
+            }
+          ]
+        },
+        {
+          "token": "shop.orders",
+          "kind": "table",
+          "relation": "target",
+          "schema_token": "shop",
+          "statement_ordinal": 1,
+          "statement_ordinal_ranges": [
+            {
+              "start": 1,
+              "end": 1
+            }
+          ]
+        },
+        {
+          "token": "remark",
+          "kind": "column",
+          "relation": "define",
+          "schema_token": "shop",
+          "parent_token": "shop.orders",
+          "statement_ordinal": 1,
+          "statement_ordinal_ranges": [
+            {
+              "start": 1,
+              "end": 1
+            }
+          ]
+        }
+      ],
+      "metadata_context_complete": true,
+      "statement_count": 1,
+      "statement_ordinal": 1,
+      "statement_ordinal_ranges": [
+        {
+          "start": 1,
+          "end": 1
+        }
+      ],
+      "statistics": {
+        "algorithm_version": "yearning-fingerprint-v1",
+        "ddl_alters_column_type": false,
+        "ddl_changes_column_position": false,
+        "in_value_count_max": 0,
+        "max_statement_bytes": 59,
+        "unbounded_mutation": false,
+        "values_row_count_max": 0
+      }
+    },
+    {
+      "group_id": "10000000-0000-4000-8000-000000000002",
+      "representative_shape": "kind=dml op=update where=true",
+      "representative_anonymized_sql": "UPDATE shop.orders SET remark = 'backfilled' WHERE id = 1",
+      "objects": [
+        {
+          "token": "shop",
+          "kind": "schema",
+          "relation": "reference",
+          "schema_token": "shop",
+          "statement_ordinal": 2,
+          "statement_ordinal_ranges": [
+            {
+              "start": 2,
+              "end": 2
+            }
+          ]
+        },
+        {
+          "token": "shop.orders",
+          "kind": "table",
+          "relation": "target",
+          "schema_token": "shop",
+          "statement_ordinal": 2,
+          "statement_ordinal_ranges": [
+            {
+              "start": 2,
+              "end": 2
+            }
+          ]
+        },
+        {
+          "token": "remark",
+          "kind": "column",
+          "relation": "write",
+          "schema_token": "shop",
+          "parent_token": "shop.orders",
+          "statement_ordinal": 2,
+          "statement_ordinal_ranges": [
+            {
+              "start": 2,
+              "end": 2
+            }
+          ]
+        },
+        {
+          "token": "id",
+          "kind": "column",
+          "relation": "filter",
+          "schema_token": "shop",
+          "parent_token": "shop.orders",
+          "statement_ordinal": 2,
+          "statement_ordinal_ranges": [
+            {
+              "start": 2,
+              "end": 2
+            }
+          ]
+        }
+      ],
+      "metadata_context_complete": true,
+      "statement_count": 1,
+      "statement_ordinal": 2,
+      "statement_ordinal_ranges": [
+        {
+          "start": 2,
+          "end": 2
+        }
+      ],
+      "statistics": {
+        "algorithm_version": "yearning-fingerprint-v1",
+        "dml_has_limit": false,
+        "dml_has_order_by": false,
+        "dml_has_subselect": false,
+        "in_value_count_max": 0,
+        "max_statement_bytes": 57,
+        "unbounded_mutation": false,
+        "values_row_count_max": 0,
+        "where_literal_null": false
+      }
+    }
+  ],
+  "normalized_evidence": [],
+  "allowed_tool_descriptors": []
+}

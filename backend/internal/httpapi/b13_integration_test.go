@@ -23,6 +23,7 @@ import (
 	"time"
 
 	"github.com/cookieY/YearningX/backend/internal/crypto"
+	"github.com/cookieY/YearningX/backend/internal/platform/systz"
 )
 
 // putWithIfMatch sends PUT with If-Match and CSRF headers.
@@ -526,6 +527,7 @@ func TestSettingsHTTPLayerAligned(t *testing.T) {
 		t.Fatalf("login: %d %v", code, body)
 	}
 	fx.db.Exec(`delete from system_settings where namespace in ('general','query')`)
+	systz.InvalidateDB(fx.db)
 	fx.db.Exec(`delete from audit_events where event_type = 'settings.replaced'`)
 
 	// GET schema: schema_version and ui_hints present.

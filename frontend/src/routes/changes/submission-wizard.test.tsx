@@ -1,10 +1,13 @@
 import { fireEvent, within, render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { SessionProvider } from "@/features/auth/session-provider";
 import { MemoryRouter, Route, Routes } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { HttpResponse, http } from "msw";
+import { apiRoute } from "@/shared/mock/api-route";
 import { server } from "@/test/msw/server";
+import { grantSession } from "@/test/session";
 import i18n from "@/shared/i18n";
 import {
   FIXTURE_FLOW_ID,
@@ -62,29 +65,6 @@ vi.mock("@/features/review/sql-editor-panel", () => ({
   ),
 }));
 
-function grantSession(): void {
-  server.use(
-    http.get("*/users/me", () =>
-      HttpResponse.json({
-        err_code: 0,
-        message: "ok",
-        data: {
-          id: FIXTURE_OWNER_ID,
-          username: "henry",
-          display_name: "henry",
-          email: null,
-          is_builtin_admin: true,
-          version: 1,
-          created_at: "2026-08-28T08:00:00Z",
-          updated_at: "2026-08-28T08:00:00Z",
-          can_access_admin: true,
-        },
-        request_id: FIXTURE_OWNER_ID,
-      }),
-    ),
-  );
-}
-
 function renderWizard(initialEntry: string) {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
@@ -133,7 +113,7 @@ interface PrecheckCapture {
 function capturePrechecks(): PrecheckCapture {
   const capture: PrecheckCapture = { bodies: [], languages: [] };
   server.use(
-    http.post("*/review-runs", async ({ request }) => {
+    http.post(apiRoute("/review-runs"), async ({ request }) => {
       capture.bodies.push((await request.json()) as PrecheckCapture["bodies"][number]);
       capture.languages.push(request.headers.get("Accept-Language"));
       return HttpResponse.json({
@@ -193,7 +173,7 @@ describe("SubmissionWizard create mode (ephemeral precheck)", () => {
     expect(screen.getByTestId("changes-new-page")).toBeVisible();
     // Precheck never adopts a draft: the page carries no draft id, and the drafts list stays empty.
     expect(screen.getByTestId("changes-new-page").getAttribute("data-draft-id")).toBeNull();
-    const drafts = (await (await fetch("/change-drafts")).json()) as {
+    const drafts = (await (await fetch("/api/v4/change-drafts")).json()) as {
       data: { items: unknown[] };
     };
     expect(drafts.data.items).toHaveLength(0);
@@ -219,7 +199,7 @@ describe("SubmissionWizard create mode (ephemeral precheck)", () => {
   it("keeps bulk import local — no server write on the import path", async () => {
     let sqlPutCalls = 0;
     server.use(
-      http.put("*/change-drafts/:draftId/sql", () => {
+      http.put(apiRoute("/change-drafts/:draftId/sql"), () => {
         sqlPutCalls += 1;
         return HttpResponse.json({
           err_code: 0,
@@ -247,7 +227,7 @@ describe("SubmissionWizard create mode (ephemeral precheck)", () => {
     });
     expect(screen.queryByTestId("sql-editor")).not.toBeInTheDocument();
     expect(sqlPutCalls).toBe(0);
-    const drafts = (await (await fetch("/change-drafts")).json()) as {
+    const drafts = (await (await fetch("/api/v4/change-drafts")).json()) as {
       data: { items: unknown[] };
     };
     expect(drafts.data.items).toHaveLength(0);
@@ -256,7 +236,7 @@ describe("SubmissionWizard create mode (ephemeral precheck)", () => {
   it("submits draftless with {sql, run_id, metadata} after a passing precheck", async () => {
     const submissions: Array<Record<string, unknown>> = [];
     server.use(
-      http.post("*/change-orders", async ({ request }) => {
+      http.post(apiRoute("/change-orders"), async ({ request }) => {
         submissions.push((await request.json()) as Record<string, unknown>);
         // The success path only reads {id, display_number} for navigation.
         return HttpResponse.json({
@@ -320,7 +300,7 @@ describe("SubmissionWizard create mode (ephemeral precheck)", () => {
     await waitFor(() => {
       expect(screen.getByTestId("mine-page")).toBeVisible();
     });
-    const drafts = (await (await fetch("/change-drafts")).json()) as {
+    const drafts = (await (await fetch("/api/v4/change-drafts")).json()) as {
       data: { items: Array<{ requested_scheduled_for: string | null }> };
     };
     expect(drafts.data.items[0]?.requested_scheduled_for).not.toBeNull();
@@ -332,7 +312,7 @@ describe("SubmissionWizard in-flight SQL saves", () => {
     // owner ruling 2026-10-31 + RCP-20261101: precheck sends current editor SQL verbatim for review,
     // never writing SQL; new local text in the editor is preserved intact.
     const created = (await (
-      await fetch("/change-drafts", {
+      await fetch("/api/v4/change-drafts", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ flow_id: FIXTURE_FLOW_ID, title: "\u8fd0\u884c\u4e0d\u4fdd\u5b58" }),
@@ -350,7 +330,7 @@ describe("SubmissionWizard in-flight SQL saves", () => {
     const precheckBodies: Array<{ sql?: string; draft_id?: string }> = [];
     let sqlPutCalls = 0;
     server.use(
-      http.put("*/change-drafts/:draftId/sql", () => {
+      http.put(apiRoute("/change-drafts/:draftId/sql"), () => {
         sqlPutCalls += 1;
         return HttpResponse.json({
           err_code: 0,
@@ -359,7 +339,7 @@ describe("SubmissionWizard in-flight SQL saves", () => {
           request_id: FIXTURE_OWNER_ID,
         });
       }),
-      http.post("*/review-runs", async ({ request }) => {
+      http.post(apiRoute("/review-runs"), async ({ request }) => {
         precheckBodies.push((await request.json()) as { sql?: string; draft_id?: string });
         return HttpResponse.json({
           err_code: 0,
@@ -389,7 +369,7 @@ describe("SubmissionWizard in-flight SQL saves", () => {
 
   it("disables the precheck button immediately while the start is in flight (owner priority)", async () => {
     const created = (await (
-      await fetch("/change-drafts", {
+      await fetch("/api/v4/change-drafts", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ flow_id: FIXTURE_FLOW_ID, title: "\u9884\u5ba1\u4e0d\u634e\u5e26\u4fdd\u5b58" }),
@@ -408,7 +388,7 @@ describe("SubmissionWizard in-flight SQL saves", () => {
     const releaseRun = gate();
     let precheckCalls = 0;
     server.use(
-      http.post("*/review-runs", async () => {
+      http.post(apiRoute("/review-runs"), async () => {
         precheckCalls += 1;
         runStarted.open();
         await releaseRun.promise;
@@ -453,7 +433,7 @@ describe("SubmissionWizard in-flight SQL saves", () => {
     const releaseRun = gate();
     const precheckBodies: Array<{ sql?: string; draft_id?: string; flow_id?: string }> = [];
     server.use(
-      http.post("*/review-runs", async ({ request }) => {
+      http.post(apiRoute("/review-runs"), async ({ request }) => {
         precheckBodies.push((await request.json()) as { sql?: string; draft_id?: string; flow_id?: string });
         runStarted.open();
         await releaseRun.promise;
@@ -488,7 +468,7 @@ describe("SubmissionWizard in-flight SQL saves", () => {
     expect(precheckBodies[0]?.sql).toBe("UPDATE orders SET status = 1;");
     expect(precheckBodies[0]?.draft_id).toBeUndefined();
     expect(editor).toHaveValue("UPDATE orders SET status = 2;");
-    const drafts = (await (await fetch("/change-drafts")).json()) as {
+    const drafts = (await (await fetch("/api/v4/change-drafts")).json()) as {
       data: { items: unknown[] };
     };
     expect(drafts.data.items).toHaveLength(0);
@@ -496,7 +476,7 @@ describe("SubmissionWizard in-flight SQL saves", () => {
 
   it("does not leave the editor when SQL changes while save-and-return is in flight", async () => {
     const created = (await (
-      await fetch("/change-drafts", {
+      await fetch("/api/v4/change-drafts", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ flow_id: FIXTURE_FLOW_ID, title: "\u4fdd\u5b58\u5e76\u8fd4\u56de\u7ade\u6001" }),
@@ -514,7 +494,7 @@ describe("SubmissionWizard in-flight SQL saves", () => {
     const saveStarted = gate();
     const releaseSave = gate();
     server.use(
-      http.put("*/change-drafts/:draftId/sql", async ({ request }) => {
+      http.put(apiRoute("/change-drafts/:draftId/sql"), async ({ request }) => {
         await request.json();
         saveStarted.open();
         await releaseSave.promise;
@@ -554,7 +534,7 @@ describe("SubmissionWizard in-flight SQL saves", () => {
 
   it("does not leave while metadata is saving if the editor changes again", async () => {
     const created = (await (
-      await fetch("/change-drafts", {
+      await fetch("/api/v4/change-drafts", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ flow_id: FIXTURE_FLOW_ID, title: "\u5143\u6570\u636e\u4fdd\u5b58\u7ade\u6001" }),
@@ -572,7 +552,7 @@ describe("SubmissionWizard in-flight SQL saves", () => {
     const metadataStarted = gate();
     const releaseMetadata = gate();
     server.use(
-      http.patch("*/change-drafts/:draftId", async ({ request }) => {
+      http.patch(apiRoute("/change-drafts/:draftId"), async ({ request }) => {
         await request.json();
         metadataStarted.open();
         await releaseMetadata.promise;
@@ -615,7 +595,7 @@ describe("SubmissionWizard in-flight SQL saves", () => {
 
   it("does not leave when metadata changes while its patch is in flight", async () => {
     const created = (await (
-      await fetch("/change-drafts", {
+      await fetch("/api/v4/change-drafts", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ flow_id: FIXTURE_FLOW_ID, title: "\u5143\u6570\u636e PATCH \u5feb\u7167" }),
@@ -634,7 +614,7 @@ describe("SubmissionWizard in-flight SQL saves", () => {
     const releaseMetadata = gate();
     let patchedMetadata: { title?: string; description?: string | null } = {};
     server.use(
-      http.patch("*/change-drafts/:draftId", async ({ request }) => {
+      http.patch(apiRoute("/change-drafts/:draftId"), async ({ request }) => {
         patchedMetadata = (await request.json()) as {
           title?: string;
           description?: string | null;
@@ -681,7 +661,7 @@ describe("SubmissionWizard in-flight SQL saves", () => {
 
   it("keeps metadata edited during implicit adoption before the first draft query", async () => {
     const created = await (
-      await fetch("/change-drafts", {
+      await fetch("/api/v4/change-drafts", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -709,7 +689,7 @@ describe("SubmissionWizard in-flight SQL saves", () => {
       requested_scheduled_for?: string | null;
     } = {};
     server.use(
-      http.post("*/change-drafts", async ({ request }) => {
+      http.post(apiRoute("/change-drafts"), async ({ request }) => {
         postedMetadata = (await request.json()) as typeof postedMetadata;
         createStarted.open();
         await releaseCreate.promise;
@@ -767,7 +747,7 @@ describe("SubmissionWizard in-flight SQL saves", () => {
     const releaseSave = gate();
     const savedBodies: string[] = [];
     server.use(
-      http.put("*/change-drafts/:draftId/sql", async ({ request, params }) => {
+      http.put(apiRoute("/change-drafts/:draftId/sql"), async ({ request, params }) => {
         const body = (await request.json()) as { sql: string };
         savedBodies.push(body.sql);
         saveStarted.open();
@@ -815,7 +795,7 @@ describe("SubmissionWizard in-flight SQL saves", () => {
   it("retries a failed adoption PUT against the adopted draft instead of creating another", async () => {
     let putCalls = 0;
     server.use(
-      http.put("*/change-drafts/:draftId/sql", async ({ request, params }) => {
+      http.put(apiRoute("/change-drafts/:draftId/sql"), async ({ request, params }) => {
         putCalls += 1;
         if (putCalls === 1) {
           return HttpResponse.json(
@@ -870,7 +850,7 @@ describe("SubmissionWizard in-flight SQL saves", () => {
     const page = screen.getByTestId("changes-new-page");
     const adoptedId = page.getAttribute("data-draft-id");
     expect(adoptedId).not.toBeNull();
-    const drafts = (await (await fetch("/change-drafts")).json()) as {
+    const drafts = (await (await fetch("/api/v4/change-drafts")).json()) as {
       data: { items: Array<{ id: string; title: string }> };
     };
     expect(drafts.data.items).toHaveLength(1);
@@ -889,7 +869,7 @@ describe("SubmissionWizard in-flight SQL saves", () => {
     await waitFor(() => {
       expect(screen.getByTestId("mine-page")).toBeVisible();
     });
-    const afterRetry = (await (await fetch("/change-drafts")).json()) as {
+    const afterRetry = (await (await fetch("/api/v4/change-drafts")).json()) as {
       data: { items: Array<{ id: string }> };
     };
     expect(afterRetry.data.items).toHaveLength(1);
@@ -903,7 +883,7 @@ describe("SubmissionWizard metadata completions (§18.42)", () => {
     // the three metadata reads answer 200 with items for the granted pair
     // and 2014 for a non-granted datasource.
     const grantedDatasource = "4f6f1a2b-0000-4000-8000-000000000002";
-    const base = `/users/me/flows/${FIXTURE_FLOW_ID}/datasources/${grantedDatasource}/metadata`;
+    const base = `/api/v4/users/me/flows/${FIXTURE_FLOW_ID}/datasources/${grantedDatasource}/metadata`;
     interface MetadataPage {
       data: { items: Array<Record<string, string>> };
       err_code: number;
@@ -921,7 +901,7 @@ describe("SubmissionWizard metadata completions (§18.42)", () => {
     // A foreign datasource never becomes enumerable, even for a granted flow.
     const denied = (await (
       await fetch(
-        `/users/me/flows/${FIXTURE_FLOW_ID}/datasources/99999999-0000-4000-8000-000000000009/metadata/schemas`,
+        `/api/v4/users/me/flows/${FIXTURE_FLOW_ID}/datasources/99999999-0000-4000-8000-000000000009/metadata/schemas`,
       )
     ).json()) as MetadataPage;
     expect(denied.err_code).toBe(2014);
@@ -931,11 +911,14 @@ describe("SubmissionWizard metadata completions (§18.42)", () => {
 describe("SubmissionWizard remote metadata prefetch removal", () => {
   it("never prefetches stage datasource schemas, tables, or columns in create or draft mode", async () => {
     const metadataRequests: string[] = [];
+    const recordMetadataHit = ({ request }: { request: Request }) => {
+      metadataRequests.push(request.url);
+      return HttpResponse.json({ err_code: 0, message: "ok", data: { items: [] } });
+    };
     server.use(
-      http.get("*/users/me/flows/:flowId/datasources/:datasourceId/metadata/*", ({ request }) => {
-        metadataRequests.push(request.url);
-        return HttpResponse.json({ err_code: 0, message: "ok", data: { items: [] } });
-      }),
+      http.get(apiRoute("/users/me/flows/:flowId/datasources/:datasourceId/metadata/schemas"), recordMetadataHit),
+      http.get(apiRoute("/users/me/flows/:flowId/datasources/:datasourceId/metadata/tables"), recordMetadataHit),
+      http.get(apiRoute("/users/me/flows/:flowId/datasources/:datasourceId/metadata/columns"), recordMetadataHit),
     );
 
     // 1. Create mode: selecting a flow and typing SQL never triggers metadata prefetch.
@@ -952,7 +935,7 @@ describe("SubmissionWizard remote metadata prefetch removal", () => {
 
     // 2. Draft mode: opening an existing draft never triggers metadata prefetch either.
     const created = (await (
-      await fetch("/change-drafts", {
+      await fetch("/api/v4/change-drafts", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ flow_id: FIXTURE_FLOW_ID, title: "\u65e0\u8fdc\u7a0b\u5143\u6570\u636e\u9884\u62c9\u53d6" }),
@@ -1002,7 +985,7 @@ describe("SubmissionWizard flow picker search", () => {
 describe("SubmissionWizard draft mode metadata", () => {
   it("shows the frozen flow inline and saves metadata edits in place", async () => {
     const create = (await (
-      await fetch("/change-drafts", {
+      await fetch("/api/v4/change-drafts", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ flow_id: FIXTURE_FLOW_ID, title: "\u521d\u59cb\u6807\u9898" }),
@@ -1028,7 +1011,7 @@ describe("SubmissionWizard draft mode metadata", () => {
     await waitFor(() => {
       expect(screen.getByTestId("mine-page")).toBeVisible();
     });
-    const drafts = (await (await fetch("/change-drafts")).json()) as {
+    const drafts = (await (await fetch("/api/v4/change-drafts")).json()) as {
       data: { items: Array<{ title: string }> };
     };
     expect(drafts.data.items[0]?.title).toBe("\u6539\u540e\u7684\u6807\u9898");
@@ -1036,7 +1019,7 @@ describe("SubmissionWizard draft mode metadata", () => {
 
   it("shows the saved draft title in the summary card on reopen (F-UX-001)", async () => {
     const create = (await (
-      await fetch("/change-drafts", {
+      await fetch("/api/v4/change-drafts", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ flow_id: FIXTURE_FLOW_ID, title: "\u5df2\u4fdd\u5b58\u6807\u9898\u8349\u7a3f" }),
@@ -1056,7 +1039,7 @@ describe("SubmissionWizard draft mode metadata", () => {
 
   it("keeps the summary dock blocked while no precheck exists, then leaves via Save Draft", async () => {
     const create = (await (
-      await fetch("/change-drafts", {
+      await fetch("/api/v4/change-drafts", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ flow_id: FIXTURE_FLOW_ID, title: "\u65e0SQL\u8349\u7a3f" }),
@@ -1084,7 +1067,7 @@ describe("SubmissionWizard draft mode metadata", () => {
     await waitFor(() => {
       expect(screen.getByTestId("mine-page")).toBeVisible();
     });
-    const drafts = (await (await fetch("/change-drafts")).json()) as {
+    const drafts = (await (await fetch("/api/v4/change-drafts")).json()) as {
       data: { items: Array<{ has_sql: boolean }> };
     };
     expect(drafts.data.items[0]?.has_sql).toBe(true);
@@ -1092,7 +1075,7 @@ describe("SubmissionWizard draft mode metadata", () => {
 
   it("shows runDraftReview SQL_PARSE_FAILED location detail only inside precheck-dialog and keeps modal switching mutually exclusive", async () => {
     server.use(
-      http.post("*/review-runs", () =>
+      http.post(apiRoute("/review-runs"), () =>
         HttpResponse.json({
           err_code: 2003,
           message: "SQL_PARSE_FAILED",
@@ -1189,9 +1172,7 @@ describe("SubmissionWizard draft mode metadata", () => {
 
     const completedProgress = screen.getByTestId("precheck-progress");
     expect(completedProgress).toHaveAttribute("data-progress-active", "false");
-    expect(["passed", "warning", "blocked"]).toContain(
-      completedProgress.getAttribute("data-progress-tone"),
-    );
+    expect(completedProgress).toHaveAttribute("data-progress-tone", "passed");
 
     // Clicking the backdrop or pressing Escape must not close precheck-dialog; only explicit close controls may dismiss it.
     const overlay = document.querySelector('[data-slot="dialog-overlay"]');
@@ -1223,5 +1204,461 @@ describe("SubmissionWizard draft mode metadata", () => {
     expect(editor.readOnly).toBe(false);
     expect(screen.getByTestId("run-review")).toBeEnabled();
     expect(useDraftEditorStore.getState().serverState).toBeNull();
+  });
+});
+
+describe("SubmissionWizard lazy target database selector", () => {
+  interface TargetSelectorMockOptions {
+    flowId: string;
+    flowName: string;
+    datasourceId: string;
+    datasourceName: string;
+    engine: "mysql" | "postgresql";
+    databaseName: string | null;
+    schemas: string[];
+    displayNumber: string;
+    schemaGate?: { resolve: () => void };
+  }
+
+  function setupTargetSelectorMocks(options: TargetSelectorMockOptions) {
+    Object.defineProperty(Element.prototype, "hasPointerCapture", { value: () => false, configurable: true });
+    Object.defineProperty(Element.prototype, "scrollIntoView", { value: () => undefined, configurable: true });
+    Object.defineProperty(Element.prototype, "releasePointerCapture", { value: () => undefined, configurable: true });
+
+    let schemaFetches = 0;
+    const reviewPayloads: Array<Record<string, unknown>> = [];
+    const orderPayloads: Array<Record<string, unknown>> = [];
+    const runId = crypto.randomUUID();
+
+    server.use(
+      http.get(apiRoute("/users/me/flows"), () =>
+        HttpResponse.json({
+          err_code: 0,
+          message: "ok",
+          data: {
+            items: [
+              {
+                id: options.flowId,
+                name: options.flowName,
+                flow_type: "change_review",
+                enabled: true,
+                status: "enabled",
+                rule_set_id: null,
+                stages: [
+                  {
+                    position: 1,
+                    datasource_id: options.datasourceId,
+                    datasource_name: options.datasourceName,
+                    datasource_engine: options.engine,
+                    datasource_compatibility_mode: options.engine,
+                    datasource_database_name: options.databaseName,
+                    approval_steps: [{ position: 1, actors: [{ user_id: FIXTURE_OWNER_ID }] }],
+                    execution_actors: [{ user_id: FIXTURE_OWNER_ID }],
+                  },
+                ],
+                version: 1,
+                created_at: "2026-08-01T00:00:00Z",
+                updated_at: "2026-08-01T00:00:00Z",
+              },
+            ],
+            next_cursor: null,
+          },
+          request_id: FIXTURE_OWNER_ID,
+        }),
+      ),
+      http.get(apiRoute("/users/me/flows/:flowId/datasources/:datasourceId/metadata/schemas"), async () => {
+        schemaFetches += 1;
+        if (options.schemaGate !== undefined) {
+          const gateRef = options.schemaGate;
+          await new Promise<void>((resolve) => {
+            gateRef.resolve = resolve;
+          });
+        }
+        return HttpResponse.json({
+          err_code: 0,
+          message: "ok",
+          data: { items: options.schemas.map((name) => ({ name })) },
+          request_id: FIXTURE_OWNER_ID,
+        });
+      }),
+      http.post(apiRoute("/review-runs"), async ({ request }) => {
+        reviewPayloads.push((await request.json()) as Record<string, unknown>);
+        return HttpResponse.json({
+          err_code: 0,
+          message: "ok",
+          data: { run_id: runId, result_ref: `/review-runs/${runId}` },
+          request_id: FIXTURE_OWNER_ID,
+        });
+      }),
+      http.get(apiRoute("/review-runs/:runId"), () =>
+        HttpResponse.json({
+          err_code: 0,
+          message: "ok",
+          data: {
+            id: runId,
+            draft_id: "",
+            draft_revision: 0,
+            state: "ready",
+            statement_count: 1,
+            fingerprint_group_count: 1,
+            stage_results: [],
+            gate: { passed: true, reason_codes: [] },
+            failure_code: null,
+            version: 1,
+            created_at: "2026-08-01T00:00:00Z",
+            started_at: "2026-08-01T00:00:00Z",
+            finished_at: "2026-08-01T00:00:01Z",
+          },
+          request_id: FIXTURE_OWNER_ID,
+        }),
+      ),
+      http.get(apiRoute("/review-runs/:runId/findings"), () =>
+        HttpResponse.json({
+          err_code: 0,
+          message: "ok",
+          data: { items: [], next_cursor: null },
+          request_id: FIXTURE_OWNER_ID,
+        }),
+      ),
+      http.post(apiRoute("/change-orders"), async ({ request }) => {
+        orderPayloads.push((await request.json()) as Record<string, unknown>);
+        return HttpResponse.json({
+          err_code: 0,
+          message: "ok",
+          data: {
+            id: crypto.randomUUID(),
+            display_number: options.displayNumber,
+            state: "stage_approval_active",
+          },
+          request_id: FIXTURE_OWNER_ID,
+        });
+      }),
+    );
+
+    return {
+      reviewPayloads,
+      orderPayloads,
+      getSchemaFetches: () => schemaFetches,
+    };
+  }
+
+  const noDefaultFlowId = "4f6f1a2b-0000-4000-8000-00000000f901";
+  const noDefaultDsId = "4f6f1a2b-0000-4000-8000-00000000d901";
+
+  it("fetches schemas only on dropdown open, requires a MySQL target DB, carries target_database to review & submit, and invalidates on change", async () => {
+    const schemaGate: { resolve: () => void } = { resolve: () => undefined };
+    const { reviewPayloads, orderPayloads, getSchemaFetches } = setupTargetSelectorMocks({
+      flowId: noDefaultFlowId,
+      flowName: "MySQL Without Default DB",
+      datasourceId: noDefaultDsId,
+      datasourceName: "mysql-no-default",
+      engine: "mysql",
+      databaseName: null,
+      schemas: ["app", "analytics"],
+      displayNumber: "YR-20261124-000001",
+      schemaGate,
+    });
+
+    renderWizard("/changes/new");
+    fireEvent.click(await screen.findByTestId(`use-flow-${noDefaultFlowId}`));
+    expect(await screen.findByTestId("wizard-target-database")).toBeVisible();
+    expect(getSchemaFetches()).toBe(0);
+
+    fireEvent.change(screen.getByTestId("draft-title-input"), {
+      target: { value: "lazy target db submission" },
+    });
+    fireEvent.change(screen.getByTestId("sql-editor"), {
+      target: { value: "UPDATE app.orders SET status = 1 WHERE id = 1;" },
+    });
+
+    // Without selecting a target DB, AI precheck runs directly without target_database.
+    await userEvent.click(screen.getByTestId("run-review"));
+    await screen.findByTestId("precheck-dialog");
+    await waitFor(() => {
+      expect(reviewPayloads).toHaveLength(1);
+      expect(screen.getByTestId("submit-draft")).toBeEnabled();
+    }, { timeout: 4_000 });
+    expect(screen.queryByTestId("wizard-step-error")).not.toBeInTheDocument();
+    expect(reviewPayloads[0]?.target_database).toBeUndefined();
+    expect(getSchemaFetches()).toBe(0);
+
+    await userEvent.click(screen.getByTestId("precheck-dialog-close"));
+    await waitFor(() => {
+      expect(screen.queryByTestId("precheck-dialog")).not.toBeInTheDocument();
+    });
+
+    // Opening the dropdown triggers lazy metadata/schemas fetch and renders loading state in the popup portal (never shifting page flow).
+    await userEvent.click(screen.getByTestId("wizard-target-database"));
+    await waitFor(() => {
+      expect(getSchemaFetches()).toBe(1);
+      expect(screen.getByTestId("wizard-target-database")).toHaveAttribute("aria-expanded", "true");
+      expect(screen.getByTestId("wizard-target-database-loading")).toBeInTheDocument();
+    });
+    expect(
+      screen.getByTestId("wizard-target-database-section").contains(
+        screen.getByTestId("wizard-target-database-loading"),
+      ),
+    ).toBe(false);
+    schemaGate.resolve();
+    await userEvent.click(await screen.findByRole("option", { name: "app" }));
+    await waitFor(() => {
+      expect(screen.getByTestId("wizard-summary-target-database")).toHaveTextContent("app");
+      expect(screen.getByTestId("wizard-summary-precheck")).toHaveTextContent("\u5df2\u4fee\u6539");
+    });
+
+    // Precheck now sends target_database: "app".
+    await userEvent.click(screen.getByTestId("run-review"));
+    await screen.findByTestId("precheck-dialog");
+    await waitFor(() => {
+      expect(reviewPayloads).toHaveLength(2);
+      expect(screen.getByTestId("submit-draft")).toBeEnabled();
+    }, { timeout: 4_000 });
+    expect(reviewPayloads[1]?.target_database).toBe("app");
+
+    // Switching target database after precheck marks precheck stale/outdated.
+    await userEvent.click(screen.getByTestId("precheck-dialog-close"));
+    await waitFor(() => {
+      expect(screen.queryByTestId("precheck-dialog")).not.toBeInTheDocument();
+    });
+    await userEvent.click(screen.getByTestId("wizard-target-database"));
+    await waitFor(() => {
+      expect(screen.getByTestId("wizard-target-database")).toHaveAttribute("aria-expanded", "true");
+    });
+    await userEvent.click(await screen.findByRole("option", { name: "analytics" }));
+    await waitFor(() => {
+      expect(screen.getByTestId("wizard-summary-target-database")).toHaveTextContent("analytics");
+      expect(screen.getByTestId("wizard-summary-precheck")).toHaveTextContent("\u5df2\u4fee\u6539");
+    });
+
+    // Switch back to the reviewed DB so submission carries target_database: "app".
+    await userEvent.click(screen.getByTestId("wizard-target-database"));
+    await waitFor(() => {
+      expect(screen.getByTestId("wizard-target-database")).toHaveAttribute("aria-expanded", "true");
+    });
+    await userEvent.click(await screen.findByRole("option", { name: "app" }));
+    await userEvent.click(screen.getByTestId("view-precheck-results"));
+    await waitFor(() => {
+      expect(screen.getByTestId("submit-draft")).toBeEnabled();
+    });
+    await userEvent.click(screen.getByTestId("submit-draft"));
+    await userEvent.click(await screen.findByTestId("submit-confirm-accept"));
+
+    await waitFor(() => {
+      expect(orderPayloads).toHaveLength(1);
+      expect(orderPayloads[0]?.target_database).toBe("app");
+    });
+  });
+
+  it("shows PG schema notice (not Database), never prefills datasource_database_name, and clears/submits optional target_database", async () => {
+    const pgFlowId = "4f6f1a2b-0000-4000-8000-00000000f902";
+    const pgDsId = "4f6f1a2b-0000-4000-8000-00000000d902";
+    const { reviewPayloads, orderPayloads, getSchemaFetches } = setupTargetSelectorMocks({
+      flowId: pgFlowId,
+      flowName: "PG Change Flow",
+      datasourceId: pgDsId,
+      datasourceName: "prod-pg",
+      engine: "postgresql",
+      databaseName: "target_db",
+      schemas: ["public", "analytics"],
+      displayNumber: "YR-20261124-000002",
+    });
+
+    renderWizard("/changes/new");
+    fireEvent.click(await screen.findByTestId(`use-flow-${pgFlowId}`));
+    expect(await screen.findByTestId("wizard-target-database")).toBeVisible();
+    expect(screen.getByTestId("wizard-pg-schema-notice")).toBeVisible();
+    expect(screen.getByTestId("wizard-target-database-hint")).toHaveTextContent("target_db");
+    expect(screen.getByTestId("wizard-target-database-hint")).toHaveTextContent("Schema");
+    // datasource_database_name ("target_db") must never be prefilled as PG Target Schema.
+    expect(screen.getByTestId("wizard-summary-target-database")).toHaveTextContent("search_path");
+    expect(screen.queryByTestId("wizard-target-database-clear")).not.toBeInTheDocument();
+    expect(getSchemaFetches()).toBe(0);
+
+    fireEvent.change(screen.getByTestId("draft-title-input"), {
+      target: { value: "pg target schema test" },
+    });
+    fireEvent.change(screen.getByTestId("sql-editor"), {
+      target: { value: "UPDATE analytics.events SET note = 'ok' WHERE id = 1;" },
+    });
+
+    await userEvent.click(screen.getByTestId("wizard-target-database"));
+    await waitFor(() => {
+      expect(getSchemaFetches()).toBe(1);
+    });
+    await userEvent.click(await screen.findByRole("option", { name: "analytics" }));
+    await waitFor(() => {
+      expect(screen.getByTestId("wizard-summary-target-database")).toHaveTextContent("analytics");
+      expect(screen.getByTestId("wizard-target-database-clear")).toBeVisible();
+    });
+
+    await userEvent.click(screen.getByTestId("run-review"));
+    await screen.findByTestId("precheck-dialog");
+    await waitFor(() => {
+      expect(reviewPayloads).toHaveLength(1);
+      expect(screen.getByTestId("submit-draft")).toBeEnabled();
+    }, { timeout: 4_000 });
+    expect(reviewPayloads[0]?.target_database).toBe("analytics");
+
+    await userEvent.click(screen.getByTestId("precheck-dialog-close"));
+    await waitFor(() => {
+      expect(screen.queryByTestId("precheck-dialog")).not.toBeInTheDocument();
+    });
+
+    // Clearing PG schema returns summary to default search_path and omits target_database on precheck + submit.
+    await userEvent.click(screen.getByTestId("wizard-target-database-clear"));
+    await waitFor(() => {
+      expect(screen.getByTestId("wizard-summary-target-database")).toHaveTextContent("search_path");
+      expect(screen.queryByTestId("wizard-target-database-clear")).not.toBeInTheDocument();
+    });
+
+    await userEvent.click(screen.getByTestId("run-review"));
+    await screen.findByTestId("precheck-dialog");
+    await waitFor(() => {
+      expect(reviewPayloads).toHaveLength(2);
+      expect(screen.getByTestId("submit-draft")).toBeEnabled();
+    }, { timeout: 4_000 });
+    expect(reviewPayloads[1]?.target_database).toBeUndefined();
+
+    await userEvent.click(screen.getByTestId("submit-draft"));
+    await userEvent.click(await screen.findByTestId("submit-confirm-accept"));
+    await waitFor(() => {
+      expect(orderPayloads).toHaveLength(1);
+      expect(orderPayloads[0]?.target_database).toBeUndefined();
+    });
+  });
+
+  it("clears saved target_database on an existing draft across precheck (null), save (null), and submit (null)", async () => {
+    const pgFlowId = "4f6f1a2b-0000-4000-8000-00000000f903";
+    const pgDsId = "4f6f1a2b-0000-4000-8000-00000000d903";
+    const savedDraftId = "4f6f1a2b-0000-4000-8000-00000000a903";
+    const sqlText = "UPDATE analytics.events SET note = 'ok' WHERE id = 1;";
+    const patchPayloads: Array<Record<string, unknown>> = [];
+    let currentTargetDb: string | null = "analytics";
+    let draftVersion = 2;
+
+    const { reviewPayloads, orderPayloads } = setupTargetSelectorMocks({
+      flowId: pgFlowId,
+      flowName: "PG Draft Flow",
+      datasourceId: pgDsId,
+      datasourceName: "prod-pg",
+      engine: "postgresql",
+      databaseName: "target_db",
+      schemas: ["public", "analytics"],
+      displayNumber: "YR-20261124-000003",
+    });
+
+    server.use(
+      http.get(apiRoute("/change-drafts/:draftId"), () =>
+        HttpResponse.json({
+          err_code: 0,
+          message: "ok",
+          data: {
+            id: savedDraftId,
+            owner_user_id: FIXTURE_OWNER_ID,
+            flow_id: pgFlowId,
+            flow_version_seen: 1,
+            title: "Saved PG draft",
+            description: null,
+            requested_scheduled_for: null,
+            rollback_enabled: true,
+            target_database: currentTargetDb,
+            ticket_type: "normal",
+            revision: 1,
+            state: "draft",
+            has_sql: true,
+            sql_size_bytes: sqlText.length,
+            statement_count: 1,
+            review_run_id: null,
+            version: draftVersion,
+            created_at: "2026-08-01T00:00:00Z",
+            updated_at: "2026-08-01T00:00:00Z",
+          },
+          request_id: FIXTURE_OWNER_ID,
+        }),
+      ),
+      http.post(apiRoute("/change-drafts/:draftId/sql-reveals"), () =>
+        HttpResponse.json({
+          err_code: 0,
+          message: "ok",
+          data: {
+            reveal_id: crypto.randomUUID(),
+            sql: sqlText,
+            watermark: "henry@yearning.io",
+            valid_until: "2026-12-01T00:00:00Z",
+          },
+          request_id: FIXTURE_OWNER_ID,
+        }),
+      ),
+      http.patch(apiRoute("/change-drafts/:draftId"), async ({ request }) => {
+        const body = (await request.json()) as Record<string, unknown>;
+        patchPayloads.push(body);
+        if ("target_database" in body) {
+          currentTargetDb = (body.target_database as string | null) ?? null;
+        }
+        draftVersion += 1;
+        return HttpResponse.json({
+          err_code: 0,
+          message: "ok",
+          data: {
+            id: savedDraftId,
+            owner_user_id: FIXTURE_OWNER_ID,
+            flow_id: pgFlowId,
+            flow_version_seen: 1,
+            title: typeof body.title === "string" ? body.title : "Saved PG draft",
+            description: null,
+            requested_scheduled_for: null,
+            rollback_enabled: true,
+            target_database: currentTargetDb,
+            ticket_type: "normal",
+            revision: 1,
+            state: "draft",
+            has_sql: true,
+            sql_size_bytes: sqlText.length,
+            statement_count: 1,
+            review_run_id: null,
+            version: draftVersion,
+            created_at: "2026-08-01T00:00:00Z",
+            updated_at: "2026-08-01T00:00:00Z",
+          },
+          request_id: FIXTURE_OWNER_ID,
+        });
+      }),
+    );
+
+    renderWizard(`/changes/drafts/${savedDraftId}`);
+    expect(await screen.findByTestId("wizard-target-database-clear")).toBeVisible();
+    expect(screen.getByTestId("wizard-summary-target-database")).toHaveTextContent("analytics");
+    await waitFor(() => {
+      expect(screen.getByTestId("sql-editor")).toHaveValue(sqlText);
+    });
+
+    await userEvent.click(screen.getByTestId("wizard-target-database-clear"));
+    await waitFor(() => {
+      expect(screen.getByTestId("wizard-summary-target-database")).toHaveTextContent("search_path");
+      expect(screen.queryByTestId("wizard-target-database-clear")).not.toBeInTheDocument();
+    });
+
+    // AI precheck explicitly sends target_database: null (no DB mutation, never falling back to saved "analytics").
+    await userEvent.click(screen.getByTestId("run-review"));
+    await screen.findByTestId("precheck-dialog");
+    await waitFor(() => {
+      expect(reviewPayloads).toHaveLength(1);
+      expect(screen.getByTestId("submit-draft")).toBeEnabled();
+    }, { timeout: 4_000 });
+    expect("target_database" in (reviewPayloads[0] ?? {})).toBe(true);
+    expect(reviewPayloads[0]?.target_database).toBeNull();
+    expect(patchPayloads).toHaveLength(0);
+
+    // Submitting patches the draft with target_database: null and posts target_database: null on /change-orders.
+    await userEvent.click(screen.getByTestId("submit-draft"));
+    await userEvent.click(await screen.findByTestId("submit-confirm-accept"));
+    await waitFor(() => {
+      expect(orderPayloads).toHaveLength(1);
+    });
+    expect(patchPayloads).toHaveLength(1);
+    expect("target_database" in (patchPayloads[0] ?? {})).toBe(true);
+    expect(patchPayloads[0]?.target_database).toBeNull();
+    expect("target_database" in (orderPayloads[0] ?? {})).toBe(true);
+    expect(orderPayloads[0]?.target_database).toBeNull();
   });
 });

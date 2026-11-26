@@ -31,36 +31,34 @@ func (f *stmtFacts) set(k string, v any) {
 }
 
 var (
-	reWordLimit      = regexp.MustCompile(`(?i)\blimit\s+\d`)
-	reWordOrderBy    = regexp.MustCompile(`(?i)\border\s+by\b`)
-	reSubSelect      = regexp.MustCompile(`(?i)\b(from|join|where|exists|in)\s*\(?\s*select\b`)
-	reInsertCols     = regexp.MustCompile(`(?i)\binsert\s+(ignore\s+)?into\s+[^\s(]+\s*\(`)
-	reNullLiteral    = regexp.MustCompile(`(?i)[=<>]\s*null\b`)
-	reInsertNull     = regexp.MustCompile(`(?i)values\s*\(.*\bnull\b`)
-	reAutoIncrement  = regexp.MustCompile(`(?i)\bauto_increment\b`)
-	reAutoIncInit    = regexp.MustCompile(`(?i)\bauto_increment\s*=\s*(\d+)`)
-	reUnsigned       = regexp.MustCompile(`(?i)\bauto_increment[^,)]*\bunsigned\b|\bunsigned\b[^,)]*\bauto_increment\b`)
-	reTableComment   = regexp.MustCompile(`(?i)\bcomment\s*=?\s*'`)
-	rePrimaryKey     = regexp.MustCompile(`(?i)\bprimary\s+key\b`)
-	reForeignKey     = regexp.MustCompile(`(?i)\bforeign\s+key\b`)
-	rePartition      = regexp.MustCompile(`(?i)\bpartition\s+by\b`)
-	reIndexEntry     = regexp.MustCompile(`(?i)[,(\s](unique\s+)?(?:key|index|constraint\s+[^\s(]+\s+key)\s*([^\s(]*)\s*\(`)
-	reCharLen        = regexp.MustCompile(`(?i)\bchar\s*\(\s*(\d+)\s*\)`)
-	reVarCharLen     = regexp.MustCompile(`(?i)\bvarchar\s*\(\s*(\d+)\s*\)`)
-	reFloatDouble    = regexp.MustCompile(`(?i)\b(float|double)\s*[(\s]`)
-	reSpecialType    = regexp.MustCompile(`(?i)\b(enum|set|geometry|point|blob|text|json)\s*[(,\s]`)
-	reCreateView     = regexp.MustCompile(`(?i)^create\s+(or\s+replace\s+)?(algorithm\s*=\s*\w+\s+)?(sql\s+security\s+\w+\s+)?view\b`)
-	reViewStar       = regexp.MustCompile(`(?i)\bselect\s+\*`)
-	reCharset        = regexp.MustCompile(`(?i)\b(charset|character\s+set)\s*=?\s*([a-z0-9_]{1,64})`)
-	reCollation      = regexp.MustCompile(`(?i)\bcollate\s*=?\s*([a-z0-9_]{1,64})`)
-	reNotnull        = regexp.MustCompile(`(?i)\bnot\s+null\b`)
-	reDefault        = regexp.MustCompile(`(?i)\bdefault\b`)
-	reModifyChange   = regexp.MustCompile(`(?i)\b(modify|change)\s+(column\s+)?[^\s]+`)
-	reAfterFirst     = regexp.MustCompile(`(?i)\b(after|first)\b`)
-	reRenameTable    = regexp.MustCompile(`(?i)\brename\s+table\b`)
-	reQualifiedIdent = regexp.MustCompile(`(?i)\bto\s+[` + "`" + `]?[a-z0-9_]+\.`)
-	reDropTarget     = regexp.MustCompile(`(?is)^drop\s+(table|database|schema|view|index|trigger|procedure|function)\b`)
-	reParens         = regexp.MustCompile(`\(`)
+	reWordLimit     = regexp.MustCompile(`(?i)\blimit\s+\d`)
+	reWordOrderBy   = regexp.MustCompile(`(?i)\border\s+by\b`)
+	reSubSelect     = regexp.MustCompile(`(?i)\b(from|join|where|exists|in)\s*\(?\s*select\b`)
+	reInsertCols    = regexp.MustCompile(`(?i)\binsert\s+(ignore\s+)?into\s+[^\s(]+\s*\(`)
+	reNullLiteral   = regexp.MustCompile(`(?i)[=<>]\s*null\b`)
+	reInsertNull    = regexp.MustCompile(`(?i)values\s*\(.*\bnull\b`)
+	reAutoIncrement = regexp.MustCompile(`(?i)\bauto_increment\b`)
+	reAutoIncInit   = regexp.MustCompile(`(?i)\bauto_increment\s*=\s*(\d+)`)
+	reUnsigned      = regexp.MustCompile(`(?i)\bauto_increment[^,)]*\bunsigned\b|\bunsigned\b[^,)]*\bauto_increment\b`)
+	reTableComment  = regexp.MustCompile(`(?i)\bcomment\s*=?\s*'`)
+	rePrimaryKey    = regexp.MustCompile(`(?i)\bprimary\s+key\b`)
+	reForeignKey    = regexp.MustCompile(`(?i)\bforeign\s+key\b`)
+	rePartition     = regexp.MustCompile(`(?i)\bpartition\s+by\b`)
+	reIndexEntry    = regexp.MustCompile(`(?i)[,(\s](unique\s+)?(?:key|index|constraint\s+[^\s(]+\s+key)\s*([^\s(]*)\s*\(`)
+	reCharLen       = regexp.MustCompile(`(?i)\bchar\s*\(\s*(\d+)\s*\)`)
+	reVarCharLen    = regexp.MustCompile(`(?i)\bvarchar\s*\(\s*(\d+)\s*\)`)
+	reFloatDouble   = regexp.MustCompile(`(?i)\b(float|double)\s*[(\s]`)
+	reSpecialType   = regexp.MustCompile(`(?i)\b(enum|set|geometry|point|blob|text|json)\s*[(,\s]`)
+	reCreateView    = regexp.MustCompile(`(?i)^create\s+(or\s+replace\s+)?(algorithm\s*=\s*\w+\s+)?(sql\s+security\s+\w+\s+)?view\b`)
+	reViewStar      = regexp.MustCompile(`(?i)\bselect\s+\*`)
+	reCharset       = regexp.MustCompile(`(?i)\b(charset|character\s+set)\s*=?\s*([a-z0-9_]{1,64})`)
+	reCollation     = regexp.MustCompile(`(?i)\bcollate\s*=?\s*([a-z0-9_]{1,64})`)
+	reNotnull       = regexp.MustCompile(`(?i)\bnot\s+null\b`)
+	reDefault       = regexp.MustCompile(`(?i)\bdefault\b`)
+	reModifyChange  = regexp.MustCompile(`(?i)\b(modify|change)\s+(column\s+)?[^\s]+`)
+	reAfterFirst    = regexp.MustCompile(`(?i)\b(after|first)\b`)
+	reDropTarget    = regexp.MustCompile(`(?is)^drop\s+(table|database|schema|view|index|trigger|procedure|function)\b`)
+	reParens        = regexp.MustCompile(`\(`)
 )
 
 // sqlKeywordSet is the subset of common reserved words used for keyword checks (trimmed from the same
@@ -100,9 +98,11 @@ func extractStmtFacts(sql []byte, op, class string) stmtFacts {
 		}
 		f.set("ddl_drop_target", kind)
 		return f
-	case op == "rename" || reRenameTable.MatchString(s):
-		f.set("ddl_is_rename_table", true)
-		f.set("ddl_across_db_rename", reQualifiedIdent.MatchString(s))
+	case op == "rename":
+		if isRenameTable, acrossDB := parseRenameTableFacts(sql); isRenameTable {
+			f.set("ddl_is_rename_table", true)
+			f.set("ddl_across_db_rename", acrossDB)
+		}
 		return f
 	case op == "alter":
 		f.set("ddl_alters_column_type", reModifyChange.MatchString(s))
@@ -138,15 +138,23 @@ func extractStmtFacts(sql []byte, op, class string) stmtFacts {
 	f.set("ddl_not_null_count", int64(len(reNotnull.FindAllString(s, -1))))
 	f.set("ddl_default_count", int64(len(reDefault.FindAllString(s, -1))))
 	// Indexes: count, max column count, empty name, prefix compliance (code-computed boolean).
+	// PRIMARY KEY (...) counts as an index (MySQL clustered PRIMARY index) without being flagged
+	// as an unnamed secondary index or failing idx_/uniq_ naming; FOREIGN KEY (...) is a constraint
+	// tracked via ddl_has_foreign_key rather than an index entry.
 	type idxEntry struct {
-		name string
-		open int
+		name      string
+		isPrimary bool
 	}
-	var idxNames []string
+	var idxEntries []idxEntry
 	maxParts := 0
 	for _, loc := range reIndexEntry.FindAllStringSubmatchIndex(s, -1) {
+		prevWord := precedingSQLWord(s, loc[0])
+		if prevWord == "foreign" {
+			continue
+		}
+		isPrimary := prevWord == "primary"
 		name := strings.Trim(strings.ToLower(s[loc[4]:loc[5]]), "`\"")
-		idxNames = append(idxNames, name)
+		idxEntries = append(idxEntries, idxEntry{name: name, isPrimary: isPrimary})
 		open := loc[1] - 1
 		if open < len(s) && s[open] == '(' {
 			depth, parts := 1, 1
@@ -167,17 +175,19 @@ func extractStmtFacts(sql []byte, op, class string) stmtFacts {
 			}
 		}
 	}
-	_ = idxEntry{}
-	f.set("ddl_index_count", int64(len(idxNames)))
+	f.set("ddl_index_count", int64(len(idxEntries)))
 	f.set("ddl_index_max_key_parts", int64(maxParts))
 	unnamed := 0
 	prefixOK := true
-	for _, n := range idxNames {
-		if n == "" {
+	for _, entry := range idxEntries {
+		if entry.isPrimary {
+			continue
+		}
+		if entry.name == "" {
 			unnamed++
 			continue
 		}
-		if !strings.HasPrefix(n, "idx_") && !strings.HasPrefix(n, "uniq_") {
+		if !strings.HasPrefix(entry.name, "idx_") && !strings.HasPrefix(entry.name, "uniq_") {
 			prefixOK = false
 		}
 	}
@@ -242,6 +252,18 @@ var (
 	reTableName  = regexp.MustCompile(`(?is)^create\s+(temporary\s+)?table\s+(if\s+not\s+exists\s+)?[` + "`" + `"]?([a-z0-9_.]+)`)
 	reColumnDefs = regexp.MustCompile(`(?i)\b([` + "`" + `"]?[a-z_][a-z0-9_]*[` + "`" + `"]?)\s+(tinyint|smallint|mediumint|int|integer|bigint|char|varchar|text|blob|decimal|numeric|float|double|date|datetime|timestamp|time|year|enum|set|json|geometry|point|bit|boolean|bool)\b`)
 )
+
+func precedingSQLWord(s string, pos int) string {
+	end := pos
+	for end > 0 && (s[end-1] == ' ' || s[end-1] == '\t' || s[end-1] == '\n' || s[end-1] == '\r') {
+		end--
+	}
+	start := end
+	for start > 0 && ((s[start-1] >= 'a' && s[start-1] <= 'z') || (s[start-1] >= 'A' && s[start-1] <= 'Z') || s[start-1] == '_') {
+		start--
+	}
+	return strings.ToLower(s[start:end])
+}
 
 func extractPrimaryKeyColumn(s string) string {
 	if m := rePKColumn.FindStringSubmatch(s); m != nil {
@@ -470,4 +492,81 @@ func controlledDDLWord(sql []byte, collation bool, suspicious bool) (string, boo
 		}
 	}
 	return values[0], true
+}
+
+func renameIdentName(t fingerprint.Token) (string, bool) {
+	switch t.Kind {
+	case fingerprint.TokWord:
+		return t.Literal, true
+	case fingerprint.TokQuotedIdent:
+		return t.Text, true
+	default:
+		return "", false
+	}
+}
+
+func readRenameTableSchema(toks []fingerprint.Token, pos int) (schema string, qualified bool, nextPos int, ok bool) {
+	if pos >= len(toks) {
+		return "", false, pos, false
+	}
+	first, ok := renameIdentName(toks[pos])
+	if !ok {
+		return "", false, pos, false
+	}
+	pos++
+	if pos+1 < len(toks) && toks[pos].IsPunct(".") {
+		if _, ok := renameIdentName(toks[pos+1]); !ok {
+			return "", false, pos, false
+		}
+		return first, true, pos + 2, true
+	}
+	return "", false, pos, true
+}
+
+// parseRenameTableFacts reports whether sql is a RENAME TABLE statement and,
+// if so, parses each old_tbl TO new_tbl pair for cross-database renames.
+// Non-TABLE forms such as RENAME USER return (false, false) so extractStmtFacts
+// routes them to universal keys only (ddl_truncate_or_other).
+// Because stmtshape extracts statement-local facts before stage default-database
+// binding, an unqualified side is treated as belonging to the same schema as the
+// other side of its pair; acrossDB is true iff any pair has two explicitly
+// qualified sides with different schema names (case-insensitive).
+func parseRenameTableFacts(sql []byte) (isRenameTable bool, acrossDB bool) {
+	lex, err := fingerprint.Tokenize(sql, fingerprint.DialectFlags{
+		BacktickIdent:            true,
+		DoubleQuoteIdent:         true,
+		BackslashEscape:          true,
+		HashLineComment:          true,
+		ExecutableVersionComment: true,
+		DollarQuote:              true,
+		DollarParam:              true,
+		NestedBlockComment:       true,
+	})
+	if err != nil {
+		return false, false
+	}
+	toks := lex.Tokens
+	if len(toks) < 2 || !toks[0].IsWord("rename") || !toks[1].IsWord("table") {
+		return false, false
+	}
+	pos := 2
+	for pos < len(toks) {
+		srcSchema, srcQualified, next, ok := readRenameTableSchema(toks, pos)
+		if !ok || next >= len(toks) || !toks[next].IsWord("to") {
+			return true, false
+		}
+		dstSchema, dstQualified, afterDst, ok := readRenameTableSchema(toks, next+1)
+		if !ok {
+			return true, false
+		}
+		if srcQualified && dstQualified && !strings.EqualFold(srcSchema, dstSchema) {
+			return true, true
+		}
+		if afterDst < len(toks) && toks[afterDst].IsPunct(",") {
+			pos = afterDst + 1
+			continue
+		}
+		break
+	}
+	return true, false
 }

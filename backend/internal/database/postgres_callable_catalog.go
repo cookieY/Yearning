@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"slices"
 	"sort"
 	"strings"
 )
@@ -412,7 +413,7 @@ func buildPostgresCallableResolutions(
 				if ValidateIdentifier(winner.Schema) != nil ||
 					winner.Signature == "" || winner.ResultType == "" || winner.OID == 0 ||
 					winner.PgCatalog != (winner.Schema == "pg_catalog") ||
-					!containsString(path.Effective, winner.Schema) {
+					!slices.Contains(path.Effective, winner.Schema) {
 					return nil, ErrPostgresCallableUnresolved
 				}
 				if seen[winner.Signature] {

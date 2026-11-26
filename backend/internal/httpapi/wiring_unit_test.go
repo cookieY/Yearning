@@ -186,6 +186,9 @@ func TestStrictWiringSkipsLazyDomainDerivation(t *testing.T) {
 }
 
 func TestBuildServeDepsFailsFastOnMissingB3AndPropagatesLifecycleCtx(t *testing.T) {
+	if _, err := BuildServeDeps(nil, ServeDeps{}); err == nil { //nolint:staticcheck // explicit nil context fail-closed test
+		t.Fatal("expected BuildServeDeps to fail when lifecycle context is nil")
+	}
 	if _, err := BuildServeDeps(context.Background(), ServeDeps{}); err == nil {
 		t.Fatal("expected BuildServeDeps to fail when B3 platform deps are missing")
 	}
@@ -428,12 +431,12 @@ func TestWriteDomainError_QueueFullAndRateLimited(t *testing.T) {
 		})
 	}
 
-	t.Run("writeExecErr maps ErrSystemCapacity to 1012 retryable", func(t *testing.T) {
+	t.Run("writeCodedError maps ErrSystemCapacity to 1012 retryable", func(t *testing.T) {
 		w := httptest.NewRecorder()
 		c, _ := gin.CreateTestContext(w)
 		c.Request = httptest.NewRequest(http.MethodPost, "/api/v4/change-orders/1/execution-attempts", nil)
-		if !writeExecErr(c, execdomain.ErrSystemCapacity()) {
-			t.Fatal("expected writeExecErr to handle ErrSystemCapacity")
+		if !writeCodedError(c, execdomain.ErrSystemCapacity()) {
+			t.Fatal("expected writeCodedError to handle ErrSystemCapacity")
 		}
 		if w.Code != http.StatusOK {
 			t.Fatalf("status = %d, want 200", w.Code)
@@ -627,5 +630,57 @@ func TestHandleListOrdersFilterValidation(t *testing.T) {
 	lq := strings.ToLower(capturedQueries[0])
 	if !strings.Contains(lq, "o.state =") || !strings.Contains(lq, "ilike") || !strings.Contains(lq, "datasource_name_snapshot") || !strings.Contains(lq, "o.submitted_at >=") || !strings.Contains(lq, "o.submitted_at <") {
 		t.Fatalf("valid query missing filter predicates:\n%s", capturedQueries[0])
+	}
+}
+
+func TestHandleResetUserPasswordBusyReturns429(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	sqlDB := sql.OpenDB(busyUserStubConnector{})
+	t.Cleanup(func() { _ = sqlDB.Close() })
+	db, err := gorm.Open(gormpostgres.New(gormpostgres.Config{
+		Conn:                 sqlDB,
+		PreferSimpleProtocol: true,
+		WithoutReturning:     true,
+	}), &gorm.Config{Logger: gormlogger.Discard})
+	if err != nil {
+		t.Fatal(err)
+	}
+	sessions, err := identity.NewSessionStore(db, identity.DefaultSessionTTL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	recorder, err := auditlog.NewRecorder(db)
+	if err != nil {
+		t.Fatal(err)
+	}
+	svc, err := identity.NewService(db, sessions, nil, recorder)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	mem := session.NewMemoryStore()
+	mem.Put(&session.Session{
+		ID:        "tok-reset-busy",
+		ExpiresAt: time.Now().Add(time.Hour),
+		Identity:  &session.Identity{UserID: "u-admin", Username: "admin", IsBuiltinAdmin: true, Role: "admin"},
+	})
+
+	r := gin.New()
+	r.Use(session.Middleware(mem, session.Options{CookieName: "yearning_session"}))
+	r.POST("/api/v4/admin/users/:user_id/password", (&B3Deps{Identity: svc}).HandleResetUserPassword)
+
+	targetID := "0198da00-0000-7000-8000-000000000099"
+	body := bytes.NewBufferString(`{"new_password":"new-strong-password-123"}`)
+	req := httptest.NewRequest(http.MethodPost, "/api/v4/admin/users/"+targetID+"/password", body)
+	req.Header.Set("Content-Type", "application/json")
+	req.AddCookie(&http.Cookie{Name: "yearning_session", Value: "tok-reset-busy"})
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusTooManyRequests {
+		t.Fatalf("status = %d, want 429 (body=%s)", w.Code, w.Body.String())
+	}
+	if got := w.Header().Get("Retry-After"); got != "1" {
+		t.Fatalf("Retry-After = %q, want 1", got)
 	}
 }

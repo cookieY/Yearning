@@ -19,10 +19,16 @@ export interface MockExecutionWindow {
   end_local_time: string;
 }
 
+const DEFAULT_SYSTEM_TIMEZONE = "Asia/Shanghai";
+const DEFAULT_PRODUCT_NAME = "Yearning";
+
 interface SettingsBridgeState {
+  systemTimezone: string;
   queryApprovalEnabled: boolean;
   executionRestrictionEnabled: boolean;
   executionWindows: MockExecutionWindow[];
+  productName: string;
+  loginDescription: string;
 }
 
 const STORAGE_KEY = "yearning-mock-settings-bridge";
@@ -32,19 +38,31 @@ function readInitial(): SettingsBridgeState {
   // resets on every page load, but the owner's saved settings knob must
   // survive a refresh (§18.47 follow-up 4).
   const fallback: SettingsBridgeState = {
+    systemTimezone: DEFAULT_SYSTEM_TIMEZONE,
     queryApprovalEnabled: true,
     executionRestrictionEnabled: false,
     executionWindows: [],
+    productName: DEFAULT_PRODUCT_NAME,
+    loginDescription: "",
   };
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw === null) return fallback;
     const parsed = JSON.parse(raw) as Partial<SettingsBridgeState>;
     return {
+      systemTimezone:
+        typeof parsed.systemTimezone === "string" && parsed.systemTimezone.trim() !== ""
+          ? parsed.systemTimezone.trim()
+          : DEFAULT_SYSTEM_TIMEZONE,
       queryApprovalEnabled: typeof parsed.queryApprovalEnabled === "boolean" ? parsed.queryApprovalEnabled : true,
       executionRestrictionEnabled:
         typeof parsed.executionRestrictionEnabled === "boolean" ? parsed.executionRestrictionEnabled : false,
       executionWindows: Array.isArray(parsed.executionWindows) ? parsed.executionWindows : [],
+      productName:
+        typeof parsed.productName === "string" && parsed.productName.trim() !== ""
+          ? parsed.productName.trim()
+          : DEFAULT_PRODUCT_NAME,
+      loginDescription: typeof parsed.loginDescription === "string" ? parsed.loginDescription : "",
     };
   } catch {
     return fallback;
@@ -53,14 +71,28 @@ function readInitial(): SettingsBridgeState {
 
 export const settingsBridge: SettingsBridgeState = readInitial();
 
+export function mockSystemTimezone(): string {
+  return settingsBridge.systemTimezone || DEFAULT_SYSTEM_TIMEZONE;
+}
+
+export function mockPublicBranding(): { product_name: string; login_description: string } {
+  return {
+    product_name: settingsBridge.productName || DEFAULT_PRODUCT_NAME,
+    login_description: settingsBridge.loginDescription,
+  };
+}
+
 function persist(): void {
   try {
     localStorage.setItem(
       STORAGE_KEY,
       JSON.stringify({
+        systemTimezone: settingsBridge.systemTimezone,
         queryApprovalEnabled: settingsBridge.queryApprovalEnabled,
         executionRestrictionEnabled: settingsBridge.executionRestrictionEnabled,
         executionWindows: settingsBridge.executionWindows,
+        productName: settingsBridge.productName,
+        loginDescription: settingsBridge.loginDescription,
       }),
     );
   } catch {
@@ -72,6 +104,14 @@ function persist(): void {
 export function applySettingsToBridge(namespace: string, settings: unknown): void {
   if (settings === null || typeof settings !== "object") return;
   const record = settings as Record<string, unknown>;
+  if (
+    namespace === "general" &&
+    typeof record.system_timezone === "string" &&
+    record.system_timezone.trim() !== ""
+  ) {
+    settingsBridge.systemTimezone = record.system_timezone.trim();
+    persist();
+  }
   if (namespace === "query" && typeof record.approval_enabled === "boolean") {
     settingsBridge.queryApprovalEnabled = record.approval_enabled;
     persist();
@@ -100,6 +140,15 @@ export function applySettingsToBridge(namespace: string, settings: unknown): voi
       settingsBridge.executionWindows = windows;
       persist();
     }
+  }
+  if (namespace === "branding") {
+    if (typeof record.product_name === "string" && record.product_name.trim() !== "") {
+      settingsBridge.productName = record.product_name.trim();
+    }
+    if (typeof record.login_description === "string") {
+      settingsBridge.loginDescription = record.login_description.trim();
+    }
+    persist();
   }
 }
 
@@ -132,9 +181,12 @@ function windowContains(window: MockExecutionWindow, at: Date): boolean {
 /** Test seam: vitest worlds mutate the bridge via PUT handlers; the browser
  * persists across page loads via localStorage instead of resetting. */
 export function resetSettingsBridge(): void {
+  settingsBridge.systemTimezone = DEFAULT_SYSTEM_TIMEZONE;
   settingsBridge.queryApprovalEnabled = true;
   settingsBridge.executionRestrictionEnabled = false;
   settingsBridge.executionWindows = [];
+  settingsBridge.productName = DEFAULT_PRODUCT_NAME;
+  settingsBridge.loginDescription = "";
   try {
     localStorage.removeItem(STORAGE_KEY);
   } catch {

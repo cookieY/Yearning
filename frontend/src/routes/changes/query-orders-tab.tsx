@@ -2,10 +2,14 @@ import { StatusBadge } from "@/shared/components/status/status-badge";
 import { QUERY_REQUEST_TONE, QUERY_SESSION_TONE, QUERY_GRANT_TONE } from "@/features/query/query-state-tone";
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { ShieldCheck, Terminal } from "lucide-react";
+import { ShieldCheck, Terminal, Undo2 } from "lucide-react";
 import type { QueryAccessRequest, QueryGrant, QuerySession } from "@/api/generated/client/yearningV4HTTPAPI.schemas";
 import { useSession } from "@/features/auth/session-provider";
 import { useMyGrants, useQueryOrders } from "@/features/query/use-query-domain";
+import {
+  WithdrawQueryAccessDialog,
+  type WithdrawQueryAccessTarget,
+} from "@/features/query/withdraw-query-access-dialog";
 import { useCursorPage } from "@/shared/lib/cursor-page";
 import { formatTimestamp } from "@/shared/lib/timezones";
 import { useFlipReorder } from "@/shared/lib/use-flip-reorder";
@@ -20,6 +24,7 @@ import {
   type SearchTerm,
 } from "@/shared/components/global-search-bar";
 import { Badge } from "@/shared/components/ui/badge";
+import { Button } from "@/shared/components/ui/button";
 import { Card, CardContent, CardDescription, CardTitle } from "@/shared/components/ui/card";
 import {
   Sheet,
@@ -63,8 +68,10 @@ export function QueryOrdersTab() {
   });
   const grantsQuery = useMyGrants(authenticated);
   const [detail, setDetail] = useState<QueryOrderRow | null>(null);
+  const [withdrawTarget, setWithdrawTarget] = useState<WithdrawQueryAccessTarget | null>(null);
   const [terms, setTerms] = useState<SearchTerm[]>([]);
   const [live, setLive] = useState<SearchTerm | null>(null);
+  const currentUserId = session.user?.id;
 
   const entries = ordersQuery.data.items;
   const grants = grantsQuery.data ?? [];
@@ -86,70 +93,67 @@ export function QueryOrdersTab() {
     return [];
   });
 
-  const searchAccessors = useMemo<SearchAccessor<QueryOrderRow>[]>(() => {
-    const stateLabels = Array.from(
-      new Set([
-        t("query.request.state.access_pending"),
-        t("query.request.state.grant_active"),
-        t("query.request.state.rejected"),
-        t("query.session.state.active"),
-        t("query.session.state.revoked"),
-        t("query.session.state.expired"),
-        t("query.session.state.closed"),
-      ]),
-    );
-    return [
-      {
-        key: "kind",
-        label: t("orders.query.column.kind"),
-        value: (row) =>
-          row.kind === "request"
-            ? `request access_request ${t("orders.query.kind.request")}`
-            : `session ${t("orders.query.kind.session")}`,
-        options: [
-          { label: t("orders.query.kind.request") },
-          { label: t("orders.query.kind.session") },
-        ],
-      },
-      {
-        key: "datasources",
-        label: t("orders.query.column.datasources"),
-        value: (row) =>
-          row.kind === "request"
-            ? [...(row.request.datasource_names ?? []), ...row.request.datasource_ids].join(" ")
-            : row.session.capabilities
-                .map((capability) => `${capability.datasource_name} ${capability.datasource_id}`)
-                .join(" "),
-      },
-      {
-        key: "state",
-        label: t("orders.query.column.state"),
-        value: (row) =>
-          row.kind === "request"
-            ? `${row.request.state} ${t(`query.request.state.${row.request.state}`)}`
-            : `${row.session.state} ${t(`query.session.state.${row.session.state}`)}`,
-        options: stateLabels.map((label) => ({ label })),
-      },
-      {
-        key: "terminal",
-        label: t("orders.query.column.terminal"),
-        value: (row) =>
-          row.kind === "request" && row.grant !== null
-            ? `${row.grant.state} ${t(`query.grant.state.${row.grant.state}`)}`
-            : "",
-        options: (["active", "expired", "revoked"] as const).map((state) => ({
-          label: t(`query.grant.state.${state}`),
-        })),
-      },
-      {
-        key: "created_at",
-        label: t("orders.query.column.createdAt"),
-        value: (row) =>
-          formatTimestamp(row.kind === "request" ? row.request.created_at : row.session.created_at),
-        input: "date",
-      },
-    ];
-  }, [t]);
+  const searchAccessors = useMemo<SearchAccessor<QueryOrderRow>[]>(() => [
+    {
+      key: "kind",
+      label: t("orders.query.column.kind"),
+      value: (row) =>
+        row.kind === "request"
+          ? `request access_request ${t("orders.query.kind.request")}`
+          : `session ${t("orders.query.kind.session")}`,
+      options: [
+        { value: "request", label: t("orders.query.kind.request") },
+        { value: "session", label: t("orders.query.kind.session") },
+      ],
+    },
+    {
+      key: "datasources",
+      label: t("orders.query.column.datasources"),
+      value: (row) =>
+        row.kind === "request"
+          ? [...(row.request.datasource_names ?? []), ...row.request.datasource_ids].join(" ")
+          : row.session.capabilities
+              .map((capability) => `${capability.datasource_name} ${capability.datasource_id}`)
+              .join(" "),
+    },
+    {
+      key: "state",
+      label: t("orders.query.column.state"),
+      value: (row) =>
+        row.kind === "request"
+          ? `${row.request.state} ${t(`query.request.state.${row.request.state}`)}`
+          : `${row.session.state} ${t(`query.session.state.${row.session.state}`)}`,
+      options: [
+        { value: "access_pending", label: t("query.request.state.access_pending") },
+        { value: "grant_active", label: t("query.request.state.grant_active") },
+        { value: "rejected", label: t("query.request.state.rejected") },
+        { value: "withdrawn", label: t("query.request.state.withdrawn") },
+        { value: "active", label: t("query.session.state.active") },
+        { value: "revoked", label: t("query.session.state.revoked") },
+        { value: "expired", label: t("query.session.state.expired") },
+        { value: "closed", label: t("query.session.state.closed") },
+      ],
+    },
+    {
+      key: "terminal",
+      label: t("orders.query.column.terminal"),
+      value: (row) =>
+        row.kind === "request" && row.grant !== null
+          ? `${row.grant.state} ${t(`query.grant.state.${row.grant.state}`)}`
+          : "",
+      options: (["active", "expired", "revoked"] as const).map((state) => ({
+        value: state,
+        label: t(`query.grant.state.${state}`),
+      })),
+    },
+    {
+      key: "created_at",
+      label: t("orders.query.column.createdAt"),
+      value: (row) =>
+        formatTimestamp(row.kind === "request" ? row.request.created_at : row.session.created_at),
+      input: "date",
+    },
+  ], [t]);
 
   const effectiveTerms = live === null ? terms : [...terms, live];
   const filteredRows = filterBySearchTerms(rows, effectiveTerms, searchAccessors);
@@ -191,7 +195,7 @@ export function QueryOrdersTab() {
           />
         )}
         {loadError === null && ordersQuery.isPending && (
-          <LoadingState variant="table" columns={5} />
+          <LoadingState variant="table" columns={6} />
         )}
         {loadError === null && !ordersQuery.isPending && rows.length === 0 && (
           <EmptyState title={t("orders.query.empty")} testId="orders-query-empty" />
@@ -208,6 +212,7 @@ export function QueryOrdersTab() {
                 <TableHead>{t("orders.query.column.state")}</TableHead>
                 <TableHead>{t("orders.query.column.createdAt")}</TableHead>
                 <TableHead>{t("orders.query.column.terminal")}</TableHead>
+                <TableHead className="w-24 text-right" />
               </TableRow>
             </TableHeader>
             <TableBody ref={ordersBodyRef} stale={ordersStale}>
@@ -248,6 +253,28 @@ export function QueryOrdersTab() {
                     {row.kind === "request" && row.grant !== null
                       ? <StatusBadge tone={QUERY_GRANT_TONE[row.grant.state]}>{t(`query.grant.state.${row.grant.state}`)}</StatusBadge>
                       : "—"}
+                  </TableCell>
+                  <TableCell className="text-right">
+                    {row.kind === "request" &&
+                      row.request.state === "access_pending" &&
+                      currentUserId !== undefined &&
+                      row.request.requester_user_id === currentUserId && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            setWithdrawTarget({
+                              label: formatRequestDatasources(row.request),
+                              request: row.request,
+                            });
+                          }}
+                          data-testid={`orders-query-withdraw-${row.request.id}`}
+                        >
+                          <Undo2 aria-hidden />
+                          {t("query.entry.withdraw")}
+                        </Button>
+                      )}
                   </TableCell>
                 </TableRow>
               ))}
@@ -294,6 +321,26 @@ export function QueryOrdersTab() {
                     <DetailRow label={t("orders.query.detail.createdAt")}>
                       {formatTimestamp(detail.request.created_at)}
                     </DetailRow>
+                    {detail.request.state === "access_pending" &&
+                      currentUserId !== undefined &&
+                      detail.request.requester_user_id === currentUserId && (
+                        <div className="pt-2">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => {
+                              setWithdrawTarget({
+                                label: formatRequestDatasources(detail.request),
+                                request: detail.request,
+                              });
+                            }}
+                            data-testid="orders-query-detail-withdraw"
+                          >
+                            <Undo2 aria-hidden />
+                            {t("query.entry.withdraw")}
+                          </Button>
+                        </div>
+                      )}
                     {detail.grant !== null && (
                       <>
                         <DetailRow label={t("orders.query.detail.grantState")}>
@@ -340,6 +387,17 @@ export function QueryOrdersTab() {
           </ScrollArea>
         </SheetContent>
       </Sheet>
+      <WithdrawQueryAccessDialog
+        target={withdrawTarget}
+        onClose={() => { setWithdrawTarget(null); }}
+        onWithdrawn={(updated) => {
+          setDetail((current) =>
+            current !== null && current.kind === "request" && current.request.id === updated.id
+              ? { ...current, request: updated }
+              : current,
+          );
+        }}
+      />
     </Card>
   );
 }

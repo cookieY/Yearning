@@ -68,11 +68,14 @@ type ServeDeps struct {
 	// trusts X-Forwarded-Proto from the same source. Empty/nil = trust no proxies (direct connection:
 	// ClientIP=RemoteAddr, XFF/XFP ignored).
 	TrustedProxies []string
+	// DevViewAsEnabled activates the development-only X-Yearning-Dev-View-As role downgrade
+	// middleware (D18); must remain false in production so the header is unconditionally ignored.
+	DevViewAsEnabled bool
 }
 
 // NewServeRouter builds the production serve router.
 // Middleware order is fixed: RequestID -> SecurityHeaders -> APINoStore ->
-// BodyLimit -> Recovery -> AccessLog -> Session -> business routes.
+// BodyLimit -> Recovery -> AccessLog -> Session -> DevViewAs -> business routes.
 // gin always runs in ReleaseMode: debug output is not part of the structured logging contract.
 func NewServeRouter(deps ServeDeps) *gin.Engine {
 	gin.SetMode(gin.ReleaseMode)
@@ -102,6 +105,7 @@ func NewServeRouter(deps ServeDeps) *gin.Engine {
 	if deps.SessionStore != nil {
 		engine.Use(session.Middleware(deps.SessionStore, deps.SessionOption))
 	}
+	engine.Use(DevViewAsMiddleware(deps.DevViewAsEnabled))
 
 	// BE-B13-LEFTOVER-CLOSURE (F001): when `-tags assets` release builds embed locked
 	// Frontend static assets, unmatched routes serve the SPA while API prefixes (including bare "/api")
@@ -357,16 +361,24 @@ func startBackgroundLoops(deps *ServeDeps) {
 		// S007: callback link base URL in notifications comes from general.public_base_url (controlled setting;
 		// degrades to empty on read failure -- omits link rather than guessing from request Host).
 		settingsSvc := settings.New(deps.B3.DB, deps.B3.Crypter)
-		if view, gerr := settingsSvc.Get(bgCtx, "general"); gerr == nil {
-			if u, ok := view.Settings["public_base_url"].(string); ok {
-				nw.SetPublicBaseURL(u)
+		syncNotificationGeneralSettings := func() {
+			if view, gerr := settingsSvc.Get(bgCtx, "general"); gerr == nil {
+				if u, ok := view.Settings["public_base_url"].(string); ok {
+					nw.SetPublicBaseURL(u)
+				}
+				if l, ok := view.Settings["default_locale"].(string); ok {
+					nw.SetLocale(l)
+				}
+			} else if deps.Logger != nil {
+				deps.Logger.Warn("notification worker settings read failed; links disabled", zap.Error(gerr))
 			}
-			if l, ok := view.Settings["default_locale"].(string); ok {
-				nw.SetLocale(l)
-			}
-		} else if deps.Logger != nil {
-			deps.Logger.Warn("notification worker settings read failed; links disabled", zap.Error(gerr))
 		}
+		syncNotificationGeneralSettings()
+		settings.RegisterPostReplaceHook(func(namespace string) {
+			if namespace == settings.NsGeneral && bgCtx.Err() == nil {
+				syncNotificationGeneralSettings()
+			}
+		})
 		go nw.Run(bgCtx)
 		if deps.Logger != nil {
 			deps.Logger.Info("background notification worker started")
@@ -643,6 +655,7 @@ func mountB3Routes(engine *gin.Engine, deps ServeDeps) {
 	admin.GET("/users", guard("listUsers"), b3.HandleListUsers)
 	admin.POST("/users", guard("createUser"), b3.HandleCreateUser)
 	admin.PATCH("/users/:user_id", guard("updateUser"), b3.HandleUpdateUser)
+	admin.POST("/users/:user_id/password", guard("resetUserPassword"), b3.HandleResetUserPassword)
 	admin.DELETE("/users/:user_id", guard("deleteUser"), b3.HandleDeleteUser)
 	admin.GET("/users/:user_id/deletion-impact", guard("getUserDeletionImpact"), b3.HandleUserDeletionImpact)
 	// Management surface: Flows.

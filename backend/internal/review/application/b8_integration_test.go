@@ -17,8 +17,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
-	"os"
 	"strings"
 	"testing"
 
@@ -27,6 +25,7 @@ import (
 	"gorm.io/gorm"
 	gormlogger "gorm.io/gorm/logger"
 
+	"github.com/cookieY/YearningX/backend/internal/platform/testenv"
 	"github.com/cookieY/YearningX/backend/internal/review/agent"
 	"github.com/cookieY/YearningX/backend/internal/review/domain"
 	"github.com/cookieY/YearningX/backend/internal/review/provider"
@@ -383,7 +382,7 @@ func TestB8DisabledRuleSetDoesNotInjectSkills(t *testing.T) {
 	}
 	var knowledgeHashes []string
 	if err := b.db.Raw(`select 'knowledge_entry:' || id::text || ':' || config_hash
-		from knowledge_entries where state = 'enabled' order by id`).Scan(&knowledgeHashes).Error; err != nil {
+		from knowledge_entries where state = 'enabled' and scope_type <> 'global' order by id`).Scan(&knowledgeHashes).Error; err != nil {
 		t.Fatal(err)
 	}
 	if len(knowledgeHashes) == 0 || toolHash != domain.EffectiveToolConfigHash(knowledgeHashes) {
@@ -860,16 +859,7 @@ func TestB8Gate7BuiltinSkillGovernance(t *testing.T) {
 // equivalence between Python hashing in migration SQL and Go Marshal), and every definition passes the enablement gate.
 // Uses an isolated evidence DB (not truncated by test fixtures).
 func TestB8MigrationSkillPackageIntegrity(t *testing.T) {
-	password := os.Getenv("YEARNING_TEST_DATABASE_PASSWORD")
-	if password == "" {
-		t.Skip("integration PostgreSQL not configured")
-	}
-	dsn := fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=disable",
-		os.Getenv("YEARNING_B8_EVIDENCE_HOST"), os.Getenv("YEARNING_B8_EVIDENCE_PORT"),
-		os.Getenv("YEARNING_B8_EVIDENCE_USER"), password, os.Getenv("YEARNING_B8_EVIDENCE_DBNAME"))
-	if os.Getenv("YEARNING_B8_EVIDENCE_DBNAME") == "" {
-		t.Skip("B8 evidence database not configured: set YEARNING_B8_EVIDENCE_*")
-	}
+	dsn := testenv.RequireB8EvidenceDSN(t)
 	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{Logger: gormlogger.Discard})
 	if err != nil {
 		t.Fatalf("connect: %v", err)

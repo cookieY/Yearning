@@ -59,7 +59,7 @@ func TestBuildSQLStatementModelTypedShapeParity(t *testing.T) {
 	if err != nil {
 		t.Fatalf("buildSQLStatementModel: %v", err)
 	}
-	wantTyped, err := jsonMarshal(map[string]any{
+	wantTyped, err := json.Marshal(map[string]any{
 		"kind":                      res.StatementKind,
 		"operation":                 "update",
 		"dialect_profile":           res.DialectProfile,

@@ -32,7 +32,6 @@ import { Alert, AlertDescription, AlertTitle } from "@/shared/components/ui/aler
 import { Badge } from "@/shared/components/ui/badge";
 import { Button } from "@/shared/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/shared/components/ui/card";
-import { holdsSessionSlot } from "@/shared/dev/mock-super";
 import {
   Dialog,
   DialogContent,
@@ -72,7 +71,7 @@ export default function OrderDetailPage() {
   // Work-order PRD §5: only the submitter may withdraw or void — frozen
   // reviewers/executors can read the order but never see the lifecycle
   // buttons (the backend keeps the authoritative 403).
-  const isSubmitter = holdsSessionSlot(order?.submitter_user_id ?? "", session.user?.id) && order !== null;
+  const isSubmitter = order !== null && order.submitter_user_id === session.user?.id;
   // owner ruling 2026-10-31 + 2026-11-22 (self-review/self-execute button split): when the same user is
   // both submitter and active reviewer or frozen executor, the action set is mutually exclusive by entry
   // context — entering from the handler queue (/approvals/orders/:id) shows only Approve/Reject or
@@ -255,7 +254,7 @@ export default function OrderDetailPage() {
               const isExecutor =
                 pendingStage !== undefined &&
                 session.user !== null &&
-                pendingStage.execution_actors.some((actor) => holdsSessionSlot(actor.id, session.user?.id));
+                pendingStage.execution_actors.some((actor) => actor.id === session.user?.id);
               if ((isExecutor && showExecutionActions) || pendingStage === undefined) return null;
               const names = pendingStage.execution_actors.map((actor) => actor.display_name).join(t("common.listSeparator"));
               return (

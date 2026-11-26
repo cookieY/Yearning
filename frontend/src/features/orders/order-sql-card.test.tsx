@@ -3,7 +3,9 @@ import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { HttpResponse, http } from "msw";
+import { apiRoute } from "@/shared/mock/api-route";
 import { server } from "@/test/msw/server";
+import { testBusinessErrorJson, testEnvelope } from "@/test/envelope";
 import "@/shared/i18n";
 import { OrderSqlCard } from "./order-sql-card";
 
@@ -23,7 +25,7 @@ const REVEAL_ID = "0d6f1a2b-0000-4000-8000-00000000a701";
 const REQUEST_ID = "0d6f1a2b-0000-4000-8000-000000000702";
 
 function envelope(data: unknown) {
-  return { err_code: 0, message: "ok", data, request_id: REQUEST_ID };
+  return testEnvelope(data, REQUEST_ID);
 }
 
 function revealResponse(sql = "UPDATE orders SET status = 1;") {
@@ -48,7 +50,7 @@ function renderCard() {
 
 async function reveal(user: ReturnType<typeof userEvent.setup>, sql?: string) {
   server.use(
-    http.post("*/change-orders/:orderId/sql-reveals", () =>
+    http.post(apiRoute("/change-orders/:orderId/sql-reveals"), () =>
       HttpResponse.json(revealResponse(sql)),
     ),
   );
@@ -77,7 +79,7 @@ describe("OrderSqlCard copy audit (SEC-0035)", () => {
       .spyOn(navigator.clipboard, "writeText")
       .mockImplementation(() => writeGate.then(() => undefined));
     server.use(
-      http.post("*/change-orders/:orderId/sql-copy-events", async ({ request }) => {
+      http.post(apiRoute("/change-orders/:orderId/sql-copy-events"), async ({ request }) => {
         copyAuditCalls += 1;
         seenBodies.push(await request.text());
         return HttpResponse.json(envelope(null));
@@ -104,14 +106,8 @@ describe("OrderSqlCard copy audit (SEC-0035)", () => {
     const user = userEvent.setup();
     vi.spyOn(navigator.clipboard, "writeText").mockResolvedValue(undefined);
     server.use(
-      http.post("*/change-orders/:orderId/sql-copy-events", () =>
-        HttpResponse.json({
-          err_code: 1002,
-          message: "order not found",
-          data: null,
-          request_id: REQUEST_ID,
-          retryable: false,
-        }),
+      http.post(apiRoute("/change-orders/:orderId/sql-copy-events"), () =>
+        testBusinessErrorJson(1002, "order not found", { requestId: REQUEST_ID }),
       ),
     );
 
@@ -127,7 +123,7 @@ describe("OrderSqlCard copy audit (SEC-0035)", () => {
     vi.spyOn(navigator.clipboard, "writeText").mockRejectedValue(new Error("denied"));
     let copyAuditCalls = 0;
     server.use(
-      http.post("*/change-orders/:orderId/sql-copy-events", () => {
+      http.post(apiRoute("/change-orders/:orderId/sql-copy-events"), () => {
         copyAuditCalls += 1;
         return HttpResponse.json(envelope(null));
       }),

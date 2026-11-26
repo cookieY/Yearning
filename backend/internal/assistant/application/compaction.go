@@ -181,13 +181,11 @@ func (s *Services) saveContextSummary(
 	summaryPlain string,
 ) error {
 	sumID := uuid.NewString()
-	env, err := s.Crypter.Seal(crypto.PurposePayload, []byte(summaryPlain), crypto.AAD{
-		DeploymentID: s.Crypter.DeploymentID(),
-		Table:        "ai_assistant_context_summaries",
-		PrimaryKey:   sumID,
-		Column:       "summary",
-		Purpose:      crypto.PurposePayload,
-	})
+	env, err := s.Crypter.SealColumn(crypto.PurposePayload, crypto.ColumnRef{
+		Table:      "ai_assistant_context_summaries",
+		PrimaryKey: sumID,
+		Column:     "summary",
+	}, []byte(summaryPlain))
 	if err != nil {
 		return err
 	}

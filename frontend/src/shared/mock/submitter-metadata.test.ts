@@ -20,7 +20,9 @@ import { setMockAuthBehavior } from "./auth-scenario-store";
 const CATALOG_DS = CATALOG_DATASOURCES[0]?.id ?? "";
 
 async function get(path: string): Promise<{ status: number; body: Record<string, unknown> }> {
-  const response = await fetch(`https://yearning.test${path}`);
+  const response = await fetch(
+    `https://yearning.test${path.startsWith("/api/v4") ? path : `/api/v4${path}`}`,
+  );
   return { status: response.status, body: (await response.json()) as Record<string, unknown> };
 }
 

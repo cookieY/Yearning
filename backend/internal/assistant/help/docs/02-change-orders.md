@@ -1,7 +1,7 @@
 ---
 id: help-change-orders
 title: Submitting DML/DDL Change Orders & Draft Management
-source_ref: docs/prd/change-order-prd.md#submit-order
+source_ref: docs/features/04-workorder-prd.md
 route_path: /orders/new
 admin_only: false
 keywords: order, change order, submit, draft, dml, ddl, insert, update, delete, alter, create, schedule, cron, change_review, withdraw, void, copy, resubmit, batch, size, limit, statements, 32mb, 512kb, 100000, 1000, 2001, 2002, 2014
@@ -16,7 +16,7 @@ summary: In New Change Order (/orders/new, UI /changes/new), select an authorize
 ## Detailed Guide
 - **Where to Create & View Change Orders**:
   - **Create Change Order / Edit Draft**: `/changes/new` (contract route `/orders/new`) and `/changes/drafts/:orderId`.
-  - **My Change Orders**: `/changes/mine`.
+  - **My Change Orders**: `/changes/mine` (calendar date filters `submitted_from` / `submitted_to` use the administrator-configured `general.system_timezone`, defaulting to `Asia/Shanghai`, taking effect on the next query).
   - **Order Detail & Execution Timeline**: `/changes/orders/:orderId`.
 - **SQL Category Rules (No Mixing DML and DDL)**:
   - Each change order must contain **either pure DML** (`INSERT`, `UPDATE`, `DELETE`) **or pure DDL** (`CREATE`, `ALTER`, `DROP`, `RENAME`, `TRUNCATE`).

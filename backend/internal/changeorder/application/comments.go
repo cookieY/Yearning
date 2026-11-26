@@ -4,12 +4,13 @@ package application
 
 import (
 	"context"
-	"encoding/json"
 	"time"
 	"unicode/utf8"
 
 	"github.com/cookieY/YearningX/backend/internal/changeorder/domain"
 	"github.com/cookieY/YearningX/backend/internal/changeorder/persistence"
+	"github.com/cookieY/YearningX/backend/internal/platform/pagecursor"
+	"github.com/cookieY/YearningX/backend/internal/platform/txutil"
 )
 
 // CommentView maps to the ChangeOrderComment schema.
@@ -38,10 +39,12 @@ func (s *Services) ListComments(ctx context.Context, actor Actor, orderID string
 		from order_comments where order_id = ?`
 	args := []any{orderID}
 	if after != "" {
-		if ts, id, ok := splitCursor(after); ok {
-			q += ` and (occurred_at, id) < (?::timestamptz, ?::uuid)`
-			args = append(args, ts, id)
+		ts, id, err := pagecursor.DecodeUUID(after)
+		if err != nil {
+			return nil, nil, domain.ErrValidation()
 		}
+		q += ` and (occurred_at, id) < (?, ?::uuid)`
+		args = append(args, ts, id)
 	}
 	q += ` order by occurred_at desc, id desc limit ?`
 	args = append(args, limit+1)
@@ -98,7 +101,7 @@ func (s *Services) ListComments(ctx context.Context, actor Actor, orderID string
 	var next *string
 	if hasMore && len(rows) > 0 {
 		last := rows[len(rows)-1]
-		cur := last.OccurredAt.UTC().Format("2006-01-02T15:04:05.999999Z") + "|" + last.ID
+		cur := pagecursor.Encode(last.OccurredAt, last.ID)
 		next = &cur
 	}
 	return out, next, nil
@@ -111,59 +114,39 @@ func (s *Services) CreateComment(ctx context.Context, actor Actor, meta RequestM
 		return nil, false, domain.ErrValidation()
 	}
 	const route = "POST /change-orders/{order_id}/comments"
-	reqHash := idemRequestHash(actor.UserID, orderID, content)
-	claimed, replay, err := s.idemClaim(ctx, actor.UserID, route, orderID, idempotencyKey, reqHash)
-	if err != nil {
-		return nil, false, err
-	}
-	if claimed == nil {
-		var v CommentView
-		if err := json.Unmarshal(replay, &v); err != nil {
-			return nil, false, err
+	reqHash := txutil.RequestHash(actor.UserID, orderID, content)
+	return txutil.RunIdempotent(ctx, s.idemStore(), actor.UserID, route, orderID, idempotencyKey, reqHash, func() (*CommentView, error) {
+		ok, err := s.CanRead(ctx, s.DB, orderID, actor.UserID)
+		if err != nil {
+			return nil, err
 		}
-		return &v, true, nil
-	}
-	ok, err := s.CanRead(ctx, s.DB, orderID, actor.UserID)
-	if err != nil {
-		return nil, false, err
-	}
-	if !ok {
-		_ = s.idemRelease(ctx, actor.UserID, route, orderID, idempotencyKey)
-		return nil, false, domain.ErrNotFound()
-	}
-	var author struct {
-		Username    string
-		DisplayName string
-	}
-	if err := s.DB.WithContext(ctx).Raw(
-		`select username, display_name from users where id = ?`, actor.UserID).Scan(&author).Error; err != nil {
-		_ = s.idemRelease(ctx, actor.UserID, route, orderID, idempotencyKey)
-		return nil, false, err
-	}
-	now := nowUTC()
-	row := &persistence.OrderCommentModel{
-		ID: newID(), OrderID: orderID, AuthorUserIDSnapshot: actor.UserID,
-		AuthorUsernameSnapshot: author.Username, Content: content, OccurredAt: now,
-	}
-	if err := s.DB.WithContext(ctx).Create(row).Error; err != nil {
-		_ = s.idemRelease(ctx, actor.UserID, route, orderID, idempotencyKey)
-		return nil, false, err
-	}
-	display := author.DisplayName
-	if display == "" {
-		display = author.Username
-	}
-	view = &CommentView{
-		ID: row.ID, OrderID: orderID, AuthorUserID: actor.UserID,
-		AuthorDisplayName: display, Content: content,
-		OccurredAt: now.UTC().Format("2006-01-02T15:04:05.999999Z"),
-	}
-	raw, err := json.Marshal(view)
-	if err == nil {
-		err = s.idemComplete(ctx, actor.UserID, route, orderID, idempotencyKey, raw)
-	}
-	if err != nil {
-		return nil, false, err
-	}
-	return view, false, nil
+		if !ok {
+			return nil, domain.ErrNotFound()
+		}
+		var author struct {
+			Username    string
+			DisplayName string
+		}
+		if err := s.DB.WithContext(ctx).Raw(
+			`select username, display_name from users where id = ?`, actor.UserID).Scan(&author).Error; err != nil {
+			return nil, err
+		}
+		now := nowUTC()
+		row := &persistence.OrderCommentModel{
+			ID: newID(), OrderID: orderID, AuthorUserIDSnapshot: actor.UserID,
+			AuthorUsernameSnapshot: author.Username, Content: content, OccurredAt: now,
+		}
+		if err := s.DB.WithContext(ctx).Create(row).Error; err != nil {
+			return nil, err
+		}
+		display := author.DisplayName
+		if display == "" {
+			display = author.Username
+		}
+		return &CommentView{
+			ID: row.ID, OrderID: orderID, AuthorUserID: actor.UserID,
+			AuthorDisplayName: display, Content: content,
+			OccurredAt: now.UTC().Format(pagecursor.Format),
+		}, nil
+	})
 }

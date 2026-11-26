@@ -2,17 +2,14 @@ package display
 
 import (
 	"context"
-	"encoding/base64"
-	"encoding/json"
 	"errors"
-	"os"
-	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
 	"unicode/utf8"
 
 	"github.com/cookieY/YearningX/backend/internal/crypto"
+	"github.com/cookieY/YearningX/backend/internal/platform/testkit"
 	"github.com/cookieY/YearningX/backend/internal/review/privacy"
 )
 
@@ -793,33 +790,5 @@ func TestRestoreIsConcurrentAndImmutable(t *testing.T) {
 
 func newTestCrypter(t *testing.T) *crypto.Crypter {
 	t.Helper()
-	key := base64.StdEncoding.EncodeToString([]byte("01234567890123456789012345678901"))
-	doc := map[string]any{
-		"contract_version": 1,
-		"deployment_id":    "test-display",
-		"keys": []map[string]any{{
-			"key_id":     "payload-1",
-			"purpose":    "payload",
-			"status":     "encrypt_decrypt",
-			"created_at": "2026-10-26T00:00:00Z",
-			"key_base64": key,
-		}},
-	}
-	raw, err := json.Marshal(doc)
-	if err != nil {
-		t.Fatalf("marshal keyring: %v", err)
-	}
-	path := filepath.Join(t.TempDir(), "keyring.json")
-	if err := os.WriteFile(path, raw, 0o400); err != nil {
-		t.Fatalf("write keyring: %v", err)
-	}
-	ring, err := crypto.LoadKeyring(path)
-	if err != nil {
-		t.Fatalf("load keyring: %v", err)
-	}
-	crypter, err := crypto.NewCrypter(ring)
-	if err != nil {
-		t.Fatalf("new crypter: %v", err)
-	}
-	return crypter
+	return testkit.NewCrypter(t)
 }

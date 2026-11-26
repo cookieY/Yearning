@@ -368,3 +368,41 @@ func TestCanonicalBuiltinSkillsCompileWithMySQLPrimaryAndSQLKeywordCatalog(t *te
 		t.Fatalf("expected ErrPolicyPrivacy when built-in skill parameter leaks catalog table name, got %v", err)
 	}
 }
+
+func TestGenericPolicyColumnNamesMatchesContract(t *testing.T) {
+	contractPath := filepath.Join("..", "..", "..", "..", "api", "contracts", "ai-review-runtime-contract.json")
+	raw, err := os.ReadFile(contractPath)
+	if err != nil {
+		t.Fatalf("read runtime contract: %v", err)
+	}
+	var contract struct {
+		PolicyTextPrivacy struct {
+			GenericColumnNameAllowlist struct {
+				Words []string `json:"words"`
+			} `json:"generic_column_name_allowlist"`
+		} `json:"policy_text_privacy"`
+	}
+	if err := json.Unmarshal(raw, &contract); err != nil {
+		t.Fatalf("unmarshal runtime contract: %v", err)
+	}
+	expected := make(map[string]struct{}, len(contract.PolicyTextPrivacy.GenericColumnNameAllowlist.Words))
+	for _, word := range contract.PolicyTextPrivacy.GenericColumnNameAllowlist.Words {
+		expected[strings.ToLower(word)] = struct{}{}
+	}
+	if len(expected) == 0 {
+		t.Fatal("contract generic_column_name_allowlist.words must not be empty")
+	}
+	if len(expected) != len(genericPolicyColumnNames) {
+		t.Fatalf("genericPolicyColumnNames count=%d differs from contract words=%d", len(genericPolicyColumnNames), len(expected))
+	}
+	for word := range expected {
+		if _, ok := genericPolicyColumnNames[word]; !ok {
+			t.Fatalf("contract generic column word %q missing from Go mirror", word)
+		}
+	}
+	for word := range genericPolicyColumnNames {
+		if _, ok := expected[word]; !ok {
+			t.Fatalf("Go mirror word %q missing from contract allowlist", word)
+		}
+	}
+}

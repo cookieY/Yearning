@@ -261,7 +261,7 @@ func TestPolicyCatalogGuardIntegrationRejectsFrozenDatabaseNameInEveryPolicyChan
 			prepare: func(t *testing.T, b *b7fx) {
 				definition, err := json.Marshal(map[string]any{
 					"knowledge_text": "Never operate against private_prod during this review.",
-					"max_severity":   "critical",
+					"max_severity":   "medium",
 					"version":        1,
 				})
 				if err != nil {
@@ -269,9 +269,10 @@ func TestPolicyCatalogGuardIntegrationRejectsFrozenDatabaseNameInEveryPolicyChan
 				}
 				if err := b.db.Exec(`
 					update knowledge_entries
-					set definition = ?::jsonb, config_hash = repeat('e', 64)
+					set scope_type = 'datasource', database_name = 'private_prod', table_name = null,
+					    definition = ?::jsonb, config_hash = repeat('e', 64)
 					where id = ?`,
-					string(definition), b.entryGlobal).Error; err != nil {
+					string(definition), b.entryTable).Error; err != nil {
 					t.Fatalf("set knowledge privacy rule: %v", err)
 				}
 			},

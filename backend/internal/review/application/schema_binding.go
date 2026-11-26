@@ -37,8 +37,11 @@ import (
 	"github.com/cookieY/YearningX/backend/internal/crypto"
 	"github.com/cookieY/YearningX/backend/internal/database"
 	"github.com/cookieY/YearningX/backend/internal/review/agent"
+	"github.com/cookieY/YearningX/backend/internal/review/domain"
+	"github.com/cookieY/YearningX/backend/internal/review/fingerprint"
 	"github.com/cookieY/YearningX/backend/internal/review/persistence"
 	"github.com/cookieY/YearningX/backend/internal/review/privacy"
+	"github.com/cookieY/YearningX/backend/internal/review/provider"
 	"github.com/cookieY/YearningX/backend/internal/review/tool"
 )
 
@@ -49,20 +52,259 @@ type stageSchemaBinding struct {
 	defensible bool
 	// schemas is the frozen set of allowed physical schema names
 	// (PostgreSQL: the execution-identity explicit search_path members;
-	// MySQL/other engines: the datasource default database alone). These
+	// MySQL/other engines: optional default database plus valid non-system SQL schema qualifiers). These
 	// names authorize tool scope; physical names never reach the model
 	// channel untokenized.
 	schemas map[string]bool
+	// defaultSchemaName stores the MySQL connection or explicit target_database default schema when
+	// defaultSchemaSet is true (empty when only explicit SQL qualifiers are present).
+	defaultSchemaName    string
+	defaultSchemaSet     bool
+	hasSQLDerivedSchemas bool
 	// postgres is present only for a frozen PostgreSQL environment whose
 	// execution-identity search_path is bound from the stage snapshot.
-	// MySQL and other engines use schemas (single default database).
+	// MySQL and other engines use schemas.
 	postgres *frozenPostgresPathBinding
+	// unavailableReason records a privacy-safe machine code explaining why defensible=false.
+	unavailableReason string
+}
+
+type frozenFlowStageRow struct {
+	Position          int32
+	CompatibilityMode string
+	DatabaseName      *string
+}
+
+func isValidPostgresExplicitSchema(name string) bool {
+	trimmed := strings.TrimSpace(name)
+	return trimmed != "" &&
+		len(trimmed) <= 128 &&
+		database.ValidateIdentifier(trimmed) == nil &&
+		!database.IsDisallowedPostgresSystemSchema(trimmed)
+}
+
+// ValidateTargetDatabase validates an explicit target_database (or PostgreSQL target schema) override:
+// non-empty identifier <= 128 chars, never targeting built-in MySQL or PostgreSQL system schemas.
+func ValidateTargetDatabase(name string) error {
+	trimmed := strings.TrimSpace(name)
+	if trimmed == "" || len(trimmed) > 128 || database.ValidateIdentifier(trimmed) != nil {
+		return &domain.Error{Code: 1001, Name: "VALIDATION_FAILED", Detail: "Invalid target_database"}
+	}
+	if database.IsDisallowedPostgresSystemSchema(trimmed) {
+		return &domain.Error{Code: 1001, Name: "VALIDATION_FAILED", Detail: "Invalid target_database"}
+	}
+	switch strings.ToLower(trimmed) {
+	case "mysql", "sys", "information_schema", "performance_schema":
+		return &domain.Error{Code: 1001, Name: "VALIDATION_FAILED", Detail: "Invalid target_database"}
+	}
+	return nil
+}
+
+// resolveEffectiveMySQLDatabase returns the effective default schema for a MySQL-compatible stage
+// from the explicit target_database override (when supplied) or datasources.database_name.
+func resolveEffectiveMySQLDatabase(row frozenFlowStageRow, targetDatabase ...string) string {
+	if len(targetDatabase) > 0 {
+		if explicit := strings.TrimSpace(targetDatabase[0]); explicit != "" {
+			return explicit
+		}
+	}
+	if row.DatabaseName != nil {
+		return strings.TrimSpace(*row.DatabaseName)
+	}
+	return ""
+}
+
+// ExplicitMySQLSchemaCheck summarizes explicit schema qualification checks shared by AI review
+// schema binding and execution preflight statement verification.
+type ExplicitMySQLSchemaCheck struct {
+	ValidSchemas      []string
+	TableCount        int
+	HasInvalidSchema  bool
+	HasUnqualified    bool
+	HasUnsupportedRef bool
+}
+
+// AllExplicitlyQualified reports whether the inspected SQL contains at least one physical table
+// reference and every table/physical object carries a valid non-system schema qualifier.
+func (c ExplicitMySQLSchemaCheck) AllExplicitlyQualified() bool {
+	return c.TableCount > 0 && !c.HasInvalidSchema && !c.HasUnqualified && !c.HasUnsupportedRef
+}
+
+func inspectMySQLObjectSchema(
+	kind, token, schemaToken, relation string,
+	mapper *privacy.RunMapper,
+	seen map[string]bool,
+	out *ExplicitMySQLSchemaCheck,
+) {
+	if kind == "alias" || kind == "cte" {
+		return
+	}
+	if kind == "schema" {
+		tok := schemaToken
+		if tok == "" {
+			tok = token
+		}
+		if relation != "reference" {
+			out.HasUnsupportedRef = true
+		}
+		origKind, original, found := mapper.Original(tok)
+		if !found || origKind != privacy.KindSchema || ValidateTargetDatabase(original) != nil {
+			out.HasInvalidSchema = true
+			return
+		}
+		if !seen[original] {
+			seen[original] = true
+			out.ValidSchemas = append(out.ValidSchemas, original)
+		}
+		return
+	}
+	if kind == "column" && schemaToken == "" {
+		return
+	}
+	if kind == "table" {
+		out.TableCount++
+	}
+	if schemaToken == "" {
+		out.HasUnqualified = true
+		return
+	}
+	origKind, original, found := mapper.Original(schemaToken)
+	if !found || origKind != privacy.KindSchema || ValidateTargetDatabase(original) != nil {
+		out.HasInvalidSchema = true
+		return
+	}
+	if !seen[original] {
+		seen[original] = true
+		out.ValidSchemas = append(out.ValidSchemas, original)
+	}
+}
+
+// InspectMySQLFingerprintObjects validates explicit schema qualifiers emitted by fingerprint analysis
+// for a single SQL statement.
+func InspectMySQLFingerprintObjects(
+	objects []fingerprint.ObjectReference,
+	metadataComplete bool,
+	mapper *privacy.RunMapper,
+) ExplicitMySQLSchemaCheck {
+	var out ExplicitMySQLSchemaCheck
+	if !metadataComplete || mapper == nil {
+		out.HasUnsupportedRef = true
+		return out
+	}
+	seen := map[string]bool{}
+	for _, obj := range objects {
+		inspectMySQLObjectSchema(obj.Kind, obj.Token, obj.SchemaToken, string(obj.Relation), mapper, seen, &out)
+	}
+	sort.Strings(out.ValidSchemas)
+	return out
+}
+
+func inspectMySQLGroupObjects(groups []provider.AnonymizedGroup, mapper *privacy.RunMapper) ExplicitMySQLSchemaCheck {
+	var out ExplicitMySQLSchemaCheck
+	if mapper == nil {
+		out.HasUnsupportedRef = true
+		return out
+	}
+	seen := map[string]bool{}
+	for _, group := range groups {
+		for _, obj := range group.Objects {
+			inspectMySQLObjectSchema(obj.Kind, obj.Token, obj.SchemaToken, obj.Relation, mapper, seen, &out)
+		}
+	}
+	sort.Strings(out.ValidSchemas)
+	return out
+}
+
+func resolvePostgresStageBinding(
+	crypter *crypto.Crypter,
+	runID string,
+	row frozenFlowStageRow,
+	snap *persistence.StageReviewSnapshotModel,
+) *stageSchemaBinding {
+	// PostgreSQL stage: execution-identity search_path binding comes from the stage snapshot
+	// normalized_context envelope (frozen at review time, never reading template rows).
+	if snap == nil || crypter == nil {
+		return &stageSchemaBinding{unavailableReason: "postgres_search_path_unavailable"}
+	}
+	env := crypto.Envelope{
+		Ciphertext: snap.NormalizedContextCiphertext,
+		Nonce:      snap.NormalizedContextNonce,
+		KeyID:      snap.NormalizedContextKeyID,
+		Algorithm:  snap.NormalizedContextAlgorithm,
+	}
+	binding, reason := openFrozenPostgresBindingFromContext(crypter, runID, row.Position, env)
+	if binding == nil || !binding.Complete || !binding.CallablesSafe {
+		return &stageSchemaBinding{
+			unavailableReason: reason,
+		}
+	}
+	pathSet := make(map[string]bool, len(binding.Path.Explicit)+len(binding.ExplicitSchemas))
+	for _, schema := range binding.Path.Explicit {
+		pathSet[schema] = true
+	}
+	for _, schema := range binding.ExplicitSchemas {
+		if isValidPostgresExplicitSchema(schema) {
+			pathSet[schema] = true
+		}
+	}
+	return &stageSchemaBinding{
+		defensible:           true,
+		schemas:              pathSet,
+		hasSQLDerivedSchemas: len(binding.ExplicitSchemas) > 0 || binding.TargetSchema != "",
+		postgres:             binding,
+	}
+}
+
+func resolveMySQLStageBinding(
+	row frozenFlowStageRow,
+	targetDatabase string,
+	groups []provider.AnonymizedGroup,
+	mapper *privacy.RunMapper,
+) *stageSchemaBinding {
+	defaultDB := resolveEffectiveMySQLDatabase(row, targetDatabase)
+	hasExplicitTarget := strings.TrimSpace(targetDatabase) != ""
+	if defaultDB != "" && ValidateTargetDatabase(defaultDB) != nil {
+		return &stageSchemaBinding{unavailableReason: "datasource_database_required"}
+	}
+	check := inspectMySQLGroupObjects(groups, mapper)
+	schemas := make(map[string]bool, len(check.ValidSchemas)+1)
+	if defaultDB != "" {
+		schemas[defaultDB] = true
+	}
+	hasSQLDerived := false
+	for _, schema := range check.ValidSchemas {
+		schemas[schema] = true
+		if schema != defaultDB {
+			hasSQLDerived = true
+		}
+	}
+	if len(schemas) == 0 {
+		if check.HasInvalidSchema {
+			return &stageSchemaBinding{unavailableReason: "sql_schema_out_of_scope"}
+		}
+		return &stageSchemaBinding{unavailableReason: "datasource_database_required"}
+	}
+	return &stageSchemaBinding{
+		defensible:           true,
+		schemas:              schemas,
+		defaultSchemaName:    defaultDB,
+		defaultSchemaSet:     true,
+		hasSQLDerivedSchemas: hasSQLDerived || hasExplicitTarget,
+	}
 }
 
 // frozenStageSchemasForFlow constructs per-stage schema bindings for an explicit flow (reused across
 // ephemeral Runs by passing er.FlowID directly — no draft row to query).
-func (r *AgentRunner) frozenStageSchemasForFlow(ctx context.Context, db *gorm.DB, flowID string,
-	run *persistence.ReviewRunModel, snapshots []persistence.StageReviewSnapshotModel) map[int32]*stageSchemaBinding {
+func (r *AgentRunner) frozenStageSchemasForFlow(
+	ctx context.Context,
+	db *gorm.DB,
+	flowID string,
+	run *persistence.ReviewRunModel,
+	snapshots []persistence.StageReviewSnapshotModel,
+	groupsForStage func(datasourceID string) []provider.AnonymizedGroup,
+	mapper *privacy.RunMapper,
+	targetDatabase ...string,
+) map[int32]*stageSchemaBinding {
 	out := make(map[int32]*stageSchemaBinding, len(snapshots))
 	for i := range snapshots {
 		out[snapshots[i].StagePosition] = &stageSchemaBinding{}
@@ -82,11 +324,7 @@ func (r *AgentRunner) frozenStageSchemasForFlow(ctx context.Context, db *gorm.DB
 	if err != nil || flowHash == "" || flowHash != run.FlowSnapshotHash {
 		return out
 	}
-	var rows []struct {
-		Position          int32
-		CompatibilityMode string
-		DatabaseName      *string
-	}
+	var rows []frozenFlowStageRow
 	if err := db.WithContext(ctx).Raw(`
 		select fs.position, d.compatibility_mode, d.database_name
 		from flow_stages fs
@@ -98,52 +336,30 @@ func (r *AgentRunner) frozenStageSchemasForFlow(ctx context.Context, db *gorm.DB
 	for i := range snapshots {
 		snapshotByPosition[snapshots[i].StagePosition] = &snapshots[i]
 	}
+	var crypter *crypto.Crypter
+	if r != nil && r.svc != nil {
+		crypter = r.svc.Crypter
+	}
+	var runID string
+	if run != nil {
+		runID = run.ID
+	}
+	var targetDB string
+	if len(targetDatabase) > 0 {
+		targetDB = strings.TrimSpace(targetDatabase[0])
+	}
 	for i := range rows {
-		row := &rows[i]
+		row := rows[i]
+		snap := snapshotByPosition[row.Position]
 		if row.CompatibilityMode == "postgresql" {
-			// PostgreSQL stage: execution-identity search_path binding comes from the stage snapshot
-			// normalized_context envelope (frozen at review time, never reading template rows).
-			snap := snapshotByPosition[row.Position]
-			if snap == nil {
-				continue
-			}
-			binding, ok := frozenPostgresBindingFromContext(
-				r.svc.Crypter, run.ID, row.Position, crypto.Envelope{
-					Ciphertext: snap.NormalizedContextCiphertext,
-					Nonce:      snap.NormalizedContextNonce,
-					KeyID:      snap.NormalizedContextKeyID,
-					Algorithm:  snap.NormalizedContextAlgorithm,
-				},
-			)
-			if !ok {
-				continue
-			}
-			if !binding.Complete || !binding.CallablesSafe {
-				continue
-			}
-			pathSet := make(map[string]bool, len(binding.Path.Explicit))
-			for _, schema := range binding.Path.Explicit {
-				pathSet[schema] = true
-			}
-			out[row.Position] = &stageSchemaBinding{
-				defensible: true,
-				schemas:    pathSet,
-				postgres:   binding,
-			}
+			out[row.Position] = resolvePostgresStageBinding(crypter, runID, row, snap)
 			continue
 		}
-		// MySQL / other engines: the datasource connection default database is the sole allowed schema.
-		if row.DatabaseName == nil {
-			continue
+		var stageGroups []provider.AnonymizedGroup
+		if snap != nil && groupsForStage != nil {
+			stageGroups = groupsForStage(snap.DatasourceID)
 		}
-		dn := *row.DatabaseName
-		if dn == "" || database.ValidateIdentifier(dn) != nil {
-			continue
-		}
-		out[row.Position] = &stageSchemaBinding{
-			defensible: true,
-			schemas:    map[string]bool{dn: true},
-		}
+		out[row.Position] = resolveMySQLStageBinding(row, targetDB, stageGroups, mapper)
 	}
 	return out
 }
@@ -206,12 +422,16 @@ func buildTokenLegend(mapper *privacy.RunMapper, binding *stageSchemaBinding, to
 	return out
 }
 
-// defaultSchema returns the single default schema name for a stage: for MySQL / other engines = the
-// datasource connection default database (when the allowed set has exactly one element); PostgreSQL
-// bindings do not provide a default schema for unqualified objects (search_path binding is handled
-// separately by the postgres branch). Under the unmapped branch this name is the allowed set itself, where physical and logical names are identical.
+// defaultSchema returns the default schema name for a stage when unqualified table references are
+// resolved (empty when only explicit SQL qualifiers are authorized or on PostgreSQL stages).
 func (b *stageSchemaBinding) defaultSchema() string {
-	if b == nil || !b.defensible || b.postgres != nil || len(b.schemas) != 1 {
+	if b == nil || !b.defensible || b.postgres != nil {
+		return ""
+	}
+	if b.defaultSchemaSet {
+		return b.defaultSchemaName
+	}
+	if len(b.schemas) != 1 {
 		return ""
 	}
 	for schema := range b.schemas {
@@ -251,16 +471,10 @@ func (b *stageSchemaBinding) allowsPhysicalSchema(schema string) bool {
 }
 
 func (b *stageSchemaBinding) allowsPostgresLookupSchema(schema string) bool {
-	if b == nil || b.postgres == nil || schema == "" ||
-		schema == "pg_catalog" || strings.HasPrefix(schema, "pg_temp_") {
+	if b == nil || b.postgres == nil || database.IsDisallowedPostgresSystemSchema(schema) {
 		return false
 	}
-	for _, candidate := range b.postgres.Path.Effective {
-		if candidate == schema {
-			return true
-		}
-	}
-	return false
+	return b.postgres.containsAllowedSchema(schema)
 }
 
 // stageBindingAllowsTool validates whether detokenized tool arguments fall within the stage's frozen

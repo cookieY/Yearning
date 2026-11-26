@@ -64,7 +64,7 @@ test.beforeEach(async ({ page }) => {
 
 test("gate 1: single-SELECT only and cursor pagination without totals", async ({ page }) => {
   await useScenario(page, "query-session");
-  await page.goto("/query/sessions/qs-fixture-active");
+  await page.goto("/query/sessions/6f0f2b3c-5555-4555-8555-000000000101");
   await expect(page.getByTestId("query-workspace")).toBeVisible();
 
   // A write statement is refused by the server's safety check (4007) and
@@ -94,7 +94,7 @@ test("gate 1: single-SELECT only and cursor pagination without totals", async ({
 
 test("gate 2: revocation is perceivable and the admin has no query read face", async ({ page }) => {
   await useScenario(page, "query-session");
-  await page.goto("/query/sessions/qs-fixture-active");
+  await page.goto("/query/sessions/6f0f2b3c-5555-4555-8555-000000000101");
   await expect(page.getByTestId("query-workspace")).toBeVisible();
 
   // §18.44: the workspace belongs to the session owner (henry), while
@@ -128,7 +128,7 @@ test("gate 2: revocation is perceivable and the admin has no query read face", a
   // Another user's session is refused for every identity — including the
   // builtin admin (Q004 grants revocation, never reads). A fresh load is
   // fine here: the world reset only restores the seeded other-user session.
-  await page.goto("/query/sessions/qs-fixture-other");
+  await page.goto("/query/sessions/6f0f2b3c-5555-4555-8555-000000000102");
   await expect(page.getByTestId("query-workspace-error")).toBeVisible();
 
 });

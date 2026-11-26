@@ -2,6 +2,7 @@ package application
 
 import (
 	"context"
+	"crypto/sha256"
 	"encoding/base64"
 	"errors"
 	"fmt"
@@ -18,6 +19,8 @@ import (
 	"github.com/cookieY/YearningX/backend/internal/datasource"
 	"github.com/cookieY/YearningX/backend/internal/execution/domain"
 	reviewapp "github.com/cookieY/YearningX/backend/internal/review/application"
+	"github.com/cookieY/YearningX/backend/internal/review/fingerprint"
+	"github.com/cookieY/YearningX/backend/internal/review/privacy"
 )
 
 func TestStageSchemaResolutionForDatasource(t *testing.T) {
@@ -31,7 +34,7 @@ func TestStageSchemaResolutionForDatasource(t *testing.T) {
 	}
 
 	t.Run("postgres replays explicit only", func(t *testing.T) {
-		got, err := stageSchemaResolutionForDatasource(pgDS, frozen)
+		got, err := stageSchemaResolutionForDatasource(pgDS, frozen, "")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -50,15 +53,13 @@ func TestStageSchemaResolutionForDatasource(t *testing.T) {
 	})
 
 	t.Run("postgres requires snapshot", func(t *testing.T) {
-		_, err := stageSchemaResolutionForDatasource(pgDS, nil)
-		if err == nil {
+		if _, err := stageSchemaResolutionForDatasource(pgDS, nil, ""); err == nil {
 			t.Fatal("missing frozen path was accepted")
 		}
 	})
 
 	t.Run("nil datasource fails", func(t *testing.T) {
-		_, err := stageSchemaResolutionForDatasource(nil, frozen)
-		if err == nil {
+		if _, err := stageSchemaResolutionForDatasource(nil, frozen, ""); err == nil {
 			t.Fatal("nil datasource was accepted")
 		}
 	})
@@ -66,7 +67,7 @@ func TestStageSchemaResolutionForDatasource(t *testing.T) {
 	t.Run("mysql uses database", func(t *testing.T) {
 		got, err := stageSchemaResolutionForDatasource(&datasource.DatasourceModel{
 			CompatibilityMode: "mysql", DatabaseName: &mysqlDB,
-		}, nil)
+		}, nil, "")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -77,15 +78,35 @@ func TestStageSchemaResolutionForDatasource(t *testing.T) {
 		}
 	})
 
-	t.Run("mysql missing database fails", func(t *testing.T) {
-		_, err := stageSchemaResolutionForDatasource(&datasource.DatasourceModel{
+	t.Run("mysql missing database fails without statements", func(t *testing.T) {
+		if _, err := stageSchemaResolutionForDatasource(&datasource.DatasourceModel{
 			CompatibilityMode: "mysql",
-		}, nil)
-		if err == nil {
+		}, nil, ""); err == nil {
 			t.Fatal("missing mysql database was accepted")
 		}
 	})
 
+	t.Run("mysql uses targetDatabase override when default missing or overridden", func(t *testing.T) {
+		got, err := stageSchemaResolutionForDatasource(&datasource.DatasourceModel{
+			CompatibilityMode: "mysql",
+		}, nil, "orders_db")
+		if err != nil {
+			t.Fatalf("unexpected error with targetDatabase override: %v", err)
+		}
+		if got.Schema != "orders_db" || !reflect.DeepEqual(got.SearchPath, []string{"orders_db"}) {
+			t.Fatalf("got %+v, want orders_db", got)
+		}
+
+		gotOverride, err := stageSchemaResolutionForDatasource(&datasource.DatasourceModel{
+			CompatibilityMode: "mysql", DatabaseName: &mysqlDB,
+		}, nil, "override_db")
+		if err != nil {
+			t.Fatalf("unexpected error overriding default db: %v", err)
+		}
+		if gotOverride.Schema != "override_db" || !reflect.DeepEqual(gotOverride.SearchPath, []string{"override_db"}) {
+			t.Fatalf("got %+v, want override_db", gotOverride)
+		}
+	})
 }
 
 func TestVerifyResolvedStageSearchPathFailsBeforeReturningTarget(t *testing.T) {
@@ -953,4 +974,117 @@ func newExecutionSearchPathTestCrypter(t *testing.T) *crypto.Crypter {
 		t.Fatal(err)
 	}
 	return crypter
+}
+
+type testFingerprintSigner struct{}
+
+func (testFingerprintSigner) KeyID() string { return "test-fp-key" }
+func (testFingerprintSigner) HMACSHA256(data []byte) ([]byte, error) {
+	sum := sha256.Sum256(data)
+	return sum[:], nil
+}
+
+func TestStageSchemaResolutionMySQLExplicitStatements(t *testing.T) {
+	t.Parallel()
+	emptyDS := &datasource.DatasourceModel{CompatibilityMode: "mysql"}
+	profile := fingerprint.Profile{Engine: "mysql", Mode: "mysql"}
+	eng, err := fingerprint.NewEngine(testFingerprintSigner{}, fingerprint.Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	analyze := func(sqls ...string) []PlanStatement {
+		out := make([]PlanStatement, 0, len(sqls))
+		for i, raw := range sqls {
+			mapper := privacy.NewRunMapper()
+			res, aerr := eng.Analyze(profile, []byte(raw), mapper)
+			if aerr != nil {
+				t.Fatalf("Analyze(%q): %v", raw, aerr)
+			}
+			qual := reviewapp.InspectMySQLFingerprintObjects(
+				res.Objects, res.MetadataContextComplete, mapper,
+			).AllExplicitlyQualified()
+			out = append(out, PlanStatement{Ordinal: int32(i + 1), SQL: []byte(raw), ExplicitlyQualified: qual})
+		}
+		return out
+	}
+
+	for _, tc := range []struct {
+		name   string
+		sqls   []string
+		wantOK bool
+	}{
+		{name: "single explicit db", sqls: []string{"INSERT INTO demo.deploy_record (project_name) VALUES ('testing')"}, wantOK: true},
+		{name: "multi-db", sqls: []string{"INSERT INTO demo.t1 (id) VALUES (1)", "UPDATE devops.t2 SET name = 'ok' WHERE id = 2"}, wantOK: true},
+		{name: "CTE with qualified tables", sqls: []string{"WITH c AS (SELECT id FROM demo.t1) DELETE FROM devops.t2 WHERE id IN (SELECT id FROM c)"}, wantOK: true},
+		{name: "unqualified", sqls: []string{"INSERT INTO deploy_record (project_name) VALUES ('testing')"}},
+		{name: "mixed qualified and unqualified", sqls: []string{"INSERT INTO demo.t1 (id) VALUES (1)", "UPDATE orders SET status = 1 WHERE id = 1"}},
+		{name: "system schema", sqls: []string{"UPDATE mysql.user SET host = 'localhost' WHERE user = 'u'"}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := stageSchemaResolutionForDatasource(emptyDS, nil, "", analyze(tc.sqls...)...)
+			if tc.wantOK {
+				if err != nil || got.Schema != "" || len(got.SearchPath) != 0 {
+					t.Fatalf("got (%+v, %v), want empty schema resolution without error", got, err)
+				}
+				return
+			}
+			if err == nil {
+				t.Fatalf("expected error for %s, got %+v", tc.name, got)
+			}
+		})
+	}
+}
+
+func TestVerifyPostgresInspectionWithExplicitSchemasAndTargetSchema(t *testing.T) {
+	t.Parallel()
+	path := reviewapp.FrozenPostgresSearchPath{
+		Version: 1, CurrentUser: "writer", Configured: "public",
+		Explicit: []string{"public"}, Effective: []string{"pg_catalog", "public"}, CreationSchema: "public",
+	}
+	binding := reviewapp.FrozenPostgresPathBinding{
+		Version: 3, Path: path, Complete: true, CallablesSafe: true, CallablesChecked: true,
+		ExplicitSchemas: []string{"analytics"},
+		Baseline: map[string]reviewapp.FrozenPostgresBaselineRelation{
+			"events": {
+				PresentBySchema: map[string]string{"analytics": "table"},
+				OIDBySchema:     map[string]uint32{"analytics": 401},
+			},
+		},
+		Relations: map[string]reviewapp.FrozenPostgresObjectBinding{
+			"1:table_1": {
+				TableName: "events", Schema: "analytics", Kind: "table", OID: 401,
+				Present: true, Explicit: true, Supported: true,
+			},
+		},
+	}
+	validLookup := database.PostgresRelationLookup{
+		Relation:        "events",
+		PresentBySchema: map[string]database.PostgresRelationKind{"analytics": database.PostgresRelationTable},
+		OIDBySchema:     map[string]uint32{"analytics": 401},
+	}
+	if err := verifyPostgresInspection(path, binding, 0, []database.PostgresRelationLookup{validLookup}); err != nil {
+		t.Fatalf("explicit schema baseline rejected: %v", err)
+	}
+	drifted := validLookup
+	drifted.OIDBySchema = map[string]uint32{"analytics": 402}
+	if err := verifyPostgresInspection(path, binding, 0, []database.PostgresRelationLookup{drifted}); err == nil {
+		t.Fatal("drifted explicit schema OID accepted")
+	}
+
+	want := databasePostgresSearchPath(reviewapp.FrozenPostgresSearchPath{
+		Version: 1, CurrentUser: "writer", Configured: "analytics",
+		Explicit: []string{"analytics"}, Effective: []string{"pg_catalog", "analytics"}, CreationSchema: "analytics",
+	})
+	observedDefault := databasePostgresSearchPath(path)
+	if !verifyPostgresProbedDefaultPath(observedDefault, want, &reviewapp.FrozenPostgresPathBinding{TargetSchema: "analytics"}) {
+		t.Fatal("TargetSchema should allow default probed role search_path with matching CurrentUser")
+	}
+	observedOtherUser := observedDefault
+	observedOtherUser.CurrentUser = "intruder"
+	if verifyPostgresProbedDefaultPath(observedOtherUser, want, &reviewapp.FrozenPostgresPathBinding{TargetSchema: "analytics"}) {
+		t.Fatal("TargetSchema must reject CurrentUser mismatch")
+	}
+	if verifyPostgresProbedDefaultPath(observedDefault, want, nil) {
+		t.Fatal("default binding without TargetSchema must require exact path equality")
+	}
 }

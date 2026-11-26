@@ -13,6 +13,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/cookieY/YearningX/backend/internal/platform/hashutil"
 	"github.com/cookieY/YearningX/backend/internal/review/changeset"
 	"github.com/cookieY/YearningX/backend/internal/review/domain"
 	"github.com/cookieY/YearningX/backend/internal/review/fingerprint"
@@ -176,7 +177,7 @@ func TestSha256ValidityProgramMatchesJSONMarshal(t *testing.T) {
 			if err != nil {
 				t.Fatalf("json.Marshal: %v", err)
 			}
-			want := sha256Hex(raw)
+			want := hashutil.SHA256Hex(raw)
 			if got != want {
 				t.Fatalf("digest mismatch: got %s, want %s", got, want)
 			}
@@ -416,7 +417,7 @@ func TestAnalyzeRunStatementsStreaming_ParityAndScale(t *testing.T) {
 			op := strings.ToLower(operationOf(st.SQL))
 			row, berr := buildSQLStatementModel(
 				"run-parity", inlined.inlineStatements[idx].ID, ord, res, op,
-				statementClassOf(op), objectsAtStatementOrdinal(res.Objects, ord),
+				fingerprint.StatementClassOf(op), objectsAtStatementOrdinal(res.Objects, ord),
 			)
 			if berr != nil {
 				t.Fatalf("buildSQLStatementModel ordinal %d: %v", ord, berr)

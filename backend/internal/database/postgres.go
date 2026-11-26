@@ -105,6 +105,7 @@ func readPostgresIdentity(ctx context.Context, a *baseAdapter, cred Credential, 
 	identity := &ServerIdentity{
 		EngineFamily:         "postgresql",
 		ServerVersion:        normalizeVersionString(version),
+		RawVersionBanner:     version,
 		InstanceMarker:       marker,
 		DatabaseOID:          uint32(dbOID),
 		DatabaseName:         dbName,

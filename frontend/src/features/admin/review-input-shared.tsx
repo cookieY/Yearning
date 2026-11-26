@@ -97,6 +97,8 @@ export function ReviewInputDialogFrame({
   onEditorChange,
   editorDisabled,
   editorHeaderAction,
+  editorMode = "skill",
+  submitDisabled = false,
   errorKey,
   errorRequestId,
   pending,
@@ -113,6 +115,8 @@ export function ReviewInputDialogFrame({
   onEditorChange: (next: ReviewInputEditorValue) => void;
   editorDisabled?: boolean;
   editorHeaderAction?: ReactNode;
+  editorMode?: "skill" | "knowledge";
+  submitDisabled?: boolean;
   errorKey: string | null;
   errorRequestId: string | null;
   pending: boolean;
@@ -126,7 +130,9 @@ export function ReviewInputDialogFrame({
       <DialogContent className="sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
-          <DialogDescription>{t("admin.reviewInput.formDescription")}</DialogDescription>
+          <DialogDescription>
+            {t(editorMode === "knowledge" ? "admin.knowledge.formDescription" : "admin.reviewInput.formDescription")}
+          </DialogDescription>
         </DialogHeader>
         <div className="flex flex-col gap-3">
           {/* Owner ruling: hash and invalidation impact notice belong to the editing context;
@@ -151,6 +157,7 @@ export function ReviewInputDialogFrame({
             onChange={onEditorChange}
             disabled={editorDisabled}
             headerAction={editorHeaderAction}
+            mode={editorMode}
           />
           {errorKey !== null ? (
             <Alert variant="destructive" data-testid="review-input-error">
@@ -165,7 +172,12 @@ export function ReviewInputDialogFrame({
           <Button variant="outline" onClick={onClose}>
             {t("common.cancel")}
           </Button>
-          <PendingButton pending={pending} onClick={onSubmit} data-testid="review-input-submit">
+          <PendingButton
+            pending={pending}
+            disabled={submitDisabled}
+            onClick={onSubmit}
+            data-testid="review-input-submit"
+          >
             {t("common.save")}
           </PendingButton>
         </DialogFooter>

@@ -1540,4 +1540,79 @@ describe("Database AI Assistant (FE-F13-AI-ASSISTANT)", () => {
       await screen.findByTestId(`assistant-draft-error-${SAMPLE_DRAFT.id}`),
     ).toBeInTheDocument();
   });
+
+  it("renders inline code backticks in draft card lists, disables selected context button, and falls back to execCommand copy", async () => {
+    const originalClipboard = Object.getOwnPropertyDescriptor(navigator, "clipboard");
+    const originalExecCommand = Object.getOwnPropertyDescriptor(document, "execCommand");
+    try {
+      Object.defineProperty(navigator, "clipboard", {
+        configurable: true,
+        value: undefined,
+      });
+      const execCommand = vi.fn().mockReturnValue(true);
+      Object.defineProperty(document, "execCommand", {
+        configurable: true,
+        writable: true,
+        value: execCommand,
+      });
+      const toastInfoSpy = vi.spyOn(appToast, "info");
+      const toastErrorSpy = vi.spyOn(appToast, "error");
+      const onSelectDraft = vi.fn();
+
+      const draftWithBackticks: AssistantSqlDraft = {
+        ...SAMPLE_DRAFT,
+        id: "44444444-4444-4444-8444-444444444499",
+        semantic_warnings: ["Avoid `SELECT *` and keep <script>alert(1)</script> escaped"],
+        assumptions: ["Index on `balance` and `name` exists"],
+        next_steps: ["Verify in `/query` before submitting"],
+      };
+
+      renderWithProviders(
+        <SqlDraftCard
+          sessionId={SAMPLE_SESSION.id}
+          draft={draftWithBackticks}
+          flows={[SAMPLE_FLOW]}
+          isSelected={true}
+          onSelectDraft={onSelectDraft}
+        />,
+      );
+
+      // Selected context button is disabled with pressed semantics
+      const selectBtn = screen.getByTestId(`assistant-select-draft-${draftWithBackticks.id}`);
+      expect(selectBtn).toBeDisabled();
+      expect(selectBtn).toHaveAttribute("aria-pressed", "true");
+
+      // Backtick spans render as inline <code> elements without raw backticks or HTML injection
+      const codes = screen.getAllByTestId("inline-code").map((el) => el.textContent);
+      expect(codes).toEqual(["SELECT *", "balance", "name", "/query"]);
+      const warningsBox = screen.getByTestId(`assistant-draft-warnings-${draftWithBackticks.id}`);
+      expect(warningsBox.textContent).not.toContain("`SELECT *`");
+      expect(warningsBox.querySelector("script")).toBeNull();
+
+      // Copy succeeds via non-HTTPS execCommand fallback
+      fireEvent.click(screen.getByTestId(`assistant-copy-sql-${draftWithBackticks.id}`));
+      await waitFor(() => {
+        expect(execCommand).toHaveBeenCalledWith("copy");
+        expect(toastInfoSpy).toHaveBeenCalled();
+      });
+
+      // Explicit error toast when copy fails completely
+      execCommand.mockReturnValue(false);
+      fireEvent.click(screen.getByTestId(`assistant-copy-sql-${draftWithBackticks.id}`));
+      await waitFor(() => {
+        expect(toastErrorSpy).toHaveBeenCalled();
+      });
+    } finally {
+      if (originalClipboard) {
+        Object.defineProperty(navigator, "clipboard", originalClipboard);
+      } else {
+        Reflect.deleteProperty(navigator, "clipboard");
+      }
+      if (originalExecCommand) {
+        Object.defineProperty(document, "execCommand", originalExecCommand);
+      } else {
+        Reflect.deleteProperty(document, "execCommand");
+      }
+    }
+  });
 });

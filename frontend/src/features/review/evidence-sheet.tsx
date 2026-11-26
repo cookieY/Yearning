@@ -18,6 +18,7 @@ import {
 import { ScrollArea } from "@/shared/components/ui/scroll-area";
 import { ClipboardCopy, Eye, ShieldAlert } from "lucide-react";
 import { describeError } from "@/shared/api/error-display";
+import { writeClipboardText } from "@/shared/lib/clipboard";
 import { unwrapApi } from "@/shared/api/mutator";
 import { formatWatermark } from "@/shared/lib/timezones";
 
@@ -115,21 +116,20 @@ export function EvidenceSheet({ findings, open, onOpenChange }: EvidenceSheetPro
     // audit request fires only after the plaintext actually reached the
     // clipboard, and every failure surfaces inline (nothing is swallowed):
     // an unrecorded audit must never pass silently after a real copy.
-    void navigator.clipboard
-      .writeText(revealedRaw.text)
-      .then(() =>
-        copyMutation
-          .mutateAsync({ evidenceId, revealId: revealedRaw.revealId })
-          .catch((auditError: unknown) => {
-            const display = describeError(auditError, "recordRawReviewEvidenceCopy");
-            setCopyError(
-              `${t("precheck.evidence.copyAuditFailed", { detail: t(display.messageKey) })}${display.requestId !== null ? ` (${display.requestId})` : ""}`,
-            );
-          }),
-      )
-      .catch(() => {
+    void writeClipboardText(revealedRaw.text).then((ok) => {
+      if (!ok) {
         setCopyError(t("precheck.evidence.copyFailed"));
-      });
+        return;
+      }
+      return copyMutation
+        .mutateAsync({ evidenceId, revealId: revealedRaw.revealId })
+        .catch((auditError: unknown) => {
+          const display = describeError(auditError, "recordRawReviewEvidenceCopy");
+          setCopyError(
+            `${t("precheck.evidence.copyAuditFailed", { detail: t(display.messageKey) })}${display.requestId !== null ? ` (${display.requestId})` : ""}`,
+          );
+        });
+    });
   };
 
   // Each query/mutation is judged by its own operation error profile.

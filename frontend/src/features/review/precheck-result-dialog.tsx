@@ -1,9 +1,9 @@
 import type { ReviewFinding, ReviewRun } from "@/api/generated/client/yearningV4HTTPAPI.schemas";
 import "./precheck-progress.css";
-import type { SqlDigest } from "@/features/review/bulk-import/sql-digest";
 import { FindingList, type FindingListState } from "@/features/review/finding-list";
 import { ReviewAllClear } from "@/features/review/review-all-clear";
-import { ReviewStatusCard } from "@/features/review/review-status-card";
+import { knownFailureKey, ReviewStatusCard } from "@/features/review/review-status-card";
+import { extractReviewSummaries, ReviewSummarySection } from "@/features/review/review-summary-section";
 import { type computePrecheckProgress, gateBlockers, isTerminalPhase, type RunPhase } from "@/features/review/run-state";
 
 export type PrecheckProgress = ReturnType<typeof computePrecheckProgress>;
@@ -54,11 +54,6 @@ export interface PrecheckResultDialogProps {
   findingsState: FindingListState;
   onOpenEvidence: (findings: ReviewFinding[]) => void;
   onRefetchFindings: () => void;
-  isBulk: boolean;
-  bulkDigest: SqlDigest | null;
-  localSqlText: string;
-  onLocate: (target: string) => void;
-  onBulkLocate: (ordinal: number) => void;
   stepError: string | null;
   submitEnabled: boolean;
   submitPending: boolean;
@@ -92,11 +87,6 @@ export function PrecheckResultDialog({
   findingsState,
   onOpenEvidence,
   onRefetchFindings,
-  isBulk,
-  bulkDigest,
-  localSqlText,
-  onLocate,
-  onBulkLocate,
   stepError,
   submitEnabled,
   submitPending,
@@ -145,8 +135,7 @@ export function PrecheckResultDialog({
       : "starting"
     : phasePresented === "blocked" || phasePresented === "failed" || run?.gate.passed === false
       ? "blocked"
-      : phasePresented === "partial" ||
-          (findingsState.status === "ready" && findingsState.findings.length > 0)
+      : phasePresented === "partial"
         ? "warning"
         : "passed";
   const progressActive = !isComplete && precheckRequestError === null;
@@ -157,6 +146,23 @@ export function PrecheckResultDialog({
     !hasTerminalBlockerState &&
     isTerminalPhase(phasePresented)
       ? gateBlockers(run?.gate ?? null)
+      : [];
+  const terminalFailureKey =
+    showAuditDetails &&
+    isComplete &&
+    !hasTerminalBlockerState &&
+    (phasePresented === "blocked" || phasePresented === "failed" || phasePresented === "partial") &&
+    run?.failure_code != null
+      ? knownFailureKey(run.failure_code)
+      : null;
+  const hasGateBlockerBanner = gateBlockerItems.length > 0 || terminalFailureKey !== null;
+  const reviewSummaries =
+    !precheckExpired &&
+    !reviewRunError &&
+    phasePresented !== "outdated" &&
+    !flowUpdated &&
+    isTerminalPhase(phasePresented)
+      ? extractReviewSummaries(run)
       : [];
 
   return (
@@ -279,16 +285,26 @@ export function PrecheckResultDialog({
                     <span>{t("precheck.flowUpdated.banner")}</span>
                   </div>
                 )}
-                {gateBlockerItems.length > 0 && (
+                {hasGateBlockerBanner && (
                   <Alert variant="destructive" data-testid="gate-blockers">
                     <ShieldAlert className="size-4" aria-hidden />
                     <AlertTitle>{t("precheck.blocked.gate")}</AlertTitle>
                     <AlertDescription>
-                      <ul className="list-disc pl-4">
-                        {gateBlockerItems.map((blocker) => (
-                          <li key={blocker.code}>{t(blocker.messageKey)}</li>
-                        ))}
-                      </ul>
+                      {gateBlockerItems.length > 0 && (
+                        <ul className="list-disc pl-4">
+                          {gateBlockerItems.map((blocker) => (
+                            <li key={blocker.code}>{t(blocker.messageKey)}</li>
+                          ))}
+                        </ul>
+                      )}
+                      {terminalFailureKey !== null && (
+                        <p
+                          className={gateBlockerItems.length > 0 ? "mt-1.5 font-medium" : "font-medium"}
+                          data-testid="gate-blocker-failure"
+                        >
+                          {t(`precheck.failure.${terminalFailureKey}`)}
+                        </p>
+                      )}
                     </AlertDescription>
                   </Alert>
                 )}
@@ -314,6 +330,7 @@ export function PrecheckResultDialog({
                         hasRunId={hasPresentedRun}
                         isPending={reviewRunPending}
                         isFetching={reviewRunFetching}
+                        expired={precheckExpired}
                         isError={reviewRunError}
                         error={reviewRunErrorDetail}
                         onRetry={onRefetchReviewRun}
@@ -321,10 +338,17 @@ export function PrecheckResultDialog({
                     </div>
                     <div>
                       {findingsState.status === "ready" && findingsState.findings.length === 0 ? (
-                        <ReviewAllClear />
+                        <div className="flex flex-col gap-3">
+                          {reviewSummaries.length > 0 && (
+                            <ReviewSummarySection summaries={reviewSummaries} />
+                          )}
+                          <ReviewAllClear />
+                        </div>
                       ) : (
                         <FindingList
                           state={findingsState}
+                          summaries={reviewSummaries}
+                          hideIncompleteNotice={hasGateBlockerBanner}
                           onOpenEvidence={onOpenEvidence}
                           onRetry={() => {
                             if (reviewRunError || run === null) {
@@ -332,38 +356,6 @@ export function PrecheckResultDialog({
                             } else {
                               onRefetchFindings();
                             }
-                          }}
-                          onLocate={
-                            isTerminalPhase(phasePresented)
-                              ? (finding) => {
-                                  const target = /`([^`]+)`/.exec(finding.message)?.[1];
-                                  if (target === undefined) return;
-                                  if (isBulk) {
-                                    const ordinal = /#(\d+)/.exec(target);
-                                    if (
-                                      ordinal !== null &&
-                                      Number(ordinal[1]) <= (bulkDigest?.statementCount ?? 0)
-                                    ) {
-                                      onBulkLocate(Number(ordinal[1]));
-                                      onOpenChange(false);
-                                    }
-                                    return;
-                                  }
-                                  if (localSqlText.includes(target)) {
-                                    onLocate(target);
-                                    onOpenChange(false);
-                                  }
-                                }
-                              : undefined
-                          }
-                          locateInEditor={(snippet) => {
-                            if (isBulk) {
-                              const ordinal = /#(\d+)/.exec(snippet);
-                              return (
-                                ordinal !== null && Number(ordinal[1]) <= (bulkDigest?.statementCount ?? 0)
-                              );
-                            }
-                            return localSqlText.includes(snippet);
                           }}
                         />
                       )}

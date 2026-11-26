@@ -7,8 +7,8 @@ import { FindingList } from "./finding-list";
 
 /**
  * The finding list is the structured AI output surface: severity filter,
- * per-finding context (stage, category), suggestion, evidence affordance and
- * the quote-based SQL locate. Only contract fields render — the gate
+ * per-finding context (stage, category), suggestion and evidence affordance.
+ * Only contract fields render — the gate
  * "do not display chain-of-thought" means no reasoning channel exists at all.
  */
 
@@ -106,18 +106,10 @@ describe("FindingList", () => {
     expect(screen.getAllByRole("button", { name: "\u67e5\u770b\u5ba1\u6838\u8bc1\u636e" })).toHaveLength(1);
   });
 
-  it("offers SQL locating only for findings quoting a snippet present in the editor", () => {
-    const onLocate = vi.fn();
-    render(
-      <FindingList state={ready()} onOpenEvidence={() => {}} onLocate={onLocate} />,
-    );
-    const locateButtons = screen.getAllByRole("button", { name: "\u5728SQL\u4e2d\u5b9a\u4f4d" });
-    // Only the medium finding quotes a snippet; the critical one does not.
-    expect(locateButtons).toHaveLength(1);
-    locateButtons[0]?.click();
-    expect(onLocate).toHaveBeenCalledWith(
-      expect.objectContaining({ id: "4f6f1a2b-0000-4000-8000-00000000f101" }),
-    );
+  it("does not render a SQL locate button even when a finding quotes backtick-delimited SQL", () => {
+    render(<FindingList state={ready()} onOpenEvidence={() => {}} />);
+    expect(screen.queryByRole("button", { name: "\u5728SQL\u4e2d\u5b9a\u4f4d" })).toBeNull();
+    expect(document.querySelector("[data-testid^='locate-']")).toBeNull();
   });
 
   it("never renders a reasoning channel or model transcript", () => {
@@ -175,11 +167,21 @@ describe("FindingList", () => {
   });
 
   it("never reports no risks when an incomplete review returns an empty list", () => {
-    render(<FindingList state={incomplete([])} onOpenEvidence={() => {}} />);
+    render(
+      <FindingList
+        state={{ status: "incomplete", findings: [], failureCode: "sql_schema_out_of_scope" }}
+        onOpenEvidence={() => {}}
+      />,
+    );
 
     const incompleteNotice = screen.getByTestId("findings-incomplete");
     expect(incompleteNotice).toHaveAttribute("role", "alert");
     expect(incompleteNotice).toHaveTextContent("\u5ba1\u6838\u672a\u5b8c\u6574\u5b8c\u6210");
+    expect(incompleteNotice).toHaveTextContent("\u6682\u672a\u751f\u6210\u98ce\u9669\u53d1\u73b0");
+    expect(screen.getByTestId("findings-incomplete-reason")).toHaveTextContent(
+      "SQL \u4e2d\u663e\u5f0f\u6307\u5b9a\u7684\u5e93\u540d\u6216 Schema",
+    );
+    expect(screen.queryByText("sql_schema_out_of_scope")).not.toBeInTheDocument();
     expect(screen.queryByTestId("findings-empty-all")).not.toBeInTheDocument();
   });
 
@@ -189,6 +191,71 @@ describe("FindingList", () => {
     expect(screen.getByTestId("findings-incomplete")).toHaveTextContent("\u5ba1\u6838\u672a\u5b8c\u6574\u5b8c\u6210");
     expect(screen.getAllByTestId("finding-item")).toHaveLength(2);
     expect(screen.queryByTestId("findings-empty-all")).not.toBeInTheDocument();
+  });
+
+  it("renders AI review conclusions inside the findings tab with explicit summary locale", () => {
+    render(
+      <FindingList
+        state={ready()}
+        summaries={[
+          {
+            stage_position: 1,
+            state: "passed",
+            highest_severity: "none",
+            gate_passed: true,
+            finding_count: 1,
+            evidence_count: 1,
+            snapshot_hash: "snap-summary",
+            summary: "\u9884\u5ba1\u7ed3\u8bba\u6b63\u6587",
+            summary_locale: "zh-CN",
+          },
+        ]}
+        onOpenEvidence={() => {}}
+      />,
+    );
+
+    const summarySection = screen.getByTestId("review-summary");
+    expect(summarySection).toHaveTextContent("AI \u5ba1\u6838\u7ed3\u8bba");
+    expect(screen.getByText("\u9884\u5ba1\u7ed3\u8bba\u6b63\u6587")).toHaveAttribute("lang", "zh-CN");
+  });
+
+  it("suppresses duplicate incomplete alert when hideIncompleteNotice is true", () => {
+    const emptyView = render(
+      <FindingList
+        state={{ status: "incomplete", findings: [], failureCode: "sql_schema_out_of_scope" }}
+        hideIncompleteNotice
+        onOpenEvidence={() => {}}
+      />,
+    );
+    expect(screen.queryByTestId("findings-incomplete")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("findings-incomplete-reason")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("findings-empty-all")).not.toBeInTheDocument();
+    expect(screen.getByTestId("findings-none-generated")).toBeInTheDocument();
+    emptyView.unmount();
+
+    render(
+      <FindingList
+        state={{ status: "incomplete", findings: [], failureCode: "risk_blocked" }}
+        hideIncompleteNotice
+        summaries={[
+          {
+            stage_position: 1,
+            state: "blocked",
+            highest_severity: "critical",
+            gate_passed: false,
+            finding_count: 0,
+            evidence_count: 1,
+            snapshot_hash: "snap-blocked-summary",
+            summary: "Blocked summary conclusion.",
+            summary_locale: "en-US",
+          },
+        ]}
+        onOpenEvidence={() => {}}
+      />,
+    );
+    expect(screen.queryByTestId("findings-incomplete")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("findings-none-generated")).not.toBeInTheDocument();
+    expect(screen.getByTestId("review-summary")).toHaveTextContent("Blocked summary conclusion.");
   });
 
   it("keeps no-run and stale results distinct from an empty review", () => {
@@ -352,8 +419,8 @@ describe("FindingList", () => {
     );
     const block = screen.getByTestId("finding-block-code");
     expect(block).toHaveTextContent(longSql);
-    // Native click (same pattern as the locate test): userEvent's pointer
-    // clipping check mis-fires on buttons nested in overflow-hidden cards.
+    // Native click: userEvent's pointer clipping check mis-fires on buttons
+    // nested in overflow-hidden cards.
     screen.getByTestId("finding-copy-code").click();
     expect(writeText).toHaveBeenCalledWith(longSql);
     // Copy feedback is announced to assistive technology.

@@ -7,6 +7,7 @@ package application
 import (
 	"context"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"strings"
 	"time"
@@ -15,6 +16,8 @@ import (
 
 	"github.com/cookieY/YearningX/backend/internal/authorization/auditlog"
 	"github.com/cookieY/YearningX/backend/internal/crypto"
+	"github.com/cookieY/YearningX/backend/internal/platform/ptr"
+	"github.com/cookieY/YearningX/backend/internal/platform/watermark"
 	"github.com/cookieY/YearningX/backend/internal/review/domain"
 	"github.com/cookieY/YearningX/backend/internal/review/persistence"
 )
@@ -27,24 +30,16 @@ func auditInputOf(eventType, action, actorID, actorName, resourceType, resourceI
 	requestID, sourceIP, userAgent string, metadata map[string]any) auditlog.AuditInput {
 	return auditlog.AuditInput{
 		EventType: eventType, ActorKind: "user",
-		ActorID:       strPtrOrNil(actorID),
-		ActorUsername: strPtrOrNil(actorName),
+		ActorID:       ptr.NonZero(actorID),
+		ActorUsername: ptr.NonZero(actorName),
 		ResourceType:  resourceType,
-		ResourceID:    strPtrOrNil(resourceID),
+		ResourceID:    ptr.NonZero(resourceID),
 		Action:        action, Outcome: "succeeded",
-		RequestID: strPtrOrNil(requestID),
-		SourceIP:  strPtrOrNil(sourceIP),
-		UserAgent: strPtrOrNil(userAgent),
+		RequestID: ptr.NonZero(requestID),
+		SourceIP:  ptr.NonZero(sourceIP),
+		UserAgent: ptr.NonZero(userAgent),
 		Metadata:  metadata,
 	}
-}
-
-// strPtrOrNil converts an empty string to NULL (uuid/inet columns do not accept "").
-func strPtrOrNil(s string) *string {
-	if s == "" {
-		return nil
-	}
-	return &s
 }
 
 // EvidenceView is the ReviewEvidence view.
@@ -134,7 +129,7 @@ func (s *Services) ListFindingEvidence(ctx context.Context, actor Actor, finding
 			return nil, err
 		}
 		var normalized any
-		if err := jsonUnmarshalStrict(plaintext, &normalized); err != nil {
+		if err := json.Unmarshal(plaintext, &normalized); err != nil {
 			return nil, err
 		}
 		_ = snap
@@ -231,7 +226,7 @@ func (s *Services) RevealRawEvidence(ctx context.Context, actor Actor, meta Requ
 		RevealID:    revealID,
 		ContentType: "application/json",
 		RawPayload:  plaintext,
-		Watermark:   buildWatermark(actor.Username, now),
+		Watermark:   watermark.SQLViewer(actor.Username, now),
 		ValidUntil:  now.Add(5 * time.Minute),
 	}, nil
 }
@@ -273,7 +268,7 @@ func (s *Services) revealEphemeralRaw(ctx context.Context, actor Actor, meta Req
 		RevealID:    revealID,
 		ContentType: "application/json",
 		RawPayload:  plaintext,
-		Watermark:   buildWatermark(actor.Username, now),
+		Watermark:   watermark.SQLViewer(actor.Username, now),
 		ValidUntil:  now.Add(5 * time.Minute),
 	}, nil
 }

@@ -70,6 +70,7 @@ describe("AppHeader release bar", () => {
       "href",
       "https://example.test/releases/v4.1.0",
     );
+    expect(screen.queryByTestId("header-refresh")).not.toBeInTheDocument();
   });
 
   it("flags an available update with the latest tag", () => {

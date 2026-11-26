@@ -30,7 +30,10 @@ async function jsonRequest(
   path: string,
   init?: RequestInit,
 ): Promise<{ status: number; body: Envelope<Record<string, unknown>> }> {
-  const response = await fetch(`https://yearning.test${path}`, init);
+  const response = await fetch(
+    `https://yearning.test${path.startsWith("/api/v4") ? path : `/api/v4${path}`}`,
+    init,
+  );
   return {
     status: response.status,
     body: (await response.json()) as Envelope<Record<string, unknown>>,
@@ -500,7 +503,7 @@ describe("execution handler edge branches", () => {
   it("tolerates a bodyless begin and rejects unknown attempt reads", async () => {
     const order = seedExecutionOrder();
     const headers = beginHeaders(order.version);
-    const bodyless = await fetch(`https://yearning.test/change-orders/${order.id}/execution-attempts`, {
+    const bodyless = await fetch(`https://yearning.test/api/v4/change-orders/${order.id}/execution-attempts`, {
       method: "POST",
       headers,
     });
@@ -533,7 +536,7 @@ describe("execution handler edge branches", () => {
     // The scenario terminalizes as succeeded; the order leaves result_unknown
     // so a verification body would fail on state anyway — send no body at all
     // to pin the shape guard branch.
-    const noBody = await fetch(`https://yearning.test/execution-attempts/${attemptId}/verifications`, {
+    const noBody = await fetch(`https://yearning.test/api/v4/execution-attempts/${attemptId}/verifications`, {
       method: "POST",
       headers: { "If-Match": '"1"', "Idempotency-Key": "v-empty" },
     });

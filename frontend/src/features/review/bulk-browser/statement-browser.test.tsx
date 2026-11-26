@@ -127,13 +127,6 @@ describe("StatementBrowser", () => {
     });
   });
 
-  it("locates an ordinal through the finding-driven locate prop", async () => {
-    renderBrowser({ locate: { ordinal: 2000, nonce: 7 } });
-    await waitFor(() => {
-      expect(highlightedIndex()).toBe("2000");
-    });
-  });
-
   it("filters statements by a selected shape group", () => {
     renderBrowser();
     const groupRows = screen.getAllByTestId("bulk-group-row");

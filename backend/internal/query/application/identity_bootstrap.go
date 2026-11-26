@@ -21,6 +21,7 @@ import (
 	"github.com/cookieY/YearningX/backend/internal/database"
 	"github.com/cookieY/YearningX/backend/internal/datasource"
 	"github.com/cookieY/YearningX/backend/internal/platform/addrguard"
+	"github.com/cookieY/YearningX/backend/internal/platform/ptr"
 )
 
 // IdentityProbeFunc probes a target datasource's server identity during on-demand fingerprint bootstrap.
@@ -148,7 +149,7 @@ func (s *Services) bootstrapSingleDatasourceIdentity(ctx context.Context, ds *da
 	if s.IdentityProbe != nil {
 		identity, err = s.IdentityProbe(probeCtx, ds, dbCred, tlsMat)
 	} else {
-		effectiveDB := derefString(ds.DatabaseName)
+		effectiveDB := ptr.Deref(ds.DatabaseName)
 		if effectiveDB == "" {
 			effectiveDB = plain.Username
 		}
@@ -158,7 +159,7 @@ func (s *Services) bootstrapSingleDatasourceIdentity(ctx context.Context, ds *da
 		ep := database.Endpoint{
 			Host:             ds.Host,
 			Port:             ds.Port,
-			DatabaseName:     derefString(ds.DatabaseName),
+			DatabaseName:     ptr.Deref(ds.DatabaseName),
 			CompatibilityMod: ds.CompatibilityMode,
 		}
 		var adapter database.Adapter
@@ -177,18 +178,19 @@ func (s *Services) bootstrapSingleDatasourceIdentity(ctx context.Context, ds *da
 	if err != nil || !isValidIdentityFingerprint(fp) {
 		return
 	}
+	target, _, capErr := datasource.ResolveCapabilities(ds.Engine, ds.CompatibilityMode, identity.ServerVersion)
+	if capErr != nil {
+		return
+	}
 	updates := map[string]any{
 		"identity_fingerprint": fp,
 		"updated_at":           s.now(),
 	}
-	if target, _, capErr := datasource.ResolveCapabilities(ds.Engine, ds.CompatibilityMode, identity.ServerVersion); capErr == nil {
-		metaBytes, merr := json.Marshal(map[string]string{
-			"detected_version":  identity.ServerVersion,
-			"capability_target": target,
-		})
-		if merr == nil {
-			updates["metadata"] = metaBytes
-		}
+	if metaBytes, merr := json.Marshal(map[string]string{
+		"detected_version":  identity.ServerVersion,
+		"capability_target": target,
+	}); merr == nil {
+		updates["metadata"] = metaBytes
 	}
 	_ = s.DB.WithContext(ctx).Model(&datasource.DatasourceModel{}).
 		Where("id = ? and enabled = true and (identity_fingerprint is null or identity_fingerprint = '')", ds.ID).

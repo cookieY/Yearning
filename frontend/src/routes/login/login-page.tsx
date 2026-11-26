@@ -1,4 +1,4 @@
-import { useState, type SyntheticEvent } from "react";
+import { useEffect, useState, type SyntheticEvent } from "react";
 import "./login-glow.css";
 import { useTranslation } from "react-i18next";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -9,8 +9,9 @@ import {
   listAuthenticationProviders,
 } from "@/api/generated/client/authentication/authentication";
 import type { LoginRequest } from "@/api/generated/client/yearningV4HTTPAPI.schemas";
-import { businessErrCodeByName, describeError } from "@/shared/api/error-display";
+import { describeError, isBusinessErrorCode } from "@/shared/api/error-display";
 import { unwrapApi } from "@/shared/api/mutator";
+import { setPublicBranding, usePublicBranding } from "@/shared/lib/branding";
 import { ErrorState } from "@/shared/components/status/status-components";
 import { LoadingState } from "@/shared/components/status/loading-state";
 import { Alert, AlertDescription, AlertTitle } from "@/shared/components/ui/alert";
@@ -50,8 +51,6 @@ import { FOOTER_TEXT } from "@/app/shell/app-footer";
 
 type LoginMode = "local" | "ldap";
 
-const ADMIN_LOCKED_CODE = businessErrCodeByName("ADMIN_PASSWORD_LOCKED");
-
 /** Only server-issued http(s) targets may become redirect targets (no javascript: URLs). */
 function isSafeStartUrl(url: string): boolean {
   try {
@@ -70,6 +69,7 @@ export default function LoginPage() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
 
+  const branding = usePublicBranding();
   const providersQuery = useQuery({
     queryKey: ["auth", "providers"],
     queryFn: () => unwrapApi(listAuthenticationProviders()),
@@ -77,6 +77,16 @@ export default function LoginPage() {
   });
 
   const providers = providersQuery.data;
+  useEffect(() => {
+    if (providers?.branding !== undefined) {
+      setPublicBranding(providers.branding);
+    }
+  }, [providers]);
+  const productName = (providers?.branding?.product_name ?? "").trim() || branding.productName;
+  const loginDescription =
+    providers?.branding !== undefined
+      ? providers.branding.login_description.trim()
+      : branding.loginDescription;
   const validOidcProviders = (providers?.oidc ?? []).filter((provider) =>
     isSafeStartUrl(provider.start_url),
   );
@@ -117,12 +127,7 @@ export default function LoginPage() {
   const operationId = effectiveMode === "ldap" ? "loginWithLdap" : "login";
   const errorDisplay = error == null ? null : describeError(error, operationId);
   const isAdminLocked =
-    !errorDisplay?.contractViolation &&
-    ADMIN_LOCKED_CODE !== null &&
-    error !== null &&
-    typeof error === "object" &&
-    "err_code" in error &&
-    (error as { err_code: unknown }).err_code === ADMIN_LOCKED_CODE;
+    !errorDisplay?.contractViolation && isBusinessErrorCode(error, "ADMIN_PASSWORD_LOCKED");
 
   return (
     // Owner ruling 2026-09-02: two-column auth layout per the reference
@@ -137,7 +142,7 @@ export default function LoginPage() {
         <div className="relative z-10 flex flex-col gap-6 lg:ml-[20%]">
           <div className="relative z-10 flex w-fit items-center gap-2 rounded-md border border-border/60 px-3 py-1.5 text-sm">
             <span className="bg-chart-series-user size-2 rounded-full" aria-hidden />
-            {t("login.brandBadge")}
+            {t("login.brandBadge", { productName })}
           </div>
           <h2 className="relative z-10 text-5xl leading-tight font-semibold tracking-tight whitespace-pre-line">
             {/* animated-text-03 typewriter over the WHOLE headline (owner
@@ -158,7 +163,7 @@ export default function LoginPage() {
             <span className="sr-only">{t("login.brandTitle")}</span>
           </h2>
           <p className="relative z-10 max-w-md text-lg text-muted-foreground">
-            {t("login.brandDescription")}
+            {t("login.brandDescription", { productName })}
           </p>
         </div>
       </div>
@@ -177,8 +182,13 @@ export default function LoginPage() {
       >
         <CardHeader className="items-center text-center">
           <BrandLogo className="mx-auto mb-2" />
-          <CardTitle className="text-xl tracking-tight">{t("login.title")}</CardTitle>
-          <CardDescription>{t("login.description")}</CardDescription>
+          <CardTitle className="text-xl tracking-tight">{t("login.title", { productName })}</CardTitle>
+          <CardDescription
+            className={loginDescription !== "" ? "whitespace-pre-line" : undefined}
+            data-testid="login-description"
+          >
+            {loginDescription !== "" ? loginDescription : t("login.description", { productName })}
+          </CardDescription>
         </CardHeader>
         <CardContent className="grid gap-4">
           {providersQuery.isPending && <LoadingState label={t("login.loadingProviders")} />}
@@ -223,34 +233,28 @@ export default function LoginPage() {
                   role="group"
                   aria-label={t("login.methodGroup")}
                 >
-                  <button
-                    type="button"
-                    aria-pressed={mode === "local"}
-                    onClick={() => {
-                      switchMode("local");
-                    }}
-                    className={
-                      mode === "local"
-                        ? "border-primary text-accent-foreground dark:text-foreground -mb-px inline-flex h-full items-center justify-center border-b-2 px-3 text-xs font-semibold transition-colors"
-                        : "text-muted-foreground hover:text-foreground -mb-px inline-flex h-full items-center justify-center border-b-2 border-transparent px-3 text-xs font-medium transition-colors"
-                    }
-                  >
-                    {t("login.modeLocal")}
-                  </button>
-                  <button
-                    type="button"
-                    aria-pressed={mode === "ldap"}
-                    onClick={() => {
-                      switchMode("ldap");
-                    }}
-                    className={
-                      mode === "ldap"
-                        ? "border-primary text-accent-foreground dark:text-foreground -mb-px inline-flex h-full items-center justify-center border-b-2 px-3 text-xs font-semibold transition-colors"
-                        : "text-muted-foreground hover:text-foreground -mb-px inline-flex h-full items-center justify-center border-b-2 border-transparent px-3 text-xs font-medium transition-colors"
-                    }
-                  >
-                    {t("login.modeLdap")}
-                  </button>
+                  {(
+                    [
+                      { key: "local", labelKey: "login.modeLocal" },
+                      { key: "ldap", labelKey: "login.modeLdap" },
+                    ] as const
+                  ).map((item) => (
+                    <button
+                      key={item.key}
+                      type="button"
+                      aria-pressed={mode === item.key}
+                      onClick={() => {
+                        switchMode(item.key);
+                      }}
+                      className={
+                        mode === item.key
+                          ? "border-primary text-accent-foreground dark:text-foreground -mb-px inline-flex h-full items-center justify-center border-b-2 px-3 text-xs font-semibold transition-colors"
+                          : "text-muted-foreground hover:text-foreground -mb-px inline-flex h-full items-center justify-center border-b-2 border-transparent px-3 text-xs font-medium transition-colors"
+                      }
+                    >
+                      {t(item.labelKey)}
+                    </button>
+                  ))}
                 </div>
               )}
               <div className="grid gap-2">

@@ -1,7 +1,10 @@
 // errors.go Execution domain business errors (frozen in error-codes.json 3003-3012).
 package domain
 
-import "fmt"
+import (
+	"fmt"
+	"strings"
+)
 
 // Error is a domain error carrying a contract error code (mapped to BusinessError by httpapi).
 type Error struct {
@@ -10,6 +13,28 @@ type Error struct {
 }
 
 func (e *Error) Error() string { return fmt.Sprintf("execution: %d %s", e.Code, e.Name) }
+
+// BizCode implements bizerr.Coded.
+func (e *Error) BizCode() int { return int(e.Code) }
+
+// BizName implements bizerr.Coded, stripping any ":reason" suffix into BizMeta.
+func (e *Error) BizName() string {
+	if base, _, ok := strings.Cut(e.Name, ":"); ok {
+		return base
+	}
+	return e.Name
+}
+
+// BizMessage implements bizerr.Coded.
+func (e *Error) BizMessage() string { return "Execution request rejected" }
+
+// BizMeta implements bizerr.Coded, exposing both reason and detail for colon-suffixed errors.
+func (e *Error) BizMeta() map[string]any {
+	if _, reason, ok := strings.Cut(e.Name, ":"); ok {
+		return map[string]any{"reason": reason, "detail": reason}
+	}
+	return nil
+}
 
 // Contract error codes (frozen values in error-codes.json business_errors).
 const (

@@ -51,13 +51,11 @@ func (c *Crypter) DeploymentID() string { return c.deploymentID }
 // AAD constructs a runtime AAD bound to this deployment ID; the caller supplies table/primaryKey/column/purpose
 // matching the corresponding runtime reader field for field (preventing cross-record and cross-field ciphertext swaps).
 func (c *Crypter) AAD(table, primaryKey, column, purpose string) crypto.AAD {
-	return crypto.AAD{
-		DeploymentID: c.deploymentID,
-		Table:        table,
-		PrimaryKey:   primaryKey,
-		Column:       column,
-		Purpose:      purpose,
-	}
+	return crypto.ColumnAAD(c.deploymentID, crypto.Purpose(purpose), crypto.ColumnRef{
+		Table:      table,
+		PrimaryKey: primaryKey,
+		Column:     column,
+	})
 }
 
 // Sealed holds the envelope encryption result mapped to each table's ciphertext/nonce/key_id/algorithm columns.

@@ -78,8 +78,7 @@
       "sql_mode": "ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION",
       "charset": "utf8mb4",
       "applies_to_targets": [
-        "mysql-5.7",
-        "mysql-8.0",
+        "mysql",
         "tidb-mysql",
         "oceanbase-mysql",
         "polardb-mysql"
@@ -101,8 +100,7 @@
   "dialects": {
     "mysql": {
       "targets": [
-        "mysql-5.7",
-        "mysql-8.0",
+        "mysql",
         "tidb-mysql",
         "oceanbase-mysql",
         "polardb-mysql"
@@ -127,10 +125,7 @@
     },
     "postgresql": {
       "targets": [
-        "postgresql-14",
-        "postgresql-15",
-        "postgresql-16",
-        "postgresql-17",
+        "postgresql",
         "polardb-postgresql"
       ],
       "driver": "pgx/v5 through database/sql-compatible adapter boundary",

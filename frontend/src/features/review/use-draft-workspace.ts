@@ -18,6 +18,7 @@ import {
   getChangeDraft,
   getReviewRun,
   listCurrentUserFlows,
+  listMyFlowDatasourceSchemas,
   listReviewRunFindings,
   replaceDraftSql,
   revealDraftSql,
@@ -25,10 +26,15 @@ import {
   updateChangeDraft,
 } from "@/api/generated/client/change-drafts/change-drafts";
 import { submitChangeDraft } from "@/api/generated/client/change-orders/change-orders";
-import { ifMatchHeader, type UnwrapEnvelope, unwrapApi } from "@/shared/api/mutator";
+import { useIdempotentMutation } from "@/shared/api/idempotency";
+import {
+  idempotencyKeyHeader,
+  ifMatchHeader,
+  type UnwrapEnvelope,
+  unwrapApi,
+} from "@/shared/api/mutator";
 import { subscribeSseEvent, useSseEvent } from "@/shared/events/sse-event-bus";
 import { fetchAllCursorPages, type CursorPage } from "@/shared/lib/fetch-all-cursor-pages";
-import { randomUUID } from "@/shared/lib/uuid";
 import { useDraftEditorStore } from "./draft-editor-store";
 import { mergeRunPhase, type RunPhase } from "./run-state";
 
@@ -72,6 +78,30 @@ export function useCurrentUserChangeFlows() {
       return page.items;
     },
     staleTime: 5 * 60_000,
+    refetchOnWindowFocus: false,
+  });
+}
+
+export function useFlowDatasourceSchemas(
+  flowId: string | null,
+  datasourceId: string | null,
+  enabled: boolean,
+) {
+  return useQuery({
+    queryKey: ["flow-datasource-schemas", flowId, datasourceId],
+    queryFn: async () => {
+      const page = await unwrapApi(
+        listMyFlowDatasourceSchemas(flowId as string, datasourceId as string),
+      );
+      return page.items.map((item) => item.name);
+    },
+    enabled:
+      enabled &&
+      flowId !== null &&
+      flowId !== "" &&
+      datasourceId !== null &&
+      datasourceId !== "",
+    staleTime: 60_000,
     refetchOnWindowFocus: false,
   });
 }
@@ -134,6 +164,7 @@ export function useReviewRun(runId: string | null): ReviewProgress {
     queryFn: () => unwrapApi(getReviewRun(runId as string)),
     enabled: runId !== null,
     refetchInterval: (query) => {
+      if (query.state.status === "error") return false;
       const state = query.state.data?.state;
       return state === "queued" || state === "running" ? RUNNING_REFETCH_MS : false;
     },
@@ -244,10 +275,6 @@ function reviewOutputLanguage(language: string): "zh-CN" | "en-US" {
   return language.toLowerCase().startsWith("en") ? "en-US" : "zh-CN";
 }
 
-function draftIdempotencyHeaders(): Record<string, string> {
-  return { "Idempotency-Key": `draft-${randomUUID()}` };
-}
-
 /** Sends a version-checked PUT to replace draft SQL and unwraps the updated draft envelope. */
 export function saveDraftSqlRequest(
   draftId: string,
@@ -326,14 +353,13 @@ export function useRunDraftReviewMutation(options?: {
   onError?: (error: unknown) => void;
 }) {
   const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: ({ body, language }: RunDraftReviewVariables) =>
+  return useIdempotentMutation("draft", {
+    mutationFn: ({ body, language }: RunDraftReviewVariables, idempotencyKey) =>
       unwrapApi(
         runDraftReview(body, {
-          headers: {
-            ...draftIdempotencyHeaders(),
+          headers: idempotencyKeyHeader(idempotencyKey, {
             "Accept-Language": reviewOutputLanguage(language),
-          },
+          }),
         }),
       ),
     onSuccess: (started, variables) => {
@@ -389,12 +415,14 @@ export function useSubmitChangeDraftMutation(options?: {
   onSuccess?: (order: ChangeOrder) => void;
   onError?: (error: unknown) => void;
 }) {
-  return useMutation({
-    mutationFn: async ({ body, beforeSubmit }: SubmitChangeDraftVariables) => {
+  return useIdempotentMutation("draft", {
+    mutationFn: async ({ body, beforeSubmit }: SubmitChangeDraftVariables, idempotencyKey) => {
       if (beforeSubmit !== undefined) {
         await beforeSubmit();
       }
-      return unwrapApi(submitChangeDraft(body, { headers: draftIdempotencyHeaders() }));
+      return unwrapApi(
+        submitChangeDraft(body, { headers: idempotencyKeyHeader(idempotencyKey) }),
+      );
     },
     onSuccess: (order) => {
       options?.onSuccess?.(order);

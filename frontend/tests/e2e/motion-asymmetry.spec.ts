@@ -16,7 +16,7 @@ test("popover enter:exit duration ratio stays between 1.2 and 2.0", async ({ pag
   await page.addInitScript(() => {
     window.localStorage.setItem("yearning-mock-scenario", "query-session");
   });
-  await page.goto("/query/sessions/qs-fixture-active");
+  await page.goto("/query/sessions/6f0f2b3c-5555-4555-8555-000000000101");
   await expect(page.getByTestId("query-workspace")).toBeVisible({ timeout: 15_000 });
   await page.getByTestId("query-grant-renew").click();
 

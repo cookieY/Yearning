@@ -9,54 +9,24 @@ package workflow
 
 import (
 	"context"
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"os"
 	"reflect"
 	"strings"
-	"syscall"
 	"testing"
 	"time"
 
 	"github.com/google/uuid"
-	"gorm.io/driver/postgres"
-	"gorm.io/gorm"
-	gormlogger "gorm.io/gorm/logger"
 
 	"github.com/cookieY/YearningX/backend/internal/authorization/auditlog"
 	"github.com/cookieY/YearningX/backend/internal/crypto"
 	"github.com/cookieY/YearningX/backend/internal/database"
+	"github.com/cookieY/YearningX/backend/internal/platform/testkit"
 	reviewapp "github.com/cookieY/YearningX/backend/internal/review/application"
 	"github.com/cookieY/YearningX/backend/internal/review/domain"
 	"github.com/cookieY/YearningX/backend/internal/review/provider"
 	"github.com/cookieY/YearningX/backend/internal/review/tool"
 )
-
-// acquireB8Lock shares the same cross-process file lock as application/httpapi integration tests
-// to prevent parallel package tests from colliding on the shared database.
-func acquireB8Lock(t *testing.T) {
-	path := os.TempDir() + "/yearningx-itest-shared.lock"
-	f, err := os.OpenFile(path, os.O_CREATE|os.O_RDWR, 0o600)
-	if err != nil {
-		return
-	}
-	if err := syscall.Flock(int(f.Fd()), syscall.LOCK_EX); err != nil {
-		_ = f.Close()
-		return
-	}
-	t.Cleanup(func() {
-		_ = syscall.Flock(int(f.Fd()), syscall.LOCK_UN)
-		_ = f.Close()
-	})
-}
-
-func envOr(key, def string) string {
-	if v := os.Getenv(key); v != "" {
-		return v
-	}
-	return def
-}
 
 // installB8DatasourceIdentityProbe installs the same deterministic test seam
 // used by the HTTP B9 fixture. Production keeps the live probe path whenever
@@ -100,21 +70,7 @@ func installB8DatasourceIdentityProbe(t *testing.T, svc *reviewapp.Services) {
 }
 
 func TestB8ReplaceFlowKeepsEphemeralRunDecoupled(t *testing.T) {
-	acquireB8Lock(t)
-	password := os.Getenv("YEARNING_TEST_DATABASE_PASSWORD")
-	if password == "" {
-		t.Skip("integration PostgreSQL not configured: set YEARNING_TEST_DATABASE_PASSWORD")
-	}
-	dsn := fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=disable",
-		envOr("YEARNING_TEST_DATABASE_HOST", "localhost"),
-		envOr("YEARNING_TEST_DATABASE_PORT", "54330"),
-		envOr("YEARNING_TEST_DATABASE_USER", "yearning"),
-		password,
-		envOr("YEARNING_TEST_DATABASE_DBNAME", "yearning_v4"))
-	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{Logger: gormlogger.Discard})
-	if err != nil {
-		t.Fatalf("connect: %v", err)
-	}
+	db := testkit.OpenPG(t)
 	tables := []string{
 		"evidence_raw_payloads", "evidence_facts", "review_finding_evidence", "review_findings",
 		"stage_review_snapshots", "sql_statements", "sql_fingerprint_groups", "review_runs",
@@ -131,31 +87,7 @@ func TestB8ReplaceFlowKeepsEphemeralRunDecoupled(t *testing.T) {
 		}
 	}
 
-	// The two purposes must use distinct key material: keyring loading rejects cross-purpose key reuse
-	// (AEAD/HMAC domain separation, SEC-0046).
-	key := make([]byte, 32)
-	fpKey := make([]byte, 32)
-	for i := range key {
-		key[i] = byte(i + 1)
-		fpKey[i] = byte(0x80 + i)
-	}
-	keyringDoc := fmt.Sprintf(`{"contract_version":1,"deployment_id":"b8-wf-itest","keys":[
-		{"key_id":"pay-1","purpose":"payload","status":"encrypt_decrypt","created_at":"2026-08-25T00:00:00Z","key_base64":"%s"},
-		{"key_id":"fp-1","purpose":"sql_fingerprint","status":"encrypt_decrypt","created_at":"2026-08-25T00:00:00Z","key_base64":"%s"}]}`,
-		base64.StdEncoding.EncodeToString(key),
-		base64.StdEncoding.EncodeToString(fpKey))
-	dir := t.TempDir()
-	if err := os.WriteFile(dir+"/keyring.json", []byte(keyringDoc), 0o400); err != nil {
-		t.Fatal(err)
-	}
-	ring, err := crypto.LoadKeyring(dir + "/keyring.json")
-	if err != nil {
-		t.Fatalf("keyring: %v", err)
-	}
-	crypter, err := crypto.NewCrypter(ring)
-	if err != nil {
-		t.Fatal(err)
-	}
+	crypter := testkit.NewCrypter(t)
 	recorder, _ := auditlog.NewRecorder(db)
 	wf, err := NewService(db, crypter, recorder)
 	if err != nil {
@@ -432,21 +364,7 @@ func (fakeWFTools) SafeExplain(_ context.Context, _, _ string) (map[string]any, 
 }
 
 func TestB8BatchFlowViewsMatchGetAndCurrentUserFlows(t *testing.T) {
-	acquireB8Lock(t)
-	password := os.Getenv("YEARNING_TEST_DATABASE_PASSWORD")
-	if password == "" {
-		t.Skip("integration PostgreSQL not configured: set YEARNING_TEST_DATABASE_PASSWORD")
-	}
-	dsn := fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=disable",
-		envOr("YEARNING_TEST_DATABASE_HOST", "localhost"),
-		envOr("YEARNING_TEST_DATABASE_PORT", "54330"),
-		envOr("YEARNING_TEST_DATABASE_USER", "yearning"),
-		password,
-		envOr("YEARNING_TEST_DATABASE_DBNAME", "yearning_v4"))
-	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{Logger: gormlogger.Discard})
-	if err != nil {
-		t.Fatalf("connect: %v", err)
-	}
+	db := testkit.OpenPG(t)
 	for _, tbl := range []string{
 		"flow_query_capabilities", "flow_approval_step_actors", "flow_execution_actors",
 		"flow_approval_steps", "flow_stages", "flows",
@@ -459,29 +377,7 @@ func TestB8BatchFlowViewsMatchGetAndCurrentUserFlows(t *testing.T) {
 		}
 	}
 
-	key := make([]byte, 32)
-	fpKey := make([]byte, 32)
-	for i := range key {
-		key[i] = byte(i + 1)
-		fpKey[i] = byte(0x80 + i)
-	}
-	keyringDoc := fmt.Sprintf(`{"contract_version":1,"deployment_id":"b8-wf-batch-itest","keys":[
-		{"key_id":"pay-1","purpose":"payload","status":"encrypt_decrypt","created_at":"2026-08-25T00:00:00Z","key_base64":"%s"},
-		{"key_id":"fp-1","purpose":"sql_fingerprint","status":"encrypt_decrypt","created_at":"2026-08-25T00:00:00Z","key_base64":"%s"}]}`,
-		base64.StdEncoding.EncodeToString(key),
-		base64.StdEncoding.EncodeToString(fpKey))
-	dir := t.TempDir()
-	if err := os.WriteFile(dir+"/keyring.json", []byte(keyringDoc), 0o400); err != nil {
-		t.Fatal(err)
-	}
-	ring, err := crypto.LoadKeyring(dir + "/keyring.json")
-	if err != nil {
-		t.Fatalf("keyring: %v", err)
-	}
-	crypter, err := crypto.NewCrypter(ring)
-	if err != nil {
-		t.Fatal(err)
-	}
+	crypter := testkit.NewCrypter(t)
 	recorder, _ := auditlog.NewRecorder(db)
 	wf, err := NewService(db, crypter, recorder)
 	if err != nil {

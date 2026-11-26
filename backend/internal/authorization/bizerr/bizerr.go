@@ -8,6 +8,16 @@ import (
 	"fmt"
 )
 
+// Coded is implemented by domain error types that carry a numeric contract error code and symbolic name.
+// Transport layers map Coded errors uniformly without per-domain adapters.
+type Coded interface {
+	error
+	BizCode() int
+	BizName() string
+	BizMessage() string
+	BizMeta() map[string]any
+}
+
 // Error code catalog (common and B3-related segments).
 const (
 	CodeValidationFailed       = 1001

@@ -5,7 +5,6 @@ package application
 
 import (
 	"context"
-	"encoding/json"
 
 	"gorm.io/gorm"
 
@@ -14,38 +13,17 @@ import (
 	"github.com/cookieY/YearningX/backend/internal/review/persistence"
 )
 
-// asMap converts an event payload struct into a map via deterministic JSON (input to Recorder.Emit).
-func asMap(v any) (map[string]any, error) {
-	raw, err := jsonMarshal(v)
-	if err != nil {
-		return nil, err
-	}
-	out := map[string]any{}
-	if err := json.Unmarshal(raw, &out); err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
 // emitDraftEvent writes a change_draft domain event (subject=change-drafts/{id}).
 func emitDraftEvent(ctx context.Context, tx *gorm.DB, rec *auditlog.Recorder,
 	internalType, draftID, actorUserID string, data any) error {
-	m, err := asMap(data)
-	if err != nil {
-		return err
-	}
-	return rec.Emit(ctx, tx, internalType, domain.EventSubject("change-drafts", draftID),
-		auditlog.Actor{Kind: "user", UserID: actorUserID}, m)
+	return rec.EmitPayload(ctx, tx, internalType, domain.EventSubject("change-drafts", draftID),
+		auditlog.UserActor(actorUserID, ""), data)
 }
 
 // emitRunEvent writes a review_run domain event (subject=review-runs/{id}).
 func emitRunEvent(ctx context.Context, tx *gorm.DB, rec *auditlog.Recorder,
 	internalType, runID string, actor auditlog.Actor, data any) error {
-	m, err := asMap(data)
-	if err != nil {
-		return err
-	}
-	return rec.Emit(ctx, tx, internalType, domain.EventSubject("review-runs", runID), actor, m)
+	return rec.EmitPayload(ctx, tx, internalType, domain.EventSubject("review-runs", runID), actor, data)
 }
 
 // invalidateActiveRuns invalidates all non-outdated Runs bound to oldRevision or earlier to outdated

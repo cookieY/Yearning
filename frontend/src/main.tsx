@@ -48,8 +48,8 @@ async function bootstrap(): Promise<void> {
     try {
       const { clearAgentationStorage } = await import("@/shared/dev/agentation-cleanup");
       clearAgentationStorage();
-      const { Agentation } = await import("agentation");
-      devTools = <Agentation />;
+      const { AgentationDevToolbar } = await import("@/shared/dev/agentation-dev-toolbar");
+      devTools = <AgentationDevToolbar />;
     } catch (error) {
       // A dev-only toolbar must never stop the app from rendering.
       console.warn("Agentation dev toolbar unavailable", error);

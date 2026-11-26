@@ -5,7 +5,9 @@ import { SessionProvider } from "@/features/auth/session-provider";
 import { HttpResponse, http } from "msw";
 import { MemoryRouter, Route, Routes } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { apiRoute } from "@/shared/mock/api-route";
 import { server } from "@/test/msw/server";
+import { grantSession } from "@/test/session";
 import "@/shared/i18n";
 import {
   FIXTURE_OWNER_ID,
@@ -40,29 +42,6 @@ afterEach(() => {
   window.localStorage.removeItem("yearning-mock-scenario");
   window.localStorage.removeItem("yearning-mock-auth");
 });
-
-function grantSession(): void {
-  server.use(
-    http.get("*/users/me", () =>
-      HttpResponse.json({
-        err_code: 0,
-        message: "ok",
-        data: {
-          id: FIXTURE_OWNER_ID,
-          username: "henry",
-          display_name: "henry",
-          email: null,
-          is_builtin_admin: true,
-          version: 1,
-          created_at: "2026-08-28T08:00:00Z",
-          updated_at: "2026-08-28T08:00:00Z",
-          can_access_admin: true,
-        },
-        request_id: FIXTURE_OWNER_ID,
-      }),
-    ),
-  );
-}
 
 function executionOrder(overrides: Partial<FixtureOrder> = {}): FixtureOrder {
   return {
@@ -252,7 +231,7 @@ describe("execution workspace rendering", () => {
       });
       seedFixtureOrder(order);
       server.use(
-        http.get(`*/change-orders/${orderId}`, () =>
+        http.get(apiRoute("/change-orders/:orderId"), () =>
           HttpResponse.json({
             err_code: 0,
             message: "ok",
@@ -281,7 +260,7 @@ describe("execution workspace rendering", () => {
             request_id: FIXTURE_OWNER_ID,
           }),
         ),
-        http.get(`*/execution-attempts/${attemptId}`, () =>
+        http.get(apiRoute("/execution-attempts/:attemptId"), () =>
           HttpResponse.json({
             err_code: 0,
             message: "ok",
@@ -298,7 +277,7 @@ describe("execution workspace rendering", () => {
             request_id: FIXTURE_OWNER_ID,
           }),
         ),
-        http.get(`*/execution-attempts/${attemptId}/statements`, () =>
+        http.get(apiRoute("/execution-attempts/:attemptId/statements"), () =>
           HttpResponse.json({
             err_code: 0,
             message: "ok",
@@ -657,7 +636,7 @@ describe("execution error and evidence branches", () => {
     // Force a lost race on the cancellation endpoint: the dialog shows the
     // backend rejection and the page refetches — no fake success.
     server.use(
-      http.post("*/execution-attempts/:attemptId/cancellation", () =>
+      http.post(apiRoute("/execution-attempts/:attemptId/cancellation"), () =>
         HttpResponse.json(
           {
             err_code: 1004,
@@ -689,7 +668,7 @@ describe("execution error and evidence branches", () => {
     const order = executionOrder({ id: "ee6f1a2b-0000-4000-8000-00000000f909" });
     seedFixtureOrder(order);
     server.use(
-      http.get("*/execution-attempts/:attemptId/statements", () =>
+      http.get(apiRoute("/execution-attempts/:attemptId/statements"), () =>
         HttpResponse.json(
           {
             type: "about:blank",
@@ -828,7 +807,7 @@ describe("execution schedule interactions (UX-004 / BUG-006)", () => {
     expect(screen.queryByTestId("execution-schedule-note")).toBeNull();
     expect(screen.getByTestId("execution-schedule-submit")).toBeEnabled();
     server.use(
-      http.post("*/change-orders/:orderId/execution-schedules", () =>
+      http.post(apiRoute("/change-orders/:orderId/execution-schedules"), () =>
         HttpResponse.json({
           err_code: 0,
           message: "ok",
@@ -857,7 +836,7 @@ describe("execution schedule interactions (UX-004 / BUG-006)", () => {
       expect(screen.getByTestId("execution-action-card")).toBeVisible();
     });
     server.use(
-      http.post("*/change-orders/:orderId/execution-schedules", () =>
+      http.post(apiRoute("/change-orders/:orderId/execution-schedules"), () =>
         HttpResponse.json({
           err_code: 3008,
           message: "outside execution window",
@@ -886,7 +865,7 @@ describe("execution schedule interactions (UX-004 / BUG-006)", () => {
       expect(screen.getByTestId("execution-start")).toBeEnabled();
     });
     server.use(
-      http.post("*/change-orders/:orderId/execution-attempts", () =>
+      http.post(apiRoute("/change-orders/:orderId/execution-attempts"), () =>
         HttpResponse.json({
           err_code: 3006,
           message: "preflight rejected",
@@ -946,8 +925,8 @@ describe("execution schedule cancel (owner ruling 2026-10-30)", () => {
     await waitFor(() => {
       expect(screen.getByTestId("execution-scheduled-card")).toBeVisible();
     });
-    // The planned time comes from the order read face (active_schedule).
-    expect(screen.getByTestId("execution-scheduled-card")).toHaveTextContent("2026-12-01 03:08");
+    // The planned time comes from the order read face (active_schedule) formatted in system timezone (Asia/Shanghai = UTC+8).
+    expect(screen.getByTestId("execution-scheduled-card")).toHaveTextContent("2026-12-01 11:08:00");
     // While scheduled the regular action card is gone.
     expect(screen.queryByTestId("execution-action-card")).toBeNull();
 
@@ -1018,7 +997,7 @@ describe("copy-to-draft dialog branches (E004)", () => {
     seedFixtureOrder(order);
     let flowsCalls = 0;
     server.use(
-      http.get("*/users/me/flows", () => {
+      http.get(apiRoute("/users/me/flows"), () => {
         flowsCalls += 1;
         return HttpResponse.json({
           err_code: 0,
@@ -1053,7 +1032,7 @@ describe("copy-to-draft dialog branches (E004)", () => {
     seedFixtureOrder(order);
     let capturedIdempotencyKey: string | null = null;
     server.use(
-      http.get("*/users/me/flows", () =>
+      http.get(apiRoute("/users/me/flows"), () =>
         HttpResponse.json({
           err_code: 0,
           message: "ok",
@@ -1061,7 +1040,7 @@ describe("copy-to-draft dialog branches (E004)", () => {
           request_id: "eeeeeeee-0000-4000-8000-00000000e916",
         }),
       ),
-      http.post("*/change-orders/:orderId/draft-copies", ({ request }) => {
+      http.post(apiRoute("/change-orders/:orderId/draft-copies"), ({ request }) => {
         capturedIdempotencyKey = request.headers.get("Idempotency-Key");
         return HttpResponse.json({
           err_code: 2014,
@@ -1128,7 +1107,7 @@ describe("verification rejection and evidence branches (E005)", () => {
     await user.type(screen.getByTestId("verification-reason"), "\u6838\u5bf9\u4ece\u5e93\u6570\u636e\u4e00\u81f4");
     await user.type(screen.getByTestId("verification-evidence-content-0"), "SELECT COUNT(*) \u4e00\u81f4");
     server.use(
-      http.post("*/execution-attempts/:attemptId/verifications", () =>
+      http.post(apiRoute("/execution-attempts/:attemptId/verifications"), () =>
         HttpResponse.json({
           err_code: 3012,
           message: "verification shape invalid",
@@ -1144,7 +1123,7 @@ describe("verification rejection and evidence branches (E005)", () => {
 
     // Transport-layer error: no request id to attach, error still renders inline.
     server.use(
-      http.post("*/execution-attempts/:attemptId/verifications", () =>
+      http.post(apiRoute("/execution-attempts/:attemptId/verifications"), () =>
         HttpResponse.json(
           {
             type: "about:blank",
@@ -1175,7 +1154,7 @@ describe("verification rejection and evidence branches (E005)", () => {
     seedFixtureOrder(order);
     let capturedBody: Record<string, unknown> | null = null;
     server.use(
-      http.post("*/change-orders/:orderId/execution-attempts", async ({ request }) => {
+      http.post(apiRoute("/change-orders/:orderId/execution-attempts"), async ({ request }) => {
         capturedBody = (await request.json()) as Record<string, unknown>;
         return HttpResponse.json({
           err_code: 3001,
@@ -1255,7 +1234,7 @@ describe("verification rejection and evidence branches (E005)", () => {
     });
     seedFixtureOrder(order);
     server.use(
-      http.get("*/change-orders/:orderId", () =>
+      http.get(apiRoute("/change-orders/:orderId"), () =>
         HttpResponse.json({
           err_code: 0,
           message: "ok",
@@ -1284,7 +1263,7 @@ describe("verification rejection and evidence branches (E005)", () => {
           request_id: FIXTURE_OWNER_ID,
         }),
       ),
-      http.get("*/execution-attempts/:attemptId", () =>
+      http.get(apiRoute("/execution-attempts/:attemptId"), () =>
         HttpResponse.json({
           err_code: 0,
           message: "ok",
@@ -1301,7 +1280,7 @@ describe("verification rejection and evidence branches (E005)", () => {
           request_id: FIXTURE_OWNER_ID,
         }),
       ),
-      http.get("*/execution-attempts/:attemptId/statements", () =>
+      http.get(apiRoute("/execution-attempts/:attemptId/statements"), () =>
         HttpResponse.json({
           err_code: 0,
           message: "ok",

@@ -1,8 +1,13 @@
 import { createContext, useContext, useEffect, type ReactNode } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { getCurrentUser, logout as logoutRequest } from "@/api/generated/client/authentication/authentication";
+import {
+  getCurrentUser,
+  listAuthenticationProviders,
+  logout as logoutRequest,
+} from "@/api/generated/client/authentication/authentication";
 import type { CurrentUser } from "@/api/generated/client/yearningV4HTTPAPI.schemas";
 import { TransportError, SESSION_EXPIRED_EVENT, unwrapApi } from "@/shared/api/mutator";
+import { setPublicBranding } from "@/shared/lib/branding";
 import { setSystemTimezone, useSystemTimezone } from "@/shared/lib/timezones";
 
 /**
@@ -59,6 +64,19 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     retry: false,
     staleTime: 60_000,
   });
+
+  const providersQuery = useQuery({
+    queryKey: ["auth", "providers"],
+    queryFn: () => unwrapApi(listAuthenticationProviders()),
+    retry: false,
+    staleTime: 60_000,
+  });
+
+  useEffect(() => {
+    if (providersQuery.data?.branding !== undefined) {
+      setPublicBranding(providersQuery.data.branding);
+    }
+  }, [providersQuery.data]);
 
   if (typeof sessionQuery.data?.system_timezone === "string" && sessionQuery.data.system_timezone.trim() !== "") {
     setSystemTimezone(sessionQuery.data.system_timezone);

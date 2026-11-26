@@ -45,11 +45,25 @@ function DialogContent({
   viewportClassName,
   children,
   showCloseButton = true,
+  initialFocus,
+  ref,
   ...props
-}: DialogPrimitive.Popup.Props & {
+}: React.ComponentProps<typeof DialogPrimitive.Popup> & {
   showCloseButton?: boolean
   viewportClassName?: string
 }) {
+  const popupRef = React.useRef<HTMLDivElement>(null)
+  const setPopupRef = React.useCallback(
+    (node: HTMLDivElement | null) => {
+      popupRef.current = node
+      if (typeof ref === "function") {
+        ref(node)
+      } else if (ref !== undefined && ref !== null) {
+        ref.current = node
+      }
+    },
+    [ref]
+  )
   const headerChildren: React.ReactNode[] = []
   const bodyChildren: React.ReactNode[] = []
   const footerChildren: React.ReactNode[] = []
@@ -82,7 +96,14 @@ function DialogContent({
     <DialogPortal>
       <DialogOverlay />
       <DialogPrimitive.Popup
+        ref={setPopupRef}
         data-slot="dialog-content"
+        /* Default initialFocus to the popup container: Base UI FloatingFocusManager
+           sets preventScroll: true only when focusing floatingFocusElement itself,
+           keeping ScrollArea scrolled to top=0 when top notices or disabled fields
+           push the first tabbable control below the fold (while still honoring
+           autoFocus children, explicit initialFocus, focus trapping, and Tab). */
+        initialFocus={initialFocus ?? popupRef}
         className={cn(
           /* Unified scrollbars (owner 2026-11-03): panel becomes a flex column embedding ScrollArea,
              scrolling tall content with an overlay thumb instead of callers passing overflow-y-auto and exposing

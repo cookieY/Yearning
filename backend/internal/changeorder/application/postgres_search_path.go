@@ -105,14 +105,13 @@ func openStageSnapshotContext(
 	if snap.NormalizedKeyID == "" || len(snap.NormalizedContext) == 0 {
 		return nil
 	}
-	plain, err := crypter.Open(crypto.PurposePayload, crypto.Envelope{
-		Ciphertext: snap.NormalizedContext, Nonce: snap.NormalizedNonce,
-		KeyID: snap.NormalizedKeyID, Algorithm: snap.NormalizedAlgorithm,
-	}, crypto.AAD{
-		DeploymentID: crypter.DeploymentID(), Table: "stage_review_snapshots",
+	plain, err := crypter.OpenColumn(crypto.PurposePayload, crypto.ColumnRef{
+		Table:      "stage_review_snapshots",
 		PrimaryKey: fmt.Sprintf("%s#%d", runID, stagePosition),
 		Column:     "normalized_context_ciphertext",
-		Purpose:    crypto.PurposePayload,
+	}, crypto.Envelope{
+		Ciphertext: snap.NormalizedContext, Nonce: snap.NormalizedNonce,
+		KeyID: snap.NormalizedKeyID, Algorithm: snap.NormalizedAlgorithm,
 	})
 	if err != nil {
 		return nil

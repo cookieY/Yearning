@@ -119,11 +119,13 @@ func policyCatalogAuthorizedSchemas(binding *stageSchemaBinding) ([]string, erro
 	if binding.postgres != nil {
 		addPostgresSchema := func(relation frozenPostgresObjectBinding) {
 			if relation.Supported && relation.Present &&
-				relation.Schema != "" &&
-				relation.Schema != "pg_catalog" &&
-				!strings.HasPrefix(relation.Schema, "pg_temp_") &&
-				relation.Schema != "pg_temp" {
+				!database.IsDisallowedPostgresSystemSchema(relation.Schema) {
 				set[relation.Schema] = struct{}{}
+			}
+		}
+		for _, schema := range binding.postgres.ExplicitSchemas {
+			if isValidPostgresExplicitSchema(schema) {
+				set[schema] = struct{}{}
 			}
 		}
 		for _, relation := range binding.postgres.UniformRelations {

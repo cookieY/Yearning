@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"database/sql/driver"
+	"encoding/json"
 	"errors"
 	"strings"
 	"testing"
@@ -787,4 +788,127 @@ func relationKindMapsEqual(
 		}
 	}
 	return true
+}
+
+func TestLookupPostgresRelationsAndSchemasVisibleExtraSchemas(t *testing.T) {
+	t.Parallel()
+	path := validSearchPathForTest()
+	relColumns := []string{"relation", "all_schemas_exist", "all_schemas_visible", "present_by_schema"}
+
+	for _, tc := range []struct {
+		name        string
+		extra       []string
+		rows        [][]driver.Value
+		visibleOnly bool
+		wantSchemas []string
+		wantErrs    []error
+	}{
+		{
+			name:        "valid extra schema in relation lookup",
+			extra:       []string{"analytics"},
+			rows:        [][]driver.Value{{"events", true, true, []byte(`{"analytics":{"kind":"r","oid":301}}`)}},
+			wantSchemas: []string{"pg_catalog", "deploy_user", "public", "analytics"},
+		},
+		{
+			name:     "disallowed extra schemas",
+			extra:    []string{"pg_temp_1"},
+			wantErrs: []error{ErrPostgresRelationUnresolved},
+		},
+		{
+			name:     "pg_toast disallowed",
+			extra:    []string{"pg_toast"},
+			wantErrs: []error{ErrPostgresRelationUnresolved},
+		},
+		{
+			name:     "information_schema disallowed",
+			extra:    []string{"information_schema"},
+			wantErrs: []error{ErrPostgresRelationUnresolved},
+		},
+		{
+			name:     "missing extra schema wraps unavailable and schema missing",
+			extra:    []string{"missing_pg"},
+			rows:     [][]driver.Value{{"events", false, false, []byte(`{}`)}},
+			wantErrs: []error{ErrPostgresSearchPathUnavailable, ErrPolicyCatalogSchemaUnavailable},
+		},
+		{
+			name:     "unprivileged extra schema wraps unavailable and visibility unproven",
+			extra:    []string{"secret_pg"},
+			rows:     [][]driver.Value{{"events", true, false, []byte(`{}`)}},
+			wantErrs: []error{ErrPostgresSearchPathUnavailable, ErrMetadataVisibilityUnproven},
+		},
+		{
+			name:        "VerifyPostgresSchemasVisible valid extra schema",
+			extra:       []string{"analytics"},
+			visibleOnly: true,
+			rows:        [][]driver.Value{{true, true}},
+		},
+		{
+			name:        "VerifyPostgresSchemasVisible missing schema",
+			extra:       []string{"missing_pg"},
+			visibleOnly: true,
+			rows:        [][]driver.Value{{false, false}},
+			wantErrs:    []error{ErrPostgresSearchPathUnavailable, ErrPolicyCatalogSchemaUnavailable},
+		},
+		{
+			name:        "VerifyPostgresSchemasVisible unprivileged schema",
+			extra:       []string{"secret_pg"},
+			visibleOnly: true,
+			rows:        [][]driver.Value{{true, false}},
+			wantErrs:    []error{ErrPostgresSearchPathUnavailable, ErrMetadataVisibilityUnproven},
+		},
+	} {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			var gotSchemas []string
+			db := newCoverageFakeDB(func(context.Context) (driver.Conn, error) {
+				return &searchPathCoverageConn{session: &searchPathCoverageSession{
+					execHook: func(context.Context, string) (driver.Result, error) {
+						return driver.RowsAffected(0), nil
+					},
+					queryHook: func(_ context.Context, _ string, args []driver.NamedValue) (driver.Rows, error) {
+						if len(args) > 0 {
+							if payload, ok := args[0].Value.(string); ok {
+								var parsed postgresBatchLookupInput
+								_ = json.Unmarshal([]byte(payload), &parsed)
+								gotSchemas = parsed.Schemas
+							}
+						}
+						cols := relColumns
+						if tc.visibleOnly {
+							cols = []string{"schemas_exist", "schemas_visible"}
+						}
+						return &searchPathCoverageRows{columns: cols, values: tc.rows}, nil
+					},
+				}}, nil
+			}, nil)
+			t.Cleanup(func() { _ = db.Close() })
+			pool := newCoveragePurposePool(db, "postgresql", PurposeReview)
+
+			var err error
+			var lookups []PostgresRelationLookup
+			if tc.visibleOnly {
+				err = VerifyPostgresSchemasVisible(context.Background(), pool, path, tc.extra...)
+			} else {
+				lookups, err = LookupPostgresRelations(context.Background(), pool, path, []string{"events"}, tc.extra...)
+			}
+			if len(tc.wantErrs) > 0 {
+				for _, want := range tc.wantErrs {
+					if !errors.Is(err, want) {
+						t.Fatalf("error = %v, want errors.Is(%v)", err, want)
+					}
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if tc.wantSchemas != nil && strings.Join(gotSchemas, ",") != strings.Join(tc.wantSchemas, ",") {
+				t.Fatalf("queried schemas = %v, want %v", gotSchemas, tc.wantSchemas)
+			}
+			if !tc.visibleOnly && (len(lookups) != 1 || lookups[0].PresentBySchema["analytics"] != PostgresRelationTable) {
+				t.Fatalf("lookups = %+v", lookups)
+			}
+		})
+	}
 }

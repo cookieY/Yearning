@@ -41,12 +41,23 @@ if (typeof Element.prototype.getAnimations !== "function") {
 }
 (globalThis as { BASE_UI_ANIMATIONS_DISABLED?: boolean }).BASE_UI_ANIMATIONS_DISABLED = true;
 
-// jsdom reports an en-US browser language; pin the locale so component tests
-// assert against the default zh-CN vocabulary deterministically.
-window.localStorage.setItem("yearning-locale", "zh-CN");
+// jsdom reports an en-US browser language; default to zh-CN while allowing
+// YEARNING_TEST_LOCALE or explicit per-test switching to exercise en-US.
+export type SupportedTestLocale = "zh-CN" | "en-US";
+
+export function setTestLocale(locale: SupportedTestLocale): void {
+  window.localStorage.setItem("yearning-locale", locale);
+}
+
+const envLocale = (
+  globalThis as { process?: { env?: Record<string, string | undefined> } }
+).process?.env?.YEARNING_TEST_LOCALE;
+const initialTestLocale: SupportedTestLocale =
+  envLocale === "en-US" ? "en-US" : "zh-CN";
+setTestLocale(initialTestLocale);
 
 beforeAll(() => {
-  server.listen({ onUnhandledRequest: "bypass" });
+  server.listen({ onUnhandledRequest: "error" });
   applyScenarioToServer(server, "ready");
 });
 afterEach(() => {

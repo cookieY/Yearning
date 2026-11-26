@@ -21,6 +21,7 @@ import (
 	"github.com/cookieY/YearningX/backend/internal/changeorder/domain"
 	"github.com/cookieY/YearningX/backend/internal/changeorder/persistence"
 	"github.com/cookieY/YearningX/backend/internal/crypto"
+	"github.com/cookieY/YearningX/backend/internal/platform/ptr"
 	reviewdomain "github.com/cookieY/YearningX/backend/internal/review/domain"
 )
 
@@ -69,6 +70,7 @@ func (s *Services) submitOnce(ctx context.Context, tx *gorm.DB, actor Actor, in 
 		// §18.56 Option B: submitter's expected execution time is frozen into the work order along with the snapshot.
 		RequestedScheduledFor *time.Time
 		RollbackEnabled       bool
+		TargetDatabase        *string
 		TicketType            string
 		SourceOrderID         *string
 		RollbackEvidenceID    *string
@@ -79,7 +81,7 @@ func (s *Services) submitOnce(ctx context.Context, tx *gorm.DB, actor Actor, in 
 	if err := tx.WithContext(ctx).Raw(
 		`select id::text as id, owner_user_id::text as owner_user_id, flow_id::text as flow_id,
 		        flow_version_seen, title, description, requested_scheduled_for,
-		        rollback_enabled, ticket_type, source_order_id::text as source_order_id,
+		        rollback_enabled, target_database, ticket_type, source_order_id::text as source_order_id,
 		        rollback_evidence_id::text as rollback_evidence_id, revision, state, version
 		 from change_drafts where id = ? for update`, in.DraftID).Scan(&draft).Error; err != nil {
 		return nil, err
@@ -319,12 +321,13 @@ func (s *Services) submitOnce(ctx context.Context, tx *gorm.DB, actor Actor, in 
 	}
 
 	// ---- Freeze Writes ----
-	plainSQL, err := s.Crypter.Open(crypto.PurposePayload, crypto.Envelope{
+	plainSQL, err := s.Crypter.OpenColumn(crypto.PurposePayload, crypto.ColumnRef{
+		Table:      "draft_sql_payloads",
+		PrimaryKey: in.DraftID,
+		Column:     "sql_ciphertext",
+	}, crypto.Envelope{
 		Ciphertext: payloadRow.SQLCiphertext, Nonce: payloadRow.SQLNonce,
 		KeyID: payloadRow.SQLKeyID, Algorithm: payloadRow.SQLAlgorithm,
-	}, crypto.AAD{
-		DeploymentID: s.Crypter.DeploymentID(), Table: "draft_sql_payloads",
-		PrimaryKey: in.DraftID, Column: "sql_ciphertext", Purpose: crypto.PurposePayload,
 	})
 	if err != nil {
 		return nil, err
@@ -384,10 +387,11 @@ func (s *Services) submitOnce(ctx context.Context, tx *gorm.DB, actor Actor, in 
 	if err != nil {
 		return nil, err
 	}
-	flowEnv, err := s.Crypter.Seal(crypto.PurposePayload, flowJSON, crypto.AAD{
-		DeploymentID: s.Crypter.DeploymentID(), Table: "order_flow_snapshots",
-		PrimaryKey: orderID, Column: "flow_snapshot_ciphertext", Purpose: crypto.PurposePayload,
-	})
+	flowEnv, err := s.Crypter.SealColumn(crypto.PurposePayload, crypto.ColumnRef{
+		Table:      "order_flow_snapshots",
+		PrimaryKey: orderID,
+		Column:     "flow_snapshot_ciphertext",
+	}, flowJSON)
 	if err != nil {
 		return nil, err
 	}
@@ -399,10 +403,11 @@ func (s *Services) submitOnce(ctx context.Context, tx *gorm.DB, actor Actor, in 
 		return nil, err
 	}
 	// Re-seal SQL payload (AAD migrated to the order table; plaintext only passes through server memory).
-	sqlEnv, err := s.Crypter.Seal(crypto.PurposePayload, plainSQL, crypto.AAD{
-		DeploymentID: s.Crypter.DeploymentID(), Table: "order_sql_payloads",
-		PrimaryKey: orderID, Column: "sql_ciphertext", Purpose: crypto.PurposePayload,
-	})
+	sqlEnv, err := s.Crypter.SealColumn(crypto.PurposePayload, crypto.ColumnRef{
+		Table:      "order_sql_payloads",
+		PrimaryKey: orderID,
+		Column:     "sql_ciphertext",
+	}, plainSQL)
 	if err != nil {
 		return nil, err
 	}
@@ -427,17 +432,11 @@ func (s *Services) submitOnce(ctx context.Context, tx *gorm.DB, actor Actor, in 
 		// stages no longer carry schema mappings, so mapping ciphertexts are removed from the target snapshot;
 		// execution-time object scope is determined by the datasource default database (MySQL) or
 		// the PostgreSQL search_path context frozen during review.
-		targetJSON, err := json.Marshal(map[string]any{
-			"datasource_id":        st.DatasourceID,
-			"engine":               st.Engine,
-			"identity_fingerprint": deref(st.IdentityFP),
-		})
-		if err != nil {
-			return nil, err
-		}
-		targetEnv, err := s.Crypter.Seal(crypto.PurposePayload, targetJSON, crypto.AAD{
-			DeploymentID: s.Crypter.DeploymentID(), Table: "order_stages",
-			PrimaryKey: stageID, Column: "target_snapshot_ciphertext", Purpose: crypto.PurposePayload,
+		targetEnv, err := domain.SealTargetSnapshot(s.Crypter, stageID, domain.TargetSnapshot{
+			DatasourceID:        st.DatasourceID,
+			Engine:              st.Engine,
+			IdentityFingerprint: ptr.Deref(st.IdentityFP),
+			TargetDatabase:      ptr.Deref(draft.TargetDatabase),
 		})
 		if err != nil {
 			return nil, err
@@ -452,7 +451,7 @@ func (s *Services) submitOnce(ctx context.Context, tx *gorm.DB, actor Actor, in 
 		if err := tx.WithContext(ctx).Create(&persistence.OrderStageModel{
 			ID: stageID, OrderID: orderID, Position: int32(st.Position),
 			DatasourceID: st.DatasourceID, DatasourceNameSnapshot: st.Name,
-			DatasourceEngineSnapshot: st.Engine, DatasourceIdentityFingerprint: deref(st.IdentityFP),
+			DatasourceEngineSnapshot: st.Engine, DatasourceIdentityFingerprint: ptr.Deref(st.IdentityFP),
 			StageReviewSnapshotID: snap.ID, ReviewSnapshotHash: snap.Hash, ReviewGatePassed: true,
 			TargetSnapshotCiphertext: targetEnv.Ciphertext, TargetSnapshotNonce: targetEnv.Nonce,
 			TargetSnapshotKeyID: targetEnv.KeyID, TargetSnapshotAlgorithm: targetEnv.Algorithm,
@@ -507,7 +506,7 @@ func (s *Services) submitOnce(ctx context.Context, tx *gorm.DB, actor Actor, in 
 	// 15. Domain event (submit_change_order.events only declares
 	// change_order.submitted; flipping draft state does not emit a separate event — the routing table
 	// has no corresponding internal event, and the command contract is authoritative).
-	auditActor := auditlog.Actor{Kind: "user", UserID: actor.UserID, Username: actor.Username}
+	auditActor := auditlog.UserActor(actor.UserID, actor.Username)
 	if err := s.emitOrderEvent(ctx, tx, EventOrderSubmitted, orderID, auditActor, OrderSubmittedPayload{
 		OrderID: orderID, DisplayNumber: displayNumber, SubmitterUserID: actor.UserID,
 		StageCount: len(stages), SnapshotHash: flowHash, AggregateVersion: 1,
@@ -657,7 +656,7 @@ func (s *Services) buildFrozenFlow(flowID, flowName string, flowVersion int64, r
 	for _, st := range stages {
 		fs := frozenFlowStage{
 			Position: st.Position, Name: st.Name, DatasourceID: st.DatasourceID, Engine: st.Engine,
-			IdentityFP: deref(st.IdentityFP),
+			IdentityFP: ptr.Deref(st.IdentityFP),
 		}
 		for _, step := range stepsByPos[st.Position] {
 			fs.ApprovalSteps = append(fs.ApprovalSteps, frozenFlowStep{Position: step.Position, Actors: step.Actors})
@@ -669,10 +668,3 @@ func (s *Services) buildFrozenFlow(flowID, flowName string, flowVersion int64, r
 }
 
 func int32Ptr(v int32) *int32 { return &v }
-
-func deref(s *string) string {
-	if s == nil {
-		return ""
-	}
-	return *s
-}

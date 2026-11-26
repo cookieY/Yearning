@@ -17,9 +17,10 @@ import (
 	"strings"
 	"testing"
 
-	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
-	gormlogger "gorm.io/gorm/logger"
+
+	"github.com/cookieY/YearningX/backend/internal/platform/testenv"
+	"github.com/cookieY/YearningX/backend/internal/platform/testkit"
 )
 
 const retentionGrantsSQLPath = "../../../../db/roles/grants.sql"
@@ -34,14 +35,10 @@ func retentionGrantsFile(t *testing.T) string {
 	return filepath.Join(wd, retentionGrantsSQLPath)
 }
 
-// openIntegrationGorm opens a live PG handle (calls t.Skip internally when integrationDSN is unconfigured).
+// openIntegrationGorm opens a live PG handle via testkit.OpenPG (process-reentrant shared flock).
 func openIntegrationGorm(t *testing.T) *gorm.DB {
 	t.Helper()
-	db, err := gorm.Open(postgres.Open(integrationDSN(t)), &gorm.Config{Logger: gormlogger.Discard})
-	if err != nil {
-		t.Fatalf("open integration postgres: %v", err)
-	}
-	return db
+	return testkit.OpenPG(t)
 }
 
 // retentionGrantsFor parses the list of tables granted to role in grants.sql.
@@ -113,7 +110,7 @@ func TestRetentionRolePrivilegeOnLiveDB(t *testing.T) {
 			t.Fatalf("probe table %s: %v", table, err)
 		}
 		if !exists {
-			t.Skipf("table %s absent in integration DB; apply migrations first", table)
+			testenv.SkipOrFatal(t, "table %s absent in integration DB; apply migrations first", table)
 		}
 		var roleExists bool
 		if err := db.Raw(
@@ -121,7 +118,7 @@ func TestRetentionRolePrivilegeOnLiveDB(t *testing.T) {
 			t.Fatalf("probe role: %v", err)
 		}
 		if !roleExists {
-			t.Skip("role yearning_retention absent in integration DB; apply db/roles first")
+			testenv.SkipOrFatal(t, "role yearning_retention absent in integration DB; apply db/roles first")
 		}
 		var allowed bool
 		if err := db.Raw(

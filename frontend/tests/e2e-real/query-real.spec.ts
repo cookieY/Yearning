@@ -107,6 +107,43 @@ test("quser opens the query entry with the real flows catalog", async ({ page })
   await expect(page.getByTestId("query-entry")).toContainText(/\u5728\u7ebf|\u67e5\u8be2|\u6d41\u7a0b/);
 });
 
+test("quser executes real SELECT with comments and exports results from query workbench", async ({ page }) => {
+  await page.goto("/workspace");
+  await expect(page.getByTestId("workspace-page")).toBeVisible();
+  await ensureActiveGrant(page);
+  await page.goto("/query");
+  await expect(page.getByTestId("query-entry")).toBeVisible({ timeout: 20_000 });
+
+  await page.getByTestId(/query-flow-enter-/).first().click();
+  await expect(page).toHaveURL(/\/query\/sessions\//, { timeout: 20_000 });
+  await expect(page.getByTestId("query-workspace")).toBeVisible();
+
+  await page.getByTestId("query-schema-input").click();
+  await page.getByRole("option", { name: "public" }).click();
+
+  const editor = page.getByTestId("query-sql-editor");
+  const lines = editor.locator(".monaco-editor .view-lines");
+  await expect(lines).toBeVisible({ timeout: 15_000 });
+  await lines.click({ position: { x: 120, y: 20 } });
+  await page.keyboard.press("ControlOrMeta+a");
+  const sql = "SELECT 1 AS real_col; -- l3b comment check";
+  await page.keyboard.type(sql);
+  await expect
+    .poll(async () => ((await editor.textContent()) ?? "").replace(/\s+/g, " ").trim(), { timeout: 15_000 })
+    .toContain("SELECT 1 AS real_col");
+
+  await page.getByTestId("query-run").click();
+  const resultTable = page.locator('[data-testid^="query-result-table-"]').first();
+  await expect(resultTable).toBeVisible({ timeout: 20_000 });
+  await expect(resultTable).toContainText("real_col");
+  await expect(resultTable).toContainText("1");
+
+  await page.getByTestId("query-export").click();
+  await expect(page.getByTestId("query-export-dialog")).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByTestId("query-export-done")).toBeVisible({ timeout: 30_000 });
+  await page.getByTestId("query-export-close").click();
+});
+
 // OBS-009 / RCP-20261021: requested_until is server-timezone wall clock with
 // a Z marker — the backend reanchors the digits by general.system_timezone.
 // The stack runs the default (Asia/Shanghai), so express (now + hours) in

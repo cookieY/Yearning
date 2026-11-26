@@ -1,3 +1,5 @@
+//go:build integration
+
 // b13_diagnostics_test.go tests SQL performance diagnostics and user administrator role (BE-B13-SQL-DIAGNOSTICS)
 // HTTP routes, role authorization (role='admin' vs role='user'), builtin admin demotion protection,
 // Cache-Control: no-store, If-Match optimistic concurrency, 30s manual snapshot rate limiting, and idempotent order submission.

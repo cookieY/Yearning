@@ -10,6 +10,7 @@ import { SqlFileViewer } from "@/features/orders/sql-file-viewer";
 import { useRecordOrderSqlCopy, useRevealOrderSql, type OrderSqlReveal } from "@/features/orders/use-approvals";
 import { useCreateRollbackDraft } from "@/features/orders/use-orders";
 import { describeError } from "@/shared/api/error-display";
+import { writeClipboardText } from "@/shared/lib/clipboard";
 import { formatTimestamp, formatWatermark } from "@/shared/lib/timezones";
 import { PendingButton } from "@/shared/components/pending-button";
 import { Alert, AlertDescription, AlertTitle } from "@/shared/components/ui/alert";
@@ -113,20 +114,20 @@ export function OrderRollbackCard({ order }: { order: ChangeOrder }) {
   const handleCopy = (): void => {
     if (revealed === null) return;
     setError(null);
-    void navigator.clipboard
-      .writeText(revealed.sql)
-      .then(() => {
-        toast.success(t("orders.rollback.copiedToast"));
-        return copyAudit.mutateAsync(revealed.revealId).catch((auditError: unknown) => {
-          const display = describeError(auditError, "recordOrderSqlCopy");
-          setError(
-            `${t("orders.sql.copyAuditFailed", { detail: t(display.messageKey) })}${display.requestId !== null ? ` (${display.requestId})` : ""}`,
-          );
-        });
-      })
-      .catch(() => {
+    void writeClipboardText(revealed.sql).then((ok) => {
+      if (!ok) {
         setError(t("orders.sql.copyFailed"));
+        toast.error(t("orders.sql.copyFailed"));
+        return;
+      }
+      toast.success(t("orders.rollback.copiedToast"));
+      return copyAudit.mutateAsync(revealed.revealId).catch((auditError: unknown) => {
+        const display = describeError(auditError, "recordOrderSqlCopy");
+        setError(
+          `${t("orders.sql.copyAuditFailed", { detail: t(display.messageKey) })}${display.requestId !== null ? ` (${display.requestId})` : ""}`,
+        );
       });
+    });
   };
 
   const handleGenerateRollbackTicket = (): void => {

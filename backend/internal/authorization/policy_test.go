@@ -1,6 +1,9 @@
 package authorization
 
 import (
+	"encoding/json"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/cookieY/YearningX/backend/internal/identity/session"
@@ -19,7 +22,7 @@ func TestActorDenyMatrix(t *testing.T) {
 		"builtin_admin": admin,
 	}
 	adminOps := []string{
-		"listUsers", "createUser", "updateUser", "deleteUser", "getUserDeletionImpact",
+		"listUsers", "createUser", "updateUser", "resetUserPassword", "deleteUser", "getUserDeletionImpact",
 		"listFlows", "createFlow", "getFlow", "replaceFlow", "deleteFlow",
 		"listDatasources", "createDatasource", "getDatasource", "replaceDatasource", "deleteDatasource",
 		"testDatasourceConnection", "getDatasourceCapabilities",
@@ -117,12 +120,72 @@ func TestIsBusinessRelationshipOperationAllowlist(t *testing.T) {
 
 func TestKnownOperationsCountAndDisjointFromBusinessOps(t *testing.T) {
 	known := KnownOperations()
-	if len(known) != 108 {
-		t.Fatalf("expected 108 classified policy operations, got %d", len(known))
+	if len(known) != 109 {
+		t.Fatalf("expected 109 classified policy operations, got %d", len(known))
 	}
 	for op := range known {
 		if IsBusinessRelationshipOperation(op) {
 			t.Fatalf("operation %q cannot belong to both static policy and business-relationship allowlist", op)
+		}
+	}
+}
+
+func TestPolicyMatchesAuthorizationPolicyContract(t *testing.T) {
+	contractPath := filepath.Join("..", "..", "..", "api", "contracts", "authorization-policy.json")
+	raw, err := os.ReadFile(contractPath)
+	if err != nil {
+		t.Fatalf("read %s: %v", contractPath, err)
+	}
+	var doc struct {
+		Rules []struct {
+			ID         string   `json:"id"`
+			Actors     []string `json:"actors"`
+			Operations []string `json:"operations"`
+		} `json:"rules"`
+	}
+	if err := json.Unmarshal(raw, &doc); err != nil {
+		t.Fatalf("parse %s: %v", contractPath, err)
+	}
+
+	unmountedOfflineOps := map[string]bool{
+		"listLegacyMigrationRuns":         true,
+		"getLegacyMigrationRun":           true,
+		"confirmLegacyMigrationCandidate": true,
+		"approveLegacyMigrationRun":       true,
+	}
+	known := KnownOperations()
+	for _, rule := range doc.Rules {
+		switch rule.ID {
+		case "anonymous-authentication":
+			for _, op := range rule.Operations {
+				req, ok := known[op]
+				if !ok || req.MinClass != ActorAnonymous || req.Exact {
+					t.Fatalf("rule %s op %q missing or misclassified in policy.go: %+v", rule.ID, op, req)
+				}
+			}
+		case "authenticated-session", "current-user-flow-catalog":
+			for _, op := range rule.Operations {
+				req, ok := known[op]
+				if !ok || req.MinClass != ActorAuthenticated || req.Exact {
+					t.Fatalf("rule %s op %q missing or misclassified in policy.go: %+v", rule.ID, op, req)
+				}
+			}
+		case "builtin-admin-management":
+			for _, op := range rule.Operations {
+				if unmountedOfflineOps[op] {
+					continue
+				}
+				req, ok := known[op]
+				if !ok || req.MinClass != ActorBuiltinAdmin || !req.Exact {
+					t.Fatalf("rule %s op %q missing or misclassified in policy.go: %+v", rule.ID, op, req)
+				}
+			}
+		default:
+			for _, op := range rule.Operations {
+				if !IsBusinessRelationshipOperation(op) {
+					t.Fatalf("business rule %s op %q missing from businessRelationshipOps", rule.ID, op)
+				}
+			}
 		}
 	}
 }

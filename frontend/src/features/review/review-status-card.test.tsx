@@ -3,7 +3,8 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { ReviewRun, ReviewStageResultState } from "@/api/generated/client/yearningV4HTTPAPI.schemas";
 import i18n from "@/shared/i18n";
-import { ReviewStatusCard } from "./review-status-card";
+import { knownFailureKey, ReviewStatusCard } from "./review-status-card";
+import { extractReviewSummaries, ReviewSummarySection } from "./review-summary-section";
 import type { RunPhase } from "./run-state";
 
 /**
@@ -51,6 +52,7 @@ function renderCard(
     hasRunId?: boolean;
     isPending?: boolean;
     isError?: boolean;
+    expired?: boolean;
     error?: unknown;
     onRetry?: () => void;
   } = {},
@@ -62,6 +64,7 @@ function renderCard(
       hasRunId={query.hasRunId ?? (run !== null || phase !== "idle")}
       isPending={query.isPending ?? false}
       isError={query.isError ?? false}
+      expired={query.expired}
       error={query.error}
       onRetry={query.onRetry}
     />,
@@ -108,7 +111,11 @@ describe("ReviewStatusCard", () => {
         ],
       }),
     );
-    expect(screen.getByTestId("review-failure").textContent).toContain("AI\u670d\u52a1\u6682\u4e0d\u53ef\u7528");
+    expect(screen.queryByTestId("review-failure")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("review-summary")).not.toBeInTheDocument();
+    expect(i18n.t(`precheck.failure.${knownFailureKey("provider_unavailable")}`)).toContain(
+      "AI\u670d\u52a1\u6682\u4e0d\u53ef\u7528",
+    );
     expect(screen.queryByText("provider_unavailable")).not.toBeInTheDocument();
   });
 
@@ -117,7 +124,9 @@ describe("ReviewStatusCard", () => {
       "failed",
       runFixture({ state: "failed", failure_code: "brand_new_failure" }),
     );
-    expect(screen.getByTestId("review-failure").textContent).toContain("\u9884\u5ba1\u5931\u8d25");
+    expect(screen.queryByTestId("review-failure")).not.toBeInTheDocument();
+    expect(knownFailureKey("brand_new_failure")).toBe("generic");
+    expect(i18n.t(`precheck.failure.${knownFailureKey("brand_new_failure")}`)).toContain("\u9884\u5ba1\u5931\u8d25");
     expect(screen.queryByText("brand_new_failure")).not.toBeInTheDocument();
   });
 
@@ -144,6 +153,17 @@ describe("ReviewStatusCard", () => {
     expect(screen.queryByText(/\u5c1a\u672a\u8fd0\u884c\u9884\u5ba1/)).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "\u91cd\u8bd5" }));
     expect(onRetry).toHaveBeenCalledOnce();
+  });
+
+  it("shows expired notice instead of generic error when an ephemeral run expired", () => {
+    renderCard("idle", null, {
+      hasRunId: true,
+      expired: true,
+      isError: true,
+      error: new Error("RESOURCE_NOT_FOUND"),
+    });
+    expect(screen.getByTestId("review-status-expired")).toHaveTextContent("\u9884\u5ba1\u7ed3\u679c\u5df2\u8fc7\u671f");
+    expect(screen.queryByTestId("review-status-error")).not.toBeInTheDocument();
   });
 
   it("shows the AI usage as a Context hover card: total on the button, exact figures on hover", async () => {
@@ -205,12 +225,8 @@ describe("ReviewStatusCard", () => {
   });
 
   it("renders budget and timeout failure copy from the known set", () => {
-    const first = renderCard("failed", runFixture({ state: "failed", failure_code: "budget_exhausted" }));
-    expect(screen.getByTestId("review-failure").textContent).toContain("\u5f53\u65e5AI\u9884\u7b97\u5df2\u8017\u5c3d");
-    first.unmount();
-    const second = renderCard("failed", runFixture({ state: "failed", failure_code: "timed_out" }));
-    expect(screen.getByTestId("review-failure").textContent).toContain("\u9884\u5ba1\u8d85\u65f6");
-    second.unmount();
+    expect(i18n.t(`precheck.failure.${knownFailureKey("budget_exhausted")}`)).toContain("\u5f53\u65e5AI\u9884\u7b97\u5df2\u8017\u5c3d");
+    expect(i18n.t(`precheck.failure.${knownFailureKey("timed_out")}`)).toContain("\u9884\u5ba1\u8d85\u65f6");
     for (const [code, expected] of [
       ["AI_PROVIDER_FAILED", "AI\u670d\u52a1\u6682\u4e0d\u53ef\u7528"],
       ["REVIEW_COVERAGE_INCOMPLETE", "\u9636\u6bb5\u5143\u6570\u636e\u6216\u7b56\u7565\u8986\u76d6\u4e0d\u5b8c\u6574"],
@@ -219,32 +235,31 @@ describe("ReviewStatusCard", () => {
       ["SQL_FINGERPRINT_FAILED", "SQL\u6307\u7eb9\u6216\u8131\u654f\u5206\u6790\u5931\u8d25"],
       ["SQL_BATCH_TOO_LARGE", "SQL\u6279\u6b21\u5927\u5c0f\u6216\u6307\u7eb9\u7ec4\u6570\u91cf\u8d85\u51fa\u9884\u5ba1\u4e0a\u9650"],
     ] as const) {
+      expect(i18n.t(`precheck.failure.${knownFailureKey(code)}`)).toContain(expected);
       const view = renderCard("failed", runFixture({ state: "failed", failure_code: code }));
-      expect(screen.getByTestId("review-failure").textContent).toContain(expected);
+      expect(screen.queryByTestId("review-failure")).not.toBeInTheDocument();
       view.unmount();
     }
   });
 
   it("shows the accepted summary verbatim while translating only its label", async () => {
     const summary = "\u5df2\u63a5\u53d7\u7684\u4e2d\u6587\u5ba1\u6838\u7ed3\u8bba\u3002";
-    renderCard(
-      "ready",
-      runFixture({
-        stage_results: [
-          {
-            stage_position: 1,
-            state: "passed",
-            highest_severity: "none",
-            gate_passed: true,
-            finding_count: 0,
-            evidence_count: 1,
-            snapshot_hash: "snap-summary",
-            summary,
-            summary_locale: "zh-CN",
-          },
-        ] as ReviewRun["stage_results"],
-      }),
-    );
+    const run = runFixture({
+      stage_results: [
+        {
+          stage_position: 1,
+          state: "passed",
+          highest_severity: "none",
+          gate_passed: true,
+          finding_count: 0,
+          evidence_count: 1,
+          snapshot_hash: "snap-summary",
+          summary,
+          summary_locale: "zh-CN",
+        },
+      ] as ReviewRun["stage_results"],
+    });
+    render(<ReviewSummarySection summaries={extractReviewSummaries(run)} />);
 
     expect(screen.getByText("AI \u5ba1\u6838\u7ed3\u8bba")).toBeInTheDocument();
     expect(screen.getByText(summary)).toHaveAttribute("lang", "zh-CN");
@@ -258,35 +273,33 @@ describe("ReviewStatusCard", () => {
   it("renders Chinese and English frozen summaries independently of UI language", async () => {
     const zhSummary = "\u4e2d\u6587\u51bb\u7ed3\u5ba1\u6838\u7ed3\u8bba\u3002";
     const enSummary = "English frozen review summary.";
-    renderCard(
-      "ready",
-      runFixture({
-        stage_results: [
-          {
-            stage_position: 1,
-            state: "passed",
-            highest_severity: "none",
-            gate_passed: true,
-            finding_count: 0,
-            evidence_count: 1,
-            snapshot_hash: "snap-summary-zh",
-            summary: zhSummary,
-            summary_locale: "zh-CN",
-          },
-          {
-            stage_position: 2,
-            state: "passed",
-            highest_severity: "none",
-            gate_passed: true,
-            finding_count: 0,
-            evidence_count: 1,
-            snapshot_hash: "snap-summary-en",
-            summary: enSummary,
-            summary_locale: "en-US",
-          },
-        ],
-      }),
-    );
+    const run = runFixture({
+      stage_results: [
+        {
+          stage_position: 1,
+          state: "passed",
+          highest_severity: "none",
+          gate_passed: true,
+          finding_count: 0,
+          evidence_count: 1,
+          snapshot_hash: "snap-summary-zh",
+          summary: zhSummary,
+          summary_locale: "zh-CN",
+        },
+        {
+          stage_position: 2,
+          state: "passed",
+          highest_severity: "none",
+          gate_passed: true,
+          finding_count: 0,
+          evidence_count: 1,
+          snapshot_hash: "snap-summary-en",
+          summary: enSummary,
+          summary_locale: "en-US",
+        },
+      ],
+    });
+    render(<ReviewSummarySection summaries={extractReviewSummaries(run)} />);
 
     expect(screen.getByText(zhSummary)).toHaveAttribute("lang", "zh-CN");
     expect(screen.getByText(enSummary)).toHaveAttribute("lang", "en-US");
@@ -298,25 +311,23 @@ describe("ReviewStatusCard", () => {
   });
 
   it("does not fabricate a summary for a stage that has not completed", () => {
-    renderCard(
-      "running",
-      runFixture({
-        state: "running",
-        stage_results: [
-          {
-            stage_position: 1,
-            state: "running",
-            highest_severity: "none",
-            gate_passed: false,
-            finding_count: 0,
-            evidence_count: 0,
-            snapshot_hash: "snap-running",
-            summary: null,
-            summary_locale: null,
-          },
-        ] as ReviewRun["stage_results"],
-      }),
-    );
+    const run = runFixture({
+      state: "running",
+      stage_results: [
+        {
+          stage_position: 1,
+          state: "running",
+          highest_severity: "none",
+          gate_passed: false,
+          finding_count: 0,
+          evidence_count: 0,
+          snapshot_hash: "snap-running",
+          summary: null,
+          summary_locale: null,
+        },
+      ] as ReviewRun["stage_results"],
+    });
+    render(<ReviewSummarySection summaries={extractReviewSummaries(run)} />);
 
     expect(screen.queryByTestId("review-summary")).not.toBeInTheDocument();
   });
@@ -331,14 +342,39 @@ describe("ReviewStatusCard", () => {
       evidence_count: 1,
       snapshot_hash: "snap-malformed",
     };
-    renderCard(
-      "ready",
-      runFixture({
-        stage_results: [malformedStage] as unknown as ReviewRun["stage_results"],
-      }),
-    );
+    const run = runFixture({
+      stage_results: [malformedStage] as unknown as ReviewRun["stage_results"],
+    });
+    expect(extractReviewSummaries(run)).toHaveLength(0);
+    renderCard("ready", run);
 
     expect(screen.queryByTestId("review-summary")).not.toBeInTheDocument();
     expect(screen.getByRole("cell", { name: "\u9636\u6bb5 1" })).toBeInTheDocument();
+  });
+
+  it("maps lowercase coverage_incomplete and specific 2007/2008 diagnostic failure codes without leaking raw codes", () => {
+    for (const [code, expected] of [
+      ["coverage_incomplete", "\u9636\u6bb5\u5143\u6570\u636e\u6216\u7b56\u7565\u8986\u76d6\u4e0d\u5b8c\u6574"],
+      ["risk_blocked", "\u53d1\u73b0\u963b\u65ad\u63d0\u4ea4\u7684\u9ad8\u5371\u6216\u4e25\u91cd\u98ce\u9669"],
+      ["sql_schema_out_of_scope", "SQL \u4e2d\u663e\u5f0f\u6307\u5b9a\u7684\u5e93\u540d\u6216 Schema"],
+      ["datasource_database_required", "\u76ee\u6807\u6570\u636e\u6e90\u672a\u914d\u7f6e\u6709\u6548\u7684\u9ed8\u8ba4\u6570\u636e\u5e93"],
+      ["postgres_search_path_unavailable", "search_path"],
+      ["datasource_identity_unverified", "\u5c1a\u672a\u5b8c\u6210\u5b9e\u4f8b\u8eab\u4efd\u6821\u9a8c"],
+      ["datasource_identity_changed", "\u5b9e\u4f8b\u8eab\u4efd\u6307\u7eb9\u5df2\u53d1\u751f\u53d8\u5316"],
+      ["review_credential_missing", "\u672a\u914d\u7f6e\u53ef\u7528\u7684\u53ea\u8bfb\u51ed\u636e"],
+      ["datasource_unreachable", "\u65e0\u6cd5\u8fde\u63a5\u76ee\u6807\u6570\u636e\u6e90"],
+      ["catalog_schema_missing", "\u4e0d\u5b58\u5728\u6307\u5b9a\u7684\u6570\u636e\u5e93\u6216 Schema"],
+      ["catalog_permission_denied", "SELECT \u6216 USAGE \u6743\u9650"],
+      ["catalog_too_large", "\u8d85\u51fa\u9690\u79c1\u76ee\u5f55\u4fdd\u62a4\u4e0a\u9650"],
+      ["catalog_read_failed", "\u8bfb\u53d6\u76ee\u6807\u6570\u636e\u5e93\u5143\u6570\u636e\u76ee\u5f55\u8d85\u65f6\u6216\u5931\u8d25"],
+      ["catalog_validation_failed", "\u76ee\u6807\u6570\u636e\u5e93\u5143\u6570\u636e\u76ee\u5f55\u7ed3\u6784\u5f02\u5e38"],
+      ["policy_privacy_conflict", "\u4e0e\u9690\u79c1\u6620\u5c04\u51b2\u7a81"],
+      ["policy_parameter_invalid", "\u672a\u5b9a\u4e49\u6216\u975e\u6cd5\u7684\u53c2\u6570\u5360\u4f4d\u7b26"],
+      ["rule_exceeds_context_window", "\u8d85\u51fa\u5f53\u524d AI \u63d0\u4f9b\u5546\u7684\u4e0a\u4e0b\u6587\u7a97\u53e3\u4e0a\u9650"],
+    ] as const) {
+      const translated = i18n.t(`precheck.failure.${knownFailureKey(code)}`);
+      expect(translated).toContain(expected);
+      expect(translated).not.toContain(code);
+    }
   });
 });

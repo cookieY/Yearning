@@ -19,7 +19,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/shared/components/ui/table";
-import { Separator } from "@/shared/components/ui/separator";
+import { Alert, AlertDescription, AlertTitle } from "@/shared/components/ui/alert";
 import { EmptyState } from "@/shared/components/status/empty-state";
 import { ErrorState } from "@/shared/components/status/status-components";
 import { LoadingState } from "@/shared/components/status/loading-state";
@@ -77,6 +77,7 @@ export interface ReviewStatusCardProps {
    * and the spinning phase badge without inserting a loading block (owner 2026-11-04 zero precheck jitter). */
   isFetching?: boolean;
   isError: boolean;
+  expired?: boolean;
   error?: unknown;
   onRetry?: () => void;
   /** Sits inside another card: drop this card's own surface and padding. */
@@ -90,32 +91,35 @@ export function ReviewStatusCard({
   isPending,
   isFetching = false,
   isError,
+  expired = false,
   error,
   onRetry,
   flat = false,
 }: ReviewStatusCardProps) {
   const { t } = useTranslation();
-  const badge = isError
+  const badge = expired
     ? {
-        key: "precheck.review.errorBadge",
-        icon: CircleAlert,
-        className: "text-destructive",
+        key: "precheck.findings.expiredTitle",
+        icon: TriangleAlert,
+        className: "text-[var(--exec-partial-failed)]",
         spin: false,
       }
-    : hasRunId && (isPending || run === null) && phase === "idle"
+    : isError
       ? {
-          key: "precheck.review.loadingBadge",
-          icon: Loader2,
-          className: "text-primary",
-          spin: true,
+          key: "precheck.review.errorBadge",
+          icon: CircleAlert,
+          className: "text-destructive",
+          spin: false,
         }
-      : PHASE_BADGE[phase];
+      : hasRunId && (isPending || run === null) && phase === "idle"
+        ? {
+            key: "precheck.review.loadingBadge",
+            icon: Loader2,
+            className: "text-primary",
+            spin: true,
+          }
+        : PHASE_BADGE[phase];
   const Icon = badge.icon;
-  // RCP-20261101 ephemeral Run: queued observations before group completion may carry null fields —
-  // stage_results:null was observed at runtime (despite non-null type declaration), so guard on the consumer side;
-  // route-level crashes are unacceptable.
-  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-  const summaries = run?.stage_results?.filter(hasReviewSummary) ?? [];
 
   return (
     <Card
@@ -138,7 +142,14 @@ export function ReviewStatusCard({
       </CardHeader>
       <CardContent className="flex flex-col gap-3" aria-busy={isFetching || undefined}>
         {!hasRunId && <EmptyState title={t("precheck.review.noRun")} />}
-        {hasRunId && isError && (
+        {hasRunId && expired && (
+          <Alert data-testid="review-status-expired">
+            <TriangleAlert className="size-4" aria-hidden />
+            <AlertTitle>{t("precheck.findings.expiredTitle")}</AlertTitle>
+            <AlertDescription>{t("precheck.findings.expiredDescription")}</AlertDescription>
+          </Alert>
+        )}
+        {hasRunId && !expired && isError && (
           <div data-testid="review-status-error">
             <ErrorState
               error={error}
@@ -147,7 +158,7 @@ export function ReviewStatusCard({
             />
           </div>
         )}
-        {hasRunId && !isError && run === null && (
+        {hasRunId && !expired && !isError && run === null && (
           <div data-testid="review-status-loading">
             <LoadingState variant="inline" label={t("precheck.review.loading")} />
           </div>
@@ -157,7 +168,7 @@ export function ReviewStatusCard({
             (and toggled the scrollbar when page height was near viewport height). When cached data exists, the table
             stays mounted and fetching is expressed solely through aria-busy and the phase badge (spinning while running),
             without changing any layout height. */}
-        {hasRunId && !isError && run !== null && (
+        {hasRunId && !expired && !isError && run !== null && (
           <>
             <div className="text-sm" data-testid="review-counts">
               {t("precheck.review.statements", { count: run.statement_count })} ·{" "}
@@ -193,57 +204,10 @@ export function ReviewStatusCard({
                 })}
               </TableBody>
             </Table>
-            {summaries.length > 0 && (
-              <>
-                <Separator />
-                <section
-                  className="flex flex-col gap-3"
-                  aria-label={t("precheck.review.summary")}
-                  data-testid="review-summary"
-                >
-                  <h3 className="text-sm font-semibold text-foreground">
-                    {t("precheck.review.summary")}
-                  </h3>
-                  <dl className="flex flex-col gap-3">
-                    {summaries.map((stage) => (
-                      <div className="flex flex-col gap-1" key={stage.stage_position}>
-                        <dt className="text-xs font-medium text-muted-foreground">
-                          {t("precheck.stagePath.stage", { position: stage.stage_position })}
-                        </dt>
-                        <dd
-                          className="text-sm leading-6 text-foreground"
-                          lang={stage.summary_locale}
-                        >
-                          {stage.summary}
-                        </dd>
-                      </div>
-                    ))}
-                  </dl>
-                </section>
-              </>
-            )}
-            {run.failure_code != null && (
-              <p className="text-sm text-[var(--exec-failed)]" data-testid="review-failure">
-                {t(`precheck.failure.${knownFailureKey(run.failure_code)}`)}
-              </p>
-            )}
           </>
         )}
       </CardContent>
     </Card>
-  );
-}
-
-function hasReviewSummary(
-  stage: ReviewRun["stage_results"][number],
-): stage is ReviewRun["stage_results"][number] & {
-  summary: string;
-  summary_locale: "zh-CN" | "en-US";
-} {
-  return (
-    typeof stage.summary === "string" &&
-    stage.summary.trim() !== "" &&
-    (stage.summary_locale === "zh-CN" || stage.summary_locale === "en-US")
   );
 }
 
@@ -262,7 +226,27 @@ export function knownFailureKey(code: string): string {
     case "REVIEW_SCHEMA_INVALID":
       return "schema_invalid";
     case "REVIEW_COVERAGE_INCOMPLETE":
+    case "coverage_incomplete":
       return "coverage_incomplete";
+    case "risk_blocked":
+    case "REVIEW_BLOCKED_BY_RISK":
+      return "risk_blocked";
+    case "sql_schema_out_of_scope":
+    case "datasource_database_required":
+    case "postgres_search_path_unavailable":
+    case "datasource_identity_unverified":
+    case "datasource_identity_changed":
+    case "review_credential_missing":
+    case "datasource_unreachable":
+    case "catalog_schema_missing":
+    case "catalog_permission_denied":
+    case "catalog_too_large":
+    case "catalog_read_failed":
+    case "catalog_validation_failed":
+    case "policy_privacy_conflict":
+    case "policy_parameter_invalid":
+    case "rule_exceeds_context_window":
+      return code;
     case "SQL_PARSE_FAILED":
       return "sql_parse_failed";
     case "SQL_FINGERPRINT_FAILED":

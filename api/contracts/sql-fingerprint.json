@@ -6,18 +6,14 @@
       "engine": "mysql",
       "mode": "mysql",
       "versions": [
-        "5.7.x",
-        "8.0.x"
+        ">=5.7"
       ]
     },
     {
       "engine": "postgresql",
       "mode": "postgresql",
       "versions": [
-        "14.x",
-        "15.x",
-        "16.x",
-        "17.x"
+        ">=14"
       ]
     },
     {

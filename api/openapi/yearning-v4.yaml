@@ -184,6 +184,22 @@ paths:
                                 type: string
                               start_url:
                                 type: string
+                        branding:
+                          type: object
+                          description: >-
+                            Public branding fields configured under the branding settings
+                            namespace (product_name and plain-text login_description).
+                          required:
+                          - product_name
+                          - login_description
+                          properties:
+                            product_name:
+                              type: string
+                              minLength: 1
+                              maxLength: 64
+                            login_description:
+                              type: string
+                              maxLength: 500
                     request_id:
                       $ref: '#/components/schemas/Uuid'
                 - $ref: '#/components/schemas/BusinessErrorResponse'
@@ -522,6 +538,55 @@ paths:
                     request_id:
                       $ref: '#/components/schemas/Uuid'
                 - $ref: '#/components/schemas/BusinessErrorResponse'
+  /admin/users/{user_id}/password:
+    parameters:
+    - $ref: '#/components/parameters/UserId'
+    post:
+      tags:
+      - Administration
+      operationId: resetUserPassword
+      summary: Admin reset of a local user's password
+      description: >-
+        Resets a local non-builtin user's password to a temporary value meeting
+        the 12-character policy and revokes all active sessions for that user.
+        Rejects the builtin admin (ADMIN_IMMUTABLE) and external identity users
+        (PASSWORD_MANAGED_BY_IDENTITY_SOURCE).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ResetUserPasswordRequest'
+      responses:
+        '200':
+          description: User password reset and sessions revoked
+          content:
+            application/json:
+              schema:
+                oneOf:
+                - type: object
+                  additionalProperties: false
+                  required:
+                  - err_code
+                  - message
+                  - data
+                  - request_id
+                  properties:
+                    err_code:
+                      type: integer
+                      const: 0
+                    message:
+                      type: string
+                      const: ok
+                    data:
+                      type: 'null'
+                    request_id:
+                      $ref: '#/components/schemas/Uuid'
+                - $ref: '#/components/schemas/BusinessErrorResponse'
+        '401':
+          $ref: '#/components/responses/Problem'
+        '403':
+          $ref: '#/components/responses/Problem'
   /admin/users/{user_id}/deletion-impact:
     parameters:
     - $ref: '#/components/parameters/UserId'
@@ -3947,6 +4012,13 @@ paths:
                 sql:
                   type: string
                   description: Current editor SQL reviewed verbatim (max 32 MiB).
+                target_database:
+                  type:
+                  - string
+                  - 'null'
+                  minLength: 1
+                  maxLength: 128
+                  description: Optional default database override for MySQL-compatible stages, or optional Target Schema override within the connected Database for PostgreSQL stages; explicit null clears any draft-level override during ephemeral precheck without mutating the draft.
                 output_locale:
                   type: string
                   description: Optional explicit locale; overrides the header when present.
@@ -4101,6 +4173,13 @@ paths:
                   description: SQL submitted verbatim; must equal the prechecked text.
                 run_id:
                   $ref: '#/components/schemas/Uuid'
+                target_database:
+                  type:
+                  - string
+                  - 'null'
+                  minLength: 1
+                  maxLength: 128
+                  description: Optional default database (MySQL-compatible stages) or Target Schema within the connected Database (PostgreSQL stages) bound during precheck; explicit null clears any saved draft override on submission.
                 metadata:
                   type: object
                   additionalProperties: false
@@ -4176,13 +4255,13 @@ paths:
           maxLength: 128
       - name: submitted_from
         in: query
-        description: Inclusive lower bound on submitted_at (UTC calendar day start).
+        description: Inclusive lower bound on submitted_at (calendar day start in general.system_timezone).
         schema:
           type: string
           format: date
       - name: submitted_to
         in: query
-        description: Inclusive upper bound on submitted_at (UTC calendar day end).
+        description: Inclusive upper bound on submitted_at (calendar day end in general.system_timezone).
         schema:
           type: string
           format: date
@@ -5178,6 +5257,16 @@ paths:
         description: 按申请状态过滤（RCP-20261021；缺省返回全部状态的关系可见项）。
         schema:
           $ref: '#/components/schemas/QueryAccessRequestState'
+      - name: scope
+        in: query
+        required: false
+        description: Optional relationship scope filter (all = requester or frozen reviewer, reviewer = frozen reviewer only, requester = requester only). Narrowing only; never widens authorization.
+        schema:
+          type: string
+          enum:
+          - all
+          - reviewer
+          - requester
       responses:
         '200':
           description: Business result
@@ -7700,6 +7789,14 @@ components:
           - admin
           default: user
           description: User account role. Both is_builtin_admin=true and role=admin grant access to /admin/* management pages.
+        auth_provider:
+          type: string
+          enum:
+          - local
+          - ldap
+          - oidc
+          default: local
+          description: Identity provider managing this user's password; only local non-builtin accounts allow admin password reset.
         version:
           type: integer
           minimum: 1
@@ -7746,6 +7843,17 @@ components:
           type: string
           minLength: 12
           maxLength: 1024
+    ResetUserPasswordRequest:
+      type: object
+      additionalProperties: false
+      required:
+      - new_password
+      properties:
+        new_password:
+          type: string
+          minLength: 12
+          maxLength: 1024
+          format: password
     CreateUserRequest:
       type: object
       additionalProperties: false
@@ -8172,7 +8280,6 @@ components:
       - deployment_kind
       - host
       - port
-      - version_constraint
       - enabled
       - credentials
       properties:
@@ -8215,6 +8322,7 @@ components:
           type: string
           minLength: 1
           maxLength: 64
+          description: Optional version constraint. When omitted on create, defaults from the capability matrix for the engine and compatibility_mode; when omitted on replace, preserves the stored value or falls back to the matrix default.
         enabled:
           type: boolean
         test_purpose:
@@ -9238,6 +9346,60 @@ components:
         scope_type:
           type: string
           enum:
+          - datasource
+          - table
+        datasource_id:
+          $ref: '#/components/schemas/Uuid'
+        database_name:
+          type: string
+          minLength: 1
+          maxLength: 128
+        table_name:
+          type: string
+          minLength: 1
+          maxLength: 128
+        definition:
+          $ref: '#/components/schemas/KnowledgeEntryDefinitionWrite'
+        provenance:
+          type: string
+          enum:
+          - manual
+          - finding_conversion
+        source_finding_id:
+          $ref: '#/components/schemas/Uuid'
+    KnowledgeEntry:
+      type: object
+      additionalProperties: false
+      required:
+      - name
+      - scope_type
+      - definition
+      - id
+      - state
+      - provenance
+      - config_hash
+      - version
+      - created_at
+      - updated_at
+      properties:
+        id:
+          $ref: '#/components/schemas/Uuid'
+        name:
+          type: string
+          minLength: 1
+          maxLength: 128
+        purpose:
+          type: string
+          maxLength: 512
+        state:
+          type: string
+          enum:
+          - draft
+          - enabled
+          - disabled
+        scope_type:
+          type: string
+          enum:
           - global
           - datasource
           - table
@@ -9252,7 +9414,7 @@ components:
           minLength: 1
           maxLength: 128
         definition:
-          $ref: '#/components/schemas/ReviewInputDefinition'
+          $ref: '#/components/schemas/KnowledgeEntryDefinition'
         provenance:
           type: string
           enum:
@@ -9260,30 +9422,63 @@ components:
           - finding_conversion
         source_finding_id:
           $ref: '#/components/schemas/Uuid'
-    KnowledgeEntry:
-      allOf:
-      - $ref: '#/components/schemas/KnowledgeEntryWrite'
-      - type: object
-        required:
-        - id
-        - state
-        - provenance
-        - config_hash
-        - version
-        - created_at
-        - updated_at
-        properties:
-          id:
-            $ref: '#/components/schemas/Uuid'
-          config_hash:
-            type: string
-          version:
-            type: integer
-            minimum: 1
-          created_at:
-            $ref: '#/components/schemas/Timestamp'
-          updated_at:
-            $ref: '#/components/schemas/Timestamp'
+        config_hash:
+          type: string
+        version:
+          type: integer
+          minimum: 1
+        created_at:
+          $ref: '#/components/schemas/Timestamp'
+        updated_at:
+          $ref: '#/components/schemas/Timestamp'
+    KnowledgeEntryDefinitionWrite:
+      type: object
+      additionalProperties: false
+      required:
+      - knowledge_text
+      - max_severity
+      - version
+      properties:
+        knowledge_text:
+          type: string
+          minLength: 1
+          maxLength: 65536
+        max_severity:
+          type: string
+          enum: [info, low, medium]
+          default: medium
+          description: >-
+            Advisory maximum severity for non-blocking internal experience
+            guidance (info, low, or medium). Internal experience entries assist
+            the Database AI Assistant and emit non-blocking advisory findings
+            during AI Review without ever blocking submission.
+        version:
+          type: integer
+          minimum: 1
+    KnowledgeEntryDefinition:
+      type: object
+      additionalProperties: false
+      required:
+      - knowledge_text
+      - max_severity
+      - version
+      properties:
+        knowledge_text:
+          type: string
+          minLength: 1
+          maxLength: 65536
+        max_severity:
+          type: string
+          enum: [info, low, medium, high, critical]
+          default: medium
+          description: >-
+            Stored advisory maximum severity for internal experience entries.
+            Legacy high/critical values remain readable for historical rows and
+            are capped at medium at runtime; new writes restrict max_severity
+            to info, low, or medium.
+        version:
+          type: integer
+          minimum: 1
     ReviewInputDefinition:
       type: object
       additionalProperties: false
@@ -9304,11 +9499,11 @@ components:
             Retained for v1 definition, API and stored-configuration
             compatibility. This field is not a submission ceiling for enabled
             mandatory rules and cannot authorize a lower-risk result: every
-            actual hit from an enabled, frozen and scope-matched Prompt Tool or
-            internal-experience rule becomes effective Critical and blocks
-            submission regardless of the model-provided severity. Unbound model
-            observations remain visible but are capped at Medium. The finding
-            key is system-derived and is injected alongside the rule text.
+            actual hit from an enabled, frozen and scope-matched Prompt Tool
+            rule becomes effective Critical and blocks submission regardless of
+            the model-provided severity. Unbound model observations remain
+            visible but are capped at Medium. The finding key is system-derived
+            and is injected alongside the rule text.
         version:
           type: integer
           minimum: 1
@@ -10145,6 +10340,24 @@ components:
           type: string
           minLength: 1
           maxLength: 128
+        datasource_engine:
+          type: string
+          enum:
+          - mysql
+          - postgresql
+          - tidb
+          - oceanbase
+          - polardb
+        datasource_compatibility_mode:
+          type: string
+          enum:
+          - mysql
+          - postgresql
+        datasource_database_name:
+          type:
+          - string
+          - 'null'
+          maxLength: 128
         approval_steps:
           type: array
           minItems: 1
@@ -10342,6 +10555,12 @@ components:
         rollback_enabled:
           type: boolean
           default: true
+        target_database:
+          type:
+          - string
+          - 'null'
+          minLength: 1
+          maxLength: 128
         ticket_type:
           type: string
           enum:
@@ -10410,6 +10629,10 @@ components:
         rollback_enabled:
           type: boolean
           default: true
+        target_database:
+          type: string
+          minLength: 1
+          maxLength: 128
     UpdateChangeDraftRequest:
       type: object
       additionalProperties: false
@@ -10434,6 +10657,12 @@ components:
           format: date-time
         rollback_enabled:
           type: boolean
+        target_database:
+          type:
+          - string
+          - 'null'
+          minLength: 1
+          maxLength: 128
     ChangeOrderState:
       type: string
       enum:
@@ -10843,10 +11072,17 @@ components:
         id:
           $ref: '#/components/schemas/Uuid'
         draft_id:
-          $ref: '#/components/schemas/Uuid'
+          type: string
+          pattern: '^($|[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})$'
+          description: >-
+            Associated change draft UUID, or empty string when precheck ran
+            ephemerally without a saved draft (RCP-20261101 / RCP-20261125).
         draft_revision:
           type: integer
-          minimum: 1
+          minimum: 0
+          description: >-
+            Persisted draft revision (>= 1), or 0 when precheck ran ephemerally
+            without a persisted draft revision (RCP-20261101 / RCP-20261125).
         state:
           $ref: '#/components/schemas/ReviewRunState'
         statement_count:
@@ -11506,6 +11742,9 @@ components:
       properties:
         id:
           $ref: '#/components/schemas/Uuid'
+        flow_id:
+          $ref: '#/components/schemas/Uuid'
+          description: Frozen query_access flow ID this request was submitted against.
         requester_user_id:
           $ref: '#/components/schemas/Uuid'
         applicant_name:
@@ -11551,6 +11790,9 @@ components:
           - type: 'null'
           description: Time the request reached a terminal state (rejected,
             withdrawn or invalid); null while pending or under an active grant.
+        can_decide:
+          type: boolean
+          description: Whether the current session actor is a frozen approver of the currently active step on an access_pending request (authoritative server-side eligibility).
     QueryGrantState:
       type: string
       enum:
@@ -11602,6 +11844,9 @@ components:
           minimum: 1
         created_at:
           $ref: '#/components/schemas/Timestamp'
+        can_revoke:
+          type: boolean
+          description: Whether the current session actor is eligible to revoke this active grant (frozen approver of the originating access request or builtin admin).
     CreateQuerySession:
       type: object
       additionalProperties: false

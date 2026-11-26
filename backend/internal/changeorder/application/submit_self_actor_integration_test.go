@@ -16,20 +16,16 @@ package application
 
 import (
 	"context"
-	"encoding/base64"
 	"fmt"
-	"os"
-	"path/filepath"
 	"testing"
 	"time"
 
 	"github.com/google/uuid"
-	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
-	gormlogger "gorm.io/gorm/logger"
 
 	"github.com/cookieY/YearningX/backend/internal/authorization/auditlog"
 	"github.com/cookieY/YearningX/backend/internal/crypto"
+	"github.com/cookieY/YearningX/backend/internal/platform/testkit"
 	reviewapp "github.com/cookieY/YearningX/backend/internal/review/application"
 	reviewpersist "github.com/cookieY/YearningX/backend/internal/review/persistence"
 )
@@ -54,14 +50,7 @@ func (fx *subFx) reviewServices(t *testing.T) *reviewapp.Services {
 
 func newSubFx(t *testing.T) *subFx {
 	t.Helper()
-	acquireCopyLock(t)
-	db, err := gorm.Open(postgres.Open(copyDSN(t)), &gorm.Config{Logger: gormlogger.Discard})
-	if err != nil {
-		t.Fatalf("postgres connect: %v", err)
-	}
-	if sqlDB, serr := db.DB(); serr == nil {
-		t.Cleanup(func() { _ = sqlDB.Close() })
-	}
+	db := testkit.OpenPG(t)
 	// Clear all tables written by self-Actor tests (including users and flow template tables;
 	// shared DB is mutually excluded via file lock, following the same pattern as httpapi truncateAll).
 	for _, tbl := range []string{
@@ -78,30 +67,7 @@ func newSubFx(t *testing.T) *subFx {
 			t.Fatalf("truncate %s: %v", tbl, err)
 		}
 	}
-	dir := t.TempDir()
-	mk := func(seed byte) string {
-		out := make([]byte, 32)
-		for i := range out {
-			out[i] = seed
-		}
-		return base64.StdEncoding.EncodeToString(out)
-	}
-	doc := fmt.Sprintf(`{"contract_version":1,"deployment_id":"t4e-itest","keys":[
-	{"key_id":"pay-1","purpose":"payload","status":"encrypt_decrypt","created_at":"2026-08-25T00:00:00Z","key_base64":"%s"},
-	{"key_id":"fp-1","purpose":"sql_fingerprint","status":"encrypt_decrypt","created_at":"2026-08-25T00:00:00Z","key_base64":"%s"}]}`,
-		mk(1), mk(4))
-	path := filepath.Join(dir, "keyring.json")
-	if err := os.WriteFile(path, []byte(doc), 0o400); err != nil {
-		t.Fatal(err)
-	}
-	ring, err := crypto.LoadKeyring(path)
-	if err != nil {
-		t.Fatal(err)
-	}
-	crypter, err := crypto.NewCrypter(ring)
-	if err != nil {
-		t.Fatal(err)
-	}
+	crypter := testkit.NewCrypter(t)
 	recorder, err := auditlog.NewRecorder(db)
 	if err != nil {
 		t.Fatal(err)

@@ -7,6 +7,9 @@ import {
   highlightSqlText,
 } from "@/shared/components/ui/code-block";
 import { ScrollArea } from "@/shared/components/ui/scroll-area";
+import { splitBacktickSegments } from "@/shared/components/inline-code-text";
+import { appToast } from "@/shared/components/shadcn-dashboard/sonner/sonner-08";
+import { writeClipboardText } from "@/shared/lib/clipboard";
 
 /**
  * Finding rich text (owner ruling 2026-10-30, readability pass):
@@ -15,8 +18,7 @@ import { ScrollArea } from "@/shared/components/ui/scroll-area";
  * (title / message / suggestion); there is no structured fact/impact split
  * and none is invented here. What IS contractual is the backtick convention:
  * the review system prompt requires code snippets and technical identifiers
- * to be wrapped in backticks (and the SQL locate affordance already depends
- * on the same convention), so backtick-delimited spans are rendered as real
+ * to be wrapped in backticks, so backtick-delimited spans are rendered as real
  * inline code instead of literal markdown. Everything outside the spans is
  * plain prose; unmatched backticks fall back to literal text — no guessing
  * beyond the convention.
@@ -28,27 +30,8 @@ import { ScrollArea } from "@/shared/components/ui/scroll-area";
 /** Spans at or above this length render as a code block instead of inline. */
 const BLOCK_CODE_MIN_LENGTH = 96;
 
-type Segment = { kind: "text" | "code"; value: string };
-
-/** Split on complete backtick pairs only; an odd trailing tick stays literal. */
-function splitSegments(input: string): Segment[] {
-  const segments: Segment[] = [];
-  let rest = input;
-  for (;;) {
-    const start = rest.indexOf("`");
-    if (start === -1) break;
-    const end = rest.indexOf("`", start + 1);
-    if (end === -1) break;
-    if (start > 0) segments.push({ kind: "text", value: rest.slice(0, start) });
-    segments.push({ kind: "code", value: rest.slice(start + 1, end) });
-    rest = rest.slice(end + 1);
-  }
-  if (rest.length > 0) segments.push({ kind: "text", value: rest });
-  return segments;
-}
-
 export function FindingText({ text }: { text: string }) {
-  const segments = splitSegments(text);
+  const segments = splitBacktickSegments(text);
   return (
     <>
       {segments.map((segment, index) =>
@@ -81,17 +64,18 @@ function FindingCodeBlock({ code }: { code: string }) {
   const [copied, setCopied] = useState(false);
 
   const copy = () => {
-    setCopied(true);
     // Clipboard write fires synchronously inside the click handler
     // (transient activation; the audit-free variant of the SEC-0035 rule —
     // this is the user's own finding text, not a revealed raw payload).
-    void navigator.clipboard
-      .writeText(code)
-      .then(() => {
+    void writeClipboardText(code).then((ok) => {
+      if (ok) {
         setCopied(true);
         window.setTimeout(() => { setCopied(false); }, 2000);
-      })
-      .catch(() => { setCopied(false); });
+      } else {
+        setCopied(false);
+        appToast.error(t("common.copyFailed"));
+      }
+    });
   };
 
   return (

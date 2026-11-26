@@ -42,8 +42,8 @@ func TestPolicySnapshotBarrierNeverExecutesReplacementPolicy(t *testing.T) {
 		{
 			name: "knowledge definition",
 			originalMarkers: []string{
-				"global-guard",
-				"global-guard boundary rule",
+				"table-boundary",
+				"table-boundary boundary rule",
 			},
 			mutate: mutateBarrierKnowledgeDefinition,
 		},
@@ -166,7 +166,7 @@ func mutateBarrierRuleSetMembership(t *testing.T, b *b7fx, replacement string) {
 func mutateBarrierKnowledgeDefinition(t *testing.T, b *b7fx, replacement string) {
 	t.Helper()
 	repo := &knowledge.Repository{DB: b.db}
-	entry, err := repo.Get(context.Background(), b.entryGlobal)
+	entry, err := repo.Get(context.Background(), b.entryTable)
 	if err != nil {
 		t.Fatal(err)
 	}

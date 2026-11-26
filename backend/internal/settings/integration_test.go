@@ -13,29 +13,13 @@ import (
 	"time"
 
 	"github.com/cookieY/YearningX/backend/internal/crypto"
-	"gorm.io/driver/postgres"
+	"github.com/cookieY/YearningX/backend/internal/platform/testkit"
 	"gorm.io/gorm"
-	gormlogger "gorm.io/gorm/logger"
 )
 
 func itestDB(t *testing.T) *gorm.DB {
 	t.Helper()
-	password := osGetenv("YEARNING_TEST_DATABASE_PASSWORD")
-	if password == "" {
-		t.Skip("integration PostgreSQL not configured")
-	}
-	db, err := gorm.Open(postgres.Open(fmt.Sprintf(
-		"host=%s port=%s user=%s password=%s dbname=%s sslmode=disable",
-		envDef("YEARNING_TEST_DATABASE_HOST", "localhost"),
-		envDef("YEARNING_TEST_DATABASE_PORT", "54330"),
-		envDef("YEARNING_TEST_DATABASE_USER", "yearning"),
-		password,
-		envDef("YEARNING_TEST_DATABASE_DBNAME", "yearning_v4"))),
-		&gorm.Config{Logger: gormlogger.Discard})
-	if err != nil {
-		t.Fatalf("postgres connect: %v", err)
-	}
-	return db
+	return testkit.OpenPG(t)
 }
 
 func newTestService(t *testing.T) (*gorm.DB, *Service) {

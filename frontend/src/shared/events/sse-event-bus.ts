@@ -32,12 +32,12 @@ export const ORDER_SSE_EVENT_TYPES = [
   "io.yearning.v4.execution.verification_recorded",
 ] as const;
 
-export const FLOW_SSE_EVENT_TYPES = [
+const FLOW_SSE_EVENT_TYPES = [
   "io.yearning.v4.flow.updated",
   "io.yearning.v4.user.deleted",
 ] as const;
 
-export const SSE_RESYNC_EVENT_TYPE = "resync" as const;
+const SSE_RESYNC_EVENT_TYPE = "resync" as const;
 
 const QUERY_EVENT_SET = new Set<string>(QUERY_SSE_EVENT_TYPES);
 const ORDER_EVENT_SET = new Set<string>(ORDER_SSE_EVENT_TYPES);
@@ -115,7 +115,7 @@ function invalidateKeyPrefixes(
   }
 }
 
-export function invalidateAllRealtimeDomains(queryClient: QueryClient): void {
+function invalidateAllRealtimeDomains(queryClient: QueryClient): void {
   invalidateKeyPrefixes(queryClient, REALTIME_ALL_DOMAIN_KEYS);
 }
 

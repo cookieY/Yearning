@@ -1,21 +1,19 @@
 import { HttpResponse, delay, http } from "msw";
 import { BUSINESS_ERROR_CATALOG } from "@/api/generated/projections/business-error-catalog";
 import {
-  getGetLatestReleaseMockHandler,
   getGetLatestReleaseResponseLatestReleaseSuccessMock,
-  getGetMyDashboardMockHandler,
   getGetMyDashboardResponseBusinessErrorResponseMock,
   getGetMyDashboardResponseMyDashboardSuccessMock,
 } from "@/api/generated/mocks/dashboard/dashboard.msw";
 import {
-  getGetOperationsDashboardMockHandler,
   getGetOperationsDashboardResponseOperationsDashboardSuccessMock,
-  getGetSystemHealthDashboardMockHandler,
   getGetSystemHealthDashboardResponseSystemHealthDashboardSuccessMock,
 } from "@/api/generated/mocks/administration/administration.msw";
 import type { BusinessErrorCode } from "@/api/generated/client/yearningV4HTTPAPI.schemas";
 import type { SetupWorker } from "msw/browser";
 import type { SetupServer } from "msw/node";
+import { apiRoute } from "@/shared/mock/api-route";
+import { withZodValidation } from "@/shared/mock/zod-guard";
 import { type MockScenario } from "@/shared/mock/scenario-store";
 import { authMockHandlers } from "@/shared/mock/auth-handlers";
 import { reviewFixtureHandlers } from "@/shared/mock/review-fixture";
@@ -24,6 +22,7 @@ import { assistantFixtureHandlers } from "@/shared/mock/assistant-fixture";
 import { diagnosticsFixtureHandlers } from "@/shared/mock/diagnostics-fixture";
 import { queryFixtureHandlers } from "@/shared/mock/query-fixture";
 import { sseMockHandlers } from "@/shared/mock/sse-mock";
+import { mockSystemTimezone } from "@/shared/mock/settings-bridge";
 
 /**
  * Scenario switching layered on top of the orval-generated base handlers
@@ -83,7 +82,7 @@ function fixtureWindow(days: number) {
   return {
     window_start: shiftDay(FIXTURE_WINDOW_END, -(days - 1)),
     window_end: FIXTURE_WINDOW_END,
-    system_timezone: "UTC",
+    system_timezone: mockSystemTimezone(),
     refreshed_at: DASHBOARD_DATA.data.refreshed_at,
     completeness: "complete" as const,
     unavailable_metric_keys: [] as string[],
@@ -94,10 +93,11 @@ function fixtureWindow(days: number) {
  * (operations trend + stat cards, review quality, system health). */
 function adminDashboardHandlers() {
   return [
-    getGetOperationsDashboardMockHandler((info) => {
-      const requested = Number(new URL(info.request.url).searchParams.get("window_days"));
+    http.get(apiRoute("/admin/dashboard/operations"), ({ request }) => {
+      const requested = Number(new URL(request.url).searchParams.get("window_days"));
       const days = Number.isFinite(requested) ? Math.min(Math.max(requested, 1), 90) : 30;
-      return getGetOperationsDashboardResponseOperationsDashboardSuccessMock({
+      return HttpResponse.json(
+        getGetOperationsDashboardResponseOperationsDashboardSuccessMock({
         request_id: DEMO_REQUEST_ID,
         data: {
           meta: fixtureWindow(days),
@@ -140,22 +140,24 @@ function adminDashboardHandlers() {
             invalid: 0,
           },
         },
-      });
+      }));
     }),
-    getGetSystemHealthDashboardMockHandler(
-      getGetSystemHealthDashboardResponseSystemHealthDashboardSuccessMock({
-        request_id: DEMO_REQUEST_ID,
-        data: {
-          checked_at: DASHBOARD_DATA.data.refreshed_at,
-          components: (
-            ["postgresql", "scheduler", "outbox", "notification", "ai_provider", "datasource"] as const
-          ).map((component) => ({
-            component,
-            status: "healthy" as const,
+    http.get(apiRoute("/admin/dashboard/system-health"), () =>
+      HttpResponse.json(
+        getGetSystemHealthDashboardResponseSystemHealthDashboardSuccessMock({
+          request_id: DEMO_REQUEST_ID,
+          data: {
             checked_at: DASHBOARD_DATA.data.refreshed_at,
-          })),
-        },
-      }),
+            components: (
+              ["postgresql", "scheduler", "outbox", "notification", "ai_provider", "datasource"] as const
+            ).map((component) => ({
+              component,
+              status: "healthy" as const,
+              checked_at: DASHBOARD_DATA.data.refreshed_at,
+            })),
+          },
+        }),
+      ),
     ),
   ];
 }
@@ -163,43 +165,49 @@ function adminDashboardHandlers() {
 export function scenarioHandlers(scenario: MockScenario) {
   switch (scenario) {
     case "ready":
-      return [
-        getGetMyDashboardMockHandler(
-          getGetMyDashboardResponseMyDashboardSuccessMock({
-            request_id: DEMO_REQUEST_ID,
-            ...DASHBOARD_DATA,
-          }),
+      return withZodValidation([
+        http.get(apiRoute("/dashboard/me"), () =>
+          HttpResponse.json(
+            getGetMyDashboardResponseMyDashboardSuccessMock({
+              request_id: DEMO_REQUEST_ID,
+              ...DASHBOARD_DATA,
+            }),
+          ),
         ),
-      ];
+      ]);
     case "blocked":
-      return [
-        getGetMyDashboardMockHandler(
-          getGetMyDashboardResponseBusinessErrorResponseMock({
-            err_code: codeByName("RESOURCE_NOT_FOUND"),
-            message: "resource not found",
-            data: null,
-            request_id: DEMO_REQUEST_ID,
-            retryable: false,
-            meta: undefined,
-          }),
+      return withZodValidation([
+        http.get(apiRoute("/dashboard/me"), () =>
+          HttpResponse.json(
+            getGetMyDashboardResponseBusinessErrorResponseMock({
+              err_code: codeByName("RESOURCE_NOT_FOUND"),
+              message: "resource not found",
+              data: null,
+              request_id: DEMO_REQUEST_ID,
+              retryable: false,
+              meta: undefined,
+            }),
+          ),
         ),
-      ];
+      ]);
     case "running":
-      return [
-        getGetMyDashboardMockHandler(async () => {
+      return withZodValidation([
+        http.get(apiRoute("/dashboard/me"), async () => {
           await delay(1200);
-          return getGetMyDashboardResponseMyDashboardSuccessMock({
-            request_id: DEMO_REQUEST_ID,
-            ...DASHBOARD_DATA,
-          });
+          return HttpResponse.json(
+            getGetMyDashboardResponseMyDashboardSuccessMock({
+              request_id: DEMO_REQUEST_ID,
+              ...DASHBOARD_DATA,
+            }),
+          );
         }),
-      ];
+      ]);
     case "error":
       // Transport failures bypass the typed envelope factories entirely and
       // answer on the Problem Details path, exactly as the real backend would.
-      return [
+      return withZodValidation([
         http.get(
-          "*/dashboard/me",
+          apiRoute("/dashboard/me"),
           () =>
             HttpResponse.json(
               {
@@ -212,7 +220,7 @@ export function scenarioHandlers(scenario: MockScenario) {
               { status: 503, headers: { "Content-Type": "application/problem+json" } },
             ),
         ),
-      ];
+      ]);
     default:
       // review-* scenarios: no dashboard override — the stateful review
       // fixture reads its behavior from the scenario store directly.
@@ -243,19 +251,23 @@ const RELEASE_SNAPSHOT_FIXTURE = {
  * change-draft/review fixture backing the FE-F4 workspace, and the stateful
  * admin fixture backing the FE-F9 review-admin management pages. */
 export function baseHandlers() {
-  return [
-    getGetMyDashboardMockHandler(
-      getGetMyDashboardResponseMyDashboardSuccessMock({
-        request_id: DEMO_REQUEST_ID,
-        ...DASHBOARD_DATA,
-      }),
+  return withZodValidation([
+    http.get(apiRoute("/dashboard/me"), () =>
+      HttpResponse.json(
+        getGetMyDashboardResponseMyDashboardSuccessMock({
+          request_id: DEMO_REQUEST_ID,
+          ...DASHBOARD_DATA,
+        }),
+      ),
     ),
     ...adminDashboardHandlers(),
-    getGetLatestReleaseMockHandler(
-      getGetLatestReleaseResponseLatestReleaseSuccessMock({
-        request_id: DEMO_REQUEST_ID,
-        data: { ...RELEASE_SNAPSHOT_FIXTURE },
-      }),
+    http.get(apiRoute("/releases/latest"), () =>
+      HttpResponse.json(
+        getGetLatestReleaseResponseLatestReleaseSuccessMock({
+          request_id: DEMO_REQUEST_ID,
+          data: { ...RELEASE_SNAPSHOT_FIXTURE },
+        }),
+      ),
     ),
     ...authMockHandlers(),
     ...reviewFixtureHandlers(),
@@ -265,7 +277,7 @@ export function baseHandlers() {
     ...queryFixtureHandlers(),
     ...siteFixtureHandlers(),
     ...sseMockHandlers(),
-  ];
+  ]);
 }
 
 /** Vitest: apply a scenario as an override on the shared node server. */

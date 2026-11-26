@@ -20,6 +20,7 @@
     "test:coverage": "vitest run --coverage",
     "test:e2e": "playwright test",
     "test:frames": "MOTION_FRAMES_ONLY=1 playwright test tests/e2e/motion-frames.spec.ts --workers=1",
+    "test:e2e:invariants": "playwright test --config playwright.invariants.config.ts",
     "screenshots": "./scripts/e2e-container.sh run",
     "screenshots:update": "./scripts/e2e-container.sh update",
     "check:i18n": "node scripts/check-i18n.mjs",
@@ -29,13 +30,19 @@
     "check:motion": "node scripts/scan-motion.mjs && node scripts/scan-motion.mjs --self-test",
     "check:assets": "node scripts/check-assets.mjs",
     "check:registry": "node scripts/generate-registry-inventory.mjs --check",
+    "check:mock-routes": "node scripts/generate-mock-routes.mjs --check",
+    "check:record-fixtures": "node scripts/record-real-fixtures.mjs --self-test",
     "api:generate": "orval --config orval.config.ts && node scripts/generate-projections.mjs && node scripts/generate-contract-manifest.mjs",
     "api:manifest": "node scripts/generate-contract-manifest.mjs",
     "api:breaking": "node scripts/api-breaking.mjs --self-test && node scripts/api-breaking.mjs",
     "check:bundle": "node scripts/check-bundle-budget.mjs",
+    "check:bundle:verify": "node scripts/check-bundle-budget.mjs --no-write",
     "check:storage": "node scripts/scan-browser-storage.mjs",
+    "check:ratchets": "node scripts/check-ratchets.mjs && node scripts/check-ratchets.mjs --self-test",
     "test:contract": "vitest run --config vitest.contract.config.ts",
-    "contract:diff": "node scripts/contract-diff.mjs"
+    "contract:diff": "node scripts/contract-diff.mjs",
+    "record:fixtures": "node scripts/record-real-fixtures.mjs",
+    "test:e2e:real": "playwright test --config playwright.real.config.ts"
   },
   "dependencies": {
     "@base-ui/react": "1.7.0",

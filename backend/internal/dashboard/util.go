@@ -3,8 +3,6 @@ package dashboard
 
 import "encoding/json"
 
-func jsonUnmarshal(b []byte, v any) error { return json.Unmarshal(b, v) }
-
 // auditMetadataKeys defines the allowed keys for the audit read projection (S004 bounded projection:
 // top-level scalars only, never passing through nested structures or unknown keys — enforcing the behavior promised by listAuditEvents).
 var auditMetadataKeys = map[string]bool{

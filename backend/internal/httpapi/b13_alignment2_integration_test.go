@@ -101,7 +101,10 @@ func TestAlignment2RevocationReadFace(t *testing.T) {
 	want := map[string]bool{
 		"id": true, "requester_user_id": true, "state": true, "version": true,
 		"created_at": true, "revoked_reason": true, "revoked_by_username": true,
-		"revoked_at": true, "expires_at": true,
+		"revoked_at": true, "expires_at": true, "can_revoke": true,
+	}
+	if g["can_revoke"] != false {
+		t.Fatalf("revoked grant must report can_revoke=false, got %v", g["can_revoke"])
 	}
 	if len(g) != len(want) {
 		t.Fatalf("grant view key set drifted: %v", g)

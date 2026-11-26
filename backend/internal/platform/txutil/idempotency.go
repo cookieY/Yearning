@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"strings"
 
@@ -26,6 +27,11 @@ type IdempotencyStore struct {
 	Errs    IdempotencyErrors
 }
 
+// NewIdempotencyStore constructs an IdempotencyStore bound to db, crypter, and domain error constructors.
+func NewIdempotencyStore(db *gorm.DB, crypter *crypto.Crypter, errs IdempotencyErrors) *IdempotencyStore {
+	return &IdempotencyStore{DB: db, Crypter: crypter, Errs: errs}
+}
+
 // PrimaryKey returns the stable AAD primary key binding a claim to its stored ciphertext envelope.
 func PrimaryKey(userID, route, aggregateID, key string) string {
 	return userID + "#" + route + "#" + aggregateID + "#" + key
@@ -41,6 +47,41 @@ func RequestHash(parts ...string) string {
 // When claimed == false and err == nil, replay contains the decrypted prior JSON response.
 func (s *IdempotencyStore) Claim(ctx context.Context, userID, route, aggregateID, key, reqHash string) (claimed bool, replay []byte, err error) {
 	return s.claimAttempt(ctx, userID, route, aggregateID, key, reqHash, false)
+}
+
+// RunIdempotent executes fn under an idempotency claim, replaying the cached JSON response on duplicate keys
+// and releasing the claim automatically whenever fn returns an error.
+func RunIdempotent[T any](
+	ctx context.Context,
+	store *IdempotencyStore,
+	userID, route, aggregateID, key, reqHash string,
+	fn func() (T, error),
+) (T, bool, error) {
+	var zero T
+	claimed, replay, err := store.Claim(ctx, userID, route, aggregateID, key, reqHash)
+	if err != nil {
+		return zero, false, err
+	}
+	if !claimed {
+		var v T
+		if err := json.Unmarshal(replay, &v); err != nil {
+			return zero, false, err
+		}
+		return v, true, nil
+	}
+	res, err := fn()
+	if err != nil {
+		_ = store.Release(ctx, userID, route, aggregateID, key)
+		return zero, false, err
+	}
+	raw, err := json.Marshal(res)
+	if err != nil {
+		return zero, false, err
+	}
+	if err := store.Complete(ctx, userID, route, aggregateID, key, raw); err != nil {
+		return zero, false, err
+	}
+	return res, false, nil
 }
 
 func (s *IdempotencyStore) claimAttempt(ctx context.Context, userID, route, aggregateID, key, reqHash string, retriedAfterExpiry bool) (bool, []byte, error) {
@@ -100,13 +141,11 @@ func (s *IdempotencyStore) claimAttempt(ctx context.Context, userID, route, aggr
 		KeyID:      row.ResponseBodyKeyID,
 		Algorithm:  row.ResponseBodyAlgorithm,
 	}
-	plaintext, err := s.Crypter.Open(crypto.PurposePayload, env, crypto.AAD{
-		DeploymentID: s.Crypter.DeploymentID(),
-		Table:        "idempotency_records",
-		PrimaryKey:   PrimaryKey(userID, route, aggregateID, key),
-		Column:       "response_body_ciphertext",
-		Purpose:      crypto.PurposePayload,
-	})
+	plaintext, err := s.Crypter.OpenColumn(crypto.PurposePayload, crypto.ColumnRef{
+		Table:      "idempotency_records",
+		PrimaryKey: PrimaryKey(userID, route, aggregateID, key),
+		Column:     "response_body_ciphertext",
+	}, env)
 	if err != nil {
 		return false, nil, err
 	}
@@ -138,13 +177,11 @@ func (s *IdempotencyStore) Complete(ctx context.Context, userID, route, aggregat
 	if s == nil || s.DB == nil || s.Crypter == nil {
 		return errors.New("txutil: unconfigured idempotency store")
 	}
-	env, err := s.Crypter.Seal(crypto.PurposePayload, response, crypto.AAD{
-		DeploymentID: s.Crypter.DeploymentID(),
-		Table:        "idempotency_records",
-		PrimaryKey:   PrimaryKey(userID, route, aggregateID, key),
-		Column:       "response_body_ciphertext",
-		Purpose:      crypto.PurposePayload,
-	})
+	env, err := s.Crypter.SealColumn(crypto.PurposePayload, crypto.ColumnRef{
+		Table:      "idempotency_records",
+		PrimaryKey: PrimaryKey(userID, route, aggregateID, key),
+		Column:     "response_body_ciphertext",
+	}, response)
 	if err != nil {
 		return err
 	}

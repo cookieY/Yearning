@@ -2,14 +2,19 @@
 package application
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/cookieY/YearningX/backend/internal/datasource"
 	"github.com/cookieY/YearningX/backend/internal/execution/domain"
 	"github.com/cookieY/YearningX/backend/internal/osc"
+	reviewapp "github.com/cookieY/YearningX/backend/internal/review/application"
+	"github.com/cookieY/YearningX/backend/internal/review/fingerprint"
 )
 
 func mysqlDS(version string) *datasource.DatasourceModel {
@@ -39,6 +44,9 @@ func TestDeriveExecutionKind(t *testing.T) {
 		{"policy-none-direct", []PlanStatement{alter}, mysqlDS("8.0.x"), none, domain.KindDDL, false},
 		{"policy-gh-ost", []PlanStatement{alter}, mysqlDS("8.0.x"), ghOst, domain.KindGhOst, false},
 		{"policy-gh-ost-5-7", []PlanStatement{{Kind: "ddl", SQL: []byte("alter table `shop`.`orders` drop c")}}, mysqlDS("5.7.x"), ghOst, domain.KindGhOst, false},
+		{"policy-gh-ost-8-4", []PlanStatement{alter}, mysqlDS("8.4.x"), ghOst, domain.KindGhOst, false},
+		{"policy-gh-ost-semver-range", []PlanStatement{alter}, mysqlDS(">=8.0,<9.0"), ghOst, domain.KindGhOst, false},
+		{"policy-gh-ost-min-floor", []PlanStatement{alter}, mysqlDS(">=5.7"), ghOst, domain.KindGhOst, false},
 		{"policy-pt-osc", []PlanStatement{alter}, mysqlDS("8.0.x"), ptOsc, domain.KindPtOsc, false},
 		{"multi-ddl-no-osc", []PlanStatement{{Kind: "ddl", SQL: []byte("ALTER TABLE t ADD c int")}, ddl}, mysqlDS("8.0.x"), ghOst, domain.KindDDL, false},
 		{"non-alter-ddl", []PlanStatement{{Kind: "ddl", SQL: []byte("CREATE TABLE t(id int)")}}, mysqlDS("8.0.x"), ghOst, domain.KindDDL, false},
@@ -176,7 +184,7 @@ func TestSplitTLSPEM(t *testing.T) {
 	client := "-----BEGIN CERTIFICATE-----\nBBBB\n-----END CERTIFICATE-----\n"
 	key := "-----BEGIN PRIVATE KEY-----\nCCCC\n-----END PRIVATE KEY-----\n"
 	// No private key: all blocks belong to the CA chain.
-	mat, err := splitTLSPEM(true, "db.local", []byte(ca+client))
+	mat, err := datasource.SplitTLSMaterial(true, "db.local", []byte(ca+client))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -184,7 +192,7 @@ func TestSplitTLSPEM(t *testing.T) {
 		t.Fatalf("ca-only split: %d %v %v", len(mat.CAPEM), mat.CertPEM, mat.KeyPEM)
 	}
 	// With private key: the last certificate is the client certificate, and the rest form the CA chain.
-	mat, err = splitTLSPEM(false, "", []byte(ca+client+key))
+	mat, err = datasource.SplitTLSMaterial(false, "", []byte(ca+client+key))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -198,14 +206,135 @@ func TestSplitTLSPEM(t *testing.T) {
 
 // TestStatementClassOf Matches review-side classification criterion.
 func TestStatementClassOf(t *testing.T) {
-	for _, op := range []string{"create", "ALTER", "Drop", "TRUNCATE"} {
-		if statementClassOf(op) != "ddl" {
+	for _, op := range []string{"create", "ALTER", "Drop", "TRUNCATE", "rename", "RENAME"} {
+		if fingerprint.StatementClassOf(op) != "ddl" {
 			t.Fatalf("%s must be ddl", op)
 		}
 	}
 	for _, op := range []string{"insert", "update", "delete", "select", "merge"} {
-		if statementClassOf(op) != "dml" {
+		if fingerprint.StatementClassOf(op) != "dml" {
 			t.Fatalf("%s must be dml", op)
+		}
+	}
+}
+
+func TestPreflightRenameDDLBehavior(t *testing.T) {
+	sql := []byte("-- comment\n/* block */ RENAME TABLE shop.orders_old TO archive.orders_old")
+	op := strings.ToLower(string(fingerprint.FirstOperationSlice(sql)))
+	if op != "rename" {
+		t.Fatalf("FirstOperationSlice = %q, want rename", op)
+	}
+	class := fingerprint.StatementClassOf(op)
+	if class != "ddl" {
+		t.Fatalf("StatementClassOf(%q) = %q, want ddl", op, class)
+	}
+
+	ds := mysqlDS("8.0.x")
+	none := oscPolicy{Tool: osc.Tool("none"), Defaults: &osc.Overrides{}}
+	ghOst := oscPolicy{Tool: osc.ToolGhOst, Defaults: &osc.Overrides{}}
+	ptOsc := oscPolicy{Tool: osc.ToolPtOsc, Defaults: &osc.Overrides{}}
+
+	renameStmt := PlanStatement{
+		Ordinal:   1,
+		Kind:      class,
+		Operation: op,
+		SQL:       []byte("RENAME TABLE shop.orders_old TO archive.orders_old"),
+	}
+	for _, tc := range []struct {
+		name string
+		pol  oscPolicy
+	}{
+		{"policy-none", none},
+		{"policy-gh-ost", ghOst},
+		{"policy-pt-osc", ptOsc},
+	} {
+		kind, err := deriveExecutionKind([]PlanStatement{renameStmt}, ds, tc.pol)
+		if err != nil {
+			t.Fatalf("%s single rename deriveExecutionKind: %v", tc.name, err)
+		}
+		if kind != domain.KindDDL {
+			t.Fatalf("%s single rename kind = %s, want %s", tc.name, kind, domain.KindDDL)
+		}
+	}
+
+	alterStmt := PlanStatement{Ordinal: 2, Kind: "ddl", Operation: "alter", SQL: []byte("ALTER TABLE shop.orders ADD COLUMN c INT")}
+	kind, err := deriveExecutionKind([]PlanStatement{renameStmt, alterStmt}, ds, ghOst)
+	if err != nil {
+		t.Fatalf("rename+alter deriveExecutionKind: %v", err)
+	}
+	if kind != domain.KindDDL {
+		t.Fatalf("rename+alter kind = %s, want %s", kind, domain.KindDDL)
+	}
+
+	updateStmt := PlanStatement{Ordinal: 2, Kind: "dml", Operation: "update", SQL: []byte("UPDATE shop.orders SET status = 'ok' WHERE id = 1")}
+	_, err = deriveExecutionKind([]PlanStatement{renameStmt, updateStmt}, ds, none)
+	var de *domain.Error
+	if !errors.As(err, &de) || de.Code != domain.CodePreflightFailed || !strings.Contains(de.Name, "mixed_statement_kinds") {
+		t.Fatalf("rename+update err = %v, want 3006 mixed_statement_kinds", err)
+	}
+}
+
+func TestPreflightStatementMismatchReason(t *testing.T) {
+	t.Run("legacy_rename_dml", func(t *testing.T) {
+		f := frozenStatementRow{Ordinal: 1, StatementKind: "dml", FingerprintQuality: fingerprint.QualityLexer}
+		got := preflightStatementMismatchReason(f, 1, "rename", "ddl", fingerprint.Result{})
+		want := "sql_changed_after_review: RENAME TABLE classification and fingerprint upgraded to DDL; please re-review this change order before execution"
+		if got != want {
+			t.Fatalf("got %q, want %q", got, want)
+		}
+	})
+
+	t.Run("legacy_ctas", func(t *testing.T) {
+		f := frozenStatementRow{Ordinal: 1, StatementKind: "ddl", FingerprintQuality: fingerprint.QualityLexer}
+		res := fingerprint.Result{Validity: fingerprint.StatementValidity{Unsupported: "create_table_as_select"}}
+		got := preflightStatementMismatchReason(f, 1, "create", "ddl", res)
+		want := "sql_changed_after_review: fingerprint upgraded for CREATE TABLE ... AS SELECT; please re-review"
+		if got != want {
+			t.Fatalf("got %q, want %q", got, want)
+		}
+	})
+
+	t.Run("ordinary_mismatch", func(t *testing.T) {
+		f := frozenStatementRow{Ordinal: 1, StatementKind: "ddl", FingerprintQuality: fingerprint.QualityExact}
+		got := preflightStatementMismatchReason(f, 1, "create", "ddl", fingerprint.Result{})
+		if got != "sql_changed_after_review" {
+			t.Fatalf("got %q, want sql_changed_after_review", got)
+		}
+		gotOrd := preflightStatementMismatchReason(f, 2, "rename", "ddl", fingerprint.Result{})
+		if gotOrd != "sql_changed_after_review" {
+			t.Fatalf("got %q, want sql_changed_after_review on ordinal mismatch", gotOrd)
+		}
+	})
+}
+
+func TestFirstWordMatchesReviewFirstOperationSlice(t *testing.T) {
+	samples := [][]byte{
+		[]byte("SELECT 1"),
+		[]byte("  insert into t values (1)"),
+		[]byte("RENAME TABLE a TO b"),
+		[]byte("-- leading comment\nRENAME TABLE shop.a TO shop.b"),
+		[]byte("-- comment only"),
+		[]byte("/* block */ UPDATE t SET a=1"),
+		[]byte("/* one */ /* two */\n  -- line\n ( (CREATE TABLE t(id int)))"),
+		[]byte("/*!50000 SELECT */ 1"),
+		[]byte("/* unclosed"),
+		[]byte("CREATE(id)"),
+		[]byte("ALTER\tTABLE t ADD COLUMN c INT"),
+		[]byte("\r\n\t DELETE FROM t WHERE id = 1"),
+		[]byte("WITH cte AS (SELECT 1) SELECT * FROM cte"),
+		[]byte("EXPLAIN ANALYZE SELECT 1"),
+		[]byte("SHOW TABLES"),
+		[]byte(""),
+		[]byte("   \n\t  "),
+		[]byte(";"),
+		[]byte("§"),
+		[]byte("CREATE OR REPLACE VIEW v AS SELECT 1"),
+	}
+	for _, sample := range samples {
+		want := reviewapp.FirstOperationSlice(sample)
+		got := fingerprint.FirstOperationSlice(sample)
+		if !bytes.Equal(got, want) {
+			t.Fatalf("fingerprint.FirstOperationSlice(%q) = %q, want review FirstOperationSlice %q", sample, got, want)
 		}
 	}
 }
@@ -247,4 +376,33 @@ func TestRunnerExecuteTaskInputDispatch(t *testing.T) {
 	// Valid JSON unmarshal path is covered by round-trip serialization; RunAttempt requires a real DB
 	// (nil DB would panic; the integration suite covers all dispatch branches).
 	_ = raw
+}
+
+func TestClassBOSCFailClosedOnNonNativeMySQLMetadata(t *testing.T) {
+	alter := PlanStatement{Kind: "ddl", SQL: []byte("ALTER TABLE shop.orders ADD COLUMN tag VARCHAR(16)")}
+	ghOst := oscPolicy{Tool: osc.ToolGhOst, Defaults: &osc.Overrides{}}
+
+	nativeWithMeta := mysqlDS("8.0.x")
+	nativeWithMeta.Metadata = []byte(`{"detected_flavor":"mysql_native","verification_tier":"class_a"}`)
+	if !oscCapable(nativeWithMeta) {
+		t.Fatal("expected native mysql metadata to allow OSC")
+	}
+	kind, err := deriveExecutionKind([]PlanStatement{alter}, nativeWithMeta, ghOst)
+	if err != nil || kind != domain.KindGhOst {
+		t.Fatalf("native mysql deriveExecutionKind = (%s, %v), want gh_ost", kind, err)
+	}
+
+	for _, flavor := range []string{"mariadb", "tidb", "oceanbase", "polardb_mysql"} {
+		t.Run(flavor, func(t *testing.T) {
+			ds := mysqlDS("8.0.x")
+			ds.Metadata = []byte(`{"detected_flavor":"` + flavor + `","verification_tier":"class_b"}`)
+			if oscCapable(ds) {
+				t.Fatalf("expected oscCapable=false for non-native flavor %q", flavor)
+			}
+			k, err := deriveExecutionKind([]PlanStatement{alter}, ds, ghOst)
+			if err != nil || k != domain.KindDDL {
+				t.Fatalf("non-native %s deriveExecutionKind = (%s, %v), want ddl", flavor, k, err)
+			}
+		})
+	}
 }

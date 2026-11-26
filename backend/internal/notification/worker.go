@@ -59,7 +59,7 @@ func (w *Worker) processOutboxEvent(ctx context.Context, ev *OutboxEventModel) (
 			// Idempotency: unique(domain_event_id, channel_id, recipient_key) guards against
 			// concurrency and multiple rules hitting the same target (at most one delivery per group or individual, acceptance-12/13).
 			if err := w.db.WithContext(ctx).Create(row).Error; err != nil {
-				if isUniqueViolation(err) {
+				if txutil.IsUniqueViolation(err) {
 					continue
 				}
 				return false, err
@@ -190,7 +190,7 @@ func (w *Worker) processDelivery(ctx context.Context, d *NotificationDeliveryMod
 	if res.RowsAffected != 1 {
 		return nil // Already claimed by another worker or backoff has not expired yet
 	}
-	addr, aerr := w.openAddress(ctx, d)
+	addr, aerr := openDeliveryAddress(w.crypter, d)
 	if aerr != nil {
 		return w.failDelivery(ctx, d, "ADDRESS_DECRYPT_FAILED")
 	}
@@ -225,28 +225,28 @@ func (w *Worker) processDelivery(ctx context.Context, d *NotificationDeliveryMod
 	case "email":
 		var cfg EmailConfig
 		_ = json.Unmarshal(ch.Configuration, &cfg)
-		secret, serr := w.openSecret(ctx, ch)
+		secret, serr := openChannelSecret(w.crypter, ch)
 		if serr != nil {
 			sendErr = fmt.Errorf("%s", FailAuth)
 		} else {
 			sendErr = SendEmail(ctx, cfg, secret, addr, "Yearning", body)
 		}
 	case "dingtalk":
-		secret, serr := w.openSecret(ctx, ch)
+		secret, serr := openChannelSecret(w.crypter, ch)
 		if serr != nil {
 			sendErr = fmt.Errorf("%s", FailWebhook)
 		} else {
 			sendErr = SendDingTalk(ctx, w.DingTalkBaseURL, secret, body)
 		}
 	case "feishu":
-		secret, serr := w.openSecret(ctx, ch)
+		secret, serr := openChannelSecret(w.crypter, ch)
 		if serr != nil {
 			sendErr = fmt.Errorf("%s", FailFeishu)
 		} else {
 			sendErr = SendFeishu(ctx, secret, body)
 		}
 	case "slack":
-		secret, serr := w.openSecret(ctx, ch)
+		secret, serr := openChannelSecret(w.crypter, ch)
 		if serr != nil {
 			sendErr = fmt.Errorf("%s", FailSlack)
 		} else {
@@ -306,8 +306,6 @@ func (w *Worker) failDelivery(ctx context.Context, d *NotificationDeliveryModel,
 	return res.Error
 }
 
-func (w *Worker) localeOf(_ context.Context) string { return "zh-CN" }
-
 // loadRuleTemplate loads the optional custom message_template configured on the source rule of a delivery.
 func (w *Worker) loadRuleTemplate(ctx context.Context, ruleID *string) string {
 	if ruleID == nil || *ruleID == "" || w.db == nil {
@@ -336,5 +334,3 @@ func (ev *OutboxEventModel) reasonCode() string {
 	}
 	return ""
 }
-
-func isUniqueViolation(err error) bool { return txutil.IsUniqueViolation(err) }

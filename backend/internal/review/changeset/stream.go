@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"slices"
 	"sort"
 
 	"github.com/cookieY/YearningX/backend/internal/review/fingerprint"
@@ -155,7 +156,7 @@ func Stream(ctx context.Context, r io.Reader,
 			batch.Groups = append(batch.Groups, g)
 		}
 		absorb(g, stmt, res)
-		if !containsString(g.DialectFingerprintHMACs, res.DialectFingerprintHMAC) {
+		if !slices.Contains(g.DialectFingerprintHMACs, res.DialectFingerprintHMAC) {
 			g.DialectFingerprintHMACs = append(g.DialectFingerprintHMACs, res.DialectFingerprintHMAC)
 		}
 		if res.Quality != fingerprint.QualityExact || len(res.Warnings) > 0 {
@@ -200,10 +201,10 @@ func absorb(g *Group, stmt Statement, res fingerprint.Result) {
 	for k, v := range res.LiteralTypeCounts {
 		g.LiteralTypeCountsAgg[k] += v
 	}
-	if !containsString(g.Kinds, res.StatementKind) {
+	if !slices.Contains(g.Kinds, res.StatementKind) {
 		g.Kinds = append(g.Kinds, res.StatementKind)
 	}
-	if !containsString(g.DialectProfiles, res.DialectProfile) {
+	if !slices.Contains(g.DialectProfiles, res.DialectProfile) {
 		g.DialectProfiles = append(g.DialectProfiles, res.DialectProfile)
 	}
 	if g.WorstQuality != fingerprint.QualityLexer {
@@ -241,15 +242,6 @@ func exceptionalReason(res fingerprint.Result) string {
 		return "warning:" + res.Warnings[0]
 	}
 	return "unknown"
-}
-
-func containsString(list []string, s string) bool {
-	for _, x := range list {
-		if x == s {
-			return true
-		}
-	}
-	return false
 }
 
 func dedupSortedStrings(in []string) []string {

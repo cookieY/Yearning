@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -94,7 +95,7 @@ func (p PostgresSearchPath) Validate() error {
 		return invalid("creation schema is not first explicit member")
 	}
 	expectedEffective := p.Explicit
-	if !containsString(p.Explicit, "pg_catalog") {
+	if !slices.Contains(p.Explicit, "pg_catalog") {
 		expectedEffective = append([]string{"pg_catalog"}, p.Explicit...)
 	}
 	if !stringSlicesEqual(p.Effective, expectedEffective) {
@@ -151,15 +152,6 @@ func validatePostgresSearchPathMembers(members []string, rejectTemporary bool) e
 		}
 	}
 	return nil
-}
-
-func containsString(values []string, target string) bool {
-	for _, value := range values {
-		if value == target {
-			return true
-		}
-	}
-	return false
 }
 
 func stringSlicesEqual(left, right []string) bool {
@@ -408,6 +400,9 @@ func ApplyTxSearchPath(ctx context.Context, pool *PurposePool, tx DMLTransaction
 	var stmt string
 	var err error
 	if pool.engine == "mysql" {
+		if len(path) == 0 {
+			return nil
+		}
 		if len(path) != 1 {
 			return ErrPostgresSearchPathInvalid
 		}
@@ -545,14 +540,16 @@ func (a *baseAdapter) executeDDLWithSearchPathInspected(
 	}
 	var pathSQL string
 	if pool.engine == "mysql" {
-		if len(searchPath) != 1 {
+		if len(searchPath) > 1 {
 			return nil, &StatementNotSentError{FailureName: "schema_context_invalid"}
 		}
-		quoted, err := quoteMySQLOpen(searchPath[0])
-		if err != nil {
-			return nil, &StatementNotSentError{FailureName: "schema_context_invalid"}
+		if len(searchPath) == 1 {
+			quoted, err := quoteMySQLOpen(searchPath[0])
+			if err != nil {
+				return nil, &StatementNotSentError{FailureName: "schema_context_invalid"}
+			}
+			pathSQL = "USE " + quoted
 		}
-		pathSQL = "USE " + quoted
 	} else if pool.engine == "postgresql" {
 		var err error
 		pathSQL, err = postgresSearchPathSQL(searchPath, false)
@@ -572,8 +569,10 @@ func (a *baseAdapter) executeDDLWithSearchPathInspected(
 	pool.trackExecutionBackend(execID, backendIdentityOf(execCtx, pool.engine, conn))
 	defer pool.untrackExecutionBackend(execID)
 	defer func() { _ = conn.Close() }()
-	if _, err := conn.ExecContext(execCtx, pathSQL); err != nil {
-		return nil, &StatementNotSentError{FailureName: "schema_context_failed"}
+	if pathSQL != "" {
+		if _, err := conn.ExecContext(execCtx, pathSQL); err != nil {
+			return nil, &StatementNotSentError{FailureName: "schema_context_failed"}
+		}
 	}
 	if beforeSend != nil {
 		if err := beforeSend(execCtx, conn); err != nil {

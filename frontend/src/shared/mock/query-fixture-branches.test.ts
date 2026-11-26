@@ -29,7 +29,7 @@ async function call<T>(
   body?: unknown,
   headers: Record<string, string> = {},
 ): Promise<Envelope<T>> {
-  const response = await fetch(path, {
+  const response = await fetch(path.startsWith("/api/v4") ? path : `/api/v4${path}`, {
     method,
     headers: { "Content-Type": "application/json", ...headers },
     body: body === undefined ? undefined : JSON.stringify(body),
@@ -47,11 +47,11 @@ describe("unauthenticated guard", () => {
     seedQueryScenario("query-session");
     window.localStorage.setItem("yearning-mock-auth", "expired");
     for (const path of ["/query-sessions", "/query-grants", "/query-access-requests"]) {
-      const response = await fetch(path);
+      const response = await fetch(path.startsWith("/api/v4") ? path : `/api/v4${path}`);
       expect(response.status).toBe(401);
       expect(response.headers.get("content-type")).toContain("application/problem+json");
     }
-    const execution = await fetch(`/query-sessions/qs-fixture-active/executions`, {
+    const execution = await fetch(`/api/v4/query-sessions/6f0f2b3c-5555-4555-8555-000000000101/executions`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ datasource_id: QUERY_FIXTURE_DS_MYSQL_ID, schema_name: "app", sql: "select 1" }),
@@ -187,41 +187,41 @@ describe("session and execution guards", () => {
   });
 
   it("refuses closing a session twice with QUERY_SESSION_CLOSED", async () => {
-    await call("POST", "/query-sessions/qs-fixture-active/closure", { reason: "bye" }, { "Idempotency-Key": "c1" });
-    const again = await call("POST", "/query-sessions/qs-fixture-active/closure", { reason: "again" }, { "Idempotency-Key": "c2" });
+    await call("POST", "/query-sessions/6f0f2b3c-5555-4555-8555-000000000101/closure", { reason: "bye" }, { "Idempotency-Key": "c1" });
+    const again = await call("POST", "/query-sessions/6f0f2b3c-5555-4555-8555-000000000101/closure", { reason: "again" }, { "Idempotency-Key": "c2" });
     expect(again.err_code).toBe(4006);
     // §18.49: reason is OPTIONAL (backend defaults empty to user_closed) —
     // a reasonless closure no longer trips validation; the state gate rules.
-    const reasonless = await call("POST", "/query-sessions/qs-fixture-active/closure", {}, { "Idempotency-Key": "c3" });
+    const reasonless = await call("POST", "/query-sessions/6f0f2b3c-5555-4555-8555-000000000101/closure", {}, { "Idempotency-Key": "c3" });
     expect(reasonless.err_code).toBe(4006);
   });
 
   it("blocks metadata reads once the session is closed", async () => {
-    await call("POST", "/query-sessions/qs-fixture-active/closure", { reason: "bye" }, { "Idempotency-Key": "c4" });
-    const schemas = await call("GET", `/query-sessions/qs-fixture-active/metadata/schemas?datasource_id=${QUERY_FIXTURE_DS_MYSQL_ID}`);
+    await call("POST", "/query-sessions/6f0f2b3c-5555-4555-8555-000000000101/closure", { reason: "bye" }, { "Idempotency-Key": "c4" });
+    const schemas = await call("GET", `/query-sessions/6f0f2b3c-5555-4555-8555-000000000101/metadata/schemas?datasource_id=${QUERY_FIXTURE_DS_MYSQL_ID}`);
     expect(schemas.err_code).toBe(4006);
     const tables = await call(
       "GET",
-      `/query-sessions/qs-fixture-active/metadata/tables?datasource_id=${QUERY_FIXTURE_DS_MYSQL_ID}&schema_name=app`,
+      `/query-sessions/6f0f2b3c-5555-4555-8555-000000000101/metadata/tables?datasource_id=${QUERY_FIXTURE_DS_MYSQL_ID}&schema_name=app`,
     );
     expect(tables.err_code).toBe(4006);
     const columns = await call(
       "GET",
-      `/query-sessions/qs-fixture-active/metadata/columns?datasource_id=${QUERY_FIXTURE_DS_MYSQL_ID}&schema_name=app&table_name=users`,
+      `/query-sessions/6f0f2b3c-5555-4555-8555-000000000101/metadata/columns?datasource_id=${QUERY_FIXTURE_DS_MYSQL_ID}&schema_name=app&table_name=users`,
     );
     expect(columns.err_code).toBe(4006);
   });
 
   it("refuses executions with malformed payloads and unknown schemas", async () => {
-    const malformed = await call("POST", "/query-sessions/qs-fixture-active/executions", null);
+    const malformed = await call("POST", "/query-sessions/6f0f2b3c-5555-4555-8555-000000000101/executions", null);
     expect(malformed.err_code).toBe(1001);
-    const noSchema = await call("POST", "/query-sessions/qs-fixture-active/executions", {
+    const noSchema = await call("POST", "/query-sessions/6f0f2b3c-5555-4555-8555-000000000101/executions", {
       datasource_id: QUERY_FIXTURE_DS_MYSQL_ID,
       schema_name: "",
       sql: "select 1",
     });
     expect(noSchema.err_code).toBe(1001);
-    const unknown = await call("POST", "/query-sessions/qs-fixture-active/executions", {
+    const unknown = await call("POST", "/query-sessions/6f0f2b3c-5555-4555-8555-000000000101/executions", {
       datasource_id: QUERY_FIXTURE_DS_MYSQL_ID,
       schema_name: "nope",
       sql: "select 1",
@@ -232,7 +232,7 @@ describe("session and execution guards", () => {
   it("refuses page reads with an invalid purpose and unknown cursor", async () => {
     const first = await call<{ execution_id: string; page: { next_cursor: string | null } }>(
       "POST",
-      "/query-sessions/qs-fixture-active/executions",
+      "/query-sessions/6f0f2b3c-5555-4555-8555-000000000101/executions",
       { datasource_id: QUERY_FIXTURE_DS_MYSQL_ID, schema_name: "app", sql: "select id from app.users", page_size: 500 },
     );
     const executionId = first.data.execution_id;
@@ -287,7 +287,7 @@ describe("approval decision guards", () => {
   it("refuses invalid decisions and closed requests", async () => {
     const invalid = await call(
       "POST",
-      "/query-access-requests/qar-fixture-pending/decisions",
+      "/query-access-requests/6f0f2b3c-5555-4555-8555-000000000201/decisions",
       { decision: "maybe" },
       { "If-Match": '"1"', "Idempotency-Key": "d1" },
     );
@@ -296,13 +296,13 @@ describe("approval decision guards", () => {
     // Approve once, then decide again on the terminal request.
     await call(
       "POST",
-      "/query-access-requests/qar-fixture-pending/decisions",
+      "/query-access-requests/6f0f2b3c-5555-4555-8555-000000000201/decisions",
       { decision: "approve" },
       { "If-Match": '"1"', "Idempotency-Key": "d2" },
     );
     const terminal = await call(
       "POST",
-      "/query-access-requests/qar-fixture-pending/decisions",
+      "/query-access-requests/6f0f2b3c-5555-4555-8555-000000000201/decisions",
       { decision: "approve" },
       { "If-Match": '"2"', "Idempotency-Key": "d3" },
     );
@@ -316,7 +316,7 @@ describe("approval decision guards", () => {
     window.localStorage.setItem("yearning-mock-auth", "admin");
     const hidden = await call(
       "POST",
-      "/query-access-requests/qar-fixture-pending/decisions",
+      "/query-access-requests/6f0f2b3c-5555-4555-8555-000000000201/decisions",
       { decision: "approve" },
       { "If-Match": '"1"', "Idempotency-Key": "d4" },
     );
@@ -373,7 +373,7 @@ describe("fixture data-model branches", () => {
   it("executes a SELECT without a FROM clause against the schema's first table", async () => {
     const execution = await call<{ rows: unknown[][] }>(
       "POST",
-      "/query-sessions/qs-fixture-active/executions",
+      "/query-sessions/6f0f2b3c-5555-4555-8555-000000000101/executions",
       { datasource_id: QUERY_FIXTURE_DS_MYSQL_ID, schema_name: "app", sql: "select 1", page_size: 10 },
     );
     expect(execution.err_code).toBe(0);
@@ -383,7 +383,7 @@ describe("fixture data-model branches", () => {
   it("falls back to the schema's first table for unknown FROM targets", async () => {
     const execution = await call<{ rows: unknown[][] }>(
       "POST",
-      "/query-sessions/qs-fixture-active/executions",
+      "/query-sessions/6f0f2b3c-5555-4555-8555-000000000101/executions",
       { datasource_id: QUERY_FIXTURE_DS_MYSQL_ID, schema_name: "app", sql: "select id from app.nonexistent" },
     );
     expect(execution.err_code).toBe(0);
@@ -393,29 +393,29 @@ describe("fixture data-model branches", () => {
     // F12 RCP-20261017 Direction A (No.010 family): metadata read surface is an {items} envelope.
     const tables = await call<{ items: { table_name: string }[] }>(
       "GET",
-      `/query-sessions/qs-fixture-active/metadata/tables?datasource_id=${QUERY_FIXTURE_DS_MYSQL_ID}&schema_name=stats`,
+      `/query-sessions/6f0f2b3c-5555-4555-8555-000000000101/metadata/tables?datasource_id=${QUERY_FIXTURE_DS_MYSQL_ID}&schema_name=stats`,
     );
     expect(tables.err_code).toBe(0);
     expect(tables.data.items.map((table) => table.table_name)).toContain("daily_counts");
     const columns = await call<{ items: { column_name: string }[] }>(
       "GET",
-      `/query-sessions/qs-fixture-active/metadata/columns?datasource_id=${QUERY_FIXTURE_DS_MYSQL_ID}&schema_name=stats&table_name=daily_counts`,
+      `/query-sessions/6f0f2b3c-5555-4555-8555-000000000101/metadata/columns?datasource_id=${QUERY_FIXTURE_DS_MYSQL_ID}&schema_name=stats&table_name=daily_counts`,
     );
     expect(columns.err_code).toBe(0);
     expect(columns.data.items.map((column) => column.column_name)).toContain("gmv");
     const unknownSchema = await call(
       "GET",
-      `/query-sessions/qs-fixture-active/metadata/tables?datasource_id=${QUERY_FIXTURE_DS_MYSQL_ID}&schema_name=missing`,
+      `/query-sessions/6f0f2b3c-5555-4555-8555-000000000101/metadata/tables?datasource_id=${QUERY_FIXTURE_DS_MYSQL_ID}&schema_name=missing`,
     );
     expect(unknownSchema.err_code).toBe(1001);
     const unknownTable = await call(
       "GET",
-      `/query-sessions/qs-fixture-active/metadata/columns?datasource_id=${QUERY_FIXTURE_DS_MYSQL_ID}&schema_name=app&table_name=missing`,
+      `/query-sessions/6f0f2b3c-5555-4555-8555-000000000101/metadata/columns?datasource_id=${QUERY_FIXTURE_DS_MYSQL_ID}&schema_name=app&table_name=missing`,
     );
     expect(unknownTable.err_code).toBe(1001);
     const unknownDatasource = await call(
       "GET",
-      `/query-sessions/qs-fixture-active/metadata/schemas?datasource_id=unknown`,
+      `/query-sessions/6f0f2b3c-5555-4555-8555-000000000101/metadata/schemas?datasource_id=unknown`,
     );
     expect(unknownDatasource.err_code).toBe(4002);
   });

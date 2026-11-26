@@ -1,0 +1,1758 @@
+{
+  "contract_version": 1,
+  "openapi_sha": "b08b588223c0b586a5c9c4e0f1c9b0cd818d7ef1d61f3f9e823d5a489e37fb73",
+  "zod_runtime_sha256": "32b72a82897ae698b7566aad9821c07cf5194173a3dc69adfb00a8f00f04a446",
+  "count": 250,
+  "entries": [
+    {
+      "operation_id": "assessSettingsImpact",
+      "case_id": "branding-noop",
+      "file": "assessSettingsImpact/branding-noop.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "cancelAssistantMessageStream",
+      "case_id": "noop-completed",
+      "file": "cancelAssistantMessageStream/noop-completed.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "cancelExecutionAttempt",
+      "case_id": "exec-chain",
+      "file": "cancelExecutionAttempt/exec-chain.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "cancelExecutionAttempt",
+      "case_id": "stuck-attempt",
+      "file": "cancelExecutionAttempt/stuck-attempt.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "cancelExecutionSchedule",
+      "case_id": "live-cancel",
+      "file": "cancelExecutionSchedule/live-cancel.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "changeMyPassword",
+      "case_id": "self-service",
+      "file": "changeMyPassword/self-service.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "closeQuerySession",
+      "case_id": "primary",
+      "file": "closeQuerySession/primary.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "confirmDiagnosticOrderLink",
+      "case_id": "confirm",
+      "file": "confirmDiagnosticOrderLink/confirm.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "copyChangeOrderToDraft",
+      "case_id": "submitter",
+      "file": "copyChangeOrderToDraft/submitter.json",
+      "http_status": 200,
+      "err_code": 1001
+    },
+    {
+      "operation_id": "createAiProvider",
+      "case_id": "scratch-create",
+      "file": "createAiProvider/scratch-create.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "createAiProviderRateVersion",
+      "case_id": "usd-full-day",
+      "file": "createAiProviderRateVersion/usd-full-day.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "createAnnouncementRevision",
+      "case_id": "scratch-create",
+      "file": "createAnnouncementRevision/scratch-create.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "createAssistantSession",
+      "case_id": "lifecycle",
+      "file": "createAssistantSession/lifecycle.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "createChangeDraft",
+      "case_id": "b6-cancel-schedule",
+      "file": "createChangeDraft/b6-cancel-schedule.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "createChangeDraft",
+      "case_id": "b6-diag-link",
+      "file": "createChangeDraft/b6-diag-link.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "createChangeDraft",
+      "case_id": "evidence-chain",
+      "file": "createChangeDraft/evidence-chain.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "createChangeDraft",
+      "case_id": "exec-chain",
+      "file": "createChangeDraft/exec-chain.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "createChangeDraft",
+      "case_id": "f12 chain order",
+      "file": "createChangeDraft/f12 chain order.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "createChangeDraft",
+      "case_id": "f12 copy source",
+      "file": "createChangeDraft/f12 copy source.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "createChangeDraft",
+      "case_id": "f12 void order",
+      "file": "createChangeDraft/f12 void order.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "createChangeDraft",
+      "case_id": "f12 withdraw order",
+      "file": "createChangeDraft/f12 withdraw order.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "createChangeDraft",
+      "case_id": "scratch",
+      "file": "createChangeDraft/scratch.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "createChangeOrderComment",
+      "case_id": "chain",
+      "file": "createChangeOrderComment/chain.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "createDatasource",
+      "case_id": "scratch-create",
+      "file": "createDatasource/scratch-create.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "createExecutionAttempt",
+      "case_id": "chain",
+      "file": "createExecutionAttempt/chain.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "createExecutionAttempt",
+      "case_id": "exec-chain",
+      "file": "createExecutionAttempt/exec-chain.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "createExecutionSchedule",
+      "case_id": "b6-cancel-setup",
+      "file": "createExecutionSchedule/b6-cancel-setup.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "createExecutionSchedule",
+      "case_id": "exec-chain",
+      "file": "createExecutionSchedule/exec-chain.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "createExecutionVerification",
+      "case_id": "still-unknown",
+      "file": "createExecutionVerification/still-unknown.json",
+      "http_status": 200,
+      "err_code": 1010
+    },
+    {
+      "operation_id": "createFlow",
+      "case_id": "scratch-create",
+      "file": "createFlow/scratch-create.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "createIdentityProvider",
+      "case_id": "scratch-oidc",
+      "file": "createIdentityProvider/scratch-oidc.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "createKnowledgeEntry",
+      "case_id": "scratch-create",
+      "file": "createKnowledgeEntry/scratch-create.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "createNotificationChannel",
+      "case_id": "scratch-create",
+      "file": "createNotificationChannel/scratch-create.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "createNotificationRule",
+      "case_id": "crud",
+      "file": "createNotificationRule/crud.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "createNotificationTestDelivery",
+      "case_id": "scratch-unroutable",
+      "file": "createNotificationTestDelivery/scratch-unroutable.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "createPermissionGroup",
+      "case_id": "scratch-create",
+      "file": "createPermissionGroup/scratch-create.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "createPromptTool",
+      "case_id": "scratch-create",
+      "file": "createPromptTool/scratch-create.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "createQueryAccessRequest",
+      "case_id": "primary",
+      "file": "createQueryAccessRequest/primary.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "createQueryGrantRenewalRequest",
+      "case_id": "primary",
+      "file": "createQueryGrantRenewalRequest/primary.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "createQuerySession",
+      "case_id": "primary",
+      "file": "createQuerySession/primary.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "createRollbackDraft",
+      "case_id": "submitter",
+      "file": "createRollbackDraft/submitter.json",
+      "http_status": 200,
+      "err_code": 1010
+    },
+    {
+      "operation_id": "createRuleSet",
+      "case_id": "scratch-create",
+      "file": "createRuleSet/scratch-create.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "createUser",
+      "case_id": "scratch-create",
+      "file": "createUser/scratch-create.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "decideChangeOrder",
+      "case_id": "approve",
+      "file": "decideChangeOrder/approve.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "decideChangeOrder",
+      "case_id": "b6-approve",
+      "file": "decideChangeOrder/b6-approve.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "decideChangeOrder",
+      "case_id": "exec-chain",
+      "file": "decideChangeOrder/exec-chain.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "decideChangeOrder",
+      "case_id": "schedule-chain",
+      "file": "decideChangeOrder/schedule-chain.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "decideQueryAccess",
+      "case_id": "approve",
+      "file": "decideQueryAccess/approve.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "deleteAiProvider",
+      "case_id": "scratch-cleanup",
+      "file": "deleteAiProvider/scratch-cleanup.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "deleteAssistantSession",
+      "case_id": "cleanup",
+      "file": "deleteAssistantSession/cleanup.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "deleteChangeDraft",
+      "case_id": "scratch",
+      "file": "deleteChangeDraft/scratch.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "deleteDatasource",
+      "case_id": "scratch-cleanup",
+      "file": "deleteDatasource/scratch-cleanup.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "deleteFlow",
+      "case_id": "scratch-cleanup",
+      "file": "deleteFlow/scratch-cleanup.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "deleteIdentityProvider",
+      "case_id": "scratch-cleanup",
+      "file": "deleteIdentityProvider/scratch-cleanup.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "deleteKnowledgeEntry",
+      "case_id": "scratch-cleanup",
+      "file": "deleteKnowledgeEntry/scratch-cleanup.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "deleteNotificationChannel",
+      "case_id": "scratch-cleanup",
+      "file": "deleteNotificationChannel/scratch-cleanup.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "deleteNotificationRule",
+      "case_id": "crud",
+      "file": "deleteNotificationRule/crud.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "deletePermissionGroup",
+      "case_id": "scratch-cleanup",
+      "file": "deletePermissionGroup/scratch-cleanup.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "deletePromptTool",
+      "case_id": "scratch-cleanup",
+      "file": "deletePromptTool/scratch-cleanup.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "deleteRuleSet",
+      "case_id": "scratch-cleanup",
+      "file": "deleteRuleSet/scratch-cleanup.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "deleteUser",
+      "case_id": "scratch-cleanup",
+      "file": "deleteUser/scratch-cleanup.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "diagnoseStatementWithAi",
+      "case_id": "analyze",
+      "file": "diagnoseStatementWithAi/analyze.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "evaluateKnowledgeEntry",
+      "case_id": "scratch-eval",
+      "file": "evaluateKnowledgeEntry/scratch-eval.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "executeSelect",
+      "case_id": "paged",
+      "file": "executeSelect/paged.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "fetchQueryResultPage",
+      "case_id": "second-page",
+      "file": "fetchQueryResultPage/second-page.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "generatePromptToolTestCases",
+      "case_id": "basic",
+      "file": "generatePromptToolTestCases/basic.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "getAiProvider",
+      "case_id": "scratch-face",
+      "file": "getAiProvider/scratch-face.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "getAssistantSession",
+      "case_id": "lifecycle",
+      "file": "getAssistantSession/lifecycle.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "getChangeDraft",
+      "case_id": "pre-submit",
+      "file": "getChangeDraft/pre-submit.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "getChangeDraft",
+      "case_id": "scratch",
+      "file": "getChangeDraft/scratch.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "getChangeOrder",
+      "case_id": "b6-approved",
+      "file": "getChangeOrder/b6-approved.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "getChangeOrder",
+      "case_id": "b6-pre-approve",
+      "file": "getChangeOrder/b6-pre-approve.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "getChangeOrder",
+      "case_id": "b6-scheduled",
+      "file": "getChangeOrder/b6-scheduled.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "getChangeOrder",
+      "case_id": "chain",
+      "file": "getChangeOrder/chain.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "getChangeOrder",
+      "case_id": "exec-chain",
+      "file": "getChangeOrder/exec-chain.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "getChangeOrder",
+      "case_id": "exec-post-approve",
+      "file": "getChangeOrder/exec-post-approve.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "getChangeOrder",
+      "case_id": "post-approve",
+      "file": "getChangeOrder/post-approve.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "getChangeOrder",
+      "case_id": "pre-void",
+      "file": "getChangeOrder/pre-void.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "getChangeOrder",
+      "case_id": "pre-withdraw",
+      "file": "getChangeOrder/pre-withdraw.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "getChangeOrder",
+      "case_id": "schedule-chain",
+      "file": "getChangeOrder/schedule-chain.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "getCurrentAnnouncement",
+      "case_id": "submitter",
+      "file": "getCurrentAnnouncement/submitter.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "getCurrentUser",
+      "case_id": "authenticated",
+      "file": "getCurrentUser/authenticated.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "getDatasource",
+      "case_id": "scratch-face",
+      "file": "getDatasource/scratch-face.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "getDatasource",
+      "case_id": "unknown-id",
+      "file": "getDatasource/unknown-id.json",
+      "http_status": 200,
+      "err_code": 1002
+    },
+    {
+      "operation_id": "getDatasourceCapabilities",
+      "case_id": "scratch-after-probe",
+      "file": "getDatasourceCapabilities/scratch-after-probe.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "getDatasourceDiagnosticsConfig",
+      "case_id": "target",
+      "file": "getDatasourceDiagnosticsConfig/target.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "getDiagnosticsOverview",
+      "case_id": "target",
+      "file": "getDiagnosticsOverview/target.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "getDiagnosticStatementDetail",
+      "case_id": "target",
+      "file": "getDiagnosticStatementDetail/target.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "getExecutionAttempt",
+      "case_id": "chain",
+      "file": "getExecutionAttempt/chain.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "getExecutionAttempt",
+      "case_id": "exec-chain",
+      "file": "getExecutionAttempt/exec-chain.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "getFlow",
+      "case_id": "scratch-face",
+      "file": "getFlow/scratch-face.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "getIdentityProvider",
+      "case_id": "scratch-face",
+      "file": "getIdentityProvider/scratch-face.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "getKnowledgeEntry",
+      "case_id": "scratch-face",
+      "file": "getKnowledgeEntry/scratch-face.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "getMyDashboard",
+      "case_id": "submitter",
+      "file": "getMyDashboard/submitter.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "getNotificationChannel",
+      "case_id": "scratch-face",
+      "file": "getNotificationChannel/scratch-face.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "getNotificationRule",
+      "case_id": "crud",
+      "file": "getNotificationRule/crud.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "getOperationsDashboard",
+      "case_id": "admin",
+      "file": "getOperationsDashboard/admin.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "getOperationsDashboard",
+      "case_id": "submitter",
+      "file": "getOperationsDashboard/submitter.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "getPermissionGroup",
+      "case_id": "scratch-face",
+      "file": "getPermissionGroup/scratch-face.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "getPromptTool",
+      "case_id": "scratch-face",
+      "file": "getPromptTool/scratch-face.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "getQueryAccessRequest",
+      "case_id": "granted",
+      "file": "getQueryAccessRequest/granted.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "getQueryAccessRequest",
+      "case_id": "primary",
+      "file": "getQueryAccessRequest/primary.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "getQueryGrant",
+      "case_id": "primary",
+      "file": "getQueryGrant/primary.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "getQuerySession",
+      "case_id": "primary",
+      "file": "getQuerySession/primary.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "getReviewRun",
+      "case_id": "b6-cancel-schedule",
+      "file": "getReviewRun/b6-cancel-schedule.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "getReviewRun",
+      "case_id": "b6-diag-link",
+      "file": "getReviewRun/b6-diag-link.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "getReviewRun",
+      "case_id": "chain-poll",
+      "file": "getReviewRun/chain-poll.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "getRuleSet",
+      "case_id": "scratch-face",
+      "file": "getRuleSet/scratch-face.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "getSettingsNamespace",
+      "case_id": "admin",
+      "file": "getSettingsNamespace/admin.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "getSettingsNamespace",
+      "case_id": "branding",
+      "file": "getSettingsNamespace/branding.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "getSettingsSchema",
+      "case_id": "admin",
+      "file": "getSettingsSchema/admin.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "getSettingsSchema",
+      "case_id": "branding",
+      "file": "getSettingsSchema/branding.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "getSystemHealthDashboard",
+      "case_id": "admin-face",
+      "file": "getSystemHealthDashboard/admin-face.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "getSystemHealthDashboard",
+      "case_id": "admin",
+      "file": "getSystemHealthDashboard/admin.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "getSystemHealthDashboard",
+      "case_id": "submitter",
+      "file": "getSystemHealthDashboard/submitter.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "getTask",
+      "case_id": "conn-test",
+      "file": "getTask/conn-test.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "getUserDeletionImpact",
+      "case_id": "scratch-no-orders",
+      "file": "getUserDeletionImpact/scratch-no-orders.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "listAiProviderModels",
+      "case_id": "scratch-catalog",
+      "file": "listAiProviderModels/scratch-catalog.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "listAiProviderModels",
+      "case_id": "stored-key-catalog",
+      "file": "listAiProviderModels/stored-key-catalog.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "listAiProviderRateVersions",
+      "case_id": "provider",
+      "file": "listAiProviderRateVersions/provider.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "listAiProviders",
+      "case_id": "admin-face",
+      "file": "listAiProviders/admin-face.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "listAiProviders",
+      "case_id": "admin",
+      "file": "listAiProviders/admin.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "listAiUsageCalls",
+      "case_id": "provider-filter",
+      "file": "listAiUsageCalls/provider-filter.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "listAiUsageSummary",
+      "case_id": "window",
+      "file": "listAiUsageSummary/window.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "listAnnouncementRevisions",
+      "case_id": "admin-face",
+      "file": "listAnnouncementRevisions/admin-face.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "listAnnouncementRevisions",
+      "case_id": "admin",
+      "file": "listAnnouncementRevisions/admin.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "listAssistantSessions",
+      "case_id": "initial",
+      "file": "listAssistantSessions/initial.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "listAuditEvents",
+      "case_id": "admin-face",
+      "file": "listAuditEvents/admin-face.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "listAuditEvents",
+      "case_id": "admin",
+      "file": "listAuditEvents/admin.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "listAuthenticationProviders",
+      "case_id": "anonymous",
+      "file": "listAuthenticationProviders/anonymous.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "listChangeDrafts",
+      "case_id": "submitter-face",
+      "file": "listChangeDrafts/submitter-face.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "listChangeDrafts",
+      "case_id": "submitter",
+      "file": "listChangeDrafts/submitter.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "listChangeOrderComments",
+      "case_id": "chain",
+      "file": "listChangeOrderComments/chain.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "listChangeOrders",
+      "case_id": "submitter-face",
+      "file": "listChangeOrders/submitter-face.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "listChangeOrders",
+      "case_id": "submitter",
+      "file": "listChangeOrders/submitter.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "listChangeOrderTimeline",
+      "case_id": "chain",
+      "file": "listChangeOrderTimeline/chain.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "listCurrentUserFlows",
+      "case_id": "submitter",
+      "file": "listCurrentUserFlows/submitter.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "listDatasources",
+      "case_id": "admin-face",
+      "file": "listDatasources/admin-face.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "listDatasources",
+      "case_id": "admin",
+      "file": "listDatasources/admin.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "listDiagnosticDatasources",
+      "case_id": "initial",
+      "file": "listDiagnosticDatasources/initial.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "listExecutionAttemptStatements",
+      "case_id": "chain",
+      "file": "listExecutionAttemptStatements/chain.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "listFlowMaskingRules",
+      "case_id": "scratch-face",
+      "file": "listFlowMaskingRules/scratch-face.json",
+      "http_status": 200,
+      "err_code": 1002
+    },
+    {
+      "operation_id": "listFlows",
+      "case_id": "admin-face",
+      "file": "listFlows/admin-face.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "listFlows",
+      "case_id": "admin",
+      "file": "listFlows/admin.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "listIdentityProviders",
+      "case_id": "admin-face",
+      "file": "listIdentityProviders/admin-face.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "listIdentityProviders",
+      "case_id": "admin",
+      "file": "listIdentityProviders/admin.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "listKnowledgeEntries",
+      "case_id": "admin-face",
+      "file": "listKnowledgeEntries/admin-face.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "listKnowledgeEntries",
+      "case_id": "admin",
+      "file": "listKnowledgeEntries/admin.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "listMyFlowDatasourceColumns",
+      "case_id": "submitter",
+      "file": "listMyFlowDatasourceColumns/submitter.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "listMyFlowDatasourceSchemas",
+      "case_id": "submitter",
+      "file": "listMyFlowDatasourceSchemas/submitter.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "listMyFlowDatasourceTables",
+      "case_id": "submitter",
+      "file": "listMyFlowDatasourceTables/submitter.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "listNotificationChannels",
+      "case_id": "admin-face",
+      "file": "listNotificationChannels/admin-face.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "listNotificationChannels",
+      "case_id": "admin",
+      "file": "listNotificationChannels/admin.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "listNotificationDeliveries",
+      "case_id": "admin-face",
+      "file": "listNotificationDeliveries/admin-face.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "listNotificationDeliveries",
+      "case_id": "admin",
+      "file": "listNotificationDeliveries/admin.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "listNotificationRules",
+      "case_id": "initial",
+      "file": "listNotificationRules/initial.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "listOrderReviewFindings",
+      "case_id": "chain",
+      "file": "listOrderReviewFindings/chain.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "listPermissionGroups",
+      "case_id": "admin-face",
+      "file": "listPermissionGroups/admin-face.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "listPermissionGroups",
+      "case_id": "admin",
+      "file": "listPermissionGroups/admin.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "listPromptTools",
+      "case_id": "admin-face",
+      "file": "listPromptTools/admin-face.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "listPromptTools",
+      "case_id": "admin",
+      "file": "listPromptTools/admin.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "listQueryAccessRequests",
+      "case_id": "quser-face",
+      "file": "listQueryAccessRequests/quser-face.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "listQueryAccessRequests",
+      "case_id": "submitter",
+      "file": "listQueryAccessRequests/submitter.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "listQueryGrants",
+      "case_id": "quser-face",
+      "file": "listQueryGrants/quser-face.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "listQueryGrants",
+      "case_id": "submitter",
+      "file": "listQueryGrants/submitter.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "listQuerySessionColumns",
+      "case_id": "primary",
+      "file": "listQuerySessionColumns/primary.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "listQuerySessions",
+      "case_id": "quser-face",
+      "file": "listQuerySessions/quser-face.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "listQuerySessions",
+      "case_id": "submitter",
+      "file": "listQuerySessions/submitter.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "listQuerySessionSchemas",
+      "case_id": "primary",
+      "file": "listQuerySessionSchemas/primary.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "listQuerySessionTables",
+      "case_id": "primary",
+      "file": "listQuerySessionTables/primary.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "listReviewFindingEvidence",
+      "case_id": "evidence-chain",
+      "file": "listReviewFindingEvidence/evidence-chain.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "listReviewRunFindings",
+      "case_id": "evidence-chain",
+      "file": "listReviewRunFindings/evidence-chain.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "listReviewRunFindings",
+      "case_id": "f12 chain order",
+      "file": "listReviewRunFindings/f12 chain order.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "listReviewRunFindings",
+      "case_id": "f12 copy source",
+      "file": "listReviewRunFindings/f12 copy source.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "listReviewRunFindings",
+      "case_id": "f12 void order",
+      "file": "listReviewRunFindings/f12 void order.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "listReviewRunFindings",
+      "case_id": "f12 withdraw order",
+      "file": "listReviewRunFindings/f12 withdraw order.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "listRuleSets",
+      "case_id": "admin-face",
+      "file": "listRuleSets/admin-face.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "listRuleSets",
+      "case_id": "admin",
+      "file": "listRuleSets/admin.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "listSettingsRevisions",
+      "case_id": "admin",
+      "file": "listSettingsRevisions/admin.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "listSettingsRevisions",
+      "case_id": "branding-face",
+      "file": "listSettingsRevisions/branding-face.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "listUsers",
+      "case_id": "admin-face",
+      "file": "listUsers/admin-face.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "listUsers",
+      "case_id": "admin",
+      "file": "listUsers/admin.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "login",
+      "case_id": "valid",
+      "file": "login/valid.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "login",
+      "case_id": "wrong-password",
+      "file": "login/wrong-password.json",
+      "http_status": 200,
+      "err_code": 1101
+    },
+    {
+      "operation_id": "loginWithLdap",
+      "case_id": "no-ldap-provider",
+      "file": "loginWithLdap/no-ldap-provider.json",
+      "http_status": 200,
+      "err_code": 1002
+    },
+    {
+      "operation_id": "logout",
+      "case_id": "authenticated",
+      "file": "logout/authenticated.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "optimizePromptToolPrompt",
+      "case_id": "basic",
+      "file": "optimizePromptToolPrompt/basic.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "precheckAssistantSqlDraft",
+      "case_id": "draft",
+      "file": "precheckAssistantSqlDraft/draft.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "precheckDiagnosticOptimizationDraft",
+      "case_id": "optimize",
+      "file": "precheckDiagnosticOptimizationDraft/optimize.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "previewNotificationRule",
+      "case_id": "draft",
+      "file": "previewNotificationRule/draft.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "publishAnnouncementRevision",
+      "case_id": "scratch-publish",
+      "file": "publishAnnouncementRevision/scratch-publish.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "recordOrderSqlCopy",
+      "case_id": "chain",
+      "file": "recordOrderSqlCopy/chain.json",
+      "http_status": 200,
+      "err_code": 1001
+    },
+    {
+      "operation_id": "recordRawReviewEvidenceCopy",
+      "case_id": "no-reveal",
+      "file": "recordRawReviewEvidenceCopy/no-reveal.json",
+      "http_status": 200,
+      "err_code": 1002
+    },
+    {
+      "operation_id": "relinquishQueryGrant",
+      "case_id": "primary",
+      "file": "relinquishQueryGrant/primary.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "replaceAiProvider",
+      "case_id": "scratch-rewrite",
+      "file": "replaceAiProvider/scratch-rewrite.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "replaceDatasource",
+      "case_id": "scratch-rewrite",
+      "file": "replaceDatasource/scratch-rewrite.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "replaceDraftSql",
+      "case_id": "b6-cancel-schedule",
+      "file": "replaceDraftSql/b6-cancel-schedule.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "replaceDraftSql",
+      "case_id": "b6-diag-link",
+      "file": "replaceDraftSql/b6-diag-link.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "replaceDraftSql",
+      "case_id": "evidence-chain",
+      "file": "replaceDraftSql/evidence-chain.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "replaceDraftSql",
+      "case_id": "exec-chain",
+      "file": "replaceDraftSql/exec-chain.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "replaceDraftSql",
+      "case_id": "f12 chain order",
+      "file": "replaceDraftSql/f12 chain order.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "replaceDraftSql",
+      "case_id": "f12 copy source",
+      "file": "replaceDraftSql/f12 copy source.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "replaceDraftSql",
+      "case_id": "f12 void order",
+      "file": "replaceDraftSql/f12 void order.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "replaceDraftSql",
+      "case_id": "f12 withdraw order",
+      "file": "replaceDraftSql/f12 withdraw order.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "replaceDraftSql",
+      "case_id": "scratch",
+      "file": "replaceDraftSql/scratch.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "replaceFlow",
+      "case_id": "scratch-enable",
+      "file": "replaceFlow/scratch-enable.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "replaceFlowMaskingRule",
+      "case_id": "scratch-rule",
+      "file": "replaceFlowMaskingRule/scratch-rule.json",
+      "http_status": 200,
+      "err_code": 1002
+    },
+    {
+      "operation_id": "replaceIdentityProvider",
+      "case_id": "scratch-disable",
+      "file": "replaceIdentityProvider/scratch-disable.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "replaceKnowledgeEntry",
+      "case_id": "scratch-disable",
+      "file": "replaceKnowledgeEntry/scratch-disable.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "replaceNotificationChannel",
+      "case_id": "scratch-enable",
+      "file": "replaceNotificationChannel/scratch-enable.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "replaceNotificationRule",
+      "case_id": "crud",
+      "file": "replaceNotificationRule/crud.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "replacePermissionGroup",
+      "case_id": "scratch-enable",
+      "file": "replacePermissionGroup/scratch-enable.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "replacePromptTool",
+      "case_id": "scratch-enable",
+      "file": "replacePromptTool/scratch-enable.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "replaceRuleSet",
+      "case_id": "scratch-enable",
+      "file": "replaceRuleSet/scratch-enable.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "replaceSettingsNamespace",
+      "case_id": "branding-writeback",
+      "file": "replaceSettingsNamespace/branding-writeback.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "resetUserPassword",
+      "case_id": "temp-user",
+      "file": "resetUserPassword/temp-user.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "revealDraftSql",
+      "case_id": "scratch",
+      "file": "revealDraftSql/scratch.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "revealOrderSql",
+      "case_id": "chain",
+      "file": "revealOrderSql/chain.json",
+      "http_status": 200,
+      "err_code": 1001
+    },
+    {
+      "operation_id": "revealRawReviewEvidence",
+      "case_id": "no-evidence-rows",
+      "file": "revealRawReviewEvidence/no-evidence-rows.json",
+      "http_status": 200,
+      "err_code": 1002
+    },
+    {
+      "operation_id": "revokeQueryGrant",
+      "case_id": "third-grant",
+      "file": "revokeQueryGrant/third-grant.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "runDraftReview",
+      "case_id": "b6-cancel-schedule",
+      "file": "runDraftReview/b6-cancel-schedule.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "runDraftReview",
+      "case_id": "b6-diag-link",
+      "file": "runDraftReview/b6-diag-link.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "runDraftReview",
+      "case_id": "evidence-chain",
+      "file": "runDraftReview/evidence-chain.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "runDraftReview",
+      "case_id": "exec-chain",
+      "file": "runDraftReview/exec-chain.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "runDraftReview",
+      "case_id": "f12 chain order",
+      "file": "runDraftReview/f12 chain order.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "runDraftReview",
+      "case_id": "f12 copy source",
+      "file": "runDraftReview/f12 copy source.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "runDraftReview",
+      "case_id": "f12 void order",
+      "file": "runDraftReview/f12 void order.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "runDraftReview",
+      "case_id": "f12 withdraw order",
+      "file": "runDraftReview/f12 withdraw order.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "runPromptToolTest",
+      "case_id": "basic",
+      "file": "runPromptToolTest/basic.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "sendAssistantMessage",
+      "case_id": "sql-optimize",
+      "file": "sendAssistantMessage/sql-optimize.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "streamDomainEvents",
+      "case_id": "handshake",
+      "file": "streamDomainEvents/handshake.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "submitAssistantSqlDraftOrder",
+      "case_id": "draft",
+      "file": "submitAssistantSqlDraftOrder/draft.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "submitChangeDraft",
+      "case_id": "b6-cancel-schedule",
+      "file": "submitChangeDraft/b6-cancel-schedule.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "submitChangeDraft",
+      "case_id": "b6-diag-link",
+      "file": "submitChangeDraft/b6-diag-link.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "submitChangeDraft",
+      "case_id": "exec-chain",
+      "file": "submitChangeDraft/exec-chain.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "submitChangeDraft",
+      "case_id": "f12 chain order",
+      "file": "submitChangeDraft/f12 chain order.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "submitChangeDraft",
+      "case_id": "f12 copy source",
+      "file": "submitChangeDraft/f12 copy source.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "submitChangeDraft",
+      "case_id": "f12 void order",
+      "file": "submitChangeDraft/f12 void order.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "submitChangeDraft",
+      "case_id": "f12 withdraw order",
+      "file": "submitChangeDraft/f12 withdraw order.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "submitDiagnosticOptimizationOrder",
+      "case_id": "optimize",
+      "file": "submitDiagnosticOptimizationOrder/optimize.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "testAiProviderConnection",
+      "case_id": "scratch-stub",
+      "file": "testAiProviderConnection/scratch-stub.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "testDatasourceConnection",
+      "case_id": "scratch-probe",
+      "file": "testDatasourceConnection/scratch-probe.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "testIdentityProviderConnection",
+      "case_id": "scratch-unreachable",
+      "file": "testIdentityProviderConnection/scratch-unreachable.json",
+      "http_status": 200,
+      "err_code": 3010
+    },
+    {
+      "operation_id": "triggerManualDiagnosticsSnapshot",
+      "case_id": "manual",
+      "file": "triggerManualDiagnosticsSnapshot/manual.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "updateChangeDraft",
+      "case_id": "scratch-title",
+      "file": "updateChangeDraft/scratch-title.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "updateDatasourceDiagnosticsConfig",
+      "case_id": "enable",
+      "file": "updateDatasourceDiagnosticsConfig/enable.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "updateUser",
+      "case_id": "scratch-rename",
+      "file": "updateUser/scratch-rename.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "voidChangeOrder",
+      "case_id": "submitter",
+      "file": "voidChangeOrder/submitter.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "withdrawChangeOrder",
+      "case_id": "submitter",
+      "file": "withdrawChangeOrder/submitter.json",
+      "http_status": 200,
+      "err_code": 0
+    },
+    {
+      "operation_id": "withdrawQueryAccessRequest",
+      "case_id": "undecided",
+      "file": "withdrawQueryAccessRequest/undecided.json",
+      "http_status": 200,
+      "err_code": 0
+    }
+  ]
+}

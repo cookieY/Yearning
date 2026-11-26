@@ -18,6 +18,7 @@ import (
 	"github.com/cookieY/YearningX/backend/internal/authorization/auditlog"
 	"github.com/cookieY/YearningX/backend/internal/authorization/bizerr"
 	"github.com/cookieY/YearningX/backend/internal/crypto"
+	"github.com/cookieY/YearningX/backend/internal/platform/ptr"
 	"github.com/cookieY/YearningX/backend/internal/platform/txutil"
 )
 
@@ -44,11 +45,32 @@ type RequestMeta struct {
 
 // Service is the identity application service.
 type Service struct {
-	db       *gorm.DB
-	sessions *SessionStore
-	crypter  *crypto.Crypter
-	audit    *auditlog.Recorder
-	limit    *loginRateLimiter
+	db            *gorm.DB
+	sessions      *SessionStore
+	crypter       *crypto.Crypter
+	audit         *auditlog.Recorder
+	limit         *loginRateLimiter
+	hookMu        sync.RWMutex
+	onUserDeleted func(userID string)
+}
+
+// SetOnUserDeleted registers a post-commit hook invoked after a user is deleted.
+func (s *Service) SetOnUserDeleted(fn func(userID string)) {
+	if s == nil {
+		return
+	}
+	s.hookMu.Lock()
+	s.onUserDeleted = fn
+	s.hookMu.Unlock()
+}
+
+func (s *Service) notifyUserDeleted(userID string) {
+	s.hookMu.RLock()
+	fn := s.onUserDeleted
+	s.hookMu.RUnlock()
+	if fn != nil {
+		fn(userID)
+	}
 }
 
 // DefaultSessionTTL is the default server-side session lifetime.
@@ -208,10 +230,10 @@ func (s *Service) AuditExternalLogin(ctx context.Context, action, username, outc
 	}
 	_ = s.audit.Audit(ctx, nil, auditlog.AuditInput{
 		EventType: action, ActorKind: "user", ActorID: userID,
-		ActorUsername: strPtr(actorUsername),
+		ActorUsername: ptr.NonZero(actorUsername),
 		ResourceType:  "user", ResourceID: userID, Action: action, Outcome: outcome,
-		RequestID: strPtr(meta.RequestID), SourceIP: strPtr(meta.SourceIP),
-		UserAgent: strPtr(meta.UserAgent),
+		RequestID: ptr.NonZero(meta.RequestID), SourceIP: ptr.NonZero(meta.SourceIP),
+		UserAgent: ptr.NonZero(meta.UserAgent),
 	})
 }
 
@@ -262,7 +284,7 @@ func (s *Service) LoginLocal(ctx context.Context, username, password string, met
 		}
 		s.limit.loginSuccess(key, ipKey)
 	} else {
-		ok, upgrade, err := VerifyPasswordCtx(ctx, password, derefString(user.PasswordHash))
+		ok, upgrade, err := VerifyPasswordCtx(ctx, password, ptr.Deref(user.PasswordHash))
 		if errors.Is(err, ErrPasswordHashBusy) {
 			s.limit.loginCapacityUndo(key, ipKey)
 			return nil, ErrRateLimited
@@ -304,7 +326,7 @@ func (s *Service) adminLocalLogin(ctx context.Context, user *UserModel, password
 			bizErr = bizerr.AdminLockedError{}
 			return nil
 		}
-		ok, upgrade, err := VerifyPasswordCtx(ctx, password, derefString(user.PasswordHash))
+		ok, upgrade, err := VerifyPasswordCtx(ctx, password, ptr.Deref(user.PasswordHash))
 		if errors.Is(err, ErrPasswordHashBusy) {
 			// Roll back without incrementing admin lockout failure count when Argon2id capacity is saturated.
 			return ErrPasswordHashBusy
@@ -407,7 +429,7 @@ func (s *Service) Register(ctx context.Context, username, displayName, email, pa
 	_ = s.audit.Audit(ctx, nil, auditlog.AuditInput{
 		EventType: "user.registered", ActorKind: "user", ActorID: &user.ID, ActorUsername: &user.Username,
 		ResourceType: "user", ResourceID: &user.ID, Action: "register", Outcome: "succeeded",
-		RequestID: strPtr(meta.RequestID), SourceIP: strPtr(meta.SourceIP), UserAgent: strPtr(meta.UserAgent),
+		RequestID: ptr.NonZero(meta.RequestID), SourceIP: ptr.NonZero(meta.SourceIP), UserAgent: ptr.NonZero(meta.UserAgent),
 	})
 	return user, nil
 }
@@ -459,7 +481,7 @@ func (s *Service) createUserRowWithRole(ctx context.Context, username, displayNa
 		CreatedAt: now, UpdatedAt: now,
 	}
 	if err := s.db.WithContext(ctx).Create(&user).Error; err != nil {
-		if isUniqueErr(err) {
+		if txutil.IsUniqueViolation(err) {
 			return nil, bizerr.ErrAlreadyExists
 		}
 		return nil, err
@@ -511,7 +533,7 @@ func (s *Service) UpsertExternalUser(ctx context.Context, providerKind, provider
 			Email: emailPtr, Role: "user", Version: 1, CreatedAt: now, UpdatedAt: now,
 		}
 		if err := tx.Create(&created).Error; err != nil {
-			if isUniqueErr(err) {
+			if txutil.IsUniqueViolation(err) {
 				return bizerr.ErrInvalidCredentials
 			}
 			return err
@@ -521,7 +543,7 @@ func (s *Service) UpsertExternalUser(ctx context.Context, providerKind, provider
 			ProviderKey: providerKey, ExternalSubject: subject, CreatedAt: now,
 		}
 		if err := tx.Create(&binding).Error; err != nil {
-			if isUniqueErr(err) {
+			if txutil.IsUniqueViolation(err) {
 				return bizerr.ErrInvalidCredentials
 			}
 			return err
@@ -582,7 +604,7 @@ func (s *Service) ResetAdminPassword(ctx context.Context, newPassword string, me
 			ActorID: &admin.ID, ActorUsername: &admin.Username,
 			ResourceType: "user", ResourceID: &admin.ID,
 			Action: "reset_admin_password", Outcome: "succeeded",
-			RequestID: strPtr(meta.RequestID),
+			RequestID: ptr.NonZero(meta.RequestID),
 		})
 	})
 }
@@ -679,7 +701,7 @@ func (s *Service) ChangeMyPassword(ctx context.Context, userID, oldPassword, new
 			ActorID: &locked.ID, ActorUsername: &locked.Username,
 			ResourceType: "user", ResourceID: &locked.ID,
 			Action: "change_password", Outcome: "succeeded",
-			RequestID: strPtr(meta.RequestID),
+			RequestID: ptr.NonZero(meta.RequestID),
 		})
 	})
 }
@@ -721,17 +743,15 @@ func (s *Service) ProviderSecret(ctx context.Context, p *IdentityProviderModel) 
 	if p.SecretCiphertext == nil || p.SecretKeyID == nil || p.SecretAlgorithm == nil {
 		return nil, fmt.Errorf("identity: provider secret not configured")
 	}
-	return s.crypter.Open(crypto.PurposePayload, crypto.Envelope{
+	return s.crypter.OpenColumn(crypto.PurposeProviderSecret, crypto.ColumnRef{
+		Table:      "identity_providers",
+		PrimaryKey: p.ID,
+		Column:     "secret",
+	}, crypto.Envelope{
 		Ciphertext: p.SecretCiphertext,
 		Nonce:      p.SecretNonce,
 		KeyID:      *p.SecretKeyID,
 		Algorithm:  *p.SecretAlgorithm,
-	}, crypto.AAD{
-		DeploymentID: s.crypter.DeploymentID(),
-		Table:        "identity_providers",
-		PrimaryKey:   p.ID,
-		Column:       "secret",
-		Purpose:      "provider_secret",
 	})
 }
 
@@ -747,22 +767,8 @@ func (s *Service) loginAudit(actorKind string, userID *string, username, action,
 	return auditlog.AuditInput{
 		EventType: action, ActorKind: actorKind, ActorID: userID, ActorUsername: &username,
 		ResourceType: "user", ResourceID: userID, Action: action, Outcome: outcome,
-		RequestID: strPtr(meta.RequestID), SourceIP: strPtr(meta.SourceIP), UserAgent: strPtr(meta.UserAgent),
+		RequestID: ptr.NonZero(meta.RequestID), SourceIP: ptr.NonZero(meta.SourceIP), UserAgent: ptr.NonZero(meta.UserAgent),
 	}
-}
-
-func strPtr(s string) *string {
-	if s == "" {
-		return nil
-	}
-	return &s
-}
-
-func derefString(s *string) string {
-	if s == nil {
-		return ""
-	}
-	return *s
 }
 
 func ifEmpty(v, fallback string) string {
@@ -771,5 +777,3 @@ func ifEmpty(v, fallback string) string {
 	}
 	return v
 }
-
-func isUniqueErr(err error) bool { return txutil.IsUniqueViolation(err) }

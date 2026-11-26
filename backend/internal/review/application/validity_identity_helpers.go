@@ -2,15 +2,6 @@ package application
 
 import "github.com/cookieY/YearningX/backend/internal/review/fingerprint"
 
-func cloneValidityProgram(program ValidityProgram) ValidityProgram {
-	out := program
-	out.Statements = append([]StatementValidityAtOrdinal(nil), program.Statements...)
-	for i := range out.Statements {
-		out.Statements[i].Facts = cloneStatementValidity(out.Statements[i].Facts)
-	}
-	return out
-}
-
 func cloneStatementValidity(in fingerprint.StatementValidity) fingerprint.StatementValidity {
 	out := in
 	out.Requirements = append([]fingerprint.ValidityRequirement(nil), in.Requirements...)

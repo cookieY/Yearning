@@ -30,7 +30,7 @@ Yearning v4 是 **AI 赋能的数据库变更治理平台**，而不是脱离治
 | **系统架构** | 依赖外部或拆分 RPC 服务 | 单二进制 **Go 模块化单体**，零 RPC，Kubernetes 无状态多副本原生就绪 |
 | **前端工作台** | Vue 2/3 (`gemini-next`) | **React 19 + TypeScript + Vite + Tailwind CSS v4 + shadcn/ui** |
 | **元数据库** | MySQL + AutoMigrate | **PostgreSQL 14–18** + 显式版本化 Migration + 三角色最小权限隔离 |
-| **目标数据库引擎** | 以 MySQL 为主 | **MySQL 5.7/8.0、PostgreSQL 14–18、TiDB、OceanBase、PolarDB** |
+| **目标数据库引擎** | 以 MySQL 为主 | **MySQL 5.7+（5.7 / 8.0 / 8.4 LTS）、PostgreSQL 14–18+、TiDB、OceanBase、PolarDB** |
 | **SQL 审核引擎** | 规则检查为主 | **确定性规则 + 双轨 AI 预审引擎**，支持 10 万条 / 32 MiB 批量指纹折叠与 5 项只读元数据工具 |
 | **流程与冻结边界** | 支持流转调整与 AutoTask | **提交即冻结**（1..N 阶段 · 1..10 级审批），含 `admin` 在内不可篡改或绕过；移除 AutoTask |
 | **在线改表 (OSC)** | 外部二进制工具 | **Go 进程内嵌 `gh-ost`**（18 项参数 + 实时拷贝进度），全面退役 `pt-osc` |

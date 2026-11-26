@@ -9,6 +9,7 @@ import (
 
 	"github.com/cookieY/YearningX/backend/internal/database"
 	"github.com/cookieY/YearningX/backend/internal/platform/addrguard"
+	"github.com/cookieY/YearningX/backend/internal/platform/testenv"
 )
 
 func runBothEnginesWithLoopbackForTest(t *testing.T, fn func(t *testing.T, env *suiteEnv)) {
@@ -16,6 +17,21 @@ func runBothEnginesWithLoopbackForTest(t *testing.T, fn func(t *testing.T, env *
 	restore := addrguard.SetLoopbackBypassForTest(true)
 	t.Cleanup(restore)
 	runBothEngines(t, fn)
+}
+
+func runPostgresWithLoopbackForTest(t *testing.T, fn func(t *testing.T, env *suiteEnv)) {
+	t.Helper()
+	restore := addrguard.SetLoopbackBypassForTest(true)
+	t.Cleanup(restore)
+	fix := loadFixtures(t)
+	tg := pgTarget()
+	if tg == nil {
+		testenv.SkipOrFatal(t, "postgresql target not configured (set YEARNING_TEST_TARGET_PG_PASSWORD)")
+	}
+	t.Run(tg.name, func(t *testing.T) {
+		env := setupSuite(t, tg, fix)
+		fn(t, env)
+	})
 }
 
 // TestAdapterSuite_QualifiedIndexAndArrayCatalogFacts covers catalog pieces

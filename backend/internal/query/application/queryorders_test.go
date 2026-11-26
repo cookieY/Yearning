@@ -2,6 +2,7 @@ package application
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"reflect"
 	"strings"
@@ -87,5 +88,43 @@ func TestListQueryOrdersRejectsInvalidCursorBeforeQuery(t *testing.T) {
 				t.Fatalf("invalid cursor error = %v", err)
 			}
 		})
+	}
+}
+
+func TestQueryOrderEntryOmitsInactiveVariant(t *testing.T) {
+	reqEntry := QueryOrderEntry{
+		Kind:      "access_request",
+		ID:        "11111111-1111-4111-8111-111111111111",
+		CreatedAt: "2026-11-25T00:00:00Z",
+		Request:   &AccessRequestView{ID: "11111111-1111-4111-8111-111111111111"},
+	}
+	reqBytes, err := json.Marshal(reqEntry)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var reqMap map[string]any
+	if err := json.Unmarshal(reqBytes, &reqMap); err != nil {
+		t.Fatal(err)
+	}
+	if _, hasSession := reqMap["session"]; hasSession {
+		t.Fatalf("access_request entry must omit inactive session field, got %s", string(reqBytes))
+	}
+
+	sessEntry := QueryOrderEntry{
+		Kind:      "session",
+		ID:        "22222222-2222-4222-8222-222222222222",
+		CreatedAt: "2026-11-25T00:00:00Z",
+		Session:   &SessionView{ID: "22222222-2222-4222-8222-222222222222"},
+	}
+	sessBytes, err := json.Marshal(sessEntry)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var sessMap map[string]any
+	if err := json.Unmarshal(sessBytes, &sessMap); err != nil {
+		t.Fatal(err)
+	}
+	if _, hasRequest := sessMap["request"]; hasRequest {
+		t.Fatalf("session entry must omit inactive request field, got %s", string(sessBytes))
 	}
 }

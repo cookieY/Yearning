@@ -6,7 +6,6 @@ import {
 import { IDENTITY_STORAGE_KEY } from "./identity-store";
 import { SCENARIO_STORAGE_KEY } from "./scenario-store";
 import { AUTH_BEHAVIOR_STORAGE_KEY } from "./auth-scenario-store";
-import { SUPER_STORAGE_KEY } from "@/shared/dev/mock-super";
 
 /**
  * The client half of the node mock transport: unregister the legacy service
@@ -65,7 +64,6 @@ describe("syncDimensionsFromServer", () => {
         json: () =>
           Promise.resolve({
             identity: "reviewer-a",
-            superMode: false,
             scenario: "orders-busy",
             authBehavior: "admin_locked",
           }),
@@ -73,13 +71,12 @@ describe("syncDimensionsFromServer", () => {
     );
     await syncDimensionsFromServer();
     expect(window.localStorage.getItem(IDENTITY_STORAGE_KEY)).toBe("reviewer-a");
-    expect(window.localStorage.getItem(SUPER_STORAGE_KEY)).toBe("0");
     expect(window.localStorage.getItem(SCENARIO_STORAGE_KEY)).toBe("orders-busy");
     expect(window.localStorage.getItem(AUTH_BEHAVIOR_STORAGE_KEY)).toBe("admin_locked");
   });
 
   it("accepts each documented identity but rejects unknown ones", async () => {
-    for (const identity of ["henry", "reviewer-a", "executor-a"]) {
+    for (const identity of ["owner", "henry", "reviewer-a", "executor-a"]) {
       stubFetch(() =>
         Promise.resolve({ ok: true, json: () => Promise.resolve({ identity }) }),
       );
@@ -94,8 +91,7 @@ describe("syncDimensionsFromServer", () => {
     expect(window.localStorage.getItem(IDENTITY_STORAGE_KEY)).toBe("henry");
   });
 
-  it("only accepts a boolean superMode, a string scenario and a string authBehavior", async () => {
-    window.localStorage.setItem(SUPER_STORAGE_KEY, "1");
+  it("only accepts a string scenario and a string authBehavior", async () => {
     window.localStorage.setItem(SCENARIO_STORAGE_KEY, "ready");
     window.localStorage.setItem(AUTH_BEHAVIOR_STORAGE_KEY, "default");
     stubFetch(() =>
@@ -103,27 +99,14 @@ describe("syncDimensionsFromServer", () => {
         ok: true,
         json: () =>
           Promise.resolve({
-            superMode: "yes",
             scenario: 42,
             authBehavior: null,
           }),
       }),
     );
     await syncDimensionsFromServer();
-    expect(window.localStorage.getItem(SUPER_STORAGE_KEY)).toBe("1");
     expect(window.localStorage.getItem(SCENARIO_STORAGE_KEY)).toBe("ready");
     expect(window.localStorage.getItem(AUTH_BEHAVIOR_STORAGE_KEY)).toBe("default");
-  });
-
-  it("maps a true superMode to the stored flag form", async () => {
-    stubFetch(() =>
-      Promise.resolve({
-        ok: true,
-        json: () => Promise.resolve({ superMode: true }),
-      }),
-    );
-    await syncDimensionsFromServer();
-    expect(window.localStorage.getItem(SUPER_STORAGE_KEY)).toBe("1");
   });
 
   it("keeps the tab state when the endpoint answers non-ok", async () => {

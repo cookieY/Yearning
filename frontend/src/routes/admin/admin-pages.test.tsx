@@ -4,19 +4,22 @@ import { openRowActions, openRowActionsAt } from "@/test/row-actions";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter, Route, Routes } from "react-router";
 import { HttpResponse, http } from "msw";
-import { afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { apiRoute } from "@/shared/mock/api-route";
 import { server } from "@/test/msw/server";
+import { stubSession } from "@/test/session";
 import { resetAdminFixture } from "@/shared/mock/admin-fixture";
 import {
   ADMIN_FIXTURE_DATASOURCE_MYSQL_ID,
   ADMIN_FIXTURE_DATASOURCE_PG_ID,
+  ADMIN_FIXTURE_KNOWLEDGE_TABLE_ID,
   ADMIN_FIXTURE_PROVIDER_PRIMARY_ID,
   ADMIN_FIXTURE_TOOL_BUILTIN_ID,
   ADMIN_FIXTURE_TOOL_DRAFT_ID,
 } from "@/shared/mock/admin-fixture";
 import { SessionProvider } from "@/features/auth/session-provider";
 import { RequireAdminCapability } from "@/app/router/guards";
-import "@/shared/i18n";
+import i18n from "@/shared/i18n";
 import AdminDatasourcesPage from "@/routes/admin/admin-datasources-page";
 import AdminProvidersPage from "@/routes/admin/admin-providers-page";
 import AdminAiBudgetPage from "@/routes/admin/admin-ai-budget-page";
@@ -35,34 +38,6 @@ import { convertParamDrafts, paramTypeKey, stringifyParamDrafts } from "@/featur
  * note are visible, internal experience offers no auto-learning entry, and
  * the admin capability guard keeps every surface behind can_access_admin.
  */
-
-const SESSION_USER_ID = "0198d9cc-e65d-7b9d-a8aa-3c81945f99ac";
-
-/** jsdom cannot carry document cookies on a cross-origin fetch, so the
- * session probe is pinned per behavior — the same override the approval
- * and execution component tests use. */
-function stubSession(admin: boolean): void {
-  server.use(
-    http.get("*/users/me", () =>
-      HttpResponse.json({
-        err_code: 0,
-        message: "ok",
-        data: {
-          id: SESSION_USER_ID,
-          username: "henry",
-          display_name: "henry",
-          email: null,
-          is_builtin_admin: admin,
-          version: 1,
-          created_at: "2026-08-28T08:00:00Z",
-          updated_at: "2026-08-28T08:00:00Z",
-          can_access_admin: admin,
-        },
-        request_id: SESSION_USER_ID,
-      }),
-    ),
-  );
-}
 
 function setAuthBehavior(behavior: "admin" | "default"): void {
   window.localStorage.setItem("yearning-mock-auth", behavior);
@@ -99,6 +74,80 @@ afterEach(() => {
   server.resetHandlers();
   resetAdminFixture();
   window.localStorage.removeItem("yearning-mock-auth");
+});
+
+describe("diagnostics config probe hint", () => {
+  function stubDiagnosticsConfig(overrides: {
+    last_probe_at: string | null;
+    last_probe_state: string;
+    state?: string;
+  }): void {
+    server.use(
+      http.get(apiRoute("/admin/datasources/:datasourceId/diagnostics-config"), ({ params }) =>
+        HttpResponse.json({
+          err_code: 0,
+          message: "ok",
+          data: {
+            datasource_id: String(params.datasourceId),
+            enabled: false,
+            interval_seconds: 60,
+            effective_interval_seconds: 60,
+            top_n: 200,
+            state: overrides.state ?? "disabled",
+            last_probe_state: overrides.last_probe_state,
+            last_probe_at: overrides.last_probe_at,
+            last_collected_at: null,
+            consecutive_failures: 0,
+            paused_reason: null,
+            version: 1,
+            updated_at: "2026-11-24T00:00:00Z",
+          },
+          request_id: "req-diag-config",
+        }),
+      ),
+    );
+  }
+
+  async function openMysqlDiagnosticsConfigDialog(): Promise<void> {
+    renderPage(<AdminDatasourcesPage />);
+    await screen.findByTestId(`ds-row-${ADMIN_FIXTURE_DATASOURCE_MYSQL_ID}`);
+    await openRowActions(`ds-actions-${ADMIN_FIXTURE_DATASOURCE_MYSQL_ID}`);
+    await userEvent.click(screen.getByTestId(`ds-diagnostics-config-${ADMIN_FIXTURE_DATASOURCE_MYSQL_ID}`));
+    await screen.findByTestId("ds-diagnostics-config-dialog");
+    await screen.findByTestId("ds-diag-circuit-state");
+  }
+
+  it("hides probe state badge and error hint when no probe has completed yet", async () => {
+    stubDiagnosticsConfig({
+      last_probe_at: null,
+      last_probe_state: "collection_failed",
+    });
+    await openMysqlDiagnosticsConfigDialog();
+    expect(screen.queryByTestId("ds-diag-probe-state")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("ds-diag-probe-hint")).not.toBeInTheDocument();
+  });
+
+  it("shows static parameter and AI fallback guidance when probe completed with stats_disabled", async () => {
+    stubDiagnosticsConfig({
+      last_probe_at: "2026-11-24T00:00:00Z",
+      last_probe_state: "stats_disabled",
+    });
+    await openMysqlDiagnosticsConfigDialog();
+    expect(screen.getByTestId("ds-diag-probe-state")).toBeInTheDocument();
+    const hint = await screen.findByTestId("ds-diag-probe-hint");
+    expect(hint).toHaveTextContent("performance_schema");
+    expect(hint).toHaveTextContent(/\u9759\u6001\u53c2\u6570/);
+  });
+
+  it("shows ready badge without hint when last probe succeeded", async () => {
+    stubDiagnosticsConfig({
+      last_probe_at: "2026-11-24T00:00:00Z",
+      last_probe_state: "ready",
+    });
+    await openMysqlDiagnosticsConfigDialog();
+    expect(screen.getByTestId("ds-diag-probe-state")).toBeInTheDocument();
+    expect(screen.queryByTestId("ds-diag-probe-hint")).not.toBeInTheDocument();
+  });
 });
 
 describe("gate: secrets are never prefilled", () => {
@@ -253,7 +302,7 @@ describe("admin page flows", () => {
     await userEvent.click(await screen.findByTestId("ds-create"));
     await userEvent.type(screen.getByTestId("ds-name"), "new-warehouse");
     await userEvent.type(screen.getByTestId("ds-host"), "10.0.0.77");
-    await userEvent.type(screen.getByTestId("ds-version-constraint"), ">=8.0");
+    expect(screen.queryByTestId("ds-version-constraint")).not.toBeInTheDocument();
     await userEvent.type(screen.getByTestId("credential-username-readonly"), "ro_user");
     await userEvent.type(screen.getByTestId("credential-password-readonly"), "secret-pw-1");
     await userEvent.click(screen.getByTestId("ds-submit"));
@@ -268,10 +317,8 @@ describe("admin page flows", () => {
 
   it("runs the knowledge eval and shows the governed result", async () => {
     renderPage(<AdminReviewKnowledgePage />);
-    const rows = await screen.findAllByTestId(/review-input-evaluate-/);
-    const firstEval = rows.at(0);
-    if (firstEval === undefined) throw new Error("no evaluate buttons rendered");
-    await userEvent.click(firstEval);
+    const tableEval = await screen.findByTestId(`review-input-evaluate-${ADMIN_FIXTURE_KNOWLEDGE_TABLE_ID}`);
+    await userEvent.click(tableEval);
     const result = await screen.findByTestId("knowledge-eval-result");
     expect(within(result).getByText("\u901a\u8fc7")).toBeInTheDocument();
   });
@@ -390,7 +437,7 @@ describe("review-input dialog flows", () => {
   it("submits a new skill with Critical as the effective severity", async () => {
     const writes: Array<Record<string, unknown>> = [];
     server.use(
-      http.post("*/admin/prompt-tools", async ({ request }) => {
+      http.post(apiRoute("/admin/prompt-tools"), async ({ request }) => {
         const body = (await request.json()) as Record<string, unknown>;
         writes.push(body);
       }),
@@ -411,7 +458,7 @@ describe("review-input dialog flows", () => {
   it("preserves legacy draft max_severity while showing Critical as the effective severity", async () => {
     const writes: Array<Record<string, unknown>> = [];
     server.use(
-      http.put("*/admin/prompt-tools/:promptToolId", async ({ request }) => {
+      http.put(apiRoute("/admin/prompt-tools/:promptToolId"), async ({ request }) => {
         const body = (await request.json()) as Record<string, unknown>;
         writes.push(body);
       }),
@@ -429,25 +476,39 @@ describe("review-input dialog flows", () => {
     expect(writes[0]?.definition).toMatchObject({ max_severity: "low" });
   });
 
-  it("submits an internal-experience rule with Critical as the effective severity", async () => {
+  it("submits a datasource-scoped internal-experience note with non-blocking advisory severity", async () => {
     const writes: Array<Record<string, unknown>> = [];
     server.use(
-      http.post("*/admin/knowledge-entries", async ({ request }) => {
+      http.post(apiRoute("/admin/knowledge-entries"), async ({ request }) => {
         const body = (await request.json()) as Record<string, unknown>;
         writes.push(body);
       }),
     );
     renderPage(<AdminReviewKnowledgePage />);
     await userEvent.click(await screen.findByTestId("review-input-create"));
+    // Verify global scope is retired from creation choices.
+    await userEvent.click(screen.getByTestId("knowledge-scope"));
+    expect(screen.queryByRole("option", { name: "\u5168\u5c40" })).not.toBeInTheDocument();
+    await userEvent.click(await screen.findByRole("option", { name: "\u6570\u636e\u6e90 / \u5e93\u7ea7" }));
+
+    await userEvent.click(screen.getByTestId("knowledge-datasource"));
+    const dsOptions = await screen.findAllByRole("option");
+    const firstDs = dsOptions[0];
+    if (firstDs === undefined) throw new Error("expected datasource option");
+    await userEvent.click(firstDs);
+    await userEvent.type(screen.getByTestId("knowledge-database"), "app_db");
+
     await userEvent.type(screen.getByTestId("review-input-name"), "charset-policy");
     await userEvent.type(screen.getByTestId("review-input-knowledge-text"), "Keep the default charset.");
-    expect(screen.getByTestId("review-input-critical-severity")).toBeInTheDocument();
-    expect(screen.queryByTestId(/^review-input-max-severity/)).not.toBeInTheDocument();
+    expect(screen.getByTestId("knowledge-advisory-policy")).toBeInTheDocument();
+    expect(screen.getByTestId("knowledge-max-severity")).toBeInTheDocument();
+    expect(screen.queryByTestId("review-input-critical-severity")).not.toBeInTheDocument();
     await userEvent.click(screen.getByTestId("review-input-submit"));
     await waitFor(() => {
       expect(writes).toHaveLength(1);
     });
-    expect(writes[0]?.definition).toMatchObject({ max_severity: "critical" });
+    expect(writes[0]).toMatchObject({ scope_type: "datasource" });
+    expect(writes[0]?.definition).toMatchObject({ max_severity: "medium" });
   });
 
   it("replaces an existing skill and bumps its version", async () => {
@@ -636,7 +697,7 @@ describe("review-input dialog flows", () => {
     expect(screen.getByText("orderdb.orders")).toBeInTheDocument();
     // Datasource-scoped entry shows the scope label; converted rows keep
     // their provenance badge and purpose line.
-    expect(screen.getByText("\u6570\u636e\u6e90\u7ea7")).toBeInTheDocument();
+    expect(screen.getAllByText("\u6570\u636e\u6e90 / \u5e93\u7ea7").length).toBeGreaterThan(0);
     expect(screen.getByText("Finding \u8f6c\u5316")).toBeInTheDocument();
     expect(screen.getAllByText("Converted from a historical review finding.").length).toBeGreaterThan(0);
   });
@@ -669,7 +730,7 @@ describe("connection test flow", () => {
 
   it("never renders an empty table row when capabilities read fails after connection test", async () => {
     server.use(
-      http.get("*/admin/datasources/:id/capabilities", () =>
+      http.get(apiRoute("/admin/datasources/:id/capabilities"), () =>
         HttpResponse.json(
           {
             type: "about:blank",
@@ -716,7 +777,6 @@ describe("connection test flow", () => {
     await userEvent.click(screen.getByTestId(`ds-edit-${ADMIN_FIXTURE_DATASOURCE_MYSQL_ID}`));
     await screen.findByTestId("credential-row-readonly");
     await userEvent.click(screen.getByTestId("credential-include-readonly"));
-    await userEvent.type(screen.getByTestId("ds-version-constraint"), ">=8.0");
     await userEvent.click(screen.getByTestId("ds-submit"));
     await waitFor(() => { expect(captured.body).not.toBeNull(); });
     expect(captured.body?.test_purpose).toBe("execution");
@@ -733,11 +793,17 @@ describe("review-input dialog coverage", () => {
     await userEvent.click(screen.getByTestId("review-input-submit"));
     const error = await screen.findByTestId("review-input-error");
     expect(error).toBeInTheDocument();
-    // Then a valid create closes the dialog and adds the row.
-    await userEvent.type(screen.getByTestId("review-input-name"), "global-manual-entry");
+    // Then a valid datasource-scoped create closes the dialog and adds the row.
+    await userEvent.click(screen.getByTestId("knowledge-datasource"));
+    const dsOptions = await screen.findAllByRole("option");
+    const firstDs = dsOptions[0];
+    if (firstDs === undefined) throw new Error("expected datasource option");
+    await userEvent.click(firstDs);
+    await userEvent.type(screen.getByTestId("knowledge-database"), "app_db");
+    await userEvent.type(screen.getByTestId("review-input-name"), "ds-manual-entry");
     await userEvent.type(screen.getByTestId("review-input-knowledge-text"), "Keep default charset.");
     await userEvent.click(screen.getByTestId("review-input-submit"));
-    await waitFor(() => expect(screen.getByText("global-manual-entry")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText("ds-manual-entry")).toBeInTheDocument());
   });
 
   it("prefills the table-scoped edit form and submits the replace", async () => {
@@ -753,10 +819,10 @@ describe("review-input dialog coverage", () => {
     await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
   });
 
-  it("omits hidden scope locators when broadening a table-scoped knowledge entry to datasource or global", async () => {
+  it("omits hidden table_name when broadening table-scoped knowledge to datasource and requires re-scoping legacy global", async () => {
     const capturedBodies: Record<string, unknown>[] = [];
     server.use(
-      http.put("*/admin/knowledge-entries/:id", async ({ request }) => {
+      http.put(apiRoute("/admin/knowledge-entries/:id"), async ({ request }) => {
         const body = (await request.json()) as Record<string, unknown>;
         capturedBodies.push(body);
         return HttpResponse.json({
@@ -767,7 +833,7 @@ describe("review-input dialog coverage", () => {
             name: typeof body.name === "string" ? body.name : "orderdb.orders",
             purpose: typeof body.purpose === "string" ? body.purpose : null,
             state: typeof body.state === "string" ? body.state : "draft",
-            scope_type: typeof body.scope_type === "string" ? body.scope_type : "global",
+            scope_type: typeof body.scope_type === "string" ? body.scope_type : "datasource",
             datasource_id: typeof body.datasource_id === "string" ? body.datasource_id : null,
             database_name: typeof body.database_name === "string" ? body.database_name : null,
             table_name: typeof body.table_name === "string" ? body.table_name : null,
@@ -789,38 +855,32 @@ describe("review-input dialog coverage", () => {
     const tableRow = rows.find((row) => row.textContent.includes("orderdb.orders"));
     if (tableRow === undefined) throw new Error("table-scoped row not rendered");
 
-    // Case 1: broaden table -> global (all three scope locators must be omitted).
+    // Case 1: broaden table -> datasource (datasource_id and database_name remain, table_name omitted; global absent).
     await userEvent.click(within(tableRow).getByTestId(/review-input-edit-/));
     await userEvent.click(screen.getByTestId("knowledge-scope"));
-    await userEvent.click(await screen.findByRole("option", { name: "\u5168\u5c40" }));
-    expect(screen.queryByTestId("knowledge-database")).not.toBeInTheDocument();
-    expect(screen.queryByTestId("knowledge-table")).not.toBeInTheDocument();
-    await userEvent.click(screen.getByTestId("review-input-submit"));
-    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
-
-    expect(capturedBodies).toHaveLength(1);
-    expect(capturedBodies[0]).toMatchObject({ scope_type: "global" });
-    expect(capturedBodies[0]?.datasource_id).toBeUndefined();
-    expect(capturedBodies[0]?.database_name).toBeUndefined();
-    expect(capturedBodies[0]?.table_name).toBeUndefined();
-
-    // Case 2: broaden table -> datasource (datasource_id and database_name remain, table_name omitted).
-    const rowsAfterBroaden = await screen.findAllByTestId(/review-input-row-/);
-    const tableRowAgain = rowsAfterBroaden.find((row) => row.textContent.includes("orderdb.orders"));
-    if (tableRowAgain === undefined) throw new Error("table-scoped row not rendered after first save");
-    await userEvent.click(within(tableRowAgain).getByTestId(/review-input-edit-/));
-    await userEvent.click(screen.getByTestId("knowledge-scope"));
-    await userEvent.click(await screen.findByRole("option", { name: "\u6570\u636e\u6e90\u7ea7" }));
+    expect(screen.queryByRole("option", { name: "\u5168\u5c40" })).not.toBeInTheDocument();
+    await userEvent.click(await screen.findByRole("option", { name: "\u6570\u636e\u6e90 / \u5e93\u7ea7" }));
     expect(screen.getByTestId("knowledge-database")).toBeInTheDocument();
     expect(screen.queryByTestId("knowledge-table")).not.toBeInTheDocument();
     await userEvent.click(screen.getByTestId("review-input-submit"));
     await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
 
-    expect(capturedBodies).toHaveLength(2);
-    expect(capturedBodies[1]?.scope_type).toBe("datasource");
-    expect(capturedBodies[1]?.datasource_id).toBeTruthy();
-    expect(capturedBodies[1]?.database_name).toBe("orderdb");
-    expect(capturedBodies[1]?.table_name).toBeUndefined();
+    expect(capturedBodies).toHaveLength(1);
+    expect(capturedBodies[0]?.scope_type).toBe("datasource");
+    expect(capturedBodies[0]?.datasource_id).toBeTruthy();
+    expect(capturedBodies[0]?.database_name).toBe("orderdb");
+    expect(capturedBodies[0]?.table_name).toBeUndefined();
+
+    // Case 2: legacy global + critical entry blocks submit until re-scoped & downgraded.
+    const legacyRow = (await screen.findAllByTestId(/review-input-row-/)).find((r) =>
+      r.textContent.includes("prod-window-policy"),
+    );
+    if (legacyRow === undefined) throw new Error("legacy global row not rendered");
+    await userEvent.click(within(legacyRow).getByTestId(/review-input-edit-/));
+    expect(screen.getByTestId("knowledge-legacy-global-warning")).toBeInTheDocument();
+    expect(screen.getByTestId("knowledge-legacy-severity-warning")).toBeInTheDocument();
+    expect(screen.getByTestId("review-input-submit")).toBeDisabled();
+    await userEvent.click(screen.getByRole("button", { name: "\u53d6\u6d88" }));
   });
 
   it("deletes a draft entry successfully and surfaces the referenced error on a converted one", async () => {
@@ -845,7 +905,7 @@ describe("review-input dialog coverage", () => {
 
   it("renders a failing evaluation with its findings list", async () => {
     server.use(
-      http.post("*/admin/knowledge-entries/:id/evaluations", () =>
+      http.post(apiRoute("/admin/knowledge-entries/:id/evaluations"), () =>
         HttpResponse.json({
           err_code: 0,
           message: "ok",
@@ -876,7 +936,7 @@ describe("review-input dialog coverage", () => {
 
   it("renders the error state and the empty state of the registries", async () => {
     server.use(
-      http.get("*/admin/prompt-tools", () =>
+      http.get(apiRoute("/admin/prompt-tools"), () =>
         HttpResponse.json({ err_code: 1002, message: "boom", data: null, request_id: "r1", retryable: false }),
       ),
     );
@@ -886,7 +946,7 @@ describe("review-input dialog coverage", () => {
 
   it("renders the empty registry state", async () => {
     server.use(
-      http.get("*/admin/prompt-tools", () =>
+      http.get(apiRoute("/admin/prompt-tools"), () =>
         HttpResponse.json({
           err_code: 0,
           message: "ok",
@@ -906,7 +966,7 @@ describe("review-input dialog coverage", () => {
 function captureDatasourcePut(): { body: Record<string, unknown> | null } {
   const captured: { body: Record<string, unknown> | null } = { body: null };
   server.use(
-    http.put("*/admin/datasources/:datasourceId", async ({ request }) => {
+    http.put(apiRoute("/admin/datasources/:datasourceId"), async ({ request }) => {
       captured.body = (await request.json()) as Record<string, unknown>;
       return HttpResponse.json({
         err_code: 0,
@@ -982,7 +1042,7 @@ describe("gate: three credential form modes (keep selectable only on configured 
     expect(screen.queryByTestId("credential-username-readonly")).not.toBeInTheDocument();
     expect(screen.queryByTestId("credential-password-readonly")).not.toBeInTheDocument();
     expect(screen.getByTestId("credential-keep-note-readonly")).toBeInTheDocument();
-    await userEvent.type(screen.getByTestId("ds-version-constraint"), ">=8.0");
+    expect(screen.queryByTestId("ds-version-constraint")).not.toBeInTheDocument();
     await userEvent.click(screen.getByTestId("ds-submit"));
     await waitFor(() => { expect(captured.body).not.toBeNull(); });
     const credentials = captured.body?.credentials as Array<Record<string, unknown>>;
@@ -1003,17 +1063,12 @@ describe("gate: three credential form modes (keep selectable only on configured 
     renderPage(<AdminDatasourcesPage />);
     await userEvent.click(await screen.findByTestId("ds-create"));
     await screen.findByTestId("credential-row-readonly");
-    // Empty name/host/version-constraint → disabled with the visible hint.
-    expect(screen.getByTestId("ds-version-constraint-hint")).toBeInTheDocument();
+    // Missing base/credential fields still block submit without a version constraint input.
+    expect(screen.queryByTestId("ds-version-constraint")).not.toBeInTheDocument();
     await userEvent.type(screen.getByTestId("ds-name"), "guard-check");
     await userEvent.type(screen.getByTestId("ds-host"), "10.0.0.95");
     expect(screen.getByTestId("ds-submit")).toBeDisabled();
-    expect(screen.getByTestId("ds-version-constraint")).toHaveAttribute("aria-invalid", "true");
-    expect(screen.getByTestId("ds-version-constraint-error")).toBeInTheDocument();
-    expect(screen.getByTestId("ds-form-invalid-hint")).toHaveTextContent("\u7248\u672c\u7ea6\u675f");
-    // Editing never echoes version_constraint — the empty value keeps the
-    // submit disabled until it is re-typed.
-    await userEvent.type(screen.getByTestId("ds-version-constraint"), ">=8.0");
+    expect(screen.getByTestId("ds-form-invalid-hint")).not.toHaveTextContent("\u7248\u672c\u7ea6\u675f");
     await userEvent.type(screen.getByTestId("credential-username-readonly"), "ro");
     await userEvent.type(screen.getByTestId("credential-password-readonly"), "pw-guard-1");
     expect(screen.getByTestId("ds-submit")).toBeEnabled();
@@ -1031,7 +1086,6 @@ describe("gate: three credential form modes (keep selectable only on configured 
     await screen.findByTestId("credential-row-readonly");
     // Unchecking execution removes it: the write is a full replacement.
     await userEvent.click(screen.getByTestId("credential-include-execution"));
-    await userEvent.type(screen.getByTestId("ds-version-constraint"), ">=8.0");
     await userEvent.click(screen.getByTestId("ds-submit"));
     await waitFor(() => { expect(captured.body).not.toBeNull(); });
     const credentials = captured.body?.credentials as Array<Record<string, unknown>>;
@@ -1064,7 +1118,6 @@ describe("gate: TLS material is never echoed and tls_verified is visible", () =>
     await userEvent.type(screen.getByTestId("ds-tls-ca"), "-----BEGIN CERTIFICATE-----\nca\n-----END CERTIFICATE-----\n");
     await userEvent.type(screen.getByTestId("ds-tls-cert"), "-----BEGIN CERTIFICATE-----\ncert\n-----END CERTIFICATE-----\n");
     await userEvent.type(screen.getByTestId("ds-tls-key"), "-----BEGIN PRIVATE KEY-----\nkey\n-----END PRIVATE KEY-----\n");
-    await userEvent.type(screen.getByTestId("ds-version-constraint"), ">=16");
     await userEvent.click(screen.getByTestId("ds-submit"));
     await waitFor(() => { expect(captured.body).not.toBeNull(); });
     expect(captured.body?.tls).toEqual({
@@ -1083,7 +1136,6 @@ describe("gate: TLS material is never echoed and tls_verified is visible", () =>
     await screen.findByTestId("ds-tls-enabled");
     await userEvent.click(screen.getByTestId("ds-tls-enabled"));
     expect(await screen.findByTestId("ds-tls-removal-warning")).toHaveTextContent("\u6062\u590d\u660e\u6587\u8fde\u63a5");
-    await userEvent.type(screen.getByTestId("ds-version-constraint"), ">=16");
     await userEvent.click(screen.getByTestId("ds-submit"));
     await waitFor(() => { expect(captured.body).not.toBeNull(); });
     expect(captured.body?.tls).toBeNull();
@@ -1094,7 +1146,6 @@ describe("gate: TLS material is never echoed and tls_verified is visible", () =>
     await userEvent.click(await screen.findByTestId("ds-create"));
     await userEvent.type(screen.getByTestId("ds-name"), "tls-check");
     await userEvent.type(screen.getByTestId("ds-host"), "10.0.0.90");
-    await userEvent.type(screen.getByTestId("ds-version-constraint"), ">=8.0");
     await userEvent.type(screen.getByTestId("credential-username-readonly"), "ro");
     await userEvent.type(screen.getByTestId("credential-password-readonly"), "pw-tls-1");
     // Enabled with no material at all.
@@ -1178,7 +1229,7 @@ describe("gate: §18.76-B model catalog autocomplete", () => {
   it("reuses the stored credential via provider_id when editing without retyping the key", async () => {
     const bodies: Array<Record<string, unknown>> = [];
     server.use(
-      http.post("*/admin/ai-providers/models", async ({ request }) => {
+      http.post(apiRoute("/admin/ai-providers/models"), async ({ request }) => {
         bodies.push((await request.json()) as Record<string, unknown>);
         return HttpResponse.json({
           err_code: 0, message: "ok", data: { items: ["spy-model-a"] }, request_id: "spy",
@@ -1210,7 +1261,7 @@ describe("gate: synchronous connection-test feedback (aligned with RCP-20261017 
 
   it("surfaces the upstream reason when the connection test fails", async () => {
     server.use(
-      http.post("*/admin/ai-providers/:providerId/connection-tests", () =>
+      http.post(apiRoute("/admin/ai-providers/:providerId/connection-tests"), () =>
         HttpResponse.json({
           err_code: 2011,
           message: "provider failed",
@@ -1234,7 +1285,7 @@ describe("gate: synchronous connection-test feedback (aligned with RCP-20261017 
 describe("gate: datasource connection-test refusal reason passthrough (§18.76 supplement)", () => {
   it("surfaces the upstream reason when the connection test fails", async () => {
     server.use(
-      http.post("*/admin/datasources/:dsId/connection-tests", () =>
+      http.post(apiRoute("/admin/datasources/:dsId/connection-tests"), () =>
         HttpResponse.json({
           err_code: 3010,
           message: "\u6570\u636e\u6e90\u8fde\u63a5\u6d4b\u8bd5\u5931\u8d25",
@@ -1255,12 +1306,59 @@ describe("gate: datasource connection-test refusal reason passthrough (§18.76 s
       await screen.findByTestId(`ds-test-error-detail-${ADMIN_FIXTURE_DATASOURCE_MYSQL_ID}`),
     ).toHaveTextContent(/connection refused/);
   });
+
+  it("renders long capability-matrix errors in a full-width sub-row outside the actions cell, with copy and close", async () => {
+    const user = userEvent.setup();
+    const detail =
+      "datasource: capability target unsupported: engine mysql mode mysql detected version 8.4.13 is not in the frozen capability matrix";
+    server.use(
+      http.post(apiRoute("/admin/datasources/:dsId/connection-tests"), () =>
+        HttpResponse.json({
+          err_code: 3010,
+          message: "datasource unavailable",
+          data: null,
+          request_id: "ds-cap-req",
+          retryable: false,
+          meta: { detail },
+        }),
+      ),
+    );
+    const writeSpy = vi.spyOn(navigator.clipboard, "writeText").mockResolvedValue(undefined);
+    try {
+      renderPage(<AdminDatasourcesPage />);
+      const row = await screen.findByTestId(`ds-row-${ADMIN_FIXTURE_DATASOURCE_MYSQL_ID}`);
+      await openRowActions(`ds-actions-${ADMIN_FIXTURE_DATASOURCE_MYSQL_ID}`);
+      await user.click(screen.getByTestId(`ds-test-button-${ADMIN_FIXTURE_DATASOURCE_MYSQL_ID}`));
+
+      const errorRow = await screen.findByTestId(`ds-test-error-${ADMIN_FIXTURE_DATASOURCE_MYSQL_ID}`);
+      expect(row.contains(errorRow)).toBe(false);
+      const cell = errorRow.querySelector("td");
+      expect(cell).toHaveAttribute("colspan", "6");
+      expect(cell).toHaveClass("whitespace-normal");
+
+      const expectedSummary = i18n.t("errors.DATASOURCE_UNAVAILABLE");
+      expect(errorRow).toHaveTextContent(expectedSummary);
+      expect(
+        screen.getByTestId(`ds-test-error-detail-${ADMIN_FIXTURE_DATASOURCE_MYSQL_ID}`),
+      ).toHaveTextContent(detail);
+
+      await user.click(screen.getByTestId(`ds-test-error-copy-${ADMIN_FIXTURE_DATASOURCE_MYSQL_ID}`));
+      expect(writeSpy).toHaveBeenCalledWith(`${expectedSummary}\n${detail}`);
+
+      await user.click(screen.getByTestId(`ds-test-error-close-${ADMIN_FIXTURE_DATASOURCE_MYSQL_ID}`));
+      await waitFor(() => {
+        expect(screen.queryByTestId(`ds-test-error-${ADMIN_FIXTURE_DATASOURCE_MYSQL_ID}`)).toBeNull();
+      });
+    } finally {
+      vi.restoreAllMocks();
+    }
+  });
 });
 
 describe("gate: datasource connection-test success feedback", () => {
   it("shows the ok line when the connection test task succeeds", async () => {
     server.use(
-      http.post("*/admin/datasources/:dsId/connection-tests", () =>
+      http.post(apiRoute("/admin/datasources/:dsId/connection-tests"), () =>
         HttpResponse.json({
           err_code: 0,
           message: "ok",
@@ -1280,7 +1378,7 @@ describe("gate: datasource connection-test success feedback", () => {
     );
     // Polling GET is also pinned to the same succeeded task (the real fixture has no such task).
     server.use(
-      http.get("*/tasks/:taskId", () =>
+      http.get(apiRoute("/tasks/:taskId"), () =>
         HttpResponse.json({
           err_code: 0,
           message: "ok",
@@ -1305,6 +1403,75 @@ describe("gate: datasource connection-test success feedback", () => {
     expect(
       await screen.findByTestId(`ds-test-ok-${ADMIN_FIXTURE_DATASOURCE_MYSQL_ID}`),
     ).toBeInTheDocument();
+  });
+
+  it("re-enables test connection and surfaces error when task polling fails after running", async () => {
+    let taskCalls = 0;
+    server.use(
+      http.post(apiRoute("/admin/datasources/:dsId/connection-tests"), () =>
+        HttpResponse.json({
+          err_code: 0,
+          message: "ok",
+          data: {
+            id: "0198d9cc-0000-7000-8000-000000000099",
+            kind: "admin_connection_test",
+            state: "running",
+            progress: { completed: 0, total: 1, unit: "steps" },
+            result_ref: null,
+            error: null,
+            created_at: "2026-10-19T00:00:00Z",
+            updated_at: "2026-10-19T00:00:00Z",
+          },
+          request_id: "ds-run-req",
+        }),
+      ),
+      http.get(apiRoute("/tasks/:taskId"), ({ params }) => {
+        taskCalls += 1;
+        if (taskCalls === 1) {
+          return HttpResponse.json({
+            err_code: 0,
+            message: "ok",
+            data: {
+              id: String(params.taskId),
+              kind: "admin_connection_test",
+              state: "running",
+              progress: { completed: 0, total: 1, unit: "steps" },
+              result_ref: null,
+              error: null,
+              created_at: "2026-10-19T00:00:00Z",
+              updated_at: "2026-10-19T00:00:00Z",
+            },
+            request_id: "ds-poll-ok-1",
+          });
+        }
+        return HttpResponse.json({
+          err_code: 1002,
+          message: "task not found",
+          data: null,
+          request_id: "ds-poll-err-2",
+          retryable: false,
+        });
+      }),
+    );
+
+    renderPage(<AdminDatasourcesPage />);
+    await screen.findByTestId(`ds-row-${ADMIN_FIXTURE_DATASOURCE_MYSQL_ID}`);
+    await openRowActions(`ds-actions-${ADMIN_FIXTURE_DATASOURCE_MYSQL_ID}`);
+    await userEvent.click(screen.getByTestId(`ds-test-button-${ADMIN_FIXTURE_DATASOURCE_MYSQL_ID}`));
+
+    const pollError = await screen.findByTestId(
+      `ds-test-poll-error-${ADMIN_FIXTURE_DATASOURCE_MYSQL_ID}`,
+      {},
+      { timeout: 3000 },
+    );
+    expect(pollError).toHaveTextContent(/\u8bf7\u6c42\u7684\u5bf9\u8c61\u4e0d\u5b58\u5728/);
+    expect(screen.queryByTestId(`ds-test-running-${ADMIN_FIXTURE_DATASOURCE_MYSQL_ID}`)).not.toBeInTheDocument();
+    expect(taskCalls).toBe(2);
+
+    await openRowActions(`ds-actions-${ADMIN_FIXTURE_DATASOURCE_MYSQL_ID}`);
+    const testButton = screen.getByTestId(`ds-test-button-${ADMIN_FIXTURE_DATASOURCE_MYSQL_ID}`);
+    expect(testButton).not.toBeDisabled();
+    expect(testButton).not.toHaveAttribute("aria-disabled", "true");
   });
 });
 
@@ -1459,7 +1626,7 @@ describe("provider generation parameters & reference pricing (S008 FE, 2026-10-3
     // Client-valid edit (genparams untouched/empty = omit): only the server
     // rejects, with field-level placement via meta.fields.
     server.use(
-      http.put("*/admin/ai-providers/:providerId", () =>
+      http.put(apiRoute("/admin/ai-providers/:providerId"), () =>
         HttpResponse.json({
           err_code: 1001,
           message: "VALIDATION_FAILED",
@@ -1498,7 +1665,7 @@ describe("provider generation parameters & reference pricing (S008 FE, 2026-10-3
     // to null and TS loses the write).
     const capture: { put: Record<string, unknown> | null } = { put: null };
     server.use(
-      http.put("*/admin/ai-providers/:providerId", async ({ request }) => {
+      http.put(apiRoute("/admin/ai-providers/:providerId"), async ({ request }) => {
         capture.put = (await request.clone().json().catch(() => null)) as Record<string, unknown> | null;
         return HttpResponse.json({
           err_code: 0,
@@ -1669,7 +1836,7 @@ describe("provider system_prompt_profile dual-track isolation (FE-F13-XMODEL-PRO
 
   it("places server 1001 meta.fields.system_prompt_profile rejection next to the profile selector", async () => {
     server.use(
-      http.put("*/admin/ai-providers/:providerId", () =>
+      http.put(apiRoute("/admin/ai-providers/:providerId"), () =>
         HttpResponse.json({
           err_code: 1001,
           message: "VALIDATION_FAILED",
@@ -1781,7 +1948,7 @@ describe("provider context_window configuration", () => {
 
   it("places server 1001 meta.fields.context_window rejection next to the context_window input", async () => {
     server.use(
-      http.put("*/admin/ai-providers/:providerId", () =>
+      http.put(apiRoute("/admin/ai-providers/:providerId"), () =>
         HttpResponse.json({
           err_code: 1001,
           message: "VALIDATION_FAILED",

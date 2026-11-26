@@ -5,8 +5,11 @@ import { cva, type VariantProps } from "class-variance-authority"
 import { CheckIcon, CopyIcon } from "lucide-react"
 
 import { cn } from "@/shared/lib/utils"
+import { writeClipboardText } from "@/shared/lib/clipboard"
 import { highlightSqlLine, highlightSqlText } from "@/shared/lib/sql-highlight"
 import { Button } from "@/shared/components/ui/button"
+import { appToast } from "@/shared/components/shadcn-dashboard/sonner/sonner-08"
+import i18n from "@/shared/i18n"
 
 const codeBlockVariants = cva(
   "group/code-block relative flex w-full min-w-0 flex-col overflow-hidden rounded-md text-sm has-[>[data-slot=code-block-content]:focus-visible]:ring-1 has-[>[data-slot=code-block-content]:focus-visible]:ring-ring/50 data-[size=sm]:text-xs",
@@ -115,10 +118,14 @@ function CodeBlockCopyButton({
         className={cn(className)}
         onClick={(event) => {
           onClick?.(event)
-          navigator.clipboard
-            .writeText(value)
-            .then(() => setCopied(true))
-            .catch(() => {})
+          void writeClipboardText(value).then((ok) => {
+            if (ok) {
+              setCopied(true)
+            } else {
+              setCopied(false)
+              appToast.error(i18n.t("common.copyFailed"))
+            }
+          })
         }}
         {...props}
       >

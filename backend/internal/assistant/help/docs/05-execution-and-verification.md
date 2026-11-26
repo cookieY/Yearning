@@ -1,7 +1,7 @@
 ---
 id: help-execution-verify
 title: Order Execution, Scheduled Windows & Result-Unknown Verification
-source_ref: docs/prd/change-order-prd.md#execution-and-verification
+source_ref: docs/features/05-execution-osc-prd.md
 route_path: /orders
 admin_only: false
 keywords: execute, execution, verify, verification, result_unknown, scheduled, timeout, network, uncertain, confirm, confirm_succeeded, confirm_failed, lease, schedule, osc, gh-ost, pt-osc, pt-online-schema-change, online ddl, 2004, 2006, 2013, 3001, 3002, 3003, 3011, 3012, 3013

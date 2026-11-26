@@ -2,14 +2,19 @@ package application
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"net/http"
 	"strings"
 	"testing"
 
+	"github.com/google/uuid"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 	"go.uber.org/zap/zaptest/observer"
+	"gorm.io/driver/postgres"
+	"gorm.io/gorm"
+	gormlogger "gorm.io/gorm/logger"
 
 	"github.com/cookieY/YearningX/backend/internal/assistant/privacy"
 	"github.com/cookieY/YearningX/backend/internal/diagnostics/domain"
@@ -31,9 +36,33 @@ func TestInvokeLLMDiagnosisLogsStructuredWarnOnFailureAndReturnsError(t *testing
 		AnonymizedTemplate: "SELECT col_1 FROM table_1 WHERE col_2 = ?",
 	}
 
+	diagBudgetOnce.Do(func() {
+		sql.Register("diagnostics_budget_stub", diagBudgetDriver{})
+	})
+	dsn := "diag-fallback-" + uuid.NewString()
+	diagBudgetMu.Lock()
+	diagBudgetMap[dsn] = &diagBudgetStubState{}
+	diagBudgetMu.Unlock()
+	t.Cleanup(func() {
+		diagBudgetMu.Lock()
+		delete(diagBudgetMap, dsn)
+		diagBudgetMu.Unlock()
+	})
+	sqlDB, err := sql.Open("diagnostics_budget_stub", dsn)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = sqlDB.Close() }()
+	gdb, err := gorm.Open(postgres.New(postgres.Config{
+		Conn: sqlDB, PreferSimpleProtocol: true, WithoutReturning: true,
+	}), &gorm.Config{DisableAutomaticPing: true, Logger: gormlogger.Discard})
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	before := AIDiagnosisLLMFailureTotal()
-	svc := &Services{Review: &reviewapp.Services{}}
-	_, _, _, err := svc.invokeLLMDiagnosis(context.Background(), priv, ds, desensitized, "last_1h", "exact", 10, 500, 50, 1000, 10, 0, true)
+	svc := &Services{DB: gdb, Review: &reviewapp.Services{DB: gdb}}
+	_, _, _, err = svc.invokeLLMDiagnosis(context.Background(), priv, ds, desensitized, "last_1h", "exact", 10, 500, 50, 1000, 10, 0, true)
 	if err == nil {
 		t.Fatal("expected invokeLLMDiagnosis to fail when provider chain is unavailable")
 	}

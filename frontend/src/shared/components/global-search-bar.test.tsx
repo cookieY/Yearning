@@ -1,8 +1,10 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { useState } from "react";
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import "@/shared/i18n";
+import { useTranslation } from "react-i18next";
+import i18n, { setLocale } from "@/shared/i18n";
+import { setTestLocale } from "@/test/setup";
 import { GlobalSearchBar, filterBySearchTerms, type SearchAccessor, type SearchTerm } from "@/shared/components/global-search-bar";
 
 interface Row {
@@ -49,6 +51,23 @@ describe("filterBySearchTerms", () => {
 
   it("returns every row for empty terms", () => {
     expect(filterBySearchTerms(rows, [{ field: null, text: "  " }], accessors)).toEqual(rows);
+  });
+
+  it("matches canonical term.value by exact leading token without colliding on localized labels", () => {
+    const queryRows = [
+      { number: "Q-1", title: "Session", state: "active Active" },
+      { number: "Q-2", title: "Request", state: "grant_active Grant Active" },
+    ];
+    const queryAccessors: SearchAccessor<(typeof queryRows)[number]>[] = [
+      { key: "state", label: "State", value: (row) => row.state },
+    ];
+    expect(
+      filterBySearchTerms(
+        queryRows,
+        [{ field: "state", text: "Active", value: "active" }],
+        queryAccessors,
+      ),
+    ).toEqual([queryRows[0]]);
   });
 });
 
@@ -326,5 +345,98 @@ describe("GlobalSearchBar", () => {
     await waitFor(() => {
       expect(screen.getByTestId("gsb")).toHaveValue("");
     });
+  });
+});
+
+function LocalizedOrderSearchBar({ initialTerms = [] }: { initialTerms?: SearchTerm[] }) {
+  const { t } = useTranslation();
+  const [terms, setTerms] = useState<SearchTerm[]>(initialTerms);
+  const localizedFields: SearchAccessor<Row>[] = [
+    {
+      key: "state",
+      label: t("orders.list.column.state"),
+      value: (row) => `${row.state} ${t(`orders.state.${row.state}`)}`,
+      options: [
+        { value: "running", label: t("orders.state.running") },
+        { value: "stage_approval_active", label: t("orders.state.stage_approval_active") },
+      ],
+    },
+  ];
+  const filtered = filterBySearchTerms(rows, terms, localizedFields);
+  return (
+    <div>
+      <GlobalSearchBar
+        fields={localizedFields}
+        terms={terms}
+        onTermsChange={setTerms}
+        testId="gsb-i18n"
+      />
+      <ul data-testid="gsb-i18n-rows">
+        {filtered.map((row) => (
+          <li key={row.number}>{row.number}</li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+describe("DEF-18 bilingual enum-chip locale matrix", () => {
+  afterEach(async () => {
+    setTestLocale("zh-CN");
+    setLocale("zh-CN");
+    await i18n.changeLanguage("zh-CN");
+  });
+
+  describe.each(["zh-CN", "en-US"] as const)("locale %s", (locale) => {
+    it("selects localized enum options and renders translated labels", async () => {
+      setTestLocale(locale);
+      setLocale(locale);
+      await i18n.changeLanguage(locale);
+      const user = userEvent.setup();
+      render(<LocalizedOrderSearchBar />);
+
+      const fieldLabel = locale === "zh-CN" ? "状态" : "Status";
+      const runningLabel = locale === "zh-CN" ? "执行中" : "Running";
+
+      await user.click(screen.getByTestId("gsb-i18n"));
+      await user.click(screen.getByRole("option", { name: fieldLabel }));
+      await user.click(screen.getByRole("option", { name: runningLabel }));
+      expect(screen.getByText(`${fieldLabel}: ${runningLabel}`)).toBeVisible();
+    });
+  });
+
+  it("re-translates committed enum chips and keeps filtering working across runtime zh-CN <-> en-US switches", async () => {
+    setTestLocale("zh-CN");
+    setLocale("zh-CN");
+    await i18n.changeLanguage("zh-CN");
+    const user = userEvent.setup();
+    render(<LocalizedOrderSearchBar />);
+
+    await user.click(screen.getByTestId("gsb-i18n"));
+    await user.click(screen.getByRole("option", { name: "状态" }));
+    await user.click(screen.getByRole("option", { name: "执行中" }));
+    expect(screen.getByText("状态: 执行中")).toBeVisible();
+    expect(within(screen.getByTestId("gsb-i18n-rows")).getByText("YR-1")).toBeVisible();
+    expect(within(screen.getByTestId("gsb-i18n-rows")).queryByText("YR-2")).toBeNull();
+    const zhPlaceholder = screen.getByTestId("gsb-i18n").getAttribute("placeholder");
+
+    setLocale("en-US");
+    await i18n.changeLanguage("en-US");
+    await waitFor(() => {
+      expect(screen.getByText("Status: Running")).toBeVisible();
+    });
+    expect(within(screen.getByTestId("gsb-i18n-rows")).getByText("YR-1")).toBeVisible();
+    expect(within(screen.getByTestId("gsb-i18n-rows")).queryByText("YR-2")).toBeNull();
+    const enPlaceholder = screen.getByTestId("gsb-i18n").getAttribute("placeholder");
+    expect(enPlaceholder).toBe(i18n.t("search.placeholderAll"));
+    expect(enPlaceholder).not.toBe(zhPlaceholder);
+
+    setLocale("zh-CN");
+    await i18n.changeLanguage("zh-CN");
+    await waitFor(() => {
+      expect(screen.getByText("状态: 执行中")).toBeVisible();
+    });
+    expect(within(screen.getByTestId("gsb-i18n-rows")).getByText("YR-1")).toBeVisible();
+    expect(within(screen.getByTestId("gsb-i18n-rows")).queryByText("YR-2")).toBeNull();
   });
 });

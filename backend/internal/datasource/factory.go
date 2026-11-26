@@ -12,6 +12,7 @@ import (
 	"github.com/cookieY/YearningX/backend/internal/crypto"
 	"github.com/cookieY/YearningX/backend/internal/database"
 	"github.com/cookieY/YearningX/backend/internal/platform/addrguard"
+	"github.com/cookieY/YearningX/backend/internal/platform/ptr"
 )
 
 // ProbeTimeout is the total timeout for a single connection probe.
@@ -65,10 +66,11 @@ func splitTLSMaterial(verifyServer bool, serverName string, plain []byte) (*data
 
 // ProbeResult is the structured result of a connection probe (excluding credentials).
 type ProbeResult struct {
-	Engine         string
-	ServerVersion  string
-	InstanceMarker string
-	DurationMS     int64
+	Engine           string
+	ServerVersion    string
+	RawVersionBanner string
+	InstanceMarker   string
+	DurationMS       int64
 }
 
 // Probe connects to the target database using the specified Purpose credential and reads its version and instance identity.
@@ -92,7 +94,7 @@ func (f *Factory) Probe(ctx context.Context, ds *DatasourceModel, cred *Datasour
 	default:
 		return nil, ErrUnsupportedCapability
 	}
-	effectiveDB := derefString(ds.DatabaseName)
+	effectiveDB := ptr.Deref(ds.DatabaseName)
 	if effectiveDB == "" {
 		effectiveDB = payload.Username
 	}
@@ -108,10 +110,11 @@ func (f *Factory) Probe(ctx context.Context, ds *DatasourceModel, cred *Datasour
 		return nil, err
 	}
 	return &ProbeResult{
-		Engine:         identity.EngineFamily,
-		ServerVersion:  identity.ServerVersion,
-		InstanceMarker: identity.InstanceMarker,
-		DurationMS:     time.Since(start).Milliseconds(),
+		Engine:           identity.EngineFamily,
+		ServerVersion:    identity.ServerVersion,
+		RawVersionBanner: identity.RawVersionBanner,
+		InstanceMarker:   identity.InstanceMarker,
+		DurationMS:       time.Since(start).Milliseconds(),
 	}, nil
 }
 
@@ -120,7 +123,7 @@ func adapterForMode(ds *DatasourceModel) database.Adapter {
 	ep := database.Endpoint{
 		Host:             ds.Host,
 		Port:             ds.Port,
-		DatabaseName:     derefString(ds.DatabaseName),
+		DatabaseName:     ptr.Deref(ds.DatabaseName),
 		CompatibilityMod: ds.CompatibilityMode,
 	}
 	if ds.CompatibilityMode == "mysql" {
@@ -141,16 +144,9 @@ func (f *Factory) IdentityFingerprint(ds *DatasourceModel, instanceMarker string
 	return fmt.Sprintf("%x", mac), nil
 }
 
-func derefString(s *string) string {
-	if s == nil {
-		return ""
-	}
-	return *s
-}
-
 // openTLSMaterialForTest constructs TLS material directly from plaintext bytes (for tests; bypasses envelope decryption).
 func (f *Factory) openTLSMaterialForTest(m *DatasourceTLSMaterialModel) (*database.TLSMaterial, error) {
 	// Reuse the splitting logic: replacing ciphertext parameters with decrypted plaintext is not possible on Open,
 	// so call the shared splitTLSMaterial implementation directly here.
-	return splitTLSMaterial(m.VerifyServer, derefString(m.ServerName), m.MaterialCiphertext)
+	return splitTLSMaterial(m.VerifyServer, ptr.Deref(m.ServerName), m.MaterialCiphertext)
 }

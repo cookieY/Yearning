@@ -13,11 +13,8 @@ package httpapi
 import (
 	"bytes"
 	"context"
-	"encoding/base64"
 	"encoding/json"
-	"fmt"
 	"net/http/httptest"
-	"os"
 	"strings"
 	"testing"
 
@@ -25,38 +22,20 @@ import (
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 	"go.uber.org/zap/zaptest/observer"
-	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
-	gormlogger "gorm.io/gorm/logger"
 
 	"github.com/cookieY/YearningX/backend/internal/authorization/auditlog"
 	"github.com/cookieY/YearningX/backend/internal/crypto"
 	"github.com/cookieY/YearningX/backend/internal/datasource"
 	"github.com/cookieY/YearningX/backend/internal/identity"
 	"github.com/cookieY/YearningX/backend/internal/identity/session"
+	"github.com/cookieY/YearningX/backend/internal/platform/testkit"
 	"github.com/cookieY/YearningX/backend/internal/workflow"
 )
 
 func integrationDSN(t *testing.T) string {
 	t.Helper()
-	password := os.Getenv("YEARNING_TEST_DATABASE_PASSWORD")
-	if password == "" {
-		t.Skip("integration PostgreSQL not configured: set YEARNING_TEST_DATABASE_PASSWORD")
-	}
-	host := itestEnv("YEARNING_TEST_DATABASE_HOST", "localhost")
-	port := itestEnv("YEARNING_TEST_DATABASE_PORT", "54330")
-	user := itestEnv("YEARNING_TEST_DATABASE_USER", "yearning")
-	dbname := itestEnv("YEARNING_TEST_DATABASE_DBNAME", "yearning_v4")
-	sslmode := itestEnv("YEARNING_TEST_DATABASE_SSLMODE", "disable")
-	return fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=%s",
-		host, port, user, password, dbname, sslmode)
-}
-
-func itestEnv(key, fallback string) string {
-	if v := os.Getenv(key); v != "" {
-		return v
-	}
-	return fallback
+	return testkit.PGDSN(t)
 }
 
 // testClient holds cookies and CSRF tokens to simulate a browser session.
@@ -125,40 +104,10 @@ type b3Fixture struct {
 
 func newB3Fixture(t *testing.T) *b3Fixture {
 	t.Helper()
-	acquireItestLock(t, "shared")
 	gin.SetMode(gin.TestMode)
-	db, err := gorm.Open(postgres.Open(integrationDSN(t)), &gorm.Config{
-		Logger: gormlogger.Discard,
-	})
-	if err != nil {
-		t.Fatalf("postgres connect: %v", err)
-	}
-	registerIntegrationDBCleanup(t, db)
+	db := testkit.OpenPG(t)
 	truncateAll(t, db)
-
-	dir := t.TempDir()
-	keyringDoc := fmt.Sprintf(`{"contract_version":1,"deployment_id":"b3-itest","keys":[
-		{"key_id":"pay-1","purpose":"payload","status":"encrypt_decrypt","created_at":"2026-08-25T00:00:00Z","key_base64":"%s"},
-		{"key_id":"state-1","purpose":"oidc_state","status":"encrypt_decrypt","created_at":"2026-08-25T00:00:00Z","key_base64":"%s"},
-		{"key_id":"ident-1","purpose":"identifier_token","status":"encrypt_decrypt","created_at":"2026-08-25T00:00:00Z","key_base64":"%s"},
-		{"key_id":"sit-1","purpose":"settings_impact_token","status":"encrypt_decrypt","created_at":"2026-08-25T00:00:00Z","key_base64":"%s"},
-		{"key_id":"fp-1","purpose":"sql_fingerprint","status":"encrypt_decrypt","created_at":"2026-08-25T00:00:00Z","key_base64":"%s"},
-		{"key_id":"aff-1","purpose":"cursor_affinity","status":"encrypt_decrypt","created_at":"2026-08-25T00:00:00Z","key_base64":"%s"}]}`,
-		base64.StdEncoding.EncodeToString(make32(1)),
-		base64.StdEncoding.EncodeToString(make32(2)),
-		base64.StdEncoding.EncodeToString(make32(3)),
-		base64.StdEncoding.EncodeToString(make32(9)),
-		base64.StdEncoding.EncodeToString(make32(11)),
-		base64.StdEncoding.EncodeToString(make32(12)))
-	keyringPath := dir + "/keyring.json"
-	if err := os.WriteFile(keyringPath, []byte(keyringDoc), 0o400); err != nil {
-		t.Fatal(err)
-	}
-	ring, err := crypto.LoadKeyring(keyringPath)
-	if err != nil {
-		t.Fatal(err)
-	}
-	crypter, _ := crypto.NewCrypter(ring)
+	crypter := testkit.NewCrypter(t)
 
 	logger, logs := observedLogger()
 	recorder, _ := auditlog.NewRecorder(db)
@@ -201,14 +150,6 @@ func newB3Fixture(t *testing.T) *b3Fixture {
 		sessions: sessions, crypter: crypter, logs: logs,
 		admin: testClient{t: t, engine: engine, cookies: map[string]string{}},
 	}
-}
-
-func make32(seed byte) []byte {
-	b := make([]byte, 32)
-	for i := range b {
-		b[i] = seed + byte(i)
-	}
-	return b
 }
 
 func observedLogger() (*zap.Logger, *observer.ObservedLogs) {

@@ -5,7 +5,9 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter } from "react-router";
 import { HttpResponse, http } from "msw";
 import { beforeAll, beforeEach, afterEach, describe, expect, it } from "vitest";
+import { apiRoute } from "@/shared/mock/api-route";
 import { server } from "@/test/msw/server";
+import { stubSession } from "@/test/session";
 import { resetAdminFixture } from "@/shared/mock/admin-fixture";
 import {
   ADMIN_FIXTURE_DATASOURCE_MYSQL_ID,
@@ -33,31 +35,6 @@ import AdminReviewSkillsPage from "@/routes/admin/admin-review-skills-page";
  * admin popup assertions HERE, inside the single test.
  */
 
-const SESSION_USER_ID = "0198d9cc-e65d-7b9d-a8aa-3c81945f99ac";
-
-function stubSession(admin: boolean): void {
-  server.use(
-    http.get("*/users/me", () =>
-      HttpResponse.json({
-        err_code: 0,
-        message: "ok",
-        data: {
-          id: SESSION_USER_ID,
-          username: "henry",
-          display_name: "henry",
-          email: null,
-          is_builtin_admin: admin,
-          version: 1,
-          created_at: "2026-08-28T08:00:00Z",
-          updated_at: "2026-08-28T08:00:00Z",
-          can_access_admin: admin,
-        },
-        request_id: SESSION_USER_ID,
-      }),
-    ),
-  );
-}
-
 beforeAll(() => {
   Object.defineProperty(Element.prototype, "hasPointerCapture", { value: () => false, configurable: true });
   Object.defineProperty(Element.prototype, "scrollIntoView", { value: () => undefined, configurable: true });
@@ -81,7 +58,7 @@ function renderPage(ui: React.ReactElement) {
 function captureDatasourcePut(): { body: Record<string, unknown> | null } {
   const captured: { body: Record<string, unknown> | null } = { body: null };
   server.use(
-    http.put("*/admin/datasources/:datasourceId", async ({ request }) => {
+    http.put(apiRoute("/admin/datasources/:datasourceId"), async ({ request }) => {
       captured.body = (await request.json()) as Record<string, unknown>;
       return HttpResponse.json({
         err_code: 0,
@@ -210,7 +187,6 @@ describe("admin select-popup interactions (single isolated test)", () => {
     await userEvent.type(screen.getByTestId("credential-username-execution"), "exec_rw");
     // The reuse-mode risk copy is visible on the row now in reuse mode.
     expect(screen.getByText(/\u6700\u5c0f\u6743\u9650\u98ce\u9669/)).toBeInTheDocument();
-    await userEvent.type(screen.getByTestId("ds-version-constraint"), ">=8.0");
     await userEvent.click(screen.getByTestId("ds-submit"));
     await waitFor(() => { expect(captured.body).not.toBeNull(); });
     const credentials = captured.body?.credentials as Array<Record<string, unknown>>;
@@ -238,7 +214,6 @@ describe("admin select-popup interactions (single isolated test)", () => {
     await userEvent.click(screen.getByTestId("ds-test-purpose"));
     await userEvent.click(await screen.findByRole("option", { name: "\u6267\u884c\u51ed\u636e\uff08\u8bfb\u5199\uff09" }));
     expect(screen.getByTestId("ds-test-purpose")).toHaveTextContent("\u6267\u884c\u51ed\u636e\uff08\u8bfb\u5199\uff09");
-    await userEvent.type(screen.getByTestId("ds-version-constraint"), ">=8.0");
     await userEvent.click(screen.getByTestId("ds-submit"));
     await waitFor(() => { expect(capturedPurpose.body).not.toBeNull(); });
     expect(capturedPurpose.body?.test_purpose).toBe("execution");

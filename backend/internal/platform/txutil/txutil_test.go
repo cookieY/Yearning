@@ -5,6 +5,7 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/go-sql-driver/mysql"
 	"github.com/jackc/pgx/v5/pgconn"
 	"gorm.io/gorm"
 )
@@ -34,11 +35,41 @@ func TestIsUniqueViolation(t *testing.T) {
 	if !IsUniqueViolation(&pgconn.PgError{Code: "23505"}) {
 		t.Fatal("SQLSTATE 23505 must be classified as unique violation")
 	}
-	if !IsUniqueViolation(errors.New("ERROR: duplicate key value violates unique constraint (SQLSTATE 23505)")) {
-		t.Fatal("driver error string containing 23505 must be classified as unique violation")
+	if !IsUniqueViolation(&mysql.MySQLError{Number: 1062, Message: "Duplicate entry 'x' for key 'idx_x'"}) {
+		t.Fatal("MySQL 1062 must be classified as unique violation")
 	}
-	if IsUniqueViolation(&pgconn.PgError{Code: "23503"}) {
+	if !IsUniqueViolation(errors.New("ERROR: duplicate key value violates unique constraint (SQLSTATE 23505)")) {
+		t.Fatal("driver error string with explicit SQLSTATE 23505 must be classified as unique violation")
+	}
+	if IsUniqueViolation(errors.New("dial tcp 127.0.0.1:23505: connection refused")) {
+		t.Fatal("port 23505 in dial error must NOT be misclassified as unique violation")
+	}
+	if IsUniqueViolation(errors.New("request 23505 timed out")) {
+		t.Fatal("bare substring 23505 must NOT be misclassified as unique violation")
+	}
+	if IsUniqueViolation(&pgconn.PgError{Code: "23503", Detail: "SQLSTATE 23505 in user text"}) {
 		t.Fatal("foreign key 23503 must not match unique violation")
+	}
+}
+
+func TestUniqueViolationConstraintAndCheckViolationAndForUpdate(t *testing.T) {
+	if got := UniqueViolationConstraint(&pgconn.PgError{Code: "23505", ConstraintName: "users_username_key"}); got != "users_username_key" {
+		t.Fatalf("UniqueViolationConstraint(pg) = %q, want users_username_key", got)
+	}
+	if got := UniqueViolationConstraint(&mysql.MySQLError{Number: 1062, Message: "Duplicate entry 'a' for key 't.uk_name'"}); got != "t.uk_name" {
+		t.Fatalf("UniqueViolationConstraint(mysql) = %q, want t.uk_name", got)
+	}
+	if got := UniqueViolationConstraint(&pgconn.PgError{Code: "23503", ConstraintName: "fk_x"}); got != "" {
+		t.Fatalf("UniqueViolationConstraint(non-23505) = %q, want empty", got)
+	}
+	if !IsCheckViolation(&pgconn.PgError{Code: "23514"}) {
+		t.Fatal("SQLSTATE 23514 must be classified as check violation")
+	}
+	if IsCheckViolation(&pgconn.PgError{Code: "23505"}) {
+		t.Fatal("SQLSTATE 23505 must not be classified as check violation")
+	}
+	if lock := ForUpdate(); lock.Strength != "UPDATE" {
+		t.Fatalf("ForUpdate().Strength = %q, want UPDATE", lock.Strength)
 	}
 }
 

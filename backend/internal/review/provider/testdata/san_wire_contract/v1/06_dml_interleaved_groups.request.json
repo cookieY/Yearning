@@ -1,0 +1,190 @@
+{
+  "request_schema_version": 1,
+  "review_run_id": "00000000-0000-4000-8000-000000000001",
+  "engine_profile": "mysql/mysql",
+  "anonymized_statement_groups": [
+    {
+      "group_id": "10000000-0000-4000-8000-000000000001",
+      "representative_shape": "kind=dml op=update where=true",
+      "representative_anonymized_sql": "UPDATE shop.orders SET status = 'paid' WHERE id = 1",
+      "objects": [
+        {
+          "token": "shop",
+          "kind": "schema",
+          "relation": "reference",
+          "schema_token": "shop",
+          "statement_ordinal": 1,
+          "statement_ordinal_ranges": [
+            {
+              "start": 1,
+              "end": 1
+            },
+            {
+              "start": 3,
+              "end": 3
+            }
+          ]
+        },
+        {
+          "token": "shop.orders",
+          "kind": "table",
+          "relation": "target",
+          "schema_token": "shop",
+          "statement_ordinal": 1,
+          "statement_ordinal_ranges": [
+            {
+              "start": 1,
+              "end": 1
+            },
+            {
+              "start": 3,
+              "end": 3
+            }
+          ]
+        },
+        {
+          "token": "status",
+          "kind": "column",
+          "relation": "write",
+          "schema_token": "shop",
+          "parent_token": "shop.orders",
+          "statement_ordinal": 1,
+          "statement_ordinal_ranges": [
+            {
+              "start": 1,
+              "end": 1
+            },
+            {
+              "start": 3,
+              "end": 3
+            }
+          ]
+        },
+        {
+          "token": "id",
+          "kind": "column",
+          "relation": "filter",
+          "schema_token": "shop",
+          "parent_token": "shop.orders",
+          "statement_ordinal": 1,
+          "statement_ordinal_ranges": [
+            {
+              "start": 1,
+              "end": 1
+            },
+            {
+              "start": 3,
+              "end": 3
+            }
+          ]
+        }
+      ],
+      "metadata_context_complete": true,
+      "statement_count": 2,
+      "statement_ordinal": 1,
+      "statement_ordinal_ranges": [
+        {
+          "start": 1,
+          "end": 1
+        },
+        {
+          "start": 3,
+          "end": 3
+        }
+      ],
+      "statistics": {
+        "algorithm_version": "yearning-fingerprint-v1",
+        "dml_has_limit": false,
+        "dml_has_order_by": false,
+        "dml_has_subselect": false,
+        "in_value_count_max": 0,
+        "max_statement_bytes": 54,
+        "unbounded_mutation": false,
+        "values_row_count_max": 0,
+        "where_literal_null": false
+      }
+    },
+    {
+      "group_id": "10000000-0000-4000-8000-000000000002",
+      "representative_shape": "kind=dml op=insert where=true",
+      "representative_anonymized_sql": "INSERT INTO shop.audit_events (order_id, event_type) VALUES (1, 'paid')",
+      "objects": [
+        {
+          "token": "shop",
+          "kind": "schema",
+          "relation": "reference",
+          "schema_token": "shop",
+          "statement_ordinal": 2,
+          "statement_ordinal_ranges": [
+            {
+              "start": 2,
+              "end": 2
+            }
+          ]
+        },
+        {
+          "token": "shop.audit_events",
+          "kind": "table",
+          "relation": "write",
+          "schema_token": "shop",
+          "statement_ordinal": 2,
+          "statement_ordinal_ranges": [
+            {
+              "start": 2,
+              "end": 2
+            }
+          ]
+        },
+        {
+          "token": "order_id",
+          "kind": "column",
+          "relation": "write",
+          "schema_token": "shop",
+          "parent_token": "shop.audit_events",
+          "statement_ordinal": 2,
+          "statement_ordinal_ranges": [
+            {
+              "start": 2,
+              "end": 2
+            }
+          ]
+        },
+        {
+          "token": "event_type",
+          "kind": "column",
+          "relation": "write",
+          "schema_token": "shop",
+          "parent_token": "shop.audit_events",
+          "statement_ordinal": 2,
+          "statement_ordinal_ranges": [
+            {
+              "start": 2,
+              "end": 2
+            }
+          ]
+        }
+      ],
+      "metadata_context_complete": true,
+      "statement_count": 1,
+      "statement_ordinal": 2,
+      "statement_ordinal_ranges": [
+        {
+          "start": 2,
+          "end": 2
+        }
+      ],
+      "statistics": {
+        "algorithm_version": "yearning-fingerprint-v1",
+        "dml_has_subselect": false,
+        "in_value_count_max": 0,
+        "insert_has_columns": true,
+        "insert_has_null_literal": false,
+        "max_statement_bytes": 71,
+        "unbounded_mutation": false,
+        "values_row_count_max": 1
+      }
+    }
+  ],
+  "normalized_evidence": [],
+  "allowed_tool_descriptors": []
+}

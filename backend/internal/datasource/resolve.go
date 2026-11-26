@@ -11,6 +11,7 @@ import (
 
 	"github.com/cookieY/YearningX/backend/internal/crypto"
 	"github.com/cookieY/YearningX/backend/internal/database"
+	"github.com/cookieY/YearningX/backend/internal/platform/ptr"
 )
 
 // ResolvedCredential holds a decrypted target database credential together with the
@@ -43,17 +44,15 @@ func OpenCredentialEnvelope(crypter *crypto.Crypter, row *DatasourceCredentialMo
 	if alg == "" {
 		alg = "aes-256-gcm"
 	}
-	plain, err := crypter.Open(crypto.PurposePayload, crypto.Envelope{
+	plain, err := crypter.OpenColumn(crypto.PurposeDatasourceCredential, crypto.ColumnRef{
+		Table:      "datasource_credentials",
+		PrimaryKey: row.ID,
+		Column:     "credential",
+	}, crypto.Envelope{
 		Ciphertext: row.CredentialCiphertext,
 		Nonce:      row.CredentialNonce,
 		KeyID:      row.CredentialKeyID,
 		Algorithm:  alg,
-	}, crypto.AAD{
-		DeploymentID: crypter.DeploymentID(),
-		Table:        "datasource_credentials",
-		PrimaryKey:   row.ID,
-		Column:       "credential",
-		Purpose:      "datasource_credential",
 	})
 	if err != nil {
 		return database.Credential{}, err
@@ -104,6 +103,26 @@ func SplitTLSMaterial(verifyServer bool, serverName string, plain []byte) (*data
 	return mat, nil
 }
 
+// ValidatePEMBlocks verifies that material contains at least one PEM block and that every block
+// matches wantCert (CERTIFICATE when wantCert is true, non-CERTIFICATE private key blocks otherwise).
+func ValidatePEMBlocks(material []byte, wantCert bool) bool {
+	rest := material
+	blocks := 0
+	for {
+		var block *pem.Block
+		block, rest = pem.Decode(rest)
+		if block == nil {
+			break
+		}
+		blocks++
+		isCert := block.Type == "CERTIFICATE"
+		if isCert != wantCert {
+			return false
+		}
+	}
+	return blocks > 0
+}
+
 // OpenTLSEnvelope decrypts a datasource_tls_materials row using the canonical datasource_tls
 // AAD contract and splits its PEM bundle. Returns (nil, nil) when TLS material is absent/unpopulated.
 func OpenTLSEnvelope(crypter *crypto.Crypter, row *DatasourceTLSMaterialModel) (*database.TLSMaterial, error) {
@@ -113,26 +132,24 @@ func OpenTLSEnvelope(crypter *crypto.Crypter, row *DatasourceTLSMaterialModel) (
 	if crypter == nil {
 		return nil, errors.New("datasource: nil crypter")
 	}
-	alg := derefString(row.MaterialAlgorithm)
+	alg := ptr.Deref(row.MaterialAlgorithm)
 	if alg == "" {
 		alg = "aes-256-gcm"
 	}
-	plain, err := crypter.Open(crypto.PurposePayload, crypto.Envelope{
+	plain, err := crypter.OpenColumn(crypto.PurposeDatasourceTLS, crypto.ColumnRef{
+		Table:      "datasource_tls_materials",
+		PrimaryKey: row.ID,
+		Column:     "material",
+	}, crypto.Envelope{
 		Ciphertext: row.MaterialCiphertext,
 		Nonce:      row.MaterialNonce,
 		KeyID:      *row.MaterialKeyID,
 		Algorithm:  alg,
-	}, crypto.AAD{
-		DeploymentID: crypter.DeploymentID(),
-		Table:        "datasource_tls_materials",
-		PrimaryKey:   row.ID,
-		Column:       "material",
-		Purpose:      "datasource_tls",
 	})
 	if err != nil {
 		return nil, err
 	}
-	return SplitTLSMaterial(row.VerifyServer, derefString(row.ServerName), plain)
+	return SplitTLSMaterial(row.VerifyServer, ptr.Deref(row.ServerName), plain)
 }
 
 // ResolveCredential loads and decrypts the first enabled datasource credential matching

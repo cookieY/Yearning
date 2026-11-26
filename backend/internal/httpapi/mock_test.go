@@ -42,7 +42,7 @@ func setScenario(t *testing.T, r *gin.Engine, id string) *httptest.ResponseRecor
 
 func TestMockEngineLoadsRealContracts(t *testing.T) {
 	if _, err := os.Stat(repoOpenAPIPath); err != nil {
-		t.Skipf("openapi not reachable from test cwd: %v", err)
+		t.Fatalf("openapi not reachable from test cwd: %v", err)
 	}
 	engine, err := NewMockEngine(repoOpenAPIPath, repoScenariosPath, zap.NewNop())
 	if err != nil {

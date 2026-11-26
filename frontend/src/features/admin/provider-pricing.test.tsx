@@ -4,7 +4,9 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter } from "react-router";
 import { http, HttpResponse } from "msw";
 import { beforeAll, afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { apiRoute } from "@/shared/mock/api-route";
 import { server } from "@/test/msw/server";
+import { stubSession as stubSharedSession } from "@/test/session";
 import {
   ADMIN_FIXTURE_PROVIDER_PRIMARY_ID,
   resetAdminFixture,
@@ -26,26 +28,7 @@ import {
 const SESSION_USER_ID = "e2e-admin";
 
 function stubSession(admin: boolean): void {
-  server.use(
-    http.get("*/users/me", () =>
-      HttpResponse.json({
-        err_code: 0,
-        message: "ok",
-        data: {
-          id: SESSION_USER_ID,
-          username: "henry",
-          display_name: "henry",
-          email: null,
-          is_builtin_admin: admin,
-          version: 1,
-          created_at: "2026-08-28T08:00:00Z",
-          updated_at: "2026-08-28T08:00:00Z",
-          can_access_admin: admin,
-        },
-        request_id: SESSION_USER_ID,
-      }),
-    ),
-  );
+  stubSharedSession({ admin, id: SESSION_USER_ID, requestId: SESSION_USER_ID });
 }
 
 function renderPanel(ui: React.ReactElement): void {
@@ -94,7 +77,7 @@ describe("ProviderPricingPanel", () => {
   it("renders the empty state, guards an empty effective-from, then creates an open-ended version", async () => {
     const created: Array<Record<string, unknown>> = [];
     server.use(
-      http.post("*/admin/ai-providers/:providerId/rate-versions", async ({ request }) => {
+      http.post(apiRoute("/admin/ai-providers/:providerId/rate-versions"), async ({ request }) => {
         created.push((await request.json()) as Record<string, unknown>);
         return HttpResponse.json({ err_code: 1002, message: "not used", data: null, request_id: "x" });
       }),
@@ -116,7 +99,7 @@ describe("ProviderPricingPanel", () => {
     fireEvent.change(screen.getByTestId("rate-output-price-0"), { target: { value: "5.67" } });
     fireEvent.change(screen.getByTestId("rate-cached-read-0"), { target: { value: "0.10" } });
     server.use(
-      http.post("*/admin/ai-providers/:providerId/rate-versions", async ({ request }) => {
+      http.post(apiRoute("/admin/ai-providers/:providerId/rate-versions"), async ({ request }) => {
         const body = (await request.json()) as Record<string, unknown>;
         created.push(body);
         return HttpResponse.json({
@@ -242,7 +225,7 @@ describe("ProviderPricingPanel", () => {
     unmountAll();
     const overrideFetches: number[] = [];
     server.use(
-      http.get("*/admin/settings/ai-budget", () => {
+      http.get(apiRoute("/admin/settings/:namespace"), () => {
         overrideFetches.push(1);
         return HttpResponse.json({
           err_code: 0,
@@ -282,7 +265,7 @@ describe("ProviderPricingPanel", () => {
   it("ignores the template when the settings namespace carries no reference prices", async () => {
     const settingsFetches: number[] = [];
     server.use(
-      http.get("*/admin/settings/ai-budget", () => {
+      http.get(apiRoute("/admin/settings/:namespace"), () => {
         settingsFetches.push(1);
         return HttpResponse.json({
           err_code: 0,
@@ -340,7 +323,7 @@ describe("ProviderPricingPanel", () => {
   it("switches the currency to USD through the real Select", async () => {
     const created: Array<Record<string, unknown>> = [];
     server.use(
-      http.post("*/admin/ai-providers/:providerId/rate-versions", async ({ request }) => {
+      http.post(apiRoute("/admin/ai-providers/:providerId/rate-versions"), async ({ request }) => {
         const body = (await request.json()) as Record<string, unknown>;
         created.push(body);
         return HttpResponse.json({
@@ -369,7 +352,7 @@ describe("ProviderPricingPanel", () => {
 
   it("surfaces the backend rejection inside the form without closing it", async () => {
     server.use(
-      http.post("*/admin/ai-providers/:providerId/rate-versions", () =>
+      http.post(apiRoute("/admin/ai-providers/:providerId/rate-versions"), () =>
         HttpResponse.json({ err_code: 1001, message: "RATE_CURRENCY_MISMATCH", data: null, request_id: "req-77" }),
       ),
     );
@@ -387,7 +370,7 @@ describe("ProviderPricingPanel", () => {
 
   it("places server meta.fields rejections next to the offending fields (RCP-20261102)", async () => {
     server.use(
-      http.post("*/admin/ai-providers/:providerId/rate-versions", () =>
+      http.post(apiRoute("/admin/ai-providers/:providerId/rate-versions"), () =>
         HttpResponse.json({
           err_code: 1001,
           message: "VALIDATION_FAILED",
@@ -481,7 +464,7 @@ describe("ProviderUsagePanel", () => {
       calc_basis: "base_only",
     };
     server.use(
-      http.get("*/admin/ai-usage/calls", () =>
+      http.get(apiRoute("/admin/ai-usage/calls"), () =>
         HttpResponse.json({
           err_code: 0, message: "ok", request_id: "x",
           data: { items: [row, rowBase], page: { next_cursor: null, has_more: false } },
@@ -500,10 +483,10 @@ describe("ProviderUsagePanel", () => {
 
   it("shows the empty forms when no usage exists for the provider", async () => {
     server.use(
-      http.get("*/admin/ai-usage/summary", () =>
+      http.get(apiRoute("/admin/ai-usage/summary"), () =>
         HttpResponse.json({ err_code: 0, message: "ok", data: [], request_id: "x" }),
       ),
-      http.get("*/admin/ai-usage/calls", () =>
+      http.get(apiRoute("/admin/ai-usage/calls"), () =>
         HttpResponse.json({
           err_code: 0, message: "ok", request_id: "x",
           data: { items: [], page: { next_cursor: null, has_more: false } },
@@ -541,13 +524,13 @@ function usageCallRow(id: string, amount: string): Record<string, unknown> {
 
 function stubUsage(summaryAmount: string, callAmounts: ReadonlyArray<string>): void {
   server.use(
-    http.get("*/admin/ai-usage/summary", () =>
+    http.get(apiRoute("/admin/ai-usage/summary"), () =>
       HttpResponse.json({
         err_code: 0, message: "ok", request_id: "x",
         data: [{ currency: "CNY", reference_amount: summaryAmount, computable_calls: 1, calls: 1 }],
       }),
     ),
-    http.get("*/admin/ai-usage/calls", () =>
+    http.get(apiRoute("/admin/ai-usage/calls"), () =>
       HttpResponse.json({
         err_code: 0, message: "ok", request_id: "x",
         data: {
@@ -561,7 +544,7 @@ function stubUsage(summaryAmount: string, callAmounts: ReadonlyArray<string>): v
 
 function stubBudgetTemplate(currency: "CNY" | "USD"): void {
   server.use(
-    http.get("*/admin/settings/ai-budget", () =>
+    http.get(apiRoute("/admin/settings/:namespace"), () =>
       HttpResponse.json({
         err_code: 0, message: "ok", request_id: SESSION_USER_ID,
         data: {
@@ -615,7 +598,7 @@ describe("S008 regression: full-day window boundary", () => {
   it("renders an accessible, representable end boundary for the default 1440 and submits 1440", async () => {
     const created: Array<Record<string, unknown>> = [];
     server.use(
-      http.post("*/admin/ai-providers/:providerId/rate-versions", async ({ request }) => {
+      http.post(apiRoute("/admin/ai-providers/:providerId/rate-versions"), async ({ request }) => {
         const body = (await request.json()) as Record<string, unknown>;
         created.push(body);
         return HttpResponse.json({
@@ -681,10 +664,10 @@ describe("S008 regression additions: pagination, field errors, a11y, error state
   it("pages the calls stream server-side with the provider_id filter", async () => {
     const callsQueries: string[] = [];
     server.use(
-      http.get("*/admin/ai-usage/summary", () =>
+      http.get(apiRoute("/admin/ai-usage/summary"), () =>
         HttpResponse.json({ err_code: 0, message: "ok", data: [], request_id: "x" }),
       ),
-      http.get("*/admin/ai-usage/calls", ({ request }) => {
+      http.get(apiRoute("/admin/ai-usage/calls"), ({ request }) => {
         const url = new URL(request.url);
         // RCP-20261102-S008: provider filtering executes server-side — request must carry
         // provider_id, and cross-provider rows are dropped by the "server" (mirroring the real backend).
@@ -730,7 +713,7 @@ describe("S008 regression additions: pagination, field errors, a11y, error state
   it("blocks invalid prices and until<from with per-field errors and no request", async () => {
     const created: Array<Record<string, unknown>> = [];
     server.use(
-      http.post("*/admin/ai-providers/:providerId/rate-versions", async ({ request }) => {
+      http.post(apiRoute("/admin/ai-providers/:providerId/rate-versions"), async ({ request }) => {
         created.push((await request.json()) as Record<string, unknown>);
         return HttpResponse.json({ err_code: 0, message: "ok", data: {}, request_id: "x" });
       }),
@@ -780,7 +763,7 @@ describe("S008 regression additions: pagination, field errors, a11y, error state
 
   it("surfaces a rate-version query failure as an error state with request id", async () => {
     server.use(
-      http.get("*/admin/ai-providers/:providerId/rate-versions", () =>
+      http.get(apiRoute("/admin/ai-providers/:providerId/rate-versions"), () =>
         HttpResponse.json({ err_code: 500, message: "boom", data: null, request_id: "rv-req-1" }),
       ),
     );
@@ -792,10 +775,10 @@ describe("S008 regression additions: pagination, field errors, a11y, error state
 
   it("surfaces a calls-query failure as an error state instead of an empty table", async () => {
     server.use(
-      http.get("*/admin/ai-usage/summary", () =>
+      http.get(apiRoute("/admin/ai-usage/summary"), () =>
         HttpResponse.json({ err_code: 0, message: "ok", data: [], request_id: "x" }),
       ),
-      http.get("*/admin/ai-usage/calls", () =>
+      http.get(apiRoute("/admin/ai-usage/calls"), () =>
         HttpResponse.json({ err_code: 500, message: "boom", data: null, request_id: "calls-req-1" }),
       ),
     );

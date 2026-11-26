@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
 import type {
   ChangeOrder,
   ChangeOrderState,
@@ -14,16 +14,16 @@ import {
   voidChangeOrder,
   withdrawChangeOrder,
 } from "@/api/generated/client/change-orders/change-orders";
-import { ifMatchHeader, unwrapApi } from "@/shared/api/mutator";
+import { useIdempotentMutation } from "@/shared/api/idempotency";
+import { idempotencyKeyHeader, ifMatchIdempotencyHeader, unwrapApi } from "@/shared/api/mutator";
 import {
   matchesEntitySubject,
   subscribeSseEvent,
   useSseEvent,
 } from "@/shared/events/sse-event-bus";
 import { useSession } from "@/features/auth/session-provider";
-import { holdsSessionSlot } from "@/shared/dev/mock-super";
 import { activeExecutorStageFor } from "@/features/orders/order-state";
-import { randomUUID } from "@/shared/lib/uuid";
+import { EMPTY_PAGE } from "@/shared/lib/cursor-page";
 
 /**
  * Server-state hooks for the personal order pages (frontend PRD F6). Events
@@ -107,7 +107,7 @@ export function useMyChangeOrders(
           page: page.page,
         };
       };
-      if (me === undefined) return { items: [], page: { has_more: false, next_cursor: null } };
+      if (me === undefined) return EMPTY_PAGE;
       if (scope === "execution") {
         // Review R1 M1: filtering AFTER cursor paging breaks the KPI→list
         // contract — the first page can hold zero matches while the
@@ -132,9 +132,8 @@ export function useMyChangeOrders(
       }
       const page = await readPage(paging?.after);
       return {
-        // My Orders submitter-scope (§5.2): the demo super session holds all identity slots at once
-        // (shared/dev/mock-super), so show all relation-scoped orders to facilitate integrated testing.
-        items: page.items.filter((order) => holdsSessionSlot(order.submitter_user_id, me)),
+        // My Orders submitter-scope (§5.2): show only orders submitted by the active user.
+        items: page.items.filter((order) => order.submitter_user_id === me),
         page: page.page,
       };
     },
@@ -224,20 +223,17 @@ export function useChangeOrderTimeline(orderId: string, enabled: boolean) {
   });
 }
 
-function orderActionRequestInit(order: ChangeOrder | null | undefined): RequestInit {
-  // Both headers are declared required on withdrawal/voidance (OpenAPI
-  // IdempotencyKey parameter; order_lifecycle profile carries the
-  // idempotency codes) — If-Match guards the aggregate version.
-  return ifMatchHeader(order?.version, {
-    "Idempotency-Key": `order-action-${randomUUID()}`,
-  });
-}
-
 export function useWithdrawOrder(order: ChangeOrder | null) {
   const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: (reason: string) =>
-      unwrapApi(withdrawChangeOrder(order?.id as string, { reason }, orderActionRequestInit(order))),
+  return useIdempotentMutation("order-action", {
+    mutationFn: (reason: string, idempotencyKey) =>
+      unwrapApi(
+        withdrawChangeOrder(
+          order?.id as string,
+          { reason },
+          ifMatchIdempotencyHeader(order?.version, idempotencyKey),
+        ),
+      ),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["change-order", order?.id] });
       void queryClient.invalidateQueries({ queryKey: ["change-order-timeline", order?.id] });
@@ -248,9 +244,15 @@ export function useWithdrawOrder(order: ChangeOrder | null) {
 
 export function useVoidOrder(order: ChangeOrder | null) {
   const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: (reason: string) =>
-      unwrapApi(voidChangeOrder(order?.id as string, { reason }, orderActionRequestInit(order))),
+  return useIdempotentMutation("order-action", {
+    mutationFn: (reason: string, idempotencyKey) =>
+      unwrapApi(
+        voidChangeOrder(
+          order?.id as string,
+          { reason },
+          ifMatchIdempotencyHeader(order?.version, idempotencyKey),
+        ),
+      ),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["change-order", order?.id] });
       void queryClient.invalidateQueries({ queryKey: ["change-order-timeline", order?.id] });
@@ -261,13 +263,14 @@ export function useVoidOrder(order: ChangeOrder | null) {
 
 export function useCopyOrderToDraft(order: ChangeOrder | null) {
   const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: (input: { target_flow_id: string; title: string; description?: string }) =>
+  return useIdempotentMutation("copy-draft", {
+    mutationFn: (
+      input: { target_flow_id: string; title: string; description?: string },
+      idempotencyKey,
+    ) =>
       unwrapApi(
         copyChangeOrderToDraft(order?.id as string, input, {
-          headers: {
-            "Idempotency-Key": `copy-draft-${randomUUID()}`,
-          },
+          headers: idempotencyKeyHeader(idempotencyKey),
         }),
       ),
     onSuccess: () => {
@@ -278,13 +281,11 @@ export function useCopyOrderToDraft(order: ChangeOrder | null) {
 
 export function useCreateRollbackDraft(order: ChangeOrder | null) {
   const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: (input?: { title?: string; description?: string }) =>
+  return useIdempotentMutation("rollback-draft", {
+    mutationFn: (input: { title?: string; description?: string } | undefined, idempotencyKey) =>
       unwrapApi(
         createRollbackDraft(order?.id ?? "", input ?? {}, {
-          headers: {
-            "Idempotency-Key": `rollback-draft-${randomUUID()}`,
-          },
+          headers: idempotencyKeyHeader(idempotencyKey),
         }),
       ),
     onSuccess: () => {

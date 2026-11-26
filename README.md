@@ -186,7 +186,7 @@ Configure `change_review` flows with **`1..N` serial datasource stages** (for ex
 - **Safe Execution & In-Process `gh-ost` Online DDL**:
   - **Approval never auto-executes** — frozen executors trigger immediate execution or create a one-shot scheduled run (within a 15-minute grace window and optional weekly maintenance windows).
   - **Single-Datasource Execution Lease** prevents concurrent conflicting changes on the same database.
-  - **Built-in `gh-ost` (`github.com/github/gh-ost`)** runs directly in-process for native MySQL 5.7/8.0 `ALTER TABLE` changes with 18 tunable safety parameters and real-time table-copy progress — no external binary required.
+  - **Built-in `gh-ost` (`github.com/github/gh-ost`)** runs directly in-process for native MySQL 5.7+ (`5.7 / 8.0 / 8.4 LTS`) `ALTER TABLE` changes with 18 tunable safety parameters and real-time table-copy progress — no external binary required.
   - **Fail-Closed `result_unknown` Recovery**: Network drops during commit never blindly replay SQL; executors inspect the target database and record an audited manual verification (`confirm_succeeded` / `confirm_failed`).
 
 <picture>
@@ -314,8 +314,8 @@ flowchart LR
 
 | Engine | Compatibility Mode | AI SQL Review | Change Execution | In-Process `gh-ost` | Auto Rollback | Governed Query | Perf Diagnostics |
 | :-- | :-- | :-: | :-: | :-: | :-: | :-: | :-: |
-| **MySQL 5.7 / 8.0** | Native MySQL | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ (`performance_schema`) |
-| **PostgreSQL 14 – 18** | Native PostgreSQL | ✅ | ✅ | — | ✅ | ✅ | ✅ (`pg_stat_statements`) |
+| **MySQL 5.7+ (5.7 / 8.0 / 8.4 LTS)** | Native MySQL | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ (`performance_schema`) |
+| **PostgreSQL 14+** | Native PostgreSQL | ✅ | ✅ | — | ✅ | ✅ | ✅ (`pg_stat_statements`) |
 | **TiDB** | MySQL Mode | ✅ | ✅ | — | ✅ | ✅ | ✅ |
 | **OceanBase** | MySQL Mode | ✅ | ✅ | — | ✅ | ✅ | ✅ |
 | **PolarDB** | MySQL &amp; PG Mode | ✅ | ✅ | — | ✅ | ✅ | ✅ |

@@ -164,32 +164,13 @@ func (s *Services) probePostgresSearchPath(
 		}
 		return path, nil
 	}
-	row, err := loadDatasourceTargetRow(ctx, s.DB, target.DatasourceID)
-	if err != nil || !target.matchesConfig(row) {
-		return FrozenPostgresSearchPath{}, ErrFactSourceIdentityChanged
-	}
-	adapter, credential, material, identity, err := probeDatasourceConnectionForPurpose(
-		ctx, s.DB, s.Crypter, row, "execution",
+	pool, closePool, err := s.openVerifiedPostgresPool(
+		ctx, target, "execution", database.PurposeExecution, true,
 	)
 	if err != nil {
 		return FrozenPostgresSearchPath{}, err
 	}
-	defer func() { _ = adapter.Close() }()
-	if !s.probeIdentityMatchesTarget(ctx, row, target, identity) {
-		return FrozenPostgresSearchPath{}, ErrFactSourceIdentityChanged
-	}
-	after, err := loadDatasourceTargetRow(ctx, s.DB, target.DatasourceID)
-	if err != nil || !target.matchesConfig(after) {
-		if err != nil {
-			return FrozenPostgresSearchPath{}, err
-		}
-		return FrozenPostgresSearchPath{}, ErrFactSourceIdentityChanged
-	}
-	pool, err := adapter.OpenPurposePool(ctx, database.PurposeExecution, credential, material)
-	if err != nil {
-		return FrozenPostgresSearchPath{}, ErrFactSourceUnavailable
-	}
-	defer func() { _ = pool.Close() }()
+	defer closePool()
 	path, err := database.ProbePostgresSearchPath(ctx, pool)
 	if err != nil {
 		return FrozenPostgresSearchPath{}, ErrFactSourceUnavailable
@@ -238,32 +219,13 @@ func (s *Services) resolvePostgresRelation(
 		return clonePostgresRelationLookup(lookup), nil
 	}
 
-	row, err := loadDatasourceTargetRow(ctx, s.DB, target.DatasourceID)
-	if err != nil || !target.matchesConfig(row) {
-		return PostgresRelationLookup{}, ErrFactSourceIdentityChanged
-	}
-	adapter, credential, material, identity, err := probeDatasourceConnectionForPurpose(
-		ctx, s.DB, s.Crypter, row, "execution",
+	pool, closePool, err := s.openVerifiedPostgresPool(
+		ctx, target, "execution", database.PurposeReview, false,
 	)
 	if err != nil {
 		return PostgresRelationLookup{}, err
 	}
-	defer func() { _ = adapter.Close() }()
-	if identity == nil || !target.matchesIdentity(*identity) {
-		return PostgresRelationLookup{}, ErrFactSourceIdentityChanged
-	}
-	after, err := loadDatasourceTargetRow(ctx, s.DB, target.DatasourceID)
-	if err != nil || !target.matchesConfig(after) {
-		if err != nil {
-			return PostgresRelationLookup{}, err
-		}
-		return PostgresRelationLookup{}, ErrFactSourceIdentityChanged
-	}
-	pool, err := adapter.OpenPurposePool(ctx, database.PurposeReview, credential, material)
-	if err != nil {
-		return PostgresRelationLookup{}, ErrFactSourceUnavailable
-	}
-	defer func() { _ = pool.Close() }()
+	defer closePool()
 	dbPath := databasePostgresPath(path)
 	lookups, err := database.LookupPostgresRelations(
 		ctx, pool, dbPath, []string{request.TableName},
@@ -286,11 +248,66 @@ func (s *Services) resolvePostgresRelation(
 	return lookup, nil
 }
 
+func (s *Services) openVerifiedPostgresPool(
+	ctx context.Context,
+	target frozenDatasourceTarget,
+	credPurpose string,
+	poolPurpose database.Purpose,
+	allowIdentitySeam bool,
+) (*database.PurposePool, func(), error) {
+	row, err := loadDatasourceTargetRow(ctx, s.DB, target.DatasourceID)
+	if err != nil || !target.matchesConfig(row) {
+		return nil, nil, ErrFactSourceIdentityChanged
+	}
+	adapter, credential, material, identity, err := probeDatasourceConnectionForPurpose(
+		ctx, s.DB, s.Crypter, row, credPurpose,
+	)
+	if err != nil {
+		return nil, nil, err
+	}
+	identityMatched := identity != nil && target.matchesIdentity(*identity)
+	if allowIdentitySeam {
+		identityMatched = s.probeIdentityMatchesTarget(ctx, row, target, identity)
+	}
+	if !identityMatched {
+		_ = adapter.Close()
+		return nil, nil, ErrFactSourceIdentityChanged
+	}
+	after, err := loadDatasourceTargetRow(ctx, s.DB, target.DatasourceID)
+	if err != nil || !target.matchesConfig(after) {
+		_ = adapter.Close()
+		if err != nil {
+			return nil, nil, err
+		}
+		return nil, nil, ErrFactSourceIdentityChanged
+	}
+	pool, err := adapter.OpenPurposePool(ctx, poolPurpose, credential, material)
+	if err != nil {
+		_ = adapter.Close()
+		return nil, nil, ErrFactSourceUnavailable
+	}
+	cleanup := func() {
+		_ = pool.Close()
+		_ = adapter.Close()
+	}
+	return pool, cleanup, nil
+}
+
+func (s *Services) openVerifiedPostgresReviewPool(
+	ctx context.Context,
+	target frozenDatasourceTarget,
+) (*database.PurposePool, func(), error) {
+	return s.openVerifiedPostgresPool(
+		ctx, target, "review", database.PurposeReview, true,
+	)
+}
+
 func (s *Services) resolvePostgresRelationBaselines(
 	ctx context.Context,
 	target frozenDatasourceTarget,
 	path FrozenPostgresSearchPath,
 	relations []string,
+	extraSchemas ...string,
 ) (map[string]PostgresRelationBaseline, error) {
 	if len(relations) == 0 || len(relations) > postgresSearchPathMaxResolvedTables {
 		return map[string]PostgresRelationBaseline{}, nil
@@ -302,7 +319,7 @@ func (s *Services) resolvePostgresRelationBaselines(
 		if err != nil {
 			return nil, err
 		}
-		return validatePostgresRelationBaselines(path, relations, values)
+		return validatePostgresRelationBaselines(path, relations, values, extraSchemas...)
 	}
 	if s.PostgresRelationResolver != nil {
 		out := make(map[string]PostgresRelationBaseline, len(relations))
@@ -321,39 +338,22 @@ func (s *Services) resolvePostgresRelationBaselines(
 				OIDBySchema:     clonePostgresOIDs(lookup.OIDBySchema),
 			}
 		}
-		return validatePostgresRelationBaselines(path, relations, mapBaselines(out))
+		return validatePostgresRelationBaselines(path, relations, mapBaselines(out), extraSchemas...)
 	}
 
-	row, err := loadDatasourceTargetRow(ctx, s.DB, target.DatasourceID)
-	if err != nil || !target.matchesConfig(row) {
-		return nil, ErrFactSourceIdentityChanged
-	}
-	adapter, credential, material, identity, err := probeDatasourceConnection(
-		ctx, s.DB, s.Crypter, row,
-	)
+	pool, closePool, err := s.openVerifiedPostgresReviewPool(ctx, target)
 	if err != nil {
 		return nil, err
 	}
-	defer func() { _ = adapter.Close() }()
-	if !s.probeIdentityMatchesTarget(ctx, row, target, identity) {
-		return nil, ErrFactSourceIdentityChanged
-	}
-	after, err := loadDatasourceTargetRow(ctx, s.DB, target.DatasourceID)
-	if err != nil || !target.matchesConfig(after) {
-		if err != nil {
-			return nil, err
-		}
-		return nil, ErrFactSourceIdentityChanged
-	}
-	pool, err := adapter.OpenPurposePool(ctx, database.PurposeReview, credential, material)
-	if err != nil {
-		return nil, ErrFactSourceUnavailable
-	}
-	defer func() { _ = pool.Close() }()
+	defer closePool()
 	lookups, err := database.LookupPostgresRelations(
-		ctx, pool, databasePostgresPath(path), relations,
+		ctx, pool, databasePostgresPath(path), relations, extraSchemas...,
 	)
 	if err != nil {
+		if errors.Is(err, database.ErrPolicyCatalogSchemaUnavailable) ||
+			errors.Is(err, database.ErrMetadataVisibilityUnproven) {
+			return nil, err
+		}
 		return nil, ErrFactSourceUnavailable
 	}
 	values := make([]PostgresRelationBaseline, 0, len(lookups))
@@ -367,7 +367,32 @@ func (s *Services) resolvePostgresRelationBaselines(
 			OIDBySchema: clonePostgresOIDs(lookup.OIDBySchema),
 		})
 	}
-	return validatePostgresRelationBaselines(path, relations, values)
+	return validatePostgresRelationBaselines(path, relations, values, extraSchemas...)
+}
+
+func (s *Services) verifyPostgresSchemasVisible(
+	ctx context.Context,
+	target frozenDatasourceTarget,
+	path FrozenPostgresSearchPath,
+	extraSchemas ...string,
+) error {
+	if s.PostgresPathProbe != nil {
+		return nil
+	}
+	pool, closePool, err := s.openVerifiedPostgresReviewPool(ctx, target)
+	if err != nil {
+		return err
+	}
+	defer closePool()
+	err = database.VerifyPostgresSchemasVisible(ctx, pool, databasePostgresPath(path), extraSchemas...)
+	if err != nil {
+		if errors.Is(err, database.ErrPolicyCatalogSchemaUnavailable) ||
+			errors.Is(err, database.ErrMetadataVisibilityUnproven) {
+			return err
+		}
+		return ErrFactSourceUnavailable
+	}
+	return nil
 }
 
 func mapBaselines(values map[string]PostgresRelationBaseline) []PostgresRelationBaseline {
@@ -390,6 +415,7 @@ func validatePostgresRelationBaselines(
 	path FrozenPostgresSearchPath,
 	relations []string,
 	values []PostgresRelationBaseline,
+	extraSchemas ...string,
 ) (map[string]PostgresRelationBaseline, error) {
 	want := make(map[string]bool, len(relations))
 	for _, relation := range relations {
@@ -401,10 +427,12 @@ func validatePostgresRelationBaselines(
 	if len(values) != len(want) {
 		return nil, ErrFactSourceUnavailable
 	}
-	pathSchemas := make(map[string]bool, len(path.Effective))
-	for _, schema := range path.Effective {
-		pathSchemas[schema] = true
+	for _, schema := range extraSchemas {
+		if !isValidPostgresExplicitSchema(schema) {
+			return nil, ErrFactSourceUnavailable
+		}
 	}
+	pathSchemas := postgresAllowedSchemaSet(path.Effective, extraSchemas)
 	out := make(map[string]PostgresRelationBaseline, len(values))
 	for _, value := range values {
 		if !want[value.TableName] {
@@ -541,25 +569,11 @@ func (s *Services) resolvePostgresCallables(
 			append([]database.PostgresCallableRequest(nil), requests...),
 		)
 	}
-	row, err := loadDatasourceTargetRow(ctx, s.DB, target.DatasourceID)
-	if err != nil || !target.matchesConfig(row) {
-		return nil, ErrFactSourceIdentityChanged
-	}
-	adapter, credential, material, identity, err := probeDatasourceConnection(
-		ctx, s.DB, s.Crypter, row,
-	)
+	pool, closePool, err := s.openVerifiedPostgresReviewPool(ctx, target)
 	if err != nil {
 		return nil, err
 	}
-	defer func() { _ = adapter.Close() }()
-	if !s.probeIdentityMatchesTarget(ctx, row, target, identity) {
-		return nil, ErrFactSourceIdentityChanged
-	}
-	pool, err := adapter.OpenPurposePool(ctx, database.PurposeReview, credential, material)
-	if err != nil {
-		return nil, ErrFactSourceUnavailable
-	}
-	defer func() { _ = pool.Close() }()
+	defer closePool()
 	resolutions, err := database.ResolvePostgresCallables(
 		ctx, pool, databasePostgresPath(path), requests,
 	)
@@ -569,18 +583,97 @@ func (s *Services) resolvePostgresCallables(
 	return resolutions, nil
 }
 
+func postgresExplicitSQLSchemas(
+	stmts []postgresAnalyzedStatement,
+	mapper *privacy.RunMapper,
+	effective []string,
+) (extra []string, hasDisallowed bool) {
+	if mapper == nil {
+		return nil, false
+	}
+	effectiveSet := make(map[string]bool, len(effective))
+	for _, schema := range effective {
+		effectiveSet[schema] = true
+	}
+	seen := map[string]bool{}
+	considerToken := func(kind, tok, relation string) {
+		if tok == "" {
+			return
+		}
+		origKind, orig, found := mapper.Original(tok)
+		if !found || origKind != privacy.KindSchema || orig == "" {
+			hasDisallowed = true
+			return
+		}
+		if strings.EqualFold(orig, "pg_catalog") && kind == string(privacy.KindSchema) && relation == "reference" && effectiveSet[orig] {
+			return
+		}
+		if !isValidPostgresExplicitSchema(orig) {
+			hasDisallowed = true
+			return
+		}
+		if effectiveSet[orig] || seen[orig] {
+			return
+		}
+		seen[orig] = true
+		extra = append(extra, orig)
+	}
+	for i := range stmts {
+		for _, obj := range stmts[i].objects {
+			if obj.Kind == "alias" || obj.Kind == "cte" {
+				continue
+			}
+			if obj.Kind == string(privacy.KindSchema) {
+				tok := obj.SchemaToken
+				if tok == "" {
+					tok = obj.Token
+				}
+				considerToken(obj.Kind, tok, string(obj.Relation))
+				continue
+			}
+			if obj.SchemaToken != "" {
+				considerToken(obj.Kind, obj.SchemaToken, string(obj.Relation))
+			}
+		}
+	}
+	sort.Strings(extra)
+	return extra, hasDisallowed
+}
+
 func (s *Services) freezePostgresStageBinding(
 	ctx context.Context,
 	target frozenDatasourceTarget,
 	stmts []postgresAnalyzedStatement,
 	mapper *privacy.RunMapper,
+	targetSchema ...string,
 ) (frozenPostgresPathBinding, error) {
 	if target.CompatibilityMode != "postgresql" || mapper == nil {
 		return frozenPostgresPathBinding{}, ErrFactSourceUnavailable
 	}
+	var overrideSchema string
+	if len(targetSchema) > 0 {
+		overrideSchema = strings.TrimSpace(targetSchema[0])
+	}
+	if overrideSchema != "" && !isValidPostgresExplicitSchema(overrideSchema) {
+		return frozenPostgresPathBinding{}, errPostgresDisallowedExplicitSchema
+	}
 	path, err := s.probePostgresSearchPath(ctx, target)
 	if err != nil {
 		return frozenPostgresPathBinding{}, err
+	}
+	if overrideSchema != "" {
+		path = FrozenPostgresSearchPath{
+			Version:        path.Version,
+			CurrentUser:    path.CurrentUser,
+			Configured:     overrideSchema,
+			Explicit:       []string{overrideSchema},
+			Effective:      []string{"pg_catalog", overrideSchema},
+			CreationSchema: overrideSchema,
+		}
+	}
+	explicitSchemas, hasDisallowed := postgresExplicitSQLSchemas(stmts, mapper, path.Effective)
+	if hasDisallowed {
+		return frozenPostgresPathBinding{}, errPostgresDisallowedExplicitSchema
 	}
 	requests, err := postgresRelationRequests(stmts, mapper)
 	if err != nil {
@@ -596,11 +689,21 @@ func (s *Services) freezePostgresStageBinding(
 			uniqueRelations = append(uniqueRelations, request.TableName)
 		}
 	}
-	baselines, err := s.resolvePostgresRelationBaselines(
-		baselineCtx, target, path, uniqueRelations,
-	)
-	if err != nil {
-		return frozenPostgresPathBinding{}, err
+	var baselines map[string]PostgresRelationBaseline
+	if len(uniqueRelations) > 0 {
+		baselines, err = s.resolvePostgresRelationBaselines(
+			baselineCtx, target, path, uniqueRelations, explicitSchemas...,
+		)
+		if err != nil {
+			return frozenPostgresPathBinding{}, err
+		}
+	} else {
+		baselines = map[string]PostgresRelationBaseline{}
+		if overrideSchema != "" || len(explicitSchemas) > 0 {
+			if err := s.verifyPostgresSchemasVisible(baselineCtx, target, path, explicitSchemas...); err != nil {
+				return frozenPostgresPathBinding{}, err
+			}
+		}
 	}
 	lookups := make([]postgresRelationLookup, 0, len(requests))
 	for _, request := range requests {
@@ -628,14 +731,15 @@ func (s *Services) freezePostgresStageBinding(
 			callables = nil
 		}
 	}
-	binding, _ := preparePostgresObjectBindingsWithCallables(
+	binding, _ := preparePostgresObjectBindingsWithOptions(
 		path, postgresStatementsOf(stmts), lookups,
 		callables, callablesOK,
+		explicitSchemas, overrideSchema,
 		// Identity resolution detokenizes tokens as-is (both schema and table tokens enter object resolution:
 		// the schema token of explicitly qualified SQL must be detokenizable to a physical schema name;
 		// after RCP-20261031-REMOVE-FLOW-SCHEMA-MAPPINGS, qualified SQL flows through this frozen path —
 		// the legacy explicit-mapping bypass previously masked this resolution). Authorization boundaries are
-		// unaffected: whether a schema falls within the frozen scope is adjudicated by pathSchemas comparison.
+		// unaffected: whether a schema falls within the frozen scope is adjudicated by allowedSchemas comparison.
 		func(token string) (string, bool) {
 			_, original, ok := mapper.Original(token)
 			return original, ok
@@ -660,21 +764,26 @@ func postgresContextValueForStage(
 	target frozenDatasourceTarget,
 	stmts []postgresAnalyzedStatement,
 	mapper *privacy.RunMapper,
+	targetSchema ...string,
 ) (map[string]any, error) {
 	if stage.Engine != "postgresql" && stage.CompatibilityMode != "postgresql" {
 		return map[string]any{}, nil
 	}
 	// RCP-20261031-REMOVE-FLOW-SCHEMA-MAPPINGS: stages no longer configure logical-to-physical Schema mappings,
-	// so PostgreSQL stages uniformly freeze the execution-identity search_path binding (the legacy
-	// "explicit_mapping" bypass disappeared with mapping removal; existing Runs on flows with mappings fail
-	// re-verification due to the frozen hash composition change and must re-run precheck).
-	binding, err := svc.freezePostgresStageBinding(ctx, target, stmts, mapper)
+	// so PostgreSQL stages uniformly freeze the execution-identity search_path binding (and optional user-selected
+	// target schema override / explicit non-system SQL schemas within the same connected database).
+	binding, err := svc.freezePostgresStageBinding(ctx, target, stmts, mapper, targetSchema...)
 	if err != nil {
-		// Keep the stage intact while making its PostgreSQL execution binding
-		// undefensible. Runtime tools and execution fail closed; there is no
-		// database_name/public fallback.
+		status := postgresSearchPathUnavailable
+		switch {
+		case errors.Is(err, errPostgresDisallowedExplicitSchema):
+			status = "sql_schema_out_of_scope"
+		case errors.Is(err, database.ErrPolicyCatalogSchemaUnavailable),
+			errors.Is(err, database.ErrMetadataVisibilityUnproven):
+			status = policyCatalogReadFailureReason(err)
+		}
 		return map[string]any{
-			stagePostgresSearchPathStatusKey: postgresSearchPathUnavailable,
+			stagePostgresSearchPathStatusKey: status,
 		}, nil
 	}
 	return withFrozenPostgresBinding(map[string]any{}, binding)

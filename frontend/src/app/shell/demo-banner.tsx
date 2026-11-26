@@ -5,20 +5,14 @@ import { ExternalLink, RotateCcw, Sparkles } from "lucide-react";
 import { Button } from "@/shared/components/ui/button";
 import { appToast } from "@/shared/components/shadcn-dashboard/sonner/sonner-08";
 import {
-  clearMockSuperSession,
-  mockSuperSession,
-  setMockSuperSession,
-} from "@/shared/dev/mock-super";
-import {
   readStoredIdentity,
   setMockIdentity,
   type MockIdentity,
 } from "@/shared/mock/identity-store";
 
-type DemoPersona = "all" | MockIdentity;
+type DemoPersona = MockIdentity;
 
 function resolveInitialPersona(): DemoPersona {
-  if (mockSuperSession()) return "all";
   return readStoredIdentity();
 }
 
@@ -34,28 +28,21 @@ export function DemoBanner() {
   const [persona, setPersona] = useState<DemoPersona>(resolveInitialPersona);
 
   const roles: Array<{ id: DemoPersona; label: string }> = [
-    { id: "all", label: t("demo.roleAll") },
+    { id: "owner", label: t("demo.roleAll") },
     { id: "henry", label: t("demo.roleSubmitter") },
     { id: "reviewer-a", label: t("demo.roleReviewer") },
     { id: "executor-a", label: t("demo.roleExecutor") },
   ];
 
   const handleSelectPersona = (next: DemoPersona, label: string) => {
-    if (next === "all") {
-      setMockIdentity("henry");
-      setMockSuperSession(true);
-    } else {
-      setMockSuperSession(false);
-      setMockIdentity(next);
-    }
+    setMockIdentity(next);
     setPersona(next);
     void queryClient.invalidateQueries();
     appToast.success(t("demo.roleSwitched", { role: label }));
   };
 
   const handleResetDemo = () => {
-    clearMockSuperSession();
-    setMockIdentity("henry");
+    setMockIdentity("owner");
     window.location.reload();
   };
 

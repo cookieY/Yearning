@@ -345,6 +345,8 @@ def cmd_precheck(client: YearningClient, args: argparse.Namespace) -> Any:
     body: dict[str, Any] = {"flow_id": args.flow_id, "sql": args.sql}
     if args.draft_id:
         body["draft_id"] = args.draft_id
+    if args.target_database:
+        body["target_database"] = args.target_database
     if args.output_locale:
         body["output_locale"] = args.output_locale
 
@@ -380,6 +382,8 @@ def cmd_create_draft(client: YearningClient, args: argparse.Namespace) -> Any:
         body["description"] = args.description
     if args.requested_scheduled_for:
         body["requested_scheduled_for"] = args.requested_scheduled_for
+    if args.target_database:
+        body["target_database"] = args.target_database
     draft = client.request("POST", "/api/v4/change-drafts", body=body)
     if args.sql and isinstance(draft, dict) and draft.get("id"):
         did = urllib.parse.quote(draft["id"])
@@ -463,6 +467,8 @@ def cmd_submit_order(client: YearningClient, args: argparse.Namespace) -> Any:
     }
     if args.draft_id:
         body["draft_id"] = args.draft_id
+    if args.target_database:
+        body["target_database"] = args.target_database
     return client.request("POST", "/api/v4/change-orders", body=body)
 
 
@@ -783,6 +789,7 @@ def build_parser() -> argparse.ArgumentParser:
     p_pre.add_argument("--flow-id", required=True)
     p_pre.add_argument("--sql", required=True)
     p_pre.add_argument("--draft-id")
+    p_pre.add_argument("--target-database", help="Optional MySQL default DB or PostgreSQL Target Schema within the connected DB")
     p_pre.add_argument("--output-locale")
     p_pre.add_argument("--no-wait", dest="wait", action="store_false", default=True)
     p_pre.add_argument("--wait-timeout", dest="wait_timeout", type=float, default=60.0)
@@ -797,6 +804,7 @@ def build_parser() -> argparse.ArgumentParser:
     p_cdraft.add_argument("--description")
     p_cdraft.add_argument("--sql")
     p_cdraft.add_argument("--requested-scheduled-for")
+    p_cdraft.add_argument("--target-database", help="Optional MySQL default DB or PostgreSQL Target Schema within the connected DB")
     p_cdraft.add_argument("--disable-rollback", action="store_true")
 
     p_orders = sub.add_parser("orders", help="List change orders (cursor-paginated via --limit and --after)")
@@ -822,6 +830,7 @@ def build_parser() -> argparse.ArgumentParser:
     p_sub.add_argument("--remark")
     p_sub.add_argument("--requested-scheduled-for")
     p_sub.add_argument("--draft-id")
+    p_sub.add_argument("--target-database", help="Optional MySQL default DB or PostgreSQL Target Schema within the connected DB")
     p_sub.add_argument("--disable-rollback", action="store_true")
 
     p_dec = sub.add_parser("decide-order", help="Approve or reject an active change order stage")

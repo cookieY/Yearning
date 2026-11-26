@@ -51,14 +51,11 @@ func SealEvidenceBundle(crypter *crypto.Crypter, evidenceID string, bundle *Evid
 	if err != nil {
 		return crypto.Envelope{}, "", err
 	}
-	aad := crypto.AAD{
-		DeploymentID: crypter.DeploymentID(),
-		Table:        EvidenceTable,
-		PrimaryKey:   evidenceID,
-		Column:       EvidenceColumn,
-		Purpose:      crypto.PurposePayload,
-	}
-	env, err := crypter.Seal(crypto.PurposePayload, raw, aad)
+	env, err := crypter.SealColumn(crypto.PurposePayload, crypto.ColumnRef{
+		Table:      EvidenceTable,
+		PrimaryKey: evidenceID,
+		Column:     EvidenceColumn,
+	}, raw)
 	if err != nil {
 		return crypto.Envelope{}, "", err
 	}
@@ -74,14 +71,11 @@ func OpenEvidenceBundle(crypter *crypto.Crypter, evidenceID string, env crypto.E
 	if crypter == nil {
 		return nil, errors.New("rollback: crypter is nil")
 	}
-	aad := crypto.AAD{
-		DeploymentID: crypter.DeploymentID(),
-		Table:        EvidenceTable,
-		PrimaryKey:   evidenceID,
-		Column:       EvidenceColumn,
-		Purpose:      crypto.PurposePayload,
-	}
-	plain, err := crypter.Open(crypto.PurposePayload, env, aad)
+	plain, err := crypter.OpenColumn(crypto.PurposePayload, crypto.ColumnRef{
+		Table:      EvidenceTable,
+		PrimaryKey: evidenceID,
+		Column:     EvidenceColumn,
+	}, env)
 	if err != nil {
 		return nil, err
 	}

@@ -2,10 +2,10 @@ import { fireEvent, render, screen, waitFor, within } from "@testing-library/rea
 import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { SessionProvider } from "@/features/auth/session-provider";
-import { HttpResponse, http } from "msw";
 import { MemoryRouter, Route, Routes } from "react-router";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { server } from "@/test/msw/server";
+import { grantSession } from "@/test/session";
 import "@/shared/i18n";
 import {
   FIXTURE_OWNER_ID,
@@ -33,32 +33,9 @@ afterEach(() => {
   resetReviewFixture();
 });
 
-function grantSession(): void {
-  server.use(
-    http.get("*/users/me", () =>
-      HttpResponse.json({
-        err_code: 0,
-        message: "ok",
-        data: {
-          id: FIXTURE_OWNER_ID,
-          username: "henry",
-          display_name: "henry",
-          email: null,
-          is_builtin_admin: true,
-          version: 1,
-          created_at: "2026-08-28T08:00:00Z",
-          updated_at: "2026-08-28T08:00:00Z",
-          can_access_admin: true,
-        },
-        request_id: FIXTURE_OWNER_ID,
-      }),
-    ),
-  );
-}
-
 function queueOrder(overrides: Partial<FixtureOrder> = {}): FixtureOrder {
   return {
-    id: "bq6f1a2b-0000-4000-8000-00000000f801",
+    id: "b66f1a2b-0000-4000-8000-00000000f801",
     display_number: "YR-20260830-000081",
     submitter_user_id: FIXTURE_OWNER_ID,
     requested_scheduled_for: null,
@@ -67,13 +44,13 @@ function queueOrder(overrides: Partial<FixtureOrder> = {}): FixtureOrder {
     current_stage_position: 1,
     stages: [
       {
-        id: "bq6f1a2b-0000-4000-8000-00000000f811",
+        id: "b66f1a2b-0000-4000-8000-00000000f811",
         position: 1,
         datasource_name: "prod-mysql",
         state: "approval_active",
         approval_steps: [
           {
-            id: "bq6f1a2b-0000-4000-8000-00000000f821",
+            id: "b66f1a2b-0000-4000-8000-00000000f821",
             position: 1,
             state: "active",
             decided_at: null,
@@ -129,18 +106,18 @@ describe("ApprovalQueuePage", () => {
     // this order sits in execution-pending with my step approved.
     seedFixtureOrder(
       queueOrder({
-        id: "bq6f1a2b-0000-4000-8000-00000000f802",
+        id: "b66f1a2b-0000-4000-8000-00000000f802",
         display_number: "YR-20260830-000082",
         state: "stage_execution_pending",
         stages: [
           {
-            id: "bq6f1a2b-0000-4000-8000-00000000f812",
+            id: "b66f1a2b-0000-4000-8000-00000000f812",
             position: 1,
             datasource_name: "prod-mysql",
             state: "execution_pending",
             approval_steps: [
               {
-                id: "bq6f1a2b-0000-4000-8000-00000000f822",
+                id: "b66f1a2b-0000-4000-8000-00000000f822",
                 position: 1,
                 state: "approved",
                 decided_at: "2026-08-30T13:00:00Z",
@@ -163,8 +140,8 @@ describe("ApprovalQueuePage", () => {
     expect(table.textContent).toContain("\u662f\u5426\u5df2\u5ba1\u6279");
     // §18.60: my step already carries my own decision (approved) -> Yes;
     // active order still awaiting a decision -> No.
-    expect(screen.getByTestId("approval-reviewed-bq6f1a2b-0000-4000-8000-00000000f802")).toHaveTextContent("\u662f");
-    expect(screen.getByTestId("approval-reviewed-bq6f1a2b-0000-4000-8000-00000000f801")).toHaveTextContent("\u5426");
+    expect(screen.getByTestId("approval-reviewed-b66f1a2b-0000-4000-8000-00000000f802")).toHaveTextContent("\u662f");
+    expect(screen.getByTestId("approval-reviewed-b66f1a2b-0000-4000-8000-00000000f801")).toHaveTextContent("\u5426");
     expect(table.textContent).toContain("\u7b49\u5f85\u6267\u884c");
   });
 
@@ -195,7 +172,7 @@ describe("ApprovalQueuePage", () => {
     seedFixtureOrder(queueOrder({ submitted_at: `${ym}-15T12:00:00Z` }));
     seedFixtureOrder(
       queueOrder({
-        id: "bq6f1a2b-0000-4000-8000-00000000f802",
+        id: "b66f1a2b-0000-4000-8000-00000000f802",
         display_number: "YR-20260830-000082",
         submitted_at: `${ym}-20T12:00:00Z`,
       }),
@@ -247,13 +224,13 @@ describe("ApprovalQueuePage", () => {
       queueOrder({
         stages: [
           {
-            id: "bq6f1a2b-0000-4000-8000-00000000f811",
+            id: "b66f1a2b-0000-4000-8000-00000000f811",
             position: 1,
             datasource_name: "prod-mysql",
             state: "approval_active",
             approval_steps: [
               {
-                id: "bq6f1a2b-0000-4000-8000-00000000f821",
+                id: "b66f1a2b-0000-4000-8000-00000000f821",
                 position: 1,
                 state: "active",
                 decided_at: null,
@@ -287,7 +264,7 @@ describe("ApprovalQueuePage", () => {
     for (let i = 0; i < 25; i += 1) {
       seedFixtureOrder(
         queueOrder({
-          id: `bq6f1a2b-0000-4000-8000-1${String(i).padStart(12, "0")}`,
+          id: `b66f1a2b-0000-4000-8000-1${String(i).padStart(11, "0")}`,
           display_number: `YR-20260830-0030${String(i).padStart(2, "0")}`,
         }),
       );

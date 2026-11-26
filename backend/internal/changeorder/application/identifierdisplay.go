@@ -5,6 +5,7 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/cookieY/YearningX/backend/internal/authorization/auditlog"
+	"github.com/cookieY/YearningX/backend/internal/platform/ptr"
 	"github.com/cookieY/YearningX/backend/internal/review/display"
 )
 
@@ -54,9 +55,9 @@ func (d *orderIdentifierDisplay) audit(ctx context.Context) error {
 			}
 			meta := d.meta
 			if err := d.service.Recorder.Audit(ctx, tx, auditlog.AuditInput{
-				EventType: "review.identifier_displayed", ActorKind: "user", ActorID: strPtrOrNil(d.actor.UserID), ActorUsername: strPtrOrNil(d.actor.Username),
-				ResourceType: "review_run", ResourceID: strPtrOrNil(runID), Action: "read", Outcome: "succeeded",
-				RequestID: strPtrOrNil(meta.RequestID), SourceIP: strPtrOrNil(meta.SourceIP), UserAgent: strPtrOrNil(meta.UserAgent),
+				EventType: "review.identifier_displayed", ActorKind: "user", ActorID: ptr.NonZero(d.actor.UserID), ActorUsername: ptr.NonZero(d.actor.Username),
+				ResourceType: "review_run", ResourceID: ptr.NonZero(runID), Action: "read", Outcome: "succeeded",
+				RequestID: ptr.NonZero(meta.RequestID), SourceIP: ptr.NonZero(meta.SourceIP), UserAgent: ptr.NonZero(meta.UserAgent),
 				Metadata: map[string]any{"surface": "order_findings", "restored_count": count},
 			}); err != nil {
 				return err

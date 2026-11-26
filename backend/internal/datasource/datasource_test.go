@@ -23,24 +23,41 @@ func TestResolveCapabilitiesMatrix(t *testing.T) {
 		engine, mode, version string
 		wantTarget            string
 		wantErr               bool
+		wantErrSubstr         string
 	}{
-		{"mysql", "mysql", "5.7.44-log", "mysql-5.7", false},
-		{"mysql", "mysql", "8.0.36", "mysql-8.0", false},
-		{"mysql", "mysql", "9.1.0", "", true},
-		{"postgresql", "postgresql", "14.11", "postgresql-14", false},
-		{"postgresql", "postgresql", "17.2", "postgresql-17", false},
-		{"postgresql", "postgresql", "13.3", "", true},
-		{"tidb", "mysql", "8.0.11-TiDB-v7.5.1", "tidb-mysql", false},
-		{"oceanbase", "mysql", "5.7.65-OceanBase", "oceanbase-mysql", false},
-		{"polardb", "mysql", "8.0.2", "polardb-mysql", false},
-		{"polardb", "postgresql", "15.4", "polardb-postgresql", false},
-		{"mysql", "postgresql", "8.0.1", "", true}, // Engine and compatibility mode mismatch
+		{"mysql", "mysql", "5.7.44-log", "mysql", false, ""},
+		{"mysql", "mysql", "8.0.36", "mysql", false, ""},
+		{"mysql", "mysql", "8.4.13-0ubuntu0.24.04.1", "mysql", false, ""},
+		{"mysql", "mysql", "9.1.0", "mysql", false, ""},
+		{"mysql", "mysql", "5.6.51", "", true, ">=5.7"},
+		{"mysql", "mysql", "5.7.", "", true, ">=5.7"},
+		{"mysql", "mysql", "8.4.x", "", true, ">=5.7"},
+		{"mysql", "mysql", "", "", true, ">=5.7"},
+		{"mysql", "mysql", "invalid", "", true, ">=5.7"},
+		{"postgresql", "postgresql", "14.11", "postgresql", false, ""},
+		{"postgresql", "postgresql", "17.2", "postgresql", false, ""},
+		{"postgresql", "postgresql", "18.0", "postgresql", false, ""},
+		{"postgresql", "postgresql", "18", "postgresql", false, ""},
+		{"postgresql", "postgresql", "13.3", "", true, ">=14"},
+		{"postgresql", "postgresql", "14.0.bad", "", true, ">=14"},
+		{"postgresql", "postgresql", "9.6.24", "", true, ">=14"},
+		{"tidb", "mysql", "8.0.11-TiDB-v7.5.1", "tidb-mysql", false, ""},
+		{"oceanbase", "mysql", "5.7.65-OceanBase", "oceanbase-mysql", false, ""},
+		{"polardb", "mysql", "8.0.2", "polardb-mysql", false, ""},
+		{"polardb", "postgresql", "15.4", "polardb-postgresql", false, ""},
+		{"mysql", "postgresql", "8.0.1", "", true, ""}, // Engine and compatibility mode mismatch
 	}
 	for _, tc := range cases {
 		target, caps, err := ResolveCapabilities(tc.engine, tc.mode, tc.version)
 		if tc.wantErr {
 			if err == nil {
 				t.Fatalf("%s/%s %s: expected unsupported", tc.engine, tc.mode, tc.version)
+			}
+			if !errors.Is(err, ErrUnsupportedCapability) {
+				t.Fatalf("%s/%s %s: err = %v, want ErrUnsupportedCapability", tc.engine, tc.mode, tc.version, err)
+			}
+			if tc.wantErrSubstr != "" && (!strings.Contains(err.Error(), tc.wantErrSubstr) || (tc.version != "" && !strings.Contains(err.Error(), tc.version))) {
+				t.Fatalf("%s/%s %s: err = %q, want substring %q and version", tc.engine, tc.mode, tc.version, err.Error(), tc.wantErrSubstr)
 			}
 			continue
 		}
@@ -53,8 +70,8 @@ func TestResolveCapabilitiesMatrix(t *testing.T) {
 		if !caps[CapConnectionTest] || !caps[CapDmlExecution] {
 			t.Fatalf("required capability missing for %s", target)
 		}
-		if tc.engine == "mysql" && target != "mysql-5.7" && !caps[CapGhOst] {
-			t.Fatalf("mysql 8.0 must advertise gh_ost")
+		if tc.engine == "mysql" && !caps[CapGhOst] {
+			t.Fatalf("native mysql (%s) must advertise gh_ost", tc.version)
 		}
 		if tc.engine == "postgresql" && caps[CapGhOst] {
 			t.Fatalf("postgresql must not advertise gh_ost")
@@ -82,6 +99,15 @@ func TestEngineModeCombinations(t *testing.T) {
 }
 
 func TestConstraintMatches(t *testing.T) {
+	if !ConstraintMatches(">=5.7", "5.7.0") || !ConstraintMatches(">=5.7", "8.4.13-0ubuntu0.24.04.1") || !ConstraintMatches(">=5.7", "9.1.0") {
+		t.Fatal(">=5.7 must accept 5.7+ releases")
+	}
+	if ConstraintMatches(">=5.7", "5.6.51") || ConstraintMatches(">=5.7", "5.7.") || ConstraintMatches(">=5.7", "8.4.x") || ConstraintMatches(">=5.7", "") || ConstraintMatches(">=5.7", "bad") {
+		t.Fatal(">=5.7 must reject <5.7 and unparseable versions")
+	}
+	if !ConstraintMatches(">=14", "14") || !ConstraintMatches(">=14", "18.1 (Debian 18.1-1)") || ConstraintMatches(">=14", "13.9") || ConstraintMatches(">=14", "14.0.bad") || ConstraintMatches(">=14", "") {
+		t.Fatal(">=14 matching wrong")
+	}
 	if !ConstraintMatches("5.7.x", "5.7.44") || ConstraintMatches("5.7.x", "5.6.50") {
 		t.Fatal("5.7.x matching wrong")
 	}
@@ -297,5 +323,69 @@ func TestTestAndCapabilitiesReturnsErrQueueFullBeforeProbeRateLimit(t *testing.T
 	}
 	if _, stored := svc.probeMu.Load(dsID); stored {
 		t.Fatal("probeMu must not be updated when TestAndCapabilities rejects due to queue capacity")
+	}
+}
+
+func TestVersionConstraintOptionalAndMatrixDefault(t *testing.T) {
+	if got := DefaultVersionConstraint("mysql", "mysql"); got != ">=5.7" {
+		t.Fatalf("DefaultVersionConstraint(mysql, mysql) = %q, want >=5.7", got)
+	}
+	if got := DefaultVersionConstraint("postgresql", "postgresql"); got != ">=14" {
+		t.Fatalf("DefaultVersionConstraint(postgresql, postgresql) = %q, want >=14", got)
+	}
+	if got := DefaultVersionConstraint("tidb", "mysql"); got != "latest_stable_at_release" {
+		t.Fatalf("DefaultVersionConstraint(tidb, mysql) = %q, want latest_stable_at_release", got)
+	}
+	if got := DefaultVersionConstraint("mysql", "postgresql"); got != "" {
+		t.Fatalf("DefaultVersionConstraint(mysql, postgresql) = %q, want empty", got)
+	}
+
+	pw := &struct {
+		Value string `json:"value"`
+	}{Value: "secret-123456"}
+	validBase := func(vc string) *WriteInput {
+		return &WriteInput{
+			Name:              "ds-test",
+			Engine:            "mysql",
+			CompatibilityMode: "mysql",
+			DeploymentKind:    "native",
+			Host:              "db.example.com",
+			Port:              3306,
+			VersionConstraint: vc,
+			Enabled:           true,
+			Credentials: []CredentialInput{{
+				Purpose:  "review",
+				Username: "reader",
+				Password: pw,
+			}},
+		}
+	}
+
+	if err := validateWrite(validBase("")); err != nil {
+		t.Fatalf("validateWrite with empty version_constraint failed: %v", err)
+	}
+	if err := validateWrite(validBase(strings.Repeat("x", 64))); err != nil {
+		t.Fatalf("validateWrite with 64-char version_constraint failed: %v", err)
+	}
+	if err := validateWrite(validBase(strings.Repeat("x", 65))); !errors.Is(err, bizerr.ErrValidationFailed) {
+		t.Fatalf("validateWrite with 65-char version_constraint = %v, want ErrValidationFailed", err)
+	}
+
+	inOmitted := validBase("   ")
+	if got := resolveCreateVersionConstraint(inOmitted); got != ">=5.7" {
+		t.Fatalf("resolveCreateVersionConstraint omitted = %q, want >=5.7", got)
+	}
+	if got := resolveCreateVersionConstraint(validBase(">=8.0,<9.0")); got != ">=8.0,<9.0" {
+		t.Fatalf("resolveCreateVersionConstraint explicit = %q, want >=8.0,<9.0", got)
+	}
+
+	if got := resolveReplaceVersionConstraint(inOmitted, "8.0.x"); got != "8.0.x" {
+		t.Fatalf("resolveReplaceVersionConstraint preserve = %q, want 8.0.x", got)
+	}
+	if got := resolveReplaceVersionConstraint(inOmitted, ""); got != ">=5.7" {
+		t.Fatalf("resolveReplaceVersionConstraint empty existing fallback = %q, want >=5.7", got)
+	}
+	if got := resolveReplaceVersionConstraint(validBase(">=8.4"), "8.0.x"); got != ">=8.4" {
+		t.Fatalf("resolveReplaceVersionConstraint explicit override = %q, want >=8.4", got)
 	}
 }

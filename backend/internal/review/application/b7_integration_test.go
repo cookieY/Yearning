@@ -317,7 +317,7 @@ func (b *b7fx) seed(t *testing.T) {
 		dbValue = *dbName
 	}
 	b.entryTable = b.insertEntry(t, "table-boundary", "table", dsID, dbValue, "orders",
-		[]string{"critical"}, "kb.orders-scan")
+		[]string{"medium"}, "kb.orders-scan")
 }
 
 func (b *b7fx) insertEntry(t *testing.T, name, scope, ds, db_, tbl string, whitelist []string, key string) string {
@@ -590,17 +590,17 @@ func TestB7Gate4KnowledgeChangeInvalidatesRun(t *testing.T) {
 	if state != string(domain.RunStateBlocked) {
 		t.Fatalf("precondition: run should be blocked, got %s", state)
 	}
-	// Mutate the entry through the real Service.Replace path (with duplicate review_tool_calls rows
+	// Mutate the table-scoped entry through the real Service.Replace path (with duplicate review_tool_calls rows
 	// for the same run) to verify SELECT DISTINCT invalidation without self-CAS collision.
 	repo := &knowledge.Repository{DB: b.db}
-	entry, err := repo.Get(context.Background(), b.entryGlobal)
+	entry, err := repo.Get(context.Background(), b.entryTable)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if err := b.db.Exec(`
 		insert into review_tool_calls (id, review_run_id, tool_kind, tool_name, input_ref_id, config_hash, success, started_at, finished_at)
 		values (?, ?, 'knowledge_entry', 'knowledge_lookup', ?, ?, true, now(), now())`,
-		uuid.NewString(), runID, b.entryGlobal, entry.ConfigHash).Error; err != nil {
+		uuid.NewString(), runID, b.entryTable, entry.ConfigHash).Error; err != nil {
 		t.Fatalf("seed duplicate review_tool_call: %v", err)
 	}
 	var runDraftID string
@@ -643,7 +643,7 @@ func TestB7Gate4bKnowledgeDisableInvalidatesRun(t *testing.T) {
 		t.Fatalf("precondition: run should be blocked, got %s", state)
 	}
 	repo := &knowledge.Repository{DB: b.db}
-	entry, err := repo.Get(context.Background(), b.entryGlobal)
+	entry, err := repo.Get(context.Background(), b.entryTable)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -696,7 +696,7 @@ func runKeySuffix() string {
 // normalized facts must appear in the request sent to the Provider.
 func TestB7Gate6InjectionAndFactsReachModel(t *testing.T) {
 	b := newB7Fixture(t)
-	var sawSkill, sawKnowledge, sawFact bool
+	var sawSkill, sawKnowledge, sawGlobal, sawFact bool
 	deps := b.fakeDial(func(req provider.Request) ([]byte, int, error) {
 		if strings.Contains(req.SystemPrompt, "must-where") &&
 			strings.Contains(req.SystemPrompt, "UPDATE/DELETE") &&
@@ -704,10 +704,14 @@ func TestB7Gate6InjectionAndFactsReachModel(t *testing.T) {
 			strings.Contains(req.SystemPrompt, "effective_severity: critical") {
 			sawSkill = true
 		}
-		if strings.Contains(req.SystemPrompt, "global-guard") &&
-			strings.Contains(req.SystemPrompt, "finding_key: kb.global-rule") &&
-			strings.Contains(req.SystemPrompt, "effective_severity: critical") {
+		if strings.Contains(req.SystemPrompt, "table-boundary") &&
+			strings.Contains(req.SystemPrompt, "finding_key: kb.orders-scan") &&
+			strings.Contains(req.SystemPrompt, "advisory_max_severity: medium") {
 			sawKnowledge = true
+		}
+		if strings.Contains(req.SystemPrompt, "global-guard") ||
+			strings.Contains(req.SystemPrompt, "finding_key: kb.global-rule") {
+			sawGlobal = true
 		}
 		for _, ev := range req.NormalizedEvidence {
 			if ev.Fact != nil && ev.Fact["existence"] == "present" &&
@@ -725,7 +729,10 @@ func TestB7Gate6InjectionAndFactsReachModel(t *testing.T) {
 		t.Fatal("skill injection text never reached provider request (C1)")
 	}
 	if !sawKnowledge {
-		t.Fatal("knowledge injection text never reached provider request (C1)")
+		t.Fatal("scoped knowledge injection text never reached provider request (C1)")
+	}
+	if sawGlobal {
+		t.Fatal("retired global knowledge must never reach provider request")
 	}
 	if !sawFact {
 		t.Fatal("normalized tool fact never reached provider request (C2)")

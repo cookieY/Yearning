@@ -1,4 +1,5 @@
-import { useId, useMemo, useRef, useState } from "react";
+import { useId, useMemo, useRef, useState, type FocusEvent } from "react";
+import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 import { Check, Search, X } from "lucide-react";
 import { enUS, zhCN, type Locale } from "react-day-picker/locale";
@@ -10,6 +11,7 @@ import {
   InputGroupButton,
   InputGroupInput,
 } from "@/shared/components/ui/input-group";
+import { usePortalAnchor } from "@/shared/lib/use-portal-anchor";
 import { cn } from "@/shared/lib/utils";
 
 /**
@@ -31,6 +33,8 @@ import { cn } from "@/shared/lib/utils";
 export interface SearchFieldOption {
   /** User-visible value (matched case-insensitively as a substring). */
   label: string;
+  /** Optional locale-independent canonical token preserved across runtime locale switches. */
+  value?: string;
 }
 
 export interface SearchFieldDef {
@@ -43,15 +47,16 @@ export interface SearchFieldDef {
   input?: "date";
 }
 
-/** One committed condition: a field key (null = any field) plus text. */
+/** One committed condition: a field key (null = any field) plus display text and optional canonical value. */
 export interface SearchTerm {
   field: string | null;
   text: string;
+  value?: string;
 }
 
 export interface SearchAccessor<T> extends SearchFieldDef {
-  /** Substring a row exposes for this field — include raw and localized
-   * forms (e.g. both raw enum and localized label) so either spelling matches. */
+  /** Substring a row exposes for this field — place canonical enum `value`
+   * token first before localized labels so canonical chip filters match exactly. */
   value: (item: T) => string;
 }
 
@@ -70,21 +75,28 @@ function toLocalDay(date: Date): string {
   return `${String(date.getFullYear())}-${month}-${day}`;
 }
 
+function matchesTerm(raw: string, term: SearchTerm): boolean {
+  if (term.value !== undefined) {
+    const firstToken = raw.trim().toLowerCase().split(/\s+/)[0] ?? "";
+    return firstToken === normalize(term.value);
+  }
+  return raw.toLowerCase().includes(normalize(term.text));
+}
+
 export function filterBySearchTerms<T>(
   items: readonly T[],
   terms: readonly SearchTerm[],
   accessors: readonly SearchAccessor<T>[],
 ): T[] {
-  const active = terms.filter((term) => normalize(term.text) !== "");
+  const active = terms.filter((term) => normalize(term.value ?? term.text) !== "");
   if (active.length === 0) return [...items];
   return items.filter((item) =>
     active.every((term) => {
-      const needle = normalize(term.text);
       if (term.field === null) {
-        return accessors.some((accessor) => accessor.value(item).toLowerCase().includes(needle));
+        return accessors.some((accessor) => matchesTerm(accessor.value(item), term));
       }
       const accessor = accessors.find((candidate) => candidate.key === term.field);
-      return accessor !== undefined && accessor.value(item).toLowerCase().includes(needle);
+      return accessor !== undefined && matchesTerm(accessor.value(item), term);
     }),
   );
 }
@@ -167,13 +179,14 @@ export function GlobalSearchBar({
     // (the q param), so a second appended chip would display without ever
     // reaching the request. A scoped chip is likewise single-value-per-field
     // (state/datasource/date params each accept exactly one value), so a new
-    // value for the same field replaces the old chip; identical text is a
-    // no-op. The index-suffixed chip keys stay unique either way.
+    // value for the same field replaces the old chip; identical canonical
+    // identity is a no-op. The index-suffixed chip keys stay unique either way.
+    const identity = (candidate: SearchTerm): string => candidate.value ?? candidate.text;
     const next =
       term.field === null
         ? [...terms.filter((existing) => existing.field !== null), term]
         : terms.some(
-              (existing) => existing.field === term.field && existing.text === term.text,
+              (existing) => existing.field === term.field && identity(existing) === identity(term),
             )
           ? [...terms]
           : [...terms.filter((existing) => existing.field !== term.field), term];
@@ -227,7 +240,11 @@ export function GlobalSearchBar({
       }
       return;
     }
-    commit({ field: row.field.key, text: row.option.label });
+    commit({
+      field: row.field.key,
+      text: row.option.label,
+      ...(row.option.value !== undefined ? { value: row.option.value } : {}),
+    });
   };
 
   const removeTerm = (index: number): void => {
@@ -249,17 +266,47 @@ export function GlobalSearchBar({
 
   const hasContent = terms.length > 0 || draft !== "";
   const isListboxOpen = open && rows.length > 0;
+  const isEmptyMenuOpen = open && rows.length === 0 && pendingField?.options !== undefined;
   const isDatePanelOpen = open && pendingField !== null && pendingField.input === "date";
   const activePopupId = isListboxOpen ? listId : isDatePanelOpen ? datePanelId : undefined;
+  const containerRef = useRef<HTMLDivElement>(null);
+  const popupRef = useRef<HTMLElement | null>(null);
+  const portalKey: string | boolean = isListboxOpen
+    ? `list:${pendingField?.key ?? "__fields__"}`
+    : isEmptyMenuOpen
+      ? `empty:${pendingField.key}`
+      : isDatePanelOpen
+        ? `date:${pendingField.key}`
+        : false;
+  usePortalAnchor(portalKey, containerRef, popupRef, {
+    matchWidth: !isDatePanelOpen,
+    fallbackWidth: isDatePanelOpen ? 280 : 240,
+    preferredHeight: isDatePanelOpen ? 360 : 256,
+    gap: isDatePanelOpen ? 6 : 4,
+  });
+  const handleContainerBlur = (event: FocusEvent<HTMLElement>): void => {
+    const related = event.relatedTarget as Node | null;
+    if (
+      !containerRef.current?.contains(related) &&
+      !popupRef.current?.contains(related)
+    ) {
+      setOpen(false);
+    }
+  };
   const fieldLabel = (key: string | null): string =>
     key === null ? "" : fields.find((field) => field.key === key)?.label ?? key;
+  const termDisplayText = (term: SearchTerm): string => {
+    if (term.field === null || term.value === undefined) return term.text;
+    return fields
+      .find((field) => field.key === term.field)
+      ?.options?.find((option) => option.value === term.value)?.label ?? term.text;
+  };
 
   return (
     <div
+      ref={containerRef}
       className={cn("relative min-w-0", className)}
-      onBlur={(event) => {
-        if (!event.currentTarget.contains(event.relatedTarget)) setOpen(false);
-      }}
+      onBlur={handleContainerBlur}
     >
       <InputGroup className="h-auto min-h-8 flex-wrap py-1">
         <InputGroupAddon>
@@ -286,27 +333,30 @@ export function GlobalSearchBar({
             </InputGroupButton>
           </Badge>
         )}
-        {terms.map((term, index) => (
-          <Badge
-            key={`${term.field ?? "*"}:${term.text}:${String(index)}`}
-            variant="secondary"
-            className="gap-0.5 pr-0.5 animate-in fade-in-0 zoom-in-95 duration-150 ease-out"
-          >
-            <span className="max-w-40 truncate">
-              {term.field === null ? term.text : `${fieldLabel(term.field)}: ${term.text}`}
-            </span>
-            <InputGroupButton
-              size="icon-xs"
-              className="size-4 p-0"
-              aria-label={t("search.removeTerm", {
-                term: term.field === null ? term.text : `${fieldLabel(term.field)}: ${term.text}`,
-              })}
-              onClick={() => { removeTerm(index); }}
+        {terms.map((term, index) => {
+          const display = termDisplayText(term);
+          return (
+            <Badge
+              key={`${term.field ?? "*"}:${term.value ?? term.text}:${String(index)}`}
+              variant="secondary"
+              className="gap-0.5 pr-0.5 animate-in fade-in-0 zoom-in-95 duration-150 ease-out"
             >
-              <X aria-hidden />
-            </InputGroupButton>
-          </Badge>
-        ))}
+              <span className="max-w-40 truncate">
+                {term.field === null ? display : `${fieldLabel(term.field)}: ${display}`}
+              </span>
+              <InputGroupButton
+                size="icon-xs"
+                className="size-4 p-0"
+                aria-label={t("search.removeTerm", {
+                  term: term.field === null ? display : `${fieldLabel(term.field)}: ${display}`,
+                })}
+                onClick={() => { removeTerm(index); }}
+              >
+                <X aria-hidden />
+              </InputGroupButton>
+            </Badge>
+          );
+        })}
         <InputGroupInput
           ref={inputRef}
           role="combobox"
@@ -376,7 +426,11 @@ export function GlobalSearchBar({
                     (option) => normalize(option.label) === normalize(draft),
                   );
                   if (exact !== undefined) {
-                    commit({ field: pendingField.key, text: exact.label });
+                    commit({
+                      field: pendingField.key,
+                      text: exact.label,
+                      ...(exact.value !== undefined ? { value: exact.value } : {}),
+                    });
                   }
                 } else {
                   commit({ field: pendingField?.key ?? null, text: draft });
@@ -409,112 +463,125 @@ export function GlobalSearchBar({
           </InputGroupAddon>
         )}
       </InputGroup>
-      {open && rows.length > 0 && (
-        <ul
-          key={pendingField?.key ?? "__fields__"}
-          id={listId}
-          role="listbox"
-          aria-label={t("search.filterByField")}
-          className="absolute inset-x-0 top-full z-30 mt-1 max-h-64 origin-top overflow-x-hidden overflow-y-auto overscroll-contain rounded-md border border-border bg-popover p-1 text-popover-foreground shadow-md animate-in fade-in-0 zoom-in-95 slide-in-from-top-2 duration-[220ms] ease-out [scrollbar-width:thin]"
-          data-testid={testId !== undefined ? `${testId}-menu` : undefined}
-        >
-          {pendingField === null && (
-            <li role="presentation" className="px-2 py-1 text-xs font-medium text-muted-foreground">
-              {t("search.filterByField")}
-            </li>
-          )}
-          {rows.map((row, index) => {
-            const active = index === activeIndex;
-            const key =
-              row.kind === "all"
-                ? "all"
-                : row.kind === "field"
-                  ? `field:${row.field.key}`
-                  : `value:${row.field.key}:${row.option.label}`;
-            return (
-              <li
-                key={key}
-                id={`${listId}-option-${String(index)}`}
-                role="option"
-                aria-selected={active}
-                style={{ animationDelay: `${String(Math.min(index * 25, 150))}ms` }}
-                className="flex cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-sm transition-[background-color,color,translate] duration-150 ease-out animate-in fade-in-0 slide-in-from-top-1 fill-mode-both data-[active=true]:translate-x-0.5 data-[active=true]:bg-accent data-[active=true]:text-accent-foreground"
-                data-active={active}
-                onMouseEnter={() => { setActiveIndex(index); }}
-                onMouseDown={(event) => { event.preventDefault(); }}
-                onClick={() => { activateRow(row); }}
-              >
-                {row.kind === "all" && (
-                  <Search className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
-                )}
-                {row.kind === "field" && normalize(row.text) !== "" && (
-                  <span className="max-w-24 shrink-0 truncate text-xs text-muted-foreground">
-                    {row.field.label}
-                  </span>
-                )}
-                {row.kind === "value" && (
-                  <Check className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
-                )}
-                <span className="min-w-0 flex-1 truncate">
-                  {row.kind === "all"
-                    ? t("search.searchInAll", { query: row.text })
-                    : row.kind === "field"
-                      ? (normalize(row.text) !== "" ? row.text : row.field.label)
-                      : row.option.label}
-                </span>
+      {isListboxOpen && typeof document !== "undefined" &&
+        createPortal(
+          <ul
+            ref={(node) => { popupRef.current = node; }}
+            key={pendingField?.key ?? "__fields__"}
+            id={listId}
+            role="listbox"
+            aria-label={t("search.filterByField")}
+            className="fixed z-[60] max-h-64 origin-top overflow-x-hidden overflow-y-auto overscroll-contain rounded-md border border-border bg-popover p-1 text-popover-foreground shadow-md animate-in fade-in-0 zoom-in-95 slide-in-from-top-2 duration-[220ms] ease-out [scrollbar-width:thin]"
+            data-testid={testId !== undefined ? `${testId}-menu` : undefined}
+            onBlur={handleContainerBlur}
+          >
+            {pendingField === null && (
+              <li role="presentation" className="px-2 py-1 text-xs font-medium text-muted-foreground">
+                {t("search.filterByField")}
               </li>
-            );
-          })}
-        </ul>
-      )}
-      {open && rows.length === 0 && pendingField?.options !== undefined && (
-        <div
-          key={`empty:${pendingField.key}`}
-          className="absolute inset-x-0 top-full z-30 mt-1 origin-top rounded-md border border-border bg-popover px-2 py-1.5 text-xs text-muted-foreground shadow-md animate-in fade-in-0 zoom-in-95 slide-in-from-top-2 duration-[220ms] ease-out"
-          data-testid={testId !== undefined ? `${testId}-menu` : undefined}
-        >
-          {t("search.noMatches")}
-        </div>
-      )}
-      {isDatePanelOpen && (
-        <div
-          key={`date:${pendingField.key}`}
-          id={datePanelId}
-          role="dialog"
-          aria-label={`${pendingField.label} — ${t("search.pickDate")}`}
-          data-slot="popover-content"
-          className="absolute left-0 top-full z-50 mt-1.5 w-auto origin-top-left rounded-lg border border-border bg-popover p-0 text-popover-foreground shadow-md animate-in fade-in-0 zoom-in-95 slide-in-from-top-2 duration-[220ms] ease-out"
-          data-testid={testId !== undefined ? `${testId}-menu` : undefined}
-        >
-          {/* Inline shadcn DatePicker calendar surface (data-slot="popover-content"
-              + p-0 matches DatePicker's PopoverContent): stays inside this
-              wrapper so combobox blur handling keeps working, while host cards
-              opt into overflow-visible so short/empty card states never clip. */}
-          <Calendar
-            mode="single"
-            defaultMonth={(() => {
-              const text = [...terms]
-                .reverse()
-                .find((term) => term.field === pendingField.key)?.text;
-              return text === undefined ? undefined : parseLocalDay(text);
-            })()}
-            selected={(() => {
-              const text = [...terms]
-                .reverse()
-                .find((term) => term.field === pendingField.key)?.text;
-              return text === undefined ? undefined : parseLocalDay(text);
-            })()}
-            onSelect={(day) => {
-              if (day === undefined) return;
-              commit({ field: pendingField.key, text: toLocalDay(day) });
-              // Picking a day is a complete gesture (ECS behavior): the panel
-              // closes instead of falling back to the field list.
-              setOpen(false);
+            )}
+            {rows.map((row, index) => {
+              const active = index === activeIndex;
+              const key =
+                row.kind === "all"
+                  ? "all"
+                  : row.kind === "field"
+                    ? `field:${row.field.key}`
+                    : `value:${row.field.key}:${row.option.value ?? row.option.label}`;
+              return (
+                <li
+                  key={key}
+                  id={`${listId}-option-${String(index)}`}
+                  role="option"
+                  aria-selected={active}
+                  style={{ animationDelay: `${String(Math.min(index * 25, 150))}ms` }}
+                  className="flex cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-sm transition-[background-color,color,translate] duration-150 ease-out animate-in fade-in-0 slide-in-from-top-1 fill-mode-both data-[active=true]:translate-x-0.5 data-[active=true]:bg-accent data-[active=true]:text-accent-foreground"
+                  data-active={active}
+                  onMouseEnter={() => { setActiveIndex(index); }}
+                  onMouseDown={(event) => { event.preventDefault(); }}
+                  onClick={() => { activateRow(row); }}
+                >
+                  {row.kind === "all" && (
+                    <Search className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
+                  )}
+                  {row.kind === "field" && normalize(row.text) !== "" && (
+                    <span className="max-w-24 shrink-0 truncate text-xs text-muted-foreground">
+                      {row.field.label}
+                    </span>
+                  )}
+                  {row.kind === "value" && (
+                    <Check className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
+                  )}
+                  <span className="min-w-0 flex-1 truncate">
+                    {row.kind === "all"
+                      ? t("search.searchInAll", { query: row.text })
+                      : row.kind === "field"
+                        ? (normalize(row.text) !== "" ? row.text : row.field.label)
+                        : row.option.label}
+                  </span>
+                </li>
+              );
+            })}
+          </ul>,
+          document.body,
+        )}
+      {isEmptyMenuOpen && typeof document !== "undefined" &&
+        createPortal(
+          <div
+            ref={(node) => { popupRef.current = node; }}
+            key={`empty:${pendingField.key}`}
+            className="fixed z-[60] origin-top rounded-md border border-border bg-popover px-2 py-1.5 text-xs text-muted-foreground shadow-md animate-in fade-in-0 zoom-in-95 slide-in-from-top-2 duration-[220ms] ease-out"
+            data-testid={testId !== undefined ? `${testId}-menu` : undefined}
+            onBlur={handleContainerBlur}
+          >
+            {t("search.noMatches")}
+          </div>,
+          document.body,
+        )}
+      {isDatePanelOpen && typeof document !== "undefined" &&
+        createPortal(
+          <div
+            ref={(node) => { popupRef.current = node; }}
+            key={`date:${pendingField.key}`}
+            id={datePanelId}
+            role="dialog"
+            aria-label={`${pendingField.label} — ${t("search.pickDate")}`}
+            data-slot="popover-content"
+            className="fixed z-[60] w-auto origin-top-left rounded-lg border border-border bg-popover p-0 text-popover-foreground shadow-md animate-in fade-in-0 zoom-in-95 slide-in-from-top-2 duration-[220ms] ease-out"
+            data-testid={testId !== undefined ? `${testId}-menu` : undefined}
+            onMouseDown={(event) => { event.preventDefault(); }}
+            onBlur={handleContainerBlur}
+            onKeyDown={(event) => {
+              if (event.key === "Escape") {
+                setOpen(false);
+                inputRef.current?.focus();
+              }
             }}
-            locale={locale}
-          />
-        </div>
-      )}
+          >
+            <Calendar
+              mode="single"
+              defaultMonth={(() => {
+                const text = [...terms]
+                  .reverse()
+                  .find((term) => term.field === pendingField.key)?.text;
+                return text === undefined ? undefined : parseLocalDay(text);
+              })()}
+              selected={(() => {
+                const text = [...terms]
+                  .reverse()
+                  .find((term) => term.field === pendingField.key)?.text;
+                return text === undefined ? undefined : parseLocalDay(text);
+              })()}
+              onSelect={(day) => {
+                if (day === undefined) return;
+                commit({ field: pendingField.key, text: toLocalDay(day) });
+                setOpen(false);
+              }}
+              locale={locale}
+            />
+          </div>,
+          document.body,
+        )}
     </div>
   );
 }

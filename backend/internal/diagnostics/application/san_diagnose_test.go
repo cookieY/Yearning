@@ -289,3 +289,65 @@ func TestDiagnoseSAN_AdditionalEdgeBranches(t *testing.T) {
 		}
 	}
 }
+
+func TestDiagnoseDefaultTrack_ProtocolKeyColumnNamesDoNotFalsePositive(t *testing.T) {
+	ctx := context.Background()
+	priv := privacy.NewTurnPrivacySession()
+	defer priv.ZeroAndRelease()
+
+	dbName := "metrics_db"
+	ds := &DatasourceRow{
+		ID:                "ds-proto-keys",
+		Name:              "pg-metrics",
+		Engine:            "postgresql",
+		CompatibilityMode: "postgresql",
+		DatabaseName:      &dbName,
+	}
+	svc := &Services{
+		Collector: &fakeStatsCollector{
+			cols: map[string][]database.MetadataColumn{
+				"metrics_db.statement_stats": {
+					{ColumnName: "calls", DatabaseType: "bigint"},
+					{ColumnName: "window", DatabaseType: "text"},
+					{ColumnName: "engine", DatabaseType: "text"},
+					{ColumnName: "rows_returned", DatabaseType: "bigint"},
+				},
+			},
+		},
+	}
+
+	sqlTemplate := `SELECT calls, "window", engine, rows_returned FROM metrics_db.statement_stats WHERE calls > 10`
+	desensitized, err := svc.DesensitizeStatementTemplate(ctx, priv, ds, "metrics_db", sqlTemplate)
+	if err != nil {
+		t.Fatalf("DesensitizeStatementTemplate error: %v", err)
+	}
+
+	_, userPayload, err := buildDiagnoseMessagesForEndpoint(
+		provider.Endpoint{BaseURL: "https://api.openai.com/v1", ModelName: "gpt-4o-mini"},
+		priv, ds, desensitized, "last_1h", "window_delta", 80, 120.0, 1.5, 500, 10, 0, true,
+	)
+	if err != nil {
+		t.Fatalf("expected no false-positive AssertZeroLeak on static JSON keys, got %v", err)
+	}
+	if !strings.Contains(userPayload, `"calls":80`) || !strings.Contains(userPayload, `"window":"last_1h"`) {
+		t.Fatalf("expected JSON protocol keys in user payload, got %s", userPayload)
+	}
+
+	// Leaking a real column name inside dynamic anonymized template must still fail closed.
+	leakingTemplate := *desensitized
+	leakingTemplate.AnonymizedTemplate = "SELECT calls FROM table_1"
+	if _, _, err := buildDiagnoseMessagesForEndpoint(
+		provider.Endpoint{BaseURL: "https://api.openai.com/v1", ModelName: "gpt-4o-mini"},
+		priv, ds, &leakingTemplate, "last_1h", "window_delta", 80, 120.0, 1.5, 500, 10, 0, true,
+	); err == nil {
+		t.Fatal("expected AssertZeroLeak to fail when dynamic template leaks real column name")
+	}
+
+	// Nil privacy context or desensitized result must fail closed without panicking.
+	if err := assertDiagnoseDynamicZeroLeak(nil, desensitized, "last_1h"); err == nil {
+		t.Fatal("expected error when privacy session is nil")
+	}
+	if err := assertDiagnoseDynamicZeroLeak(priv, nil, "last_1h"); err == nil {
+		t.Fatal("expected error when desensitized result is nil")
+	}
+}

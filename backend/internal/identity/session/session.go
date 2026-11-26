@@ -26,6 +26,9 @@ type Identity struct {
 	Username       string
 	IsBuiltinAdmin bool
 	Role           string
+	// ViewAsRole holds an in-memory development-only view preset ("user", "approver", "executor")
+	// applied by DevViewAsMiddleware; it is never persisted to session storage.
+	ViewAsRole string
 }
 
 // HasAdminAccess reports whether the identity is eligible for management-surface operations (built-in admin or role='admin').
@@ -84,10 +87,14 @@ func continueAs(c *gin.Context, opts Options, id *Identity) {
 		return
 	}
 	if id != nil {
-		ctx := context.WithValue(c.Request.Context(), identityKey{}, id)
-		c.Request = c.Request.WithContext(ctx)
+		c.Request = c.Request.WithContext(WithIdentity(c.Request.Context(), id))
 	}
 	c.Next()
+}
+
+// WithIdentity returns a child context carrying id for downstream handlers and guards.
+func WithIdentity(ctx context.Context, id *Identity) context.Context {
+	return context.WithValue(ctx, identityKey{}, id)
 }
 
 // FromContext returns the current Identity from ctx, or nil for anonymous requests.

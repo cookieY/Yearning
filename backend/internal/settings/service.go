@@ -5,18 +5,20 @@ package settings
 import (
 	"context"
 	"crypto/hmac"
-	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"gorm.io/gorm"
 
 	"github.com/cookieY/YearningX/backend/internal/crypto"
+	"github.com/cookieY/YearningX/backend/internal/platform/hashutil"
+	"github.com/cookieY/YearningX/backend/internal/platform/pagination"
 )
 
 // ErrNotFound / ErrConflict / ErrTokenInvalid are stable domain errors.
@@ -36,6 +38,30 @@ type Service struct {
 // New constructs a Service.
 func New(db *gorm.DB, crypter *crypto.Crypter) *Service {
 	return &Service{DB: db, Crypter: crypter, Now: func() time.Time { return time.Now().UTC() }}
+}
+
+var (
+	postReplaceMu    sync.RWMutex
+	postReplaceHooks []func(namespace string)
+)
+
+// RegisterPostReplaceHook registers a callback invoked strictly after Service.Replace commits.
+func RegisterPostReplaceHook(fn func(namespace string)) {
+	if fn == nil {
+		return
+	}
+	postReplaceMu.Lock()
+	postReplaceHooks = append(postReplaceHooks, fn)
+	postReplaceMu.Unlock()
+}
+
+func notifyPostReplace(namespace string) {
+	postReplaceMu.RLock()
+	hooks := append(([]func(string))(nil), postReplaceHooks...)
+	postReplaceMu.RUnlock()
+	for _, fn := range hooks {
+		fn(namespace)
+	}
 }
 
 // Row is a projection of a system_settings table row.
@@ -208,6 +234,7 @@ func (s *Service) Replace(ctx context.Context, in ReplaceInput) (*NamespaceView,
 		}
 		return nil, txErr
 	}
+	notifyPostReplace(storageNamespace(in.Namespace))
 	return s.Get(ctx, in.Namespace)
 }
 
@@ -274,7 +301,7 @@ func (s *Service) Assess(ctx context.Context, namespace string, proposed json.Ra
 	if terr != nil {
 		return nil, terr
 	}
-	sha := sha256Hex(blob)
+	sha := hashutil.SHA256Hex(blob)
 	return &ImpactAssessment{
 		Namespace: namespace, CurrentVersion: version,
 		ProposedSettingsSha256: sha, Impact: summary,
@@ -442,11 +469,6 @@ func impactBlob(namespace string, blob []byte, version int64, actorID string, ex
 	return binding
 }
 
-func sha256Hex(b []byte) string {
-	sum := sha256.Sum256(b)
-	return hex.EncodeToString(sum[:])
-}
-
 // Revision is a settings revision projection (sourced from audit_events settings.replaced; conforms to OpenAPI
 // SettingsRevision: changed_by is the actor UUID, and changed_paths/impact_summary come from event metadata).
 type Revision struct {
@@ -474,9 +496,7 @@ func (s *Service) ListRevisions(ctx context.Context, namespace string, limit int
 	if !ValidNamespace(namespace) {
 		return nil, nil, ErrNotFound
 	}
-	if limit <= 0 || limit > 200 {
-		limit = 50
-	}
+	limit = pagination.ClampLimit(limit, 50, 200)
 	q := `
 		select id, actor_id, occurred_at, (metadata->>'version')::bigint as version,
 		       metadata->'changed_paths' as changed_paths,

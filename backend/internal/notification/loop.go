@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/cookieY/YearningX/backend/internal/authorization/auditlog"
@@ -16,6 +17,7 @@ import (
 
 // Worker is the notification Worker (outbox consumer + delivery executor).
 type Worker struct {
+	mu        sync.RWMutex
 	db        *gorm.DB
 	crypter   *crypto.Crypter
 	pollEvery time.Duration
@@ -107,61 +109,44 @@ func (w *Worker) loadChannel(ctx context.Context, id string) (*NotificationChann
 }
 
 // encryptAddress seals a delivery recipient address (contract column recipient_address_ciphertext;
-// AAD matches openAddress field for field).
+// AAD matches openDeliveryAddress field for field).
 func (w *Worker) encryptAddress(deliveryID, address string) ([]byte, []byte, string, error) {
-	env, err := w.crypter.Seal(crypto.PurposePayload, []byte(address), crypto.AAD{
-		DeploymentID: w.crypter.DeploymentID(), Table: "notification_deliveries",
-		PrimaryKey: deliveryID, Column: "recipient_address", Purpose: crypto.PurposePayload,
-	})
-	if err != nil {
-		return nil, nil, "", err
-	}
-	return env.Ciphertext, env.Nonce, env.KeyID, nil
-}
-
-// openSecret decrypts a channel Secret (used only at the instant of sending; AAD matches Service.sealSecret).
-func (w *Worker) openSecret(_ context.Context, row *NotificationChannelModel) (string, error) {
-	if row.SecretCiphertext == nil || row.SecretKeyID == nil {
-		return "", ErrValidation
-	}
-	plain, err := w.crypter.Open(crypto.PurposePayload, crypto.Envelope{
-		Ciphertext: row.SecretCiphertext, Nonce: row.SecretNonce,
-		KeyID: *row.SecretKeyID, Algorithm: *row.SecretAlgorithm,
-	}, crypto.AAD{
-		DeploymentID: w.crypter.DeploymentID(), Table: "notification_channels",
-		PrimaryKey: row.ID, Column: "secret", Purpose: crypto.PurposePayload,
-	})
-	if err != nil {
-		return "", err
-	}
-	return string(plain), nil
-}
-
-// openAddress decrypts a delivery recipient address (AAD matches encryptAddress field for field).
-func (w *Worker) openAddress(_ context.Context, d *NotificationDeliveryModel) (string, error) {
-	plain, err := w.crypter.Open(crypto.PurposePayload, crypto.Envelope{
-		Ciphertext: d.AddressCiphertext, Nonce: d.AddressNonce,
-		KeyID: d.AddressKeyID, Algorithm: d.AddressAlgorithm,
-	}, crypto.AAD{
-		DeploymentID: w.crypter.DeploymentID(), Table: "notification_deliveries",
-		PrimaryKey: d.ID, Column: "recipient_address", Purpose: crypto.PurposePayload,
-	})
-	if err != nil {
-		return "", err
-	}
-	return string(plain), nil
+	return sealDeliveryAddress(w.crypter, deliveryID, address)
 }
 
 // SetLocale sets the notification language (wired from S006 settings by the composition root).
 func (w *Worker) SetLocale(l string) {
 	if l == "en-US" || l == "zh-CN" {
+		w.mu.Lock()
 		w.locale = l
+		w.mu.Unlock()
 	}
+}
+
+func (w *Worker) getLocale() string {
+	w.mu.RLock()
+	l := w.locale
+	w.mu.RUnlock()
+	if l == "en-US" {
+		return "en-US"
+	}
+	return "zh-CN"
 }
 
 // SetPublicBaseURL injects the controlled public base URL (S006 general.public_base_url;
 // empty string = omit links from messages — degrading gracefully without guessing request Host headers).
-func (w *Worker) SetPublicBaseURL(u string) { w.publicBaseURL = u }
+func (w *Worker) SetPublicBaseURL(u string) {
+	w.mu.Lock()
+	w.publicBaseURL = u
+	w.mu.Unlock()
+}
+
+func (w *Worker) getPublicBaseURL() string {
+	w.mu.RLock()
+	u := w.publicBaseURL
+	w.mu.RUnlock()
+	return u
+}
 
 // SetLogger injects the structured logger (R1 M6 explainable skips; nil-safe).
 func (w *Worker) SetLogger(l *zap.Logger) { w.logger = l }
@@ -208,9 +193,7 @@ func (w *Worker) processTestDeliveries(ctx context.Context) {
 		if res.Error != nil || res.RowsAffected != 1 {
 			continue
 		}
-		var input struct {
-			ChannelID string `json:"channel_id"`
-		}
+		var input testDeliveryInput
 		_ = json.Unmarshal(t.Input, &input)
 		ch, err := w.loadChannel(ctx, input.ChannelID)
 		if err != nil {
@@ -224,29 +207,40 @@ func (w *Worker) processTestDeliveries(ctx context.Context) {
 		case "email":
 			var cfg EmailConfig
 			_ = json.Unmarshal(ch.Configuration, &cfg)
-			secret, serr := w.openSecret(ctx, ch)
+			secret, serr := openChannelSecret(w.crypter, ch)
 			if serr != nil {
 				sendErr = fmt.Errorf("%s", FailAuth)
 			} else {
-				// Test delivery target = channel from address (introducing no extra recipient configuration surface).
-				sendErr = SendEmail(ctx, cfg, secret, cfg.FromAddress, "Yearning Test", text)
+				// Use optional encrypted test recipient when supplied; otherwise fall back to channel FromAddress.
+				to := cfg.FromAddress
+				if len(input.RecipientCipher) > 0 {
+					decrypted, derr := openTestDeliveryRecipient(w.crypter, t.ID, &input)
+					if derr != nil {
+						sendErr = fmt.Errorf("%s", FailMail)
+					} else {
+						to = decrypted
+					}
+				}
+				if sendErr == nil {
+					sendErr = SendEmail(ctx, cfg, secret, to, "Yearning Test", text)
+				}
 			}
 		case "dingtalk":
-			secret, serr := w.openSecret(ctx, ch)
+			secret, serr := openChannelSecret(w.crypter, ch)
 			if serr != nil {
 				sendErr = fmt.Errorf("%s", FailWebhook)
 			} else {
 				sendErr = SendDingTalk(ctx, w.DingTalkBaseURL, secret, text)
 			}
 		case "feishu":
-			secret, serr := w.openSecret(ctx, ch)
+			secret, serr := openChannelSecret(w.crypter, ch)
 			if serr != nil {
 				sendErr = fmt.Errorf("%s", FailFeishu)
 			} else {
 				sendErr = SendFeishu(ctx, secret, text)
 			}
 		case "slack":
-			secret, serr := w.openSecret(ctx, ch)
+			secret, serr := openChannelSecret(w.crypter, ch)
 			if serr != nil {
 				sendErr = fmt.Errorf("%s", FailSlack)
 			} else {
@@ -267,18 +261,29 @@ func (w *Worker) processTestDeliveries(ctx context.Context) {
 }
 
 func (w *Worker) finishTask(ctx context.Context, id, state string, code int, failure string) {
+	var err error
 	if state == "succeeded" {
-		_ = w.db.WithContext(ctx).Exec(`
-			update async_tasks set state = 'succeeded', finished_at = now(),
-			    progress_completed = 1
-			where id = ? and state = 'running'`, id)
-		return
+		// Raise progress_total to at least 1 so legacy/pre-fix rows satisfy async_task_progress_consistency.
+		err = w.db.WithContext(ctx).Exec(`
+			update async_tasks set state = 'succeeded', finished_at = now(), updated_at = now(),
+			    progress_total = greatest(progress_total, 1), progress_completed = 1,
+			    lease_owner = null, lease_expires_at = null
+			where id = ? and state = 'running'`, id).Error
+	} else {
+		fn := failure
+		err = w.db.WithContext(ctx).Exec(`
+			update async_tasks set state = ?, finished_at = now(), updated_at = now(),
+			    business_err_code = ?, failure_name = ?,
+			    lease_owner = null, lease_expires_at = null
+			where id = ? and state = 'running'`, state, code, fn, id).Error
 	}
-	fn := failure
-	_ = w.db.WithContext(ctx).Exec(`
-		update async_tasks set state = ?, finished_at = now(),
-		    business_err_code = ?, failure_name = ?
-		where id = ? and state = 'running'`, state, code, fn, id)
+	if err != nil && w.logger != nil {
+		w.logger.Warn("notification test delivery task finish failed",
+			zap.String("task_id", id),
+			zap.String("state", state),
+			zap.Error(err),
+		)
+	}
 }
 
 func (w *Worker) instanceName() string { return "notification-worker" }

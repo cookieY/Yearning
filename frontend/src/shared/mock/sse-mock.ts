@@ -1,4 +1,5 @@
 import { http, HttpResponse } from "msw";
+import { apiRoute } from "@/shared/mock/api-route";
 
 export interface MockSseEventPayload {
   id: string;
@@ -48,7 +49,16 @@ export function emitMockSseEvent(
  */
 export function sseMockHandlers() {
   return [
-    http.get("*/events/stream", () => {
+    http.get(apiRoute("/events/stream"), ({ request }) => {
+      const accept = (request.headers.get("accept") ?? "").toLowerCase();
+      if (!accept.includes("text/event-stream")) {
+        return HttpResponse.json({
+          err_code: 0,
+          message: "ok",
+          data: { status: "ready", transport: "sse" },
+          request_id: "55555555-5555-4555-8555-555555555555",
+        });
+      }
       const encoder = new TextEncoder();
       let subscriber: SseSubscriber | null = null;
 

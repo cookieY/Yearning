@@ -2,6 +2,7 @@ package application
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"strings"
 	"sync"
@@ -11,6 +12,7 @@ import (
 	"github.com/cookieY/YearningX/backend/internal/review/domain"
 	"github.com/cookieY/YearningX/backend/internal/review/fingerprint"
 	"github.com/cookieY/YearningX/backend/internal/review/persistence"
+	"github.com/cookieY/YearningX/backend/internal/review/privacy"
 )
 
 // RCP-20261101-EPHEMERAL-PRECHECK: ownership, TTL, and idempotency semantics of the ephemeral Run store.
@@ -221,5 +223,34 @@ func TestCountStatementsSQLParseFailureLocationAndReason(t *testing.T) {
 		if !strings.Contains(de2.Detail, want) {
 			t.Fatalf("unterminated detail %q missing %q", de2.Detail, want)
 		}
+	}
+}
+
+func TestRestoreEphemeralRunDisplay_EmptyStageResultsSerializesAsJSONArray(t *testing.T) {
+	svc := &Services{}
+	er := &EphemeralRun{
+		ID:          "run-empty-stages",
+		OwnerUserID: "u1",
+		Mapper:      privacy.NewRunMapper(),
+	}
+	in := &RunView{
+		ID:           er.ID,
+		State:        string(domain.RunStateQueued),
+		StageResults: []StageResultView{},
+		Gate:         domain.GatePayload{Passed: false, ReasonCodes: []string{}},
+	}
+	out, err := svc.restoreEphemeralRunDisplay(context.Background(), Actor{UserID: "u1", Username: "alice"}, RequestMeta{}, er, in)
+	if err != nil {
+		t.Fatalf("restoreEphemeralRunDisplay failed: %v", err)
+	}
+	if out.StageResults == nil {
+		t.Fatal("expected non-nil empty StageResults slice")
+	}
+	raw, err := json.Marshal(out)
+	if err != nil {
+		t.Fatalf("json.Marshal failed: %v", err)
+	}
+	if !strings.Contains(string(raw), `"stage_results":[]`) {
+		t.Fatalf("expected empty JSON array for stage_results, got %s", string(raw))
 	}
 }

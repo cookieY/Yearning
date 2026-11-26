@@ -5,19 +5,16 @@ import { BookOpenText, Menu, Pencil, Play, Plus, Search, Trash2 } from "lucide-r
 import type {
   KnowledgeEntry,
   KnowledgeEntryEvaluation,
-  KnowledgeEntryWrite,
 } from "@/api/generated/client/yearningV4HTTPAPI.schemas";
-import type { ReviewInputEditorValue } from "@/features/admin/review-input-editor";
+import {
+  KnowledgeDetailPanel,
+  KnowledgeFormDialog,
+} from "@/features/admin/knowledge-notes-sections";
 import {
   DeleteReviewInputDialog,
-  type InputState,
-  ReviewInputDialogFrame,
-  ReviewInputStateSelect,
   StateBadge,
 } from "@/features/admin/review-input-shared";
 import {
-  useCreateKnowledgeEntry,
-  useDatasources,
   useEvaluateKnowledgeEntry,
   useKnowledgeEntries,
   useReplaceKnowledgeEntry,
@@ -42,60 +39,11 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/shared/components/ui/dialog";
-import { Input } from "@/shared/components/ui/input";
 import { InputGroup, InputGroupAddon, InputGroupInput } from "@/shared/components/ui/input-group";
-import { Label } from "@/shared/components/ui/label";
 import { ScrollArea } from "@/shared/components/ui/scroll-area";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/shared/components/ui/select";
 import { Sheet, SheetContent } from "@/shared/components/ui/sheet";
-import { Textarea } from "@/shared/components/ui/textarea";
 import { formatTimestamp } from "@/shared/lib/timezones";
 import { cn } from "@/shared/lib/utils";
-
-interface KnowledgeFormState {
-  name: string;
-  state: InputState;
-  purpose: string;
-  scopeType: "global" | "datasource" | "table";
-  datasourceId: string;
-  databaseName: string;
-  tableName: string;
-  editor: ReviewInputEditorValue;
-}
-
-function initialKnowledgeForm(entry: KnowledgeEntry | null): KnowledgeFormState {
-  if (entry === null) {
-    return {
-      name: "",
-      state: "draft",
-      purpose: "",
-      scopeType: "global",
-      datasourceId: "",
-      databaseName: "",
-      tableName: "",
-      editor: {
-        definition: { knowledge_text: "", max_severity: "critical", version: 1 },
-        parameters: {},
-      },
-    };
-  }
-  return {
-    name: entry.name,
-    state: entry.state,
-    purpose: entry.purpose ?? "",
-    scopeType: entry.scope_type,
-    datasourceId: entry.datasource_id ?? "",
-    databaseName: entry.database_name ?? "",
-    tableName: entry.table_name ?? "",
-    editor: { definition: entry.definition, parameters: {} },
-  };
-}
 
 /** Internal knowledge notes master-detail page (/admin/review-engine/knowledge). */
 export function KnowledgeNotesPage() {
@@ -219,6 +167,9 @@ export function KnowledgeNotesPage() {
                         >
                           <div className="flex items-center gap-2">
                             <StateBadge state={entry.state} />
+                            <Badge variant="secondary">
+                              {t(`admin.reviewInput.severity_${entry.definition.max_severity}`)}
+                            </Badge>
                             <span className="text-muted-foreground text-xs">
                               {t(`admin.knowledge.provenance_${entry.provenance}`)}
                             </span>
@@ -229,7 +180,7 @@ export function KnowledgeNotesPage() {
                           ) : null}
                           <p className="text-muted-foreground mt-1 text-xs">
                             {entry.scope_type === "global"
-                              ? t("admin.knowledge.scopeGlobal")
+                              ? t("admin.knowledge.scopeGlobalRetired")
                               : entry.scope_type === "datasource"
                                 ? t("admin.knowledge.scopeDatasource")
                                 : `${entry.database_name ?? "?"}.${entry.table_name ?? "?"}`}
@@ -465,279 +416,5 @@ export function KnowledgeNotesPage() {
         </DialogContent>
       </Dialog>
     </PageLayout>
-  );
-}
-
-function KnowledgeDetailPanel({
-  selected,
-  draftText,
-  onDraftChange,
-  replaceEntry,
-  onEdit,
-}: {
-  selected: KnowledgeEntry;
-  draftText: string | null;
-  onDraftChange: (next: string | null) => void;
-  replaceEntry: ReturnType<typeof useReplaceKnowledgeEntry>;
-  onEdit: () => void;
-}) {
-  const { t } = useTranslation();
-  const serverText = selected.definition.knowledge_text;
-  const effectiveText = draftText ?? serverText;
-  const dirty = draftText !== null && draftText !== serverText;
-
-  const save = () => {
-    replaceEntry.mutate(
-      {
-        id: selected.id,
-        version: selected.version,
-        write: {
-          name: selected.name,
-          purpose: selected.purpose,
-          state: selected.state,
-          scope_type: selected.scope_type,
-          datasource_id: selected.datasource_id,
-          database_name: selected.database_name,
-          table_name: selected.table_name,
-          definition: { ...selected.definition, knowledge_text: effectiveText },
-          provenance: selected.provenance,
-        },
-      },
-      {
-        onSuccess: () => {
-          onDraftChange(null);
-          appToast.success(t("common.savedToast"), { description: selected.name });
-        },
-        onError: (error) => {
-          const display = describeError(error, "replaceKnowledgeEntry");
-          appToast.error(t(display.messageKey));
-        },
-      },
-    );
-  };
-
-  return (
-    <div className="flex flex-col gap-4" data-testid="knowledge-detail">
-      <div className="flex items-start justify-between gap-3">
-        <h3 className="text-xl font-semibold">{selected.name}</h3>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={onEdit}
-          data-testid={`review-input-edit-${selected.id}`}
-        >
-          {t("admin.knowledge.editTitle")}
-        </Button>
-      </div>
-      <div className="flex flex-wrap items-center gap-2">
-        <StateBadge state={selected.state} />
-        <Badge variant="outline">
-          {selected.scope_type === "global"
-            ? t("admin.knowledge.scopeGlobal")
-            : selected.scope_type === "datasource"
-              ? t("admin.knowledge.scopeDatasource")
-              : t("admin.knowledge.scopeTable")}
-        </Badge>
-        <Badge variant="secondary">
-          {t(`admin.knowledge.provenance_${selected.provenance}`)}
-        </Badge>
-        <span className="text-muted-foreground text-xs tabular-nums">
-          {formatTimestamp(selected.updated_at)}
-        </span>
-      </div>
-      {selected.purpose ? <p className="text-sm">{selected.purpose}</p> : null}
-      <div className="flex flex-col gap-2">
-        <Textarea
-          value={effectiveText}
-          onChange={(event) => { onDraftChange(event.target.value); }}
-          onBlur={() => { if (dirty) save(); }}
-          rows={8}
-          data-testid="knowledge-notes-editor"
-          aria-label={t("admin.knowledge.editHeader")}
-        />
-        {dirty ? (
-          <PendingButton
-            size="sm"
-            pending={replaceEntry.isPending}
-            onClick={save}
-            data-testid="knowledge-notes-save"
-          >
-            {t("admin.knowledge.save")}
-          </PendingButton>
-        ) : null}
-      </div>
-    </div>
-  );
-}
-
-function KnowledgeFormDialog({
-  editing,
-  onClose,
-}: {
-  editing: KnowledgeEntry | null;
-  onClose: () => void;
-}) {
-  const { t } = useTranslation();
-  const createEntry = useCreateKnowledgeEntry();
-  const replaceEntry = useReplaceKnowledgeEntry();
-  const session = useSession();
-  const datasourcesQuery = useDatasources(session.user?.can_access_admin === true);
-  const [form, setForm] = useState<KnowledgeFormState>(() => initialKnowledgeForm(editing));
-  const [errorKey, setErrorKey] = useState<string | null>(null);
-  const [errorRequestId, setErrorRequestId] = useState<string | null>(null);
-
-  const onWriteError = (operationId: string) => (error: unknown) => {
-    const display = describeError(error, operationId);
-    setErrorKey(display.messageKey);
-    setErrorRequestId(display.requestId);
-    appToast.error(t(display.messageKey));
-  };
-
-  const mutation = editing === null ? createEntry : replaceEntry;
-
-  const submit = () => {
-    setErrorKey(null);
-    setErrorRequestId(null);
-    const write: KnowledgeEntryWrite = {
-      name: form.name,
-      purpose: form.purpose === "" ? undefined : form.purpose,
-      state: form.state,
-      scope_type: form.scopeType,
-      datasource_id: form.scopeType === "global" ? undefined : form.datasourceId === "" ? undefined : form.datasourceId,
-      database_name: form.scopeType === "global" ? undefined : form.databaseName === "" ? undefined : form.databaseName,
-      table_name: form.scopeType === "table" ? (form.tableName === "" ? undefined : form.tableName) : undefined,
-      definition: form.editor.definition,
-      provenance: editing !== null ? editing.provenance : "manual",
-      source_finding_id: editing !== null ? (editing.source_finding_id ?? undefined) : undefined,
-    };
-    if (editing === null) {
-      createEntry.mutate(write, {
-        onSuccess: () => {
-          appToast.success(t("common.save"), { description: write.name });
-          onClose();
-        },
-        onError: onWriteError("createKnowledgeEntry"),
-      });
-    } else {
-      replaceEntry.mutate(
-        { id: editing.id, version: editing.version, write },
-        {
-          onSuccess: () => {
-            appToast.success(t("common.save"), { description: write.name });
-            onClose();
-          },
-          onError: onWriteError("replaceKnowledgeEntry"),
-        },
-      );
-    }
-  };
-
-  return (
-    <ReviewInputDialogFrame
-      title={t(editing === null ? "admin.knowledge.createTitle" : "admin.knowledge.editTitle")}
-      configHash={editing?.config_hash ?? ""}
-      fields={
-        <>
-          <div className="flex flex-col gap-1">
-            <Label htmlFor="review-input-name">{t("admin.reviewInput.name")}</Label>
-            <Input
-              id="review-input-name"
-              value={form.name}
-              onChange={(event) => { setForm({ ...form, name: event.target.value }); }}
-              data-testid="review-input-name"
-            />
-          </div>
-          <ReviewInputStateSelect
-            value={form.state}
-            onChange={(state) => { setForm({ ...form, state }); }}
-          />
-          <div className="flex flex-col gap-1">
-            <Label>{t("admin.knowledge.scope")}</Label>
-            <Select
-              value={form.scopeType}
-              onValueChange={(next) => {
-                if (next === null) return;
-                setForm({ ...form, scopeType: next });
-              }}
-              items={{
-                global: t("admin.knowledge.scopeGlobal"),
-                datasource: t("admin.knowledge.scopeDatasource"),
-                table: t("admin.knowledge.scopeTable"),
-              }}
-            >
-              <SelectTrigger data-testid="knowledge-scope">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="global">{t("admin.knowledge.scopeGlobal")}</SelectItem>
-                <SelectItem value="datasource">{t("admin.knowledge.scopeDatasource")}</SelectItem>
-                <SelectItem value="table">{t("admin.knowledge.scopeTable")}</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="flex flex-col gap-1">
-            <Label htmlFor="knowledge-purpose">{t("admin.knowledge.purpose")}</Label>
-            <Input
-              id="knowledge-purpose"
-              value={form.purpose}
-              onChange={(event) => { setForm({ ...form, purpose: event.target.value }); }}
-              data-testid="knowledge-purpose"
-            />
-          </div>
-          {form.scopeType !== "global" ? (
-            <>
-              <div className="flex flex-col gap-1">
-                <Label>{t("admin.knowledge.datasource")}</Label>
-                <Select
-                  value={form.datasourceId}
-                  onValueChange={(next) => {
-                    if (next === null) return;
-                    setForm({ ...form, datasourceId: next });
-                  }}
-                >
-                  <SelectTrigger data-testid="knowledge-datasource">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {(datasourcesQuery.data?.items ?? []).map((datasource: { id: string; name: string }) => (
-                      <SelectItem key={datasource.id} value={datasource.id}>
-                        {datasource.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="flex flex-col gap-1">
-                <Label htmlFor="knowledge-database">{t("admin.knowledge.databaseName")}</Label>
-                <Input
-                  id="knowledge-database"
-                  value={form.databaseName}
-                  onChange={(event) => { setForm({ ...form, databaseName: event.target.value }); }}
-                  data-testid="knowledge-database"
-                />
-              </div>
-            </>
-          ) : null}
-          {form.scopeType === "table" ? (
-            <div className="flex flex-col gap-1">
-              <Label htmlFor="knowledge-table">{t("admin.knowledge.tableName")}</Label>
-              <Input
-                id="knowledge-table"
-                value={form.tableName}
-                onChange={(event) => { setForm({ ...form, tableName: event.target.value }); }}
-                data-testid="knowledge-table"
-              />
-            </div>
-          ) : null}
-        </>
-      }
-      editorValue={form.editor}
-      onEditorChange={(editor) => { setForm({ ...form, editor }); }}
-      errorKey={errorKey}
-      errorRequestId={errorRequestId}
-      pending={mutation.isPending}
-      onSubmit={submit}
-      onClose={onClose}
-    />
   );
 }

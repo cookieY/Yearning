@@ -5,7 +5,9 @@ import { SessionProvider } from "@/features/auth/session-provider";
 import { HttpResponse, http } from "msw";
 import { MemoryRouter, Route, Routes } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { apiRoute } from "@/shared/mock/api-route";
 import { server } from "@/test/msw/server";
+import { grantSession } from "@/test/session";
 import "@/shared/i18n";
 import {
   FIXTURE_FLOW_ID,
@@ -51,29 +53,6 @@ beforeEach(() => {
 afterEach(() => {
   resetReviewFixture();
 });
-
-function grantSession(): void {
-  server.use(
-    http.get("*/users/me", () =>
-      HttpResponse.json({
-        err_code: 0,
-        message: "ok",
-        data: {
-          id: FIXTURE_OWNER_ID,
-          username: "henry",
-          display_name: "henry",
-          email: null,
-          is_builtin_admin: true,
-          version: 1,
-          created_at: "2026-08-28T08:00:00Z",
-          updated_at: "2026-08-28T08:00:00Z",
-          can_access_admin: true,
-        },
-        request_id: FIXTURE_OWNER_ID,
-      }),
-    ),
-  );
-}
 
 function approvalOrder(overrides: Partial<FixtureOrder> = {}): FixtureOrder {
   return {
@@ -161,7 +140,7 @@ interface SubmittedFixture {
  * /change-orders with the run id). */
 async function submitReadyDraft(): Promise<string> {
   const created = (await (
-    await fetch("/change-drafts", {
+    await fetch("/api/v4/change-drafts", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ flow_id: FIXTURE_FLOW_ID, title: "\u5ba1\u6279\u5939\u5177\u63d0\u4ea4\u6d41" }),
@@ -169,13 +148,13 @@ async function submitReadyDraft(): Promise<string> {
   ).json()) as { data: { id: string } };
   const draftId = created.data.id;
   const sql = "UPDATE orders SET status = 1 WHERE user_id = 42;";
-  await fetch(`/change-drafts/${draftId}/sql`, {
+  await fetch(`/api/v4/change-drafts/${draftId}/sql`, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ sql }),
   });
   const started = (await (
-    await fetch("/review-runs", {
+    await fetch("/api/v4/review-runs", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ flow_id: FIXTURE_FLOW_ID, draft_id: draftId, sql }),
@@ -183,7 +162,7 @@ async function submitReadyDraft(): Promise<string> {
   ).json()) as { data: { run_id: string } };
   await waitFor(
     async () => {
-      const response = (await (await fetch(`/review-runs/${started.data.run_id}`)).json()) as {
+      const response = (await (await fetch(`/api/v4/review-runs/${started.data.run_id}`)).json()) as {
         data: { state: string };
       };
       if (response.data.state !== "ready") throw new Error("run not finished yet");
@@ -192,7 +171,7 @@ async function submitReadyDraft(): Promise<string> {
     { timeout: 4_000 },
   );
   const submitted = (await (
-    await fetch("/change-orders", {
+    await fetch("/api/v4/change-orders", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -282,7 +261,7 @@ describe("approval decision on the order detail page", () => {
     window.fetch = countingFetch;
     try {
       server.use(
-        http.post("*/change-orders/:orderId/approval-decisions", () =>
+        http.post(apiRoute("/change-orders/:orderId/approval-decisions"), () =>
           HttpResponse.json({
             err_code: 1004,
             message: "order changed elsewhere",
@@ -400,7 +379,7 @@ describe("frozen review and comments on the order detail page", () => {
     const requestedCursors: Array<string | null> = [];
     const requestedLimits: Array<string | null> = [];
     server.use(
-      http.get("*/change-orders/:orderId/review-findings", ({ request }) => {
+      http.get(apiRoute("/change-orders/:orderId/review-findings"), ({ request }) => {
         const url = new URL(request.url);
         const after = url.searchParams.get("after");
         requestedCursors.push(after);
@@ -450,7 +429,7 @@ describe("frozen review and comments on the order detail page", () => {
     // then the copy-audit endpoint is observed (SEC-0035 ordering).
     let copyAudited = false;
     server.use(
-      http.post("*/change-orders/:orderId/sql-copy-events", () => {
+      http.post(apiRoute("/change-orders/:orderId/sql-copy-events"), () => {
         copyAudited = true;
         return HttpResponse.json({ err_code: 0, message: "ok", data: { recorded: true }, request_id: REQUEST_ID });
       }),
@@ -479,7 +458,7 @@ describe("frozen review and comments on the order detail page", () => {
     expect(screen.getByTestId("order-comment-item")).toHaveAttribute("data-align", "end");
 
     server.use(
-      http.post("*/change-orders/:orderId/comments", () =>
+      http.post(apiRoute("/change-orders/:orderId/comments"), () =>
         HttpResponse.json({
           err_code: 1010,
           message: "comment is not legal from this state",

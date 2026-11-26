@@ -5,13 +5,13 @@ package application
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"time"
 
 	"gorm.io/gorm"
 
 	"github.com/cookieY/YearningX/backend/internal/crypto"
+	"github.com/cookieY/YearningX/backend/internal/platform/txutil"
 	"github.com/cookieY/YearningX/backend/internal/query/domain"
 	"github.com/cookieY/YearningX/backend/internal/query/persistence"
 )
@@ -78,42 +78,24 @@ func (s *Services) CreateSession(ctx context.Context, in CreateSessionInput) (*S
 		}
 		return out, false, nil
 	}
-	reqHash := idemRequestHash(in.Actor.UserID, in.FlowID, in.GrantID, dsKey(in.DatasourceIDs))
-	claimed, replay, cerr := s.idemClaim(ctx, in.Actor.UserID, route, in.FlowID, in.IdempotencyKey, reqHash)
-	if cerr != nil {
-		return nil, false, cerr
-	}
-	if !claimed {
-		var v SessionView
-		if err := json.Unmarshal(replay, &v); err != nil {
-			return nil, false, err
+	reqHash := txutil.RequestHash(in.Actor.UserID, in.FlowID, in.GrantID, dsKey(in.DatasourceIDs))
+	return txutil.RunIdempotent(ctx, s.idemStore(), in.Actor.UserID, route, in.FlowID, in.IdempotencyKey, reqHash, func() (*SessionView, error) {
+		if in.GrantID == "" && !s.loadQuerySettings(ctx, s.DB).ApprovalEnabled {
+			s.ensureDatasourcesIdentity(ctx, in.Actor.UserID, in.FlowID, in.DatasourceIDs)
 		}
-		return &v, true, nil
-	}
-	if in.GrantID == "" && !s.loadQuerySettings(ctx, s.DB).ApprovalEnabled {
-		s.ensureDatasourcesIdentity(ctx, in.Actor.UserID, in.FlowID, in.DatasourceIDs)
-	}
-	var out *SessionView
-	txErr := s.serializable(ctx, func(tx *gorm.DB) error {
-		v, err := s.createSessionOnce(ctx, tx, in)
-		if err != nil {
-			return err
+		var out *SessionView
+		if txErr := s.serializable(ctx, func(tx *gorm.DB) error {
+			v, err := s.createSessionOnce(ctx, tx, in)
+			if err != nil {
+				return err
+			}
+			out = v
+			return nil
+		}); txErr != nil {
+			return nil, txErr
 		}
-		out = v
-		return nil
+		return out, nil
 	})
-	if txErr != nil {
-		_ = s.idemRelease(ctx, in.Actor.UserID, route, in.FlowID, in.IdempotencyKey)
-		return nil, false, txErr
-	}
-	raw, merr := json.Marshal(out)
-	if merr != nil {
-		return nil, false, merr
-	}
-	if cerr := s.idemComplete(ctx, in.Actor.UserID, route, in.FlowID, in.IdempotencyKey, raw); cerr != nil {
-		return nil, false, cerr
-	}
-	return out, false, nil
 }
 
 func (s *Services) createSessionOnce(ctx context.Context, tx *gorm.DB, in CreateSessionInput) (*SessionView, error) {
@@ -131,7 +113,7 @@ func (s *Services) createSessionOnce(ctx context.Context, tx *gorm.DB, in Create
 			return nil, domain.ErrGrantRequired()
 		}
 		var g persistence.QueryGrantModel
-		if err := tx.WithContext(ctx).Clauses(lockUpdate()).
+		if err := tx.WithContext(ctx).Clauses(txutil.ForUpdate()).
 			Where("id = ?", in.GrantID).First(&g).Error; err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
 				return nil, domain.ErrGrantRequired()
@@ -309,7 +291,11 @@ func (s *Services) GetSession(ctx context.Context, actor Actor, sessionID string
 		Limit(50).
 		Find(&execRows)
 	for _, ex := range execRows {
-		plain, err := s.openPayload("query_executions", ex.ID, "query_payload", crypto.Envelope{
+		plain, err := s.Crypter.OpenColumn(crypto.PurposePayload, crypto.ColumnRef{
+			Table:      "query_executions",
+			PrimaryKey: ex.ID,
+			Column:     "query_payload",
+		}, crypto.Envelope{
 			Ciphertext: ex.QueryPayloadCiphertext,
 			Nonce:      ex.QueryPayloadNonce,
 			KeyID:      ex.QueryPayloadKeyID,
@@ -368,45 +354,27 @@ type CloseSessionInput struct {
 // and requests cancellation of running SELECTs while recording their final outcome.
 func (s *Services) CloseSession(ctx context.Context, in CloseSessionInput) (*SessionView, bool, error) {
 	route := "POST:/query-sessions/{session_id}/closure"
-	reqHash := idemRequestHash(in.Actor.UserID, in.SessionID, in.Reason)
-	claimed, replay, cerr := s.idemClaim(ctx, in.Actor.UserID, route, in.SessionID, in.IdempotencyKey, reqHash)
-	if cerr != nil {
-		return nil, false, cerr
-	}
-	if !claimed {
-		var v SessionView
-		if err := json.Unmarshal(replay, &v); err != nil {
-			return nil, false, err
+	reqHash := txutil.RequestHash(in.Actor.UserID, in.SessionID, in.Reason)
+	return txutil.RunIdempotent(ctx, s.idemStore(), in.Actor.UserID, route, in.SessionID, in.IdempotencyKey, reqHash, func() (*SessionView, error) {
+		var out *SessionView
+		if txErr := s.serializable(ctx, func(tx *gorm.DB) error {
+			v, err := s.closeSessionOnce(ctx, tx, in)
+			if err != nil {
+				return err
+			}
+			out = v
+			return nil
+		}); txErr != nil {
+			return nil, txErr
 		}
-		return &v, true, nil
-	}
-	var out *SessionView
-	txErr := s.serializable(ctx, func(tx *gorm.DB) error {
-		v, err := s.closeSessionOnce(ctx, tx, in)
-		if err != nil {
-			return err
-		}
-		out = v
-		return nil
+		s.terminateSessionsCursors(ctx, []string{in.SessionID})
+		return out, nil
 	})
-	if txErr != nil {
-		_ = s.idemRelease(ctx, in.Actor.UserID, route, in.SessionID, in.IdempotencyKey)
-		return nil, false, txErr
-	}
-	s.terminateSessionsCursors(ctx, []string{in.SessionID})
-	raw, merr := json.Marshal(out)
-	if merr != nil {
-		return nil, false, merr
-	}
-	if cerr := s.idemComplete(ctx, in.Actor.UserID, route, in.SessionID, in.IdempotencyKey, raw); cerr != nil {
-		return nil, false, cerr
-	}
-	return out, false, nil
 }
 
 func (s *Services) closeSessionOnce(ctx context.Context, tx *gorm.DB, in CloseSessionInput) (*SessionView, error) {
 	var row persistence.QuerySessionModel
-	if err := tx.WithContext(ctx).Clauses(lockUpdate()).
+	if err := tx.WithContext(ctx).Clauses(txutil.ForUpdate()).
 		Where("id = ?", in.SessionID).First(&row).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, domain.ErrNotFound()

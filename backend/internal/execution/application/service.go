@@ -7,16 +7,13 @@ package application
 
 import (
 	"context"
-	"crypto/sha256"
 	"encoding/hex"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
 	"time"
 
 	"gorm.io/gorm"
-	"gorm.io/gorm/clause"
 
 	"github.com/google/uuid"
 
@@ -28,10 +25,9 @@ import (
 	"github.com/cookieY/YearningX/backend/internal/execution/persistence"
 	"github.com/cookieY/YearningX/backend/internal/osc"
 	"github.com/cookieY/YearningX/backend/internal/platform/addrguard"
+	"github.com/cookieY/YearningX/backend/internal/platform/ptr"
 	"github.com/cookieY/YearningX/backend/internal/platform/txutil"
 )
-
-func forUpdate() clause.Locking { return clause.Locking{Strength: "UPDATE"} }
 
 // Actor represents the command initiator (session identity snapshot).
 type Actor struct {
@@ -110,10 +106,6 @@ func (s *Services) serializable(ctx context.Context, fn func(tx *gorm.DB) error)
 	return txutil.Serializable(ctx, s.DB, fn)
 }
 
-func isSerializationFailure(err error) bool { return txutil.IsSerializationFailure(err) }
-
-func isUniqueViolation(err error) bool { return txutil.IsUniqueViolation(err) }
-
 // ---- Domain Events (repository-event-routing: execution.* -> execution.state_changed) ----
 
 const (
@@ -170,48 +162,18 @@ type VerificationRecordedPayload struct {
 // external type is mapped by the outbox consumer according to the routing table).
 func (s *Services) emitOrderEvent(ctx context.Context, tx *gorm.DB, internalType, orderID string,
 	actor auditlog.Actor, data any) error {
-	payload, err := json.Marshal(data)
-	if err != nil {
-		return err
-	}
-	m := map[string]any{}
-	if err := json.Unmarshal(payload, &m); err != nil {
-		return err
-	}
-	return s.Recorder.Emit(ctx, tx, internalType, "change-orders/"+orderID, actor, m)
-}
-
-func auditActor(a Actor) auditlog.Actor {
-	return auditlog.Actor{UserID: a.UserID, Username: a.Username}
+	return s.Recorder.EmitPayload(ctx, tx, internalType, "change-orders/"+orderID, actor, data)
 }
 
 // ---- Idempotency (same contract surface as changeorder) ----
 
 func (s *Services) idemStore() *txutil.IdempotencyStore {
-	return &txutil.IdempotencyStore{
-		DB:      s.DB,
-		Crypter: s.Crypter,
-		Errs: txutil.IdempotencyErrors{
-			Reused:     func() error { return domain.ErrIdemReused() },
-			InProgress: func() error { return domain.ErrIdemInProgress() },
-			Concurrent: func() error { return domain.ErrConcurrent() },
-		},
-	}
+	return txutil.NewIdempotencyStore(s.DB, s.Crypter, txutil.IdempotencyErrors{
+		Reused:     func() error { return domain.ErrIdemReused() },
+		InProgress: func() error { return domain.ErrIdemInProgress() },
+		Concurrent: func() error { return domain.ErrConcurrent() },
+	})
 }
-
-func (s *Services) idemClaim(ctx context.Context, userID, route, aggregateID, key, reqHash string) (claimed bool, replay []byte, err error) {
-	return s.idemStore().Claim(ctx, userID, route, aggregateID, key, reqHash)
-}
-
-func (s *Services) idemRelease(ctx context.Context, userID, route, aggregateID, key string) error {
-	return s.idemStore().Release(ctx, userID, route, aggregateID, key)
-}
-
-func (s *Services) idemComplete(ctx context.Context, userID, route, aggregateID, key string, response []byte) error {
-	return s.idemStore().Complete(ctx, userID, route, aggregateID, key, response)
-}
-
-func idemRequestHash(parts ...string) string { return txutil.RequestHash(parts...) }
 
 // ---- Encryption Helpers (same AAD contract surface as review/datasource) ----
 
@@ -220,12 +182,13 @@ const sqlHMACPurpose = "sql_fingerprint"
 
 // openOrderSQL decrypts the work order's frozen SQL (AAD = order_sql_payloads row).
 func (s *Services) openOrderSQL(orderID string, row *orderSQLRow) ([]byte, error) {
-	return s.Crypter.Open(crypto.PurposePayload, crypto.Envelope{
+	return s.Crypter.OpenColumn(crypto.PurposePayload, crypto.ColumnRef{
+		Table:      "order_sql_payloads",
+		PrimaryKey: orderID,
+		Column:     "sql_ciphertext",
+	}, crypto.Envelope{
 		Ciphertext: row.SQLCiphertext, Nonce: row.SQLNonce,
 		KeyID: row.SQLKeyID, Algorithm: row.SQLAlgorithm,
-	}, crypto.AAD{
-		DeploymentID: s.Crypter.DeploymentID(), Table: "order_sql_payloads",
-		PrimaryKey: orderID, Column: "sql_ciphertext", Purpose: crypto.PurposePayload,
 	})
 }
 
@@ -240,11 +203,11 @@ func (s *Services) hmacSQL(plain []byte) (string, error) {
 
 // sealErrorDetail encrypts statement error details (execution_statements.error_* envelope).
 func (s *Services) sealErrorDetail(attemptID string, ordinal int32, detail []byte) (ct, nonce []byte, keyID string, err error) {
-	env, err := s.Crypter.Seal(crypto.PurposePayload, detail, crypto.AAD{
-		DeploymentID: s.Crypter.DeploymentID(), Table: "execution_statements",
+	env, err := s.Crypter.SealColumn(crypto.PurposePayload, crypto.ColumnRef{
+		Table:      "execution_statements",
 		PrimaryKey: fmt.Sprintf("%s#%d", attemptID, ordinal),
-		Column:     "error_detail", Purpose: crypto.PurposePayload,
-	})
+		Column:     "error_detail",
+	}, detail)
 	if err != nil {
 		return nil, nil, "", err
 	}
@@ -253,19 +216,13 @@ func (s *Services) sealErrorDetail(attemptID string, ordinal int32, detail []byt
 
 // openErrorDetail decrypts statement error details (read surface).
 func (s *Services) openErrorDetail(attemptID string, ordinal int32, ct, nonce []byte, keyID string) ([]byte, error) {
-	return s.Crypter.Open(crypto.PurposePayload, crypto.Envelope{
-		Ciphertext: ct, Nonce: nonce, KeyID: keyID, Algorithm: crypto.EnvelopeAlgorithm,
-	}, crypto.AAD{
-		DeploymentID: s.Crypter.DeploymentID(), Table: "execution_statements",
+	return s.Crypter.OpenColumn(crypto.PurposePayload, crypto.ColumnRef{
+		Table:      "execution_statements",
 		PrimaryKey: fmt.Sprintf("%s#%d", attemptID, ordinal),
-		Column:     "error_detail", Purpose: crypto.PurposePayload,
+		Column:     "error_detail",
+	}, crypto.Envelope{
+		Ciphertext: ct, Nonce: nonce, KeyID: keyID, Algorithm: crypto.EnvelopeAlgorithm,
 	})
-}
-
-// sha256Hex computes an unkeyed SHA-256 hex digest.
-func sha256Hex(data []byte) string {
-	sum := sha256.Sum256(data)
-	return hex.EncodeToString(sum[:])
 }
 
 // ---- Target Datasource Resolution (execution-purpose credentials & TLS via canonical datasource helpers) ----
@@ -287,7 +244,7 @@ func (s *Services) defaultPoolFactory(ctx context.Context, ds *datasource.Dataso
 	}
 	ep := database.Endpoint{
 		Host: ds.Host, Port: ds.Port,
-		DatabaseName: derefStr(ds.DatabaseName), CompatibilityMod: ds.CompatibilityMode,
+		DatabaseName: ptr.Deref(ds.DatabaseName), CompatibilityMod: ds.CompatibilityMode,
 	}
 	var adapter database.Adapter
 	if ds.CompatibilityMode == "mysql" {
@@ -305,17 +262,6 @@ func (s *Services) openPool(ctx context.Context, ds *datasource.DatasourceModel)
 		return s.PoolFactory(ctx, ds)
 	}
 	return s.defaultPoolFactory(ctx, ds)
-}
-
-func derefStr(p *string) string {
-	if p == nil {
-		return ""
-	}
-	return *p
-}
-
-func splitTLSPEM(verifyServer bool, serverName string, plain []byte) (*database.TLSMaterial, error) {
-	return datasource.SplitTLSMaterial(verifyServer, serverName, plain)
 }
 
 // openExecPassword decrypts the execution credential password (called only at the instant of
@@ -358,7 +304,7 @@ func (s *Services) loadOrderSQL(ctx context.Context, db *gorm.DB, orderID string
 // loadAttemptForUpdate locks and returns the Attempt row.
 func (s *Services) loadAttemptForUpdate(ctx context.Context, tx *gorm.DB, attemptID string) (*persistence.ExecutionAttemptModel, error) {
 	var m persistence.ExecutionAttemptModel
-	if err := tx.WithContext(ctx).Clauses(forUpdate()).
+	if err := tx.WithContext(ctx).Clauses(txutil.ForUpdate()).
 		Where("id = ?", attemptID).First(&m).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, domain.ErrNotFound()

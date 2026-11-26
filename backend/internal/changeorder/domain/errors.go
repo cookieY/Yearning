@@ -2,6 +2,8 @@
 // submission domain + common). The HTTP layer maps these to HTTP 200 + err_code per business result conventions.
 package domain
 
+import "strings"
+
 // Error is a domain error carrying a numeric business code.
 type Error struct {
 	Code int32
@@ -9,6 +11,33 @@ type Error struct {
 }
 
 func (e *Error) Error() string { return "changeorder: " + e.Name }
+
+// BizCode implements bizerr.Coded.
+func (e *Error) BizCode() int { return int(e.Code) }
+
+// BizName implements bizerr.Coded, stripping any ":reason" suffix into BizMeta.
+func (e *Error) BizName() string {
+	if base, _, ok := strings.Cut(e.Name, ":"); ok {
+		return base
+	}
+	return e.Name
+}
+
+// BizMessage implements bizerr.Coded.
+func (e *Error) BizMessage() string {
+	if _, _, ok := strings.Cut(e.Name, ":"); ok {
+		return "Submission gate check failed"
+	}
+	return "Business operation failed"
+}
+
+// BizMeta implements bizerr.Coded.
+func (e *Error) BizMeta() map[string]any {
+	if _, reason, ok := strings.Cut(e.Name, ":"); ok {
+		return map[string]any{"reason": reason}
+	}
+	return nil
+}
 
 // Contract error codes (error-codes.json).
 const (

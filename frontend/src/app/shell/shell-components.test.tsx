@@ -5,7 +5,9 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { HttpResponse, http } from "msw";
 import { beforeEach, describe, expect, it } from "vitest";
 import "@/shared/i18n";
+import { apiRoute } from "@/shared/mock/api-route";
 import { server } from "@/test/msw/server";
+import { buildSessionEnvelope } from "@/test/session";
 import { SidebarProvider } from "@/shared/components/ui/sidebar";
 import { SessionProvider } from "@/features/auth/session-provider";
 import { YearningSidebar } from "./yearning-sidebar";
@@ -18,25 +20,16 @@ function stubCurrentUser(canAccessAdmin: boolean): Promise<void> {
     resolveProbe = resolve;
   });
   server.use(
-    http.get("*/users/me", () => {
+    http.get(apiRoute("/users/me"), () => {
       queueMicrotask(resolveProbe);
-      return HttpResponse.json({
-        err_code: 0,
-        message: "ok",
-        data: {
+      return HttpResponse.json(
+        buildSessionEnvelope({
           id: "0198d9cc-e65d-7b9d-a8aa-3c81945f99ad",
           username: canAccessAdmin ? "admin" : "henry",
-          display_name: canAccessAdmin ? "admin" : "henry",
-          email: null,
-          is_builtin_admin: canAccessAdmin,
-          version: 1,
-          created_at: "2026-08-28T08:00:00Z",
-          updated_at: "2026-08-28T08:00:00Z",
-          can_access_admin: canAccessAdmin,
-          auth_provider: "local",
-        },
-        request_id: "0198d9cc-e65d-7b9d-a8aa-3c81945f99ad",
-      });
+          admin: canAccessAdmin,
+          authProvider: "local",
+        }),
+      );
     }),
   );
   return settled;
@@ -147,7 +140,7 @@ describe("UserMenu", () => {
 describe("UserMenu sign-out resilience", () => {
   it("still returns to a clean state when the logout request itself fails", async () => {
     server.use(
-      http.post("*/auth/logout", () => new HttpResponse(null, { status: 500 })),
+      http.post(apiRoute("/auth/logout"), () => new HttpResponse(null, { status: 500 })),
     );
     const user = userEvent.setup();
     renderWithShellProviders(<UserMenu />);

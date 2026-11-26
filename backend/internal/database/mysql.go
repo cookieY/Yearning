@@ -122,6 +122,7 @@ func readMySQLIdentity(ctx context.Context, a *baseAdapter, cred Credential, mat
 	return &ServerIdentity{
 		EngineFamily:         "mysql",
 		ServerVersion:        normalizeVersionString(version),
+		RawVersionBanner:     version,
 		InstanceMarker:       "mysql:" + serverUUID,
 		LowerCaseTableNames:  lowerCase,
 		DatabaseName:         dbName,

@@ -4,10 +4,14 @@ package application
 import (
 	"context"
 	"errors"
+	"time"
 
 	"gorm.io/gorm"
 
 	"github.com/cookieY/YearningX/backend/internal/crypto"
+	"github.com/cookieY/YearningX/backend/internal/platform/pagecursor"
+	"github.com/cookieY/YearningX/backend/internal/platform/pagination"
+	"github.com/cookieY/YearningX/backend/internal/platform/txutil"
 	"github.com/cookieY/YearningX/backend/internal/review/domain"
 	"github.com/cookieY/YearningX/backend/internal/review/persistence"
 )
@@ -87,7 +91,7 @@ func (s *Services) loadRun(ctx context.Context, db *gorm.DB, runID string) (*per
 // loadRunForUpdate reads a Run row with a row lock.
 func (s *Services) loadRunForUpdate(ctx context.Context, tx *gorm.DB, runID string) (*persistence.ReviewRunModel, error) {
 	var m persistence.ReviewRunModel
-	if err := tx.WithContext(ctx).Clauses(forUpdate()).
+	if err := tx.WithContext(ctx).Clauses(txutil.ForUpdate()).
 		Where("id = ?", runID).First(&m).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, ErrNotFound
@@ -326,9 +330,7 @@ func (s *Services) ListRunFindings(ctx context.Context, actor Actor, runID strin
 	if draft.OwnerUserID != actor.UserID {
 		return nil, nil, ErrNotFound
 	}
-	if limit <= 0 || limit > 200 {
-		limit = 50
-	}
+	limit = pagination.ClampLimit(limit, 50, 200)
 	type row struct {
 		ID         string
 		StagePos   int32
@@ -339,7 +341,7 @@ func (s *Services) ListRunFindings(ctx context.Context, actor Actor, runID strin
 		Message    string
 		Suggestion *string
 		Confidence *string
-		CreatedAt  string
+		CreatedAt  time.Time
 	}
 	q := s.DB.WithContext(ctx).Table("review_findings f").
 		Select(`f.id::text as id, s.stage_position as stage_pos, f.fingerprint_group_id::text as group_id,
@@ -348,8 +350,8 @@ func (s *Services) ListRunFindings(ctx context.Context, actor Actor, runID strin
 		Joins("join stage_review_snapshots s on s.id = f.stage_review_id").
 		Where("s.review_run_id = ?", runID)
 	if afterCursor != "" {
-		created, id, ok := splitCursor(afterCursor)
-		if !ok {
+		created, id, err := pagecursor.DecodeUUID(afterCursor)
+		if err != nil {
 			return nil, nil, ErrValidation
 		}
 		q = q.Where("(f.created_at, f.id) < (?, ?)", created, id)
@@ -361,7 +363,7 @@ func (s *Services) ListRunFindings(ctx context.Context, actor Actor, runID strin
 	var next *string
 	if len(rows) > limit {
 		last := rows[limit-1]
-		c := last.CreatedAt + "|" + last.ID
+		c := pagecursor.Encode(last.CreatedAt, last.ID)
 		next = &c
 		rows = rows[:limit]
 	}

@@ -15,6 +15,7 @@ import (
 
 	"github.com/cookieY/YearningX/backend/internal/authorization/auditlog"
 	"github.com/cookieY/YearningX/backend/internal/authorization/bizerr"
+	"github.com/cookieY/YearningX/backend/internal/platform/ptr"
 	"github.com/cookieY/YearningX/backend/internal/platform/txutil"
 )
 
@@ -26,6 +27,7 @@ type UserView struct {
 	Email          *string   `json:"email"`
 	IsBuiltinAdmin bool      `json:"is_builtin_admin"`
 	Role           string    `json:"role"`
+	AuthProvider   string    `json:"auth_provider,omitempty"`
 	Version        int64     `json:"version"`
 	CreatedAt      time.Time `json:"created_at"`
 	UpdatedAt      time.Time `json:"updated_at"`
@@ -41,7 +43,7 @@ func UserViewOf(u *UserModel) UserView {
 	}
 	return UserView{
 		ID: u.ID, Username: u.Username, DisplayName: u.DisplayName, Email: u.Email,
-		IsBuiltinAdmin: u.IsBuiltinAdmin, Role: role, Version: u.Version,
+		IsBuiltinAdmin: u.IsBuiltinAdmin, Role: role, AuthProvider: "local", Version: u.Version,
 		CreatedAt: u.CreatedAt, UpdatedAt: u.UpdatedAt,
 	}
 }
@@ -88,8 +90,35 @@ func (s *Service) ListUsers(ctx context.Context, limit int, after, search, kind 
 		rows = rows[:limit]
 	}
 	views := make([]UserView, 0, len(rows))
+	userIDs := make([]string, 0, len(rows))
 	for i := range rows {
 		views = append(views, UserViewOf(&rows[i]))
+		userIDs = append(userIDs, rows[i].ID)
+	}
+	if len(userIDs) > 0 {
+		type extProviderRow struct {
+			UserID       string `gorm:"column:user_id"`
+			ProviderKind string `gorm:"column:provider_kind"`
+		}
+		var extRows []extProviderRow
+		if err := s.db.WithContext(ctx).Raw(`
+			select distinct on (user_id) user_id::text as user_id, provider_kind
+			from external_identities
+			where user_id in ?
+			order by user_id, created_at asc`, userIDs).Scan(&extRows).Error; err != nil {
+			return nil, nil, err
+		}
+		providersByUser := make(map[string]string, len(extRows))
+		for _, er := range extRows {
+			if er.ProviderKind != "" {
+				providersByUser[er.UserID] = er.ProviderKind
+			}
+		}
+		for i := range views {
+			if pk, ok := providersByUser[views[i].ID]; ok {
+				views[i].AuthProvider = pk
+			}
+		}
 	}
 	var next *string
 	if hasMore && len(rows) > 0 {
@@ -118,7 +147,7 @@ func (s *Service) CreateUser(ctx context.Context, actor ActorRef, username, disp
 	_ = s.audit.Audit(ctx, nil, auditlog.AuditInput{
 		EventType: "user.created", ActorKind: "user", ActorID: &actor.UserID, ActorUsername: &actor.Username,
 		ResourceType: "user", ResourceID: &user.ID, Action: "create_user", Outcome: "succeeded",
-		RequestID: strPtr(meta.RequestID),
+		RequestID: ptr.NonZero(meta.RequestID),
 		Metadata:  map[string]any{"username": user.Username, "role": view.Role},
 	})
 	return &view, nil
@@ -179,13 +208,95 @@ func (s *Service) UpdateUser(ctx context.Context, actor ActorRef, userID string,
 		return nil, err
 	}
 	view := UserViewOf(&user)
+	if provider, err := s.AuthProviderOf(ctx, user.ID); err == nil && provider != "" {
+		view.AuthProvider = provider
+	}
 	_ = s.audit.Audit(ctx, nil, auditlog.AuditInput{
 		EventType: "user.updated", ActorKind: "user", ActorID: &actor.UserID, ActorUsername: &actor.Username,
 		ResourceType: "user", ResourceID: &userID, Action: "update_user", Outcome: "succeeded",
-		RequestID: strPtr(meta.RequestID),
+		RequestID: ptr.NonZero(meta.RequestID),
 		Metadata:  map[string]any{"role": view.Role},
 	})
 	return &view, nil
+}
+
+// ResetUserPassword resets a local non-builtin user's password as an administrator,
+// revokes all active sessions of the target user, and records an audit entry.
+func (s *Service) ResetUserPassword(ctx context.Context, actor ActorRef, userID, newPassword string, meta RequestMeta) error {
+	if _, err := uuid.Parse(userID); err != nil {
+		return bizerr.ErrValidationFailed
+	}
+	if len(newPassword) < 12 || len(newPassword) > 1024 {
+		return bizerr.ErrValidationFailed
+	}
+	var user UserModel
+	if err := s.db.WithContext(ctx).Where("id = ?", userID).First(&user).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return bizerr.ErrNotFound
+		}
+		return err
+	}
+	if user.IsBuiltinAdmin {
+		return bizerr.AdminImmutableError{}
+	}
+	var external int64
+	if err := s.db.WithContext(ctx).Model(&ExternalIdentityModel{}).
+		Where("user_id = ?", userID).Count(&external).Error; err != nil {
+		return err
+	}
+	if external > 0 {
+		return bizerr.ErrPasswordManagedByIdentitySource
+	}
+	// Run Argon2id hashing outside any FOR UPDATE transaction (guardrail #8).
+	hash, err := HashPasswordCtx(ctx, newPassword)
+	if err != nil {
+		return err
+	}
+	return s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var locked UserModel
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+			Where("id = ?", userID).First(&locked).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return bizerr.ErrNotFound
+			}
+			return err
+		}
+		if locked.IsBuiltinAdmin {
+			return bizerr.AdminImmutableError{}
+		}
+		var lockedExternal int64
+		if err := tx.Model(&ExternalIdentityModel{}).
+			Where("user_id = ?", userID).Count(&lockedExternal).Error; err != nil {
+			return err
+		}
+		if lockedExternal > 0 {
+			return bizerr.ErrPasswordManagedByIdentitySource
+		}
+		if err := tx.Model(&UserModel{}).Where("id = ?", userID).
+			Updates(map[string]any{
+				"password_hash": hash,
+				"version":       gorm.Expr("version + 1"),
+				"updated_at":    time.Now().UTC(),
+			}).Error; err != nil {
+			return err
+		}
+		if err := s.sessions.RevokeByUser(ctx, tx, locked.ID, "admin_password_reset"); err != nil {
+			return err
+		}
+		return s.audit.Audit(ctx, tx, auditlog.AuditInput{
+			EventType:     "user.password_reset_by_admin",
+			ActorKind:     "user",
+			ActorID:       ptr.NonZero(actor.UserID),
+			ActorUsername: ptr.NonZero(actor.Username),
+			ResourceType:  "user",
+			ResourceID:    &locked.ID,
+			Action:        "reset_user_password",
+			Outcome:       "succeeded",
+			RequestID:     ptr.NonZero(meta.RequestID),
+			SourceIP:      ptr.NonZero(meta.SourceIP),
+			UserAgent:     ptr.NonZero(meta.UserAgent),
+		})
+	})
 }
 
 // DeletionImpactBlocker represents a single blocker in the user deletion impact report.
@@ -331,6 +442,71 @@ func (s *Service) DeleteUser(ctx context.Context, actor ActorRef, userID string,
 		if err := tx.Exec("delete from sql_diagnostics_order_links where confirmed_by_user_id = ?", userID).Error; err != nil {
 			return err
 		}
+		// Clean up unsubmitted drafts and private AI assistant records owned by the user while
+		// preserving submitted immutable change orders and insert-only review fact tables.
+		var deletableDraftIDs []string
+		if err := tx.Raw(`
+			select d.id::text
+			from change_drafts d
+			where d.owner_user_id = ?
+			  and d.state <> 'submitted'
+			  and not exists (
+			      select 1 from order_stages os
+			      join stage_review_snapshots srs on srs.id = os.stage_review_snapshot_id
+			      join review_runs rr on rr.id = srs.review_run_id
+			      where rr.draft_id = d.id
+			  )`, userID).Scan(&deletableDraftIDs).Error; err != nil {
+			return err
+		}
+		if len(deletableDraftIDs) > 0 {
+			if err := tx.Exec(`
+				update async_tasks set state='cancelled', business_err_code=2007,
+				       failure_name='user_deleted', lease_owner=null, lease_expires_at=null,
+				       updated_at=now(), finished_at=now()
+				where state in ('queued','running') and (
+				    aggregate_id in (select id from review_runs where draft_id in ?)
+				    or (aggregate_type='review_run' and input->>'draft_id' in ?)
+				)`, deletableDraftIDs, deletableDraftIDs).Error; err != nil {
+				return err
+			}
+			if err := tx.Exec(`
+				delete from review_identifier_mappings
+				where review_run_id in (select id from review_runs where draft_id in ?)`, deletableDraftIDs).Error; err != nil {
+				return err
+			}
+			if err := tx.Exec(`
+				delete from stage_review_snapshots
+				where review_run_id in (select id from review_runs where draft_id in ?)`, deletableDraftIDs).Error; err != nil {
+				return err
+			}
+			if err := tx.Exec(`delete from review_runs where draft_id in ?`, deletableDraftIDs).Error; err != nil {
+				return err
+			}
+			if err := tx.Exec(`delete from draft_sql_payloads where draft_id in ?`, deletableDraftIDs).Error; err != nil {
+				return err
+			}
+			if err := tx.Exec(`delete from change_drafts where id in ?`, deletableDraftIDs).Error; err != nil {
+				return err
+			}
+		}
+		if err := tx.Exec(`
+			delete from ai_assistant_context_summaries
+			where session_id in (select id from ai_assistant_sessions where user_id = ?)`, userID).Error; err != nil {
+			return err
+		}
+		if err := tx.Exec(`
+			delete from ai_assistant_sql_drafts
+			where user_id = ? or session_id in (select id from ai_assistant_sessions where user_id = ?)`, userID, userID).Error; err != nil {
+			return err
+		}
+		if err := tx.Exec(`
+			delete from ai_assistant_messages
+			where user_id = ? or session_id in (select id from ai_assistant_sessions where user_id = ?)`, userID, userID).Error; err != nil {
+			return err
+		}
+		if err := tx.Exec(`delete from ai_assistant_sessions where user_id = ?`, userID).Error; err != nil {
+			return err
+		}
 		// Revoke Query Grants and terminate active Query Sessions (reason fixed to user_deleted).
 		if err := tx.Exec(`update query_grants set state = 'revoked',
 			revoked_by_user_id_snapshot = ?, revoked_by_username_snapshot = ?,
@@ -407,7 +583,7 @@ func (s *Service) DeleteUser(ctx context.Context, actor ActorRef, userID string,
 			return bizerr.ErrNotFound
 		}
 		// Persist domain events and audit records in the same transaction.
-		actorSnap := auditlog.Actor{Kind: "user", UserID: actor.UserID, Username: actor.Username}
+		actorSnap := auditlog.UserActor(actor.UserID, actor.Username)
 		if err := s.audit.Emit(ctx, tx, "user.deleted", "user:"+userID, actorSnap, map[string]any{
 			"user_id": userID, "username": user.Username,
 		}); err != nil {
@@ -423,13 +599,14 @@ func (s *Service) DeleteUser(ctx context.Context, actor ActorRef, userID string,
 		return s.audit.Audit(ctx, tx, auditlog.AuditInput{
 			EventType: "user.deleted", ActorKind: "user", ActorID: &actor.UserID, ActorUsername: &actor.Username,
 			ResourceType: "user", ResourceID: &userID, Action: "delete_user", Outcome: "succeeded",
-			RequestID: strPtr(meta.RequestID),
+			RequestID: ptr.NonZero(meta.RequestID),
 			Metadata:  map[string]any{"invalidated_flow_count": len(affectedFlows)},
 		})
 	})
 	if err != nil {
 		return err
 	}
+	s.notifyUserDeleted(userID)
 	return nil
 }
 

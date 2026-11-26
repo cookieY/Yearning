@@ -37,14 +37,14 @@ import (
 	execapp "github.com/cookieY/YearningX/backend/internal/execution/application"
 )
 
-// b10PGDatasource creates target PG datasource (supports connection fault injection via proxy port).
 func (fx *b10Fixture) b10PGDatasource(t *testing.T, name string, port int) string {
+	cfg := b10PGTarget()
 	pw := fx.b10PGPassword(t)
 	if port == 54330 {
-		port = b10PGPort()
+		port = cfg.Port
 	}
-	return fx.b10ExecDatasource(t, name, "postgresql", "127.0.0.1", port,
-		"yearning_exec_target", b10PGUser(), pw, "16.x")
+	return fx.b10ExecDatasource(t, name, "postgresql", cfg.Host, port,
+		"yearning_exec_target", cfg.User, pw, "16.x")
 }
 
 // F01/F02: worker dead (task not run) -> lease expiry reconciliation marks failed/not_started

@@ -22,7 +22,7 @@ async function call<T>(
   body?: unknown,
   headers: Record<string, string> = {},
 ): Promise<Envelope<T>> {
-  const response = await fetch(path, {
+  const response = await fetch(path.startsWith("/api/v4") ? path : `/api/v4${path}`, {
     method,
     headers: { "Content-Type": "application/json", ...headers },
     body: body === undefined ? undefined : JSON.stringify(body),
@@ -50,16 +50,22 @@ describe("flow happy writes", () => {
           position: 1,
           datasource_id: "4f6f1a2b-0000-4000-8000-00000000a001",
           approval_steps: [
-            { position: 1, actors: [{ user_id: "u1" }] },
-            { position: 2, actors: [{ user_id: "u2" }, { user_id: "u3" }] },
+            { position: 1, actors: [{ user_id: "4f6f1a2b-0000-4000-8000-00000000c001" }] },
+            {
+              position: 2,
+              actors: [
+                { user_id: "4f6f1a2b-0000-4000-8000-00000000c002" },
+                { user_id: "4f6f1a2b-0000-4000-8000-00000000c003" },
+              ],
+            },
           ],
-          execution_actors: [{ user_id: "u4" }],
+          execution_actors: [{ user_id: "4f6f1a2b-0000-4000-8000-00000000c004" }],
         },
         {
           position: 2,
           datasource_id: "4f6f1a2b-0000-4000-8000-00000000a002",
-          approval_steps: [{ position: 1, actors: [{ user_id: "u5" }] }],
-          execution_actors: [{ user_id: "u6" }],
+          approval_steps: [{ position: 1, actors: [{ user_id: "4f6f1a2b-0000-4000-8000-00000000c005" }] }],
+          execution_actors: [{ user_id: "4f6f1a2b-0000-4000-8000-00000000c006" }],
         },
       ],
     };
@@ -85,7 +91,7 @@ describe("flow happy writes", () => {
         { datasource_id: "4f6f1a2b-0000-4000-8000-00000000a001", can_query: true, can_export: true },
         { datasource_id: "4f6f1a2b-0000-4000-8000-00000000a002", can_query: true, can_export: false },
       ],
-      approval_steps: [{ position: 1, actors: [{ user_id: "u1" }] }],
+      approval_steps: [{ position: 1, actors: [{ user_id: "4f6f1a2b-0000-4000-8000-00000000c001" }] }],
     };
     const created = await call<{ id: string; version: number; query_capabilities: unknown[] }>(
       "POST",
@@ -129,24 +135,29 @@ describe("announcement markdown shapes", () => {
 
 describe("group happy writes", () => {
   it("deduplicates members and flows on create and replace", async () => {
+    const userA = "4f6f1a2b-0000-4000-8000-00000000a101";
+    const userB = "4f6f1a2b-0000-4000-8000-00000000a102";
+    const userC = "4f6f1a2b-0000-4000-8000-00000000a103";
+    const flowF = "4f6f1a2b-0000-4000-8000-00000000f101";
+    const flowG = "4f6f1a2b-0000-4000-8000-00000000f102";
     const created = await call<{ id: string; version: number; member_user_ids: string[]; granted_flow_ids: string[] }>(
       "POST",
       "/admin/permission-groups",
       {
         name: "Dedup group",
         enabled: true,
-        member_user_ids: ["a", "a", "b"],
-        granted_flow_ids: ["f", "f"],
+        member_user_ids: [userA, userA, userB],
+        granted_flow_ids: [flowF, flowF],
       },
     );
     expect(created.err_code).toBe(0);
-    expect(created.data.member_user_ids).toEqual(["a", "b"]);
-    expect(created.data.granted_flow_ids).toEqual(["f"]);
+    expect(created.data.member_user_ids).toEqual([userA, userB]);
+    expect(created.data.granted_flow_ids).toEqual([flowF]);
     const replaced = await call("PUT", `/admin/permission-groups/${created.data.id}`, {
       name: "Dedup group 2",
       enabled: false,
-      member_user_ids: ["c"],
-      granted_flow_ids: ["g"],
+      member_user_ids: [userC],
+      granted_flow_ids: [flowG],
     }, { "If-Match": `"${String(created.data.version)}"` });
     expect(replaced.err_code).toBe(0);
   });

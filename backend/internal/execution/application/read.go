@@ -13,6 +13,8 @@ import (
 
 	"github.com/cookieY/YearningX/backend/internal/execution/domain"
 	"github.com/cookieY/YearningX/backend/internal/execution/persistence"
+	"github.com/cookieY/YearningX/backend/internal/platform/pagination"
+	"github.com/cookieY/YearningX/backend/internal/platform/ptr"
 )
 
 // OscDetailsView maps to OscExecutionDetails.
@@ -130,11 +132,11 @@ func (s *Services) buildAttemptView(ctx context.Context, db *gorm.DB, attemptID 
 			tool = "pt-osc"
 		}
 		v.Osc = &OscDetailsView{
-			Tool: tool, ToolVersion: derefStr(at.OSCToolVersion),
-			BinarySHA256: derefStr(at.OSCBinarySHA256), PlanHash: derefStr(at.OSCPlanHash),
-			Phase:       derefStr(at.OSCPhase),
+			Tool: tool, ToolVersion: ptr.Deref(at.OSCToolVersion),
+			BinarySHA256: ptr.Deref(at.OSCBinarySHA256), PlanHash: ptr.Deref(at.OSCPlanHash),
+			Phase:       ptr.Deref(at.OSCPhase),
 			ProgressBps: derefInt(at.OSCProgressBasisPoints), RowsCopied: derefInt64(at.OSCRowsCopied),
-			ResidualState: derefStr(at.OSCResidualState), LastHeartbeatAt: at.OSCLastHeartbeatAt,
+			ResidualState: ptr.Deref(at.OSCResidualState), LastHeartbeatAt: at.OSCLastHeartbeatAt,
 		}
 	}
 	return v, nil
@@ -147,9 +149,7 @@ func (s *Services) GetAttempt(ctx context.Context, attemptID string) (*AttemptVi
 
 // ListStatements paginates the statement ledger (after = last ordinal of previous page; default limit = 50).
 func (s *Services) ListStatements(ctx context.Context, attemptID string, after string, limit int) ([]StatementView, string, bool, error) {
-	if limit <= 0 || limit > 200 {
-		limit = 50
-	}
+	limit = pagination.ClampLimit(limit, 50, 200)
 	afterOrdinal := 0
 	if after != "" {
 		v, err := strconv.Atoi(after)

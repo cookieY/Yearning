@@ -5,12 +5,9 @@ package application
 import (
 	"context"
 	"database/sql"
-	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"os"
-	"strconv"
 	"testing"
 	"time"
 
@@ -18,6 +15,8 @@ import (
 
 	"github.com/cookieY/YearningX/backend/internal/authorization/auditlog"
 	"github.com/cookieY/YearningX/backend/internal/crypto"
+	"github.com/cookieY/YearningX/backend/internal/platform/testenv"
+	"github.com/cookieY/YearningX/backend/internal/platform/testkit"
 	"github.com/cookieY/YearningX/backend/internal/review/tool"
 )
 
@@ -26,23 +25,15 @@ import (
 // sealed review credential -> live identity probe -> frozen target -> AdapterFactSourceFor.
 // It deliberately does not use Services.DatasourceIdentityProbe or fake facts.
 func TestAdapterFactSourceFactoryRealPostgreSQLWiring(t *testing.T) {
-	password := os.Getenv("YEARNING_TEST_ADAPTER_PG_PASSWORD")
-	if password == "" {
-		t.Skip("target PostgreSQL not configured")
-	}
-	port, err := strconv.Atoi(itestEnv("YEARNING_TEST_ADAPTER_PG_PORT", "54333"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	host := itestEnv("YEARNING_TEST_ADAPTER_PG_HOST", "127.0.0.1")
-	user := itestEnv("YEARNING_TEST_ADAPTER_PG_USER", "yearning")
-	databaseName := itestEnv("YEARNING_TEST_ADAPTER_PG_DB", "yearning")
+	cfg := testenv.RequireTargetPG(t, testenv.WithDefaultHost("127.0.0.1"), testenv.WithDefaultPort(54333))
+	port := cfg.Port
+	host := cfg.Host
+	user := cfg.User
+	password := cfg.Password
+	databaseName := cfg.DBName
 
 	t.Setenv("YEARNING_ALLOW_LOOPBACK_TARGETS", "1")
-	admin, err := sql.Open("pgx", fmt.Sprintf(
-		"host=%s port=%d user=%s password=%s dbname=%s sslmode=disable",
-		host, port, user, password, databaseName,
-	))
+	admin, err := sql.Open("pgx", cfg.LibpqDSN())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -206,25 +197,7 @@ type factoryCredential struct {
 
 func newFactoryTestCrypterAndRecorder(t *testing.T, f *fx) (*crypto.Crypter, *auditlog.Recorder) {
 	t.Helper()
-	keyringDoc := fmt.Sprintf(`{"contract_version":1,"deployment_id":"ir03-factory-itest","keys":[
-		{"key_id":"pay-1","purpose":"payload","status":"encrypt_decrypt","created_at":"2026-08-25T00:00:00Z","key_base64":"%s"},
-		{"key_id":"ident-1","purpose":"identifier_token","status":"encrypt_decrypt","created_at":"2026-08-25T00:00:00Z","key_base64":"%s"},
-		{"key_id":"fp-1","purpose":"sql_fingerprint","status":"encrypt_decrypt","created_at":"2026-08-25T00:00:00Z","key_base64":"%s"}]}`,
-		base64.StdEncoding.EncodeToString(make32(11)),
-		base64.StdEncoding.EncodeToString(make32(12)),
-		base64.StdEncoding.EncodeToString(make32(13)))
-	path := t.TempDir() + "/keyring.json"
-	if err := os.WriteFile(path, []byte(keyringDoc), 0o400); err != nil {
-		t.Fatal(err)
-	}
-	ring, err := crypto.LoadKeyring(path)
-	if err != nil {
-		t.Fatal(err)
-	}
-	crypter, err := crypto.NewCrypter(ring)
-	if err != nil {
-		t.Fatal(err)
-	}
+	crypter := testkit.NewCrypter(t)
 	recorder, err := auditlog.NewRecorder(f.db)
 	if err != nil {
 		t.Fatal(err)
@@ -247,7 +220,7 @@ func insertFactoryDatasource(t *testing.T, f *fx, host string, port int, databas
 }
 
 func make32Hex(seed byte) string {
-	raw := make32(seed)
+	raw := testkit.Key32(seed)
 	return fmt.Sprintf("%x", raw)
 }
 

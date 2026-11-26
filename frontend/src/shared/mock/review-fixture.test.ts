@@ -31,7 +31,7 @@ interface FixtureDraftView {
 }
 
 async function createDraft(): Promise<FixtureDraftView> {
-  const response = await fetch("https://yearning.test/change-drafts", {
+  const response = await fetch("https://yearning.test/api/v4/change-drafts", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ flow_id: FIXTURE_FLOW_ID, title: "Fixture draft" }),
@@ -40,7 +40,7 @@ async function createDraft(): Promise<FixtureDraftView> {
 }
 
 async function saveSql(draftId: string, sql: string): Promise<FixtureDraftView> {
-  const response = await fetch(`https://yearning.test/change-drafts/${draftId}/sql`, {
+  const response = await fetch(`https://yearning.test/api/v4/change-drafts/${draftId}/sql`, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ sql }),
@@ -55,7 +55,7 @@ async function startPrecheck(body: {
 }): Promise<string> {
   // RCP-20261101 ephemeral precheck: POST /review-runs reviews request-body SQL verbatim and directly returns
   // run_id (no longer going through a task row).
-  const response = await fetch("https://yearning.test/review-runs", {
+  const response = await fetch("https://yearning.test/api/v4/review-runs", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
@@ -90,7 +90,7 @@ describe("review fixture flow catalog", () => {
   });
 
   it("returns an empty page for the zero-permission default session", async () => {
-    const response = await fetch("https://yearning.test/users/me/flows?flow_type=change_review");
+    const response = await fetch("https://yearning.test/api/v4/users/me/flows?flow_type=change_review");
     const body = (await response.json()) as { data: { items: unknown[]; page: { has_more: boolean } } };
     expect(body.data.items).toEqual([]);
     expect(body.data.page.has_more).toBe(false);
@@ -98,7 +98,7 @@ describe("review fixture flow catalog", () => {
 
   it("grants the change flow to an admin session", async () => {
     setMockAuthBehavior("admin");
-    const response = await fetch("https://yearning.test/users/me/flows?flow_type=change_review");
+    const response = await fetch("https://yearning.test/api/v4/users/me/flows?flow_type=change_review");
     const body = (await response.json()) as { data: { items: Array<{ id: string; flow_type: string; enabled: boolean }> } };
     // Default e2e flow first, then the 20-flow owner catalog (two catalog
     // entries are disabled and still listed — the wizard filters nothing;
@@ -111,7 +111,7 @@ describe("review fixture flow catalog", () => {
 
   it("returns an empty page for query_access flow type", async () => {
     setMockAuthBehavior("admin");
-    const response = await fetch("https://yearning.test/users/me/flows?flow_type=query_access");
+    const response = await fetch("https://yearning.test/api/v4/users/me/flows?flow_type=query_access");
     const body = (await response.json()) as { data: { items: unknown[] } };
     expect(body.data.items).toEqual([]);
   });
@@ -132,7 +132,7 @@ describe("review fixture draft and run lifecycle", () => {
   });
 
   it("states the empty-SQL cause in meta.detail when prechecking without SQL (F-UX-003)", async () => {
-    const response = await fetch("https://yearning.test/review-runs", {
+    const response = await fetch("https://yearning.test/api/v4/review-runs", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ flow_id: FIXTURE_FLOW_ID, sql: "" }),
@@ -149,7 +149,7 @@ describe("review fixture draft and run lifecycle", () => {
     const runId = await runToTerminal(sql, draft.id);
 
     const finished = (await (
-      await fetch(`https://yearning.test/review-runs/${runId}`)
+      await fetch(`https://yearning.test/api/v4/review-runs/${runId}`)
     ).json()) as { data: { state: string; gate: { passed: boolean } } };
     expect(finished.data.state).toBe("ready");
     expect(finished.data.gate.passed).toBe(true);
@@ -157,7 +157,7 @@ describe("review fixture draft and run lifecycle", () => {
     // Precheck never writes to the draft: row version, state, and review_run_id all stay untouched (staleness is
     // a local client comparison; the server only compares SQL verbatim at submission time).
     const detail = (await (
-      await fetch(`https://yearning.test/change-drafts/${draft.id}`)
+      await fetch(`https://yearning.test/api/v4/change-drafts/${draft.id}`)
     ).json()) as { data: { state: string; version: number; review_run_id: string | null } };
     expect(detail.data.state).toBe("draft");
     expect(detail.data.version).toBe(draft.version + 1); // Advanced only by saveSql itself
@@ -167,7 +167,7 @@ describe("review fixture draft and run lifecycle", () => {
   it("rejects submission with REVIEW_OUTDATED when the precheck run is gone", async () => {
     const draft = await createDraft();
     await saveSql(draft.id, "DROP TABLE orders;");
-    const response = await fetch("https://yearning.test/change-orders", {
+    const response = await fetch("https://yearning.test/api/v4/change-orders", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -188,7 +188,7 @@ describe("review fixture draft and run lifecycle", () => {
     const sql = "SELECT 1;";
     await saveSql(draft.id, sql);
     const runId = await runToTerminal(sql, draft.id);
-    const response = await fetch("https://yearning.test/change-orders", {
+    const response = await fetch("https://yearning.test/api/v4/change-orders", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -215,7 +215,7 @@ describe("review fixture draft and run lifecycle", () => {
   it("submits draftless create-mode orders with metadata and rejects a missing title", async () => {
     const sql = "SELECT 1;";
     const runId = await runToTerminal(sql);
-    const missing = await fetch("https://yearning.test/change-orders", {
+    const missing = await fetch("https://yearning.test/api/v4/change-orders", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ flow_id: FIXTURE_FLOW_ID, sql, run_id: runId }),
@@ -224,7 +224,7 @@ describe("review fixture draft and run lifecycle", () => {
 
     // Each submission consumes the Run: submitting again requires a fresh precheck.
     const secondRunId = await runToTerminal(sql);
-    const created = await fetch("https://yearning.test/change-orders", {
+    const created = await fetch("https://yearning.test/api/v4/change-orders", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -245,7 +245,7 @@ describe("review fixture draft and run lifecycle", () => {
     const draft = await createDraft();
     await saveSql(draft.id, "SELECT 1;");
     const stale = { "If-Match": '"1"' };
-    const put = await fetch(`https://yearning.test/change-drafts/${draft.id}/sql`, {
+    const put = await fetch(`https://yearning.test/api/v4/change-drafts/${draft.id}/sql`, {
       method: "PUT",
       headers: { "Content-Type": "application/json", ...stale },
       body: JSON.stringify({ sql: "SELECT 2;" }),
@@ -258,14 +258,14 @@ describe("review fixture draft and run lifecycle", () => {
     const draft = await createDraft();
     // After create, revision and version coincide; the row version is the
     // only If-Match target once a review run has bumped version alone.
-    const stale = await fetch(`https://yearning.test/change-drafts/${draft.id}`, {
+    const stale = await fetch(`https://yearning.test/api/v4/change-drafts/${draft.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json", "If-Match": '"99"' },
       body: JSON.stringify({ title: "Immutable title" }),
     });
     expect(((await stale.json()) as { err_code: number }).err_code).toBe(1003);
 
-    const live = await fetch(`https://yearning.test/change-drafts/${draft.id}`, {
+    const live = await fetch(`https://yearning.test/api/v4/change-drafts/${draft.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json", "If-Match": `"${String(draft.version)}"` },
       body: JSON.stringify({ title: "Mutable title" }),
@@ -299,7 +299,7 @@ describe("review fixture draft and run lifecycle", () => {
       setTimeout(resolve, 1_900);
     });
     const detail = (await (
-      await fetch(`https://yearning.test/change-drafts/${draft.id}`)
+      await fetch(`https://yearning.test/api/v4/change-drafts/${draft.id}`)
     ).json()) as { data: { state: string; review_run_id: string | null } };
     expect(detail.data.state).toBe("draft");
     expect(detail.data.review_run_id).toBeNull();
@@ -310,7 +310,7 @@ describe("review fixture draft and run lifecycle", () => {
     await saveSql(draft.id, "SELECT 1;");
     const runId = await runToTerminal("SELECT 1;", draft.id);
 
-    const response = await fetch("https://yearning.test/change-orders", {
+    const response = await fetch("https://yearning.test/api/v4/change-orders", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -332,7 +332,7 @@ describe("review fixture draft and run lifecycle", () => {
     const runId = await runToTerminal(sql, draft.id);
 
     const findings = (await (
-      await fetch(`https://yearning.test/review-runs/${runId}/findings`)
+      await fetch(`https://yearning.test/api/v4/review-runs/${runId}/findings`)
     ).json()) as { data: { items: Array<{ id: string; evidence_ids: string[] }> } };
     const finding = findings.data.items[0];
     if (finding === undefined) {
@@ -340,7 +340,7 @@ describe("review fixture draft and run lifecycle", () => {
     }
 
     const evidence = (await (
-      await fetch(`https://yearning.test/review-findings/${finding.id}/evidence`)
+      await fetch(`https://yearning.test/api/v4/review-findings/${finding.id}/evidence`)
     ).json()) as {
       data: Array<{ id: string; has_raw_payload: boolean; raw_payload_expires_at: string | null }>;
     };
@@ -350,7 +350,7 @@ describe("review fixture draft and run lifecycle", () => {
     expect(evidence.data[0]?.raw_payload_expires_at).not.toBeNull();
 
     const reveal = (await (
-      await fetch(`https://yearning.test/review-evidence/${evidenceId as string}/raw-reveals`, {
+      await fetch(`https://yearning.test/api/v4/review-evidence/${evidenceId as string}/raw-reveals`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ purpose: "review-evidence" }),
@@ -360,7 +360,7 @@ describe("review fixture draft and run lifecycle", () => {
     expect(reveal.data.watermark).toContain("henry");
 
     const copy = await fetch(
-      `https://yearning.test/review-evidence/${evidenceId as string}/raw-copy-events`,
+      `https://yearning.test/api/v4/review-evidence/${evidenceId as string}/raw-copy-events`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },

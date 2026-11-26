@@ -1,0 +1,9 @@
+{
+  "contract_version": "san-wire-v2",
+  "contract_digest": "7cf573a08aef075e2580a8828684bb28896c1e878407fbc3026a4b8fd9018f6d",
+  "case_name": "05_replace_into",
+  "description": "Single REPLACE INTO statement",
+  "default_database": "shop",
+  "engine_profile": "mysql/mysql",
+  "generate_command": "cd backend \u0026\u0026 go test -tags nomsgpack ./internal/review/application -run TestSANWireGolden -update"
+}

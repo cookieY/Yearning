@@ -2,9 +2,12 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter, Route, Routes } from "react-router";
-import { HttpResponse, http } from "msw";
+import { http } from "msw";
 import { beforeEach, describe, expect, it } from "vitest";
+import { apiRoute } from "@/shared/mock/api-route";
 import { server } from "@/test/msw/server";
+import { testBusinessErrorJson, testEnvelopeJson } from "@/test/envelope";
+import { SESSION_USER_ID, stubSession } from "@/test/session";
 import { SessionProvider } from "@/features/auth/session-provider";
 import "@/shared/i18n";
 import ProfilePage from "@/routes/profile/profile-page";
@@ -16,30 +19,8 @@ import ProfilePage from "@/routes/profile/profile-page";
  * ldap/oidc accounts get the identity-source note instead.
  */
 
-const SESSION_USER_ID = "0198d9cc-e65d-7b9d-a8aa-3c81945f99ac";
-
 function meOverride(authProvider: string | undefined): void {
-  server.use(
-    http.get("*/users/me", () =>
-      HttpResponse.json({
-        err_code: 0,
-        message: "ok",
-        data: {
-          id: SESSION_USER_ID,
-          username: "henry",
-          display_name: "henry",
-          email: null,
-          is_builtin_admin: false,
-          version: 1,
-          created_at: "2026-08-28T08:00:00Z",
-          updated_at: "2026-08-28T08:00:00Z",
-          can_access_admin: false,
-          ...(authProvider === undefined ? {} : { auth_provider: authProvider }),
-        },
-        request_id: SESSION_USER_ID,
-      }),
-    ),
-  );
+  stubSession({ admin: false, authProvider });
 }
 
 function renderProfile(): void {
@@ -94,14 +75,7 @@ describe("profile security tab password change (§18.52)", () => {
   it("returns to the login route after a successful change", async () => {
     meOverride(undefined);
     server.use(
-      http.post("*/users/me/password", () =>
-        HttpResponse.json({
-          err_code: 0,
-          message: "ok",
-          data: null,
-          request_id: SESSION_USER_ID,
-        }),
-      ),
+      http.post(apiRoute("/users/me/password"), () => testEnvelopeJson(null, SESSION_USER_ID)),
     );
     renderProfile();
     await openSecurityTab();
@@ -117,13 +91,9 @@ describe("profile security tab password change (§18.52)", () => {
   it("renders the dedicated copy when the old password is wrong (1101)", async () => {
     meOverride(undefined);
     server.use(
-      http.post("*/users/me/password", () =>
-        HttpResponse.json({
-          err_code: 1101,
-          message: "\u7528\u6237\u540d\u6216\u5bc6\u7801\u9519\u8bef",
-          data: null,
-          request_id: SESSION_USER_ID,
-          retryable: false,
+      http.post(apiRoute("/users/me/password"), () =>
+        testBusinessErrorJson(1101, "\u7528\u6237\u540d\u6216\u5bc6\u7801\u9519\u8bef", {
+          requestId: SESSION_USER_ID,
         }),
       ),
     );

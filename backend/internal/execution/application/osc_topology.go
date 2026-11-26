@@ -20,6 +20,7 @@ import (
 	"github.com/cookieY/YearningX/backend/internal/execution/persistence"
 	"github.com/cookieY/YearningX/backend/internal/osc"
 	"github.com/cookieY/YearningX/backend/internal/platform/addrguard"
+	"github.com/cookieY/YearningX/backend/internal/platform/ptr"
 )
 
 const (
@@ -56,7 +57,7 @@ func (s *Services) preflightOscTopologyAndPin(
 		return "", "", nil, err
 	}
 
-	targetIP, perr := addrguard.ResolvePinned(ctx, addrguard.PurposeOSC, ds.Host, ds.Port, derefStr(ds.DatabaseName), s.oscResolver())
+	targetIP, perr := addrguard.ResolvePinned(ctx, addrguard.PurposeOSC, ds.Host, ds.Port, ptr.Deref(ds.DatabaseName), s.oscResolver())
 	if perr != nil {
 		s.auditOscPreflightDenied(ctx, at, in, actor, "osc.target_address_forbidden", map[string]any{
 			"datasource_id": ds.ID, "host": ds.Host, "port": ds.Port, "reason": perr.Error(),
@@ -204,11 +205,11 @@ func (s *Services) auditOscPreflightDenied(
 	actorKind := "worker"
 	if _, err := uuid.Parse(actor.UserID); err == nil {
 		actorKind = "user"
-		actorID = strPtr(actor.UserID)
+		actorID = ptr.To(actor.UserID)
 	}
 	var actorUsername *string
 	if actor.Username != "" {
-		actorUsername = strPtr(actor.Username)
+		actorUsername = ptr.To(actor.Username)
 	}
 	_ = s.Recorder.Audit(ctx, nil, auditlog.AuditInput{
 		EventType:     eventType,
@@ -216,7 +217,7 @@ func (s *Services) auditOscPreflightDenied(
 		ActorID:       actorID,
 		ActorUsername: actorUsername,
 		ResourceType:  "execution_attempt",
-		ResourceID:    strPtr(at.ID),
+		ResourceID:    ptr.To(at.ID),
 		Action:        "preflight_osc_topology",
 		Outcome:       "denied",
 		Metadata:      meta,

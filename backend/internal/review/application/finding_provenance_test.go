@@ -5,6 +5,7 @@ import "testing"
 func TestFindingProvenanceClosedKindsAndAnonymousSources(t *testing.T) {
 	for _, tc := range []struct{ kind, key, wantKind, wantKey string }{
 		{"policy_finding", "skill.safe-id", "policy_finding", "skill.safe-id"},
+		{"knowledge_advisory", "exp.safe-id", "knowledge_advisory", "exp.safe-id"},
 		{"proven_invalid_execution", "private_table", "proven_invalid_execution", ""},
 		{"agent_observation", "private_table", "agent_observation", ""},
 		{"invented", "private_table", "agent_observation", ""},

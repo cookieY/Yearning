@@ -1,31 +1,39 @@
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
-import { CircleAlert } from "lucide-react";
+import { CircleAlert, Info } from "lucide-react";
 import { Label } from "@/shared/components/ui/label";
 import { Textarea } from "@/shared/components/ui/textarea";
 import { Badge } from "@/shared/components/ui/badge";
 import { Alert, AlertDescription, AlertTitle } from "@/shared/components/ui/alert";
-import type { ReviewInputDefinition } from "@/api/generated/client/yearningV4HTTPAPI.schemas";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/shared/components/ui/select";
+import type {
+  KnowledgeEntryDefinition,
+  KnowledgeEntryDefinitionWriteMaxSeverity,
+  ReviewInputDefinition,
+} from "@/api/generated/client/yearningV4HTTPAPI.schemas";
+
+export const KNOWLEDGE_ADVISORY_SEVERITIES = ["info", "low", "medium"] as const;
+
+export function isAdvisorySeverity(
+  value: string,
+): value is KnowledgeEntryDefinitionWriteMaxSeverity {
+  return value === "info" || value === "low" || value === "medium";
+}
 
 /**
- * Shared editor for the review-input definition (§18.66 five-field model:
- * name / state / engine live in the page form, this editor carries rule
- * content). The definition is {knowledge_text, max_severity, version}: the
- * finding key is system-derived per row and injected into the model context
- * together with the rule text — there is deliberately NO field for it (nor
- * for finding templates, categories or fix suggestions: the review model
- * authors those per finding at run time). There is also NO field for
- * executable behavior: no code, no HTTP endpoint, no database write. The
- * definition is the sole object the structured-output, privacy-scan and
- * injection-check eval gates act on.
- *
- * max_severity remains in the wire DTO for historical payload compatibility.
- * It is no longer a user-selectable policy: an enabled rule's actual
- * violation is always Critical and blocks submission.
+ * Shared editor for review-input definitions:
+ * - mode="skill": Prompt Tool / Review Skill (mandatory Critical blocking policy, non-downgradeable).
+ * - mode="knowledge": Internal Experience (scoped non-blocking advisory severity: info | low | medium).
  */
 
 export interface ReviewInputEditorValue {
-  definition: ReviewInputDefinition;
+  definition: ReviewInputDefinition | KnowledgeEntryDefinition;
   parameters: Record<string, number | string | boolean | string[]>;
 }
 
@@ -34,6 +42,7 @@ export function ReviewInputDefinitionEditor({
   onChange,
   disabled = false,
   headerAction,
+  mode = "skill",
 }: {
   value: ReviewInputEditorValue;
   onChange: (next: ReviewInputEditorValue) => void;
@@ -41,6 +50,7 @@ export function ReviewInputDefinitionEditor({
    * definition face is system-owned (only the state may be toggled). */
   disabled?: boolean;
   headerAction?: ReactNode;
+  mode?: "skill" | "knowledge";
 }) {
   const { t } = useTranslation();
   const { definition } = value;
@@ -53,11 +63,23 @@ export function ReviewInputDefinitionEditor({
     });
   };
 
+  const updateKnowledgeSeverity = (maxSeverity: KnowledgeEntryDefinitionWriteMaxSeverity) => {
+    if (disabled) return;
+    onChange({
+      ...value,
+      definition: { ...definition, max_severity: maxSeverity },
+    });
+  };
+
+  const legacyBlockingSeverity = mode === "knowledge" && !isAdvisorySeverity(definition.max_severity);
+
   return (
     <div className="flex flex-col gap-3" data-testid="review-input-editor">
       <div className="flex flex-col gap-1.5">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <Label htmlFor="review-input-knowledge-text">{t("admin.reviewInput.knowledgeText")}</Label>
+          <Label htmlFor="review-input-knowledge-text">
+            {t(mode === "knowledge" ? "admin.knowledge.knowledgeText" : "admin.reviewInput.knowledgeText")}
+          </Label>
           {headerAction}
         </div>
         <Textarea
@@ -68,20 +90,80 @@ export function ReviewInputDefinitionEditor({
           disabled={disabled}
           data-testid="review-input-knowledge-text"
         />
-        <p className="text-muted-foreground text-xs">{t("admin.reviewInput.knowledgeTextHint")}</p>
+        <p className="text-muted-foreground text-xs">
+          {t(mode === "knowledge" ? "admin.knowledge.knowledgeTextHint" : "admin.reviewInput.knowledgeTextHint")}
+        </p>
       </div>
-      {/* max_severity is accepted only for wire compatibility. The effective
-       * severity of an enabled rule's actual violation is fixed at Critical. */}
-      <Alert data-testid="review-input-severity-policy">
-        <CircleAlert aria-hidden="true" />
-        <AlertTitle className="flex flex-wrap items-center gap-2">
-          {t("admin.reviewInput.severityPolicyTitle")}
-          <Badge variant="destructive" data-testid="review-input-critical-severity">
-            {t("admin.reviewInput.severity_critical")}
-          </Badge>
-        </AlertTitle>
-        <AlertDescription>{t("admin.reviewInput.severityPolicyHint")}</AlertDescription>
-      </Alert>
+      {mode === "knowledge" ? (
+        <div className="flex flex-col gap-2">
+          <div className="flex flex-col gap-1">
+            <Label>{t("admin.knowledge.advisorySeverityLabel")}</Label>
+            <Select
+              value={isAdvisorySeverity(definition.max_severity) ? definition.max_severity : undefined}
+              onValueChange={(next) => {
+                if (next !== null && isAdvisorySeverity(next)) {
+                  updateKnowledgeSeverity(next);
+                }
+              }}
+              items={Object.fromEntries(
+                KNOWLEDGE_ADVISORY_SEVERITIES.map((sev) => [sev, t(`admin.reviewInput.severity_${sev}`)]),
+              )}
+              disabled={disabled}
+            >
+              <SelectTrigger data-testid="knowledge-max-severity">
+                <SelectValue>
+                  {isAdvisorySeverity(definition.max_severity)
+                    ? t(`admin.reviewInput.severity_${definition.max_severity}`)
+                    : t("admin.knowledge.selectAdvisorySeverity")}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                {KNOWLEDGE_ADVISORY_SEVERITIES.map((sev) => (
+                  <SelectItem key={sev} value={sev}>
+                    {t(`admin.reviewInput.severity_${sev}`)}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          {legacyBlockingSeverity ? (
+            <Alert variant="destructive" data-testid="knowledge-legacy-severity-warning">
+              <CircleAlert aria-hidden="true" />
+              <AlertTitle>{t("admin.knowledge.legacySeverityTitle")}</AlertTitle>
+              <AlertDescription>
+                {t("admin.knowledge.legacySeverityHint", {
+                  severity: t(`admin.reviewInput.severity_${definition.max_severity}`),
+                })}
+              </AlertDescription>
+            </Alert>
+          ) : null}
+          <Alert data-testid="knowledge-advisory-policy">
+            <Info aria-hidden="true" />
+            <AlertTitle className="flex flex-wrap items-center gap-2">
+              {t("admin.knowledge.advisoryPolicyTitle")}
+              {isAdvisorySeverity(definition.max_severity) ? (
+                <Badge variant="secondary" data-testid="knowledge-advisory-severity-badge">
+                  {t(`admin.reviewInput.severity_${definition.max_severity}`)}
+                </Badge>
+              ) : null}
+            </AlertTitle>
+            <AlertDescription>{t("admin.knowledge.advisoryPolicyHint")}</AlertDescription>
+          </Alert>
+        </div>
+      ) : (
+        /* max_severity is accepted only for wire compatibility. The effective
+         * severity of an enabled skill's actual violation is fixed at Critical. */
+        <Alert data-testid="review-input-severity-policy">
+          <CircleAlert aria-hidden="true" />
+          <AlertTitle className="flex flex-wrap items-center gap-2">
+            {t("admin.reviewInput.severityPolicyTitle")}
+            <Badge variant="destructive" data-testid="review-input-critical-severity">
+              {t("admin.reviewInput.severity_critical")}
+            </Badge>
+          </AlertTitle>
+          <AlertDescription>{t("admin.reviewInput.severityPolicyHint")}</AlertDescription>
+        </Alert>
+      )}
     </div>
   );
 }

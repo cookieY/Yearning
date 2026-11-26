@@ -6,13 +6,13 @@ package application
 
 import (
 	"context"
-	"encoding/json"
 	"time"
 
 	"gorm.io/gorm"
 
 	"github.com/cookieY/YearningX/backend/internal/changeorder/domain"
 	"github.com/cookieY/YearningX/backend/internal/crypto"
+	"github.com/cookieY/YearningX/backend/internal/platform/txutil"
 )
 
 // CopyInput parameters for copying a work order.
@@ -39,31 +39,10 @@ func (s *Services) CopyToDraft(ctx context.Context, actor Actor, meta RequestMet
 	if len(in.Description) > 4096 {
 		return nil, false, domain.ErrValidation()
 	}
-	reqHash := idemRequestHash(actor.UserID, in.OrderID, in.TargetFlowID, in.Title)
-	claimed, replay, err := s.idemClaim(ctx, actor.UserID, idemRouteCopy, in.OrderID, in.IdempotencyKey, reqHash)
-	if err != nil {
-		return nil, false, err
-	}
-	if claimed == nil {
-		var v CopyView
-		if err := json.Unmarshal(replay, &v); err != nil {
-			return nil, false, err
-		}
-		return &v, true, nil
-	}
-	view, err = s.copyTx(ctx, actor, in)
-	if err != nil {
-		_ = s.idemRelease(ctx, actor.UserID, idemRouteCopy, in.OrderID, in.IdempotencyKey)
-		return nil, false, err
-	}
-	raw, err := json.Marshal(view)
-	if err != nil {
-		return nil, false, err
-	}
-	if err := s.idemComplete(ctx, actor.UserID, idemRouteCopy, in.OrderID, in.IdempotencyKey, raw); err != nil {
-		return nil, false, err
-	}
-	return view, false, nil
+	reqHash := txutil.RequestHash(actor.UserID, in.OrderID, in.TargetFlowID, in.Title)
+	return txutil.RunIdempotent(ctx, s.idemStore(), actor.UserID, idemRouteCopy, in.OrderID, in.IdempotencyKey, reqHash, func() (*CopyView, error) {
+		return s.copyTx(ctx, actor, in)
+	})
 }
 
 func (s *Services) copyTx(ctx context.Context, actor Actor, in CopyInput) (*CopyView, error) {
@@ -146,12 +125,13 @@ func (s *Services) copyOnce(ctx context.Context, tx *gorm.DB, actor Actor, in Co
 	if payload.PlaintextHMAC == "" {
 		return nil, domain.ErrNotFound()
 	}
-	plain, err := s.Crypter.Open(crypto.PurposePayload, crypto.Envelope{
+	plain, err := s.Crypter.OpenColumn(crypto.PurposePayload, crypto.ColumnRef{
+		Table:      "order_sql_payloads",
+		PrimaryKey: in.OrderID,
+		Column:     "sql_ciphertext",
+	}, crypto.Envelope{
 		Ciphertext: payload.SQLCiphertext, Nonce: payload.SQLNonce,
 		KeyID: payload.SQLKeyID, Algorithm: payload.SQLAlgorithm,
-	}, crypto.AAD{
-		DeploymentID: s.Crypter.DeploymentID(), Table: "order_sql_payloads",
-		PrimaryKey: in.OrderID, Column: "sql_ciphertext", Purpose: crypto.PurposePayload,
 	})
 	if err != nil {
 		return nil, err
@@ -165,10 +145,11 @@ func (s *Services) copyOnce(ctx context.Context, tx *gorm.DB, actor Actor, in Co
 		draftID, actor.UserID, in.TargetFlowID, flow.Version, in.Title, in.Description, now, now).Error; err != nil {
 		return nil, err
 	}
-	env, err := s.Crypter.Seal(crypto.PurposePayload, plain, crypto.AAD{
-		DeploymentID: s.Crypter.DeploymentID(), Table: "draft_sql_payloads",
-		PrimaryKey: draftID, Column: "sql_ciphertext", Purpose: crypto.PurposePayload,
-	})
+	env, err := s.Crypter.SealColumn(crypto.PurposePayload, crypto.ColumnRef{
+		Table:      "draft_sql_payloads",
+		PrimaryKey: draftID,
+		Column:     "sql_ciphertext",
+	}, plain)
 	if err != nil {
 		return nil, err
 	}

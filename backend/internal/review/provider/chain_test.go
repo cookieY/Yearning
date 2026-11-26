@@ -50,6 +50,12 @@ func TestChainFallbackRequiresIdenticalContracts(t *testing.T) {
 	}
 }
 
+func TestNewChainNilDialerFailsClosed(t *testing.T) {
+	if _, err := NewChain([]Endpoint{ep("p1", hashA(), hashB(), 1)}, nil); err == nil {
+		t.Fatal("expected NewChain with nil dial function to fail closed without panicking")
+	}
+}
+
 func TestChainFallbackOnIdenticalContracts(t *testing.T) {
 	chain, err := NewChain([]Endpoint{ep("p1", hashA(), hashB(), 1), ep("p2", hashA(), hashB(), 2)},
 		func(e Endpoint) (Client, error) {

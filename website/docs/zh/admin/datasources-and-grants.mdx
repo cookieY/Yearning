@@ -9,7 +9,7 @@ Yearning v4 严格分离 **只读凭据（审核/查询/性能诊断）** 与 **
   captionZh="数据源管理（/admin/datasources）：支持五类数据库引擎、只读与执行凭据分离、TLS 证书与连接测试"
 />
 
-## 1. MySQL 5.7 / 8.0（含 TiDB / OceanBase / PolarDB MySQL）建权 SQL
+## 1. MySQL 5.7+ / 8.0 / 8.4 LTS（含 TiDB / OceanBase / PolarDB MySQL）建权 SQL
 
 以目标库管理员登录，分别创建 **只读账号 `yearning_ro`** 与 **执行账号 `yearning_exec`**（将 `<app_db>` 与 `<yearning_ip>` 替换为实际业务库名与 Yearning 服务器网段）：
 
@@ -30,10 +30,10 @@ CREATE USER 'yearning_exec'@'10.0.%' IDENTIFIED BY 'STRONG_EXEC_PASSWORD';
 GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, ALTER, DROP, INDEX, REFERENCES, CREATE VIEW, SHOW VIEW
   ON `<app_db>`.* TO 'yearning_exec'@'10.0.%';
 
--- 如需在原生 MySQL 5.7/8.0 上使用「进程内 gh-ost 在线改表」，执行账号需额外具备：
+-- 如需在原生 MySQL 5.7+ 上使用「进程内 gh-ost 在线改表」，执行账号需额外具备：
 GRANT REPLICATION CLIENT, REPLICATION SLAVE ON *.* TO 'yearning_exec'@'10.0.%';
 GRANT SUPER, TRIGGER, LOCK TABLES ON *.* TO 'yearning_exec'@'10.0.%';
--- 说明：MySQL 8.0 若不给 SUPER，可按实际版本授予 BINLOG_ADMIN / CONNECTION_ADMIN / SYSTEM_VARIABLES_ADMIN
+-- 说明：MySQL 8.0+ 若不给 SUPER，可按实际版本授予 BINLOG_ADMIN / CONNECTION_ADMIN / SYSTEM_VARIABLES_ADMIN
 
 FLUSH PRIVILEGES;
 ```
@@ -42,7 +42,7 @@ FLUSH PRIVILEGES;
 Yearning v4 的跨引擎自动回滚采用**事务内前像采样**，完全不读取 Binlog，因此无需为了回滚去给 `REPLICATION SLAVE`（仅在需要启用原生 MySQL 进程内 `gh-ost` 在线改表时才需要复制流权限）。
 :::
 
-## 2. PostgreSQL 14–18（含 PolarDB PG）建权 SQL
+## 2. PostgreSQL 14+（含 PolarDB PG）建权 SQL
 
 在目标 PostgreSQL 业务库中执行以下语句，分别建立只读与执行角色（以 `public` / `<app_schema>` 为例）：
 

@@ -39,7 +39,15 @@ export function ensureMockNodeServer(): SetupServer {
   const globalTarget = globalThis as typeof globalThis & GlobalWithMockServer;
   if (globalTarget[SERVER_KEY] === undefined) {
     const server = setupServer();
-    server.listen({ onUnhandledRequest: "bypass" });
+    server.listen({
+      onUnhandledRequest(request, print) {
+        const pathname = new URL(request.url).pathname;
+        if (pathname.startsWith("/api/")) {
+          print.error();
+          throw new Error(`Unhandled API mock request: ${request.method} ${pathname}`);
+        }
+      },
+    });
     globalTarget[SERVER_KEY] = server;
   }
   return globalTarget[SERVER_KEY];

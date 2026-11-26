@@ -1,0 +1,67 @@
+{
+  "contract_version": 1,
+  "openapi_sha": "b08b588223c0b586a5c9c4e0f1c9b0cd818d7ef1d61f3f9e823d5a489e37fb73",
+  "zod_runtime_sha256": "32b72a82897ae698b7566aad9821c07cf5194173a3dc69adfb00a8f00f04a446",
+  "operation_id": "getSettingsSchema",
+  "case_id": "admin",
+  "http_status": 200,
+  "err_code": 0,
+  "response": {
+    "data": {
+      "namespace": "general",
+      "schema_version": 1,
+      "json_schema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "properties": {
+          "default_locale": {
+            "enum": [
+              "zh-CN",
+              "en-US"
+            ],
+            "type": "string"
+          },
+          "public_base_url": {
+            "maxLength": 512,
+            "minLength": 0,
+            "type": "string"
+          },
+          "registration_enabled": {
+            "type": "boolean"
+          },
+          "system_timezone": {
+            "type": "object"
+          }
+        },
+        "required": [
+          "default_locale",
+          "public_base_url",
+          "registration_enabled",
+          "system_timezone"
+        ],
+        "type": "object"
+      },
+      "ui_hints": {
+        "default_locale": {
+          "default": "zh-CN",
+          "impact": "next_session"
+        },
+        "public_base_url": {
+          "default": "",
+          "impact": "immediate"
+        },
+        "registration_enabled": {
+          "default": false,
+          "impact": "immediate"
+        },
+        "system_timezone": {
+          "default": "Asia/Shanghai",
+          "impact": "next_operation"
+        }
+      }
+    },
+    "err_code": 0,
+    "message": "ok",
+    "request_id": "00000000-0000-4000-8000-999999999999"
+  }
+}

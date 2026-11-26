@@ -1,11 +1,10 @@
+//go:build integration
+
 package rollback_test
 
 import (
 	"context"
 	"fmt"
-	"os"
-	"strconv"
-	"strings"
 	"testing"
 	"time"
 
@@ -13,54 +12,46 @@ import (
 	"github.com/cookieY/YearningX/backend/internal/datasource"
 	"github.com/cookieY/YearningX/backend/internal/execution/rollback"
 	"github.com/cookieY/YearningX/backend/internal/platform/addrguard"
+	"github.com/cookieY/YearningX/backend/internal/platform/testenv"
 )
 
 func openMySQLTestPool(t *testing.T) (database.Adapter, *database.PurposePool, string) {
 	t.Helper()
 	t.Cleanup(addrguard.SetLoopbackBypassForTest(true))
-	host := envOr("YEARNING_ROLLBACK_TEST_MYSQL_HOST", "127.0.0.1")
-	port := envIntOr("YEARNING_ROLLBACK_TEST_MYSQL_PORT", 54334)
-	user := envOr("YEARNING_ROLLBACK_TEST_MYSQL_USER", "root")
-	pass := envOr("YEARNING_ROLLBACK_TEST_MYSQL_PASSWORD", "f12-mysql-902d734b79df")
-	dbName := envOr("YEARNING_ROLLBACK_TEST_MYSQL_DB", "demo")
+	cfg := testenv.RequireTargetMySQL(t)
 
 	ep := database.Endpoint{
-		Host:             host,
-		Port:             port,
-		DatabaseName:     dbName,
+		Host:             cfg.Host,
+		Port:             cfg.Port,
+		DatabaseName:     cfg.DBName,
 		CompatibilityMod: "mysql",
 	}
 	opts := database.AdapterOptions{
 		CapabilityResolver: datasource.ResolveCapabilities,
-		SchemaContext:      dbName,
+		SchemaContext:      cfg.DBName,
 	}
 	adapter := database.NewMySQLAdapter(ep, opts)
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	pool, err := adapter.OpenPurposePool(ctx, database.PurposeExecution, database.Credential{
-		Username: user,
-		Password: pass,
+		Username: cfg.User,
+		Password: cfg.Password,
 	}, nil)
 	if err != nil {
-		t.Skipf("skipping MySQL live rollback integration test (container not reachable at %s:%d): %v", host, port, err)
+		testenv.SkipOrFatal(t, "MySQL live rollback target not reachable at %s:%d: %v", cfg.Host, cfg.Port, err)
 	}
 	t.Cleanup(func() { _ = pool.Close() })
-	return adapter, pool, dbName
+	return adapter, pool, cfg.DBName
 }
 
-func openPGTestPool(t *testing.T, defaultPort int, defaultUser, defaultPass, defaultDB string) (database.Adapter, *database.PurposePool, string) {
+func openPGTestPool(t *testing.T, cfg testenv.DBConfig) (database.Adapter, *database.PurposePool, string) {
 	t.Helper()
 	t.Cleanup(addrguard.SetLoopbackBypassForTest(true))
-	host := envOr("YEARNING_ROLLBACK_TEST_PG_HOST", "127.0.0.1")
-	port := defaultPort
-	user := defaultUser
-	pass := defaultPass
-	dbName := defaultDB
 
 	ep := database.Endpoint{
-		Host:             host,
-		Port:             port,
-		DatabaseName:     dbName,
+		Host:             cfg.Host,
+		Port:             cfg.Port,
+		DatabaseName:     cfg.DBName,
 		CompatibilityMod: "postgresql",
 	}
 	opts := database.AdapterOptions{
@@ -71,30 +62,14 @@ func openPGTestPool(t *testing.T, defaultPort int, defaultUser, defaultPass, def
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	pool, err := adapter.OpenPurposePool(ctx, database.PurposeExecution, database.Credential{
-		Username: user,
-		Password: pass,
+		Username: cfg.User,
+		Password: cfg.Password,
 	}, nil)
 	if err != nil {
-		t.Skipf("skipping PostgreSQL live rollback integration test (container not reachable at %s:%d): %v", host, port, err)
+		testenv.SkipOrFatal(t, "PostgreSQL live rollback target not reachable at %s:%d: %v", cfg.Host, cfg.Port, err)
 	}
 	t.Cleanup(func() { _ = pool.Close() })
 	return adapter, pool, "public"
-}
-
-func envOr(key, fallback string) string {
-	if v := strings.TrimSpace(os.Getenv(key)); v != "" {
-		return v
-	}
-	return fallback
-}
-
-func envIntOr(key string, fallback int) int {
-	if v := strings.TrimSpace(os.Getenv(key)); v != "" {
-		if n, err := strconv.Atoi(v); err == nil && n > 0 {
-			return n
-		}
-	}
-	return fallback
 }
 
 func execDDLOrFail(t *testing.T, ctx context.Context, adapter database.Adapter, pool *database.PurposePool, schema, sqlText string) {
@@ -310,28 +285,19 @@ func TestMySQLDMLAndDDLRollbackIntegration(t *testing.T) {
 func TestPostgreSQL17And18DMLAndDDLRollbackIntegration(t *testing.T) {
 	targets := []struct {
 		name        string
-		port        int
-		user        string
-		pass        string
-		db          string
+		resolve     func(*testing.T) testenv.DBConfig
 		expectPG18  bool
 		expectedStr string
 	}{
 		{
 			name:        "PG17_TxSelectForUpdateReturning",
-			port:        envIntOr("YEARNING_ROLLBACK_TEST_PG17_PORT", 54333),
-			user:        envOr("YEARNING_ROLLBACK_TEST_PG17_USER", "yr"),
-			pass:        envOr("YEARNING_ROLLBACK_TEST_PG17_PASSWORD", "f12-target-a16f4908848a"),
-			db:          envOr("YEARNING_ROLLBACK_TEST_PG17_DB", "target"),
+			resolve:     func(t *testing.T) testenv.DBConfig { return testenv.RequireTargetPG(t) },
 			expectPG18:  false,
 			expectedStr: rollback.StrategyPGDMLTxReturning,
 		},
 		{
 			name:        "PG18_NativeReturningOldNew",
-			port:        envIntOr("YEARNING_ROLLBACK_TEST_PG18_PORT", 54332),
-			user:        envOr("YEARNING_ROLLBACK_TEST_PG18_USER", "yearning"),
-			pass:        envOr("YEARNING_ROLLBACK_TEST_PG18_PASSWORD", "f12-meta-a4512e1f9cbe"),
-			db:          envOr("YEARNING_ROLLBACK_TEST_PG18_DB", "yearning_f12b"),
+			resolve:     func(t *testing.T) testenv.DBConfig { return testenv.RequireRollbackPG18(t) },
 			expectPG18:  true,
 			expectedStr: rollback.StrategyPG18DMLReturning,
 		},
@@ -339,7 +305,7 @@ func TestPostgreSQL17And18DMLAndDDLRollbackIntegration(t *testing.T) {
 
 	for _, tc := range targets {
 		t.Run(tc.name, func(t *testing.T) {
-			adapter, pool, schema := openPGTestPool(t, tc.port, tc.user, tc.pass, tc.db)
+			adapter, pool, schema := openPGTestPool(t, tc.resolve(t))
 			ctx := context.Background()
 
 			table := fmt.Sprintf("rb_pg_test_%d", time.Now().UnixNano()%1000000)

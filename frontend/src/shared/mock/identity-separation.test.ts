@@ -31,7 +31,10 @@ async function call<T = Record<string, unknown>>(
   path: string,
   init?: RequestInit,
 ): Promise<{ status: number; body: Envelope<T> }> {
-  const response = await fetch(`https://yearning.test${path}`, init);
+  const response = await fetch(
+    `https://yearning.test${path.startsWith("/api/v4") ? path : `/api/v4${path}`}`,
+    init,
+  );
   return { status: response.status, body: (await response.json()) as Envelope<T> };
 }
 
@@ -232,11 +235,11 @@ describe("identity role separation (§18.44)", () => {
 
   it("query access decisions belong to the reviewer: henry cannot even read the pending request", async () => {
     seedQueryScenario("query-approval");
-    const asSubmitter = await call("/query-access-requests/qar-fixture-pending");
+    const asSubmitter = await call("/query-access-requests/6f0f2b3c-5555-4555-8555-000000000201");
     expect(asSubmitter.body.err_code).toBe(1002);
 
     setMockIdentity("reviewer-a");
-    const asReviewer = await call<{ state: string }>("/query-access-requests/qar-fixture-pending");
+    const asReviewer = await call<{ state: string }>("/query-access-requests/6f0f2b3c-5555-4555-8555-000000000201");
     expect(asReviewer.body.err_code).toBe(0);
     expect(asReviewer.body.data.state).toBe("access_pending");
   });

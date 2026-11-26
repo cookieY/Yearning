@@ -149,7 +149,7 @@ test("a concurrent peer decision is recoverable: the UI converges on the real st
   // While the dialog is open, a peer reviewer approves from another tab:
   // the fixture's winning decision advances the order to execution-pending.
   const raced = await page.evaluate(async (id) => {
-    const response = await fetch(`/change-orders/${id}/approval-decisions`, {
+    const response = await fetch(`/api/v4/change-orders/${id}/approval-decisions`, {
       method: "POST",
       headers: { "Content-Type": "application/json", "If-Match": '"1"' },
       body: JSON.stringify({ decision: "approve", comment: "\u5e76\u53d1\u5ba1\u6279\u62a2\u5148\u6210\u529f" }),

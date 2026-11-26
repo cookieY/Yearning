@@ -85,9 +85,7 @@ func (e *Entry) Validate() error {
 	}
 	switch e.ScopeType {
 	case ScopeGlobal:
-		if e.DatasourceID != "" || e.DatabaseName != "" || e.TableName != "" {
-			return fmt.Errorf("%w: global scope must not carry locator", ErrValidation)
-		}
+		return fmt.Errorf("%w: global scope is retired; use datasource or table scope, or create an audit skill for global rules", ErrValidation)
 	case ScopeDatasource:
 		if e.DatasourceID == "" || e.DatabaseName == "" || e.TableName != "" {
 			return fmt.Errorf("%w: datasource scope needs datasource+database", ErrValidation)
@@ -114,10 +112,27 @@ func (e *Entry) Validate() error {
 	return e.Definition.Validate()
 }
 
-var controlledSeverities = map[string]bool{"info": true, "low": true, "medium": true, "high": true, "critical": true}
+// EffectiveAdvisorySeverity clamps stored max_severity to the non-blocking advisory ceiling (info/low/medium).
+func (d Definition) EffectiveAdvisorySeverity() string {
+	switch strings.ToLower(strings.TrimSpace(d.MaxSeverity)) {
+	case "info", "low", "medium":
+		return strings.ToLower(strings.TrimSpace(d.MaxSeverity))
+	default:
+		return "medium"
+	}
+}
 
-// Validate checks knowledge text length bounds, allowed severity, and version >= 1.
+// Validate checks knowledge text length bounds, allowed non-blocking advisory severity (info/low/medium), and version >= 1.
 func (d Definition) Validate() error {
+	return d.validateWithSeverities(false)
+}
+
+// ValidatePersisted validates a stored definition including legacy high/critical severities for read compatibility.
+func (d Definition) ValidatePersisted() error {
+	return d.validateWithSeverities(true)
+}
+
+func (d Definition) validateWithSeverities(allowLegacyHighCritical bool) error {
 	if strings.TrimSpace(d.KnowledgeText) == "" {
 		return fmt.Errorf("%w: knowledge_text required", ErrValidation)
 	}
@@ -125,7 +140,11 @@ func (d Definition) Validate() error {
 		return fmt.Errorf("%w: knowledge_text too large", ErrValidation)
 	}
 	switch d.MaxSeverity {
-	case "info", "low", "medium", "high", "critical":
+	case "info", "low", "medium":
+	case "high", "critical":
+		if !allowLegacyHighCritical {
+			return fmt.Errorf("%w: max_severity must be info, low, or medium", ErrValidation)
+		}
 	default:
 		return fmt.Errorf("%w: max_severity invalid", ErrValidation)
 	}
@@ -185,10 +204,11 @@ type TouchedObject struct {
 }
 
 // Matched reports whether this entry's scope matches the stage's touched physical objects.
+// Retired global scope never matches at runtime.
 func (e *Entry) Matched(o TouchedObjects) bool {
 	switch e.ScopeType {
 	case ScopeGlobal:
-		return true
+		return false
 	case ScopeDatasource:
 		if o.PreciseScopes {
 			if o.DatasourceID != e.DatasourceID {

@@ -8,10 +8,10 @@
  * and every tab/browser/device shares it, like a real backend.
  *
  * The localStorage-backed dimension readers (identity-store,
- * scenario-store, auth-scenario-store, shared/dev/mock-super) fall back to
- * this store when no localStorage exists (node). Switching dimensions in
- * node mode goes through the dev-only `/__mock/dimensions` endpoint (see
- * vite.config.ts); the next page load propagates the change to every tab.
+ * scenario-store, auth-scenario-store) fall back to this store when no
+ * localStorage exists (node). Switching dimensions in node mode goes through
+ * the dev-only `/__mock/dimensions` endpoint (see vite.config.ts); the next
+ * page load propagates the change to every tab.
  * In browser/worker/vitest modes this module is inert.
  *
  * State lives on globalThis (Symbol.for registry), not module scope: the
@@ -23,7 +23,6 @@
 
 export interface MockServerDimensions {
   identity: string;
-  superMode: boolean;
   scenario: string;
   authBehavior: string;
 }
@@ -38,10 +37,7 @@ function store(): MockServerDimensions {
   const globalTarget = globalThis as typeof globalThis & GlobalWithDimensions;
   if (globalTarget[DIMENSIONS_KEY] === undefined) {
     globalTarget[DIMENSIONS_KEY] = {
-      identity: "henry",
-      // Mirrors the dev default in shared/dev/mock-super.ts: the dev session
-      // is super unless explicitly opted out.
-      superMode: true,
+      identity: "owner",
       scenario: "ready",
       authBehavior: "default",
     };
@@ -58,7 +54,6 @@ export function setServerDimensions(
 ): MockServerDimensions {
   const dimensions = store();
   if (patch.identity !== undefined) dimensions.identity = patch.identity;
-  if (patch.superMode !== undefined) dimensions.superMode = patch.superMode;
   if (patch.scenario !== undefined) dimensions.scenario = patch.scenario;
   if (patch.authBehavior !== undefined) dimensions.authBehavior = patch.authBehavior;
   return getServerDimensions();

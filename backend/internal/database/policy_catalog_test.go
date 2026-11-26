@@ -118,3 +118,29 @@ func TestPolicyCatalogEntryLimitNeverTruncates(t *testing.T) {
 		t.Fatalf("overflow error = %v", err)
 	}
 }
+
+func TestMySQLPolicyCatalogSQLUsesDirectSchemaPruningAndMatchingArgs(t *testing.T) {
+	for _, count := range []int{1, 3} {
+		query, _, err := policyCatalogQuery("mysql", count)
+		if err != nil {
+			t.Fatalf("policyCatalogQuery(mysql, %d) failed: %v", count, err)
+		}
+		for _, clause := range []string{
+			"t.table_schema IN (",
+			"c.table_schema IN (",
+			"st.table_schema IN (",
+			"tc.table_schema IN (",
+		} {
+			if !strings.Contains(query, clause) {
+				t.Fatalf("mysqlPolicyCatalogSQL(%d) missing direct schema pruning clause %q", count, clause)
+			}
+		}
+		if !strings.Contains(query, "BINARY visible_schema.schema_name = BINARY") {
+			t.Fatalf("mysqlPolicyCatalogSQL(%d) missing exact BINARY case verification join", count)
+		}
+		wantPlaceholders := 10*count + 1
+		if got := strings.Count(query, "?"); got != wantPlaceholders {
+			t.Fatalf("mysqlPolicyCatalogSQL(%d) placeholder count = %d, want %d", count, got, wantPlaceholders)
+		}
+	}
+}

@@ -33,6 +33,7 @@ import { ContextMenu } from "@/shared/components/context-menu";
 import { PageHeader, PageLayout } from "@/shared/components/page-layout";
 import { PendingButton } from "@/shared/components/pending-button";
 import { appToast as toast } from "@/shared/components/shadcn-dashboard/sonner/sonner-08";
+import { writeClipboardText } from "@/shared/lib/clipboard";
 import { LoadingState } from "@/shared/components/status/loading-state";
 import { ErrorState } from "@/shared/components/status/status-components";
 import { Alert, AlertDescription, AlertTitle } from "@/shared/components/ui/alert";
@@ -516,7 +517,13 @@ export default function QueryWorkspacePage() {
               label: t("query.tree.copyName"),
               testId: "query-inspect-copy",
               onClick: () => {
-                if ("clipboard" in navigator) void navigator.clipboard.writeText(`"${inspectMenu.schema}"."${inspectMenu.table}"`);
+                void writeClipboardText(`"${inspectMenu.schema}"."${inspectMenu.table}"`).then((ok) => {
+                  if (ok) {
+                    toast.info(t("common.copied"));
+                  } else {
+                    toast.error(t("common.copyFailed"));
+                  }
+                });
               },
             },
             {

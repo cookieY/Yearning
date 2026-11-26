@@ -103,17 +103,19 @@ func compilePolicy(skills []agent.SkillInjection, entries []*knowledge.Entry,
 	mapper *privacy.RunMapper, binding *stageSchemaBinding, catalog database.PolicyCatalog,
 	databaseName string, prior metadataScope,
 ) (compiledPolicy, error) {
-	fail := func() (compiledPolicy, error) { return compiledPolicy{}, ErrPolicyPrivacy }
+	failReason := func(reason string, cause error) (compiledPolicy, error) {
+		return compiledPolicy{}, newPolicyCompileError(reason, cause)
+	}
 	if mapper == nil {
-		return fail()
+		return failReason("REVIEW_COVERAGE_INCOMPLETE", nil)
 	}
 	schemas, err := policyCatalogAuthorizedSchemas(binding)
 	if err != nil {
-		return fail()
+		return failReason(schemaBindingFailureReason(binding), err)
 	}
 	index, lexical, err := validateCompletePolicyCatalog(catalog, schemas, databaseName)
 	if err != nil {
-		return fail()
+		return failReason("catalog_validation_failed", err)
 	}
 	// RCP-20261031-POLICY-TEXT-GENERIC-COLUMN-ALLOWLIST: the text-collision lexical set excludes frozen
 	// generic allowlist words of column class in the catalog (zero specificity, constituting no object-existence
@@ -146,23 +148,23 @@ func compilePolicy(skills []agent.SkillInjection, entries []*knowledge.Entry,
 		out: compiledPolicy{scope: clonePolicyMetadataScope(prior)}, seen: map[string]bool{}}
 	for _, sk := range skills {
 		if agent.ValidatePolicyParameters(sk.KnowledgeText, sk.Parameters) != nil {
-			return fail()
+			return failReason("policy_parameter_invalid", nil)
 		}
 		next := sk
 		if isCanonicalBuiltinSkill(sk.Name, sk.KnowledgeText) {
 			if err := c.validateParameterValues(sk.Parameters); err != nil {
-				return fail()
+				return failReason("policy_privacy_conflict", err)
 			}
 			next.Name = sk.Name
 			next.KnowledgeText = agent.RenderParameters(sk.KnowledgeText, sk.Parameters)
 		} else {
 			next.Name, err = c.text(sk.Name)
 			if err != nil {
-				return fail()
+				return failReason("policy_privacy_conflict", err)
 			}
 			next.KnowledgeText, err = c.text(agent.RenderParameters(sk.KnowledgeText, sk.Parameters))
 			if err != nil {
-				return fail()
+				return failReason("policy_privacy_conflict", err)
 			}
 		}
 		next.Parameters = nil // Rendering must not interpret compiled values a second time.
@@ -170,26 +172,26 @@ func compilePolicy(skills []agent.SkillInjection, entries []*knowledge.Entry,
 	}
 	for _, entry := range entries {
 		if entry == nil || agent.ValidatePolicyParameters(entry.Definition.KnowledgeText, nil) != nil {
-			return fail()
+			return failReason("policy_parameter_invalid", nil)
 		}
 		next := *entry
 		next.Name, err = c.text(entry.Name)
 		if err != nil {
-			return fail()
+			return failReason("policy_privacy_conflict", err)
 		}
 		next.Purpose, err = c.text(entry.Purpose)
 		if err != nil {
-			return fail()
+			return failReason("policy_privacy_conflict", err)
 		}
 		next.Definition = entry.Definition
 		next.Definition.KnowledgeText, err = c.text(entry.Definition.KnowledgeText)
 		if err != nil {
-			return fail()
+			return failReason("policy_privacy_conflict", err)
 		}
 		c.out.knowledge = append(c.out.knowledge, &next)
 	}
 	if policyMapperTokenCollidesWithCatalog(mapper, lexical) {
-		return fail()
+		return failReason("policy_privacy_conflict", nil)
 	}
 	return c.out, nil
 }

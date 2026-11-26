@@ -10,49 +10,19 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
-	"os"
 	"strings"
-	"syscall"
 	"testing"
 
 	"github.com/cookieY/YearningX/backend/internal/crypto"
 	"github.com/cookieY/YearningX/backend/internal/identity/session"
+	"github.com/cookieY/YearningX/backend/internal/platform/testkit"
 	"github.com/gin-gonic/gin"
-	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
-	gormlogger "gorm.io/gorm/logger"
 )
 
 func itestDB(t *testing.T) *gorm.DB {
 	t.Helper()
-	password := osGetenv("YEARNING_TEST_DATABASE_PASSWORD")
-	if password == "" {
-		t.Skip("integration PostgreSQL not configured")
-	}
-	acquireSharedITestLock(t)
-	db, err := gorm.Open(postgres.Open(dsnOf(password)), &gorm.Config{Logger: gormlogger.Discard})
-	if err != nil {
-		t.Fatalf("postgres connect: %v", err)
-	}
-	return db
-}
-
-// acquireSharedITestLock shares the same flock file with httpapi/review packages: once all four domains
-// are mounted, httpapi truncation includes announcement/notification/audit tables, requiring serialized access to the shared itest DB.
-func acquireSharedITestLock(t *testing.T) {
-	t.Helper()
-	f, err := os.OpenFile(os.TempDir()+"/yearningx-itest-shared.lock", os.O_CREATE|os.O_RDWR, 0o600)
-	if err != nil {
-		return
-	}
-	if err := syscall.Flock(int(f.Fd()), syscall.LOCK_EX); err != nil {
-		_ = f.Close()
-		return
-	}
-	t.Cleanup(func() {
-		_ = syscall.Flock(int(f.Fd()), syscall.LOCK_UN)
-		_ = f.Close()
-	})
+	return testkit.OpenPG(t)
 }
 
 func newTestService(t *testing.T) (*gorm.DB, *Service) {
@@ -240,7 +210,10 @@ func TestAuditEventsEndpoint(t *testing.T) {
 	store := fakeSessionStore{"itest-sid": {ID: "itest-sid", Identity: &session.Identity{
 		UserID: testAdminID, Username: "admin", IsBuiltinAdmin: true}}}
 	router.Use(session.Middleware(store, session.Options{CookieName: "itest-sid"}))
-	RegisterRoutes(router, &Deps{Service: s})
+	RegisterRoutes(router, &Deps{
+		Service: s,
+		Guard:   func(_ string) gin.HandlerFunc { return func(c *gin.Context) { c.Next() } },
+	})
 	client := func(url string) (int, gin.H) {
 		req := httptest.NewRequest(http.MethodGet, url, nil)
 		req.AddCookie(&http.Cookie{Name: "itest-sid", Value: "itest-sid"})

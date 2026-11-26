@@ -211,9 +211,9 @@ fallback: cloud 'default' fallback blocked from receiving raw payload`,
     tagZh: '零外部二进制在线 DDL',
     tagEn: 'Zero-Binary Online DDL',
     summaryZh:
-      'Go 进程内嵌 gh-ost 直接执行 MySQL 5.7/8.0 大表 ALTER TABLE，持单数据源排他租约、实时上报拷贝进度，并自动采集逆向 DDL 结构快照。',
+      'Go 进程内嵌 gh-ost 直接执行 MySQL 5.7+ 大表 ALTER TABLE，持单数据源排他租约、实时上报拷贝进度，并自动采集逆向 DDL 结构快照。',
     summaryEn:
-      'Embedded Go gh-ost migrator runs MySQL 5.7/8.0 online ALTER TABLE without spawning binaries, under a single-datasource lease with live copy telemetry.',
+      'Embedded Go gh-ost migrator runs MySQL 5.7+ online ALTER TABLE without spawning binaries, under a single-datasource lease with live copy telemetry.',
     inputSql: `ALTER TABLE core.transactions
 ADD COLUMN risk_score SMALLINT NOT NULL DEFAULT 0
 AFTER status;`,

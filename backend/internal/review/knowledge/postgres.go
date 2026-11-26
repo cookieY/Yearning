@@ -4,12 +4,17 @@ package knowledge
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
+
+	"github.com/cookieY/YearningX/backend/internal/platform/pagecursor"
+	"github.com/cookieY/YearningX/backend/internal/platform/ptr"
 )
 
 // Model maps directly to the knowledge_entries table.
@@ -48,47 +53,34 @@ var ErrConcurrent = errors.New("knowledge: concurrent modification")
 // Repository encapsulates GORM queries and mutations for knowledge entries.
 type Repository struct{ DB *gorm.DB }
 
-func strPtr(s string) *string {
-	if s == "" {
-		return nil
-	}
-	return &s
-}
-func derefStr(p *string) string {
-	if p == nil {
-		return ""
-	}
-	return *p
-}
-
 // toEntry converts a persistence Model into a domain Entry.
 func toEntry(m *Model) *Entry {
 	def := Definition{}
-	_ = jsonUnmarshal(m.Definition, &def)
+	_ = json.Unmarshal(m.Definition, &def)
 	return &Entry{
 		ID: m.ID, Name: m.Name, Purpose: m.Purpose,
 		State: State(m.State), ScopeType: ScopeType(m.ScopeType),
-		DatasourceID: derefStr(m.DatasourceID), DatabaseName: derefStr(m.DatabaseName),
-		TableName: derefStr(m.TableRef), Definition: def, FindingKey: m.FindingKey, ConfigHash: m.ConfigHash,
+		DatasourceID: ptr.Deref(m.DatasourceID), DatabaseName: ptr.Deref(m.DatabaseName),
+		TableName: ptr.Deref(m.TableRef), Definition: def, FindingKey: m.FindingKey, ConfigHash: m.ConfigHash,
 		Version: m.Version, Provenance: Provenance(m.Provenance),
-		SourceFindingID: derefStr(m.SourceFindingID), CreatedByUserID: m.CreatedByUserID,
+		SourceFindingID: ptr.Deref(m.SourceFindingID), CreatedByUserID: m.CreatedByUserID,
 		CreatedAt: m.CreatedAt, UpdatedAt: m.UpdatedAt,
 	}
 }
 
 // toModel serializes a domain Entry into a persistence Model.
 func toModel(e *Entry) (*Model, error) {
-	raw, err := jsonMarshal(e.Definition)
+	raw, err := json.Marshal(e.Definition)
 	if err != nil {
 		return nil, err
 	}
 	return &Model{
 		ID: e.ID, Name: e.Name, Purpose: e.Purpose,
 		State: string(e.State), ScopeType: string(e.ScopeType),
-		DatasourceID: strPtr(e.DatasourceID), DatabaseName: strPtr(e.DatabaseName),
-		TableRef: strPtr(e.TableName), Definition: raw, FindingKey: e.FindingKey, ConfigHash: e.ConfigHash,
+		DatasourceID: ptr.NonZero(e.DatasourceID), DatabaseName: ptr.NonZero(e.DatabaseName),
+		TableRef: ptr.NonZero(e.TableName), Definition: raw, FindingKey: e.FindingKey, ConfigHash: e.ConfigHash,
 		Version: e.Version, Provenance: string(e.Provenance),
-		SourceFindingID: strPtr(e.SourceFindingID), CreatedByUserID: e.CreatedByUserID,
+		SourceFindingID: ptr.NonZero(e.SourceFindingID), CreatedByUserID: e.CreatedByUserID,
 		CreatedAt: e.CreatedAt, UpdatedAt: e.UpdatedAt,
 	}, nil
 }
@@ -97,9 +89,11 @@ func toModel(e *Entry) (*Model, error) {
 func (r *Repository) List(ctx context.Context, limit int, after, search string) ([]*Entry, error) {
 	q := r.DB.WithContext(ctx).Model(&Model{})
 	if after != "" {
-		if created, id, ok := splitCursor(after); ok {
-			q = q.Where("(created_at, id) < (?, ?)", created, id)
+		created, id, err := pagecursor.DecodeUUID(after)
+		if err != nil {
+			return nil, ErrValidation
 		}
+		q = q.Where("(created_at, id) < (?, ?)", created, id)
 	}
 	if search != "" {
 		q = q.Where("name ILIKE ?", "%"+search+"%")
@@ -192,10 +186,11 @@ func (r *Repository) LoadForUpdate(ctx context.Context, tx *gorm.DB, id string) 
 	return toEntry(&m), nil
 }
 
-// MatchedEnabledForUpdate locks enabled entries and returns the deterministic subset matching touched objects.
+// MatchedEnabledForUpdate locks enabled scoped entries and returns the deterministic subset matching touched objects.
 func (r *Repository) MatchedEnabledForUpdate(ctx context.Context, db *gorm.DB, touched TouchedObjects) ([]*Entry, error) {
 	var rows []Model
-	q := db.WithContext(ctx).Where("state = ?", string(StateEnabled)).
+	q := db.WithContext(ctx).
+		Where("state = ? and scope_type in ?", string(StateEnabled), []string{string(ScopeDatasource), string(ScopeTable)}).
 		Clauses(clause.Locking{Strength: "UPDATE"})
 	if err := q.Find(&rows).Error; err != nil {
 		return nil, err
@@ -211,16 +206,45 @@ func (r *Repository) MatchedEnabledForUpdate(ctx context.Context, db *gorm.DB, t
 	return out, nil
 }
 
-// CursorOf encodes an entry's keyset pagination cursor (`created_at|id`).
-func CursorOf(e *Entry) string {
-	return e.CreatedAt.UTC().Format("2006-01-02T15:04:05.999999Z") + "|" + e.ID
-}
-
-func splitCursor(c string) (string, string, bool) {
-	for i := len(c) - 1; i >= 0; i-- {
-		if c[i] == '|' {
-			return c[:i], c[i+1:], true
+// ListEnabledForScope performs a single indexed read of enabled datasource/table entries matching
+// datasourceID, non-empty databaseName, and any table in tables (case-folded).
+func (r *Repository) ListEnabledForScope(ctx context.Context, datasourceID, databaseName string, tables []string) ([]*Entry, error) {
+	ds := strings.TrimSpace(datasourceID)
+	dbName := strings.TrimSpace(databaseName)
+	if r == nil || r.DB == nil || ds == "" || dbName == "" {
+		return nil, nil
+	}
+	var rows []Model
+	if err := r.DB.WithContext(ctx).
+		Where("state = ? and datasource_id = ? and scope_type in ?",
+			string(StateEnabled), ds, []string{string(ScopeDatasource), string(ScopeTable)}).
+		Order("id asc").
+		Find(&rows).Error; err != nil {
+		return nil, err
+	}
+	tableSet := make(map[string]bool, len(tables))
+	for _, t := range tables {
+		clean := strings.TrimSpace(t)
+		if clean != "" {
+			tableSet[strings.ToLower(clean)] = true
 		}
 	}
-	return "", "", false
+	out := make([]*Entry, 0, len(rows))
+	for i := range rows {
+		e := toEntry(&rows[i])
+		if !strings.EqualFold(e.DatabaseName, dbName) {
+			continue
+		}
+		if e.ScopeType == ScopeTable && !tableSet[strings.ToLower(strings.TrimSpace(e.TableName))] {
+			continue
+		}
+		out = append(out, e)
+	}
+	SortByDeterminism(out)
+	return out, nil
+}
+
+// CursorOf encodes an entry's keyset pagination cursor (`created_at|id`).
+func CursorOf(e *Entry) string {
+	return pagecursor.Encode(e.CreatedAt, e.ID)
 }

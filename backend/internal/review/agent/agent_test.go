@@ -76,8 +76,11 @@ func TestSystemPromptInjectsSkillsAndKnowledge(t *testing.T) {
 	if !strings.Contains(prompt, "<knowledge-entry") || !strings.Contains(prompt, "orders-guard") {
 		t.Fatal("knowledge injection missing")
 	}
-	if !strings.Contains(prompt, "mandatory") {
-		t.Fatal("hard-rule framing missing")
+	if !strings.Contains(prompt, "mandatory blocking boundaries") {
+		t.Fatal("hard-rule skill framing missing")
+	}
+	if !strings.Contains(prompt, "non-blocking advisory") || !strings.Contains(prompt, "advisory_max_severity: medium") {
+		t.Fatal("non-blocking advisory knowledge framing missing")
 	}
 }
 

@@ -1,0 +1,89 @@
+{
+  "request_schema_version": 1,
+  "review_run_id": "00000000-0000-4000-8000-000000000001",
+  "engine_profile": "mysql/mysql",
+  "anonymized_statement_groups": [
+    {
+      "group_id": "10000000-0000-4000-8000-000000000001",
+      "representative_shape": "kind=dml op=insert where=true",
+      "representative_anonymized_sql": "INSERT INTO shop.order_notes (order_id, note) VALUES (1001, 'xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx...\u003ctruncated:300_chars\u003e')",
+      "objects": [
+        {
+          "token": "shop",
+          "kind": "schema",
+          "relation": "reference",
+          "schema_token": "shop",
+          "statement_ordinal": 1,
+          "statement_ordinal_ranges": [
+            {
+              "start": 1,
+              "end": 1
+            }
+          ]
+        },
+        {
+          "token": "shop.order_notes",
+          "kind": "table",
+          "relation": "write",
+          "schema_token": "shop",
+          "statement_ordinal": 1,
+          "statement_ordinal_ranges": [
+            {
+              "start": 1,
+              "end": 1
+            }
+          ]
+        },
+        {
+          "token": "order_id",
+          "kind": "column",
+          "relation": "write",
+          "schema_token": "shop",
+          "parent_token": "shop.order_notes",
+          "statement_ordinal": 1,
+          "statement_ordinal_ranges": [
+            {
+              "start": 1,
+              "end": 1
+            }
+          ]
+        },
+        {
+          "token": "note",
+          "kind": "column",
+          "relation": "write",
+          "schema_token": "shop",
+          "parent_token": "shop.order_notes",
+          "statement_ordinal": 1,
+          "statement_ordinal_ranges": [
+            {
+              "start": 1,
+              "end": 1
+            }
+          ]
+        }
+      ],
+      "metadata_context_complete": true,
+      "statement_count": 1,
+      "statement_ordinal": 1,
+      "statement_ordinal_ranges": [
+        {
+          "start": 1,
+          "end": 1
+        }
+      ],
+      "statistics": {
+        "algorithm_version": "yearning-fingerprint-v1",
+        "dml_has_subselect": false,
+        "in_value_count_max": 0,
+        "insert_has_columns": true,
+        "insert_has_null_literal": false,
+        "max_statement_bytes": 363,
+        "unbounded_mutation": false,
+        "values_row_count_max": 1
+      }
+    }
+  ],
+  "normalized_evidence": [],
+  "allowed_tool_descriptors": []
+}

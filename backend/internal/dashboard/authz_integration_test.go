@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 
 	"github.com/cookieY/YearningX/backend/internal/identity/session"
 )
@@ -38,8 +39,8 @@ func (errNoSession) Error() string { return "dashboard test: no session" }
 func TestDashboardAuthz(t *testing.T) {
 	_, s := newTestService(t)
 	gin.SetMode(gin.TestMode)
-	admin := &session.Identity{UserID: "u-admin", Username: "admin", IsBuiltinAdmin: true}
-	member := &session.Identity{UserID: "u-member", Username: "member", IsBuiltinAdmin: false}
+	admin := &session.Identity{UserID: uuid.NewString(), Username: "admin", IsBuiltinAdmin: true}
+	member := &session.Identity{UserID: uuid.NewString(), Username: "member", IsBuiltinAdmin: false}
 	store := fakeStore{
 		"sess-admin":  {Identity: admin},
 		"sess-member": {Identity: member},
@@ -48,7 +49,10 @@ func TestDashboardAuthz(t *testing.T) {
 	newEngine := func() *gin.Engine {
 		engine := gin.New()
 		engine.Use(session.Middleware(store, session.Options{CookieName: "yearning_session"}))
-		RegisterRoutes(engine, &Deps{Service: s})
+		RegisterRoutes(engine, &Deps{
+			Service: s,
+			Guard:   func(_ string) gin.HandlerFunc { return func(c *gin.Context) { c.Next() } },
+		})
 		return engine
 	}
 

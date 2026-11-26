@@ -40,198 +40,26 @@ function configureWorkers(): void {
   };
 }
 
-/**
- * Monaco's theme parser only accepts hex colors, not oklch(). The SQL syntax
- * theme is the one sanctioned business-semantic exception to the Shadcn
- * Dashboard token system (UI spec §4), so the two palettes are the template
- * semantic tokens (—card, —primary, —muted-foreground, —accent, —success,
- * —warning) statically converted to hex at adoption time.
- */
-const THEME_COLORS = {
-  light: {
-    background: "FAFBFD",
-    foreground: "202733",
-    keyword: "005DC2",
-    operator: "44566D",
-    string: "126F47",
-    number: "A14417",
-    comment: "576475",
-    predefined: "633DBA",
-    lineNumber: "596677",
-    activeLineNumber: "005BBB",
-    activeLine: "F4F8FF",
-    selection: "E3EFFF",
-    selectionInactive: "EDF2F8",
-    findFill: "FFF1C8",
-    findOutline: "936000",
-    cursor: "0075EA",
-    error: "D33145",
-    warning: "B75B08",
-  },
-  dark: {
-    primary: "e5e5e5",
-    success: "00a63e",
-    warning: "f0b100",
-    mutedForeground: "a1a1a1",
-    card: "171717",
-    accent: "262626",
-    keywordBlue: "75aec7",
-    schemaTeal: "009689",
-  },
-} as const;
-
-function defineYearningThemes(resolved: "light" | "dark"): void {
-  if (resolved === "light") {
-    const palette = THEME_COLORS.light;
-    monaco.editor.defineTheme("yearning-sql", {
-      base: "vs",
-      inherit: true,
-      rules: [
-        { token: "identifier", foreground: palette.foreground },
-        { token: "keyword", foreground: palette.keyword },
-        { token: "keyword.sql", foreground: palette.keyword },
-        { token: "operator", foreground: palette.operator },
-        { token: "operator.sql", foreground: palette.operator },
-        { token: "string", foreground: palette.string },
-        { token: "string.sql", foreground: palette.string },
-        { token: "number", foreground: palette.number },
-        { token: "comment", foreground: palette.comment, fontStyle: "italic" },
-        { token: "predefined", foreground: palette.predefined },
-        { token: "predefined.sql", foreground: palette.predefined },
-      ],
-      colors: {
-        "editor.background": `#${palette.background}`,
-        "editor.foreground": `#${palette.foreground}`,
-        "editorLineNumber.foreground": `#${palette.lineNumber}`,
-        "editorLineNumber.activeForeground": `#${palette.activeLineNumber}`,
-        "editor.lineHighlightBackground": `#${palette.activeLine}`,
-        "editor.selectionBackground": `#${palette.selection}`,
-        "editor.inactiveSelectionBackground": `#${palette.selectionInactive}`,
-        "editor.findMatchBackground": `#${palette.findFill}`,
-        "editor.findMatchBorder": `#${palette.findOutline}`,
-        "editorCursor.foreground": `#${palette.cursor}`,
-        "editorError.foreground": `#${palette.error}`,
-        "editorWarning.foreground": `#${palette.warning}`,
-      },
-    });
-    return;
-  }
-  const palette = THEME_COLORS.dark;
-  monaco.editor.defineTheme("yearning-sql", {
-    base: "vs-dark",
-    inherit: true,
-    rules: [
-      { token: "keyword", foreground: palette.keywordBlue },
-      { token: "string", foreground: palette.success },
-      { token: "number", foreground: palette.warning },
-      { token: "comment", foreground: palette.mutedForeground, fontStyle: "italic" },
-      { token: "operator", foreground: palette.keywordBlue },
-      { token: "predefined", foreground: palette.schemaTeal },
-    ],
-    colors: {
-      "editor.background": `#${palette.card}`,
-      "editorLineNumber.foreground": `#${palette.mutedForeground}`,
-      "editor.selectionBackground": `#${palette.accent}`,
-    },
-  });
-}
-
 /** Optional schema/table/column catalog feeding the SQL completion provider.
  * Schemas come from the frozen flow's schema mappings; tables and columns
  * require a metadata read surface the submission journey does not have yet
  * (contract: metadata endpoints are query-session scoped only), so the
  * catalog ships empty there and lights up when a read surface exists. */
+import type { SqlCompletionCatalog } from "./sql-completions";
 import {
-  buildSqlSuggestions,
-  type SqlCompletionCatalog,
-} from "./sql-completions";
+  IS_MAC_PLATFORM,
+  defineYearningThemes,
+  execClipboardCommand,
+  getAsyncClipboard,
+  readClipboardText,
+  registerSqlCompletionProvider,
+  resolveCopyTarget,
+  writeClipboardText,
+} from "./sql-editor-support";
 
 export type { SqlCompletionCatalog };
 
 const EMPTY_CATALOG: SqlCompletionCatalog = { schemas: [], tables: [], columns: [] };
-
-const IS_MAC_PLATFORM =
-  typeof navigator !== "undefined" &&
-  /Macintosh|Mac OS X|iPhone|iPad|iPod/i.test(navigator.userAgent);
-
-function getAsyncClipboard(): Clipboard | undefined {
-  if (typeof navigator === "undefined") return undefined;
-  return (navigator as { clipboard?: Clipboard }).clipboard;
-}
-
-function execClipboardCommand(command: "copy" | "paste"): boolean {
-  if (typeof document === "undefined") return false;
-  try {
-    // eslint-disable-next-line @typescript-eslint/no-deprecated -- non-HTTPS LAN fallback when navigator.clipboard is unavailable
-    return document.execCommand(command);
-  } catch {
-    return false;
-  }
-}
-
-async function writeClipboardText(text: string): Promise<boolean> {
-  const clipboard = getAsyncClipboard();
-  if (clipboard !== undefined && typeof clipboard.writeText === "function") {
-    try {
-      await clipboard.writeText(text);
-      return true;
-    } catch {
-      // Fall back to execCommand when Clipboard API rejects (e.g., permission denied).
-    }
-  }
-  if (typeof document === "undefined") return false;
-  const textarea = document.createElement("textarea");
-  textarea.value = text;
-  textarea.setAttribute("readonly", "");
-  textarea.style.position = "fixed";
-  textarea.style.top = "-9999px";
-  textarea.style.left = "-9999px";
-  textarea.style.opacity = "0";
-  document.body.appendChild(textarea);
-  textarea.focus();
-  textarea.select();
-  try {
-    return execClipboardCommand("copy");
-  } finally {
-    document.body.removeChild(textarea);
-  }
-}
-
-async function readClipboardText(): Promise<string | null> {
-  const clipboard = getAsyncClipboard();
-  if (clipboard !== undefined && typeof clipboard.readText === "function") {
-    try {
-      return await clipboard.readText();
-    } catch {
-      return null;
-    }
-  }
-  return null;
-}
-
-function resolveCopyTarget(
-  editor: monaco.editor.IStandaloneCodeEditor,
-  model: monaco.editor.ITextModel,
-): { range: monaco.IRange; text: string } | null {
-  const selection = editor.getSelection();
-  if (selection !== null && !selection.isEmpty()) {
-    return { range: selection, text: model.getValueInRange(selection) };
-  }
-  const lineNumber = selection?.startLineNumber ?? 1;
-  const lineContent = model.getLineContent(lineNumber);
-  if (lineContent !== "") {
-    const range =
-      lineNumber < model.getLineCount()
-        ? { startLineNumber: lineNumber, startColumn: 1, endLineNumber: lineNumber + 1, endColumn: 1 }
-        : { startLineNumber: lineNumber, startColumn: 1, endLineNumber: lineNumber, endColumn: model.getLineMaxColumn(lineNumber) };
-    return { range, text: model.getValueInRange(range) };
-  }
-  const fullText = model.getValue();
-  if (fullText !== "") {
-    return { range: model.getFullModelRange(), text: fullText };
-  }
-  return null;
-}
 
 export interface SqlEditorPanelProps {
   value: string;
@@ -239,7 +67,6 @@ export interface SqlEditorPanelProps {
   readOnly?: boolean;
   /** Programmatic value loads (reveal); keeps the user's undo stack intact. */
   loadValue?: { text: string; nonce: number } | null;
-  onLocate?: null | { target: string; nonce: number };
   /** Schema/table/column suggestions for the completion provider. */
   completionCatalog?: SqlCompletionCatalog;
   /** Optional lazy resolver invoked by Monaco when a `<schema>.` or `<table_or_alias>.`
@@ -262,7 +89,6 @@ export function SqlEditorPanel({
   onChange,
   readOnly = false,
   loadValue = null,
-  onLocate = null,
   completionCatalog = EMPTY_CATALOG,
   onResolveCompletion,
   onSelectionChange,
@@ -305,78 +131,7 @@ export function SqlEditorPanel({
   useEffect(() => {
     configureWorkers();
     defineYearningThemes(resolvedTheme);
-    const providerDisposable = monaco.languages.registerCompletionItemProvider("sql", {
-      triggerCharacters: [".", " ", "`"],
-      async provideCompletionItems(model, position, _context, token) {
-        const word = model.getWordUntilPosition(position);
-        const range = {
-          startLineNumber: position.lineNumber,
-          endLineNumber: position.lineNumber,
-          startColumn: word.startColumn,
-          endColumn: word.endColumn,
-        };
-        const linePrefix = model.getValueInRange({
-          startLineNumber: position.lineNumber,
-          startColumn: 1,
-          endLineNumber: position.lineNumber,
-          endColumn: word.startColumn,
-        });
-        const dotMatch = /(?:[`"]?([A-Za-z0-9_$-]+)[`"]?\s*\.\s*)$/.exec(linePrefix);
-        const qualifier = dotMatch?.[1];
-        const sqlText = model.getValue();
-
-        let activeCatalog = catalogRef.current;
-        const resolver = onResolveCompletionRef.current;
-        if (resolver !== undefined && qualifier !== undefined) {
-          const qLower = qualifier.toLowerCase();
-          const hasMatchingTables = activeCatalog.tables.some(
-            (table) => table.schema !== null && table.schema.toLowerCase() === qLower,
-          );
-          const hasMatchingColumns = activeCatalog.columns.some(
-            (column) => column.table.toLowerCase() === qLower,
-          );
-          if (!hasMatchingTables && !hasMatchingColumns) {
-            try {
-              const resolved = await resolver({ qualifier, sql: sqlText });
-              if (token.isCancellationRequested) {
-                return { suggestions: [] };
-              }
-              if (resolved != null) {
-                activeCatalog = resolved;
-                catalogRef.current = resolved;
-              }
-            } catch {
-              // Ignore transient metadata fetch errors; fall back to local catalog.
-            }
-          }
-        }
-
-        const KIND_MAP = {
-          keyword: monaco.languages.CompletionItemKind.Keyword,
-          schema: monaco.languages.CompletionItemKind.Module,
-          table: monaco.languages.CompletionItemKind.Class,
-          column: monaco.languages.CompletionItemKind.Field,
-        } as const;
-        const SORT_PREFIX = {
-          column: "0_",
-          table: "1_",
-          schema: "2_",
-          keyword: "3_",
-        } as const;
-        const suggestions = buildSqlSuggestions(activeCatalog, {
-          ...(qualifier === undefined ? {} : { qualifier }),
-          sql: sqlText,
-        }).map((item) => ({
-          label: item.label,
-          kind: KIND_MAP[item.kind],
-          insertText: item.insertText,
-          sortText: `${SORT_PREFIX[item.kind]}${item.label}`,
-          range,
-          detail: item.detail,
-        }));
-        return { suggestions };
-      },
-    });
+    const providerDisposable = registerSqlCompletionProvider(catalogRef, onResolveCompletionRef);
     return () => { providerDisposable.dispose(); };
   }, [resolvedTheme]);
 
@@ -522,21 +277,6 @@ export function SqlEditorPanel({
       suppressChangeRef.current = false;
     }
   }, [loadValue]);
-
-  // Statement locating: select the first occurrence of the target snippet.
-  useEffect(() => {
-    const editor = editorRef.current;
-    const model = editor?.getModel();
-    if (editor == null || model == null || onLocate === null) return;
-    const text = model.getValue();
-    const index = text.indexOf(onLocate.target);
-    if (index < 0) return;
-    const start = model.getPositionAt(index);
-    const end = model.getPositionAt(index + onLocate.target.length);
-    editor.setSelection({ startLineNumber: start.lineNumber, startColumn: start.column, endLineNumber: end.lineNumber, endColumn: end.column });
-    editor.revealRangeInCenter({ startLineNumber: start.lineNumber, startColumn: start.column, endLineNumber: end.lineNumber, endColumn: end.column });
-    editor.focus();
-  }, [onLocate]);
 
   const handleCopy = useCallback(() => {
     const editor = editorRef.current;

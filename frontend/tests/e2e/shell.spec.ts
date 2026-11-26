@@ -101,13 +101,14 @@ test("the language picker switches the locale and persists the choice", async ({
 test("the header release cluster shows the installed and latest version", async ({ page }) => {
   // RCP-20261020: the release snapshot is backend-fed. Owner ruling 2026-10-23
   // moved the tag out of the sidebar into the header's right-hand action row,
-  // next to the theme/language toggles and the refresh button.
+  // next to the theme/language toggles (the manual refresh button was later
+  // removed once SSE live updates landed).
   const release = page.getByTestId("header-release");
   await expect(release).toBeVisible();
   await expect(release).toContainText("v4.1.0");
   // The default mock world is up to date, so no "new version" tag renders.
   await expect(release).toContainText("\u5df2\u662f\u6700\u65b0");
-  await expect(release.getByTestId("header-refresh")).toBeVisible();
+  await expect(page.getByTestId("header-refresh")).toHaveCount(0);
 });
 
 test("the sidebar collapses to icon mode and back", async ({ page }) => {

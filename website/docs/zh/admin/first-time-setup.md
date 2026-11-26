@@ -51,7 +51,7 @@
 
 进入 **管理 → 数据源（`/admin/datasources`）**，点击 **新建数据源**：
 
-1. 选择数据库引擎与兼容模式（MySQL 5.7/8.0、PostgreSQL 14–18、TiDB、OceanBase、PolarDB）。
+1. 选择数据库引擎与兼容模式（MySQL 5.7+ / 8.0 / 8.4 LTS、PostgreSQL 14–18+、TiDB、OceanBase、PolarDB）。
 2. 填写 Host、Port 与 **必填的版本约束 `version_constraint`**（例如 MySQL 8.0 填 `>=8.0,<9.0`，PG 16 填 `>=16.0,<17.0`）。
 3. 分别录入 **只读凭据（用于预审与查询）** 与 **执行凭据（用于变更落库）**。建权 SQL 可直接从 [数据源接入与目标库建权 SQL](/admin/datasources-and-grants) 复制。
 4. 点击 **测试连接** 确认版本与身份指纹（`identity_fingerprint`）探测成功，保持 **启用** 状态。

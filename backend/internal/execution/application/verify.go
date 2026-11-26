@@ -12,10 +12,13 @@ import (
 
 	"gorm.io/gorm"
 
+	"github.com/cookieY/YearningX/backend/internal/authorization/auditlog"
 	orderdomain "github.com/cookieY/YearningX/backend/internal/changeorder/domain"
 	"github.com/cookieY/YearningX/backend/internal/crypto"
 	"github.com/cookieY/YearningX/backend/internal/execution/domain"
 	"github.com/cookieY/YearningX/backend/internal/execution/persistence"
+	"github.com/cookieY/YearningX/backend/internal/platform/ptr"
+	"github.com/cookieY/YearningX/backend/internal/platform/txutil"
 )
 
 // EvidenceItem represents a single database-side evidence item (kind: text|database_fact|external_reference).
@@ -39,8 +42,9 @@ type VerifyInput struct {
 // view is assembled by httpapi via the changeorder read surface — the replay path likewise reads only the current order view).
 func (s *Services) Verify(ctx context.Context, in VerifyInput) (orderID string, replayed bool, err error) {
 	route := "POST:/execution-attempts/{attempt_id}/verifications"
-	reqHash := idemRequestHash(in.Actor.UserID, in.AttemptID, in.Result, in.Reason)
-	claimed, replay, cerr := s.idemClaim(ctx, in.Actor.UserID, route, in.AttemptID, in.IdempotencyKey, reqHash)
+	idem := s.idemStore()
+	reqHash := txutil.RequestHash(in.Actor.UserID, in.AttemptID, in.Result, in.Reason)
+	claimed, replay, cerr := idem.Claim(ctx, in.Actor.UserID, route, in.AttemptID, in.IdempotencyKey, reqHash)
 	if cerr != nil {
 		return "", false, cerr
 	}
@@ -65,10 +69,10 @@ func (s *Services) Verify(ctx context.Context, in VerifyInput) (orderID string, 
 		return nil
 	})
 	if txErr != nil {
-		_ = s.idemRelease(ctx, in.Actor.UserID, route, in.AttemptID, in.IdempotencyKey)
+		_ = idem.Release(ctx, in.Actor.UserID, route, in.AttemptID, in.IdempotencyKey)
 		return "", false, txErr
 	}
-	if cerr := s.idemComplete(ctx, in.Actor.UserID, route, in.AttemptID, in.IdempotencyKey, out); cerr != nil {
+	if cerr := idem.Complete(ctx, in.Actor.UserID, route, in.AttemptID, in.IdempotencyKey, out); cerr != nil {
 		return "", false, cerr
 	}
 	return order, false, nil
@@ -128,10 +132,11 @@ func (s *Services) verifyOnce(ctx context.Context, tx *gorm.DB, in VerifyInput) 
 	now := nowUTC()
 	// Verification fact (append-only; reason and Evidence are AEAD-sealed).
 	reasonJSON, _ := json.Marshal(in.Reason)
-	reasonEnv, err := s.Crypter.Seal(crypto.PurposePayload, reasonJSON, crypto.AAD{
-		DeploymentID: s.Crypter.DeploymentID(), Table: "execution_verifications",
-		PrimaryKey: at.ID + "#reason", Column: "reason", Purpose: crypto.PurposePayload,
-	})
+	reasonEnv, err := s.Crypter.SealColumn(crypto.PurposePayload, crypto.ColumnRef{
+		Table:      "execution_verifications",
+		PrimaryKey: at.ID + "#reason",
+		Column:     "reason",
+	}, reasonJSON)
 	if err != nil {
 		return "", nil, err
 	}
@@ -139,10 +144,11 @@ func (s *Services) verifyOnce(ctx context.Context, tx *gorm.DB, in VerifyInput) 
 	if err != nil {
 		return "", nil, err
 	}
-	evEnv, err := s.Crypter.Seal(crypto.PurposePayload, evJSON, crypto.AAD{
-		DeploymentID: s.Crypter.DeploymentID(), Table: "execution_verifications",
-		PrimaryKey: at.ID + "#evidence", Column: "evidence_bundle", Purpose: crypto.PurposePayload,
-	})
+	evEnv, err := s.Crypter.SealColumn(crypto.PurposePayload, crypto.ColumnRef{
+		Table:      "execution_verifications",
+		PrimaryKey: at.ID + "#evidence",
+		Column:     "evidence_bundle",
+	}, evJSON)
 	if err != nil {
 		return "", nil, err
 	}
@@ -157,7 +163,7 @@ func (s *Services) verifyOnce(ctx context.Context, tx *gorm.DB, in VerifyInput) 
 		OccurredAt: now,
 	}
 	if err := tx.WithContext(ctx).Create(ver).Error; err != nil {
-		if isUniqueViolation(err) {
+		if txutil.IsUniqueViolation(err) {
 			return "", nil, domain.ErrIllegal()
 		}
 		return "", nil, err
@@ -245,17 +251,18 @@ func (s *Services) emitVerificationEvent(ctx context.Context, tx *gorm.DB, order
 		}
 		toState = cur
 	}
-	if err := s.emitOrderEvent(ctx, tx, EventUnknownResolv, order.ID, auditActor(in.Actor),
+	actor := auditlog.UserActor(in.Actor.UserID, in.Actor.Username)
+	if err := s.emitOrderEvent(ctx, tx, EventUnknownResolv, order.ID, actor,
 		VerificationRecordedPayload{
 			OrderID: order.ID, AttemptID: at.ID, VerifiedByUserID: in.Actor.UserID,
 			Result: in.Result, EvidenceCount: len(in.Evidence), AggregateVersion: version,
 		}); err != nil {
 		return nil, err
 	}
-	if err := s.emitOrderEvent(ctx, tx, EventUnknownResolv, order.ID, auditActor(in.Actor),
+	if err := s.emitOrderEvent(ctx, tx, EventUnknownResolv, order.ID, actor,
 		StateChangedPayload{
-			AggregateID: order.ID, From: strPtr(order.State), To: toState,
-			ReasonCode: "unknown_resolved:" + in.Result, StageID: strPtr(stage.StageID),
+			AggregateID: order.ID, From: ptr.To(order.State), To: toState,
+			ReasonCode: "unknown_resolved:" + in.Result, StageID: ptr.To(stage.StageID),
 			AggregateVersion: version,
 		}); err != nil {
 		return nil, err

@@ -1,4 +1,5 @@
 import type { QueryResultPage } from "@/api/generated/client/yearningV4HTTPAPI.schemas";
+import { nextCursorOf } from "./use-query-domain";
 import { columnLetter, createXlsxSheet, type XlsxSheetBuffer } from "./xlsx-sheet-core";
 import type { XlsxWorkerRequest, XlsxWorkerResponse } from "./xlsx-export.worker";
 
@@ -28,11 +29,6 @@ export interface ExportControllerCallbacks {
   /** Honest failure: message plus the range that WAS exported before the
    * failure so the UI never claims a complete file. */
   onFailure: (message: string, exportedRows: number) => void;
-}
-
-function nextCursorOf(page: QueryResultPage): string | null {
-  const pageInfo = (page as { page?: { next_cursor?: string | null } }).page;
-  return pageInfo?.next_cursor ?? null;
 }
 
 async function runMainThreadFallbackExport(

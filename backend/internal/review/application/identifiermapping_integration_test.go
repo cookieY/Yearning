@@ -12,6 +12,7 @@ package application
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"strings"
 	"testing"
@@ -58,7 +59,7 @@ func TestNEWAI01IdentifierMappingPersistedAndRehydratable(t *testing.T) {
 				},
 			},
 		}
-		raw, _ := jsonMarshal(body)
+		raw, _ := json.Marshal(body)
 		return raw, 200, nil
 	})
 	runID := b.runAgent(t, deps)

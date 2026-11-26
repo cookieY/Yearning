@@ -13,23 +13,28 @@ import (
 
 	"gorm.io/gorm"
 
+	orderdomain "github.com/cookieY/YearningX/backend/internal/changeorder/domain"
 	"github.com/cookieY/YearningX/backend/internal/crypto"
+	"github.com/cookieY/YearningX/backend/internal/database"
 	"github.com/cookieY/YearningX/backend/internal/datasource"
 	"github.com/cookieY/YearningX/backend/internal/execution/domain"
 	"github.com/cookieY/YearningX/backend/internal/osc"
+	"github.com/cookieY/YearningX/backend/internal/platform/systz"
 	reviewapp "github.com/cookieY/YearningX/backend/internal/review/application"
 	"github.com/cookieY/YearningX/backend/internal/review/changeset"
 	"github.com/cookieY/YearningX/backend/internal/review/fingerprint"
+	"github.com/cookieY/YearningX/backend/internal/review/privacy"
 )
 
 // PlanStatement is a single statement in the frozen statement plan (SQL lives only in memory; only fact columns are persisted to the ledger).
 type PlanStatement struct {
-	Ordinal       int32
-	Kind          string // ddl|dml
-	Operation     string
-	SQL           []byte
-	CanonicalHMAC string
-	DialectHMAC   string
+	Ordinal             int32
+	Kind                string // ddl|dml
+	Operation           string
+	SQL                 []byte
+	CanonicalHMAC       string
+	DialectHMAC         string
+	ExplicitlyQualified bool
 }
 
 // planResult holds the outcome of a plan freeze.
@@ -37,6 +42,14 @@ type planResult struct {
 	Statements []PlanStatement
 	Kind       domain.ExecutionKind
 	SQLHMAC    string
+}
+
+type frozenStatementRow struct {
+	Ordinal                  int32  `gorm:"column:ordinal"`
+	StatementKind            string `gorm:"column:statement_kind"`
+	FingerprintQuality       string `gorm:"column:fingerprint_quality"`
+	CanonicalFingerprintHMAC string `gorm:"column:canonical_fingerprint_hmac"`
+	DialectFingerprintHMAC   string `gorm:"column:dialect_fingerprint_hmac"`
 }
 
 // freezeStatementPlan decrypts work order SQL -> verifies HMAC consistency -> splits statements
@@ -72,14 +85,9 @@ func (s *Services) freezeStatementPlan(ctx context.Context, db *gorm.DB,
 	if run.ReviewRunID == "" {
 		return nil, domain.ErrPreflightFailed("accepted_review_missing")
 	}
-	var frozen []struct {
-		Ordinal                  int32  `gorm:"column:ordinal"`
-		StatementKind            string `gorm:"column:statement_kind"`
-		CanonicalFingerprintHMAC string `gorm:"column:canonical_fingerprint_hmac"`
-		DialectFingerprintHMAC   string `gorm:"column:dialect_fingerprint_hmac"`
-	}
+	var frozen []frozenStatementRow
 	if err := db.WithContext(ctx).Raw(`
-		select ordinal, statement_kind, canonical_fingerprint_hmac, dialect_fingerprint_hmac
+		select ordinal, statement_kind, fingerprint_quality, canonical_fingerprint_hmac, dialect_fingerprint_hmac
 		from sql_statements where review_run_id = ? order by ordinal`, run.ReviewRunID).
 		Scan(&frozen).Error; err != nil {
 		return nil, err
@@ -87,8 +95,9 @@ func (s *Services) freezeStatementPlan(ctx context.Context, db *gorm.DB,
 	if int32(len(frozen)) != row.StatementCount {
 		return nil, domain.ErrPreflightFailed("statement_count_mismatch")
 	}
-	// Split statements + fingerprint each (same engine and profile as review; RunMapper is unused —
-	// fingerprint recomputation only needs to match frozen rows and does not require stable identifier mapping).
+	// Split statements + fingerprint each using the same engine and profile as review.
+	// MySQL stages also inspect anonymized object references from this pass so execution
+	// enforces the exact same explicit db.table qualification rules without double-parsing.
 	profile := fingerprint.Profile{Engine: ds.Engine, Mode: ds.CompatibilityMode}
 	if err := profile.Validate(); err != nil {
 		return nil, domain.ErrPreflightFailed("dialect_profile_invalid")
@@ -107,7 +116,11 @@ func (s *Services) freezeStatementPlan(ctx context.Context, db *gorm.DB,
 		if done {
 			break
 		}
-		res, aerr := engine.Analyze(profile, st.SQL, nil)
+		var stmtMapper *privacy.RunMapper
+		if ds.CompatibilityMode != "postgresql" {
+			stmtMapper = privacy.NewRunMapper()
+		}
+		res, aerr := engine.Analyze(profile, st.SQL, stmtMapper)
 		if aerr != nil {
 			return nil, domain.ErrPreflightFailed("sql_fingerprint_failed")
 		}
@@ -116,21 +129,30 @@ func (s *Services) freezeStatementPlan(ctx context.Context, db *gorm.DB,
 			return nil, domain.ErrPreflightFailed("statement_count_mismatch")
 		}
 		f := frozen[ordinal-1]
-		// The statement_kind frozen during review is a ddl/dml classification (review-side
-		// statementClassOf criterion); the engine outputs an operation name, which is bucketed here using the same criterion.
-		class := statementClassOf(res.StatementKind)
+		// Both review and execution preflight derive statement_kind (ddl|dml) from the leading
+		// SQL verb (operation) using the shared fingerprint operation classifier.
+		op := strings.ToLower(string(fingerprint.FirstOperationSlice(st.SQL)))
+		class := fingerprint.StatementClassOf(op)
 		if f.Ordinal != ordinal || f.StatementKind != class ||
 			f.CanonicalFingerprintHMAC != res.CanonicalFingerprintHMAC ||
 			f.DialectFingerprintHMAC != res.DialectFingerprintHMAC {
-			// SQL was modified after review (Review/Submission/Execution hashes do not match).
-			return nil, domain.ErrPreflightFailed("sql_changed_after_review")
+			// SQL was modified after review (Review/Submission/Execution hashes do not match),
+			// or a frozen san-wire-v1 RENAME/CTAS order needs re-review under san-wire-v2.
+			return nil, domain.ErrPreflightFailed(preflightStatementMismatchReason(f, ordinal, op, class, res))
+		}
+		explicitlyQualified := false
+		if stmtMapper != nil {
+			explicitlyQualified = reviewapp.InspectMySQLFingerprintObjects(
+				res.Objects, res.MetadataContextComplete, stmtMapper,
+			).AllExplicitlyQualified()
 		}
 		sqlCopy := append([]byte(nil), st.SQL...)
 		plan.Statements = append(plan.Statements, PlanStatement{
 			Ordinal: ordinal, Kind: class,
-			Operation: strings.ToLower(string(firstWord(sqlCopy))),
+			Operation: op,
 			SQL:       sqlCopy, CanonicalHMAC: res.CanonicalFingerprintHMAC,
-			DialectHMAC: res.DialectFingerprintHMAC,
+			DialectHMAC:         res.DialectFingerprintHMAC,
+			ExplicitlyQualified: explicitlyQualified,
 		})
 	}
 	if int32(len(plan.Statements)) != row.StatementCount {
@@ -144,14 +166,16 @@ func (s *Services) freezeStatementPlan(ctx context.Context, db *gorm.DB,
 	return plan, nil
 }
 
-// statementClassOf uses the same criterion as review-side statementClassOf (operation name -> ddl/dml).
-func statementClassOf(kind string) string {
-	switch strings.ToLower(kind) {
-	case "create", "alter", "drop", "truncate":
-		return "ddl"
-	default:
-		return "dml"
+func preflightStatementMismatchReason(f frozenStatementRow, ordinal int32, op, class string, res fingerprint.Result) string {
+	if f.Ordinal == ordinal {
+		if op == "rename" && class == "ddl" && (f.StatementKind == "dml" || f.FingerprintQuality == fingerprint.QualityLexer) {
+			return "sql_changed_after_review: RENAME TABLE classification and fingerprint upgraded to DDL; please re-review this change order before execution"
+		}
+		if op == "create" && class == "ddl" && f.StatementKind == "ddl" && res.Validity.Unsupported == "create_table_as_select" {
+			return "sql_changed_after_review: fingerprint upgraded for CREATE TABLE ... AS SELECT; please re-review"
+		}
 	}
+	return "sql_changed_after_review"
 }
 
 // oscPolicy represents the OSC policy in the execution settings namespace (RCP-20260827-OSC-PARAMS:
@@ -193,7 +217,7 @@ func (s *Services) loadOscPolicy(ctx context.Context, db *gorm.DB) oscPolicy {
 
 // deriveExecutionKind derives the Attempt execution Kind:
 // all DML -> dml; all DDL -> ddl; policy enables OSC tool + single ALTER TABLE + native
-// MySQL 5.7/8.0 -> that tool; mixed DDL/DML -> fail closed (single-transaction and non-transactional
+// MySQL (>= 5.7) -> that tool; mixed DDL/DML -> fail closed (single-transaction and non-transactional
 // semantics cannot coexist in a single Attempt).
 func deriveExecutionKind(stmts []PlanStatement, ds *datasource.DatasourceModel,
 	policy oscPolicy) (domain.ExecutionKind, error) {
@@ -227,23 +251,24 @@ func isAlterTable(st PlanStatement) bool {
 	return len(w) >= 2 && w[0] == "ALTER" && w[1] == "TABLE"
 }
 
-// oscCapable reports whether the datasource is a gh-ost-serviceable target
-// (gh-ost-execution-contract scope: native mysql-5.7/8.0 only).
+// oscCapable reports whether the datasource is an OSC-serviceable target
+// (osc-execution-contract scope: native MySQL >= 5.7 only; non-native probe flavors fail closed).
 func oscCapable(ds *datasource.DatasourceModel) bool {
-	if ds.Engine != "mysql" || ds.CompatibilityMode != "mysql" || ds.DeploymentKind != "native" {
+	if ds == nil || ds.Engine != "mysql" || ds.CompatibilityMode != "mysql" || ds.DeploymentKind != "native" {
 		return false
 	}
-	v := strings.TrimSpace(ds.VersionConstraint)
-	return strings.HasPrefix(v, "5.7") || strings.HasPrefix(v, "8.0")
-}
-
-// firstWord extracts the leading word of a statement.
-func firstWord(sql []byte) []byte {
-	s := strings.TrimLeft(strings.TrimSpace(string(sql)), "( \t\r\n")
-	if i := strings.IndexAny(s, " \t\r\n("); i > 0 {
-		return []byte(s[:i])
+	if len(ds.Metadata) > 0 {
+		var meta struct {
+			DetectedFlavor string `json:"detected_flavor"`
+		}
+		if err := json.Unmarshal(ds.Metadata, &meta); err == nil {
+			flavor := strings.TrimSpace(strings.ToLower(meta.DetectedFlavor))
+			if flavor != "" && flavor != "mysql_native" {
+				return false
+			}
+		}
 	}
-	return []byte(s)
+	return true
 }
 
 // validateOscOverrides validates user-submitted override keys (unknown key / out-of-range value -> 1001).
@@ -348,19 +373,9 @@ func (s *Services) checkExecutionWindowAt(ctx context.Context, db *gorm.DB, at t
 	return domain.ErrOutsideWindow()
 }
 
-// systemTimezone reads general.system_timezone (defaults to UTC).
+// systemTimezone reads general.system_timezone via canonical platform/systz.
 func (s *Services) systemTimezone(ctx context.Context, db *gorm.DB) *time.Location {
-	var tzName string
-	_ = db.WithContext(ctx).Raw(
-		`select settings->>'system_timezone' from system_settings where namespace = 'general'`).
-		Scan(&tzName).Error
-	if tzName == "" {
-		return time.UTC
-	}
-	if loc, err := time.LoadLocation(tzName); err == nil {
-		return loc
-	}
-	return time.UTC
+	return systz.Location(ctx, db)
 }
 
 // windowContains reports whether now falls within the window (start > end is treated as a
@@ -489,11 +504,7 @@ func (s *Services) loadStageByID(ctx context.Context, db *gorm.DB, stageID strin
 // RCP-20261031-REMOVE-FLOW-SCHEMA-MAPPINGS: target snapshots no longer carry
 // schema mapping ciphertexts; object scope is determined by the datasource default database
 // or the PostgreSQL search_path context frozen during review.
-type frozenTargetSnapshot struct {
-	DatasourceID        string `json:"datasource_id"`
-	Engine              string `json:"engine"`
-	IdentityFingerprint string `json:"identity_fingerprint"`
-}
+type frozenTargetSnapshot = orderdomain.TargetSnapshot
 
 type stageSchemaResolution struct {
 	Schema       string
@@ -502,12 +513,34 @@ type stageSchemaResolution struct {
 	Binding      *reviewapp.FrozenPostgresPathBinding
 }
 
-// stageSchemaResolutionForDatasource is pure once the frozen review path has
-// been loaded. PostgreSQL replays only Explicit; Effective keeps implicit
-// namespaces for lookup and must never be installed as schema context.
+func resolveEffectiveMySQLExecutionDB(ds *datasource.DatasourceModel, targetDB string) string {
+	effectiveDB := strings.TrimSpace(targetDB)
+	if effectiveDB == "" && ds != nil && ds.DatabaseName != nil {
+		effectiveDB = strings.TrimSpace(*ds.DatabaseName)
+	}
+	return effectiveDB
+}
+
+func allPlanStatementsExplicitlyQualified(stmts []PlanStatement) bool {
+	if len(stmts) == 0 {
+		return false
+	}
+	for _, st := range stmts {
+		if !st.ExplicitlyQualified {
+			return false
+		}
+	}
+	return true
+}
+
+// stageSchemaResolutionForDatasource is pure once the frozen review path and (for empty-default MySQL
+// stages) statement qualification facts have been loaded. PostgreSQL replays only Explicit; Effective
+// keeps implicit namespaces for lookup and must never be installed as schema context.
 func stageSchemaResolutionForDatasource(
 	ds *datasource.DatasourceModel,
 	frozen *reviewapp.FrozenPostgresSearchPath,
+	targetDB string,
+	planStmts ...PlanStatement,
 ) (stageSchemaResolution, error) {
 	if ds == nil {
 		return stageSchemaResolution{}, domain.ErrPreflightFailed("schema_unresolvable")
@@ -527,29 +560,28 @@ func stageSchemaResolutionForDatasource(
 			PostgresPath: frozen,
 		}, nil
 	}
-	// MySQL / other engines: the datasource connection's default database is the sole allowed schema.
-	if ds.DatabaseName == nil || *ds.DatabaseName == "" {
-		return stageSchemaResolution{}, domain.ErrPreflightFailed("schema_unresolvable")
+	effectiveDB := resolveEffectiveMySQLExecutionDB(ds, targetDB)
+	if effectiveDB != "" {
+		if database.ValidateIdentifier(effectiveDB) != nil {
+			return stageSchemaResolution{}, domain.ErrPreflightFailed("schema_unresolvable")
+		}
+		return stageSchemaResolution{
+			Schema: effectiveDB, SearchPath: []string{effectiveDB},
+		}, nil
 	}
-	return stageSchemaResolution{
-		Schema: *ds.DatabaseName, SearchPath: []string{*ds.DatabaseName},
-	}, nil
+	if allPlanStatementsExplicitlyQualified(planStmts) {
+		return stageSchemaResolution{}, nil
+	}
+	return stageSchemaResolution{}, domain.ErrPreflightFailed("schema_unresolvable")
 }
 
 // openTargetSnapshot decrypts the target snapshot.
 func (s *Services) openTargetSnapshot(stage *targetSnapshotRow) (*frozenTargetSnapshot, error) {
-	plain, err := s.Crypter.Open(crypto.PurposePayload, crypto.Envelope{
+	snap, err := orderdomain.OpenTargetSnapshot(s.Crypter, stage.StageID, crypto.Envelope{
 		Ciphertext: stage.TargetSnapshotCiphertext, Nonce: stage.TargetSnapshotNonce,
 		KeyID: stage.TargetSnapshotKeyID, Algorithm: stage.TargetSnapshotAlgorithm,
-	}, crypto.AAD{
-		DeploymentID: s.Crypter.DeploymentID(), Table: "order_stages",
-		PrimaryKey: stage.StageID, Column: "target_snapshot_ciphertext", Purpose: crypto.PurposePayload,
 	})
 	if err != nil {
-		return nil, domain.ErrPreflightFailed("target_snapshot_unreadable")
-	}
-	var snap frozenTargetSnapshot
-	if err := json.Unmarshal(plain, &snap); err != nil {
 		return nil, domain.ErrPreflightFailed("target_snapshot_unreadable")
 	}
 	return &snap, nil
@@ -560,19 +592,15 @@ func (s *Services) openTargetSnapshot(stage *targetSnapshotRow) (*frozenTargetSn
 //   - PostgreSQL: execution environment comes from the search_path context frozen by the
 //     accepted review (the immutable stage_review_snapshot envelope associated with order_stages);
 //     the path must pass validation and match object bindings, otherwise fail closed.
-//   - MySQL / other engines: the datasource connection's default database is the sole allowed
-//     schema (datasource drift is pinned by target snapshot identity_fingerprint).
-//
-// The legacy implementation located the template flow_stages row via frozen FlowID+position and
-// compared mapping ciphertexts byte-for-byte to prevent "silently using new template mappings after
-// template replacement"; with mapping consumption removed, the execution side no longer reads
-// any template stage rows, and that bypass naturally disappears.
+//   - MySQL / other engines: effective default database (explicit target_database override or
+//     datasources.database_name), or empty default schema context when every frozen statement
+//     explicitly qualifies valid non-system db.table references.
 func (s *Services) resolveStageSchema(ctx context.Context, db *gorm.DB, orderID string,
 	stage *targetSnapshotRow, snap *frozenTargetSnapshot,
-	ds *datasource.DatasourceModel) (stageSchemaResolution, error) {
+	ds *datasource.DatasourceModel, planStmts ...PlanStatement) (stageSchemaResolution, error) {
 	var frozen *reviewapp.FrozenPostgresSearchPath
 	var binding *reviewapp.FrozenPostgresPathBinding
-	if ds.CompatibilityMode == "postgresql" {
+	if ds != nil && ds.CompatibilityMode == "postgresql" {
 		environment, environmentErr := s.loadFrozenPostgresReviewContext(ctx, db, stage)
 		if environmentErr != nil {
 			return stageSchemaResolution{}, environmentErr
@@ -585,7 +613,21 @@ func (s *Services) resolveStageSchema(ctx context.Context, db *gorm.DB, orderID 
 		frozen = &path
 		binding = &environment.Binding
 	}
-	resolution, err := stageSchemaResolutionForDatasource(ds, frozen)
+	var targetDB string
+	if snap != nil {
+		targetDB = snap.TargetDatabase
+	}
+	stmts := planStmts
+	if ds != nil && ds.CompatibilityMode != "postgresql" &&
+		resolveEffectiveMySQLExecutionDB(ds, targetDB) == "" &&
+		len(stmts) == 0 && s != nil && db != nil && stage != nil {
+		plan, err := s.freezeStatementPlan(ctx, db, orderID, stage.StageID, ds)
+		if err != nil {
+			return stageSchemaResolution{}, err
+		}
+		stmts = plan.Statements
+	}
+	resolution, err := stageSchemaResolutionForDatasource(ds, frozen, targetDB, stmts...)
 	if err != nil {
 		return stageSchemaResolution{}, err
 	}

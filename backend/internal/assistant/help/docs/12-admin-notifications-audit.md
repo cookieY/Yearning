@@ -1,7 +1,7 @@
 ---
 id: help-admin-notifications-audit
 title: Notification Channels, Audit Logs & Watermarked SQL Reveal (Admin)
-source_ref: docs/prd/management-plane-prd.md#notifications-and-audit
+source_ref: docs/features/08-notification-prd.md
 route_path: /admin/audit
 admin_only: true
 keywords: notification, webhook, email, smtp, dingtalk, feishu, slack, delivery, dead_letter, rule, audit, audit log, records, watermark, reveal, security, compliance

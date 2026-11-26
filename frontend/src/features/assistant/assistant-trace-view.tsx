@@ -24,7 +24,7 @@ import {
 } from "@/shared/components/ui/trace";
 
 /** Resolves a help citation id into its localized title via i18n keys. */
-export function resolveCitationTitle(
+function resolveCitationTitle(
   citationId: string,
   fallbackTitle: string,
   t: (key: string) => string,
@@ -59,7 +59,7 @@ export function resolveCitationTitle(
   }
 }
 
-export function buildReasoningSummary(
+function buildReasoningSummary(
   msg: AssistantMessage,
   t: (key: string) => string,
 ): string {
@@ -72,7 +72,7 @@ export function buildReasoningSummary(
   return t("assistant.trace.reasoning.platform_help");
 }
 
-export function buildPrivacyGateOutput(msg: AssistantMessage): string {
+function buildPrivacyGateOutput(msg: AssistantMessage): string {
   return JSON.stringify(
     {
       gate: "prompt_scope_gate_v4",
@@ -86,7 +86,7 @@ export function buildPrivacyGateOutput(msg: AssistantMessage): string {
   );
 }
 
-export function buildCapabilityToolOutput(
+function buildCapabilityToolOutput(
   msg: AssistantMessage,
   t: (key: string) => string,
 ): string {

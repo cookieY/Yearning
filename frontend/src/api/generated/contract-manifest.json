@@ -3,7 +3,7 @@
   "sources": {
     "openapi": {
       "path": "api/openapi/yearning-v4.yaml",
-      "sha256": "ef66be5d9a5115b4c18432a76bf6703e84655999fb0d35ff948bb92c2fc5b788"
+      "sha256": "b08b588223c0b586a5c9c4e0f1c9b0cd818d7ef1d61f3f9e823d5a489e37fb73"
     },
     "error_codes": {
       "path": "api/contracts/error-codes.json",
@@ -11,7 +11,7 @@
     },
     "operation_error_profiles": {
       "path": "api/contracts/operation-error-profiles.json",
-      "sha256": "fce1afcab9f2f96c21a24f2e6209a06e3de10ea55ac5657ce81b631547b96417"
+      "sha256": "e41df40481ce6b14f5211762a3fd4e742b348a6584bd10bc6c47368fab3d65e4"
     },
     "state_machines": {
       "path": "api/contracts/state-machines.json",
@@ -29,15 +29,15 @@
   "outputs": {
     "typescript_client": {
       "path": "src/api/generated/client",
-      "sha256": "8d34bc87b8f85dcaba8822cb49776320c8cdc990d16fdc4a8b0a3602246963d1"
+      "sha256": "dc5ce59040603854f006e05f70719ecb237186b452851682da1260b68e975675"
     },
     "zod_runtime_schemas": {
       "path": "src/api/generated/zod",
-      "sha256": "07cd54ca9a53c0e41433db68ab2f3478e46723ba9575d996f37a37d5915bf8ae"
+      "sha256": "32b72a82897ae698b7566aad9821c07cf5194173a3dc69adfb00a8f00f04a446"
     },
     "msw_mock_handlers": {
       "path": "src/api/generated/mocks",
-      "sha256": "7662ccc10eec7853efb94a60df72b81e35cc3439dadf63a13435903ffa30af13"
+      "sha256": "464757306ec52a8685a313331911d74fb35ff6d07948fca4b6df2afae87ae0f0"
     },
     "business_error_catalog": {
       "path": "src/api/generated/projections/business-error-catalog.ts",
@@ -45,7 +45,7 @@
     },
     "operation_error_profiles": {
       "path": "src/api/generated/projections/operation-error-profiles.ts",
-      "sha256": "fb82ff3abd57a36ec247954c348b8359bea93643cbbcad8a70c93ecb24c8cb83"
+      "sha256": "1abe249e56f3ec7f50fe28b96adfb6f4b6216786e24e6dfa0a0081b840b97aba"
     },
     "state_display_projection": {
       "path": "src/api/generated/projections/state-display-projection.ts",
@@ -53,5 +53,5 @@
     }
   },
   "authorization_policy_generated": false,
-  "generated_at": "2026-11-21T11:35:39.573Z"
+  "generated_at": "2026-11-26T10:21:41.891Z"
 }

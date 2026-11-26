@@ -120,7 +120,12 @@ function usePendingApprovalTabCounts() {
   const authenticated = session.status === "authenticated";
   const userId = session.user?.id;
   const ordersQuery = useApprovalQueue(authenticated);
-  const requestsQuery = useMyAccessRequests(authenticated, { limit: 20, after: "" });
+  const requestsQuery = useMyAccessRequests(authenticated, {
+    limit: 50,
+    after: "",
+    state: "access_pending",
+    scope: "reviewer",
+  });
 
   const pendingOrdersCount = useMemo(() => {
     if (userId === undefined) return 0;
@@ -131,7 +136,10 @@ function usePendingApprovalTabCounts() {
   }, [ordersQuery.data, userId]);
 
   const pendingQueryAccessCount = useMemo(
-    () => requestsQuery.data.items.filter((item) => item.state === "access_pending").length,
+    () =>
+      requestsQuery.data.items.filter(
+        (item) => item.state === "access_pending" && item.can_decide === true,
+      ).length,
     [requestsQuery.data.items],
   );
 
@@ -206,7 +214,7 @@ export function ApprovalsWorkspacePage() {
   );
 }
 
-export function ApprovalQueueContent() {
+function ApprovalQueueContent() {
   const { t } = useTranslation();
   const session = useSession();
   const queueQuery = useApprovalQueue(true);
@@ -235,7 +243,7 @@ export function ApprovalQueueContent() {
         label: t("approvals.queue.column.state"),
         // Raw enum + localized label so either spelling matches a chip.
         value: (order) => `${order.state} ${t(`orders.state.${order.state}`)}`,
-        options: ORDER_STATES.map((state) => ({ label: t(`orders.state.${state}`) })),
+        options: ORDER_STATES.map((state) => ({ value: state, label: t(`orders.state.${state}`) })),
       },
       {
         key: "submitter",

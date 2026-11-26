@@ -636,8 +636,9 @@ func TestApplyTxSearchPathValidationAndExecution(t *testing.T) {
 		path   []string
 		want   string
 	}{
-		"postgres": {engine: "postgresql", path: []string{"app", "public"}, want: `SET LOCAL search_path = "app", "public"`},
-		"mysql":    {engine: "mysql", path: []string{"app"}, want: "USE `app`"},
+		"postgres":         {engine: "postgresql", path: []string{"app", "public"}, want: `SET LOCAL search_path = "app", "public"`},
+		"mysql":            {engine: "mysql", path: []string{"app"}, want: "USE `app`"},
+		"mysql empty path": {engine: "mysql", path: nil, want: ""},
 	} {
 		name, tc := name, tc
 		t.Run(name, func(t *testing.T) {

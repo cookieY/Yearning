@@ -1,7 +1,7 @@
 ---
 id: help-rollback-orders
 title: Automatic Rollback SQL Capture & Rollback Change Orders
-source_ref: docs/prd/change-order-prd.md#rollback-orders
+source_ref: docs/iterations/v4.0.0/features/sql-rollback-system-prd.md
 route_path: /orders
 admin_only: false
 keywords: rollback, undo, reverse, before-image, recovery, conflicted, evidence_incomplete, available, unsupported, rollback_enabled, ticket, dml, ddl, parent_order_id, 100000, limit, rows, 2015, 2016, 3004, 3005, 3006

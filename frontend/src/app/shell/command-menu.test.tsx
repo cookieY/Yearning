@@ -6,38 +6,18 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import "@/shared/i18n";
 import { SessionProvider } from "@/features/auth/session-provider";
 import { server } from "@/test/msw/server";
-import { HttpResponse, http } from "msw";
+import { stubSession } from "@/test/session";
 import { CommandMenu } from "./command-menu";
 
 // The menu is a presentation shortcut over NAV_GROUPS, so the assertions are
 // about what a given session may see and where Enter lands — never about
 // authorization (the backend stays default-deny).
-function currentUser(canAccessAdmin: boolean) {
-  return {
-    id: "0198d9cc-e65d-7b9d-a8aa-3c81945f99ac",
-    username: canAccessAdmin ? "admin" : "henry",
-    display_name: canAccessAdmin ? "admin" : "henry",
-    email: null,
-    is_builtin_admin: canAccessAdmin,
-    version: 1,
-    created_at: "2026-08-28T08:00:00Z",
-    updated_at: "2026-08-28T08:00:00Z",
-    can_access_admin: canAccessAdmin,
-    auth_provider: "local",
-  };
-}
-
 function renderMenu(canAccessAdmin: boolean, onOpenChange = vi.fn()) {
-  server.use(
-    http.get("*/users/me", () =>
-      HttpResponse.json({
-        err_code: 0,
-        message: "ok",
-        data: currentUser(canAccessAdmin),
-        request_id: "0198d9cc-e65d-7b9d-a8aa-3c81945f99ac",
-      }),
-    ),
-  );
+  stubSession({
+    admin: canAccessAdmin,
+    username: canAccessAdmin ? "admin" : "henry",
+    authProvider: "local",
+  });
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   });

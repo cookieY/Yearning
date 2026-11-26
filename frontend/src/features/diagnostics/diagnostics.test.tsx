@@ -1012,4 +1012,30 @@ describe("SQL Performance Diagnostics (FE-F13-SQL-DIAGNOSTICS)", () => {
       expect(adminApi.submitDiagnosticOptimizationOrder).toHaveBeenCalled();
     });
   });
+
+  it("shows static-parameter and SaaS AI-Assistant guidance banner when probe_state is stats_disabled", async () => {
+    vi.mocked(adminApi.getDiagnosticsOverview).mockResolvedValue({
+      ...SAMPLE_OVERVIEW,
+      probe_state: "stats_disabled",
+    } as never);
+
+    const prevLang = i18n.language;
+    try {
+      await i18n.changeLanguage("zh-CN");
+      const view = renderDiagnostics(`/admin/diagnostics?datasource_id=${DS_ID}`);
+      const bannerZh = await screen.findByTestId("diag-probe-status-banner");
+      expect(bannerZh).toHaveTextContent("\u7edf\u8ba1\u672a\u542f\u7528");
+      expect(bannerZh).toHaveTextContent("performance_schema");
+      expect(bannerZh).toHaveTextContent("\u9759\u6001\u53c2\u6570");
+      expect(bannerZh).toHaveTextContent("AI \u52a9\u624b");
+
+      await i18n.changeLanguage("en-US");
+      expect(screen.getByTestId("diag-probe-status-banner")).toHaveTextContent("Stats Disabled");
+      expect(screen.getByTestId("diag-probe-status-banner")).toHaveTextContent("static parameter");
+      expect(screen.getByTestId("diag-probe-status-banner")).toHaveTextContent("AI Assistant");
+      view.unmount();
+    } finally {
+      await i18n.changeLanguage(prevLang);
+    }
+  });
 });

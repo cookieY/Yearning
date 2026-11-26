@@ -3,569 +3,27 @@ package application
 
 import (
 	"context"
-	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"regexp"
-	"strings"
-	"sync"
-	"time"
-
-	"github.com/google/uuid"
-	"gorm.io/gorm"
-
 	"github.com/cookieY/YearningX/backend/internal/assistant/domain"
 	"github.com/cookieY/YearningX/backend/internal/assistant/help"
 	"github.com/cookieY/YearningX/backend/internal/assistant/persistence"
 	"github.com/cookieY/YearningX/backend/internal/assistant/privacy"
 	"github.com/cookieY/YearningX/backend/internal/assistant/tool"
-	orderapp "github.com/cookieY/YearningX/backend/internal/changeorder/application"
-	"github.com/cookieY/YearningX/backend/internal/crypto"
-	"github.com/cookieY/YearningX/backend/internal/review/application"
 	"github.com/cookieY/YearningX/backend/internal/review/fingerprint"
+	"github.com/cookieY/YearningX/backend/internal/review/knowledge"
+	"github.com/google/uuid"
+	"go.uber.org/zap"
+	"gorm.io/gorm"
+	"strings"
+	"sync"
+	"time"
 )
-
-const (
-	timeFormatRFC3339 = "2006-01-02T15:04:05.000Z07:00"
-
-	defaultSessionTitleEN = "New Chat"
-	// Localized zh-CN equivalent of "New Chat" (kept Unicode-escaped per Go pure-English rule;
-	// matches frontend i18n key assistant.newSessionDefaultTitle).
-	defaultSessionTitleZH = "\u65b0\u5bf9\u8bdd"
-
-	missingDatasourceClarifyEN = "### Please Select a Target Datasource\n\nPlease select a **Target Datasource** (along with schema and table) at the top of the panel so the assistant can inspect authorized table metadata."
-	// Localized zh-CN equivalent prompting the user to select a Target Datasource and schema/table first.
-	missingDatasourceClarifyZH = "### \u8bf7\u5148\u9009\u62e9\u76ee\u6807\u6570\u636e\u6e90\n\n\u8bf7\u5148\u5728\u9762\u677f\u9876\u90e8\u9009\u62e9**\u76ee\u6807\u6570\u636e\u6e90**\uff08\u4ee5\u53ca\u76ee\u6807\u5e93/Schema \u548c\u8868\u540d\uff09\uff0c\u4ee5\u4fbf\u52a9\u624b\u5728\u60a8\u7684\u6388\u6743\u8303\u56f4\u5185\u8bfb\u53d6\u8868\u7ed3\u6784\u5e76\u751f\u6210\u6216\u5206\u6790 SQL\u3002"
-)
-
-// zhChangeActionKeywords holds Chinese DML/DDL intent verbs ("insert", "add", "write", "update",
-// "modify", "delete", "create table", "add column", "add field", "create index", "submit order")
-// kept Unicode-escaped to preserve pure-English Go source files.
-var zhChangeActionKeywords = []string{
-	"\u63d2\u5165",
-	"\u65b0\u589e",
-	"\u5199\u5165",
-	"\u66f4\u65b0",
-	"\u4fee\u6539",
-	"\u5220\u9664",
-	"\u5efa\u8868",
-	"\u52a0\u5b57\u6bb5",
-	"\u65b0\u589e\u5b57\u6bb5",
-	"\u521b\u5efa\u7d22\u5f15",
-	"\u63d0\u4ea4\u5de5\u5355",
-}
-
-func defaultSessionTitle(outputLocale string) string {
-	if isEnglishLocale(outputLocale) {
-		return defaultSessionTitleEN
-	}
-	return defaultSessionTitleZH
-}
-
-func isDefaultSessionTitle(title string) bool {
-	return title == defaultSessionTitleZH || title == defaultSessionTitleEN || title == ""
-}
-
-func missingDatasourceClarifyMarkdown(outputLocale string) string {
-	if isEnglishLocale(outputLocale) {
-		return missingDatasourceClarifyEN
-	}
-	return missingDatasourceClarifyZH
-}
-
-type activeStreamEntry struct {
-	sessionID string
-	messageID string
-	cancel    context.CancelFunc
-}
-
-// persistedMessagePayload is the internal JSON payload encrypted inside ai_assistant_messages.content_ciphertext.
-type persistedMessagePayload struct {
-	Content   string                `json:"content"`
-	Citations []domain.CitationView `json:"citations,omitempty"`
-}
-
-// persistedDraftPayload is the internal JSON payload encrypted inside ai_assistant_sql_drafts.sql_ciphertext.
-type persistedDraftPayload struct {
-	SQLText          string   `json:"sql_text"`
-	Assumptions      []string `json:"assumptions,omitempty"`
-	NextSteps        []string `json:"next_steps,omitempty"`
-	SemanticWarnings []string `json:"semantic_warnings,omitempty"`
-	ReferencedTables []string `json:"referenced_tables,omitempty"`
-}
-
-// Services aggregates all application dependencies for the Database AI Assistant domain.
-type Services struct {
-	DB           *gorm.DB
-	Crypter      *crypto.Crypter
-	Review       *application.Services
-	ReviewAgent  *application.AgentRunner
-	Orders       *orderapp.Services
-	Authorizer   *tool.Authorizer
-	Synthesizer  Synthesizer
-	BudgetConfig ContextBudgetConfig
-
-	// Optional test hooks to override formal precheck or change order submission bridges.
-	PrecheckRunner PrecheckRunner
-	OrderSubmitter OrderSubmitter
-
-	streamMu      sync.Mutex
-	activeStreams map[string]*activeStreamEntry // userID -> activeStreamEntry
-}
-
-// NewServices constructs the Database AI Assistant application services.
-func NewServices(
-	db *gorm.DB,
-	crypter *crypto.Crypter,
-	reviewSvc *application.Services,
-	reviewAgent *application.AgentRunner,
-	orderSvc *orderapp.Services,
-) (*Services, error) {
-	if db == nil || crypter == nil {
-		return nil, errors.New("assistant: nil db or crypter dependency")
-	}
-	catalog := &tool.AdapterCatalogReader{DB: db, Crypter: crypter}
-	auth := &tool.Authorizer{
-		DB:      db,
-		Crypter: crypter,
-		Catalog: catalog,
-	}
-	return &Services{
-		DB:            db,
-		Crypter:       crypter,
-		Review:        reviewSvc,
-		ReviewAgent:   reviewAgent,
-		Orders:        orderSvc,
-		Authorizer:    auth,
-		Synthesizer:   NewProviderSynthesizer(db, crypter, nil),
-		BudgetConfig:  ContextBudgetConfig{}.withDefaults(),
-		activeStreams: make(map[string]*activeStreamEntry),
-	}, nil
-}
-
-// CreateSessionInput corresponds to CreateAssistantSessionRequest.
-type CreateSessionInput struct {
-	Title              string
-	ActiveDatasourceID *string
-	ActiveFlowID       *string
-	ActiveSchemaName   *string
-	OutputLocale       string
-}
-
-// CreateSession creates a new Database AI Assistant session (enforcing the per-user quota of 50 active sessions and 30-day default retention).
-func (s *Services) CreateSession(ctx context.Context, actor domain.Actor, in CreateSessionInput) (*domain.SessionView, error) {
-	now := time.Now().UTC()
-
-	// Lazily archive expired active sessions for this user first.
-	_ = s.DB.WithContext(ctx).Model(&persistence.AIAssistantSessionModel{}).
-		Where("user_id = ? and state = 'active' and expires_at <= ?", actor.UserID, now).
-		Updates(map[string]any{"state": string(domain.SessionStateExpired), "updated_at": now}).Error
-
-	var activeCount int64
-	if err := s.DB.WithContext(ctx).Model(&persistence.AIAssistantSessionModel{}).
-		Where("user_id = ? and state = 'active' and expires_at > ?", actor.UserID, now).
-		Count(&activeCount).Error; err != nil {
-		return nil, err
-	}
-	if activeCount >= domain.MaxActiveSessionsPerUser {
-		return nil, domain.ErrCapacityExhausted(fmt.Sprintf("At most %d active sessions are allowed per user; delete an older session before creating a new one", domain.MaxActiveSessionsPerUser))
-	}
-
-	title := strings.TrimSpace(in.Title)
-	if title == "" {
-		title = defaultSessionTitle(in.OutputLocale)
-	}
-	if len([]rune(title)) > 120 {
-		title = string([]rune(title)[:120])
-	}
-
-	sessionID := uuid.NewString()
-	env, err := s.sealSessionTitle(sessionID, title)
-	if err != nil {
-		return nil, err
-	}
-
-	row := persistence.AIAssistantSessionModel{
-		ID:                  sessionID,
-		UserID:              actor.UserID,
-		TitleCiphertext:     env.Ciphertext,
-		TitleNonce:          env.Nonce,
-		TitleKeyID:          env.KeyID,
-		TitleAlgorithm:      env.Algorithm,
-		State:               string(domain.SessionStateActive),
-		ActiveDatasourceID:  normalizeOptionalString(in.ActiveDatasourceID),
-		ActiveFlowID:        normalizeOptionalString(in.ActiveFlowID),
-		ActiveSchemaName:    normalizeOptionalString(in.ActiveSchemaName),
-		CompactedThroughSeq: 0,
-		ExpiresAt:           now.Add(domain.DefaultSessionRetention),
-		Version:             1,
-		CreatedAt:           now,
-		UpdatedAt:           now,
-	}
-	if err := s.DB.WithContext(ctx).Create(&row).Error; err != nil {
-		return nil, err
-	}
-	view := s.sessionView(&row, title)
-	return &view, nil
-}
-
-// ListSessions returns a paginated list of the current user's active, non-expired assistant sessions.
-func (s *Services) ListSessions(ctx context.Context, actor domain.Actor, limit int, after string) ([]domain.SessionView, *string, error) {
-	if limit <= 0 || limit > 200 {
-		limit = 50
-	}
-	now := time.Now().UTC()
-	q := s.DB.WithContext(ctx).Model(&persistence.AIAssistantSessionModel{}).
-		Where("user_id = ? and state = 'active' and expires_at > ?", actor.UserID, now)
-
-	if after != "" {
-		parts := strings.SplitN(after, "|", 2)
-		if len(parts) != 2 || parts[0] == "" || parts[1] == "" {
-			return nil, nil, domain.ErrValidation("Invalid pagination cursor")
-		}
-		q = q.Where("(updated_at, id) < (?, ?)", parts[0], parts[1])
-	}
-
-	var rows []persistence.AIAssistantSessionModel
-	if err := q.Order("updated_at desc, id desc").Limit(limit + 1).Find(&rows).Error; err != nil {
-		return nil, nil, err
-	}
-
-	var next *string
-	if len(rows) > limit {
-		last := rows[limit-1]
-		cur := fmt.Sprintf("%s|%s", last.UpdatedAt.UTC().Format(timeFormatRFC3339), last.ID)
-		next = &cur
-		rows = rows[:limit]
-	}
-
-	out := make([]domain.SessionView, 0, len(rows))
-	for i := range rows {
-		title, err := s.openSessionTitle(&rows[i])
-		if err != nil {
-			title = "Chat Session"
-		}
-		out = append(out, s.sessionView(&rows[i], title))
-	}
-	return out, next, nil
-}
-
-// GetSessionDetail returns the full message history and associated SQL drafts for a session owned by the current user (strictly forbidding cross-user access).
-func (s *Services) GetSessionDetail(ctx context.Context, actor domain.Actor, sessionID string) (*domain.SessionDetailView, error) {
-	sess, err := s.loadOwnedSession(ctx, s.DB, actor.UserID, sessionID)
-	if err != nil {
-		return nil, err
-	}
-	title, err := s.openSessionTitle(sess)
-	if err != nil {
-		return nil, err
-	}
-
-	var draftRows []persistence.AIAssistantSQLDraftModel
-	if err := s.DB.WithContext(ctx).
-		Where("session_id = ? and user_id = ?", sess.ID, actor.UserID).
-		Order("revision asc, created_at asc").
-		Find(&draftRows).Error; err != nil {
-		return nil, err
-	}
-
-	dsNames := s.loadDatasourceNames(ctx, draftRows)
-	draftByID := make(map[string]domain.SQLDraftView, len(draftRows))
-	draftViews := make([]domain.SQLDraftView, 0, len(draftRows))
-	for i := range draftRows {
-		payload, oerr := s.openDraftPayload(&draftRows[i])
-		if oerr != nil {
-			return nil, oerr
-		}
-		var dsName *string
-		if n, ok := dsNames[draftRows[i].DatasourceID]; ok {
-			dsName = &n
-		}
-		dv := s.draftView(&draftRows[i], payload, dsName)
-		draftByID[dv.ID] = dv
-		draftViews = append(draftViews, dv)
-	}
-
-	var msgRows []persistence.AIAssistantMessageModel
-	if err := s.DB.WithContext(ctx).
-		Where("session_id = ? and user_id = ?", sess.ID, actor.UserID).
-		Order("sequence asc").
-		Find(&msgRows).Error; err != nil {
-		return nil, err
-	}
-
-	msgViews := make([]domain.MessageView, 0, len(msgRows))
-	for i := range msgRows {
-		mp, oerr := s.openMessagePayload(&msgRows[i])
-		if oerr != nil {
-			return nil, oerr
-		}
-		var attachedDraft *domain.SQLDraftView
-		if msgRows[i].SQLDraftID != nil {
-			if dv, ok := draftByID[*msgRows[i].SQLDraftID]; ok {
-				dvCopy := dv
-				attachedDraft = &dvCopy
-			}
-		}
-		msgViews = append(msgViews, s.messageView(&msgRows[i], mp, attachedDraft))
-	}
-
-	return &domain.SessionDetailView{
-		Session:  s.sessionView(sess, title),
-		Messages: msgViews,
-		Drafts:   draftViews,
-	}, nil
-}
-
-// DeleteSession soft-deletes session metadata and immediately purges all encrypted messages, SQL drafts, and context summary ciphertexts (PRD §5.7 A3).
-func (s *Services) DeleteSession(ctx context.Context, actor domain.Actor, sessionID string, expectVersion int64) error {
-	sess, err := s.loadOwnedSession(ctx, s.DB, actor.UserID, sessionID)
-	if err != nil {
-		return err
-	}
-	if sess.Version != expectVersion {
-		return &domain.Error{Code: domain.CodeVersionConflict, Name: "VERSION_CONFLICT", Message: "Session version conflict; please refresh and retry"}
-	}
-
-	// If an active generation stream exists for this session, cancel it first.
-	s.cancelActiveStreamForSession(actor.UserID, sess.ID)
-
-	redactedEnv, err := s.sealSessionTitle(sess.ID, "[deleted]")
-	if err != nil {
-		return err
-	}
-	now := time.Now().UTC()
-	return s.DB.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		// Physically delete associated encrypted summaries, messages, and SQL drafts immediately (clear draft references on messages/sessions before deleting drafts).
-		if err := tx.Where("session_id = ?", sess.ID).Delete(&persistence.AIAssistantContextSummaryModel{}).Error; err != nil {
-			return err
-		}
-		if err := tx.Where("session_id = ? and user_id = ?", sess.ID, actor.UserID).Delete(&persistence.AIAssistantMessageModel{}).Error; err != nil {
-			return err
-		}
-		if err := tx.Model(&persistence.AIAssistantSessionModel{}).
-			Where("id = ?", sess.ID).
-			Update("selected_draft_id", nil).Error; err != nil {
-			return err
-		}
-		if err := tx.Where("session_id = ? and user_id = ?", sess.ID, actor.UserID).Delete(&persistence.AIAssistantSQLDraftModel{}).Error; err != nil {
-			return err
-		}
-		res := tx.Model(&persistence.AIAssistantSessionModel{}).
-			Where("id = ? and user_id = ? and version = ?", sess.ID, actor.UserID, expectVersion).
-			Updates(map[string]any{
-				"title_ciphertext":  redactedEnv.Ciphertext,
-				"title_nonce":       redactedEnv.Nonce,
-				"title_key_id":      redactedEnv.KeyID,
-				"title_algorithm":   redactedEnv.Algorithm,
-				"state":             string(domain.SessionStateDeleted),
-				"selected_draft_id": nil,
-				"deleted_at":        now,
-				"version":           expectVersion + 1,
-				"updated_at":        now,
-			})
-		if res.Error != nil {
-			return res.Error
-		}
-		if res.RowsAffected != 1 {
-			return domain.ErrConcurrent()
-		}
-		return nil
-	})
-}
-
-// CancelMessageStream cancels an in-flight streaming assistant response and marks the message state as cancelled.
-func (s *Services) CancelMessageStream(ctx context.Context, actor domain.Actor, sessionID, messageID string) (*domain.MessageView, error) {
-	sess, err := s.loadOwnedSession(ctx, s.DB, actor.UserID, sessionID)
-	if err != nil {
-		return nil, err
-	}
-	var msg persistence.AIAssistantMessageModel
-	if err := s.DB.WithContext(ctx).
-		Where("id = ? and session_id = ? and user_id = ?", messageID, sess.ID, actor.UserID).
-		First(&msg).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, domain.ErrNotFound()
-		}
-		return nil, err
-	}
-
-	s.cancelActiveStreamForSession(actor.UserID, sess.ID)
-
-	if msg.State == string(domain.MessageStreaming) {
-		now := time.Now().UTC()
-		_ = s.DB.WithContext(ctx).Model(&persistence.AIAssistantMessageModel{}).
-			Where("id = ?", msg.ID).
-			Updates(map[string]any{
-				"state":      string(domain.MessageCancelled),
-				"version":    msg.Version + 1,
-				"updated_at": now,
-			}).Error
-		msg.State = string(domain.MessageCancelled)
-		msg.Version++
-		msg.UpdatedAt = now
-	}
-
-	mp, err := s.openMessagePayload(&msg)
-	if err != nil {
-		mp = persistedMessagePayload{Content: "Generation stopped"}
-	}
-	view := s.messageView(&msg, mp, nil)
-	return &view, nil
-}
-
-// StreamEvent represents a real-time SSE event pushed from the server to the client.
-type StreamEvent struct {
-	Event string
-	Data  any
-}
-
-// SendMessageInput corresponds to SendAssistantMessageRequest.
-type SendMessageInput struct {
-	SessionID         string
-	Content           string
-	CapabilityHint    string
-	OutputLocale      string
-	DatasourceID      *string
-	FlowID            *string
-	SchemaName        *string
-	TargetTable       *string
-	SelectedDraftID   *string
-	InputSQL          *string
-	ExecutionPlanText *string
-	OnStreamEvent     func(StreamEvent) `json:"-"`
-}
-
-func summarizeLatestSessionTitle(modelTitle, latestUserMessage, previousTitle, outputLocale string) string {
-	cleanModel := strings.TrimSpace(strings.ReplaceAll(modelTitle, "\n", " "))
-	if cleanModel != "" && uuid.Validate(cleanModel) != nil {
-		runes := []rune(cleanModel)
-		if len(runes) > 40 {
-			cleanModel = string(runes[:40]) + "…"
-		}
-		return cleanModel
-	}
-	cleanMsg := strings.TrimSpace(strings.ReplaceAll(latestUserMessage, "\n", " "))
-	cleanMsg = strings.Join(strings.Fields(cleanMsg), " ")
-	if cleanMsg != "" && uuid.Validate(cleanMsg) != nil {
-		runes := []rune(cleanMsg)
-		if len(runes) > 28 {
-			return string(runes[:28]) + "…"
-		}
-		return cleanMsg
-	}
-	if previousTitle != "" && uuid.Validate(previousTitle) != nil {
-		return previousTitle
-	}
-	return defaultSessionTitle(outputLocale)
-}
-
-func (in SendMessageInput) emit(event string, data any) {
-	if in.OnStreamEvent != nil {
-		in.OnStreamEvent(StreamEvent{Event: event, Data: data})
-	}
-}
-
-func isTokenBoundaryBlockedChar(b byte) bool {
-	return (b >= 'a' && b <= 'z') || (b >= 'A' && b <= 'Z') || (b >= '0' && b <= '9') ||
-		b == '_' || b == ':' || b == '<' || b == '>'
-}
 
 func makeSafeRestoringDeltaHandler(priv *privacy.TurnPrivacySession, emit func(string, any)) (func(string, string), func(string)) {
 	onAnon, _, flush := makeTurnDeltaHandlers(priv, emit)
 	return onAnon, flush
-}
-
-func makeTurnDeltaHandlers(priv *privacy.TurnPrivacySession, emit func(string, any)) (func(string, string), func(string, string), func(string)) {
-	var (
-		anonBuf    strings.Builder
-		rawBuf     strings.Builder
-		emittedLen int
-	)
-	emitIncremental := func(text string) {
-		if len(text) > emittedLen {
-			emit("delta", map[string]any{"delta": text[emittedLen:]})
-			emittedLen = len(text)
-		}
-	}
-	onAnonDelta := func(kind string, delta string) {
-		if delta == "" {
-			return
-		}
-		if kind == "reasoning" {
-			emit("reasoning", map[string]any{"status": "running", "delta": priv.RestoreTextTokens(delta)})
-			return
-		}
-		anonBuf.WriteString(delta)
-		raw := anonBuf.String()
-		safeEnd := len(raw)
-		for safeEnd > 0 && isTokenBoundaryBlockedChar(raw[safeEnd-1]) {
-			safeEnd--
-		}
-		if safeEnd == 0 {
-			return
-		}
-		emitIncremental(priv.RestoreTextTokens(raw[:safeEnd]))
-	}
-	onRawDelta := func(kind string, delta string) {
-		if delta == "" {
-			return
-		}
-		if kind == "reasoning" {
-			emit("reasoning", map[string]any{"status": "running", "delta": delta})
-			return
-		}
-		rawBuf.WriteString(delta)
-		emitIncremental(rawBuf.String())
-	}
-	flush := func(finalRestored string) {
-		emitIncremental(finalRestored)
-	}
-	return onAnonDelta, onRawDelta, flush
-}
-
-func sanitizeSANComment(raw string) string {
-	trimmed := strings.TrimSpace(raw)
-	if trimmed == "" {
-		return ""
-	}
-	var b strings.Builder
-	b.Grow(len(trimmed))
-	prevSpace := false
-	for _, r := range trimmed {
-		switch {
-		case r < 0x20 || r == 0x7f:
-			if !prevSpace {
-				b.WriteByte(' ')
-				prevSpace = true
-			}
-		case r == '<':
-			b.WriteByte('(')
-			prevSpace = false
-		case r == '>':
-			b.WriteByte(')')
-			prevSpace = false
-		default:
-			b.WriteRune(r)
-			prevSpace = false
-		}
-	}
-	cleaned := strings.TrimSpace(b.String())
-	runes := []rune(cleaned)
-	if len(runes) > 200 {
-		return string(runes[:200])
-	}
-	return cleaned
-}
-
-func restoreSANToken(priv *privacy.TurnPrivacySession, tok string) string {
-	if priv != nil {
-		if _, orig, ok := priv.LookupIdentifier(tok); ok && orig != "" {
-			return orig
-		}
-	}
-	return tok
 }
 
 func buildAssistantRawSQLScope(
@@ -645,81 +103,6 @@ func buildAssistantRawSQLScope(
 			return out, true
 		},
 	}
-}
-
-func restoreSANMetadata(priv *privacy.TurnPrivacySession, anon []*tool.AnonymizedTableDescription) []SANTableDescription {
-	if len(anon) == 0 {
-		return nil
-	}
-	out := make([]SANTableDescription, 0, len(anon))
-	for _, tbl := range anon {
-		if tbl == nil {
-			continue
-		}
-		cols := make([]SANColumnFact, 0, len(tbl.Columns))
-		for _, c := range tbl.Columns {
-			cols = append(cols, SANColumnFact{
-				Name:            restoreSANToken(priv, c.ColumnToken),
-				Ordinal:         c.Ordinal,
-				DataType:        c.DataType,
-				Nullable:        c.Nullable,
-				IsPrimaryKey:    c.IsPrimaryKey,
-				IsUnique:        c.IsUnique,
-				DefaultBehavior: string(c.DefaultBehavior),
-				Comment:         sanitizeSANComment(c.RawComment),
-			})
-		}
-		idxs := make([]SANIndexFact, 0, len(tbl.Indexes))
-		for _, idx := range tbl.Indexes {
-			idxCols := make([]string, 0, len(idx.ColumnTokens))
-			for _, ct := range idx.ColumnTokens {
-				idxCols = append(idxCols, restoreSANToken(priv, ct))
-			}
-			incCols := make([]string, 0, len(idx.IncludedTokens))
-			for _, it := range idx.IncludedTokens {
-				incCols = append(incCols, restoreSANToken(priv, it))
-			}
-			idxs = append(idxs, SANIndexFact{
-				Name:            restoreSANToken(priv, idx.IndexToken),
-				Primary:         idx.Primary,
-				Unique:          idx.Unique,
-				Columns:         idxCols,
-				IncludedColumns: incCols,
-				ExpressionCount: idx.ExpressionCount,
-			})
-		}
-		out = append(out, SANTableDescription{
-			Schema:  restoreSANToken(priv, tbl.SchemaToken),
-			Table:   restoreSANToken(priv, tbl.TableToken),
-			Columns: cols,
-			Indexes: idxs,
-		})
-	}
-	return out
-}
-
-func retainRawHistory(existing []domain.MessageView, anon []AnonymizedTurn) []AnonymizedTurn {
-	if len(anon) == 0 {
-		return nil
-	}
-	bySeq := make(map[int64]string, len(existing))
-	for _, m := range existing {
-		bySeq[m.Sequence] = m.Content
-	}
-	out := make([]AnonymizedTurn, len(anon))
-	for i, turn := range anon {
-		rawContent := turn.Content
-		if orig, ok := bySeq[turn.Sequence]; ok && orig != "" {
-			rawContent = orig
-		}
-		out[i] = AnonymizedTurn{
-			Sequence:   turn.Sequence,
-			Role:       turn.Role,
-			Capability: turn.Capability,
-			Content:    rawContent,
-		}
-	}
-	return out
 }
 
 // SendMessage processes a single user turn in the Database AI Assistant:
@@ -917,30 +300,29 @@ func (s *Services) SendMessage(ctx context.Context, actor domain.Actor, in SendM
 		}
 	}
 
-	// 4. Load column, type, nullability, default behavior, and index metadata for referenced tables via controlled read-only tools within the authorized scope.
-	in.emit("tool", map[string]any{"tool": "catalog_inspector.load_schema_metadata", "status": "running", "schema": schemaName})
-	tablesToDescribe := collectTargetTables(targetTable, inputSQL, content, profile)
-	if len(tablesToDescribe) == 0 && s.Authorizer.Catalog != nil {
-		// If the user did not explicitly pass target_table, try matching table names mentioned in the user message against the authorized schema's table list.
-		if allTables, lerr := s.Authorizer.Catalog.ListTables(runCtx, dsTarget, schemaName); lerr == nil {
-			lowContent := strings.ToLower(content)
-			for _, tbl := range allTables {
-				if tbl != "" && strings.Contains(lowContent, strings.ToLower(tbl)) {
-					tablesToDescribe = append(tablesToDescribe, tbl)
-				}
-			}
-			if len(tablesToDescribe) == 0 && len(allTables) == 1 {
-				tablesToDescribe = append(tablesToDescribe, allTables[0])
+	// 4. If an existing draft is selected and inputSQL is not explicitly provided in optimization mode, load it before table discovery
+	// so table-scoped metadata and internal experience also match the draft's tables.
+	if inputSQL == "" && capKind == domain.CapabilitySQLOptimize {
+		selectedID := firstNonEmptyString(in.SelectedDraftID, sess.SelectedDraftID)
+		if selectedID != "" {
+			if _, dp, derr := s.loadOwnedDraft(runCtx, s.DB, actor.UserID, sess.ID, selectedID); derr == nil {
+				inputSQL = dp.SQLText
 			}
 		}
 	}
 
+	// 5. Load column, type, nullability, default behavior, and index metadata for referenced tables via controlled read-only tools within the authorized scope.
+	in.emit("tool", map[string]any{"tool": "catalog_inspector.load_schema_metadata", "status": "running", "schema": schemaName})
+	tablesToDescribe, catalogTables := s.resolveTablesAndCatalogToDescribe(runCtx, dsTarget, schemaName, targetTable, inputSQL, content, profile)
+
 	var anonMetadata []*tool.AnonymizedTableDescription
+	describedSet := make(map[string]bool, len(tablesToDescribe))
 	for _, tblName := range tablesToDescribe {
 		desc, derr := s.Authorizer.DescribeAuthorizedTable(runCtx, priv, dsTarget, schemaName, tblName)
 		if derr != nil {
 			return nil, derr
 		}
+		describedSet[strings.ToLower(strings.TrimSpace(tblName))] = true
 		anonMetadata = append(anonMetadata, desc)
 	}
 	in.emit("tool", map[string]any{"tool": "catalog_inspector.load_schema_metadata", "status": "completed", "schema": schemaName, "tables": len(anonMetadata)})
@@ -950,13 +332,40 @@ func (s *Services) SendMessage(ctx context.Context, actor domain.Actor, in SendM
 		return nil, err
 	}
 
-	// 5. If an existing draft is selected and inputSQL is not explicitly provided in this turn, load the selected draft in optimization mode and re-anonymize it in the current turn.
-	if inputSQL == "" && capKind == domain.CapabilitySQLOptimize {
-		selectedID := firstNonEmptyString(in.SelectedDraftID, sess.SelectedDraftID)
-		if selectedID != "" {
-			if _, dp, derr := s.loadOwnedDraft(runCtx, s.DB, actor.UserID, sess.ID, selectedID); derr == nil {
-				inputSQL = dp.SQLText
+	var extraCatalogTables []string
+	for _, tbl := range catalogTables {
+		clean := strings.TrimSpace(tbl)
+		if clean != "" && !describedSet[strings.ToLower(clean)] {
+			extraCatalogTables = append(extraCatalogTables, clean)
+		}
+	}
+
+	// 5b. Load enabled datasource/table internal experience within the authorized scope (skipping empty schemaName and global entries).
+	var anonKnowledge []AssistantKnowledgeItem
+	var rawKnowledge []AssistantKnowledgeItem
+	if schemaName != "" {
+		if _, rerr := priv.RegisterSchema(schemaName); rerr != nil {
+			return nil, rerr
+		}
+		matchedEntries, kerr := (&knowledge.Repository{DB: s.DB}).ListEnabledForScope(runCtx, dsTarget.DatasourceID, schemaName, tablesToDescribe)
+		if kerr != nil {
+			return nil, kerr
+		}
+		selectedEntries, truncatedCount := selectAndTrimAssistantKnowledge(matchedEntries, content, inputSQL, tablesToDescribe)
+		if len(matchedEntries) > 0 || truncatedCount > 0 {
+			zap.L().Info("assistant_knowledge_matched",
+				zap.String("session_id", sess.ID),
+				zap.Int("matched_count", len(matchedEntries)),
+				zap.Int("injected_count", len(selectedEntries)),
+				zap.Int("truncated_count", truncatedCount),
+			)
+		}
+		if len(selectedEntries) > 0 {
+			anonKnowledge, err = buildDefaultAssistantKnowledge(priv, selectedEntries, extraCatalogTables)
+			if err != nil {
+				return nil, err
 			}
+			rawKnowledge = buildSANAssistantKnowledge(selectedEntries)
 		}
 	}
 
@@ -994,24 +403,26 @@ func (s *Services) SendMessage(ctx context.Context, actor domain.Actor, in SendM
 	boundPhs := extractPlaceholdersInOrder(anonPrompt + " " + anonInputSQL)
 
 	synthIn := SynthesizeInput{
-		Capability:         capKind,
-		EngineProfile:      profile.String(),
-		OutputLocale:       in.OutputLocale,
-		AnonymizedPrompt:   anonPrompt,
-		AnonymizedInputSQL: anonInputSQL,
-		AnonymizedPlanText: anonPlan,
-		AnonymizedMetadata: anonMetadata,
-		AnonymizedHistory:  anonHistory,
-		AnonymizedSummary:  anonSummary,
-		BoundPlaceholders:  boundPhs,
-		PlatformKnowledge:  help.RetrieveRelevantArticles(actor, content, "", 2),
-		Actor:              actor,
-		RawPrompt:          content,
-		RawInputSQL:        inputSQL,
-		RawPlanText:        planText,
-		RawMetadata:        restoreSANMetadata(priv, anonMetadata),
-		RawHistory:         retainRawHistory(existingHistory, anonHistory),
-		RawSummary:         anonSummary,
+		Capability:          capKind,
+		EngineProfile:       profile.String(),
+		OutputLocale:        in.OutputLocale,
+		AnonymizedPrompt:    anonPrompt,
+		AnonymizedInputSQL:  anonInputSQL,
+		AnonymizedPlanText:  anonPlan,
+		AnonymizedMetadata:  anonMetadata,
+		AnonymizedKnowledge: anonKnowledge,
+		AnonymizedHistory:   anonHistory,
+		AnonymizedSummary:   anonSummary,
+		BoundPlaceholders:   boundPhs,
+		PlatformKnowledge:   help.RetrieveRelevantArticles(actor, content, "", 2),
+		Actor:               actor,
+		RawPrompt:           content,
+		RawInputSQL:         inputSQL,
+		RawPlanText:         planText,
+		RawMetadata:         restoreSANMetadata(priv, anonMetadata),
+		RawKnowledge:        rawKnowledge,
+		RawHistory:          retainRawHistory(existingHistory, anonHistory),
+		RawSummary:          anonSummary,
 	}
 
 	// 8–9. Zero-leak outbound check, daily AI budget reservation, synthesis execution, settlement, and token restoration.
@@ -1034,11 +445,18 @@ func (s *Services) SendMessage(ctx context.Context, actor domain.Actor, in SendM
 		)
 		if synthOut.UsedSANProfile {
 			rawScope := buildAssistantRawSQLScope(runCtx, s.Authorizer, dsTarget, schemaName, synthIn.RawMetadata)
-			restored, rerr = privacy.ValidateRawAssistantSQL(synthOut.AnonymizedSQL, profile, rawScope)
+			restored, rerr = privacy.ValidateRawAssistantSQL(synthOut.AnonymizedSQL, profile, rawScope, in.OutputLocale)
 		} else {
-			restored, rerr = privacy.ValidateAndRestoreSQL(priv, synthOut.AnonymizedSQL, profile)
+			restored, rerr = privacy.ValidateAndRestoreSQL(priv, synthOut.AnonymizedSQL, profile, in.OutputLocale)
 		}
 		if rerr != nil {
+			zap.L().Warn("assistant_sql_restoration_rejected",
+				zap.String("session_id", sess.ID),
+				zap.String("capability", string(capKind)),
+				zap.String("engine", dsTarget.Engine),
+				zap.Bool("used_san_profile", synthOut.UsedSANProfile),
+				zap.String("reason", sanitizeRestorationLogReason(rerr)),
+			)
 			return nil, rerr
 		}
 		// If the restored statement is DML/DDL, double-check that the user holds a change_review grant.
@@ -1088,96 +506,22 @@ func (s *Services) SendMessage(ctx context.Context, actor domain.Actor, in SendM
 		draftSpec, compactedNow, assistantMsgID)
 }
 
-type executedSynthesizeTurn struct {
-	Out           *SynthesizeOutput
-	RestoredReply string
-	NextTitle     string
-}
-
-// executeSynthesizeTurn runs the shared outbound zero-leak check, daily AI budget reserve/settle/release,
-// stream delta handling, out-of-scope gate, and session-local token restoration for all SendMessage branches.
-func (s *Services) executeSynthesizeTurn(
-	runCtx context.Context,
-	priv *privacy.TurnPrivacySession,
-	in SendMessageInput,
-	assistantMsgID string,
-	capKind domain.Capability,
-	userContent string,
-	currentTitle string,
-	synthIn *SynthesizeInput,
-	fallbackEmptyReply string,
-) (*executedSynthesizeTurn, error) {
-	if err := scrubAndAssertSynthesizeInput(priv, synthIn); err != nil {
-		return nil, err
+// sanitizeRestorationLogReason extracts the fixed failure category from a 6004 domain error
+// while stripping any suffix after ":" so raw SQL, literals, or identifiers never reach logs.
+func sanitizeRestorationLogReason(err error) string {
+	var de *domain.Error
+	if !errors.As(err, &de) || de.Meta == nil {
+		return "unknown"
 	}
-	outboundBytes, err := json.Marshal(synthIn)
-	if err != nil {
-		return nil, domain.ErrAnonymizationFailed("marshal_synthesize_input_failed")
+	raw, _ := de.Meta["reason"].(string)
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return "unknown"
 	}
-	in.emit("tool", map[string]any{"tool": "privacy_session.anonymize_and_gate", "status": "completed", "capability": string(capKind)})
-	reservedMinor, budgetDay, budgetCurrency, budgetSettings, err := s.reserveDailyBudgetWithSettings(runCtx, int64(len(outboundBytes))/3+256)
-	if err != nil {
-		return nil, err
+	if idx := strings.IndexByte(raw, ':'); idx > 0 {
+		return raw[:idx]
 	}
-	in.emit("reasoning", map[string]any{"status": "running"})
-	onDelta, onSANDelta, flushDelta := makeTurnDeltaHandlers(priv, in.emit)
-	synthIn.OnDelta = onDelta
-	synthIn.OnSANDelta = onSANDelta
-	synthOut, err := s.Synthesizer.Synthesize(runCtx, *synthIn)
-	if err != nil {
-		s.releaseDailyBudget(context.WithoutCancel(runCtx), budgetDay, budgetCurrency, reservedMinor)
-		if errors.Is(err, context.Canceled) {
-			return nil, domain.ErrInvalidState("Generation request cancelled")
-		}
-		var ade *domain.Error
-		if errors.As(err, &ade) {
-			return nil, ade
-		}
-		return nil, domain.ErrProviderFailed(err.Error())
-	}
-	if bserr := s.settleDailyBudget(runCtx, assistantMsgID, budgetDay, budgetCurrency, reservedMinor, budgetSettings, synthOut); bserr != nil {
-		return nil, bserr
-	}
-	if synthOut.OutOfScope || synthOut.ResolvedCapability == string(domain.CapabilityOutOfScope) {
-		msg := strings.TrimSpace(synthOut.AssistantReply)
-		if msg == "" {
-			msg = "The Database AI Assistant only supports Platform Usage Help, Natural Language SQL Generation, and SQL Analysis & Optimization; non-database requests are out of scope"
-		}
-		return nil, domain.ErrOutOfScope(msg)
-	}
-	in.emit("reasoning", map[string]any{"status": "completed"})
-	reply := synthOut.AssistantReply
-	rawTitle := synthOut.SessionTitle
-	if !synthOut.UsedSANProfile {
-		reply = priv.RestoreTextTokens(reply)
-		rawTitle = priv.RestoreTextTokens(rawTitle)
-	}
-	if fallbackEmptyReply != "" {
-		if trimmed := strings.TrimSpace(reply); trimmed != "" {
-			reply = trimmed
-		} else {
-			reply = fallbackEmptyReply
-		}
-	}
-	nextTitle := summarizeLatestSessionTitle(rawTitle, userContent, currentTitle, in.OutputLocale)
-	flushDelta(reply)
-	in.emit("progress", map[string]any{"phase": "validating_and_restoring"})
-	return &executedSynthesizeTurn{
-		Out:           synthOut,
-		RestoredReply: reply,
-		NextTitle:     nextTitle,
-	}, nil
-}
-
-type newDraftSpec struct {
-	DatasourceID   string
-	DatasourceName string
-	FlowID         *string
-	Engine         string
-	SchemaName     string
-	StatementKind  string
-	RiskCategory   string
-	Payload        persistedDraftPayload
+	return raw
 }
 
 func scrubAndAssertSynthesizeInput(priv *privacy.TurnPrivacySession, in *SynthesizeInput) error {
@@ -1226,6 +570,16 @@ func scrubAndAssertSynthesizeInput(priv *privacy.TurnPrivacySession, in *Synthes
 		}
 		for _, idx := range m.Indexes {
 			if err := priv.AssertZeroLeak(idx.IndexToken); err != nil {
+				return err
+			}
+		}
+	}
+	for _, item := range in.AnonymizedKnowledge {
+		for _, field := range []string{item.Name, item.Text} {
+			if field == "" {
+				continue
+			}
+			if err := priv.AssertZeroLeak(field); err != nil {
 				return err
 			}
 		}
@@ -1421,526 +775,4 @@ func (s *Services) persistTurnOutcome(
 		SQLDraft:         draftViewPt,
 		ContextCompacted: compactedNow,
 	}, nil
-}
-
-// ---- Helper & encryption methods ----
-
-func (s *Services) acquireActiveStream(parent context.Context, userID, sessionID, messageID string) (context.Context, context.CancelFunc, bool) {
-	s.streamMu.Lock()
-	defer s.streamMu.Unlock()
-	if _, busy := s.activeStreams[userID]; busy {
-		return nil, nil, false
-	}
-	runCtx, cancel := context.WithCancel(parent)
-	s.activeStreams[userID] = &activeStreamEntry{
-		sessionID: sessionID,
-		messageID: messageID,
-		cancel:    cancel,
-	}
-	return runCtx, cancel, true
-}
-
-func (s *Services) releaseActiveStream(userID, messageID string, cancel context.CancelFunc) {
-	if cancel != nil {
-		cancel()
-	}
-	s.streamMu.Lock()
-	defer s.streamMu.Unlock()
-	if cur, ok := s.activeStreams[userID]; ok && cur.messageID == messageID {
-		delete(s.activeStreams, userID)
-	}
-}
-
-func (s *Services) cancelActiveStreamForSession(userID, sessionID string) {
-	s.streamMu.Lock()
-	defer s.streamMu.Unlock()
-	if cur, ok := s.activeStreams[userID]; ok && cur.sessionID == sessionID {
-		cur.cancel()
-		delete(s.activeStreams, userID)
-	}
-}
-
-func (s *Services) loadOwnedSession(ctx context.Context, db *gorm.DB, userID, sessionID string) (*persistence.AIAssistantSessionModel, error) {
-	var row persistence.AIAssistantSessionModel
-	if err := db.WithContext(ctx).Where("id = ?", sessionID).First(&row).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, domain.ErrNotFound()
-		}
-		return nil, err
-	}
-	if row.UserID != userID || row.State != string(domain.SessionStateActive) || !row.ExpiresAt.After(time.Now().UTC()) {
-		return nil, domain.ErrNotFound()
-	}
-	return &row, nil
-}
-
-func (s *Services) loadOwnedDraft(
-	ctx context.Context,
-	db *gorm.DB,
-	userID, sessionID, draftID string,
-) (*persistence.AIAssistantSQLDraftModel, persistedDraftPayload, error) {
-	var row persistence.AIAssistantSQLDraftModel
-	if err := db.WithContext(ctx).
-		Where("id = ? and session_id = ? and user_id = ?", draftID, sessionID, userID).
-		First(&row).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, persistedDraftPayload{}, domain.ErrNotFound()
-		}
-		return nil, persistedDraftPayload{}, err
-	}
-	payload, err := s.openDraftPayload(&row)
-	if err != nil {
-		return nil, persistedDraftPayload{}, err
-	}
-	return &row, payload, nil
-}
-
-func (s *Services) loadSessionMessagesForContext(ctx context.Context, userID, sessionID string) ([]domain.MessageView, error) {
-	var rows []persistence.AIAssistantMessageModel
-	if err := s.DB.WithContext(ctx).
-		Where("session_id = ? and user_id = ?", sessionID, userID).
-		Order("sequence asc").
-		Find(&rows).Error; err != nil {
-		return nil, err
-	}
-	out := make([]domain.MessageView, 0, len(rows))
-	for i := range rows {
-		mp, err := s.openMessagePayload(&rows[i])
-		if err != nil {
-			continue
-		}
-		out = append(out, s.messageView(&rows[i], mp, nil))
-	}
-	return out, nil
-}
-
-func (s *Services) loadDatasourceNames(ctx context.Context, drafts []persistence.AIAssistantSQLDraftModel) map[string]string {
-	out := make(map[string]string)
-	if len(drafts) == 0 {
-		return out
-	}
-	ids := make([]string, 0, len(drafts))
-	seen := make(map[string]bool)
-	for _, d := range drafts {
-		if d.DatasourceID != "" && !seen[d.DatasourceID] {
-			seen[d.DatasourceID] = true
-			ids = append(ids, d.DatasourceID)
-		}
-	}
-	var rows []struct {
-		ID   string `gorm:"column:id"`
-		Name string `gorm:"column:name"`
-	}
-	_ = s.DB.WithContext(ctx).Raw(`select id::text as id, name from datasources where id in ?`, ids).Scan(&rows).Error
-	for _, r := range rows {
-		out[r.ID] = r.Name
-	}
-	return out
-}
-
-func (s *Services) sealSessionTitle(sessionID, title string) (crypto.Envelope, error) {
-	return s.Crypter.Seal(crypto.PurposePayload, []byte(title), crypto.AAD{
-		DeploymentID: s.Crypter.DeploymentID(),
-		Table:        "ai_assistant_sessions",
-		PrimaryKey:   sessionID,
-		Column:       "title",
-		Purpose:      crypto.PurposePayload,
-	})
-}
-
-func (s *Services) openSessionTitle(row *persistence.AIAssistantSessionModel) (string, error) {
-	plain, err := s.Crypter.Open(crypto.PurposePayload, crypto.Envelope{
-		Ciphertext: row.TitleCiphertext,
-		Nonce:      row.TitleNonce,
-		KeyID:      row.TitleKeyID,
-		Algorithm:  row.TitleAlgorithm,
-	}, crypto.AAD{
-		DeploymentID: s.Crypter.DeploymentID(),
-		Table:        "ai_assistant_sessions",
-		PrimaryKey:   row.ID,
-		Column:       "title",
-		Purpose:      crypto.PurposePayload,
-	})
-	if err != nil {
-		return "", err
-	}
-	return string(plain), nil
-}
-
-func (s *Services) sealMessagePayload(messageID string, payload persistedMessagePayload) (crypto.Envelope, error) {
-	raw, err := json.Marshal(payload)
-	if err != nil {
-		return crypto.Envelope{}, err
-	}
-	return s.Crypter.Seal(crypto.PurposePayload, raw, crypto.AAD{
-		DeploymentID: s.Crypter.DeploymentID(),
-		Table:        "ai_assistant_messages",
-		PrimaryKey:   messageID,
-		Column:       "content",
-		Purpose:      crypto.PurposePayload,
-	})
-}
-
-func (s *Services) openMessagePayload(row *persistence.AIAssistantMessageModel) (persistedMessagePayload, error) {
-	plain, err := s.Crypter.Open(crypto.PurposePayload, crypto.Envelope{
-		Ciphertext: row.ContentCiphertext,
-		Nonce:      row.ContentNonce,
-		KeyID:      row.ContentKeyID,
-		Algorithm:  row.ContentAlgorithm,
-	}, crypto.AAD{
-		DeploymentID: s.Crypter.DeploymentID(),
-		Table:        "ai_assistant_messages",
-		PrimaryKey:   row.ID,
-		Column:       "content",
-		Purpose:      crypto.PurposePayload,
-	})
-	if err != nil {
-		return persistedMessagePayload{}, err
-	}
-	var out persistedMessagePayload
-	if err := json.Unmarshal(plain, &out); err != nil {
-		return persistedMessagePayload{Content: UnwrapAssistantReplyJSON(string(plain))}, nil
-	}
-	out.Content = UnwrapAssistantReplyJSON(out.Content)
-	return out, nil
-}
-
-func (s *Services) sealDraftPayload(draftID string, payload persistedDraftPayload) (crypto.Envelope, error) {
-	raw, err := json.Marshal(payload)
-	if err != nil {
-		return crypto.Envelope{}, err
-	}
-	return s.Crypter.Seal(crypto.PurposePayload, raw, crypto.AAD{
-		DeploymentID: s.Crypter.DeploymentID(),
-		Table:        "ai_assistant_sql_drafts",
-		PrimaryKey:   draftID,
-		Column:       "sql",
-		Purpose:      crypto.PurposePayload,
-	})
-}
-
-func (s *Services) openDraftPayload(row *persistence.AIAssistantSQLDraftModel) (persistedDraftPayload, error) {
-	plain, err := s.Crypter.Open(crypto.PurposePayload, crypto.Envelope{
-		Ciphertext: row.SQLCiphertext,
-		Nonce:      row.SQLNonce,
-		KeyID:      row.SQLKeyID,
-		Algorithm:  row.SQLAlgorithm,
-	}, crypto.AAD{
-		DeploymentID: s.Crypter.DeploymentID(),
-		Table:        "ai_assistant_sql_drafts",
-		PrimaryKey:   row.ID,
-		Column:       "sql",
-		Purpose:      crypto.PurposePayload,
-	})
-	if err != nil {
-		return persistedDraftPayload{}, err
-	}
-	var out persistedDraftPayload
-	if err := json.Unmarshal(plain, &out); err != nil || out.SQLText == "" {
-		return persistedDraftPayload{SQLText: string(plain)}, nil
-	}
-	return out, nil
-}
-
-func (s *Services) openSummaryContent(row *persistence.AIAssistantContextSummaryModel) (string, error) {
-	plain, err := s.Crypter.Open(crypto.PurposePayload, crypto.Envelope{
-		Ciphertext: row.SummaryCiphertext,
-		Nonce:      row.SummaryNonce,
-		KeyID:      row.SummaryKeyID,
-		Algorithm:  row.SummaryAlgorithm,
-	}, crypto.AAD{
-		DeploymentID: s.Crypter.DeploymentID(),
-		Table:        "ai_assistant_context_summaries",
-		PrimaryKey:   row.ID,
-		Column:       "summary",
-		Purpose:      crypto.PurposePayload,
-	})
-	if err != nil {
-		return "", err
-	}
-	return string(plain), nil
-}
-
-func (s *Services) computeSQLHMAC(sqlText string) ([]byte, string, error) {
-	keyID, err := s.Crypter.HMACKeyID("sql_fingerprint")
-	if err != nil {
-		return nil, "", err
-	}
-	mac, err := s.Crypter.HMAC("sql_fingerprint", []byte(sqlText))
-	if err != nil {
-		return nil, "", err
-	}
-	return mac, keyID, nil
-}
-
-func (s *Services) reserveDailyBudget(ctx context.Context, estTokens int64) (int64, string, string, error) {
-	amt, day, cur, _, err := s.reserveDailyBudgetWithSettings(ctx, estTokens)
-	return amt, day, cur, err
-}
-
-func (s *Services) reserveDailyBudgetWithSettings(ctx context.Context, estTokens int64) (int64, string, string, application.BudgetSettings, error) {
-	if s.Review == nil {
-		return 0, "", "", application.BudgetSettings{}, nil
-	}
-	settings, err := s.Review.LoadBudgetSettings(ctx, s.DB)
-	if err != nil {
-		return 0, "", "", settings, err
-	}
-	if !settings.Enforced {
-		return 0, "", "", settings, nil
-	}
-	amountMinor := int64(1)
-	if settings.InputPricePerMillionMinor > 0 {
-		calc := (estTokens * settings.InputPricePerMillionMinor) / 1_000_000
-		if calc > amountMinor {
-			amountMinor = calc
-		}
-	}
-	day := s.Review.BudgetDay(time.Now())
-	if err := s.Review.Reserve(ctx, s.DB, day, settings.Currency, settings, amountMinor); err != nil {
-		if errors.Is(err, application.ErrBudgetExhausted) {
-			return 0, "", "", settings, domain.ErrBudgetExhausted()
-		}
-		return 0, "", "", settings, err
-	}
-	return amountMinor, day, settings.Currency, settings, nil
-}
-
-func (s *Services) settleDailyBudget(
-	ctx context.Context,
-	turnID string,
-	day string,
-	currency string,
-	reservedMinor int64,
-	settings application.BudgetSettings,
-	out *SynthesizeOutput,
-) error {
-	if s.Review == nil || !settings.Enforced || reservedMinor <= 0 || day == "" {
-		return nil
-	}
-	var inTokens, outTokens int64
-	providerID := uuid.Nil.String()
-	modelName := "assistant"
-	if out != nil {
-		inTokens = out.InputTokens
-		outTokens = out.OutputTokens
-		if parsed, err := uuid.Parse(strings.TrimSpace(out.ProviderID)); err == nil {
-			providerID = parsed.String()
-		}
-		if strings.TrimSpace(out.ModelName) != "" {
-			modelName = strings.TrimSpace(out.ModelName)
-		}
-	}
-	actualMinor := application.TokenBasedAmount(
-		inTokens, outTokens,
-		settings.InputPricePerMillionMinor, settings.OutputPricePerMillionMinor,
-		reservedMinor,
-	)
-	settleCtx := context.WithoutCancel(ctx)
-	if err := s.DB.WithContext(settleCtx).Transaction(func(tx *gorm.DB) error {
-		if err := s.Review.Settle(
-			settleCtx, tx, turnID, providerID, modelName,
-			1, inTokens, outTokens, actualMinor, currency, day, "succeeded",
-		); err != nil {
-			return err
-		}
-		if rem := reservedMinor - actualMinor; rem > 0 {
-			return s.Review.Release(settleCtx, tx, day, currency, rem)
-		}
-		return nil
-	}); err != nil {
-		_ = s.Review.Release(settleCtx, s.DB, day, currency, reservedMinor)
-		return err
-	}
-	return nil
-}
-
-func (s *Services) releaseDailyBudget(ctx context.Context, day, currency string, amountMinor int64) {
-	if s.Review == nil || amountMinor <= 0 || day == "" {
-		return
-	}
-	_ = s.Review.Release(ctx, s.DB, day, currency, amountMinor)
-}
-
-func (s *Services) sessionView(row *persistence.AIAssistantSessionModel, title string) domain.SessionView {
-	return domain.SessionView{
-		ID:                  row.ID,
-		UserID:              row.UserID,
-		Title:               title,
-		State:               row.State,
-		ActiveDatasourceID:  row.ActiveDatasourceID,
-		ActiveFlowID:        row.ActiveFlowID,
-		ActiveSchemaName:    row.ActiveSchemaName,
-		SelectedDraftID:     row.SelectedDraftID,
-		CompactedThroughSeq: row.CompactedThroughSeq,
-		ExpiresAt:           row.ExpiresAt.UTC().Format(timeFormatRFC3339),
-		Version:             row.Version,
-		CreatedAt:           row.CreatedAt.UTC().Format(timeFormatRFC3339),
-		UpdatedAt:           row.UpdatedAt.UTC().Format(timeFormatRFC3339),
-	}
-}
-
-func (s *Services) messageView(
-	row *persistence.AIAssistantMessageModel,
-	mp persistedMessagePayload,
-	draft *domain.SQLDraftView,
-) domain.MessageView {
-	citations := mp.Citations
-	if citations == nil {
-		citations = []domain.CitationView{}
-	}
-	return domain.MessageView{
-		ID:          row.ID,
-		SessionID:   row.SessionID,
-		Sequence:    row.Sequence,
-		Role:        row.Role,
-		Capability:  row.Capability,
-		State:       row.State,
-		Content:     mp.Content,
-		Citations:   citations,
-		SQLDraft:    draft,
-		FailureCode: row.FailureCode,
-		CreatedAt:   row.CreatedAt.UTC().Format(timeFormatRFC3339),
-	}
-}
-
-func (s *Services) draftView(
-	row *persistence.AIAssistantSQLDraftModel,
-	dp persistedDraftPayload,
-	dsName *string,
-) domain.SQLDraftView {
-	return domain.SQLDraftView{
-		ID:                      row.ID,
-		SessionID:               row.SessionID,
-		MessageID:               row.MessageID,
-		Revision:                row.Revision,
-		DatasourceID:            row.DatasourceID,
-		DatasourceName:          dsName,
-		FlowID:                  row.FlowID,
-		Engine:                  row.Engine,
-		SchemaName:              row.SchemaName,
-		StatementKind:           row.StatementKind,
-		RiskCategory:            row.RiskCategory,
-		SQLText:                 dp.SQLText,
-		SQLHMAC:                 hex.EncodeToString(row.SQLHMAC),
-		Assumptions:             ensureStringSlice(dp.Assumptions),
-		NextSteps:               ensureStringSlice(dp.NextSteps),
-		SemanticWarnings:        ensureStringSlice(dp.SemanticWarnings),
-		ReferencedTables:        ensureStringSlice(dp.ReferencedTables),
-		SubmissionState:         row.SubmissionState,
-		EphemeralRunID:          row.EphemeralRunID,
-		SubmittedOrderID:        row.SubmittedOrderID,
-		SubmittedOrderDisplayNo: row.SubmittedOrderDisplayNo,
-		Version:                 row.Version,
-		CreatedAt:               row.CreatedAt.UTC().Format(timeFormatRFC3339),
-		UpdatedAt:               row.UpdatedAt.UTC().Format(timeFormatRFC3339),
-	}
-}
-
-var enChangeActionKeywords = []string{
-	"insert", "update", "delete", "create", "alter", "drop", "truncate",
-}
-
-func requiresChangeFlowPermission(capKind domain.Capability, prompt, inputSQL string) bool {
-	combined := strings.ToLower(prompt + " " + inputSQL)
-	for _, kw := range enChangeActionKeywords {
-		if strings.Contains(combined, kw) {
-			return true
-		}
-	}
-	for _, kw := range zhChangeActionKeywords {
-		if strings.Contains(combined, kw) {
-			return true
-		}
-	}
-	return false
-}
-
-func collectTargetTables(explicitTable, inputSQL, prompt string, profile fingerprint.Profile) []string {
-	seen := make(map[string]bool)
-	var out []string
-	add := func(t string) {
-		clean := strings.Trim(strings.TrimSpace(t), "`\"'")
-		if clean == "" {
-			return
-		}
-		low := strings.ToLower(clean)
-		if !seen[low] {
-			seen[low] = true
-			out = append(out, clean)
-		}
-	}
-	if explicitTable != "" {
-		add(explicitTable)
-	}
-	if inputSQL != "" {
-		for _, t := range ExtractTablesFromSQL(inputSQL, profile) {
-			add(t)
-		}
-	}
-	if prompt != "" {
-		for _, t := range ExtractTablesFromSQL(prompt, profile) {
-			add(t)
-		}
-	}
-	return out
-}
-
-var (
-	boundPhTokenRe       = regexp.MustCompile(`(?i):val_(?:str|int|num|bool|ts|uuid|json|hex)_[0-9]+`)
-	forbiddenStmtScopeRe = regexp.MustCompile(`(?i)\b(?:truncate\s+table|truncate\b|drop\s+database\b|drop\s+schema\b|grant\s+|revoke\s+)`)
-)
-
-func containsForbiddenStatementScope(content, inputSQL string) bool {
-	return forbiddenStmtScopeRe.MatchString(content) || forbiddenStmtScopeRe.MatchString(inputSQL)
-}
-
-func extractPlaceholdersInOrder(text string) []string {
-	matches := boundPhTokenRe.FindAllString(text, -1)
-	seen := make(map[string]bool)
-	var out []string
-	for _, m := range matches {
-		low := strings.ToLower(m)
-		if !seen[low] {
-			seen[low] = true
-			out = append(out, low)
-		}
-	}
-	return out
-}
-
-func normalizeOptionalString(p *string) *string {
-	if p == nil {
-		return nil
-	}
-	v := strings.TrimSpace(*p)
-	if v == "" {
-		return nil
-	}
-	return &v
-}
-
-func optionalStringPtr(s string) *string {
-	v := strings.TrimSpace(s)
-	if v == "" {
-		return nil
-	}
-	return &v
-}
-
-func firstNonEmptyString(a, b *string) string {
-	if a != nil && strings.TrimSpace(*a) != "" {
-		return strings.TrimSpace(*a)
-	}
-	if b != nil && strings.TrimSpace(*b) != "" {
-		return strings.TrimSpace(*b)
-	}
-	return ""
-}
-
-func ensureStringSlice(in []string) []string {
-	if in == nil {
-		return []string{}
-	}
-	return in
 }

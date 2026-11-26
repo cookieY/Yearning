@@ -13,17 +13,16 @@ import {
   recordOrderSqlCopy,
   revealOrderSql,
 } from "@/api/generated/client/change-orders/change-orders";
-import { ifMatchHeader, unwrapApi } from "@/shared/api/mutator";
+import { useIdempotentMutation } from "@/shared/api/idempotency";
+import { idempotencyKeyHeader, ifMatchIdempotencyHeader, unwrapApi } from "@/shared/api/mutator";
 import {
   matchesEntitySubject,
   subscribeSseEvent,
   useSseEvent,
 } from "@/shared/events/sse-event-bus";
 import { useSession } from "@/features/auth/session-provider";
-import { holdsSessionSlot } from "@/shared/dev/mock-super";
 import { stageApprovalSteps } from "@/features/orders/approval-steps";
 import { fetchAllCursorPages, type CursorPage } from "@/shared/lib/fetch-all-cursor-pages";
-import { randomUUID } from "@/shared/lib/uuid";
 
 /**
  * Server-state hooks for the approval workspace (frontend PRD F7). The
@@ -60,7 +59,7 @@ export function useApprovalQueue(enabled: boolean) {
       if (me === undefined) return [];
       return page.items.filter((order) =>
         order.stages.some((stage) =>
-          stageApprovalSteps(stage).some((step) => step.actors.some((actor) => holdsSessionSlot(actor.id, me))),
+          stageApprovalSteps(stage).some((step) => step.actors.some((actor) => actor.id === me)),
         ),
       );
     },
@@ -94,18 +93,16 @@ export interface ApprovalDecisionInput {
 
 export function useApprovalDecision(order: ChangeOrder | null) {
   const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: (input: ApprovalDecisionInput) =>
+  return useIdempotentMutation("order-decision", {
+    mutationFn: (input: ApprovalDecisionInput, idempotencyKey) =>
       unwrapApi(
         decideChangeOrder(
           order?.id as string,
           { decision: input.decision, comment: input.comment },
-          ifMatchHeader(order?.version, {
-            // Both headers are declared required on approval-decisions —
-            // If-Match guards the aggregate version, Idempotency-Key makes the
-            // decision retry-safe (order_decision profile).
-            "Idempotency-Key": `order-decision-${randomUUID()}`,
-          }),
+          // Both headers are declared required on approval-decisions —
+          // If-Match guards the aggregate version, Idempotency-Key makes the
+          // decision retry-safe (order_decision profile).
+          ifMatchIdempotencyHeader(order?.version, idempotencyKey),
         ),
       ),
     onSuccess: () => {
@@ -143,12 +140,12 @@ export function useOrderComments(orderId: string, enabled: boolean) {
 
 export function useCreateOrderComment(orderId: string) {
   const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: (content: string) =>
+  return useIdempotentMutation("order-comment", {
+    mutationFn: (content: string, idempotencyKey) =>
       createChangeOrderComment(
         orderId,
         { content },
-        { headers: { "Idempotency-Key": `order-comment-${randomUUID()}` } },
+        { headers: idempotencyKeyHeader(idempotencyKey) },
       ),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["change-order-comments", orderId] });

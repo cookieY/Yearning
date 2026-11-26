@@ -85,7 +85,7 @@ test("a racing backend rejection keeps the dialog open without faking success", 
   await page.getByTestId("withdraw-order").click();
   await page.getByTestId("order-action-reason").fill("\u754c\u9762\u64a4\u56de\uff08\u5c06\u88ab\u5e76\u53d1\u62a2\u65ad\uff09");
   const raced = await page.evaluate(async (id) => {
-    const response = await fetch(`/change-orders/${id}/withdrawal`, {
+    const response = await fetch(`/api/v4/change-orders/${id}/withdrawal`, {
       method: "POST",
       headers: { "Content-Type": "application/json", "If-Match": '"1"' },
       body: JSON.stringify({ reason: "\u5e76\u53d1\u64a4\u56de\u62a2\u5148\u6210\u529f" }),
@@ -129,7 +129,7 @@ test("the personal order list updates in place without duplicate rows", async ({
   await expect(page.getByTestId("mine-order-row").filter({ hasText: "\u5217\u8868\u53bb\u91cd\u8349\u7a3f" })).toHaveCount(1);
 
   const orderId = await page.evaluate(async () => {
-    const response = await fetch("/change-orders");
+    const response = await fetch("/api/v4/change-orders");
     const body = (await response.json()) as {
       data: { items: Array<{ id: string }> };
     };
@@ -139,7 +139,7 @@ test("the personal order list updates in place without duplicate rows", async ({
   // The server applies the withdrawal; the notification triggers a re-read
   // that updates the row in place (state badge, still exactly one row).
   const withdrawn = await page.evaluate(async (id) => {
-    const response = await fetch(`/change-orders/${id}/withdrawal`, {
+    const response = await fetch(`/api/v4/change-orders/${id}/withdrawal`, {
       method: "POST",
       headers: { "Content-Type": "application/json", "If-Match": '"1"' },
       body: JSON.stringify({ reason: "E2E \u64a4\u56de" }),
@@ -233,11 +233,12 @@ test("server-side filters narrow the personal list without losing event freshnes
   await expect(page.getByTestId("filter-keyword")).toHaveAttribute("aria-expanded", "true");
   const day25Hittable = await page.evaluate(() => {
     const dialogEl = document.querySelector('[data-testid="filter-keyword-menu"]');
-    const cardEl = dialogEl?.closest('[data-slot="card"]');
+    const inputEl = document.querySelector('[data-testid="filter-keyword"]');
+    const cardEl = inputEl?.closest('[data-slot="card"]');
     const day25 = Array.from(dialogEl?.querySelectorAll("button") ?? []).find(
       (btn) => btn.textContent.trim() === "25",
     );
-    if (!dialogEl || !cardEl || !day25) return false;
+    if (!dialogEl || dialogEl.parentElement !== document.body || !cardEl || !day25) return false;
     if (getComputedStyle(cardEl).overflow !== "visible") return false;
     day25.scrollIntoView({ block: "nearest" });
     const rect = day25.getBoundingClientRect();
@@ -254,19 +255,24 @@ test("server-side filters narrow the personal list without losing event freshnes
   // its badge (event re-read under active filter produces no duplicate rows).
   await page.getByTestId("filter-keyword").fill("\u7b5b\u9009\u9a8c\u6536");
   await expect(page.getByTestId("mine-orders-table")).toBeVisible({ timeout: 8_000 });
-  const orderId = await page.evaluate(async () => {
-    const response = await fetch("/change-orders");
-    const body = (await response.json()) as { data: { items: Array<{ id: string }> } };
-    return body.data.items[0]?.id ?? "";
+  const target = await page.evaluate(async () => {
+    const response = await fetch("/api/v4/change-orders");
+    const body = (await response.json()) as {
+      data: { items: Array<{ id: string; version: number }> };
+    };
+    return body.data.items[0] ?? null;
   });
-  const withdrawn = await page.evaluate(async (id) => {
-    const response = await fetch(`/change-orders/${id}/withdrawal`, {
+  if (target === null) {
+    throw new Error("Expected seeded order target");
+  }
+  const withdrawn = await page.evaluate(async (order) => {
+    const response = await fetch(`/api/v4/change-orders/${order.id}/withdrawal`, {
       method: "POST",
-      headers: { "Content-Type": "application/json", "If-Match": '"1"' },
+      headers: { "Content-Type": "application/json", "If-Match": `"${String(order.version)}"` },
       body: JSON.stringify({ reason: "\u7b5b\u9009\u6001\u64a4\u56de" }),
     });
     return (await response.json()) as { err_code: number };
-  }, orderId);
+  }, target);
   expect(withdrawn.err_code).toBe(0);
   await expect(page.getByTestId("mine-orders-table")).toContainText("\u5df2\u64a4\u56de", {
     timeout: 8_000,

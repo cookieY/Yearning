@@ -21,6 +21,15 @@ const DemoBanner =
       )
     : null;
 
+const DevViewAsToolbar =
+  import.meta.env.DEV && import.meta.env.MODE !== "test"
+    ? lazy(() =>
+        import("@/app/shell/dev-view-as-toolbar").then((module) => ({
+          default: module.DevViewAsToolbar,
+        })),
+      )
+    : null;
+
 /**
  * Logged-in shell, independently written against the frozen template's
  * FullLayout structure: inset sidebar, sticky header, centered content
@@ -45,6 +54,11 @@ export function FullLayout() {
           floating canvas (8px margin, rounded corners, hairline outline) is
           gone, so the header bar and the sidebar meet the page edges. */}
       <SidebarInset className="bg-background h-svh overflow-hidden md:peer-data-[variant=inset]:m-0!">
+        {DevViewAsToolbar !== null ? (
+          <Suspense fallback={null}>
+            <DevViewAsToolbar />
+          </Suspense>
+        ) : null}
         {DemoBanner !== null ? (
           <Suspense fallback={null}>
             <DemoBanner />

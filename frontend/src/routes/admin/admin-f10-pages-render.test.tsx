@@ -4,7 +4,9 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter, Route, Routes } from "react-router";
 import { HttpResponse, http } from "msw";
 import { beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { apiRoute } from "@/shared/mock/api-route";
 import { server } from "@/test/msw/server";
+import { SESSION_USER_ID, stubSession } from "@/test/session";
 import { ADMIN_FIXTURE_CHANNEL_EMAIL_ID, resetAdminFixture } from "@/shared/mock/admin-fixture";
 import { openRowActions } from "@/test/row-actions";
 import { resetQueryFixture, seedQueryScenario } from "@/shared/mock/query-fixture";
@@ -25,31 +27,6 @@ import { QueryOrdersTab } from "@/routes/changes/query-orders-tab";
  * five-tab layout, the generic settings namespaces, identity providers,
  * notification channels, the workspace dashboard and the query-orders tab.
  */
-
-const SESSION_USER_ID = "0198d9cc-e65d-7b9d-a8aa-3c81945f99ac";
-
-function stubSession(admin: boolean): void {
-  server.use(
-    http.get("*/users/me", () =>
-      HttpResponse.json({
-        err_code: 0,
-        message: "ok",
-        data: {
-          id: SESSION_USER_ID,
-          username: "henry",
-          display_name: "henry",
-          email: null,
-          is_builtin_admin: admin,
-          version: 1,
-          created_at: "2026-08-28T08:00:00Z",
-          updated_at: "2026-08-28T08:00:00Z",
-          can_access_admin: admin,
-        },
-        request_id: SESSION_USER_ID,
-      }),
-    ),
-  );
-}
 
 function renderPage(ui: React.ReactElement): void {
   const client = new QueryClient({
@@ -270,7 +247,7 @@ describe("AI budget usage ring (2026-10-31 round 3)", () => {
     stubSession(true);
     let savedSettings: Record<string, unknown> | null = null;
     server.use(
-      http.put("*/admin/settings/ai-budget", async ({ request }) => {
+      http.put(apiRoute("/admin/settings/:namespace"), async ({ request }) => {
         const body = (await request.json()) as { settings: Record<string, unknown> };
         savedSettings = body.settings;
         return HttpResponse.json({
@@ -343,11 +320,48 @@ describe("notification channels page", () => {
 
   it("shows the test-delivery outcome on the channel row (async task poll)", async () => {
     stubSession(true);
+    let submittedBody: unknown = null;
+    server.use(
+      http.post(apiRoute("/admin/notification-channels/:channelId/test-deliveries"), async ({ request }) => {
+        submittedBody = await request.json().catch(() => null);
+        return HttpResponse.json({
+          err_code: 0,
+          message: "ok",
+          data: { task_id: "0198da00-0000-7000-8000-000000000099", channel_id: ADMIN_FIXTURE_CHANNEL_EMAIL_ID },
+          request_id: "notif-test-1",
+        });
+      }),
+      http.get(apiRoute("/tasks/:taskId"), () =>
+        HttpResponse.json({
+          err_code: 0,
+          message: "ok",
+          data: {
+            id: "0198da00-0000-7000-8000-000000000099",
+            kind: "notification_test_delivery",
+            state: "succeeded",
+            aggregate_type: "notification_channel",
+            aggregate_id: ADMIN_FIXTURE_CHANNEL_EMAIL_ID,
+            progress_completed: 1,
+            progress_total: 1,
+            progress_unit: "deliveries",
+            created_at: "2026-11-26T00:00:00Z",
+            updated_at: "2026-11-26T00:00:01Z",
+          },
+          request_id: "notif-task-1",
+        }),
+      ),
+    );
     renderNotificationsPage();
     await screen.findByTestId("admin-notifications-table");
     await openRowActions(`admin-channel-actions-${ADMIN_FIXTURE_CHANNEL_EMAIL_ID}`);
     await userEvent.click(screen.getByTestId(`admin-channel-test-${ADMIN_FIXTURE_CHANNEL_EMAIL_ID}`));
-    // An in-progress placeholder appears upon acceptance; the fixture task reaches terminal success in ~900ms.
+
+    const dialog = await screen.findByTestId("channel-test-email-dialog");
+    const recipientInput = within(dialog).getByTestId("channel-test-recipient");
+    await userEvent.clear(recipientInput);
+    await userEvent.type(recipientInput, "qa-inbox@example.com");
+    await userEvent.click(within(dialog).getByTestId("channel-test-submit"));
+
     const result = await screen.findByTestId(
       `admin-channel-test-result-${ADMIN_FIXTURE_CHANNEL_EMAIL_ID}`,
       {},
@@ -357,6 +371,45 @@ describe("notification channels page", () => {
       () => { expect(result.textContent).toContain("\u6d4b\u8bd5\u6295\u9012\u6210\u529f"); },
       { timeout: 4000 },
     );
+    expect(submittedBody).toEqual({ recipient: "qa-inbox@example.com" });
+  });
+
+  it("surfaces an error instead of spinning indefinitely when test-delivery task polling fails", async () => {
+    stubSession(true);
+    let taskCalls = 0;
+    server.use(
+      http.get(apiRoute("/tasks/:taskId"), () => {
+        taskCalls += 1;
+        return HttpResponse.json({
+          err_code: 1002,
+          message: "task not found",
+          data: null,
+          request_id: "notif-poll-err-1",
+          retryable: false,
+        });
+      }),
+    );
+    renderNotificationsPage();
+    await screen.findByTestId("admin-notifications-table");
+    await openRowActions(`admin-channel-actions-${ADMIN_FIXTURE_CHANNEL_EMAIL_ID}`);
+    await userEvent.click(screen.getByTestId(`admin-channel-test-${ADMIN_FIXTURE_CHANNEL_EMAIL_ID}`));
+
+    const dialog = await screen.findByTestId("channel-test-email-dialog");
+    await userEvent.click(within(dialog).getByTestId("channel-test-submit"));
+
+    const result = await screen.findByTestId(
+      `admin-channel-test-result-${ADMIN_FIXTURE_CHANNEL_EMAIL_ID}`,
+      {},
+      { timeout: 4000 },
+    );
+    await waitFor(
+      () => {
+        expect(result.textContent).toContain("\u8bf7\u6c42\u7684\u5bf9\u8c61\u4e0d\u5b58\u5728");
+      },
+      { timeout: 4000 },
+    );
+    expect(result.querySelector('[data-slot="spinner"]')).toBeNull();
+    expect(taskCalls).toBe(1);
   });
 });
 
@@ -369,6 +422,9 @@ describe("notification rules view (S007)", () => {
     await screen.findByTestId("admin-rules-table");
     const text = screen.getByTestId("admin-rules-table").textContent;
     expect(text).toContain("\u6267\u884c\u5931\u8d25\u901a\u77e5\u63d0\u4ea4\u4eba");
+    expect(text).toContain("\u542f\u7528");
+    expect(text).not.toContain("common.enabled");
+    expect(text).not.toContain("common.disabled");
   });
 
   it("supports filling the default template, inserting allowlisted placeholders, previewing, and saving a custom rule template", async () => {
@@ -461,7 +517,7 @@ describe("workspace home", () => {
   it("renders the zero-permission notice alongside the dashboard, never instead of it (auth PRD §11)", async () => {
     stubSession(false);
     server.use(
-      http.get("*/users/me/flows", () =>
+      http.get(apiRoute("/users/me/flows"), () =>
         HttpResponse.json({
           err_code: 0,
           message: "ok",
@@ -486,7 +542,7 @@ describe("workspace home", () => {
     // rather than claim 0 / 0 done. Regression guard for the round-1 finding
     // that an unresolved query rendered a confident zero with a 0% arc.
     server.use(
-      http.get("*/admin/dashboard/operations", () =>
+      http.get(apiRoute("/admin/dashboard/operations"), () =>
         HttpResponse.json(
           { err_code: 5000, message: "internal error", data: null, request_id: "req-ops-fail" },
           { status: 500 },
@@ -519,7 +575,7 @@ describe("workspace home", () => {
     seedQueryScenario("query-flow");
     stubSession(false);
     server.use(
-      http.get("*/announcements/current", () =>
+      http.get(apiRoute("/announcements/current"), () =>
         HttpResponse.json({ err_code: 0, message: "ok", data: null, request_id: "req-ann-null" }),
       ),
     );

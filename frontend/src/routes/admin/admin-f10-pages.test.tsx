@@ -5,8 +5,14 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter } from "react-router";
 import { HttpResponse, http } from "msw";
 import { beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { apiRoute } from "@/shared/mock/api-route";
 import { server } from "@/test/msw/server";
-import { resetAdminFixture, ADMIN_FIXTURE_USER_BLOCKED_ID } from "@/shared/mock/admin-fixture";
+import { SESSION_USER_ID, stubSession } from "@/test/session";
+import {
+  ADMIN_FIXTURE_USER_BLOCKED_ID,
+  ADMIN_FIXTURE_USER_MEMBER_ID,
+  resetAdminFixture,
+} from "@/shared/mock/admin-fixture";
 import { SessionProvider } from "@/features/auth/session-provider";
 import "@/shared/i18n";
 import AdminUsersPage from "@/routes/admin/admin-users-page";
@@ -23,31 +29,6 @@ import AdminMigrationsPage from "@/routes/migrations/admin-migrations-page";
  * announcements, and the migration workbench's NO-Apply rule with the
  * APPROVE-phrase gating.
  */
-
-const SESSION_USER_ID = "0198d9cc-e65d-7b9d-a8aa-3c81945f99ac";
-
-function stubSession(admin: boolean): void {
-  server.use(
-    http.get("*/users/me", () =>
-      HttpResponse.json({
-        err_code: 0,
-        message: "ok",
-        data: {
-          id: SESSION_USER_ID,
-          username: "henry",
-          display_name: "henry",
-          email: null,
-          is_builtin_admin: admin,
-          version: 1,
-          created_at: "2026-08-28T08:00:00Z",
-          updated_at: "2026-08-28T08:00:00Z",
-          can_access_admin: admin,
-        },
-        request_id: SESSION_USER_ID,
-      }),
-    ),
-  );
-}
 
 function renderPage(ui: React.ReactElement): void {
   const client = new QueryClient({
@@ -133,6 +114,120 @@ describe("gate: user deletion impact preview (P105)", () => {
     expect(headers).not.toContain("\u90e8\u95e8");
     expect(headers).not.toContain("\u5ba1\u8ba1\u4eba");
     expect(screen.getByTestId("admin-users-table").textContent).not.toContain("\u89d2\u8272");
+  });
+
+  it("opens edit profile from username click, validates and resets local user password, and updates version", async () => {
+    const capturedResetBodies: Array<Record<string, unknown>> = [];
+    const capturedPatchIfMatch: Array<string | null> = [];
+    const onRequest = async ({ request }: { request: Request }) => {
+      if (request.method === "POST" && request.url.endsWith(`/admin/users/${ADMIN_FIXTURE_USER_MEMBER_ID}/password`)) {
+        capturedResetBodies.push((await request.clone().json()) as Record<string, unknown>);
+      }
+      if (request.method === "PATCH" && request.url.endsWith(`/admin/users/${ADMIN_FIXTURE_USER_MEMBER_ID}`)) {
+        capturedPatchIfMatch.push(request.headers.get("If-Match"));
+      }
+    };
+    server.events.on("request:start", onRequest);
+
+    try {
+      stubSession(true);
+      renderPage(<AdminUsersPage />);
+      await screen.findByTestId("admin-users-table");
+      await userEvent.click(screen.getByTestId(`admin-user-profile-${ADMIN_FIXTURE_USER_MEMBER_ID}`));
+      await screen.findByTestId("admin-user-edit-dialog");
+
+      const footer = screen.getByTestId("admin-user-edit-footer");
+      const resetBtn = within(footer).getByTestId("user-edit-reset-password-submit");
+      expect(within(footer).getByTestId("user-edit-submit")).toBeVisible();
+      expect(within(screen.getByTestId("user-edit-password-section")).queryByTestId("user-edit-reset-password-submit")).toBeNull();
+      expect(resetBtn).toBeDisabled();
+
+      // Short password shows inline min-length validation warning and keeps button disabled.
+      await userEvent.type(screen.getByTestId("user-edit-new-password"), "short-pw");
+      await userEvent.type(screen.getByTestId("user-edit-confirm-password"), "short-pw");
+      expect(screen.getByTestId("user-edit-new-password")).toHaveAttribute("aria-invalid", "true");
+      expect(await screen.findByTestId("user-edit-password-too-short")).toHaveTextContent("8/12");
+      expect(resetBtn).toBeDisabled();
+
+      // Mismatch shows hint and keeps button disabled; 12+ char clears short warning.
+      await userEvent.clear(screen.getByTestId("user-edit-new-password"));
+      await userEvent.clear(screen.getByTestId("user-edit-confirm-password"));
+      await userEvent.type(screen.getByTestId("user-edit-new-password"), "ResetPassword-123");
+      await userEvent.type(screen.getByTestId("user-edit-confirm-password"), "MismatchPassword-1");
+      expect(screen.queryByTestId("user-edit-password-too-short")).toBeNull();
+      expect(await screen.findByTestId("user-edit-password-mismatch")).toBeVisible();
+      expect(resetBtn).toBeDisabled();
+
+      // Valid matching password enables reset, sends POST, clears inputs, and advances currentVersion.
+      await userEvent.clear(screen.getByTestId("user-edit-confirm-password"));
+      await userEvent.type(screen.getByTestId("user-edit-confirm-password"), "ResetPassword-123");
+      expect(resetBtn).toBeEnabled();
+      await userEvent.click(resetBtn);
+
+      await waitFor(() => {
+        expect(capturedResetBodies).toEqual([{ new_password: "ResetPassword-123" }]);
+        expect(screen.getByTestId("user-edit-new-password")).toHaveValue("");
+        expect(screen.getByTestId("user-edit-confirm-password")).toHaveValue("");
+      });
+
+      // Subsequent profile save uses bumped version=2 without 1004 conflict.
+      await userEvent.clear(screen.getByTestId("user-edit-display"));
+      await userEvent.type(screen.getByTestId("user-edit-display"), "Anne Updated");
+      await userEvent.click(screen.getByTestId("user-edit-submit"));
+      await waitFor(() => {
+        expect(capturedPatchIfMatch).toEqual(['"2"']);
+        expect(screen.queryByTestId("admin-user-edit-dialog")).toBeNull();
+      });
+    } finally {
+      server.events.removeListener("request:start", onRequest);
+    }
+  });
+
+  it("shows protected password notices for builtin admin and external identity users", async () => {
+    stubSession(true);
+    renderPage(<AdminUsersPage />);
+    await screen.findByTestId("admin-users-table");
+
+    await userEvent.click(screen.getByRole("button", { name: "admin" }));
+    await screen.findByTestId("admin-user-edit-dialog");
+    expect(screen.getByTestId("user-edit-password-builtin-hint")).toBeVisible();
+    expect(screen.queryByTestId("user-edit-new-password")).toBeNull();
+    await userEvent.click(screen.getByRole("button", { name: "\u53d6\u6d88" }));
+
+    const externalId = "7a1a3c4d-1111-4111-8111-00000000e199";
+    server.use(
+      http.get(apiRoute("/admin/users"), () =>
+        HttpResponse.json({
+          err_code: 0,
+          message: "ok",
+          data: {
+            items: [
+              {
+                id: externalId,
+                username: "oidc-alice",
+                display_name: "Alice OIDC",
+                email: "alice@example.com",
+                role: "user",
+                auth_provider: "oidc",
+                is_builtin_admin: false,
+                version: 1,
+                created_at: "2026-08-28T08:00:00Z",
+                updated_at: "2026-08-28T08:00:00Z",
+              },
+            ],
+            next_cursor: null,
+          },
+          request_id: SESSION_USER_ID,
+        }),
+      ),
+    );
+
+    // Re-render to observe external identity user.
+    renderPage(<AdminUsersPage />);
+    await userEvent.click(await screen.findByTestId(`admin-user-profile-${externalId}`));
+    await screen.findByTestId("admin-user-edit-dialog");
+    expect(screen.getByTestId("user-edit-password-external-hint")).toBeVisible();
+    expect(screen.queryByTestId("user-edit-new-password")).toBeNull();
   });
 });
 
@@ -318,7 +413,7 @@ describe("gate: dual flow forms match the v4 model (§3)", () => {
 
   it("requires a rule set on change-review flows and warns when no rule sets exist", async () => {
     server.use(
-      http.get("*/admin/rule-sets", () =>
+      http.get(apiRoute("/admin/rule-sets"), () =>
         HttpResponse.json({
           err_code: 0,
           message: "ok",

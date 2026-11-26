@@ -24,6 +24,8 @@ import (
 	"github.com/cookieY/YearningX/backend/internal/execution/domain"
 	"github.com/cookieY/YearningX/backend/internal/execution/persistence"
 	"github.com/cookieY/YearningX/backend/internal/osc"
+	"github.com/cookieY/YearningX/backend/internal/platform/ptr"
+	"github.com/cookieY/YearningX/backend/internal/platform/txutil"
 	"github.com/cookieY/YearningX/backend/internal/tasks"
 )
 
@@ -125,95 +127,74 @@ func (s *Services) Begin(ctx context.Context, in BeginInput) (view *AttemptView,
 	if in.DDLExecutionMode != "" {
 		hashParts = append(hashParts, in.DDLExecutionMode)
 	}
-	reqHash := idemRequestHash(hashParts...)
-	claimed, replay, cerr := s.idemClaim(ctx, in.Actor.UserID, route, in.OrderID, in.IdempotencyKey, reqHash)
-	if cerr != nil {
-		return nil, false, cerr
-	}
-	if !claimed {
-		var v AttemptView
-		if err := json.Unmarshal(replay, &v); err != nil {
-			return nil, false, err
+	reqHash := txutil.RequestHash(hashParts...)
+	return txutil.RunIdempotent(ctx, s.idemStore(), in.Actor.UserID, route, in.OrderID, in.IdempotencyKey, reqHash, func() (*AttemptView, error) {
+		// Expired lease reconciliation commits first in an independent transaction: reconciliation
+		// progression (not_started -> failed / sent -> result_unknown + order transition) must not roll back
+		// with a 1003 in begin (otherwise retriers would be stuck in a reconcile-conflict loop forever).
+		if rerr := s.reconcileExpiredStage(ctx, in.OrderID); rerr != nil {
+			return nil, rerr
 		}
-		return &v, true, nil
-	}
-	// Expired lease reconciliation commits first in an independent transaction: reconciliation
-	// progression (not_started -> failed / sent -> result_unknown + order transition) must not roll back
-	// with a 1003 in begin (otherwise retriers would be stuck in a reconcile-conflict loop forever).
-	// Transient reconciliation failures release the idempotency claim so the same key can retry
-	// (without locking the caller in in_progress for 24 hours).
-	if rerr := s.reconcileExpiredStage(ctx, in.OrderID); rerr != nil {
-		_ = s.idemRelease(ctx, in.Actor.UserID, route, in.OrderID, in.IdempotencyKey)
-		return nil, false, rerr
-	}
-	var out *AttemptView
-	var committedFailure error
-	txErr := s.serializable(ctx, func(tx *gorm.DB) error {
-		committedFailure = nil
-		v, berr := s.beginOnce(ctx, tx, in)
-		if berr != nil {
-			if isPostgresSearchPathFailure(deName(berr)) {
-				if ferr := s.failOrderAfterPostgresSearchPathPreflightTx(
-					ctx, tx, in, deName(berr),
-				); ferr != nil {
-					return ferr
+		var out *AttemptView
+		var committedFailure error
+		txErr := s.serializable(ctx, func(tx *gorm.DB) error {
+			committedFailure = nil
+			v, berr := s.beginOnce(ctx, tx, in)
+			if berr != nil {
+				if isPostgresSearchPathFailure(deName(berr)) {
+					if ferr := s.failOrderAfterPostgresSearchPathPreflightTx(
+						ctx, tx, in, deName(berr),
+					); ferr != nil {
+						return ferr
+					}
+					committedFailure = berr
+					return nil
 				}
-				committedFailure = berr
-				return nil
+				return berr
 			}
-			return berr
-		}
-		out = v
-		return nil
-	})
-	if txErr != nil {
-		_ = s.idemRelease(ctx, in.Actor.UserID, route, in.OrderID, in.IdempotencyKey)
-		var de *domain.Error
-		if errors.As(txErr, &de) {
-			// Previously, preflight failures left no trace (no Attempt, no audit), making diagnosis
-			// impossible for both executors and admins (BUG-006); record an audit event here.
-			if de.Code == domain.CodePreflightFailed {
-				reason := de.Name
-				if i := strings.Index(reason, ":"); i >= 0 {
-					reason = reason[i+1:]
+			out = v
+			return nil
+		})
+		if txErr != nil {
+			var de *domain.Error
+			if errors.As(txErr, &de) {
+				// Previously, preflight failures left no trace (no Attempt, no audit), making diagnosis
+				// impossible for both executors and admins (BUG-006); record an audit event here.
+				if de.Code == domain.CodePreflightFailed {
+					reason := de.Name
+					if i := strings.Index(reason, ":"); i >= 0 {
+						reason = reason[i+1:]
+					}
+					_ = s.Recorder.Audit(ctx, nil, auditlog.AuditInput{
+						EventType: "execution.preflight_failed", ActorKind: "user",
+						ActorID: &in.Actor.UserID, ActorUsername: &in.Actor.Username,
+						ResourceType: "change_order", ResourceID: &in.OrderID,
+						Action: "begin_stage_execution", Outcome: "failed",
+						Metadata: map[string]any{"reason": reason},
+					})
 				}
+			}
+			return nil, txErr
+		}
+		if committedFailure != nil {
+			if de := domainError(committedFailure); de != nil &&
+				de.Code == domain.CodePreflightFailed {
 				_ = s.Recorder.Audit(ctx, nil, auditlog.AuditInput{
 					EventType: "execution.preflight_failed", ActorKind: "user",
 					ActorID: &in.Actor.UserID, ActorUsername: &in.Actor.Username,
 					ResourceType: "change_order", ResourceID: &in.OrderID,
 					Action: "begin_stage_execution", Outcome: "failed",
-					Metadata: map[string]any{"reason": reason},
+					Metadata: map[string]any{
+						"reason": postgresSearchPathFailureReason(de.Name),
+					},
 				})
 			}
+			return nil, committedFailure
 		}
-		return nil, false, txErr
-	}
-	if committedFailure != nil {
-		_ = s.idemRelease(ctx, in.Actor.UserID, route, in.OrderID, in.IdempotencyKey)
-		if de := domainError(committedFailure); de != nil &&
-			de.Code == domain.CodePreflightFailed {
-			_ = s.Recorder.Audit(ctx, nil, auditlog.AuditInput{
-				EventType: "execution.preflight_failed", ActorKind: "user",
-				ActorID: &in.Actor.UserID, ActorUsername: &in.Actor.Username,
-				ResourceType: "change_order", ResourceID: &in.OrderID,
-				Action: "begin_stage_execution", Outcome: "failed",
-				Metadata: map[string]any{
-					"reason": postgresSearchPathFailureReason(de.Name),
-				},
-			})
-		}
-		return nil, false, committedFailure
-	}
-	// Post-commit in-process wakeup so idle stage_execution workers claim immediately without waiting for backoff.
-	tasks.WakeKind(KindStageExecution)
-	raw, merr := json.Marshal(out)
-	if merr != nil {
-		return nil, false, merr
-	}
-	if cerr := s.idemComplete(ctx, in.Actor.UserID, route, in.OrderID, in.IdempotencyKey, raw); cerr != nil {
-		return nil, false, cerr
-	}
-	return out, false, nil
+		// Post-commit in-process wakeup so idle stage_execution workers claim immediately without waiting for backoff.
+		tasks.WakeKind(KindStageExecution)
+		return out, nil
+	})
 }
 
 func deName(err error) string {
@@ -317,6 +298,9 @@ func (s *Services) beginCore(ctx context.Context, tx *gorm.DB, order *orderRow, 
 	if err != nil {
 		return nil, err
 	}
+	if in.DDLExecutionMode == "gh_ost" && !oscCapable(ds) {
+		return nil, domain.ErrPreflightFailed("osc_unsupported_target")
+	}
 	if in.DDLExecutionMode == "online_ddl" && plan.Kind.IsOscKind() {
 		plan.Kind = domain.KindDDL
 	}
@@ -324,7 +308,7 @@ func (s *Services) beginCore(ctx context.Context, tx *gorm.DB, order *orderRow, 
 	if err != nil {
 		return nil, err
 	}
-	schema, err := s.resolveStageSchema(ctx, tx, order.ID, stage, snap, ds)
+	schema, err := s.resolveStageSchema(ctx, tx, order.ID, stage, snap, ds, plan.Statements...)
 	if err != nil {
 		return nil, err
 	}
@@ -355,7 +339,7 @@ func (s *Services) beginCore(ctx context.Context, tx *gorm.DB, order *orderRow, 
 		InitiatedByUserID: in.Actor.UserID, InitiatedByUsername: in.Actor.Username,
 		ExecutionKind: string(plan.Kind), State: string(domain.AttemptRunning),
 		SendBoundary: string(domain.BoundaryNotStarted), FenceToken: 1,
-		LeaseOwner: strPtr(s.instanceOwner()), LeaseExpiresAt: &leaseExp,
+		LeaseOwner: ptr.To(s.instanceOwner()), LeaseExpiresAt: &leaseExp,
 		StartedAt: &now, Version: 1, CreatedAt: now,
 	}
 	if plan.Kind.IsOscKind() {
@@ -364,7 +348,7 @@ func (s *Services) beginCore(ctx context.Context, tx *gorm.DB, order *orderRow, 
 		}
 	}
 	if err := tx.WithContext(ctx).Create(attempt).Error; err != nil {
-		if isUniqueViolation(err) {
+		if txutil.IsUniqueViolation(err) {
 			return nil, domain.ErrAlreadyStarted()
 		}
 		return nil, err
@@ -391,9 +375,9 @@ func (s *Services) beginCore(ctx context.Context, tx *gorm.DB, order *orderRow, 
 		return nil, uerr
 	}
 	reason := opts.reason
-	if eerr := s.emitOrderEvent(ctx, tx, EventExecStarted, order.ID, auditActor(in.Actor), StateChangedPayload{
-		AggregateID: order.ID, From: strPtr(order.State), To: opts.nextOrderState,
-		ReasonCode: reason, StageID: strPtr(stage.StageID), AggregateVersion: nextVersion,
+	if eerr := s.emitOrderEvent(ctx, tx, EventExecStarted, order.ID, auditlog.UserActor(in.Actor.UserID, in.Actor.Username), StateChangedPayload{
+		AggregateID: order.ID, From: ptr.To(order.State), To: opts.nextOrderState,
+		ReasonCode: reason, StageID: ptr.To(stage.StageID), AggregateVersion: nextVersion,
 	}); eerr != nil {
 		return nil, eerr
 	}
@@ -453,10 +437,11 @@ func (s *Services) sealOscPlan(ctx context.Context, tx *gorm.DB, at *persistence
 	if err != nil {
 		return err
 	}
-	env, err := s.Crypter.Seal(crypto.PurposePayload, planJSON, crypto.AAD{
-		DeploymentID: s.Crypter.DeploymentID(), Table: "execution_attempts",
-		PrimaryKey: at.ID, Column: "osc_plan_ciphertext", Purpose: crypto.PurposePayload,
-	})
+	env, err := s.Crypter.SealColumn(crypto.PurposePayload, crypto.ColumnRef{
+		Table:      "execution_attempts",
+		PrimaryKey: at.ID,
+		Column:     "osc_plan_ciphertext",
+	}, planJSON)
 	if err != nil {
 		return err
 	}
@@ -465,17 +450,17 @@ func (s *Services) sealOscPlan(ctx context.Context, tx *gorm.DB, at *persistence
 		return domain.ErrGhOstUnsupported()
 	}
 	progress0, rows0 := 0, int64(0)
-	at.OSCToolVersion = strPtr(bin.Version)
-	at.OSCBinarySHA256 = strPtr(bin.SHA256)
-	at.OSCPlanHash = strPtr(osc.PlanHash(argv, dir))
+	at.OSCToolVersion = ptr.To(bin.Version)
+	at.OSCBinarySHA256 = ptr.To(bin.SHA256)
+	at.OSCPlanHash = ptr.To(osc.PlanHash(argv, dir))
 	at.OSCPlanCiphertext = env.Ciphertext
 	at.OSCPlanNonce = env.Nonce
-	at.OSCPlanKeyID = strPtr(env.KeyID)
-	at.OSCPlanAlgorithm = strPtr(env.Algorithm)
-	at.OSCPhase = strPtr(osc.PhasePlanned)
+	at.OSCPlanKeyID = ptr.To(env.KeyID)
+	at.OSCPlanAlgorithm = ptr.To(env.Algorithm)
+	at.OSCPhase = ptr.To(osc.PhasePlanned)
 	at.OSCProgressBasisPoints = &progress0
 	at.OSCRowsCopied = &rows0
-	at.OSCResidualState = strPtr(osc.ResidualNotChecked)
+	at.OSCResidualState = ptr.To(osc.ResidualNotChecked)
 	return nil
 }
 
@@ -487,12 +472,13 @@ func (s *Services) execCredentialUser(ctx context.Context, tx *gorm.DB, dsID str
 		"datasource_id = ? and purpose = 'execution' and enabled", dsID).First(&cred).Error; err != nil {
 		return "", domain.ErrDatasourceDown()
 	}
-	plain, err := s.Crypter.Open(crypto.PurposePayload, crypto.Envelope{
+	plain, err := s.Crypter.OpenColumn(crypto.PurposeDatasourceCredential, crypto.ColumnRef{
+		Table:      "datasource_credentials",
+		PrimaryKey: cred.ID,
+		Column:     "credential",
+	}, crypto.Envelope{
 		Ciphertext: cred.CredentialCiphertext, Nonce: cred.CredentialNonce,
 		KeyID: cred.CredentialKeyID, Algorithm: cred.CredentialAlgorithm,
-	}, crypto.AAD{
-		DeploymentID: s.Crypter.DeploymentID(), Table: "datasource_credentials",
-		PrimaryKey: cred.ID, Column: "credential", Purpose: "datasource_credential",
 	})
 	if err != nil {
 		return "", domain.ErrDatasourceDown()
@@ -637,8 +623,6 @@ func (s *Services) ReconcileExpiredAttempts(ctx context.Context) error {
 	}
 	return errors.Join(errs...)
 }
-
-func strPtr(s string) *string { return &s }
 
 // canonicalOverrides canonicalizes override key-value pairs for idempotency hashing (sorted keys).
 func canonicalOverrides(raw map[string]any) string {

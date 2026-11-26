@@ -1,5 +1,5 @@
-// senders.go delivery senders (PRD08 §4): SMTP email (required = mandatory STARTTLS /
-// starttls = opportunistic TLS) and DingTalk robot webhook. Send failures map to structured
+// senders.go delivery senders (PRD08 §4): SMTP email (required or port 465 = implicit SSL/TLS /
+// starttls = STARTTLS upgrade) and DingTalk robot webhook. Send failures map to structured
 // failure names without carrying raw server responses.
 //
 // SEC-0009: outbound dialing for both sender classes goes through addrguard (validating the resolved
@@ -47,40 +47,15 @@ const (
 
 // SendEmail delivers a notification email over SMTP (from -> to; secret is the SMTP password).
 func SendEmail(ctx context.Context, cfg EmailConfig, secret, to, subject, body string) error {
-	// SEC-0009: run shape validation first (CheckEndpoint: immediate rejection of Unix socket paths,
-	// empty hosts, and disallowed IP literals + port bounds) so path-like hosts never enter slow DNS
-	// resolution; resolved IPs for hostnames are guarded at dial time by the Control hook below.
-	if err := addrguard.CheckEndpointFor(addrguard.PurposeSMTP, cfg.Host, cfg.Port); err != nil {
-		return fmt.Errorf("%s", FailDial)
-	}
-	cleanHost, addr := smtpDialAddr(cfg.Host, cfg.Port)
-	// SEC-0009: outbound connection dials through addrguard; guard rejections return only bounded failure names.
-	d := addrguard.GuardedDialerFor(addrguard.PurposeSMTP, 10*time.Second)
-	conn, err := d.DialContext(ctx, "tcp", addr)
+	return sendEmailWithTLS(ctx, cfg, secret, to, subject, body, nil)
+}
+
+func sendEmailWithTLS(ctx context.Context, cfg EmailConfig, secret, to, subject, body string, baseTLS *tls.Config) error {
+	client, host, err := dialSMTPClient(ctx, cfg, baseTLS)
 	if err != nil {
-		return fmt.Errorf("%s", FailDial)
-	}
-	deadline := time.Now().Add(15 * time.Second)
-	_ = conn.SetDeadline(deadline)
-	host := cleanHost
-	if h, _, serr := net.SplitHostPort(addr); serr == nil {
-		host = h
-	}
-	client, err := smtp.NewClient(conn, host)
-	if err != nil {
-		_ = conn.Close()
-		return fmt.Errorf("%s", FailDial)
+		return err
 	}
 	defer client.Close()
-	if ok, _ := client.Extension("STARTTLS"); ok {
-		if err := client.StartTLS(&tls.Config{ServerName: host, MinVersion: tls.VersionTLS12}); err != nil {
-			if cfg.TLSMode == "required" {
-				return fmt.Errorf("%s", FailTLS)
-			}
-		}
-	} else if cfg.TLSMode == "required" {
-		return fmt.Errorf("%s", FailTLS)
-	}
 	if cfg.Username != "" {
 		auth := smtp.PlainAuth("", cfg.Username, secret, host)
 		if err := client.Auth(auth); err != nil {
@@ -111,6 +86,69 @@ func SendEmail(ctx context.Context, cfg EmailConfig, secret, to, subject, body s
 		return fmt.Errorf("%s", FailMail)
 	}
 	return nil
+}
+
+func smtpTLSConfig(host string, base *tls.Config) *tls.Config {
+	var tlsCfg *tls.Config
+	if base != nil {
+		tlsCfg = base.Clone()
+	} else {
+		tlsCfg = &tls.Config{}
+	}
+	tlsCfg.ServerName = host
+	tlsCfg.MinVersion = tls.VersionTLS12
+	return tlsCfg
+}
+
+func dialSMTPClient(ctx context.Context, cfg EmailConfig, baseTLS *tls.Config) (*smtp.Client, string, error) {
+	// SEC-0009: run shape validation first (CheckEndpoint: immediate rejection of Unix socket paths,
+	// empty hosts, and disallowed IP literals + port bounds) so path-like hosts never enter slow DNS
+	// resolution; resolved IPs for hostnames are guarded at dial time by the Control hook below.
+	if err := addrguard.CheckEndpointFor(addrguard.PurposeSMTP, cfg.Host, cfg.Port); err != nil {
+		return nil, "", fmt.Errorf("%s", FailDial)
+	}
+	cleanHost, addr := smtpDialAddr(cfg.Host, cfg.Port)
+	// SEC-0009: outbound connection dials through addrguard; guard rejections return only bounded failure names.
+	d := addrguard.GuardedDialerFor(addrguard.PurposeSMTP, 10*time.Second)
+	conn, err := d.DialContext(ctx, "tcp", addr)
+	if err != nil {
+		return nil, "", fmt.Errorf("%s", FailDial)
+	}
+	deadline := time.Now().Add(15 * time.Second)
+	if d, ok := ctx.Deadline(); ok && d.Before(deadline) {
+		deadline = d
+	}
+	_ = conn.SetDeadline(deadline)
+	host := cleanHost
+	if h, _, serr := net.SplitHostPort(addr); serr == nil {
+		host = h
+	}
+	tlsCfg := smtpTLSConfig(host, baseTLS)
+	if cfg.TLSMode == "required" || cfg.Port == 465 {
+		tlsConn := tls.Client(conn, tlsCfg)
+		if err := tlsConn.HandshakeContext(ctx); err != nil {
+			_ = tlsConn.Close()
+			return nil, "", fmt.Errorf("%s", FailTLS)
+		}
+		client, err := smtp.NewClient(tlsConn, host)
+		if err != nil {
+			_ = tlsConn.Close()
+			return nil, "", fmt.Errorf("%s", FailDial)
+		}
+		return client, host, nil
+	}
+	client, err := smtp.NewClient(conn, host)
+	if err != nil {
+		_ = conn.Close()
+		return nil, "", fmt.Errorf("%s", FailDial)
+	}
+	if ok, _ := client.Extension("STARTTLS"); ok {
+		if err := client.StartTLS(tlsCfg); err != nil {
+			_ = client.Close()
+			return nil, "", fmt.Errorf("%s", FailTLS)
+		}
+	}
+	return client, host, nil
 }
 
 func smtpDialAddr(rawHost string, port int) (cleanHost, addr string) {

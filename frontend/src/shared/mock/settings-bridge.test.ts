@@ -33,7 +33,10 @@ async function call<T = Record<string, unknown>>(
   path: string,
   init?: RequestInit,
 ): Promise<{ status: number; body: Envelope<T> }> {
-  const response = await fetch(`https://yearning.test${path}`, init);
+  const response = await fetch(
+    `https://yearning.test${path.startsWith("/api/v4") ? path : `/api/v4${path}`}`,
+    init,
+  );
   return { status: response.status, body: (await response.json()) as Envelope<T> };
 }
 
@@ -78,13 +81,13 @@ function executionPendingOrder(id: string, stepId: string): FixtureOrder {
     current_stage_position: 1,
     stages: [
       {
-        id: `${id}-s1`,
+        id: `${id.slice(0, 34)}a1`,
         position: 1,
         datasource_name: "orders-mysql",
         state: "execution_pending",
         approval_steps: [
           {
-            id: `${id}-a1`,
+            id: `${id.slice(0, 34)}b1`,
             position: 1,
             state: "approved",
             decided_at: "2026-10-14T00:00:00Z",

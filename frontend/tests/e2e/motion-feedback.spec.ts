@@ -246,13 +246,16 @@ test("paging and search acknowledge within 100ms while old rows stay", async ({ 
 test("reduced motion toasts keep their stacking offset without a transform transition", async ({ page }) => {
   await page.emulateMedia({ reducedMotion: "reduce" });
   await mockSession(page, "admin");
-  await page.goto("/workspace");
+  await page.goto("/admin/settings/identity");
+
+  const trigger = page.locator('[data-testid^="admin-idp-test-"]').first();
+  await expect(trigger).toBeVisible();
 
   const toasts = page.locator("[data-sonner-toast]");
-  await page.getByTestId("header-refresh").click();
+  await trigger.click();
   await expect(toasts).toHaveCount(1);
   await page.waitForTimeout(200);
-  await page.getByTestId("header-refresh").click();
+  await trigger.click();
   await expect(toasts).toHaveCount(2);
 
   const stacked = await toasts.evaluateAll((els) =>

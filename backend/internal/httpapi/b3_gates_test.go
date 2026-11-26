@@ -270,7 +270,7 @@ func TestGate3SecretsNeverSurface(t *testing.T) {
 	// Datasource Purpose credentials.
 	code, body, raw = fx.admin.do("POST", "/api/v4/admin/datasources", map[string]any{
 		"name": "sec-ds", "engine": "mysql", "compatibility_mode": "mysql",
-		"deployment_kind": "native", "host": "db.example.com", "port": 3306,
+		"deployment_kind": "native", "host": "db.invalid", "port": 3306,
 		"version_constraint": "8.0.x", "enabled": true,
 		"credentials": []map[string]any{{
 			"purpose": "execution", "username": "app",
@@ -348,7 +348,7 @@ func TestB3DatasourceTestPurpose(t *testing.T) {
 	payload := func(name string, purpose any) map[string]any {
 		body := map[string]any{
 			"name": name, "engine": "mysql", "compatibility_mode": "mysql",
-			"deployment_kind": "native", "host": "db.example.com", "port": 3306,
+			"deployment_kind": "native", "host": "db.invalid", "port": 3306,
 			"version_constraint": "8.0.x", "enabled": true,
 			"credentials": []map[string]any{{
 				"purpose": "execution", "username": "app",
@@ -890,7 +890,7 @@ func TestB3AdminListFieldFilters(t *testing.T) {
 	// Datasource with review credential only: no execution credential -> credential_mode=read_only.
 	code, body, raw := fx.admin.do("POST", "/api/v4/admin/datasources", map[string]any{
 		"name": "filter-ds-ro", "engine": "postgresql", "compatibility_mode": "postgresql",
-		"deployment_kind": "native", "host": "filter-ds-ro.example.com", "port": 5432,
+		"deployment_kind": "native", "host": "filter-ds-ro.invalid", "port": 5432,
 		"version_constraint": "16.x", "enabled": true,
 		"credentials": []map[string]any{{
 			"purpose": "review", "username": "reader",

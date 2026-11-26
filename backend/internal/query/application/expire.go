@@ -9,11 +9,7 @@ import (
 	"github.com/cookieY/YearningX/backend/internal/authorization/auditlog"
 )
 
-var systemAuditActor = auditlog.Actor{
-	Kind:     "system",
-	UserID:   "00000000-0000-0000-0000-000000000000",
-	Username: "system",
-}
+var systemAuditActor = auditlog.SystemActor("00000000-0000-0000-0000-000000000000", "system")
 
 // ExpireGrants advances expired or invalidated Grants and their cascading Sessions (idempotent and batch-bounded).
 func (s *Services) ExpireGrants(ctx context.Context) error {

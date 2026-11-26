@@ -1,0 +1,15 @@
+{
+  "contract_version": 1,
+  "openapi_sha": "b08b588223c0b586a5c9c4e0f1c9b0cd818d7ef1d61f3f9e823d5a489e37fb73",
+  "zod_runtime_sha256": "32b72a82897ae698b7566aad9821c07cf5194173a3dc69adfb00a8f00f04a446",
+  "operation_id": "logout",
+  "case_id": "authenticated",
+  "http_status": 200,
+  "err_code": 0,
+  "response": {
+    "data": null,
+    "err_code": 0,
+    "message": "ok",
+    "request_id": "00000000-0000-4000-8000-999999999999"
+  }
+}

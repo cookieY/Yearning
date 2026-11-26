@@ -19,12 +19,8 @@ import { ErrorState } from "@/shared/components/status/status-components";
 import { LoadingState } from "@/shared/components/status/loading-state";
 import { EmptyState } from "@/shared/components/status/empty-state";
 import { ListToolbar, PageHeader, PageLayout } from "@/shared/components/page-layout";
-import { PendingButton } from "@/shared/components/pending-button";
-import { Badge } from "@/shared/components/ui/badge";
 import { Button } from "@/shared/components/ui/button";
 import { Card, CardContent, CardTitle } from "@/shared/components/ui/card";
-import { Popover, PopoverContent, PopoverTrigger } from "@/shared/components/ui/popover";
-import { ScrollArea } from "@/shared/components/ui/scroll-area";
 import { useCursorPage } from "@/shared/lib/cursor-page";
 import { formatTimestamp } from "@/shared/lib/timezones";
 import { useFlipReorder } from "@/shared/lib/use-flip-reorder";
@@ -45,19 +41,12 @@ import {
 } from "@/shared/components/ui/table";
 import { Tabs, TabsList, TabsTrigger } from "@/shared/components/ui/tabs";
 import { TAB_PANEL_VARIANTS, TransitionPanel } from "@/shared/components/ui/transition-panel";
-import { ArrowRight, FileStack, Inbox, Trash2 } from "lucide-react";
+import { ArrowRight, FileStack } from "lucide-react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { deleteChangeDraft } from "@/api/generated/client/change-drafts/change-drafts";
 import { describeError } from "@/shared/api/error-display";
 import { appToast as toast } from "@/shared/components/shadcn-dashboard/sonner/sonner-08";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/shared/components/ui/dialog";
+import { DeleteDraftDialog, MineDraftsPopover } from "./mine-drafts-popover";
 
 /**
  * My Orders (route /changes/mine; migration contract §2: drafts and submitted orders are separated;
@@ -77,69 +66,6 @@ import {
 const ALL_STATES = "all" as const;
 const ALL_DATASOURCES = "all" as const;
 const KEYWORD_DEBOUNCE_MS = 300;
-
-function DraftRow({
-  draft,
-  onSelect,
-  onDelete,
-}: {
-  draft: ChangeDraft;
-  onSelect: (draft: ChangeDraft) => void;
-  onDelete: (draft: ChangeDraft) => void;
-}) {
-  const { t } = useTranslation();
-  return (
-    <div
-      role="button"
-      tabIndex={0}
-      onClick={() => { onSelect(draft); }}
-      onKeyDown={(event) => {
-        if (event.key === "Enter") onSelect(draft);
-      }}
-      className="group hover:bg-muted/40 focus-visible:bg-muted/40 flex w-full cursor-pointer items-center gap-3 px-5 py-3 text-left outline-none transition-colors duration-150 ease-out"
-      data-testid="mine-draft-row"
-    >
-      <div className="relative shrink-0">
-        <span
-          className="bg-primary ring-popover absolute top-0 right-0 size-2.5 rounded-full ring-2"
-          aria-hidden
-        />
-        <span className="bg-secondary text-secondary-foreground flex size-10 items-center justify-center rounded-full">
-          <FileStack className="size-4" aria-hidden />
-        </span>
-      </div>
-      <div className="min-w-0 flex-1">
-        <div className="flex items-center justify-between gap-2">
-          <span className="text-foreground truncate text-sm font-semibold">
-            {draft.title}
-          </span>
-          <span className="text-muted-foreground shrink-0 text-xs">
-            {draft.updated_at.slice(0, 10)}
-          </span>
-        </div>
-        <div className="mt-0.5 flex items-center justify-between gap-2">
-          <span className="text-muted-foreground truncate text-xs">
-            {t("orders.list.draftsUpdated", { time: formatTimestamp(draft.updated_at) })}
-          </span>
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon-sm"
-            className="text-muted-foreground hover:text-destructive size-6 shrink-0"
-            aria-label={t("orders.list.draftsDelete")}
-            onClick={(event) => {
-              event.stopPropagation();
-              onDelete(draft);
-            }}
-            data-testid={`delete-draft-${draft.id}`}
-          >
-            <Trash2 className="size-3.5" aria-hidden />
-          </Button>
-        </div>
-      </div>
-    </div>
-  );
-}
 
 function OrderRow({ order, detailBasePath }: {
   order: ChangeOrder;
@@ -243,10 +169,10 @@ export default function MinePage() {
   const textOf = (terms: readonly SearchTerm[], field: string): string =>
     [...terms].reverse().find((term) => term.field === field)?.text ?? "";
   const stateOfTerms = (terms: readonly SearchTerm[]): string => {
-    const label = [...terms].reverse().find((term) => term.field === "state")?.text;
-    return label === undefined
-      ? ALL_STATES
-      : ORDER_STATES.find((candidate) => t(`orders.state.${candidate}`) === label) ?? ALL_STATES;
+    const stateTerm = [...terms].reverse().find((term) => term.field === "state");
+    if (stateTerm === undefined) return ALL_STATES;
+    if (stateTerm.value !== undefined) return ORDER_STATES.find((c) => c === stateTerm.value) ?? ALL_STATES;
+    return ORDER_STATES.find((candidate) => t(`orders.state.${candidate}`) === stateTerm.text) ?? ALL_STATES;
   };
   const handleTermsChange = (next: SearchTerm[]): void => {
     committedTermsRef.current = next;
@@ -314,9 +240,7 @@ export default function MinePage() {
       {
         key: "state",
         label: t("orders.list.column.state"),
-        options: ORDER_STATES.map((state) => ({
-          label: t(`orders.state.${state}`),
-        })),
+        options: ORDER_STATES.map((state) => ({ value: state, label: t(`orders.state.${state}`) })),
       },
       {
         key: "datasource",
@@ -395,40 +319,12 @@ export default function MinePage() {
               {/* Delete confirmation (owner ruling 2026-10-24): the draft,
                * its SQL and its review records go in one transaction — the
                * dialog says so before the irreversible call. */}
-              <Dialog
-                open={pendingDelete !== null}
-                onOpenChange={(open) => {
-                  if (!open) setPendingDelete(null);
-                }}
-              >
-                <DialogContent data-testid="delete-draft-dialog">
-                  <DialogHeader>
-                    <DialogTitle>{t("orders.list.draftsDeleteTitle")}</DialogTitle>
-                    <DialogDescription>
-                      {t("orders.list.draftsDeleteDescription")}
-                    </DialogDescription>
-                  </DialogHeader>
-                  <DialogFooter>
-                    <Button
-                      variant="outline"
-                      onClick={() => { setPendingDelete(null); }}
-                      data-testid="delete-draft-cancel"
-                    >
-                      {t("common.cancel")}
-                    </Button>
-                    <PendingButton
-                      variant="destructive"
-                      pending={deleteDraftMutation.isPending}
-                      onClick={() => {
-                        if (pendingDelete !== null) deleteDraftMutation.mutate(pendingDelete);
-                      }}
-                      data-testid="delete-draft-accept"
-                    >
-                      {t("orders.list.draftsDeleteAction")}
-                    </PendingButton>
-                  </DialogFooter>
-                </DialogContent>
-              </Dialog>
+              <DeleteDraftDialog
+                pendingDelete={pendingDelete}
+                isPending={deleteDraftMutation.isPending}
+                onCancel={() => { setPendingDelete(null); }}
+                onConfirm={(draft) => { deleteDraftMutation.mutate(draft); }}
+              />
               {/* overflow-visible (review R2 H1): the search bar's suggestion
                   listbox and inline calendar extend below the card in empty or
                   1-row states; the default Card overflow-hidden would clip
@@ -438,91 +334,23 @@ export default function MinePage() {
                   busy={ordersStale}
                   fill
                   actions={
-                    <Popover open={draftsOpen} onOpenChange={setDraftsOpen}>
-                      <PopoverTrigger
-                        render={
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="icon"
-                            className="relative shrink-0"
-                            aria-label={t("orders.list.draftsCard")}
-                            data-testid="mine-drafts-trigger"
-                          />
-                        }
-                      >
-                        <Inbox className="size-4" aria-hidden />
-                        {(draftsQuery.data ?? []).length > 0 && (
-                          <span
-                            className="bg-primary text-primary-foreground ring-card absolute -top-1.5 -right-1.5 flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[10px] leading-none font-semibold tabular-nums ring-2"
-                            data-testid="mine-drafts-count"
-                          >
-                            {(draftsQuery.data ?? []).length}
-                          </span>
-                        )}
-                      </PopoverTrigger>
-                      <PopoverContent
-                        align="end"
-                        sideOffset={8}
-                        className="w-[360px] rounded-xl p-0"
-                        data-testid="mine-drafts-popover"
-                      >
-                        <div className="flex items-center justify-between border-b border-border px-5 py-3.5">
-                          <h3 className="text-base font-semibold text-foreground">
-                            {t("orders.list.draftsCard")}
-                          </h3>
-                          <Badge
-                            variant="secondary"
-                            className="rounded-full px-2.5 py-0.5 text-xs font-semibold"
-                            data-testid="mine-drafts-badge"
-                          >
-                            {t("orders.list.draftsBadgeCount", {
-                              total: (draftsQuery.data ?? []).length,
-                            })}
-                          </Badge>
-                        </div>
-                        <ScrollArea viewportClassName="max-h-80">
-                          {(draftsQuery.data ?? []).length === 0 ? (
-                            <div
-                              className="px-5 py-8 text-center text-xs text-muted-foreground"
-                              data-testid="mine-drafts-empty"
-                            >
-                              {t("orders.list.draftsEmpty")}
-                            </div>
-                          ) : (
-                            <div className="divide-y divide-border">
-                              {(draftsQuery.data ?? []).map((draft) => (
-                                <DraftRow
-                                  key={draft.id}
-                                  draft={draft}
-                                  onSelect={(selected) => {
-                                    setDraftsOpen(false);
-                                    void navigate(`/changes/drafts/${selected.id}`);
-                                  }}
-                                  onDelete={(target) => {
-                                    setDraftsOpen(false);
-                                    setPendingDelete(target);
-                                  }}
-                                />
-                              ))}
-                            </div>
-                          )}
-                        </ScrollArea>
-                        <div className="border-t border-border px-5 py-3.5">
-                          <Button
-                            variant="secondary"
-                            className="w-full"
-                            onClick={() => {
-                              setDraftsOpen(false);
-                              void navigate("/changes/new");
-                            }}
-                            data-testid="mine-drafts-new"
-                          >
-                            {t("orders.list.newDraftAction")}
-                          </Button>
-                        </div>
-                      </PopoverContent>
-                    </Popover>
+                    <MineDraftsPopover
+                      open={draftsOpen}
+                      onOpenChange={setDraftsOpen}
+                      drafts={draftsQuery.data ?? []}
+                      onSelectDraft={(selected) => {
+                        setDraftsOpen(false);
+                        void navigate(`/changes/drafts/${selected.id}`);
+                      }}
+                      onRequestDelete={(target) => {
+                        setDraftsOpen(false);
+                        setPendingDelete(target);
+                      }}
+                      onNewDraft={() => {
+                        setDraftsOpen(false);
+                        void navigate("/changes/new");
+                      }}
+                    />
                   }
                 >
                   <CardTitle>{t("orders.list.ordersCard")}</CardTitle>

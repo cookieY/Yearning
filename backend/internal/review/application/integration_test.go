@@ -10,73 +10,27 @@ package application
 
 import (
 	"context"
-	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"os"
 	"strings"
-	"syscall"
 	"testing"
 	"time"
 
 	"github.com/google/uuid"
-	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
-	gormlogger "gorm.io/gorm/logger"
 
 	"github.com/cookieY/YearningX/backend/internal/authorization/auditlog"
 	"github.com/cookieY/YearningX/backend/internal/crypto"
 	"github.com/cookieY/YearningX/backend/internal/database"
+	"github.com/cookieY/YearningX/backend/internal/platform/testkit"
 	"github.com/cookieY/YearningX/backend/internal/review/domain"
 	"github.com/cookieY/YearningX/backend/internal/review/provider"
 )
 
-// acquireItestLock acquires an inter-process lock for the shared test DB (same lock file name as the httpapi fixture).
-func acquireItestLock(t *testing.T) {
-	path := os.TempDir() + "/yearningx-itest-shared.lock"
-	f, err := os.OpenFile(path, os.O_CREATE|os.O_RDWR, 0o600)
-	if err != nil {
-		return
-	}
-	if err := syscall.Flock(int(f.Fd()), syscall.LOCK_EX); err != nil {
-		_ = f.Close()
-		return
-	}
-	t.Cleanup(func() {
-		_ = syscall.Flock(int(f.Fd()), syscall.LOCK_UN)
-		_ = f.Close()
-	})
-}
-
-func itestEnv(key, def string) string {
-	if v := os.Getenv(key); v != "" {
-		return v
-	}
-	return def
-}
-
 func integrationDSN(t *testing.T) string {
 	t.Helper()
-	password := os.Getenv("YEARNING_TEST_DATABASE_PASSWORD")
-	if password == "" {
-		t.Skip("integration PostgreSQL not configured: set YEARNING_TEST_DATABASE_PASSWORD")
-	}
-	return fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=%s",
-		itestEnv("YEARNING_TEST_DATABASE_HOST", "localhost"),
-		itestEnv("YEARNING_TEST_DATABASE_PORT", "54330"),
-		itestEnv("YEARNING_TEST_DATABASE_USER", "yearning"),
-		password,
-		itestEnv("YEARNING_TEST_DATABASE_DBNAME", "yearning_v4"),
-		itestEnv("YEARNING_TEST_DATABASE_SSLMODE", "disable"))
-}
-
-func make32(seed byte) []byte {
-	out := make([]byte, 32)
-	for i := range out {
-		out[i] = seed
-	}
-	return out
+	return testkit.PGDSN(t)
 }
 
 type fx struct {
@@ -90,11 +44,7 @@ type fx struct {
 
 func newFixture(t *testing.T) *fx {
 	t.Helper()
-	acquireItestLock(t)
-	db, err := gorm.Open(postgres.Open(integrationDSN(t)), &gorm.Config{Logger: gormlogger.Discard})
-	if err != nil {
-		t.Fatalf("postgres connect: %v", err)
-	}
+	db := testkit.OpenPG(t)
 	sqlDB, err := db.DB()
 	if err != nil {
 		t.Fatalf("postgres sql db: %v", err)
@@ -102,29 +52,9 @@ func newFixture(t *testing.T) *fx {
 	sqlDB.SetMaxOpenConns(32)
 	sqlDB.SetMaxIdleConns(8)
 	sqlDB.SetConnMaxLifetime(5 * time.Minute)
-	t.Cleanup(func() {
-		_ = sqlDB.Close()
-	})
 	truncateReviewTables(t, db)
 
-	dir := t.TempDir()
-	keyringDoc := fmt.Sprintf(`{"contract_version":1,"deployment_id":"b6-itest","keys":[
-		{"key_id":"pay-1","purpose":"payload","status":"encrypt_decrypt","created_at":"2026-08-25T00:00:00Z","key_base64":"%s"},
-		{"key_id":"fp-1","purpose":"sql_fingerprint","status":"encrypt_decrypt","created_at":"2026-08-25T00:00:00Z","key_base64":"%s"}]}`,
-		base64.StdEncoding.EncodeToString(make32(1)),
-		base64.StdEncoding.EncodeToString(make32(2)))
-	path := dir + "/keyring.json"
-	if err := os.WriteFile(path, []byte(keyringDoc), 0o400); err != nil {
-		t.Fatal(err)
-	}
-	ring, err := crypto.LoadKeyring(path)
-	if err != nil {
-		t.Fatal(err)
-	}
-	crypter, err := crypto.NewCrypter(ring)
-	if err != nil {
-		t.Fatal(err)
-	}
+	crypter := testkit.NewCrypter(t)
 	recorder, _ := auditlog.NewRecorder(db)
 	svc, err := NewServices(db, crypter, recorder, nil)
 	if err != nil {

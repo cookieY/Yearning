@@ -1,0 +1,9 @@
+{
+  "contract_version": "san-wire-v1",
+  "contract_digest": "c3666f9629bc47de75195d3893d12c08c0d33d8001ea94e2ba2f53232dedb324",
+  "case_name": "13_truncate_table",
+  "description": "TRUNCATE TABLE statement",
+  "default_database": "shop",
+  "engine_profile": "mysql/mysql",
+  "generate_command": "cd backend \u0026\u0026 go test -tags nomsgpack ./internal/review/application -run TestSANWireGolden -update"
+}

@@ -14,6 +14,7 @@ import (
 	ldap "github.com/go-ldap/ldap/v3"
 
 	"github.com/cookieY/YearningX/backend/internal/platform/addrguard"
+	"github.com/cookieY/YearningX/backend/internal/platform/ptr"
 )
 
 // systemAndEnvRootCAs returns a certificate pool initialized from the OS trust store
@@ -141,7 +142,7 @@ func LDAPAuthenticate(c *LDAPConfiguration, bindPassword, username, password str
 	req := ldap.NewSearchRequest(
 		c.BaseDN, ldap.ScopeWholeSubtree, ldap.NeverDerefAliases, 2, 0, false,
 		filter,
-		[]string{c.UsernameAttribute, c.DisplayNameAttribute, deref(c.EmailAttribute)},
+		[]string{c.UsernameAttribute, c.DisplayNameAttribute, ptr.Deref(c.EmailAttribute)},
 		nil,
 	)
 	res, err := conn.Search(req)
@@ -165,7 +166,7 @@ func LDAPAuthenticate(c *LDAPConfiguration, bindPassword, username, password str
 		EntryDN:     entry.DN,
 		Username:    found,
 		DisplayName: entry.GetAttributeValue(c.DisplayNameAttribute),
-		Email:       entry.GetAttributeValue(deref(c.EmailAttribute)),
+		Email:       entry.GetAttributeValue(ptr.Deref(c.EmailAttribute)),
 	}, nil
 }
 
@@ -195,11 +196,4 @@ func LDAPConnectionTest(c *LDAPConfiguration, bindPassword string) error {
 		return fmt.Errorf("identity: ldap base search failed")
 	}
 	return nil
-}
-
-func deref(s *string) string {
-	if s == nil {
-		return ""
-	}
-	return *s
 }

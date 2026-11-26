@@ -61,7 +61,7 @@ const wallClockIso = (minutes: number): string => {
 const futureIso = (minutes: number): string =>
   new Date(Date.now() + minutes * 60_000).toISOString().replace(/\.\d{3}Z$/, "Z");
 
-const DDL = "create table if not exists f12_contract_b5 (id bigint primary key, note text);";
+const DDL = `create table if not exists f12_contract_b5_${suffix} (id bigint primary key, note text);`;
 
 let queryFlowId: string;
 let changeFlowId: string;
@@ -234,52 +234,54 @@ describe("query access family", () => {
   }, 180_000);
 });
 
-describe("execution leftovers", () => {
-  it("approved order → schedule (path A); approved order → attempt → verification → cancel (path B)", async () => {
-    // Path A: the scheduled-execution face. A scheduled order no longer
-    // accepts a manual attempt (state machine), so the attempt family runs
-    // on its own order.
-    const scheduleOrderId = await draftToSubmittedOrder(`f12 schedule ${suffix}`);
-    await loginAs("approver");
-    const scheduleOrder = await record("getChangeOrder", "schedule-chain", () => getChangeOrder(scheduleOrderId));
-    const scheduleVersion = asView<IdVersion | undefined>(scheduleOrder.value)?.version ?? 1;
-    await record("decideChangeOrder", "schedule-chain", () =>
-      decideChangeOrder(scheduleOrderId, { decision: "approve", comment: "f12 batch5 schedule" },
-        { headers: ifMatch(scheduleVersion, true) }),
-      "real execution_actors snapshot omits is_builtin_admin/version (divergence #006)");
-    await loginAs("executor");
-    await record("createExecutionSchedule", "exec-chain", () =>
-      createExecutionSchedule(scheduleOrderId, { scheduled_for: futureIso(60) },
-        { headers: ifMatch(scheduleVersion + 1, true) }));
+if (process.env.F12_CONTRACT_SCOPE !== "non-ai") {
+  describe("execution leftovers", () => {
+    it("approved order → schedule (path A); approved order → attempt → verification → cancel (path B)", async () => {
+      // Path A: the scheduled-execution face. A scheduled order no longer
+      // accepts a manual attempt (state machine), so the attempt family runs
+      // on its own order.
+      const scheduleOrderId = await draftToSubmittedOrder(`f12 schedule ${suffix}`);
+      await loginAs("approver");
+      const scheduleOrder = await record("getChangeOrder", "schedule-chain", () => getChangeOrder(scheduleOrderId));
+      const scheduleVersion = asView<IdVersion | undefined>(scheduleOrder.value)?.version ?? 1;
+      await record("decideChangeOrder", "schedule-chain", () =>
+        decideChangeOrder(scheduleOrderId, { decision: "approve", comment: "f12 batch5 schedule" },
+          { headers: ifMatch(scheduleVersion, true) }),
+        "real execution_actors snapshot omits is_builtin_admin/version (divergence #006)");
+      await loginAs("executor");
+      await record("createExecutionSchedule", "exec-chain", () =>
+        createExecutionSchedule(scheduleOrderId, { scheduled_for: futureIso(60) },
+          { headers: ifMatch(scheduleVersion + 1, true) }));
 
-    // Path B: attempt + verification + cancel.
-    const orderId = await draftToSubmittedOrder(`f12 exec ${suffix}`);
-    await loginAs("approver");
-    const order = await record("getChangeOrder", "exec-chain", () => getChangeOrder(orderId));
-    const version = asView<IdVersion | undefined>(order.value)?.version ?? 1;
-    await record("decideChangeOrder", "exec-chain", () =>
-      decideChangeOrder(orderId, { decision: "approve", comment: "f12 batch5 exec" }, { headers: ifMatch(version, true) }),
-      "real execution_actors snapshot omits is_builtin_admin/version (divergence #006)");
+      // Path B: attempt + verification + cancel.
+      const orderId = await draftToSubmittedOrder(`f12 exec ${suffix}`);
+      await loginAs("approver");
+      const order = await record("getChangeOrder", "exec-chain", () => getChangeOrder(orderId));
+      const version = asView<IdVersion | undefined>(order.value)?.version ?? 1;
+      await record("decideChangeOrder", "exec-chain", () =>
+        decideChangeOrder(orderId, { decision: "approve", comment: "f12 batch5 exec" }, { headers: ifMatch(version, true) }),
+        "real execution_actors snapshot omits is_builtin_admin/version (divergence #006)");
 
-    await loginAs("executor");
-    const approved = await record("getChangeOrder", "exec-post-approve", () => getChangeOrder(orderId));
-    const approvedVersion = asView<IdVersion | undefined>(approved.value)?.version ?? version + 1;
-    const attempt = await record("createExecutionAttempt", "exec-chain", () =>
-      createExecutionAttempt(orderId, {} as never, { headers: ifMatch(approvedVersion, true) }));
-    const attemptView = asView<IdVersion | undefined>(attempt.value);
-    if (!attemptView?.id) throw new Error(`attempt not created: ${attempt.errCode} ${attempt.status}`);
-    await record("createExecutionVerification", "still-unknown", () =>
-      createExecutionVerification(attemptView.id, {
-        result: "still_unknown",
-        reason: "serve starts no stage_execution worker (BLK-20261017-SERVE-BACKGROUND-WORKERS): no statement outcome is observable",
-        evidence: [{ kind: "text", content: "f12 contract batch5: attempt remains running" }],
-      }, { headers: ifMatch(1, true) }),
-      "verification honestly reports still_unknown under the serve-worker blocker");
-    const current = await record("getExecutionAttempt", "exec-chain", () => getExecutionAttempt(attemptView.id));
-    const attemptVersion = asView<IdVersion | undefined>(current.value)?.version ?? 1;
-    await record("cancelExecutionAttempt", "exec-chain", () =>
-      cancelExecutionAttempt(attemptView.id, { reason: "f12: no worker in serve (BLK-20261017)" },
-        { headers: ifMatch(attemptVersion, true) }),
-      "mock runs the attempt to a terminal state synchronously (1010 on cancel); the real attempt stays running under BLK-20261017 and cancels cleanly");
-  }, 600_000);
-});
+      await loginAs("executor");
+      const approved = await record("getChangeOrder", "exec-post-approve", () => getChangeOrder(orderId));
+      const approvedVersion = asView<IdVersion | undefined>(approved.value)?.version ?? version + 1;
+      const attempt = await record("createExecutionAttempt", "exec-chain", () =>
+        createExecutionAttempt(orderId, {} as never, { headers: ifMatch(approvedVersion, true) }));
+      const attemptView = asView<IdVersion | undefined>(attempt.value);
+      if (!attemptView?.id) throw new Error(`attempt not created: ${attempt.errCode} ${attempt.status}`);
+      await record("createExecutionVerification", "still-unknown", () =>
+        createExecutionVerification(attemptView.id, {
+          result: "still_unknown",
+          reason: "serve starts no stage_execution worker (BLK-20261017-SERVE-BACKGROUND-WORKERS): no statement outcome is observable",
+          evidence: [{ kind: "text", content: "f12 contract batch5: attempt remains running" }],
+        }, { headers: ifMatch(1, true) }),
+        "verification honestly reports still_unknown under the serve-worker blocker");
+      const current = await record("getExecutionAttempt", "exec-chain", () => getExecutionAttempt(attemptView.id));
+      const attemptVersion = asView<IdVersion | undefined>(current.value)?.version ?? 1;
+      await record("cancelExecutionAttempt", "exec-chain", () =>
+        cancelExecutionAttempt(attemptView.id, { reason: "f12: no worker in serve (BLK-20261017)" },
+          { headers: ifMatch(attemptVersion, true) }),
+        "mock runs the attempt to a terminal state synchronously (1010 on cancel); the real attempt stays running under BLK-20261017 and cancels cleanly");
+    }, 600_000);
+  });
+}

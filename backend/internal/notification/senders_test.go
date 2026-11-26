@@ -8,14 +8,21 @@ package notification
 import (
 	"bufio"
 	"context"
+	"crypto/ecdsa"
+	"crypto/elliptic"
 	"crypto/hmac"
+	"crypto/rand"
 	"crypto/sha256"
+	"crypto/tls"
+	"crypto/x509"
 	"encoding/base64"
+	"math/big"
 	"net"
 	"net/http"
 	"net/http/httptest"
 	neturl "net/url"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -141,6 +148,227 @@ func serveStubSMTP(t *testing.T, ln net.Listener) {
 		default:
 			reply("250 ok")
 		}
+	}
+}
+
+type stubSMTPOptions struct {
+	allowSTARTTLS bool
+	tlsConfig     *tls.Config
+	tlsActiveInit bool
+	tlsCompleted  *atomic.Bool
+	authOK        *atomic.Bool
+	delivered     *atomic.Bool
+}
+
+func newSelfSignedSMTPServerCert(t *testing.T) (tls.Certificate, *x509.CertPool) {
+	t.Helper()
+	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	tmpl := &x509.Certificate{
+		SerialNumber:          big.NewInt(1),
+		NotBefore:             time.Now().Add(-time.Hour),
+		NotAfter:              time.Now().Add(24 * time.Hour),
+		KeyUsage:              x509.KeyUsageDigitalSignature | x509.KeyUsageKeyEncipherment,
+		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
+		BasicConstraintsValid: true,
+		IPAddresses:           []net.IP{net.ParseIP("127.0.0.1")},
+		DNSNames:              []string{"localhost"},
+	}
+	der, err := x509.CreateCertificate(rand.Reader, tmpl, tmpl, &key.PublicKey, key)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cert, err := x509.ParseCertificate(der)
+	if err != nil {
+		t.Fatal(err)
+	}
+	pool := x509.NewCertPool()
+	pool.AddCert(cert)
+	return tls.Certificate{Certificate: [][]byte{der}, PrivateKey: key}, pool
+}
+
+func serveStubSMTPConn(conn net.Conn, opts stubSMTPOptions) {
+	defer func() { _ = conn.Close() }()
+	_ = conn.SetDeadline(time.Now().Add(10 * time.Second))
+	activeConn := conn
+	r := bufio.NewReader(activeConn)
+	reply := func(s string) {
+		_, _ = activeConn.Write([]byte(s + "\r\n"))
+	}
+	reply("220 stub ESMTP")
+	inData := false
+	tlsActive := opts.tlsActiveInit
+	if tlsActive && opts.tlsCompleted != nil {
+		opts.tlsCompleted.Store(true)
+	}
+	for {
+		line, err := r.ReadString('\n')
+		if err != nil {
+			return
+		}
+		trimmed := strings.TrimRight(line, "\r\n")
+		if inData {
+			if trimmed == "." {
+				inData = false
+				if opts.delivered != nil {
+					opts.delivered.Store(true)
+				}
+				reply("250 accepted")
+			}
+			continue
+		}
+		upper := strings.ToUpper(trimmed)
+		switch {
+		case strings.HasPrefix(upper, "EHLO"), strings.HasPrefix(upper, "HELO"):
+			reply("250-stub")
+			if opts.allowSTARTTLS && !tlsActive {
+				reply("250-STARTTLS")
+			}
+			reply("250 AUTH PLAIN")
+		case upper == "STARTTLS" && opts.allowSTARTTLS && opts.tlsConfig != nil:
+			reply("220 Ready to start TLS")
+			tlsConn := tls.Server(activeConn, opts.tlsConfig)
+			if err := tlsConn.Handshake(); err != nil {
+				return
+			}
+			activeConn = tlsConn
+			r = bufio.NewReader(activeConn)
+			tlsActive = true
+			if opts.tlsCompleted != nil {
+				opts.tlsCompleted.Store(true)
+			}
+		case strings.HasPrefix(upper, "AUTH PLAIN"):
+			if opts.authOK != nil {
+				opts.authOK.Store(true)
+			}
+			reply("235 ok")
+		case strings.HasPrefix(upper, "MAIL FROM"), strings.HasPrefix(upper, "RCPT TO"):
+			reply("250 ok")
+		case upper == "DATA":
+			reply("354 go ahead")
+			inData = true
+		case upper == "QUIT":
+			reply("221 bye")
+			return
+		default:
+			reply("250 ok")
+		}
+	}
+}
+
+func TestSendEmailImplicitTLS(t *testing.T) {
+	restore := addrguard.SetLoopbackBypassForTest(true)
+	t.Cleanup(restore)
+
+	cert, pool := newSelfSignedSMTPServerCert(t)
+	srvTLS := &tls.Config{Certificates: []tls.Certificate{cert}, MinVersion: tls.VersionTLS12}
+	ln, err := tls.Listen("tcp", "127.0.0.1:0", srvTLS)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = ln.Close() })
+
+	var tlsCompleted, authOK, delivered atomic.Bool
+	go func() {
+		for {
+			c, err := ln.Accept()
+			if err != nil {
+				return
+			}
+			go serveStubSMTPConn(c, stubSMTPOptions{
+				tlsActiveInit: true,
+				tlsCompleted:  &tlsCompleted,
+				authOK:        &authOK,
+				delivered:     &delivered,
+			})
+		}
+	}()
+
+	cfg := EmailConfig{
+		Host:        "127.0.0.1",
+		Port:        ln.Addr().(*net.TCPAddr).Port,
+		TLSMode:     "required",
+		Username:    "sender",
+		FromAddress: "sender@example.com",
+	}
+	if err := sendEmailWithTLS(context.Background(), cfg, "app-pass", "to@example.com", "hello", "body", &tls.Config{RootCAs: pool}); err != nil {
+		t.Fatalf("sendEmailWithTLS implicit TLS = %v; want nil", err)
+	}
+	if !tlsCompleted.Load() || !authOK.Load() || !delivered.Load() {
+		t.Fatalf("expected TLS+AUTH+DATA completion, got tls=%v auth=%v delivered=%v", tlsCompleted.Load(), authOK.Load(), delivered.Load())
+	}
+
+	if err := SendEmail(context.Background(), cfg, "app-pass", "to@example.com", "hello", "body"); err == nil || err.Error() != FailTLS {
+		t.Fatalf("SendEmail implicit TLS untrusted cert = %v; want %s", err, FailTLS)
+	}
+
+	plainLn, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = plainLn.Close() })
+	go serveStubSMTP(t, plainLn)
+
+	plainCfg := EmailConfig{
+		Host:        "127.0.0.1",
+		Port:        plainLn.Addr().(*net.TCPAddr).Port,
+		TLSMode:     "required",
+		FromAddress: "sender@example.com",
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	if err := sendEmailWithTLS(ctx, plainCfg, "app-pass", "to@example.com", "hello", "body", &tls.Config{RootCAs: pool}); err == nil || err.Error() != FailTLS {
+		t.Fatalf("sendEmailWithTLS required against plaintext server = %v; want %s", err, FailTLS)
+	}
+}
+
+func TestSendEmailSTARTTLS(t *testing.T) {
+	restore := addrguard.SetLoopbackBypassForTest(true)
+	t.Cleanup(restore)
+
+	cert, pool := newSelfSignedSMTPServerCert(t)
+	srvTLS := &tls.Config{Certificates: []tls.Certificate{cert}, MinVersion: tls.VersionTLS12}
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = ln.Close() })
+
+	var tlsCompleted, authOK, delivered atomic.Bool
+	go func() {
+		for {
+			c, err := ln.Accept()
+			if err != nil {
+				return
+			}
+			go serveStubSMTPConn(c, stubSMTPOptions{
+				allowSTARTTLS: true,
+				tlsConfig:     srvTLS,
+				tlsCompleted:  &tlsCompleted,
+				authOK:        &authOK,
+				delivered:     &delivered,
+			})
+		}
+	}()
+
+	cfg := EmailConfig{
+		Host:        "127.0.0.1",
+		Port:        ln.Addr().(*net.TCPAddr).Port,
+		TLSMode:     "starttls",
+		Username:    "sender",
+		FromAddress: "sender@example.com",
+	}
+	if err := sendEmailWithTLS(context.Background(), cfg, "app-pass", "to@example.com", "hello", "body", &tls.Config{RootCAs: pool}); err != nil {
+		t.Fatalf("sendEmailWithTLS STARTTLS = %v; want nil", err)
+	}
+	if !tlsCompleted.Load() || !authOK.Load() || !delivered.Load() {
+		t.Fatalf("expected STARTTLS+AUTH+DATA completion, got tls=%v auth=%v delivered=%v", tlsCompleted.Load(), authOK.Load(), delivered.Load())
+	}
+
+	if err := SendEmail(context.Background(), cfg, "app-pass", "to@example.com", "hello", "body"); err == nil || err.Error() != FailTLS {
+		t.Fatalf("SendEmail STARTTLS untrusted cert = %v; want %s", err, FailTLS)
 	}
 }
 

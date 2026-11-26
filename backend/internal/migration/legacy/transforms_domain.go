@@ -3,6 +3,7 @@ package legacy
 import (
 	"encoding/json"
 	"fmt"
+	"html"
 	"strings"
 
 	"github.com/google/uuid"
@@ -150,7 +151,7 @@ func (tc *TransformContext) TransformGlobalConfig(row Row) (bool, error) {
 
 	// Board -> announcement revision (treated as untrusted text under current policy and HTML-escaped).
 	if board := strings.TrimSpace(rowString(row["board"])); board != "" {
-		safe := escapeHTML(board)
+		safe := html.EscapeString(board)
 		tc.addWrite("announcement_revisions", AnnouncementRevisionModel{
 			ID:             tc.detID("announcement_revisions", "board").String(),
 			RevisionNumber: 1, Title: "Legacy Board", MarkdownSource: board,
@@ -483,11 +484,6 @@ func mustJSON(v any) string {
 		return "{}"
 	}
 	return string(raw)
-}
-
-func escapeHTML(s string) string {
-	replacer := strings.NewReplacer("&", "&amp;", "<", "&lt;", ">", "&gt;", `"`, "&#34;", "'", "&#39;")
-	return replacer.Replace(s)
 }
 
 func jsonUnmarshalArray(text string, out *[]string) error {

@@ -278,9 +278,10 @@ func verifyBinaryHash(path, want string) error {
 // ---- Bounded output parser ----
 
 var (
-	copyRe   = regexp.MustCompile(`Copy:\s+([0-9]+)/([0-9]+)`)
-	ptCopyRe = regexp.MustCompile("Copying `[^`]+`[^:]*:\\s*([0-9]{1,3})%")
-	secretRe = regexp.MustCompile(`(?i)(password|passwd|pwd)\s*[:=]\s*\S+`)
+	copyRe          = regexp.MustCompile(`Copy:\s+([0-9]+)/([0-9]+)`)
+	ptCopyRe        = regexp.MustCompile("Copying `[^`]+`[^:]*:\\s*([0-9]{1,3})%")
+	secretRe        = regexp.MustCompile(`(?i)(password|passwd|pwd)\s*[:=]\s*\S+`)
+	quotedLiteralRe = regexp.MustCompile(`'[^']*'|"[^"]*"`)
 )
 
 // outputParser parses process output: progress, phase, heartbeat, and redacted tail.
@@ -375,7 +376,7 @@ func redact(line string) string {
 	line = secretRe.ReplaceAllString(line, "${1}=***")
 	// Uniformly redact quoted literals so residual SQL values do not leak.
 	if strings.Count(line, "'") >= 2 || strings.Count(line, `"`) >= 2 {
-		line = regexp.MustCompile(`'[^']*'|"[^"]*"`).ReplaceAllString(line, "'***'")
+		line = quotedLiteralRe.ReplaceAllString(line, "'***'")
 	}
 	return line
 }

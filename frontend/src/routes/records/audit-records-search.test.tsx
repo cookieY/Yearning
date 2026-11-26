@@ -27,8 +27,8 @@ vi.stubGlobal("matchMedia", vi.fn().mockImplementation((query: string) => ({
   dispatchEvent: vi.fn(),
 })));
 
-import { HttpResponse, http } from "msw";
 import { server } from "@/test/msw/server";
+import { grantSession } from "@/test/session";
 
 beforeEach(() => {
   server.resetHandlers();
@@ -36,26 +36,7 @@ beforeEach(() => {
   setMockAuthBehavior("admin");
   // Same session stub the admin pages tests plant: the audit page gates on
   // can_access_admin and the query enable flag.
-  server.use(
-    http.get("*/users/me", () =>
-      HttpResponse.json({
-        err_code: 0,
-        message: "ok",
-        data: {
-          id: "0198d9cc-1111-7111-8111-000000000001",
-          username: "henry",
-          display_name: "henry",
-          email: null,
-          is_builtin_admin: true,
-          version: 1,
-          created_at: "2026-08-28T08:00:00Z",
-          updated_at: "2026-08-28T08:00:00Z",
-          can_access_admin: true,
-        },
-        request_id: "x",
-      }),
-    ),
-  );
+  grantSession({ id: "0198d9cc-1111-7111-8111-000000000001", requestId: "x" });
 });
 
 function renderPage(): void {

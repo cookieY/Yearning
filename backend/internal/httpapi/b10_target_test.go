@@ -117,8 +117,9 @@ func execTarget(t *testing.T, db *sql.DB, query string, args ...any) {
 // b10TargetQueryMySQL queries target MySQL directly (exec_target schema).
 func (fx *b10Fixture) b10TargetQueryMySQL(t *testing.T, query string, args ...any) [][]string {
 	t.Helper()
+	cfg := b10MySQLTarget()
 	pw := b10MySQLPassword(t)
-	db := openTargetMySQL(t, fmt.Sprintf("root:%s@tcp(127.0.0.1:%d)/exec_target", pw, b10MySQLPort()))
+	db := openTargetMySQL(t, fmt.Sprintf("%s:%s@tcp(%s:%d)/exec_target", cfg.User, pw, cfg.Host, cfg.Port))
 	defer func() { _ = db.Close() }()
 	return queryTarget(t, db, query, args...)
 }
@@ -126,12 +127,14 @@ func (fx *b10Fixture) b10TargetQueryMySQL(t *testing.T, query string, args ...an
 // mustOpenTargetPG opens a target PG connection (caller is responsible for Close).
 func mustOpenTargetPG(t *testing.T, fx *b10Fixture) *sql.DB {
 	t.Helper()
-	return openTargetPG(t, envOrB6("YEARNING_TEST_ADAPTER_PG_HOST", "localhost"), fmt.Sprint(b10PGPort()), "yearning_exec_target", b10PGUser(), fx.b10PGPassword(t))
+	cfg := b10PGTarget()
+	return openTargetPG(t, cfg.Host, fmt.Sprint(cfg.Port), "yearning_exec_target", cfg.User, fx.b10PGPassword(t))
 }
 
 // openTargetMySQLRoot opens a root connection to target MySQL (caller is responsible for Close).
 func openTargetMySQLRoot(t *testing.T) *sql.DB {
 	t.Helper()
+	cfg := b10MySQLTarget()
 	pw := b10MySQLPassword(t)
-	return openTargetMySQL(t, fmt.Sprintf("root:%s@tcp(127.0.0.1:%d)/exec_target", pw, b10MySQLPort()))
+	return openTargetMySQL(t, fmt.Sprintf("%s:%s@tcp(%s:%d)/exec_target", cfg.User, pw, cfg.Host, cfg.Port))
 }

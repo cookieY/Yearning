@@ -5,18 +5,16 @@ package application
 
 import (
 	"context"
-	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
+	"sync"
 	"time"
 
 	"github.com/google/uuid"
 	"gorm.io/gorm"
-	"gorm.io/gorm/clause"
-	"sync"
 
 	"github.com/cookieY/YearningX/backend/internal/authorization/auditlog"
 	"github.com/cookieY/YearningX/backend/internal/crypto"
@@ -125,10 +123,6 @@ func (s *Services) serializable(ctx context.Context, fn func(tx *gorm.DB) error)
 	return txutil.Serializable(ctx, s.DB, fn)
 }
 
-func isSerializationFailure(err error) bool { return txutil.IsSerializationFailure(err) }
-
-func isUniqueViolation(err error) bool { return txutil.IsUniqueViolation(err) }
-
 // ---- Domain events (frozen surface in repository-event-routing) ----
 
 const (
@@ -144,74 +138,23 @@ const (
 	EventExecUnknown    = "query.execution_result_unknown"
 )
 
-func auditActor(a Actor) auditlog.Actor {
-	return auditlog.Actor{UserID: a.UserID, Username: a.Username}
-}
-
 // emitQueryEvent writes a query domain event (with subject = aggregate/{uuid}).
 func (s *Services) emitQueryEvent(ctx context.Context, tx *gorm.DB, internalType, subject string,
 	actor Actor, data any) error {
-	payload, err := json.Marshal(data)
-	if err != nil {
-		return err
-	}
-	m := map[string]any{}
-	if err := json.Unmarshal(payload, &m); err != nil {
-		return err
-	}
-	return s.Recorder.Emit(ctx, tx, internalType, subject, auditActor(actor), m)
+	return s.Recorder.EmitPayload(ctx, tx, internalType, subject, auditlog.UserActor(actor.UserID, actor.Username), data)
 }
 
 // ---- Idempotency (matching execution/changeorder contract surface) ----
 
 func (s *Services) idemStore() *txutil.IdempotencyStore {
-	return &txutil.IdempotencyStore{
-		DB:      s.DB,
-		Crypter: s.Crypter,
-		Errs: txutil.IdempotencyErrors{
-			Reused:     func() error { return domain.ErrIdemReused() },
-			InProgress: func() error { return domain.ErrIdemInProgress() },
-			Concurrent: func() error { return domain.ErrConcurrent() },
-		},
-	}
-}
-
-func (s *Services) idemClaim(ctx context.Context, userID, route, aggregateID, key, reqHash string) (claimed bool, replay []byte, err error) {
-	return s.idemStore().Claim(ctx, userID, route, aggregateID, key, reqHash)
-}
-
-func (s *Services) idemRelease(ctx context.Context, userID, route, aggregateID, key string) error {
-	return s.idemStore().Release(ctx, userID, route, aggregateID, key)
-}
-
-func (s *Services) idemComplete(ctx context.Context, userID, route, aggregateID, key string, response []byte) error {
-	return s.idemStore().Complete(ctx, userID, route, aggregateID, key, response)
-}
-
-func idemRequestHash(parts ...string) string { return txutil.RequestHash(parts...) }
-
-// ---- Cryptographic helpers (AAD contract surface) ----
-
-// sealPayload encrypts a query domain payload using AAD bound to table name + primary key.
-func (s *Services) sealPayload(table, primaryKey, column string, plain []byte) (crypto.Envelope, error) {
-	return s.Crypter.Seal(crypto.PurposePayload, plain, crypto.AAD{
-		DeploymentID: s.Crypter.DeploymentID(), Table: table,
-		PrimaryKey: primaryKey, Column: column, Purpose: crypto.PurposePayload,
+	return txutil.NewIdempotencyStore(s.DB, s.Crypter, txutil.IdempotencyErrors{
+		Reused:     func() error { return domain.ErrIdemReused() },
+		InProgress: func() error { return domain.ErrIdemInProgress() },
+		Concurrent: func() error { return domain.ErrConcurrent() },
 	})
 }
 
-// openPayload decrypts a query domain payload.
-func (s *Services) openPayload(table, primaryKey, column string, env crypto.Envelope) ([]byte, error) {
-	return s.Crypter.Open(crypto.PurposePayload, env, crypto.AAD{
-		DeploymentID: s.Crypter.DeploymentID(), Table: table,
-		PrimaryKey: primaryKey, Column: column, Purpose: crypto.PurposePayload,
-	})
-}
-
-func sha256Hex(data []byte) string {
-	sum := sha256.Sum256(data)
-	return hex.EncodeToString(sum[:])
-}
+// ---- Cryptographic helpers (HMAC contract surface) ----
 
 // AffinityHMAC computes the cursor affinity cookie HMAC signature (using the cursor_affinity purpose;
 // frozen value in cryptographic-key-contract hmac.purposes).
@@ -273,9 +216,6 @@ func (s *Services) loadQuerySettings(ctx context.Context, db *gorm.DB) querySett
 	}
 	return q
 }
-
-// lockUpdate returns a FOR UPDATE locking clause.
-func lockUpdate() clause.Locking { return clause.Locking{Strength: "UPDATE"} }
 
 // auditInput constructs a standard audit event input.
 func auditInput(a Actor, eventType, resourceType, resourceID, action, outcome string) auditlog.AuditInput {

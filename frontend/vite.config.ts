@@ -200,7 +200,22 @@ async function startDispatcher() {
         body: body !== undefined && body.length > 0 ? new Uint8Array(body) : undefined,
         redirect: "manual",
       });
-      if (response.headers.get(NO_HANDLER_HEADER) === "1") return false;
+      if (response.headers.get(NO_HANDLER_HEADER) === "1") {
+        if ((req.url ?? "").startsWith("/api/")) {
+          res.statusCode = 500;
+          res.setHeader("Content-Type", "application/problem+json");
+          res.end(
+            JSON.stringify({
+              type: "about:blank",
+              title: "mock_unhandled_request",
+              status: 500,
+              detail: `No mock handler matched ${req.method ?? "GET"} ${req.url ?? ""}`,
+            }),
+          );
+          return true;
+        }
+        return false;
+      }
       res.statusCode = response.status;
       response.headers.forEach((value, name) => {
         if (!HOP_BY_HOP.has(name) && name !== "set-cookie") res.setHeader(name, value);
@@ -209,8 +224,21 @@ async function startDispatcher() {
       // Mock handlers return buffered JSON responses, never streams.
       res.end(Buffer.from(await response.arrayBuffer()));
       return true;
-    } catch {
-      // Loopback hiccup — let vite answer rather than 500 the tab.
+    } catch (error) {
+      if ((req.url ?? "").startsWith("/api/")) {
+        res.statusCode = 500;
+        res.setHeader("Content-Type", "application/problem+json");
+        res.end(
+          JSON.stringify({
+            type: "about:blank",
+            title: "mock_dispatch_error",
+            status: 500,
+            detail: error instanceof Error ? error.message : String(error),
+          }),
+        );
+        return true;
+      }
+      // Loopback hiccup — let vite answer non-API routes rather than 500 the tab.
       return false;
     }
   };
@@ -264,10 +292,10 @@ function mockNodePlugin(): Plugin {
           void boot();
         }
       });
-      // Dev-only dimension control (identity / super / scenario / auth
-      // behavior): GET reads, POST `{identity?, superMode?, scenario?,
-      // authBehavior?}` sets. Readers without localStorage (the node world)
-      // answer from this state; tabs sync it on boot (client-dimensions.ts).
+      // Dev-only dimension control (identity / scenario / auth behavior): GET
+      // reads, POST `{identity?, scenario?, authBehavior?}` sets. Readers
+      // without localStorage (the node world) answer from this state; tabs
+      // sync it on boot (client-dimensions.ts).
       server.middlewares.use(DIMENSIONS_ENDPOINT, async (req, res) => {
         const dimensions = await server.ssrLoadModule(MOCK_DIMENSIONS_ENTRY);
         if (req.method === "GET") {
@@ -284,7 +312,6 @@ function mockNodePlugin(): Plugin {
               JSON.stringify(
                 dimensions.setServerDimensions({
                   identity: typeof patch.identity === "string" ? patch.identity : undefined,
-                  superMode: typeof patch.superMode === "boolean" ? patch.superMode : undefined,
                   scenario: typeof patch.scenario === "string" ? patch.scenario : undefined,
                   authBehavior:
                     typeof patch.authBehavior === "string" ? patch.authBehavior : undefined,

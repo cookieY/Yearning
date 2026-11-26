@@ -345,3 +345,24 @@ func TestAcquireReadPool_SingleflightCoalescesAndIsolatesCancel(t *testing.T) {
 		t.Fatalf("expected context.Canceled after Close(), got %v", err)
 	}
 }
+
+func TestNormalizeProbeState_RejectsDisabledAndDefaultsToNoSamples(t *testing.T) {
+	valid := []string{
+		string(database.StatsProbeReady),
+		string(database.StatsProbeDisabled),
+		string(database.StatsProbeInsufficientPriv),
+		string(database.StatsProbeUnsupportedEngine),
+		string(database.StatsProbeNoSamples),
+		string(database.StatsProbeCollectionFailed),
+	}
+	for _, st := range valid {
+		if got := normalizeProbeState(st); got != st {
+			t.Fatalf("normalizeProbeState(%q) = %q, want %q", st, got, st)
+		}
+	}
+	for _, invalid := range []string{"", "disabled", "unknown"} {
+		if got := normalizeProbeState(invalid); got != string(database.StatsProbeNoSamples) {
+			t.Fatalf("normalizeProbeState(%q) = %q, want %q", invalid, got, database.StatsProbeNoSamples)
+		}
+	}
+}

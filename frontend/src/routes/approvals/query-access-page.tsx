@@ -48,15 +48,13 @@ import {
 /**
  * Query Access Approval (route /approvals/query-access; migration contract §2 maps
  * legacy /server/query/list here — "approve datasource access eligibility, never SQL", Q001).
- * The server scopes listQueryAccessRequests to requester-ownership ∪
- * frozen-reviewer relations, so the pending queue is exactly the
- * access_pending rows of that scoped list — no client-side guessing about
- * reviewer identity. Decisions approve the DATASOURCE ACCESS eligibility
- * (never SQL); final approval creates the grant server-side (Q003).
+ * The page queries listQueryAccessRequests with scope="reviewer" so only frozen-reviewer
+ * rows enter the queue, and gates Approve/Reject strictly on server-computed can_decide
+ * (active-step frozen approver eligibility) without client-side guessing. Decisions approve
+ * DATASOURCE ACCESS eligibility (never SQL); final approval creates the grant server-side (Q003).
  *
- * Active grants the current reviewer relation can see carry the revoke
- * action (frozen reviewer or builtin admin, Q004) — revocation is
- * terminating access, never reading it.
+ * Active grants render in GrantRevocationCard only when server-computed can_revoke is true
+ * (frozen reviewer or builtin admin, Q004) — revocation terminates access, never reads it.
  */
 
 export function ApprovalTabBadge({ count, testId }: { count: number; testId: string }) {
@@ -81,6 +79,7 @@ export function QueryAccessApprovalsContent() {
   const requestsQuery = useMyAccessRequests(authenticated, {
     limit: pager.pageSize,
     after: pager.after,
+    scope: "reviewer",
   });
   const grantsQuery = useMyGrants(authenticated);
   // §18.82: capture before the exhaustive conditional so narrowing does not leak into pagination guards.
@@ -95,7 +94,7 @@ export function QueryAccessApprovalsContent() {
   const pending = requestsQuery.data.items;
   const grants = useMemo(() => grantsQuery.data ?? [], [grantsQuery.data]);
   const grantById = useMemo(() => new Map(grants.map((grant) => [grant.id, grant])), [grants]);
-  const activeGrants = grants.filter((row) => row.state === "active");
+  const activeGrants = grants.filter((row) => row.state === "active" && row.can_revoke === true);
   const anyLoading = requestsQuery.isPending || grantsQuery.isPending;
   const [pendingTerms, setPendingTerms] = useState<SearchTerm[]>([]);
   const [pendingLive, setPendingLive] = useState<SearchTerm | null>(null);
@@ -123,11 +122,11 @@ export function QueryAccessApprovalsContent() {
             : `${row.state} ${t(`query.request.state.${row.state}`)}`;
         },
         options: [
-          { label: t("query.request.state.access_pending") },
-          { label: t("query.request.state.grant_active") },
-          { label: t("query.request.state.rejected") },
-          { label: t("query.grant.state.expired") },
-          { label: t("query.grant.state.revoked") },
+          { value: "access_pending", label: t("query.request.state.access_pending") },
+          { value: "grant_active", label: t("query.request.state.grant_active") },
+          { value: "rejected", label: t("query.request.state.rejected") },
+          { value: "expired", label: t("query.grant.state.expired") },
+          { value: "revoked", label: t("query.grant.state.revoked") },
         ],
       },
       {
@@ -273,7 +272,7 @@ export function QueryAccessApprovalsContent() {
                             {formatTimestamp(row.created_at)}
                           </TableCell>
                           <TableCell className="text-right">
-                            {row.state === "access_pending" ? (
+                            {row.state === "access_pending" && row.can_decide === true ? (
                               <TableRowActions testId={`query-access-actions-${row.id}`}>
                                 <DropdownMenuItem
                                   onClick={() => {
@@ -398,7 +397,7 @@ function GrantRevocationCard({ grants }: { grants: QueryGrant[] }) {
         key: "state",
         label: t("approvals.queryAccess.column.state"),
         value: (grant) => `${grant.state} ${t(`query.grant.state.${grant.state}`)}`,
-        options: [{ label: t("query.grant.state.active") }],
+        options: [{ value: "active", label: t("query.grant.state.active") }],
       },
       {
         key: "expires_at",

@@ -96,6 +96,38 @@ func TestIncompleteDDLRemainsIncompleteAfterGroupMerge(t *testing.T) {
 	}
 }
 
+func TestDDLPrimaryAndForeignKeyNotFlaggedAsUnnamedIndex(t *testing.T) {
+	sql := `CREATE TABLE t_idx (
+		id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+		parent_id BIGINT UNSIGNED NOT NULL,
+		col_a VARCHAR(32) NOT NULL DEFAULT '',
+		PRIMARY KEY (id),
+		KEY idx_col_a (col_a),
+		CONSTRAINT fk_parent FOREIGN KEY (parent_id) REFERENCES parents (id)
+	) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;`
+	facts := extractStmtFacts([]byte(sql), "create", "ddl")
+	if got := facts.m["ddl_index_count"]; got != int64(2) {
+		t.Fatalf("ddl_index_count = %v, want 2 (PRIMARY + idx_col_a, excluding FOREIGN KEY)", got)
+	}
+	if got := facts.m["ddl_index_unnamed_count"]; got != int64(0) {
+		t.Fatalf("ddl_index_unnamed_count = %v, want 0", got)
+	}
+	if got := facts.m["ddl_index_prefix_conformant"]; got != true {
+		t.Fatalf("ddl_index_prefix_conformant = %v, want true", got)
+	}
+
+	unnamedSQL := `CREATE TABLE t_unnamed (
+		id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+		col_a VARCHAR(32) NOT NULL DEFAULT '',
+		PRIMARY KEY (id),
+		KEY (col_a)
+	) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;`
+	unnamedFacts := extractStmtFacts([]byte(unnamedSQL), "create", "ddl")
+	if got := unnamedFacts.m["ddl_index_unnamed_count"]; got != int64(1) {
+		t.Fatalf("truly unnamed secondary KEY must yield ddl_index_unnamed_count = 1, got %v", got)
+	}
+}
+
 func containsFold(haystack, needle string) bool {
 	for i := 0; i+len(needle) <= len(haystack); i++ {
 		if strings.EqualFold(haystack[i:i+len(needle)], needle) {
@@ -146,5 +178,73 @@ func TestMergeStmtFactsIntoDMLAndDDLParity(t *testing.T) {
 		if got.incomplete != want.incomplete || !reflect.DeepEqual(got.m, want.m) {
 			t.Fatalf("batch %d mismatch:\n got  = %#v\n want = %#v", bIdx, got, want)
 		}
+	}
+}
+
+func TestRenameTableAcrossDBDetection(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name string
+		sql  string
+		want bool
+	}{
+		{"unqualified_same_db", "RENAME TABLE orders_old TO orders_archive", false},
+		{"explicit_same_db", "RENAME TABLE shop.orders_old TO shop.orders_archive", false},
+		{"explicit_same_db_quoted_case", "RENAME TABLE `SHOP`.`orders_old` TO `shop`.`orders_archive`", false},
+		{"src_unqualified_dst_qualified", "RENAME TABLE orders_old TO shop.orders_archive", false},
+		{"src_qualified_dst_unqualified", "RENAME TABLE shop.orders_old TO orders_archive", false},
+		{"cross_db", "RENAME TABLE shop.orders_old TO archive.orders_old", true},
+		{"cross_db_quoted", "RENAME TABLE `shop`.`orders_old` TO `archive`.`orders_old`", true},
+		{"multi_pair_all_same_db", "RENAME TABLE shop.a TO shop.b, shop.c TO shop.d", false},
+		{"multi_pair_one_cross_db", "RENAME TABLE shop.a TO shop.b, shop.c TO archive.d", true},
+		{"leading_comment_trick", "/* TO archive.fake */ RENAME TABLE shop.a TO shop.b", false},
+	}
+
+	for _, tc := range cases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			facts := extractStmtFacts([]byte(tc.sql), "rename", "ddl")
+			if facts.m["ddl_is_rename_table"] != true {
+				t.Fatalf("ddl_is_rename_table = %v, want true", facts.m["ddl_is_rename_table"])
+			}
+			if facts.m["ddl_across_db_rename"] != tc.want {
+				t.Fatalf("ddl_across_db_rename = %v, want %v (sql=%q)", facts.m["ddl_across_db_rename"], tc.want, tc.sql)
+			}
+		})
+	}
+}
+
+func TestRenameNonTableRoutesToDDLOther(t *testing.T) {
+	t.Parallel()
+
+	facts := extractStmtFacts([]byte("RENAME USER 'a'@'%' TO 'b'@'%'"), "rename", "ddl")
+	if len(facts.m) != 0 {
+		t.Fatalf("non-TABLE RENAME USER must emit no branch facts, got %#v", facts.m)
+	}
+}
+
+func TestAlterTableRenameToKeepsAlterBranch(t *testing.T) {
+	t.Parallel()
+
+	for _, sql := range []string{
+		"ALTER TABLE shop.orders RENAME TO shop.orders_v2",
+		"ALTER TABLE shop.orders ADD COLUMN note VARCHAR(32) COMMENT 'rename table'",
+	} {
+		sql := sql
+		t.Run(sql, func(t *testing.T) {
+			t.Parallel()
+			facts := extractStmtFacts([]byte(sql), "alter", "ddl")
+			if _, ok := facts.m["ddl_is_rename_table"]; ok {
+				t.Fatalf("ALTER statement must not emit ddl_is_rename_table: %#v", facts.m)
+			}
+			if _, ok := facts.m["ddl_across_db_rename"]; ok {
+				t.Fatalf("ALTER statement must not emit ddl_across_db_rename: %#v", facts.m)
+			}
+			if facts.m["ddl_alters_column_type"] != false || facts.m["ddl_changes_column_position"] != false {
+				t.Fatalf("unexpected alter facts: %#v", facts.m)
+			}
+		})
 	}
 }

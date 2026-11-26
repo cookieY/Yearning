@@ -1,0 +1,239 @@
+{
+  "request_schema_version": 1,
+  "review_run_id": "00000000-0000-4000-8000-000000000001",
+  "engine_profile": "mysql/mysql",
+  "anonymized_statement_groups": [
+    {
+      "group_id": "10000000-0000-4000-8000-000000000001",
+      "representative_shape": "kind=ddl op=create where=true",
+      "representative_anonymized_sql": "CREATE TABLE shop.shipments (\n  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,\n  order_id BIGINT UNSIGNED NOT NULL,\n  PRIMARY KEY (id)\n) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+      "objects": [
+        {
+          "token": "shop",
+          "kind": "schema",
+          "relation": "reference",
+          "schema_token": "shop",
+          "statement_ordinal": 1,
+          "statement_ordinal_ranges": [
+            {
+              "start": 1,
+              "end": 1
+            }
+          ]
+        },
+        {
+          "token": "shop.shipments",
+          "kind": "table",
+          "relation": "define",
+          "schema_token": "shop",
+          "statement_ordinal": 1,
+          "statement_ordinal_ranges": [
+            {
+              "start": 1,
+              "end": 1
+            }
+          ]
+        },
+        {
+          "token": "id",
+          "kind": "column",
+          "relation": "define",
+          "schema_token": "shop",
+          "parent_token": "shop.shipments",
+          "statement_ordinal": 1,
+          "statement_ordinal_ranges": [
+            {
+              "start": 1,
+              "end": 1
+            }
+          ]
+        },
+        {
+          "token": "order_id",
+          "kind": "column",
+          "relation": "define",
+          "schema_token": "shop",
+          "parent_token": "shop.shipments",
+          "statement_ordinal": 1,
+          "statement_ordinal_ranges": [
+            {
+              "start": 1,
+              "end": 1
+            }
+          ]
+        },
+        {
+          "token": "id",
+          "kind": "column",
+          "relation": "reference",
+          "schema_token": "shop",
+          "parent_token": "shop.shipments",
+          "statement_ordinal": 1,
+          "statement_ordinal_ranges": [
+            {
+              "start": 1,
+              "end": 1
+            }
+          ]
+        }
+      ],
+      "metadata_context_complete": true,
+      "statement_count": 1,
+      "statement_ordinal": 1,
+      "statement_ordinal_ranges": [
+        {
+          "start": 1,
+          "end": 1
+        }
+      ],
+      "statistics": {
+        "algorithm_version": "yearning-fingerprint-v1",
+        "ddl_autoincrement_unsigned": true,
+        "ddl_charset": "utf8mb4",
+        "ddl_column_comment_count": 0,
+        "ddl_column_count": 2,
+        "ddl_default_count": 1,
+        "ddl_has_auto_increment": true,
+        "ddl_has_float_double": false,
+        "ddl_has_foreign_key": false,
+        "ddl_has_partition": false,
+        "ddl_has_primary_key": true,
+        "ddl_has_special_type": false,
+        "ddl_index_count": 1,
+        "ddl_index_max_key_parts": 1,
+        "ddl_index_prefix_conformant": true,
+        "ddl_index_unnamed_count": 1,
+        "ddl_max_char_length": 0,
+        "ddl_max_varchar_length": 0,
+        "ddl_not_null_count": 2,
+        "ddl_pk_is_integer": true,
+        "ddl_pk_named_id": true,
+        "ddl_table_comment_present": false,
+        "ddl_table_identifier_not_keyword": true,
+        "ddl_table_name_length": 9,
+        "ddl_table_prefix_conformant": true,
+        "in_value_count_max": 0,
+        "max_statement_bytes": 171,
+        "unbounded_mutation": false,
+        "values_row_count_max": 0
+      }
+    },
+    {
+      "group_id": "10000000-0000-4000-8000-000000000002",
+      "representative_shape": "kind=ddl op=alter where=true",
+      "representative_anonymized_sql": "ALTER TABLE shop.orders ADD COLUMN tracking_no VARCHAR(64) NULL",
+      "objects": [
+        {
+          "token": "shop",
+          "kind": "schema",
+          "relation": "reference",
+          "schema_token": "shop",
+          "statement_ordinal": 2,
+          "statement_ordinal_ranges": [
+            {
+              "start": 2,
+              "end": 2
+            }
+          ]
+        },
+        {
+          "token": "shop.orders",
+          "kind": "table",
+          "relation": "target",
+          "schema_token": "shop",
+          "statement_ordinal": 2,
+          "statement_ordinal_ranges": [
+            {
+              "start": 2,
+              "end": 2
+            }
+          ]
+        },
+        {
+          "token": "tracking_no",
+          "kind": "column",
+          "relation": "define",
+          "schema_token": "shop",
+          "parent_token": "shop.orders",
+          "statement_ordinal": 2,
+          "statement_ordinal_ranges": [
+            {
+              "start": 2,
+              "end": 2
+            }
+          ]
+        }
+      ],
+      "metadata_context_complete": true,
+      "statement_count": 1,
+      "statement_ordinal": 2,
+      "statement_ordinal_ranges": [
+        {
+          "start": 2,
+          "end": 2
+        }
+      ],
+      "statistics": {
+        "algorithm_version": "yearning-fingerprint-v1",
+        "ddl_alters_column_type": false,
+        "ddl_changes_column_position": false,
+        "in_value_count_max": 0,
+        "max_statement_bytes": 63,
+        "unbounded_mutation": false,
+        "values_row_count_max": 0
+      }
+    },
+    {
+      "group_id": "10000000-0000-4000-8000-000000000003",
+      "representative_shape": "kind=ddl op=drop where=true",
+      "representative_anonymized_sql": "DROP TABLE IF EXISTS shop.tmp_shipments",
+      "objects": [
+        {
+          "token": "shop",
+          "kind": "schema",
+          "relation": "reference",
+          "schema_token": "shop",
+          "statement_ordinal": 3,
+          "statement_ordinal_ranges": [
+            {
+              "start": 3,
+              "end": 3
+            }
+          ]
+        },
+        {
+          "token": "shop.tmp_shipments",
+          "kind": "table",
+          "relation": "target",
+          "schema_token": "shop",
+          "statement_ordinal": 3,
+          "statement_ordinal_ranges": [
+            {
+              "start": 3,
+              "end": 3
+            }
+          ]
+        }
+      ],
+      "metadata_context_complete": true,
+      "statement_count": 1,
+      "statement_ordinal": 3,
+      "statement_ordinal_ranges": [
+        {
+          "start": 3,
+          "end": 3
+        }
+      ],
+      "statistics": {
+        "algorithm_version": "yearning-fingerprint-v1",
+        "ddl_drop_target": "table",
+        "in_value_count_max": 0,
+        "max_statement_bytes": 39,
+        "unbounded_mutation": false,
+        "values_row_count_max": 0
+      }
+    }
+  ],
+  "normalized_evidence": [],
+  "allowed_tool_descriptors": []
+}

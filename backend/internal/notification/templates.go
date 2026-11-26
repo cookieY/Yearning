@@ -9,11 +9,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/cookieY/YearningX/backend/internal/crypto"
 	"strings"
 	"time"
-	"unicode/utf8"
-
-	"github.com/cookieY/YearningX/backend/internal/crypto"
 )
 
 // MaxMessageTemplateRunes is the maximum character length of a custom notification rule template
@@ -175,10 +173,10 @@ var defaultPlaceholderTemplates = map[string]map[string]string{
 		"execution_missed":            "\u5de5\u5355 {{order_display_number}} \u9884\u7ea6\u5df2\u9519\u8fc7\uff0c\u4e0d\u81ea\u52a8\u8865\u8dd1\uff0c\u8bf7\u91cd\u65b0\u53d1\u8d77\u3002\n\u5de5\u5355ID\uff1a{{order_id}}\n\u6807\u9898\uff1a{{order_title}}\n\u63d0\u4ea4\u4eba\uff1a{{submitter}}\n\u5f53\u524d\u72b6\u6001\uff1a{{order_state}}\n\u6267\u884c\u4eba\uff1a{{executors}}",
 		"execution_cancelled":         "\u5de5\u5355 {{order_display_number}} \u6267\u884c\u5df2\u53d6\u6d88\u3002\n\u5de5\u5355ID\uff1a{{order_id}}\n\u6807\u9898\uff1a{{order_title}}\n\u63d0\u4ea4\u4eba\uff1a{{submitter}}\n\u5f53\u524d\u72b6\u6001\uff1a{{order_state}}\n\u6267\u884c\u4eba\uff1a{{executed_by}}\n\u6267\u884c\u65f6\u95f4\uff1a{{executed_at}}",
 		"execution_partial_cancelled": "\u5de5\u5355 {{order_display_number}} \u90e8\u5206\u53d6\u6d88\u5df2\u5b8c\u6210\uff08\u5df2\u6267\u884c\u9636\u6bb5\u4fdd\u7559\uff0c\u4e0d\u81ea\u52a8\u56de\u6eda\uff09\u3002\n\u5de5\u5355ID\uff1a{{order_id}}\n\u6807\u9898\uff1a{{order_title}}\n\u63d0\u4ea4\u4eba\uff1a{{submitter}}\n\u5f53\u524d\u72b6\u6001\uff1a{{order_state}}\n\u6267\u884c\u4eba\uff1a{{executed_by}}\n\u6267\u884c\u65f6\u95f4\uff1a{{executed_at}}",
-		"grant_revoked":               "\u60a8\u7684\u67e5\u8be2\u8bbf\u95ee\u8d44\u683c\u5df2\u88ab\u64a4\u9500\u3002\u67e5\u8be2\u6d41\u7a0b\uff1a{{grant_flow_name}}\uff1b\u53d7\u5f71\u54cd\u6570\u636e\u6e90\uff1a{{grant_datasources}}\uff1b\u539f\u56e0\uff1a{{reason_code}}\uff1b\u64cd\u4f5c\u8005\uff1a{{revoked_by}}\uff1b\u65f6\u95f4\uff1a{{revoked_at}}\u3002\u5982\u9700\u7ee7\u7eed\u8bf7\u91cd\u65b0\u7533\u8bf7\u3002",
-		"budget_warning":              "AI\u65e5\u9884\u7b97\u5df2\u8fbe\u9608\u503c\u3002",
-		"budget_exhausted":            "AI\u65e5\u9884\u7b97\u5df2\u8017\u5c3d\u3002",
-		"provider_failover":           "AI Provider\u5df2\u89e6\u53d1\u6545\u969c\u5207\u6362\u3002",
+		"grant_revoked":               "\u60a8\u7684\u67e5\u8be2\u8bbf\u95ee\u8d44\u683c\u5df2\u88ab\u64a4\u9500\uff0c\u5982\u9700\u7ee7\u7eed\u8bf7\u91cd\u65b0\u7533\u8bf7\u3002\n\u67e5\u8be2\u6d41\u7a0b\uff1a{{grant_flow_name}}\n\u53d7\u5f71\u54cd\u6570\u636e\u6e90\uff1a{{grant_datasources}}\n\u64a4\u9500\u539f\u56e0\uff1a{{reason_code}}\n\u64cd\u4f5c\u4eba\uff1a{{revoked_by}}\n\u64a4\u9500\u65f6\u95f4\uff1a{{revoked_at}}",
+		"budget_warning":              "AI \u65e5\u9884\u7b97\u5df2\u8fbe\u5230\u544a\u8b66\u9608\u503c\uff0c\u8bf7\u53ca\u65f6\u5173\u6ce8\u7528\u91cf\u3002\n\u4e8b\u4ef6\u540d\u79f0\uff1a{{event_label}}\n\u89e6\u53d1\u65f6\u95f4\uff1a{{occurred_at}}\n\u539f\u56e0\u7801\uff1a{{reason_code}}",
+		"budget_exhausted":            "AI \u65e5\u9884\u7b97\u5df2\u8017\u5c3d\uff0c\u65b0\u7684 AI \u9884\u5ba1\u5c06\u53d7\u9650\u3002\n\u4e8b\u4ef6\u540d\u79f0\uff1a{{event_label}}\n\u89e6\u53d1\u65f6\u95f4\uff1a{{occurred_at}}\n\u539f\u56e0\u7801\uff1a{{reason_code}}",
+		"provider_failover":           "AI Provider \u5df2\u89e6\u53d1\u6545\u969c\u5207\u6362\uff0c\u8bf7\u68c0\u67e5\u4e3b Provider \u72b6\u6001\u3002\n\u4e8b\u4ef6\u540d\u79f0\uff1a{{event_label}}\n\u89e6\u53d1\u65f6\u95f4\uff1a{{occurred_at}}\n\u539f\u56e0\u7801\uff1a{{reason_code}}",
 	},
 	"en-US": {
 		"order_submitted":             "Order {{order_display_number}} submitted and pending approval.\nOrder ID: {{order_id}}\nTitle: {{order_title}}\nSubmitter: {{submitter}}\nSubmitted At: {{submitted_at}}\nState: {{order_state}}\nApprovers: {{approvers}}\nExecutors: {{executors}}",
@@ -199,261 +197,11 @@ var defaultPlaceholderTemplates = map[string]map[string]string{
 		"execution_missed":            "Order {{order_display_number}} schedule missed; no auto catch-up, please reschedule.\nOrder ID: {{order_id}}\nTitle: {{order_title}}\nSubmitter: {{submitter}}\nState: {{order_state}}\nExecutors: {{executors}}",
 		"execution_cancelled":         "Order {{order_display_number}} execution cancelled.\nOrder ID: {{order_id}}\nTitle: {{order_title}}\nSubmitter: {{submitter}}\nState: {{order_state}}\nExecuted By: {{executed_by}}\nExecuted At: {{executed_at}}",
 		"execution_partial_cancelled": "Order {{order_display_number}} partial cancellation completed (executed stages retained; no automatic rollback).\nOrder ID: {{order_id}}\nTitle: {{order_title}}\nSubmitter: {{submitter}}\nState: {{order_state}}\nExecuted By: {{executed_by}}\nExecuted At: {{executed_at}}",
-		"grant_revoked":               "Your query access grant was revoked. Flow: {{grant_flow_name}}; affected datasources: {{grant_datasources}}; reason: {{reason_code}}; operator: {{revoked_by}}; time: {{revoked_at}}. Reapply if needed.",
-		"budget_warning":              "AI daily budget threshold reached.",
-		"budget_exhausted":            "AI daily budget exhausted.",
-		"provider_failover":           "AI provider failover triggered.",
+		"grant_revoked":               "Your query access grant was revoked. Reapply if needed.\nFlow: {{grant_flow_name}}\nAffected Datasources: {{grant_datasources}}\nReason: {{reason_code}}\nRevoked By: {{revoked_by}}\nRevoked At: {{revoked_at}}",
+		"budget_warning":              "AI daily budget threshold reached.\nEvent: {{event_label}}\nOccurred At: {{occurred_at}}\nReason: {{reason_code}}",
+		"budget_exhausted":            "AI daily budget exhausted; new AI reviews are restricted.\nEvent: {{event_label}}\nOccurred At: {{occurred_at}}\nReason: {{reason_code}}",
+		"provider_failover":           "AI provider failover triggered; please inspect the primary provider.\nEvent: {{event_label}}\nOccurred At: {{occurred_at}}\nReason: {{reason_code}}",
 	},
-}
-
-// DefaultPlaceholderTemplate returns the built-in default template with {{placeholder}} variables for an event.
-func DefaultPlaceholderTemplate(eventType, locale string) string {
-	key, ok := templateKey[eventType]
-	if !ok {
-		return ""
-	}
-	if locale != "en-US" {
-		locale = "zh-CN"
-	}
-	return defaultPlaceholderTemplates[locale][key]
-}
-
-// ValidateMessageTemplate validates a custom notification rule template against length, control-character,
-// balanced {{...}} syntax, allowlisted placeholder names, and forbidden SQL/secret literal patterns.
-func ValidateMessageTemplate(tpl string) error {
-	if tpl == "" {
-		return nil
-	}
-	if utf8.RuneCountInString(tpl) > MaxMessageTemplateRunes {
-		return ErrValidation
-	}
-	for _, r := range tpl {
-		if (r < 0x20 && r != '\n' && r != '\r' && r != '\t') || r == 0x7f {
-			return ErrValidation
-		}
-	}
-	var staticBuf strings.Builder
-	rest := tpl
-	for len(rest) > 0 {
-		openIdx := strings.Index(rest, "{{")
-		closeIdx := strings.Index(rest, "}}")
-		if closeIdx >= 0 && (openIdx < 0 || closeIdx < openIdx) {
-			return ErrValidation // unmatched closing braces
-		}
-		if openIdx < 0 {
-			staticBuf.WriteString(rest)
-			break
-		}
-		staticBuf.WriteString(rest[:openIdx])
-		afterOpen := rest[openIdx+2:]
-		relClose := strings.Index(afterOpen, "}}")
-		if relClose < 0 {
-			return ErrValidation // unclosed {{
-		}
-		token := strings.TrimSpace(afterOpen[:relClose])
-		if token == "" || strings.ContainsAny(token, "\r\n\t {}") || !allowlistedPlaceholderSet[token] {
-			return ErrValidation
-		}
-		rest = afterOpen[relClose+2:]
-	}
-	lowerStatic := strings.ToLower(staticBuf.String())
-	for _, pat := range forbiddenStaticPatterns {
-		if strings.Contains(lowerStatic, pat) {
-			return ErrValidation
-		}
-	}
-	return nil
-}
-
-// RenderTemplateString replaces allowlisted {{placeholder}} tokens with bounded values from vars.
-func RenderTemplateString(tpl string, vars map[string]string) string {
-	if tpl == "" {
-		return ""
-	}
-	var out strings.Builder
-	rest := tpl
-	for len(rest) > 0 {
-		openIdx := strings.Index(rest, "{{")
-		if openIdx < 0 {
-			out.WriteString(rest)
-			break
-		}
-		out.WriteString(rest[:openIdx])
-		afterOpen := rest[openIdx+2:]
-		relClose := strings.Index(afterOpen, "}}")
-		if relClose < 0 {
-			out.WriteString(rest[openIdx:])
-			break
-		}
-		token := strings.TrimSpace(afterOpen[:relClose])
-		if allowlistedPlaceholderSet[token] {
-			val := strings.TrimSpace(vars[token])
-			if val == "" {
-				val = "-"
-			}
-			out.WriteString(val)
-		} else {
-			out.WriteString("-")
-		}
-		rest = afterOpen[relClose+2:]
-	}
-	return out.String()
-}
-
-// boundedText strips control characters and truncates length (unified sanitizer for display fields).
-func boundedText(s string, max int) string {
-	if len(s) > max {
-		s = s[:max]
-	}
-	return strings.Map(func(r rune) rune {
-		if r < 0x20 || r == 0x7f {
-			return -1
-		}
-		return r
-	}, s)
-}
-
-// sanitizeOrderTitle sanitizes a change order title into a single-line bounded string (<= 120 runes)
-// and redacts any SQL statement keywords or secret assignment patterns.
-func sanitizeOrderTitle(s string) string {
-	cleaned := strings.Map(func(r rune) rune {
-		if r == '\r' || r == '\n' || r == '\t' {
-			return ' '
-		}
-		if r < 0x20 || r == 0x7f {
-			return -1
-		}
-		return r
-	}, strings.TrimSpace(s))
-	runes := []rune(cleaned)
-	if len(runes) > MaxOrderTitlePlaceholderRunes {
-		cleaned = string(runes[:MaxOrderTitlePlaceholderRunes]) + "…"
-	}
-	lower := strings.ToLower(cleaned)
-	for _, pat := range forbiddenStaticPatterns {
-		if strings.Contains(lower, pat) {
-			return "[REDACTED]"
-		}
-	}
-	if cleaned == "" {
-		return "-"
-	}
-	return cleaned
-}
-
-// boundedOperator sanitizes an operator name to the safe username character set.
-func boundedOperator(s string) string {
-	if len(s) > 64 {
-		s = s[:64]
-	}
-	return strings.Map(func(r rune) rune {
-		ok := r >= 'a' && r <= 'z' || r >= 'A' && r <= 'Z' || r >= '0' && r <= '9' ||
-			r == '_' || r == '.' || r == '-'
-		if !ok {
-			return -1
-		}
-		return r
-	}, s)
-}
-
-func reasonOr(reason, locale, fallback string) string {
-	if reason == "" {
-		if locale == "en-US" {
-			return fallback
-		}
-		switch fallback {
-		case "reviewed":
-			return "\u5df2\u5904\u7406"
-		default:
-			return "\u5931\u8d25"
-		}
-	}
-	return reason
-}
-
-// validReason checks whether reason matches the bounded reason code format (never passing through free text).
-func validReason(reason string) bool {
-	if reason == "" || len(reason) > 64 {
-		return false
-	}
-	for _, r := range reason {
-		ok := r >= 'A' && r <= 'Z' || r >= '0' && r <= '9' || r == '_'
-		if !ok {
-			return false
-		}
-	}
-	return true
-}
-
-// orderDisplayNumber resolves display_number from a change order ID (bounded read-only lookup; falls back to truncated ID).
-func (w *Worker) orderDisplayNumber(ctx context.Context, orderID string) string {
-	var dn string
-	if w.db != nil {
-		if err := w.db.WithContext(ctx).Raw(
-			`select display_number from change_orders where id = ?`, orderID).Scan(&dn).Error; err == nil && dn != "" {
-			return dn
-		}
-	}
-	return shortRef(orderID)
-}
-
-func shortRef(id string) string {
-	if len(id) > 8 {
-		return "YR-" + id[:8]
-	}
-	if id == "" {
-		return "YR-PREVIEW"
-	}
-	return "YR-" + id
-}
-
-// EventBody renders the complete notification body for an outbox event using the default template.
-func (w *Worker) EventBody(ctx context.Context, ev *OutboxEventModel, reason string) string {
-	return w.EventBodyWithTemplate(ctx, ev, reason, "")
-}
-
-// EventBodyWithTemplate renders the notification body for an outbox event, using customTemplate when
-// non-empty and falling back to the built-in default template for ev.EventType.
-func (w *Worker) EventBodyWithTemplate(ctx context.Context, ev *OutboxEventModel, reason, customTemplate string) string {
-	if _, ok := templateKey[ev.EventType]; !ok {
-		return ""
-	}
-	locale := w.locale
-	if locale != "en-US" {
-		locale = "zh-CN"
-	}
-	customTemplate = strings.TrimSpace(customTemplate)
-	if customTemplate != "" && ValidateMessageTemplate(customTemplate) != nil {
-		customTemplate = ""
-	}
-	tpl := customTemplate
-	if tpl == "" {
-		tpl = DefaultPlaceholderTemplate(ev.EventType, locale)
-	}
-	if tpl == "" {
-		return ""
-	}
-	var vars map[string]string
-	switch {
-	case ev.EventType == "query_grant.revoked":
-		vars = w.buildGrantRevokedTemplateVars(ctx, ev, reason, locale)
-	case strings.HasPrefix(ev.EventType, "change_order.") || strings.HasPrefix(ev.EventType, "execution."):
-		vars = w.buildOrderTemplateVars(ctx, ev, reason, locale)
-	default:
-		vars = w.buildAITemplateVars(ev, reason, locale)
-	}
-	body := RenderTemplateString(tpl, vars)
-	if body == "" {
-		return ""
-	}
-	// S007: append back-link to the system when general.public_base_url is configured and the template
-	// did not already include {{order_url}} explicitly.
-	if w.publicBaseURL != "" && vars["order_id"] != "" && vars["order_id"] != "-" &&
-		!strings.Contains(tpl, "{{order_url}}") &&
-		(strings.HasPrefix(ev.EventType, "change_order.") || strings.HasPrefix(ev.EventType, "execution.")) {
-		body += "\n" + strings.TrimRight(w.publicBaseURL, "/") + "/changes/orders/" + vars["order_id"]
-	}
-	return body
 }
 
 // buildOrderTemplateVars resolves all allowlisted order/approval/execution placeholders from frozen snapshots.
@@ -478,8 +226,8 @@ func (w *Worker) buildOrderTemplateVars(ctx context.Context, ev *OutboxEventMode
 		occurredAt = ev.OccurredAt.UTC().Format("2006-01-02T15:04:05Z")
 	}
 	orderURL := "-"
-	if w.publicBaseURL != "" && orderID != "" {
-		orderURL = strings.TrimRight(w.publicBaseURL, "/") + "/changes/orders/" + orderID
+	if baseURL := w.getPublicBaseURL(); baseURL != "" && orderID != "" {
+		orderURL = strings.TrimRight(baseURL, "/") + "/changes/orders/" + orderID
 	}
 	vars := map[string]string{
 		"order_display_number":  ref,
@@ -568,13 +316,11 @@ func (w *Worker) buildOrderTemplateVars(ctx context.Context, ev *OutboxEventMode
 			select flow_snapshot_ciphertext, flow_snapshot_nonce,
 			       flow_snapshot_key_id, flow_snapshot_algorithm
 			from order_flow_snapshots where order_id = ?`, orderID).Scan(&snapRow).Error; err == nil && snapRow.Ciphertext != nil {
-			if plain, oerr := w.crypter.Open(crypto.PurposePayload, crypto.Envelope{
-				Ciphertext: snapRow.Ciphertext, Nonce: snapRow.Nonce,
-				KeyID: snapRow.KeyID, Algorithm: snapRow.Algorithm,
-			}, crypto.AAD{
-				DeploymentID: w.crypter.DeploymentID(), Table: "order_flow_snapshots",
-				PrimaryKey: orderID, Column: "flow_snapshot_ciphertext", Purpose: crypto.PurposePayload,
-			}); oerr == nil {
+			if plain, oerr := w.crypter.OpenColumn(
+				crypto.PurposePayload,
+				crypto.ColumnRef{Table: "order_flow_snapshots", PrimaryKey: orderID, Column: "flow_snapshot_ciphertext"},
+				crypto.Envelope{Ciphertext: snapRow.Ciphertext, Nonce: snapRow.Nonce, KeyID: snapRow.KeyID, Algorithm: snapRow.Algorithm},
+			); oerr == nil {
 				var doc struct {
 					FlowID   string `json:"flow_id"`
 					FlowName string `json:"flow_name"`
@@ -700,153 +446,4 @@ func (w *Worker) buildOrderTemplateVars(ctx context.Context, ev *OutboxEventMode
 	}
 
 	return vars
-}
-
-func joinBoundedActors(users []string, maxCount int) string {
-	cleaned := make([]string, 0, len(users))
-	for _, u := range users {
-		if c := boundedOperator(u); c != "" {
-			cleaned = append(cleaned, c)
-		}
-	}
-	if len(cleaned) == 0 {
-		return "-"
-	}
-	if len(cleaned) > maxCount {
-		cleaned = append(cleaned[:maxCount], "…")
-	}
-	return strings.Join(cleaned, ", ")
-}
-
-func nonEmptyOr(v, fallback string) string {
-	if strings.TrimSpace(v) == "" {
-		return fallback
-	}
-	return v
-}
-
-// buildGrantRevokedTemplateVars resolves placeholders for query_grant.revoked events.
-func (w *Worker) buildGrantRevokedTemplateVars(ctx context.Context, ev *OutboxEventModel, reason, locale string) map[string]string {
-	var payload struct {
-		GrantID    string `json:"grant_id"`
-		RevokedBy  string `json:"revoked_by"`
-		ReasonCode string `json:"reason_code"`
-	}
-	_ = json.Unmarshal(ev.Payload, &payload)
-	grantID := payload.GrantID
-	if grantID == "" {
-		grantID = strings.TrimPrefix(ev.Subject, "query-grants/")
-	}
-	var row struct {
-		RequestID string `gorm:"column:query_access_request_id"`
-		Operator  string `gorm:"column:revoked_by_username_snapshot"`
-	}
-	if w.db != nil && grantID != "" {
-		_ = w.db.WithContext(ctx).Raw(
-			`select query_access_request_id, coalesce(revoked_by_username_snapshot, '')
-			 from query_grants where id = ?`, grantID).Scan(&row).Error
-	}
-	operator := payload.RevokedBy
-	if operator == "" {
-		operator = row.Operator
-	}
-	var flowName string
-	var datasources []string
-	if w.db != nil && row.RequestID != "" {
-		_ = w.db.WithContext(ctx).Raw(
-			`select flow_name_snapshot from query_access_requests where id = ?`,
-			row.RequestID).Scan(&flowName).Error
-		_ = w.db.WithContext(ctx).Raw(
-			`select datasource_name_snapshot from query_access_request_datasources
-			 where request_id = ? order by datasource_name_snapshot limit 4`,
-			row.RequestID).Scan(&datasources).Error
-	}
-	dsJoined := "-"
-	if len(datasources) > 0 {
-		shown := datasources
-		if len(shown) > 3 {
-			shown = append(shown[:3], "…")
-		}
-		dsJoined = strings.Join(shown, ", ")
-	}
-	if !validReason(reason) {
-		reason = payload.ReasonCode
-	}
-	if !validReason(reason) {
-		reason = "-"
-	}
-	occurredAt := "-"
-	if !ev.OccurredAt.IsZero() {
-		occurredAt = ev.OccurredAt.UTC().Format("2006-01-02T15:04:05Z")
-	}
-	return map[string]string{
-		"event_type":        ev.EventType,
-		"event_label":       nonEmptyOr(eventLabels[locale][ev.EventType], ev.EventType),
-		"grant_flow_name":   nonEmptyOr(boundedText(flowName, 128), "-"),
-		"grant_datasources": nonEmptyOr(boundedText(dsJoined, 384), "-"),
-		"reason_code":       reason,
-		"revoked_by":        nonEmptyOr(boundedOperator(operator), "-"),
-		"revoked_at":        occurredAt,
-		"occurred_at":       occurredAt,
-	}
-}
-
-// buildAITemplateVars resolves placeholders for ai.* budget/failover events.
-func (w *Worker) buildAITemplateVars(ev *OutboxEventModel, reason, locale string) map[string]string {
-	if !validReason(reason) {
-		reason = "-"
-	}
-	occurredAt := "-"
-	if !ev.OccurredAt.IsZero() {
-		occurredAt = ev.OccurredAt.UTC().Format("2006-01-02T15:04:05Z")
-	}
-	return map[string]string{
-		"event_type":  ev.EventType,
-		"event_label": nonEmptyOr(eventLabels[locale][ev.EventType], ev.EventType),
-		"occurred_at": occurredAt,
-		"reason_code": reason,
-	}
-}
-
-// sampleTemplateVars returns deterministic preview placeholder values when no sample_order_id is supplied.
-func sampleTemplateVars(locale, eventType string) map[string]string {
-	if locale != "en-US" {
-		locale = "zh-CN"
-	}
-	return map[string]string{
-		"order_display_number":  "YR-PREVIEW",
-		"order_no":              "YR-PREVIEW",
-		"order_id":              "00000000-0000-4000-8000-000000000001",
-		"order_title":           "orders_index_change",
-		"event_type":            eventType,
-		"event_label":           nonEmptyOr(eventLabels[locale][eventType], eventType),
-		"order_state":           "stage_approval_active",
-		"flow_name":             "prod-standard-flow",
-		"stage_position":        "1",
-		"stage_name":            "prod-primary",
-		"datasource_name":       "prod-mysql-01",
-		"datasource_engine":     "mysql",
-		"submitter":             "alice",
-		"submitter_username":    "alice",
-		"submitted_at":          "2026-11-10T09:00:00Z",
-		"approvers":             "bob, carol",
-		"approved_by":           "bob",
-		"reviewer":              "bob",
-		"approval_decision":     "approve",
-		"approved_at":           "2026-11-10T09:05:00Z",
-		"reviewed_at":           "2026-11-10T09:05:00Z",
-		"executors":             "dba_ops",
-		"executed_by":           "dba_ops",
-		"executor":              "dba_ops",
-		"execution_started_at":  "2026-11-10T09:10:00Z",
-		"executed_at":           "2026-11-10T09:10:03Z",
-		"execution_finished_at": "2026-11-10T09:10:03Z",
-		"reason_code":           "REVIEWED",
-		"order_url":             "/changes/orders/00000000-0000-4000-8000-000000000001",
-		"grant_flow_name":       "readonly-query-flow",
-		"grant_datasources":     "prod-mysql-01",
-		"revoked_by":            "admin",
-		"revoked_at":            "2026-11-10T09:15:00Z",
-		"occurred_at":           "2026-11-10T09:15:00Z",
-	}
 }

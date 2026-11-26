@@ -14,6 +14,23 @@ type Error struct {
 
 func (e *Error) Error() string { return fmt.Sprintf("query: %d %s", e.Code, e.Name) }
 
+// BizCode implements bizerr.Coded.
+func (e *Error) BizCode() int { return int(e.Code) }
+
+// BizName implements bizerr.Coded.
+func (e *Error) BizName() string { return e.Name }
+
+// BizMessage implements bizerr.Coded.
+func (e *Error) BizMessage() string { return "Query request rejected" }
+
+// BizMeta implements bizerr.Coded.
+func (e *Error) BizMeta() map[string]any {
+	if e.Detail != "" {
+		return map[string]any{"detail": e.Detail}
+	}
+	return nil
+}
+
 // WithDetail attaches sanitized diagnostic detail (chainable).
 func (e *Error) WithDetail(detail string) *Error {
 	e.Detail = detail

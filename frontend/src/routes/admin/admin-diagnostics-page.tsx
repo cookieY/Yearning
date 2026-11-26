@@ -3,11 +3,7 @@ import { useTranslation } from "react-i18next";
 import { useSearchParams } from "react-router";
 import {
   Activity,
-  ArrowUpDown,
   Camera,
-  ChevronDown,
-  Eye,
-  Sparkles,
   TableProperties,
 } from "lucide-react";
 import type {
@@ -16,16 +12,14 @@ import type {
 } from "@/api/generated/client/yearningV4HTTPAPI.schemas";
 import { useSession } from "@/features/auth/session-provider";
 import { DiagnosticStatementDetailPanel } from "@/features/diagnostics/diagnostic-statement-detail";
-import {
-  DiagnosticsOverviewCharts,
-  formatReadableSqlLabel,
-} from "@/features/diagnostics/diagnostics-overview-charts";
+import { DiagnosticsOverviewCharts } from "@/features/diagnostics/diagnostics-overview-charts";
 import {
   useDiagnosticDatasources,
   useDiagnosticStatementDetail,
   useDiagnosticsOverview,
   useTriggerManualDiagnosticsSnapshot,
 } from "@/features/diagnostics/use-diagnostics";
+import { DiagnosticsStatementsCard } from "@/routes/admin/admin-diagnostics-statements-card";
 import { describeError, describeErrorText } from "@/shared/api/error-display";
 import { formatTimestamp } from "@/shared/lib/timezones";
 import { appToast } from "@/shared/components/shadcn-dashboard/sonner/sonner-08";
@@ -34,34 +28,18 @@ import { ErrorState } from "@/shared/components/status/status-components";
 import { LoadingState } from "@/shared/components/status/loading-state";
 import { PageHeader, PageLayout } from "@/shared/components/page-layout";
 import { PendingButton } from "@/shared/components/pending-button";
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/shared/components/ui/collapsible";
-import {
-  CodeBlock,
-  CodeBlockActions,
-  CodeBlockContent,
-  CodeBlockCopyButton,
-  highlightSqlLine,
-} from "@/shared/components/ui/code-block";
 import { Alert, AlertDescription, AlertTitle } from "@/shared/components/ui/alert";
 import { Badge } from "@/shared/components/ui/badge";
 import { Button } from "@/shared/components/ui/button";
 import {
   Card,
   CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
 } from "@/shared/components/ui/card";
 import {
   Dialog,
   DialogContent,
   DialogTitle,
 } from "@/shared/components/ui/dialog";
-import { ScrollArea } from "@/shared/components/ui/scroll-area";
 import {
   Select,
   SelectContent,
@@ -69,14 +47,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/shared/components/ui/select";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/shared/components/ui/table";
 
 type TimeRangePreset = "15m" | "1h" | "6h" | "24h" | "7d";
 
@@ -476,181 +446,11 @@ export default function AdminDiagnosticsPage() {
             }}
           />
 
-          {/* Sortable SQL Statement Table */}
-          <Card data-testid="diag-statements-card">
-            <CardHeader>
-              <CardTitle>{t("diagnostics.table.title")}</CardTitle>
-              <CardDescription>{t("diagnostics.table.description")}</CardDescription>
-            </CardHeader>
-            <CardContent className="px-0!">
-              {sortedStatements.length === 0 ? (
-                <EmptyState
-                  title={t("diagnostics.table.empty")}
-                  testId="diag-statements-empty"
-                />
-              ) : (
-                <ScrollArea className="h-80" viewportClassName="h-80 pr-3">
-                  <Table data-testid="diag-statements-table">
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>{t("diagnostics.columns.fingerprint")}</TableHead>
-                        <TableHead>{t("diagnostics.columns.schema")}</TableHead>
-                        <TableHead>{t("diagnostics.columns.templatePreview")}</TableHead>
-                        <TableHead>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => {
-                              setSortBy("total_exec_time_ms");
-                            }}
-                            data-testid="diag-sort-total_exec_time_ms"
-                          >
-                            {t("diagnostics.metrics.totalExecTimeMs")}
-                            <ArrowUpDown className="size-3.5" />
-                          </Button>
-                        </TableHead>
-                        <TableHead>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => {
-                              setSortBy("avg_exec_time_ms");
-                            }}
-                            data-testid="diag-sort-avg_exec_time_ms"
-                          >
-                            {t("diagnostics.metrics.avgExecTimeMs")}
-                            <ArrowUpDown className="size-3.5" />
-                          </Button>
-                        </TableHead>
-                        <TableHead>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => {
-                              setSortBy("calls");
-                            }}
-                            data-testid="diag-sort-calls"
-                          >
-                            {t("diagnostics.metrics.calls")}
-                            <ArrowUpDown className="size-3.5" />
-                          </Button>
-                        </TableHead>
-                        <TableHead>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => {
-                              setSortBy("rows_examined");
-                            }}
-                            data-testid="diag-sort-rows_examined"
-                          >
-                            {t("diagnostics.metrics.rowsExaminedOrBlksRead")}
-                            <ArrowUpDown className="size-3.5" />
-                          </Button>
-                        </TableHead>
-                        <TableHead className="text-right">{t("common.actions")}</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {sortedStatements.map((stmt, idx) => {
-                        const previewText =
-                          stmt.template_preview ??
-                          t(`diagnostics.templateStatus.${stmt.template_status}`);
-                        const isLongPreview = previewText.length > 52;
-                        return (
-                          <TableRow
-                            key={stmt.statement_id}
-                            data-testid={`diag-statement-row-${stmt.statement_id}`}
-                          >
-                            <TableCell className="font-mono text-xs font-semibold">
-                              {formatReadableSqlLabel({
-                                templatePreview: stmt.template_preview,
-                                databaseOrSchema: stmt.database_or_schema,
-                                engineFingerprint: stmt.engine_fingerprint,
-                                fallbackIndex: idx,
-                                maxLength: 42,
-                              })}
-                            </TableCell>
-                            <TableCell className="font-mono text-xs">
-                              {stmt.database_or_schema}
-                            </TableCell>
-                            <TableCell className="max-w-xs font-mono text-xs text-muted-foreground">
-                              {isLongPreview ? (
-                                <Collapsible>
-                                  <CollapsibleTrigger className="group hover:bg-muted/40 flex w-full cursor-pointer items-center justify-between gap-2 rounded px-1.5 py-1 text-left font-mono text-xs transition-colors hover:text-foreground">
-                                    <span className="max-w-60 truncate">
-                                      {stmt.template_preview
-                                        ? highlightSqlLine(previewText)
-                                        : previewText}
-                                    </span>
-                                    <ChevronDown className="size-3.5 shrink-0 text-muted-foreground transition-transform duration-200 ease-out group-data-panel-open:rotate-180" />
-                                  </CollapsibleTrigger>
-                                  <CollapsibleContent className="pt-1 pb-1">
-                                    <CodeBlock size="sm">
-                                      <CodeBlockActions>
-                                        <CodeBlockCopyButton value={previewText} />
-                                      </CodeBlockActions>
-                                      <CodeBlockContent wrap>
-                                        {previewText}
-                                      </CodeBlockContent>
-                                    </CodeBlock>
-                                  </CollapsibleContent>
-                                </Collapsible>
-                              ) : (
-                                <span className="block max-w-xs truncate">
-                                  {stmt.template_preview
-                                    ? highlightSqlLine(previewText)
-                                    : previewText}
-                                </span>
-                              )}
-                            </TableCell>
-                            <TableCell className="tabular-nums text-xs">
-                              {stmt.total_exec_time_ms.toFixed(2)} ms
-                            </TableCell>
-                            <TableCell className="tabular-nums text-xs">
-                              {stmt.avg_exec_time_ms.toFixed(2)} ms
-                            </TableCell>
-                            <TableCell className="tabular-nums text-xs">
-                              {stmt.calls}
-                            </TableCell>
-                            <TableCell className="tabular-nums text-xs">
-                              {stmt.rows_examined_or_shared_blks_read}
-                            </TableCell>
-                            <TableCell className="text-right">
-                              <div className="flex justify-end gap-1.5">
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => {
-                                    handleSelectStatement(stmt.statement_id);
-                                  }}
-                                  data-testid={`diag-open-detail-${stmt.statement_id}`}
-                                >
-                                  <Eye className="size-3.5" />
-                                  {t("diagnostics.actions.viewDetail")}
-                                </Button>
-                                <Button
-                                  variant="secondary"
-                                  size="sm"
-                                  onClick={() => {
-                                    handleSelectStatement(stmt.statement_id);
-                                  }}
-                                  data-testid={`diag-open-ai-${stmt.statement_id}`}
-                                >
-                                  <Sparkles className="size-3.5" />
-                                  {t("diagnostics.actions.aiAnalyze")}
-                                </Button>
-                              </div>
-                            </TableCell>
-                          </TableRow>
-                        );
-                      })}
-                    </TableBody>
-                  </Table>
-                </ScrollArea>
-              )}
-            </CardContent>
-          </Card>
+          <DiagnosticsStatementsCard
+            sortedStatements={sortedStatements}
+            onSortChange={setSortBy}
+            onSelectStatement={handleSelectStatement}
+          />
         </>
       )}
     </PageLayout>

@@ -6,13 +6,9 @@ package application
 import (
 	"context"
 	"errors"
-	"strings"
 	"time"
 
-	"github.com/go-sql-driver/mysql"
-	"github.com/jackc/pgx/v5/pgconn"
 	"gorm.io/gorm"
-	"gorm.io/gorm/clause"
 
 	"github.com/google/uuid"
 
@@ -24,9 +20,6 @@ import (
 	"github.com/cookieY/YearningX/backend/internal/review/fingerprint"
 	"github.com/cookieY/YearningX/backend/internal/review/persistence"
 )
-
-// forUpdate is the row-lock clause (command contract locks field).
-func forUpdate() clause.Locking { return clause.Locking{Strength: "UPDATE"} }
 
 // Actor represents the command initiator (session identity snapshot).
 type Actor struct {
@@ -106,7 +99,7 @@ var (
 func (s *Services) loadDraftForUpdate(ctx context.Context, tx *gorm.DB, draftID string) (*persistence.ChangeDraftModel, error) {
 	var m persistence.ChangeDraftModel
 	if err := tx.WithContext(ctx).
-		Clauses(forUpdate()).
+		Clauses(txutil.ForUpdate()).
 		Where("id = ?", draftID).
 		First(&m).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -323,47 +316,6 @@ func nowUTC() time.Time { return time.Now().UTC() }
 // errEnumUnknown indicates an unknown persisted state enum (PERSISTENCE_ENUM_UNKNOWN,
 // HTTP 500 transport error; mapping to a default state is forbidden).
 var errEnumUnknown = errors.New("review: persisted enum unknown")
-
-// splitCursor parses a "created|id" cursor.
-func splitCursor(c string) (string, string, bool) {
-	for i := len(c) - 1; i >= 0; i-- {
-		if c[i] == '|' {
-			return c[:i], c[i+1:], true
-		}
-	}
-	return "", "", false
-}
-
-// isPgCheckViolation reports whether an error is a PG CHECK constraint violation (23514).
-func isPgCheckViolation(err error) bool {
-	var pgErr *pgconn.PgError
-	return errors.As(err, &pgErr) && pgErr.Code == "23514"
-}
-
-func isUniqueViolationErr(err error) bool { return txutil.IsUniqueViolation(err) }
-
-// uniqueViolationConstraint extracts the constraint/index name from a unique constraint violation
-// (PG uses ConstraintName; MySQL extracts the key name from 1062 message "for key '...'" — that arm is
-// defensive since the platform DB is strictly PG and go-sql-driver is used only for target business DBs).
-// Constraint names in both dialects include the column name, allowing callers to tell which unique axis
-// collided; returns an empty string when unavailable (driver differences / future wrappers) to degrade to generic wording.
-func uniqueViolationConstraint(err error) string {
-	var pgErr *pgconn.PgError
-	if errors.As(err, &pgErr) && pgErr.Code == "23505" {
-		return pgErr.ConstraintName
-	}
-	var mysqlErr *mysql.MySQLError
-	if errors.As(err, &mysqlErr) && mysqlErr.Number == 1062 {
-		const marker = "for key '"
-		if i := strings.Index(mysqlErr.Message, marker); i >= 0 {
-			rest := mysqlErr.Message[i+len(marker):]
-			if j := strings.Index(rest, "'"); j >= 0 {
-				return rest[:j]
-			}
-		}
-	}
-	return ""
-}
 
 // failureCodeOf maps a domain error to a business code; unknown errors default to fingerprint failure (fail closed).
 func failureCodeOf(err error) int32 {

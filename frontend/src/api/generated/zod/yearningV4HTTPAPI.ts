@@ -73,6 +73,7 @@ export const RegisterBody = zod.object({
 })
 
 export const registerResponseOneDataRoleDefault = `user`;
+export const registerResponseOneDataAuthProviderDefault = `local`;
 
 
 export const RegisterResponse = zod.union([zod.object({
@@ -85,6 +86,7 @@ export const RegisterResponse = zod.union([zod.object({
   "email": zod.email().nullish(),
   "is_builtin_admin": zod.boolean(),
   "role": zod.enum(['user', 'admin']).default(registerResponseOneDataRoleDefault).describe('User account role. Both is_builtin_admin=true and role=admin grant access to \/admin\/\* management pages.'),
+  "auth_provider": zod.enum(['local', 'ldap', 'oidc']).default(registerResponseOneDataAuthProviderDefault).describe('Identity provider managing this user\'s password; only local non-builtin accounts allow admin password reset.'),
   "version": zod.int().min(1),
   "created_at": zod.iso.datetime({"offset":true}),
   "updated_at": zod.iso.datetime({"offset":true})
@@ -103,6 +105,12 @@ export const RegisterResponse = zod.union([zod.object({
 })])
 
 
+export const listAuthenticationProvidersResponseOneDataBrandingProductNameMax = 64;
+
+export const listAuthenticationProvidersResponseOneDataBrandingLoginDescriptionMax = 500;
+
+
+
 export const ListAuthenticationProvidersResponse = zod.union([zod.object({
   "err_code": zod.literal(0),
   "message": zod.literal("ok"),
@@ -113,7 +121,11 @@ export const ListAuthenticationProvidersResponse = zod.union([zod.object({
   "key": zod.string(),
   "label": zod.string(),
   "start_url": zod.string()
-}))
+})),
+  "branding": zod.object({
+  "product_name": zod.string().min(1).max(listAuthenticationProvidersResponseOneDataBrandingProductNameMax),
+  "login_description": zod.string().max(listAuthenticationProvidersResponseOneDataBrandingLoginDescriptionMax)
+}).optional().describe('Public branding fields configured under the branding settings namespace (product_name and plain-text login_description).')
 }),
   "request_id": zod.uuid()
 }),zod.object({
@@ -178,6 +190,7 @@ export const FinishOidcLoginResponse = zod.void()
 
 
 export const getCurrentUserResponseOneDataOneRoleDefault = `user`;
+export const getCurrentUserResponseOneDataOneAuthProviderDefault = `local`;
 
 
 export const GetCurrentUserResponse = zod.union([zod.object({
@@ -190,6 +203,7 @@ export const GetCurrentUserResponse = zod.union([zod.object({
   "email": zod.email().nullish(),
   "is_builtin_admin": zod.boolean(),
   "role": zod.enum(['user', 'admin']).default(getCurrentUserResponseOneDataOneRoleDefault).describe('User account role. Both is_builtin_admin=true and role=admin grant access to \/admin\/\* management pages.'),
+  "auth_provider": zod.enum(['local', 'ldap', 'oidc']).default(getCurrentUserResponseOneDataOneAuthProviderDefault).describe('Identity provider managing this user\'s password; only local non-builtin accounts allow admin password reset.'),
   "version": zod.int().min(1),
   "created_at": zod.iso.datetime({"offset":true}),
   "updated_at": zod.iso.datetime({"offset":true})
@@ -259,6 +273,7 @@ export const ListUsersQueryParams = zod.object({
 })
 
 export const listUsersResponseOneDataTwoItemsItemRoleDefault = `user`;
+export const listUsersResponseOneDataTwoItemsItemAuthProviderDefault = `local`;
 
 
 export const ListUsersResponse = zod.union([zod.object({
@@ -278,6 +293,7 @@ export const ListUsersResponse = zod.union([zod.object({
   "email": zod.email().nullish(),
   "is_builtin_admin": zod.boolean(),
   "role": zod.enum(['user', 'admin']).default(listUsersResponseOneDataTwoItemsItemRoleDefault).describe('User account role. Both is_builtin_admin=true and role=admin grant access to \/admin\/\* management pages.'),
+  "auth_provider": zod.enum(['local', 'ldap', 'oidc']).default(listUsersResponseOneDataTwoItemsItemAuthProviderDefault).describe('Identity provider managing this user\'s password; only local non-builtin accounts allow admin password reset.'),
   "version": zod.int().min(1),
   "created_at": zod.iso.datetime({"offset":true}),
   "updated_at": zod.iso.datetime({"offset":true})
@@ -315,6 +331,7 @@ export const CreateUserBody = zod.object({
 })
 
 export const createUserResponseOneDataRoleDefault = `user`;
+export const createUserResponseOneDataAuthProviderDefault = `local`;
 
 
 export const CreateUserResponse = zod.union([zod.object({
@@ -327,6 +344,7 @@ export const CreateUserResponse = zod.union([zod.object({
   "email": zod.email().nullish(),
   "is_builtin_admin": zod.boolean(),
   "role": zod.enum(['user', 'admin']).default(createUserResponseOneDataRoleDefault).describe('User account role. Both is_builtin_admin=true and role=admin grant access to \/admin\/\* management pages.'),
+  "auth_provider": zod.enum(['local', 'ldap', 'oidc']).default(createUserResponseOneDataAuthProviderDefault).describe('Identity provider managing this user\'s password; only local non-builtin accounts allow admin password reset.'),
   "version": zod.int().min(1),
   "created_at": zod.iso.datetime({"offset":true}),
   "updated_at": zod.iso.datetime({"offset":true})
@@ -367,6 +385,7 @@ export const UpdateUserBody = zod.object({
 })
 
 export const updateUserResponseOneDataRoleDefault = `user`;
+export const updateUserResponseOneDataAuthProviderDefault = `local`;
 
 
 export const UpdateUserResponse = zod.union([zod.object({
@@ -379,6 +398,7 @@ export const UpdateUserResponse = zod.union([zod.object({
   "email": zod.email().nullish(),
   "is_builtin_admin": zod.boolean(),
   "role": zod.enum(['user', 'admin']).default(updateUserResponseOneDataRoleDefault).describe('User account role. Both is_builtin_admin=true and role=admin grant access to \/admin\/\* management pages.'),
+  "auth_provider": zod.enum(['local', 'ldap', 'oidc']).default(updateUserResponseOneDataAuthProviderDefault).describe('Identity provider managing this user\'s password; only local non-builtin accounts allow admin password reset.'),
   "version": zod.int().min(1),
   "created_at": zod.iso.datetime({"offset":true}),
   "updated_at": zod.iso.datetime({"offset":true})
@@ -409,6 +429,41 @@ export const DeleteUserHeader = zod.object({
 })
 
 export const DeleteUserResponse = zod.union([zod.object({
+  "err_code": zod.literal(0),
+  "message": zod.literal("ok"),
+  "data": zod.null(),
+  "request_id": zod.uuid()
+}),zod.object({
+  "err_code": zod.union([zod.literal(1001),zod.literal(1002),zod.literal(1003),zod.literal(1004),zod.literal(1005),zod.literal(1006),zod.literal(1007),zod.literal(1008),zod.literal(1009),zod.literal(1010),zod.literal(1011),zod.literal(1012),zod.literal(1101),zod.literal(1102),zod.literal(1103),zod.literal(1104),zod.literal(1105),zod.literal(1106),zod.literal(1107),zod.literal(1108),zod.literal(1109),zod.literal(2001),zod.literal(2002),zod.literal(2003),zod.literal(2004),zod.literal(2005),zod.literal(2006),zod.literal(2007),zod.literal(2008),zod.literal(2009),zod.literal(2010),zod.literal(2011),zod.literal(2012),zod.literal(2013),zod.literal(2014),zod.literal(3001),zod.literal(3002),zod.literal(3003),zod.literal(3004),zod.literal(3005),zod.literal(3006),zod.literal(3007),zod.literal(3008),zod.literal(3009),zod.literal(3010),zod.literal(3011),zod.literal(3012),zod.literal(4001),zod.literal(4002),zod.literal(4003),zod.literal(4004),zod.literal(4005),zod.literal(4006),zod.literal(4007),zod.literal(4008),zod.literal(4009),zod.literal(4010),zod.literal(4011),zod.literal(5001),zod.literal(5002),zod.literal(5003),zod.literal(5004),zod.literal(5005),zod.literal(6001),zod.literal(6002),zod.literal(6003),zod.literal(6004),zod.literal(6005),zod.literal(6006),zod.literal(6007),zod.literal(7001),zod.literal(7002),zod.literal(7003),zod.literal(7004),zod.literal(7005),zod.literal(7006),zod.literal(7007),zod.literal(7008)]),
+  "message": zod.string(),
+  "data": zod.null(),
+  "request_id": zod.uuid(),
+  "retryable": zod.boolean(),
+  "meta": zod.object({
+  "detail": zod.string().optional(),
+  "fields": zod.record(zod.string(), zod.array(zod.string())).optional().describe('Field-level VALIDATION_FAILED reasons; keys are request field names (snake_case), values are human-readable constraint messages for that field.')
+}).optional().describe('Optional error metadata with a bounded, per-error-code key set. VALIDATION_FAILED (1001) may carry detail (free-text constraint sentence, R1 L-1) and fields (RCP-20261102-S008): field-level reasons keyed by request field name (snake_case, matching the request schema).')
+})])
+
+
+/**
+ * Resets a local non-builtin user's password to a temporary value meeting the 12-character policy and revokes all active sessions for that user. Rejects the builtin admin (ADMIN_IMMUTABLE) and external identity users (PASSWORD_MANAGED_BY_IDENTITY_SOURCE).
+ * @summary Admin reset of a local user's password
+ */
+export const ResetUserPasswordParams = zod.object({
+  "user_id": zod.uuid()
+})
+
+export const resetUserPasswordBodyNewPasswordMin = 12;
+export const resetUserPasswordBodyNewPasswordMax = 1024;
+
+
+
+export const ResetUserPasswordBody = zod.object({
+  "new_password": zod.string().min(resetUserPasswordBodyNewPasswordMin).max(resetUserPasswordBodyNewPasswordMax)
+})
+
+export const ResetUserPasswordResponse = zod.union([zod.object({
   "err_code": zod.literal(0),
   "message": zod.literal("ok"),
   "data": zod.null(),
@@ -490,6 +545,8 @@ export const listFlowsResponseOneDataTwoItemsItemNameMax = 128;
 
 export const listFlowsResponseOneDataTwoItemsItemStagesItemDatasourceNameMax = 128;
 
+export const listFlowsResponseOneDataTwoItemsItemStagesItemDatasourceDatabaseNameMax = 128;
+
 export const listFlowsResponseOneDataTwoItemsItemStagesItemApprovalStepsItemPositionMax = 10;
 
 
@@ -525,6 +582,9 @@ export const ListFlowsResponse = zod.union([zod.object({
   "position": zod.int().min(1),
   "datasource_id": zod.uuid(),
   "datasource_name": zod.string().min(1).max(listFlowsResponseOneDataTwoItemsItemStagesItemDatasourceNameMax),
+  "datasource_engine": zod.enum(['mysql', 'postgresql', 'tidb', 'oceanbase', 'polardb']).optional(),
+  "datasource_compatibility_mode": zod.enum(['mysql', 'postgresql']).optional(),
+  "datasource_database_name": zod.string().max(listFlowsResponseOneDataTwoItemsItemStagesItemDatasourceDatabaseNameMax).nullish(),
   "approval_steps": zod.array(zod.object({
   "position": zod.int().min(1).max(listFlowsResponseOneDataTwoItemsItemStagesItemApprovalStepsItemPositionMax),
   "actors": zod.array(zod.object({
@@ -622,6 +682,8 @@ export const createFlowResponseOneDataNameMax = 128;
 
 export const createFlowResponseOneDataStagesItemDatasourceNameMax = 128;
 
+export const createFlowResponseOneDataStagesItemDatasourceDatabaseNameMax = 128;
+
 export const createFlowResponseOneDataStagesItemApprovalStepsItemPositionMax = 10;
 
 
@@ -650,6 +712,9 @@ export const CreateFlowResponse = zod.union([zod.object({
   "position": zod.int().min(1),
   "datasource_id": zod.uuid(),
   "datasource_name": zod.string().min(1).max(createFlowResponseOneDataStagesItemDatasourceNameMax),
+  "datasource_engine": zod.enum(['mysql', 'postgresql', 'tidb', 'oceanbase', 'polardb']).optional(),
+  "datasource_compatibility_mode": zod.enum(['mysql', 'postgresql']).optional(),
+  "datasource_database_name": zod.string().max(createFlowResponseOneDataStagesItemDatasourceDatabaseNameMax).nullish(),
   "approval_steps": zod.array(zod.object({
   "position": zod.int().min(1).max(createFlowResponseOneDataStagesItemApprovalStepsItemPositionMax),
   "actors": zod.array(zod.object({
@@ -701,6 +766,8 @@ export const getFlowResponseOneDataNameMax = 128;
 
 export const getFlowResponseOneDataStagesItemDatasourceNameMax = 128;
 
+export const getFlowResponseOneDataStagesItemDatasourceDatabaseNameMax = 128;
+
 export const getFlowResponseOneDataStagesItemApprovalStepsItemPositionMax = 10;
 
 
@@ -729,6 +796,9 @@ export const GetFlowResponse = zod.union([zod.object({
   "position": zod.int().min(1),
   "datasource_id": zod.uuid(),
   "datasource_name": zod.string().min(1).max(getFlowResponseOneDataStagesItemDatasourceNameMax),
+  "datasource_engine": zod.enum(['mysql', 'postgresql', 'tidb', 'oceanbase', 'polardb']).optional(),
+  "datasource_compatibility_mode": zod.enum(['mysql', 'postgresql']).optional(),
+  "datasource_database_name": zod.string().max(getFlowResponseOneDataStagesItemDatasourceDatabaseNameMax).nullish(),
   "approval_steps": zod.array(zod.object({
   "position": zod.int().min(1).max(getFlowResponseOneDataStagesItemApprovalStepsItemPositionMax),
   "actors": zod.array(zod.object({
@@ -836,6 +906,8 @@ export const replaceFlowResponseOneDataNameMax = 128;
 
 export const replaceFlowResponseOneDataStagesItemDatasourceNameMax = 128;
 
+export const replaceFlowResponseOneDataStagesItemDatasourceDatabaseNameMax = 128;
+
 export const replaceFlowResponseOneDataStagesItemApprovalStepsItemPositionMax = 10;
 
 
@@ -864,6 +936,9 @@ export const ReplaceFlowResponse = zod.union([zod.object({
   "position": zod.int().min(1),
   "datasource_id": zod.uuid(),
   "datasource_name": zod.string().min(1).max(replaceFlowResponseOneDataStagesItemDatasourceNameMax),
+  "datasource_engine": zod.enum(['mysql', 'postgresql', 'tidb', 'oceanbase', 'polardb']).optional(),
+  "datasource_compatibility_mode": zod.enum(['mysql', 'postgresql']).optional(),
+  "datasource_database_name": zod.string().max(replaceFlowResponseOneDataStagesItemDatasourceDatabaseNameMax).nullish(),
   "approval_steps": zod.array(zod.object({
   "position": zod.int().min(1).max(replaceFlowResponseOneDataStagesItemApprovalStepsItemPositionMax),
   "actors": zod.array(zod.object({
@@ -2269,7 +2344,7 @@ export const CreateDatasourceBody = zod.object({
   "host": zod.string().min(1).max(createDatasourceBodyHostMax),
   "port": zod.int().min(1).max(createDatasourceBodyPortMax),
   "database_name": zod.string().max(createDatasourceBodyDatabaseNameMax).nullish(),
-  "version_constraint": zod.string().min(1).max(createDatasourceBodyVersionConstraintMax),
+  "version_constraint": zod.string().min(1).max(createDatasourceBodyVersionConstraintMax).optional().describe('Optional version constraint. When omitted on create, defaults from the capability matrix for the engine and compatibility_mode; when omitted on replace, preserves the stored value or falls back to the matrix default.'),
   "enabled": zod.boolean(),
   "test_purpose": zod.enum(['review', 'query', 'execution']).default(createDatasourceBodyTestPurposeDefault).describe('Connection test purpose stored on the datasource; the connection-test action probes with this purpose\'s stored credential. Full-replacement semantics like every other field — omitting it resets the purpose to review.'),
   "credentials": zod.array(zod.object({
@@ -2417,7 +2492,7 @@ export const ReplaceDatasourceBody = zod.object({
   "host": zod.string().min(1).max(replaceDatasourceBodyHostMax),
   "port": zod.int().min(1).max(replaceDatasourceBodyPortMax),
   "database_name": zod.string().max(replaceDatasourceBodyDatabaseNameMax).nullish(),
-  "version_constraint": zod.string().min(1).max(replaceDatasourceBodyVersionConstraintMax),
+  "version_constraint": zod.string().min(1).max(replaceDatasourceBodyVersionConstraintMax).optional().describe('Optional version constraint. When omitted on create, defaults from the capability matrix for the engine and compatibility_mode; when omitted on replace, preserves the stored value or falls back to the matrix default.'),
   "enabled": zod.boolean(),
   "test_purpose": zod.enum(['review', 'query', 'execution']).default(replaceDatasourceBodyTestPurposeDefault).describe('Connection test purpose stored on the datasource; the connection-test action probes with this purpose\'s stored credential. Full-replacement semantics like every other field — omitting it resets the purpose to review.'),
   "credentials": zod.array(zod.object({
@@ -3095,7 +3170,7 @@ export const ListPromptToolsResponse = zod.union([zod.object({
   "parameters": zod.record(zod.string(), zod.union([zod.int().min(1).max(listPromptToolsResponseOneDataTwoItemsItemOneParametersOneMax),zod.string().max(listPromptToolsResponseOneDataTwoItemsItemOneParametersTwoMax),zod.boolean(),zod.array(zod.string().max(listPromptToolsResponseOneDataTwoItemsItemOneParametersFourItemMax)).max(listPromptToolsResponseOneDataTwoItemsItemOneParametersFourMax)])).optional().describe('可调参数（阈值类；键命名^[a-z][a-z0-9_]{0,31}$， 值为正整数\/短字符串\/布尔\/短字符串数组；内置技能键集与 类型以行内为准，值可调）。知识文本以{{参数名}}引用， 注入时按行内当前值渲染；engine和parameters均由管理API 持久化并参与config_hash，变化使引用旧配置的未提交Review失效。'),
   "definition": zod.object({
   "knowledge_text": zod.string().min(1).max(listPromptToolsResponseOneDataTwoItemsItemOneDefinitionKnowledgeTextMax),
-  "max_severity": zod.enum(['info', 'low', 'medium', 'high', 'critical']).default(listPromptToolsResponseOneDataTwoItemsItemOneDefinitionMaxSeverityDefault).describe('Retained for v1 definition, API and stored-configuration compatibility. This field is not a submission ceiling for enabled mandatory rules and cannot authorize a lower-risk result: every actual hit from an enabled, frozen and scope-matched Prompt Tool or internal-experience rule becomes effective Critical and blocks submission regardless of the model-provided severity. Unbound model observations remain visible but are capped at Medium. The finding key is system-derived and is injected alongside the rule text.'),
+  "max_severity": zod.enum(['info', 'low', 'medium', 'high', 'critical']).default(listPromptToolsResponseOneDataTwoItemsItemOneDefinitionMaxSeverityDefault).describe('Retained for v1 definition, API and stored-configuration compatibility. This field is not a submission ceiling for enabled mandatory rules and cannot authorize a lower-risk result: every actual hit from an enabled, frozen and scope-matched Prompt Tool rule becomes effective Critical and blocks submission regardless of the model-provided severity. Unbound model observations remain visible but are capped at Medium. The finding key is system-derived and is injected alongside the rule text.'),
   "version": zod.int().min(1)
 })
 }).and(zod.object({
@@ -3149,7 +3224,7 @@ export const CreatePromptToolBody = zod.object({
   "parameters": zod.record(zod.string(), zod.union([zod.int().min(1).max(createPromptToolBodyParametersOneMax),zod.string().max(createPromptToolBodyParametersTwoMax),zod.boolean(),zod.array(zod.string().max(createPromptToolBodyParametersFourItemMax)).max(createPromptToolBodyParametersFourMax)])).optional().describe('可调参数（阈值类；键命名^[a-z][a-z0-9_]{0,31}$， 值为正整数\/短字符串\/布尔\/短字符串数组；内置技能键集与 类型以行内为准，值可调）。知识文本以{{参数名}}引用， 注入时按行内当前值渲染；engine和parameters均由管理API 持久化并参与config_hash，变化使引用旧配置的未提交Review失效。'),
   "definition": zod.object({
   "knowledge_text": zod.string().min(1).max(createPromptToolBodyDefinitionKnowledgeTextMax),
-  "max_severity": zod.enum(['info', 'low', 'medium', 'high', 'critical']).default(createPromptToolBodyDefinitionMaxSeverityDefault).describe('Retained for v1 definition, API and stored-configuration compatibility. This field is not a submission ceiling for enabled mandatory rules and cannot authorize a lower-risk result: every actual hit from an enabled, frozen and scope-matched Prompt Tool or internal-experience rule becomes effective Critical and blocks submission regardless of the model-provided severity. Unbound model observations remain visible but are capped at Medium. The finding key is system-derived and is injected alongside the rule text.'),
+  "max_severity": zod.enum(['info', 'low', 'medium', 'high', 'critical']).default(createPromptToolBodyDefinitionMaxSeverityDefault).describe('Retained for v1 definition, API and stored-configuration compatibility. This field is not a submission ceiling for enabled mandatory rules and cannot authorize a lower-risk result: every actual hit from an enabled, frozen and scope-matched Prompt Tool rule becomes effective Critical and blocks submission regardless of the model-provided severity. Unbound model observations remain visible but are capped at Medium. The finding key is system-derived and is injected alongside the rule text.'),
   "version": zod.int().min(1)
 })
 })
@@ -3184,7 +3259,7 @@ export const CreatePromptToolResponse = zod.union([zod.object({
   "parameters": zod.record(zod.string(), zod.union([zod.int().min(1).max(createPromptToolResponseOneDataOneParametersOneMax),zod.string().max(createPromptToolResponseOneDataOneParametersTwoMax),zod.boolean(),zod.array(zod.string().max(createPromptToolResponseOneDataOneParametersFourItemMax)).max(createPromptToolResponseOneDataOneParametersFourMax)])).optional().describe('可调参数（阈值类；键命名^[a-z][a-z0-9_]{0,31}$， 值为正整数\/短字符串\/布尔\/短字符串数组；内置技能键集与 类型以行内为准，值可调）。知识文本以{{参数名}}引用， 注入时按行内当前值渲染；engine和parameters均由管理API 持久化并参与config_hash，变化使引用旧配置的未提交Review失效。'),
   "definition": zod.object({
   "knowledge_text": zod.string().min(1).max(createPromptToolResponseOneDataOneDefinitionKnowledgeTextMax),
-  "max_severity": zod.enum(['info', 'low', 'medium', 'high', 'critical']).default(createPromptToolResponseOneDataOneDefinitionMaxSeverityDefault).describe('Retained for v1 definition, API and stored-configuration compatibility. This field is not a submission ceiling for enabled mandatory rules and cannot authorize a lower-risk result: every actual hit from an enabled, frozen and scope-matched Prompt Tool or internal-experience rule becomes effective Critical and blocks submission regardless of the model-provided severity. Unbound model observations remain visible but are capped at Medium. The finding key is system-derived and is injected alongside the rule text.'),
+  "max_severity": zod.enum(['info', 'low', 'medium', 'high', 'critical']).default(createPromptToolResponseOneDataOneDefinitionMaxSeverityDefault).describe('Retained for v1 definition, API and stored-configuration compatibility. This field is not a submission ceiling for enabled mandatory rules and cannot authorize a lower-risk result: every actual hit from an enabled, frozen and scope-matched Prompt Tool rule becomes effective Critical and blocks submission regardless of the model-provided severity. Unbound model observations remain visible but are capped at Medium. The finding key is system-derived and is injected alongside the rule text.'),
   "version": zod.int().min(1)
 })
 }).and(zod.object({
@@ -3436,7 +3511,7 @@ export const GetPromptToolResponse = zod.union([zod.object({
   "parameters": zod.record(zod.string(), zod.union([zod.int().min(1).max(getPromptToolResponseOneDataOneParametersOneMax),zod.string().max(getPromptToolResponseOneDataOneParametersTwoMax),zod.boolean(),zod.array(zod.string().max(getPromptToolResponseOneDataOneParametersFourItemMax)).max(getPromptToolResponseOneDataOneParametersFourMax)])).optional().describe('可调参数（阈值类；键命名^[a-z][a-z0-9_]{0,31}$， 值为正整数\/短字符串\/布尔\/短字符串数组；内置技能键集与 类型以行内为准，值可调）。知识文本以{{参数名}}引用， 注入时按行内当前值渲染；engine和parameters均由管理API 持久化并参与config_hash，变化使引用旧配置的未提交Review失效。'),
   "definition": zod.object({
   "knowledge_text": zod.string().min(1).max(getPromptToolResponseOneDataOneDefinitionKnowledgeTextMax),
-  "max_severity": zod.enum(['info', 'low', 'medium', 'high', 'critical']).default(getPromptToolResponseOneDataOneDefinitionMaxSeverityDefault).describe('Retained for v1 definition, API and stored-configuration compatibility. This field is not a submission ceiling for enabled mandatory rules and cannot authorize a lower-risk result: every actual hit from an enabled, frozen and scope-matched Prompt Tool or internal-experience rule becomes effective Critical and blocks submission regardless of the model-provided severity. Unbound model observations remain visible but are capped at Medium. The finding key is system-derived and is injected alongside the rule text.'),
+  "max_severity": zod.enum(['info', 'low', 'medium', 'high', 'critical']).default(getPromptToolResponseOneDataOneDefinitionMaxSeverityDefault).describe('Retained for v1 definition, API and stored-configuration compatibility. This field is not a submission ceiling for enabled mandatory rules and cannot authorize a lower-risk result: every actual hit from an enabled, frozen and scope-matched Prompt Tool rule becomes effective Critical and blocks submission regardless of the model-provided severity. Unbound model observations remain visible but are capped at Medium. The finding key is system-derived and is injected alongside the rule text.'),
   "version": zod.int().min(1)
 })
 }).and(zod.object({
@@ -3500,7 +3575,7 @@ export const ReplacePromptToolBody = zod.object({
   "parameters": zod.record(zod.string(), zod.union([zod.int().min(1).max(replacePromptToolBodyParametersOneMax),zod.string().max(replacePromptToolBodyParametersTwoMax),zod.boolean(),zod.array(zod.string().max(replacePromptToolBodyParametersFourItemMax)).max(replacePromptToolBodyParametersFourMax)])).optional().describe('可调参数（阈值类；键命名^[a-z][a-z0-9_]{0,31}$， 值为正整数\/短字符串\/布尔\/短字符串数组；内置技能键集与 类型以行内为准，值可调）。知识文本以{{参数名}}引用， 注入时按行内当前值渲染；engine和parameters均由管理API 持久化并参与config_hash，变化使引用旧配置的未提交Review失效。'),
   "definition": zod.object({
   "knowledge_text": zod.string().min(1).max(replacePromptToolBodyDefinitionKnowledgeTextMax),
-  "max_severity": zod.enum(['info', 'low', 'medium', 'high', 'critical']).default(replacePromptToolBodyDefinitionMaxSeverityDefault).describe('Retained for v1 definition, API and stored-configuration compatibility. This field is not a submission ceiling for enabled mandatory rules and cannot authorize a lower-risk result: every actual hit from an enabled, frozen and scope-matched Prompt Tool or internal-experience rule becomes effective Critical and blocks submission regardless of the model-provided severity. Unbound model observations remain visible but are capped at Medium. The finding key is system-derived and is injected alongside the rule text.'),
+  "max_severity": zod.enum(['info', 'low', 'medium', 'high', 'critical']).default(replacePromptToolBodyDefinitionMaxSeverityDefault).describe('Retained for v1 definition, API and stored-configuration compatibility. This field is not a submission ceiling for enabled mandatory rules and cannot authorize a lower-risk result: every actual hit from an enabled, frozen and scope-matched Prompt Tool rule becomes effective Critical and blocks submission regardless of the model-provided severity. Unbound model observations remain visible but are capped at Medium. The finding key is system-derived and is injected alongside the rule text.'),
   "version": zod.int().min(1)
 })
 })
@@ -3535,7 +3610,7 @@ export const ReplacePromptToolResponse = zod.union([zod.object({
   "parameters": zod.record(zod.string(), zod.union([zod.int().min(1).max(replacePromptToolResponseOneDataOneParametersOneMax),zod.string().max(replacePromptToolResponseOneDataOneParametersTwoMax),zod.boolean(),zod.array(zod.string().max(replacePromptToolResponseOneDataOneParametersFourItemMax)).max(replacePromptToolResponseOneDataOneParametersFourMax)])).optional().describe('可调参数（阈值类；键命名^[a-z][a-z0-9_]{0,31}$， 值为正整数\/短字符串\/布尔\/短字符串数组；内置技能键集与 类型以行内为准，值可调）。知识文本以{{参数名}}引用， 注入时按行内当前值渲染；engine和parameters均由管理API 持久化并参与config_hash，变化使引用旧配置的未提交Review失效。'),
   "definition": zod.object({
   "knowledge_text": zod.string().min(1).max(replacePromptToolResponseOneDataOneDefinitionKnowledgeTextMax),
-  "max_severity": zod.enum(['info', 'low', 'medium', 'high', 'critical']).default(replacePromptToolResponseOneDataOneDefinitionMaxSeverityDefault).describe('Retained for v1 definition, API and stored-configuration compatibility. This field is not a submission ceiling for enabled mandatory rules and cannot authorize a lower-risk result: every actual hit from an enabled, frozen and scope-matched Prompt Tool or internal-experience rule becomes effective Critical and blocks submission regardless of the model-provided severity. Unbound model observations remain visible but are capped at Medium. The finding key is system-derived and is injected alongside the rule text.'),
+  "max_severity": zod.enum(['info', 'low', 'medium', 'high', 'critical']).default(replacePromptToolResponseOneDataOneDefinitionMaxSeverityDefault).describe('Retained for v1 definition, API and stored-configuration compatibility. This field is not a submission ceiling for enabled mandatory rules and cannot authorize a lower-risk result: every actual hit from an enabled, frozen and scope-matched Prompt Tool rule becomes effective Critical and blocks submission regardless of the model-provided severity. Unbound model observations remain visible but are capped at Medium. The finding key is system-derived and is injected alongside the rule text.'),
   "version": zod.int().min(1)
 })
 }).and(zod.object({
@@ -3602,17 +3677,17 @@ export const ListKnowledgeEntriesQueryParams = zod.object({
   "after": zod.string().optional()
 })
 
-export const listKnowledgeEntriesResponseOneDataTwoItemsItemOneNameMax = 128;
+export const listKnowledgeEntriesResponseOneDataTwoItemsItemNameMax = 128;
 
-export const listKnowledgeEntriesResponseOneDataTwoItemsItemOnePurposeMax = 512;
+export const listKnowledgeEntriesResponseOneDataTwoItemsItemPurposeMax = 512;
 
-export const listKnowledgeEntriesResponseOneDataTwoItemsItemOneDatabaseNameMax = 128;
+export const listKnowledgeEntriesResponseOneDataTwoItemsItemDatabaseNameMax = 128;
 
-export const listKnowledgeEntriesResponseOneDataTwoItemsItemOneTableNameMax = 128;
+export const listKnowledgeEntriesResponseOneDataTwoItemsItemTableNameMax = 128;
 
-export const listKnowledgeEntriesResponseOneDataTwoItemsItemOneDefinitionKnowledgeTextMax = 65536;
+export const listKnowledgeEntriesResponseOneDataTwoItemsItemDefinitionKnowledgeTextMax = 65536;
 
-export const listKnowledgeEntriesResponseOneDataTwoItemsItemOneDefinitionMaxSeverityDefault = `medium`;
+export const listKnowledgeEntriesResponseOneDataTwoItemsItemDefinitionMaxSeverityDefault = `medium`;
 
 
 
@@ -3627,27 +3702,26 @@ export const ListKnowledgeEntriesResponse = zod.union([zod.object({
 })
 }).and(zod.object({
   "items": zod.array(zod.object({
-  "name": zod.string().min(1).max(listKnowledgeEntriesResponseOneDataTwoItemsItemOneNameMax),
-  "purpose": zod.string().max(listKnowledgeEntriesResponseOneDataTwoItemsItemOnePurposeMax).optional(),
+  "id": zod.uuid(),
+  "name": zod.string().min(1).max(listKnowledgeEntriesResponseOneDataTwoItemsItemNameMax),
+  "purpose": zod.string().max(listKnowledgeEntriesResponseOneDataTwoItemsItemPurposeMax).optional(),
   "state": zod.enum(['draft', 'enabled', 'disabled']),
   "scope_type": zod.enum(['global', 'datasource', 'table']),
   "datasource_id": zod.uuid().optional(),
-  "database_name": zod.string().min(1).max(listKnowledgeEntriesResponseOneDataTwoItemsItemOneDatabaseNameMax).optional(),
-  "table_name": zod.string().min(1).max(listKnowledgeEntriesResponseOneDataTwoItemsItemOneTableNameMax).optional(),
+  "database_name": zod.string().min(1).max(listKnowledgeEntriesResponseOneDataTwoItemsItemDatabaseNameMax).optional(),
+  "table_name": zod.string().min(1).max(listKnowledgeEntriesResponseOneDataTwoItemsItemTableNameMax).optional(),
   "definition": zod.object({
-  "knowledge_text": zod.string().min(1).max(listKnowledgeEntriesResponseOneDataTwoItemsItemOneDefinitionKnowledgeTextMax),
-  "max_severity": zod.enum(['info', 'low', 'medium', 'high', 'critical']).default(listKnowledgeEntriesResponseOneDataTwoItemsItemOneDefinitionMaxSeverityDefault).describe('Retained for v1 definition, API and stored-configuration compatibility. This field is not a submission ceiling for enabled mandatory rules and cannot authorize a lower-risk result: every actual hit from an enabled, frozen and scope-matched Prompt Tool or internal-experience rule becomes effective Critical and blocks submission regardless of the model-provided severity. Unbound model observations remain visible but are capped at Medium. The finding key is system-derived and is injected alongside the rule text.'),
+  "knowledge_text": zod.string().min(1).max(listKnowledgeEntriesResponseOneDataTwoItemsItemDefinitionKnowledgeTextMax),
+  "max_severity": zod.enum(['info', 'low', 'medium', 'high', 'critical']).default(listKnowledgeEntriesResponseOneDataTwoItemsItemDefinitionMaxSeverityDefault).describe('Stored advisory maximum severity for internal experience entries. Legacy high\/critical values remain readable for historical rows and are capped at medium at runtime; new writes restrict max_severity to info, low, or medium.'),
   "version": zod.int().min(1)
 }),
   "provenance": zod.enum(['manual', 'finding_conversion']),
-  "source_finding_id": zod.uuid().optional()
-}).and(zod.object({
-  "id": zod.uuid(),
+  "source_finding_id": zod.uuid().optional(),
   "config_hash": zod.string(),
   "version": zod.int().min(1),
   "created_at": zod.iso.datetime({"offset":true}),
   "updated_at": zod.iso.datetime({"offset":true})
-})))
+}))
 })),
   "request_id": zod.uuid()
 }),zod.object({
@@ -3680,30 +3754,30 @@ export const CreateKnowledgeEntryBody = zod.object({
   "name": zod.string().min(1).max(createKnowledgeEntryBodyNameMax),
   "purpose": zod.string().max(createKnowledgeEntryBodyPurposeMax).optional(),
   "state": zod.enum(['draft', 'enabled', 'disabled']).optional(),
-  "scope_type": zod.enum(['global', 'datasource', 'table']),
+  "scope_type": zod.enum(['datasource', 'table']),
   "datasource_id": zod.uuid().optional(),
   "database_name": zod.string().min(1).max(createKnowledgeEntryBodyDatabaseNameMax).optional(),
   "table_name": zod.string().min(1).max(createKnowledgeEntryBodyTableNameMax).optional(),
   "definition": zod.object({
   "knowledge_text": zod.string().min(1).max(createKnowledgeEntryBodyDefinitionKnowledgeTextMax),
-  "max_severity": zod.enum(['info', 'low', 'medium', 'high', 'critical']).default(createKnowledgeEntryBodyDefinitionMaxSeverityDefault).describe('Retained for v1 definition, API and stored-configuration compatibility. This field is not a submission ceiling for enabled mandatory rules and cannot authorize a lower-risk result: every actual hit from an enabled, frozen and scope-matched Prompt Tool or internal-experience rule becomes effective Critical and blocks submission regardless of the model-provided severity. Unbound model observations remain visible but are capped at Medium. The finding key is system-derived and is injected alongside the rule text.'),
+  "max_severity": zod.enum(['info', 'low', 'medium']).default(createKnowledgeEntryBodyDefinitionMaxSeverityDefault).describe('Advisory maximum severity for non-blocking internal experience guidance (info, low, or medium). Internal experience entries assist the Database AI Assistant and emit non-blocking advisory findings during AI Review without ever blocking submission.'),
   "version": zod.int().min(1)
 }),
   "provenance": zod.enum(['manual', 'finding_conversion']).optional(),
   "source_finding_id": zod.uuid().optional()
 })
 
-export const createKnowledgeEntryResponseOneDataOneNameMax = 128;
+export const createKnowledgeEntryResponseOneDataNameMax = 128;
 
-export const createKnowledgeEntryResponseOneDataOnePurposeMax = 512;
+export const createKnowledgeEntryResponseOneDataPurposeMax = 512;
 
-export const createKnowledgeEntryResponseOneDataOneDatabaseNameMax = 128;
+export const createKnowledgeEntryResponseOneDataDatabaseNameMax = 128;
 
-export const createKnowledgeEntryResponseOneDataOneTableNameMax = 128;
+export const createKnowledgeEntryResponseOneDataTableNameMax = 128;
 
-export const createKnowledgeEntryResponseOneDataOneDefinitionKnowledgeTextMax = 65536;
+export const createKnowledgeEntryResponseOneDataDefinitionKnowledgeTextMax = 65536;
 
-export const createKnowledgeEntryResponseOneDataOneDefinitionMaxSeverityDefault = `medium`;
+export const createKnowledgeEntryResponseOneDataDefinitionMaxSeverityDefault = `medium`;
 
 
 
@@ -3711,27 +3785,26 @@ export const CreateKnowledgeEntryResponse = zod.union([zod.object({
   "err_code": zod.literal(0),
   "message": zod.literal("ok"),
   "data": zod.object({
-  "name": zod.string().min(1).max(createKnowledgeEntryResponseOneDataOneNameMax),
-  "purpose": zod.string().max(createKnowledgeEntryResponseOneDataOnePurposeMax).optional(),
+  "id": zod.uuid(),
+  "name": zod.string().min(1).max(createKnowledgeEntryResponseOneDataNameMax),
+  "purpose": zod.string().max(createKnowledgeEntryResponseOneDataPurposeMax).optional(),
   "state": zod.enum(['draft', 'enabled', 'disabled']),
   "scope_type": zod.enum(['global', 'datasource', 'table']),
   "datasource_id": zod.uuid().optional(),
-  "database_name": zod.string().min(1).max(createKnowledgeEntryResponseOneDataOneDatabaseNameMax).optional(),
-  "table_name": zod.string().min(1).max(createKnowledgeEntryResponseOneDataOneTableNameMax).optional(),
+  "database_name": zod.string().min(1).max(createKnowledgeEntryResponseOneDataDatabaseNameMax).optional(),
+  "table_name": zod.string().min(1).max(createKnowledgeEntryResponseOneDataTableNameMax).optional(),
   "definition": zod.object({
-  "knowledge_text": zod.string().min(1).max(createKnowledgeEntryResponseOneDataOneDefinitionKnowledgeTextMax),
-  "max_severity": zod.enum(['info', 'low', 'medium', 'high', 'critical']).default(createKnowledgeEntryResponseOneDataOneDefinitionMaxSeverityDefault).describe('Retained for v1 definition, API and stored-configuration compatibility. This field is not a submission ceiling for enabled mandatory rules and cannot authorize a lower-risk result: every actual hit from an enabled, frozen and scope-matched Prompt Tool or internal-experience rule becomes effective Critical and blocks submission regardless of the model-provided severity. Unbound model observations remain visible but are capped at Medium. The finding key is system-derived and is injected alongside the rule text.'),
+  "knowledge_text": zod.string().min(1).max(createKnowledgeEntryResponseOneDataDefinitionKnowledgeTextMax),
+  "max_severity": zod.enum(['info', 'low', 'medium', 'high', 'critical']).default(createKnowledgeEntryResponseOneDataDefinitionMaxSeverityDefault).describe('Stored advisory maximum severity for internal experience entries. Legacy high\/critical values remain readable for historical rows and are capped at medium at runtime; new writes restrict max_severity to info, low, or medium.'),
   "version": zod.int().min(1)
 }),
   "provenance": zod.enum(['manual', 'finding_conversion']),
-  "source_finding_id": zod.uuid().optional()
-}).and(zod.object({
-  "id": zod.uuid(),
+  "source_finding_id": zod.uuid().optional(),
   "config_hash": zod.string(),
   "version": zod.int().min(1),
   "created_at": zod.iso.datetime({"offset":true}),
   "updated_at": zod.iso.datetime({"offset":true})
-})),
+}),
   "request_id": zod.uuid()
 }),zod.object({
   "err_code": zod.union([zod.literal(1001),zod.literal(1002),zod.literal(1003),zod.literal(1004),zod.literal(1005),zod.literal(1006),zod.literal(1007),zod.literal(1008),zod.literal(1009),zod.literal(1010),zod.literal(1011),zod.literal(1012),zod.literal(1101),zod.literal(1102),zod.literal(1103),zod.literal(1104),zod.literal(1105),zod.literal(1106),zod.literal(1107),zod.literal(1108),zod.literal(1109),zod.literal(2001),zod.literal(2002),zod.literal(2003),zod.literal(2004),zod.literal(2005),zod.literal(2006),zod.literal(2007),zod.literal(2008),zod.literal(2009),zod.literal(2010),zod.literal(2011),zod.literal(2012),zod.literal(2013),zod.literal(2014),zod.literal(3001),zod.literal(3002),zod.literal(3003),zod.literal(3004),zod.literal(3005),zod.literal(3006),zod.literal(3007),zod.literal(3008),zod.literal(3009),zod.literal(3010),zod.literal(3011),zod.literal(3012),zod.literal(4001),zod.literal(4002),zod.literal(4003),zod.literal(4004),zod.literal(4005),zod.literal(4006),zod.literal(4007),zod.literal(4008),zod.literal(4009),zod.literal(4010),zod.literal(4011),zod.literal(5001),zod.literal(5002),zod.literal(5003),zod.literal(5004),zod.literal(5005),zod.literal(6001),zod.literal(6002),zod.literal(6003),zod.literal(6004),zod.literal(6005),zod.literal(6006),zod.literal(6007),zod.literal(7001),zod.literal(7002),zod.literal(7003),zod.literal(7004),zod.literal(7005),zod.literal(7006),zod.literal(7007),zod.literal(7008)]),
@@ -3750,17 +3823,17 @@ export const GetKnowledgeEntryParams = zod.object({
   "knowledge_entry_id": zod.uuid()
 })
 
-export const getKnowledgeEntryResponseOneDataOneNameMax = 128;
+export const getKnowledgeEntryResponseOneDataNameMax = 128;
 
-export const getKnowledgeEntryResponseOneDataOnePurposeMax = 512;
+export const getKnowledgeEntryResponseOneDataPurposeMax = 512;
 
-export const getKnowledgeEntryResponseOneDataOneDatabaseNameMax = 128;
+export const getKnowledgeEntryResponseOneDataDatabaseNameMax = 128;
 
-export const getKnowledgeEntryResponseOneDataOneTableNameMax = 128;
+export const getKnowledgeEntryResponseOneDataTableNameMax = 128;
 
-export const getKnowledgeEntryResponseOneDataOneDefinitionKnowledgeTextMax = 65536;
+export const getKnowledgeEntryResponseOneDataDefinitionKnowledgeTextMax = 65536;
 
-export const getKnowledgeEntryResponseOneDataOneDefinitionMaxSeverityDefault = `medium`;
+export const getKnowledgeEntryResponseOneDataDefinitionMaxSeverityDefault = `medium`;
 
 
 
@@ -3768,27 +3841,26 @@ export const GetKnowledgeEntryResponse = zod.union([zod.object({
   "err_code": zod.literal(0),
   "message": zod.literal("ok"),
   "data": zod.object({
-  "name": zod.string().min(1).max(getKnowledgeEntryResponseOneDataOneNameMax),
-  "purpose": zod.string().max(getKnowledgeEntryResponseOneDataOnePurposeMax).optional(),
+  "id": zod.uuid(),
+  "name": zod.string().min(1).max(getKnowledgeEntryResponseOneDataNameMax),
+  "purpose": zod.string().max(getKnowledgeEntryResponseOneDataPurposeMax).optional(),
   "state": zod.enum(['draft', 'enabled', 'disabled']),
   "scope_type": zod.enum(['global', 'datasource', 'table']),
   "datasource_id": zod.uuid().optional(),
-  "database_name": zod.string().min(1).max(getKnowledgeEntryResponseOneDataOneDatabaseNameMax).optional(),
-  "table_name": zod.string().min(1).max(getKnowledgeEntryResponseOneDataOneTableNameMax).optional(),
+  "database_name": zod.string().min(1).max(getKnowledgeEntryResponseOneDataDatabaseNameMax).optional(),
+  "table_name": zod.string().min(1).max(getKnowledgeEntryResponseOneDataTableNameMax).optional(),
   "definition": zod.object({
-  "knowledge_text": zod.string().min(1).max(getKnowledgeEntryResponseOneDataOneDefinitionKnowledgeTextMax),
-  "max_severity": zod.enum(['info', 'low', 'medium', 'high', 'critical']).default(getKnowledgeEntryResponseOneDataOneDefinitionMaxSeverityDefault).describe('Retained for v1 definition, API and stored-configuration compatibility. This field is not a submission ceiling for enabled mandatory rules and cannot authorize a lower-risk result: every actual hit from an enabled, frozen and scope-matched Prompt Tool or internal-experience rule becomes effective Critical and blocks submission regardless of the model-provided severity. Unbound model observations remain visible but are capped at Medium. The finding key is system-derived and is injected alongside the rule text.'),
+  "knowledge_text": zod.string().min(1).max(getKnowledgeEntryResponseOneDataDefinitionKnowledgeTextMax),
+  "max_severity": zod.enum(['info', 'low', 'medium', 'high', 'critical']).default(getKnowledgeEntryResponseOneDataDefinitionMaxSeverityDefault).describe('Stored advisory maximum severity for internal experience entries. Legacy high\/critical values remain readable for historical rows and are capped at medium at runtime; new writes restrict max_severity to info, low, or medium.'),
   "version": zod.int().min(1)
 }),
   "provenance": zod.enum(['manual', 'finding_conversion']),
-  "source_finding_id": zod.uuid().optional()
-}).and(zod.object({
-  "id": zod.uuid(),
+  "source_finding_id": zod.uuid().optional(),
   "config_hash": zod.string(),
   "version": zod.int().min(1),
   "created_at": zod.iso.datetime({"offset":true}),
   "updated_at": zod.iso.datetime({"offset":true})
-})),
+}),
   "request_id": zod.uuid()
 }),zod.object({
   "err_code": zod.union([zod.literal(1001),zod.literal(1002),zod.literal(1003),zod.literal(1004),zod.literal(1005),zod.literal(1006),zod.literal(1007),zod.literal(1008),zod.literal(1009),zod.literal(1010),zod.literal(1011),zod.literal(1012),zod.literal(1101),zod.literal(1102),zod.literal(1103),zod.literal(1104),zod.literal(1105),zod.literal(1106),zod.literal(1107),zod.literal(1108),zod.literal(1109),zod.literal(2001),zod.literal(2002),zod.literal(2003),zod.literal(2004),zod.literal(2005),zod.literal(2006),zod.literal(2007),zod.literal(2008),zod.literal(2009),zod.literal(2010),zod.literal(2011),zod.literal(2012),zod.literal(2013),zod.literal(2014),zod.literal(3001),zod.literal(3002),zod.literal(3003),zod.literal(3004),zod.literal(3005),zod.literal(3006),zod.literal(3007),zod.literal(3008),zod.literal(3009),zod.literal(3010),zod.literal(3011),zod.literal(3012),zod.literal(4001),zod.literal(4002),zod.literal(4003),zod.literal(4004),zod.literal(4005),zod.literal(4006),zod.literal(4007),zod.literal(4008),zod.literal(4009),zod.literal(4010),zod.literal(4011),zod.literal(5001),zod.literal(5002),zod.literal(5003),zod.literal(5004),zod.literal(5005),zod.literal(6001),zod.literal(6002),zod.literal(6003),zod.literal(6004),zod.literal(6005),zod.literal(6006),zod.literal(6007),zod.literal(7001),zod.literal(7002),zod.literal(7003),zod.literal(7004),zod.literal(7005),zod.literal(7006),zod.literal(7007),zod.literal(7008)]),
@@ -3831,30 +3903,30 @@ export const ReplaceKnowledgeEntryBody = zod.object({
   "name": zod.string().min(1).max(replaceKnowledgeEntryBodyNameMax),
   "purpose": zod.string().max(replaceKnowledgeEntryBodyPurposeMax).optional(),
   "state": zod.enum(['draft', 'enabled', 'disabled']).optional(),
-  "scope_type": zod.enum(['global', 'datasource', 'table']),
+  "scope_type": zod.enum(['datasource', 'table']),
   "datasource_id": zod.uuid().optional(),
   "database_name": zod.string().min(1).max(replaceKnowledgeEntryBodyDatabaseNameMax).optional(),
   "table_name": zod.string().min(1).max(replaceKnowledgeEntryBodyTableNameMax).optional(),
   "definition": zod.object({
   "knowledge_text": zod.string().min(1).max(replaceKnowledgeEntryBodyDefinitionKnowledgeTextMax),
-  "max_severity": zod.enum(['info', 'low', 'medium', 'high', 'critical']).default(replaceKnowledgeEntryBodyDefinitionMaxSeverityDefault).describe('Retained for v1 definition, API and stored-configuration compatibility. This field is not a submission ceiling for enabled mandatory rules and cannot authorize a lower-risk result: every actual hit from an enabled, frozen and scope-matched Prompt Tool or internal-experience rule becomes effective Critical and blocks submission regardless of the model-provided severity. Unbound model observations remain visible but are capped at Medium. The finding key is system-derived and is injected alongside the rule text.'),
+  "max_severity": zod.enum(['info', 'low', 'medium']).default(replaceKnowledgeEntryBodyDefinitionMaxSeverityDefault).describe('Advisory maximum severity for non-blocking internal experience guidance (info, low, or medium). Internal experience entries assist the Database AI Assistant and emit non-blocking advisory findings during AI Review without ever blocking submission.'),
   "version": zod.int().min(1)
 }),
   "provenance": zod.enum(['manual', 'finding_conversion']).optional(),
   "source_finding_id": zod.uuid().optional()
 })
 
-export const replaceKnowledgeEntryResponseOneDataOneNameMax = 128;
+export const replaceKnowledgeEntryResponseOneDataNameMax = 128;
 
-export const replaceKnowledgeEntryResponseOneDataOnePurposeMax = 512;
+export const replaceKnowledgeEntryResponseOneDataPurposeMax = 512;
 
-export const replaceKnowledgeEntryResponseOneDataOneDatabaseNameMax = 128;
+export const replaceKnowledgeEntryResponseOneDataDatabaseNameMax = 128;
 
-export const replaceKnowledgeEntryResponseOneDataOneTableNameMax = 128;
+export const replaceKnowledgeEntryResponseOneDataTableNameMax = 128;
 
-export const replaceKnowledgeEntryResponseOneDataOneDefinitionKnowledgeTextMax = 65536;
+export const replaceKnowledgeEntryResponseOneDataDefinitionKnowledgeTextMax = 65536;
 
-export const replaceKnowledgeEntryResponseOneDataOneDefinitionMaxSeverityDefault = `medium`;
+export const replaceKnowledgeEntryResponseOneDataDefinitionMaxSeverityDefault = `medium`;
 
 
 
@@ -3862,27 +3934,26 @@ export const ReplaceKnowledgeEntryResponse = zod.union([zod.object({
   "err_code": zod.literal(0),
   "message": zod.literal("ok"),
   "data": zod.object({
-  "name": zod.string().min(1).max(replaceKnowledgeEntryResponseOneDataOneNameMax),
-  "purpose": zod.string().max(replaceKnowledgeEntryResponseOneDataOnePurposeMax).optional(),
+  "id": zod.uuid(),
+  "name": zod.string().min(1).max(replaceKnowledgeEntryResponseOneDataNameMax),
+  "purpose": zod.string().max(replaceKnowledgeEntryResponseOneDataPurposeMax).optional(),
   "state": zod.enum(['draft', 'enabled', 'disabled']),
   "scope_type": zod.enum(['global', 'datasource', 'table']),
   "datasource_id": zod.uuid().optional(),
-  "database_name": zod.string().min(1).max(replaceKnowledgeEntryResponseOneDataOneDatabaseNameMax).optional(),
-  "table_name": zod.string().min(1).max(replaceKnowledgeEntryResponseOneDataOneTableNameMax).optional(),
+  "database_name": zod.string().min(1).max(replaceKnowledgeEntryResponseOneDataDatabaseNameMax).optional(),
+  "table_name": zod.string().min(1).max(replaceKnowledgeEntryResponseOneDataTableNameMax).optional(),
   "definition": zod.object({
-  "knowledge_text": zod.string().min(1).max(replaceKnowledgeEntryResponseOneDataOneDefinitionKnowledgeTextMax),
-  "max_severity": zod.enum(['info', 'low', 'medium', 'high', 'critical']).default(replaceKnowledgeEntryResponseOneDataOneDefinitionMaxSeverityDefault).describe('Retained for v1 definition, API and stored-configuration compatibility. This field is not a submission ceiling for enabled mandatory rules and cannot authorize a lower-risk result: every actual hit from an enabled, frozen and scope-matched Prompt Tool or internal-experience rule becomes effective Critical and blocks submission regardless of the model-provided severity. Unbound model observations remain visible but are capped at Medium. The finding key is system-derived and is injected alongside the rule text.'),
+  "knowledge_text": zod.string().min(1).max(replaceKnowledgeEntryResponseOneDataDefinitionKnowledgeTextMax),
+  "max_severity": zod.enum(['info', 'low', 'medium', 'high', 'critical']).default(replaceKnowledgeEntryResponseOneDataDefinitionMaxSeverityDefault).describe('Stored advisory maximum severity for internal experience entries. Legacy high\/critical values remain readable for historical rows and are capped at medium at runtime; new writes restrict max_severity to info, low, or medium.'),
   "version": zod.int().min(1)
 }),
   "provenance": zod.enum(['manual', 'finding_conversion']),
-  "source_finding_id": zod.uuid().optional()
-}).and(zod.object({
-  "id": zod.uuid(),
+  "source_finding_id": zod.uuid().optional(),
   "config_hash": zod.string(),
   "version": zod.int().min(1),
   "created_at": zod.iso.datetime({"offset":true}),
   "updated_at": zod.iso.datetime({"offset":true})
-})),
+}),
   "request_id": zod.uuid()
 }),zod.object({
   "err_code": zod.union([zod.literal(1001),zod.literal(1002),zod.literal(1003),zod.literal(1004),zod.literal(1005),zod.literal(1006),zod.literal(1007),zod.literal(1008),zod.literal(1009),zod.literal(1010),zod.literal(1011),zod.literal(1012),zod.literal(1101),zod.literal(1102),zod.literal(1103),zod.literal(1104),zod.literal(1105),zod.literal(1106),zod.literal(1107),zod.literal(1108),zod.literal(1109),zod.literal(2001),zod.literal(2002),zod.literal(2003),zod.literal(2004),zod.literal(2005),zod.literal(2006),zod.literal(2007),zod.literal(2008),zod.literal(2009),zod.literal(2010),zod.literal(2011),zod.literal(2012),zod.literal(2013),zod.literal(2014),zod.literal(3001),zod.literal(3002),zod.literal(3003),zod.literal(3004),zod.literal(3005),zod.literal(3006),zod.literal(3007),zod.literal(3008),zod.literal(3009),zod.literal(3010),zod.literal(3011),zod.literal(3012),zod.literal(4001),zod.literal(4002),zod.literal(4003),zod.literal(4004),zod.literal(4005),zod.literal(4006),zod.literal(4007),zod.literal(4008),zod.literal(4009),zod.literal(4010),zod.literal(4011),zod.literal(5001),zod.literal(5002),zod.literal(5003),zod.literal(5004),zod.literal(5005),zod.literal(6001),zod.literal(6002),zod.literal(6003),zod.literal(6004),zod.literal(6005),zod.literal(6006),zod.literal(6007),zod.literal(7001),zod.literal(7002),zod.literal(7003),zod.literal(7004),zod.literal(7005),zod.literal(7006),zod.literal(7007),zod.literal(7008)]),
@@ -6051,6 +6122,8 @@ export const listCurrentUserFlowsResponseOneDataTwoItemsItemNameMax = 128;
 
 export const listCurrentUserFlowsResponseOneDataTwoItemsItemStagesItemDatasourceNameMax = 128;
 
+export const listCurrentUserFlowsResponseOneDataTwoItemsItemStagesItemDatasourceDatabaseNameMax = 128;
+
 export const listCurrentUserFlowsResponseOneDataTwoItemsItemStagesItemApprovalStepsItemPositionMax = 10;
 
 
@@ -6086,6 +6159,9 @@ export const ListCurrentUserFlowsResponse = zod.union([zod.object({
   "position": zod.int().min(1),
   "datasource_id": zod.uuid(),
   "datasource_name": zod.string().min(1).max(listCurrentUserFlowsResponseOneDataTwoItemsItemStagesItemDatasourceNameMax),
+  "datasource_engine": zod.enum(['mysql', 'postgresql', 'tidb', 'oceanbase', 'polardb']).optional(),
+  "datasource_compatibility_mode": zod.enum(['mysql', 'postgresql']).optional(),
+  "datasource_database_name": zod.string().max(listCurrentUserFlowsResponseOneDataTwoItemsItemStagesItemDatasourceDatabaseNameMax).nullish(),
   "approval_steps": zod.array(zod.object({
   "position": zod.int().min(1).max(listCurrentUserFlowsResponseOneDataTwoItemsItemStagesItemApprovalStepsItemPositionMax),
   "actors": zod.array(zod.object({
@@ -6255,6 +6331,9 @@ export const ListChangeDraftsQueryParams = zod.object({
 })
 
 export const listChangeDraftsResponseOneDataTwoItemsItemRollbackEnabledDefault = true;
+export const listChangeDraftsResponseOneDataTwoItemsItemTargetDatabaseMax = 128;
+
+
 export const listChangeDraftsResponseOneDataTwoItemsItemSqlSizeBytesMin = 0;
 export const listChangeDraftsResponseOneDataTwoItemsItemSqlSizeBytesMax = 33554432;
 
@@ -6282,6 +6361,7 @@ export const ListChangeDraftsResponse = zod.union([zod.object({
   "description": zod.string().optional(),
   "requested_scheduled_for": zod.iso.datetime({"offset":true}).nullish().describe('Submitter\'s desired execution time (§18.56 ruling B). Advisory only; frozen onto the order at submission and prefilled for the frozen executor\'s schedule confirmation. Never an execution authorization.'),
   "rollback_enabled": zod.boolean().default(listChangeDraftsResponseOneDataTwoItemsItemRollbackEnabledDefault),
+  "target_database": zod.string().min(1).max(listChangeDraftsResponseOneDataTwoItemsItemTargetDatabaseMax).nullish(),
   "ticket_type": zod.enum(['normal', 'rollback']).optional(),
   "source_order_id": zod.union([zod.uuid(),zod.null()]).optional(),
   "source_order_display_number": zod.string().nullish(),
@@ -6316,16 +6396,23 @@ export const createChangeDraftBodyTitleMax = 256;
 export const createChangeDraftBodyDescriptionMax = 4096;
 
 export const createChangeDraftBodyRollbackEnabledDefault = true;
+export const createChangeDraftBodyTargetDatabaseMax = 128;
+
+
 
 export const CreateChangeDraftBody = zod.object({
   "flow_id": zod.uuid(),
   "title": zod.string().min(1).max(createChangeDraftBodyTitleMax),
   "description": zod.string().max(createChangeDraftBodyDescriptionMax).optional(),
   "requested_scheduled_for": zod.iso.datetime({"offset":true}).optional().describe('Desired execution time (RFC3339, must be in the future at save time). Optional; §18.56 ruling B.'),
-  "rollback_enabled": zod.boolean().default(createChangeDraftBodyRollbackEnabledDefault)
+  "rollback_enabled": zod.boolean().default(createChangeDraftBodyRollbackEnabledDefault),
+  "target_database": zod.string().min(1).max(createChangeDraftBodyTargetDatabaseMax).optional()
 })
 
 export const createChangeDraftResponseOneDataRollbackEnabledDefault = true;
+export const createChangeDraftResponseOneDataTargetDatabaseMax = 128;
+
+
 export const createChangeDraftResponseOneDataSqlSizeBytesMin = 0;
 export const createChangeDraftResponseOneDataSqlSizeBytesMax = 33554432;
 
@@ -6346,6 +6433,7 @@ export const CreateChangeDraftResponse = zod.union([zod.object({
   "description": zod.string().optional(),
   "requested_scheduled_for": zod.iso.datetime({"offset":true}).nullish().describe('Submitter\'s desired execution time (§18.56 ruling B). Advisory only; frozen onto the order at submission and prefilled for the frozen executor\'s schedule confirmation. Never an execution authorization.'),
   "rollback_enabled": zod.boolean().default(createChangeDraftResponseOneDataRollbackEnabledDefault),
+  "target_database": zod.string().min(1).max(createChangeDraftResponseOneDataTargetDatabaseMax).nullish(),
   "ticket_type": zod.enum(['normal', 'rollback']).optional(),
   "source_order_id": zod.union([zod.uuid(),zod.null()]).optional(),
   "source_order_display_number": zod.string().nullish(),
@@ -6379,6 +6467,9 @@ export const GetChangeDraftParams = zod.object({
 })
 
 export const getChangeDraftResponseOneDataRollbackEnabledDefault = true;
+export const getChangeDraftResponseOneDataTargetDatabaseMax = 128;
+
+
 export const getChangeDraftResponseOneDataSqlSizeBytesMin = 0;
 export const getChangeDraftResponseOneDataSqlSizeBytesMax = 33554432;
 
@@ -6399,6 +6490,7 @@ export const GetChangeDraftResponse = zod.union([zod.object({
   "description": zod.string().optional(),
   "requested_scheduled_for": zod.iso.datetime({"offset":true}).nullish().describe('Submitter\'s desired execution time (§18.56 ruling B). Advisory only; frozen onto the order at submission and prefilled for the frozen executor\'s schedule confirmation. Never an execution authorization.'),
   "rollback_enabled": zod.boolean().default(getChangeDraftResponseOneDataRollbackEnabledDefault),
+  "target_database": zod.string().min(1).max(getChangeDraftResponseOneDataTargetDatabaseMax).nullish(),
   "ticket_type": zod.enum(['normal', 'rollback']).optional(),
   "source_order_id": zod.union([zod.uuid(),zod.null()]).optional(),
   "source_order_display_number": zod.string().nullish(),
@@ -6442,6 +6534,8 @@ export const updateChangeDraftBodyTitleMax = 256;
 
 export const updateChangeDraftBodyDescriptionMax = 4096;
 
+export const updateChangeDraftBodyTargetDatabaseMax = 128;
+
 
 
 export const UpdateChangeDraftBody = zod.object({
@@ -6449,10 +6543,14 @@ export const UpdateChangeDraftBody = zod.object({
   "description": zod.string().max(updateChangeDraftBodyDescriptionMax).optional(),
   "flow_id": zod.uuid().optional(),
   "requested_scheduled_for": zod.iso.datetime({"offset":true}).nullish().describe('Set (future RFC3339) or clear (null); absent leaves the value unchanged. §18.56 ruling B.'),
-  "rollback_enabled": zod.boolean().optional()
+  "rollback_enabled": zod.boolean().optional(),
+  "target_database": zod.string().min(1).max(updateChangeDraftBodyTargetDatabaseMax).nullish()
 })
 
 export const updateChangeDraftResponseOneDataRollbackEnabledDefault = true;
+export const updateChangeDraftResponseOneDataTargetDatabaseMax = 128;
+
+
 export const updateChangeDraftResponseOneDataSqlSizeBytesMin = 0;
 export const updateChangeDraftResponseOneDataSqlSizeBytesMax = 33554432;
 
@@ -6473,6 +6571,7 @@ export const UpdateChangeDraftResponse = zod.union([zod.object({
   "description": zod.string().optional(),
   "requested_scheduled_for": zod.iso.datetime({"offset":true}).nullish().describe('Submitter\'s desired execution time (§18.56 ruling B). Advisory only; frozen onto the order at submission and prefilled for the frozen executor\'s schedule confirmation. Never an execution authorization.'),
   "rollback_enabled": zod.boolean().default(updateChangeDraftResponseOneDataRollbackEnabledDefault),
+  "target_database": zod.string().min(1).max(updateChangeDraftResponseOneDataTargetDatabaseMax).nullish(),
   "ticket_type": zod.enum(['normal', 'rollback']).optional(),
   "source_order_id": zod.union([zod.uuid(),zod.null()]).optional(),
   "source_order_display_number": zod.string().nullish(),
@@ -6550,6 +6649,9 @@ export const ReplaceDraftSqlBody = zod.object({
 })
 
 export const replaceDraftSqlResponseOneDataRollbackEnabledDefault = true;
+export const replaceDraftSqlResponseOneDataTargetDatabaseMax = 128;
+
+
 export const replaceDraftSqlResponseOneDataSqlSizeBytesMin = 0;
 export const replaceDraftSqlResponseOneDataSqlSizeBytesMax = 33554432;
 
@@ -6570,6 +6672,7 @@ export const ReplaceDraftSqlResponse = zod.union([zod.object({
   "description": zod.string().optional(),
   "requested_scheduled_for": zod.iso.datetime({"offset":true}).nullish().describe('Submitter\'s desired execution time (§18.56 ruling B). Advisory only; frozen onto the order at submission and prefilled for the frozen executor\'s schedule confirmation. Never an execution authorization.'),
   "rollback_enabled": zod.boolean().default(replaceDraftSqlResponseOneDataRollbackEnabledDefault),
+  "target_database": zod.string().min(1).max(replaceDraftSqlResponseOneDataTargetDatabaseMax).nullish(),
   "ticket_type": zod.enum(['normal', 'rollback']).optional(),
   "source_order_id": zod.union([zod.uuid(),zod.null()]).optional(),
   "source_order_display_number": zod.string().nullish(),
@@ -6649,6 +6752,8 @@ export const RunDraftReviewHeader = zod.object({
   "Accept-Language": zod.string().max(runDraftReviewHeaderAcceptLanguageMax).optional().describe('Language preference for AI summary and finding title\/message\/suggestion. zh\/en variants are negotiated in preference order to zh-CN\/en-US; unsupported or malformed preferences default to zh-CN. The chosen locale is frozen when review starts, including retries and model turns.')
 })
 
+export const runDraftReviewBodyTargetDatabaseMax = 128;
+
 export const runDraftReviewBodyOutputLocaleMax = 16;
 
 
@@ -6657,6 +6762,7 @@ export const RunDraftReviewBody = zod.object({
   "flow_id": zod.uuid(),
   "draft_id": zod.uuid().optional(),
   "sql": zod.string().describe('Current editor SQL reviewed verbatim (max 32 MiB).'),
+  "target_database": zod.string().min(1).max(runDraftReviewBodyTargetDatabaseMax).nullish().describe('Optional default database override for MySQL-compatible stages, or optional Target Schema override within the connected Database for PostgreSQL stages; explicit null clears any draft-level override during ephemeral precheck without mutating the draft.'),
   "output_locale": zod.string().max(runDraftReviewBodyOutputLocaleMax).optional().describe('Optional explicit locale; overrides the header when present.')
 })
 
@@ -6685,6 +6791,8 @@ export const GetReviewRunParams = zod.object({
   "review_run_id": zod.uuid()
 })
 
+export const getReviewRunResponseOneDataDraftIdRegExp = new RegExp('^($|[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})$');
+export const getReviewRunResponseOneDataDraftRevisionMin = 0;
 
 export const getReviewRunResponseOneDataStatementCountMin = 0;
 export const getReviewRunResponseOneDataStatementCountMax = 100000;
@@ -6713,8 +6821,8 @@ export const GetReviewRunResponse = zod.union([zod.object({
   "message": zod.literal("ok"),
   "data": zod.object({
   "id": zod.uuid(),
-  "draft_id": zod.uuid(),
-  "draft_revision": zod.int().min(1),
+  "draft_id": zod.string().regex(getReviewRunResponseOneDataDraftIdRegExp).describe('Associated change draft UUID, or empty string when precheck ran ephemerally without a saved draft (RCP-20261101 \/ RCP-20261125).'),
+  "draft_revision": zod.int().min(getReviewRunResponseOneDataDraftRevisionMin).describe('Persisted draft revision (>= 1), or 0 when precheck ran ephemerally without a persisted draft revision (RCP-20261101 \/ RCP-20261125).'),
   "state": zod.enum(['queued', 'running', 'ready', 'blocked', 'partial', 'failed', 'outdated']),
   "statement_count": zod.int().min(getReviewRunResponseOneDataStatementCountMin).max(getReviewRunResponseOneDataStatementCountMax),
   "fingerprint_group_count": zod.int().min(getReviewRunResponseOneDataFingerprintGroupCountMin).max(getReviewRunResponseOneDataFingerprintGroupCountMax),
@@ -6832,6 +6940,8 @@ export const SubmitChangeDraftHeader = zod.object({
   "Idempotency-Key": zod.string().min(1).max(submitChangeDraftHeaderIdempotencyKeyMax).regex(submitChangeDraftHeaderIdempotencyKeyRegExp)
 })
 
+export const submitChangeDraftBodyTargetDatabaseMax = 128;
+
 export const submitChangeDraftBodyMetadataTitleMax = 128;
 
 export const submitChangeDraftBodyMetadataDescriptionMax = 4096;
@@ -6843,6 +6953,7 @@ export const SubmitChangeDraftBody = zod.object({
   "draft_id": zod.uuid().optional(),
   "sql": zod.string().describe('SQL submitted verbatim; must equal the prechecked text.'),
   "run_id": zod.uuid(),
+  "target_database": zod.string().min(1).max(submitChangeDraftBodyTargetDatabaseMax).nullish().describe('Optional default database (MySQL-compatible stages) or Target Schema within the connected Database (PostgreSQL stages) bound during precheck; explicit null clears any saved draft override on submission.'),
   "metadata": zod.object({
   "title": zod.string().min(1).max(submitChangeDraftBodyMetadataTitleMax).optional(),
   "description": zod.string().max(submitChangeDraftBodyMetadataDescriptionMax).optional(),
@@ -6855,6 +6966,7 @@ export const submitChangeDraftResponseOneDataDisplayNumberRegExp = new RegExp('^
 
 
 export const submitChangeDraftResponseOneDataStagesItemExecutionActorsItemRoleDefault = `user`;
+export const submitChangeDraftResponseOneDataStagesItemExecutionActorsItemAuthProviderDefault = `local`;
 
 export const submitChangeDraftResponseOneDataManuallyVerifiedDefault = false;
 export const submitChangeDraftResponseOneDataHasDdlDefault = false;
@@ -6890,6 +7002,7 @@ export const SubmitChangeDraftResponse = zod.union([zod.object({
   "email": zod.email().nullish(),
   "is_builtin_admin": zod.boolean(),
   "role": zod.enum(['user', 'admin']).default(submitChangeDraftResponseOneDataStagesItemExecutionActorsItemRoleDefault).describe('User account role. Both is_builtin_admin=true and role=admin grant access to \/admin\/\* management pages.'),
+  "auth_provider": zod.enum(['local', 'ldap', 'oidc']).default(submitChangeDraftResponseOneDataStagesItemExecutionActorsItemAuthProviderDefault).describe('Identity provider managing this user\'s password; only local non-builtin accounts allow admin password reset.'),
   "version": zod.int().min(1),
   "created_at": zod.iso.datetime({"offset":true}),
   "updated_at": zod.iso.datetime({"offset":true})
@@ -6955,14 +7068,15 @@ export const ListChangeOrdersQueryParams = zod.object({
   "state": zod.enum(['submitted', 'stage_approval_active', 'stage_execution_pending', 'scheduled', 'running', 'completed', 'rejected', 'withdrawn', 'withdrawn_after_partial_execution', 'voided', 'failed', 'partial_failed', 'cancelled', 'partial_cancelled', 'result_unknown', 'blocked_datasource_unavailable', 'missed_schedule', 'invalid']).optional().describe('Exact-match filter on the aggregate order state.'),
   "q": zod.string().min(1).max(listChangeOrdersQueryQMax).optional().describe('Case-insensitive keyword matched against display_number or title (Work ID and title search). Filters narrow the session-scoped result; they never widen authorization.'),
   "datasource": zod.string().min(1).max(listChangeOrdersQueryDatasourceMax).optional().describe('Exact match against any stage datasource_name of the order.'),
-  "submitted_from": zod.iso.date().optional().describe('Inclusive lower bound on submitted_at (UTC calendar day start).'),
-  "submitted_to": zod.iso.date().optional().describe('Inclusive upper bound on submitted_at (UTC calendar day end).')
+  "submitted_from": zod.iso.date().optional().describe('Inclusive lower bound on submitted_at (calendar day start in general.system_timezone).'),
+  "submitted_to": zod.iso.date().optional().describe('Inclusive upper bound on submitted_at (calendar day end in general.system_timezone).')
 })
 
 export const listChangeOrdersResponseOneDataTwoItemsItemDisplayNumberRegExp = new RegExp('^YR-[0-9]{8}-[0-9]{6}$');
 
 
 export const listChangeOrdersResponseOneDataTwoItemsItemStagesItemExecutionActorsItemRoleDefault = `user`;
+export const listChangeOrdersResponseOneDataTwoItemsItemStagesItemExecutionActorsItemAuthProviderDefault = `local`;
 
 export const listChangeOrdersResponseOneDataTwoItemsItemManuallyVerifiedDefault = false;
 export const listChangeOrdersResponseOneDataTwoItemsItemHasDdlDefault = false;
@@ -7005,6 +7119,7 @@ export const ListChangeOrdersResponse = zod.union([zod.object({
   "email": zod.email().nullish(),
   "is_builtin_admin": zod.boolean(),
   "role": zod.enum(['user', 'admin']).default(listChangeOrdersResponseOneDataTwoItemsItemStagesItemExecutionActorsItemRoleDefault).describe('User account role. Both is_builtin_admin=true and role=admin grant access to \/admin\/\* management pages.'),
+  "auth_provider": zod.enum(['local', 'ldap', 'oidc']).default(listChangeOrdersResponseOneDataTwoItemsItemStagesItemExecutionActorsItemAuthProviderDefault).describe('Identity provider managing this user\'s password; only local non-builtin accounts allow admin password reset.'),
   "version": zod.int().min(1),
   "created_at": zod.iso.datetime({"offset":true}),
   "updated_at": zod.iso.datetime({"offset":true})
@@ -7064,6 +7179,7 @@ export const getChangeOrderResponseOneDataDisplayNumberRegExp = new RegExp('^YR-
 
 
 export const getChangeOrderResponseOneDataStagesItemExecutionActorsItemRoleDefault = `user`;
+export const getChangeOrderResponseOneDataStagesItemExecutionActorsItemAuthProviderDefault = `local`;
 
 export const getChangeOrderResponseOneDataManuallyVerifiedDefault = false;
 export const getChangeOrderResponseOneDataHasDdlDefault = false;
@@ -7099,6 +7215,7 @@ export const GetChangeOrderResponse = zod.union([zod.object({
   "email": zod.email().nullish(),
   "is_builtin_admin": zod.boolean(),
   "role": zod.enum(['user', 'admin']).default(getChangeOrderResponseOneDataStagesItemExecutionActorsItemRoleDefault).describe('User account role. Both is_builtin_admin=true and role=admin grant access to \/admin\/\* management pages.'),
+  "auth_provider": zod.enum(['local', 'ldap', 'oidc']).default(getChangeOrderResponseOneDataStagesItemExecutionActorsItemAuthProviderDefault).describe('Identity provider managing this user\'s password; only local non-builtin accounts allow admin password reset.'),
   "version": zod.int().min(1),
   "created_at": zod.iso.datetime({"offset":true}),
   "updated_at": zod.iso.datetime({"offset":true})
@@ -7434,6 +7551,9 @@ export const CopyChangeOrderToDraftBody = zod.object({
 })
 
 export const copyChangeOrderToDraftResponseOneDataRollbackEnabledDefault = true;
+export const copyChangeOrderToDraftResponseOneDataTargetDatabaseMax = 128;
+
+
 export const copyChangeOrderToDraftResponseOneDataSqlSizeBytesMin = 0;
 export const copyChangeOrderToDraftResponseOneDataSqlSizeBytesMax = 33554432;
 
@@ -7454,6 +7574,7 @@ export const CopyChangeOrderToDraftResponse = zod.union([zod.object({
   "description": zod.string().optional(),
   "requested_scheduled_for": zod.iso.datetime({"offset":true}).nullish().describe('Submitter\'s desired execution time (§18.56 ruling B). Advisory only; frozen onto the order at submission and prefilled for the frozen executor\'s schedule confirmation. Never an execution authorization.'),
   "rollback_enabled": zod.boolean().default(copyChangeOrderToDraftResponseOneDataRollbackEnabledDefault),
+  "target_database": zod.string().min(1).max(copyChangeOrderToDraftResponseOneDataTargetDatabaseMax).nullish(),
   "ticket_type": zod.enum(['normal', 'rollback']).optional(),
   "source_order_id": zod.union([zod.uuid(),zod.null()]).optional(),
   "source_order_display_number": zod.string().nullish(),
@@ -7508,6 +7629,9 @@ export const CreateRollbackDraftBody = zod.object({
 })
 
 export const createRollbackDraftResponseOneDataRollbackEnabledDefault = true;
+export const createRollbackDraftResponseOneDataTargetDatabaseMax = 128;
+
+
 export const createRollbackDraftResponseOneDataSqlSizeBytesMin = 0;
 export const createRollbackDraftResponseOneDataSqlSizeBytesMax = 33554432;
 
@@ -7528,6 +7652,7 @@ export const CreateRollbackDraftResponse = zod.union([zod.object({
   "description": zod.string().optional(),
   "requested_scheduled_for": zod.iso.datetime({"offset":true}).nullish().describe('Submitter\'s desired execution time (§18.56 ruling B). Advisory only; frozen onto the order at submission and prefilled for the frozen executor\'s schedule confirmation. Never an execution authorization.'),
   "rollback_enabled": zod.boolean().default(createRollbackDraftResponseOneDataRollbackEnabledDefault),
+  "target_database": zod.string().min(1).max(createRollbackDraftResponseOneDataTargetDatabaseMax).nullish(),
   "ticket_type": zod.enum(['normal', 'rollback']).optional(),
   "source_order_id": zod.union([zod.uuid(),zod.null()]).optional(),
   "source_order_display_number": zod.string().nullish(),
@@ -7733,6 +7858,7 @@ export const decideChangeOrderResponseOneDataDisplayNumberRegExp = new RegExp('^
 
 
 export const decideChangeOrderResponseOneDataStagesItemExecutionActorsItemRoleDefault = `user`;
+export const decideChangeOrderResponseOneDataStagesItemExecutionActorsItemAuthProviderDefault = `local`;
 
 export const decideChangeOrderResponseOneDataManuallyVerifiedDefault = false;
 export const decideChangeOrderResponseOneDataHasDdlDefault = false;
@@ -7768,6 +7894,7 @@ export const DecideChangeOrderResponse = zod.union([zod.object({
   "email": zod.email().nullish(),
   "is_builtin_admin": zod.boolean(),
   "role": zod.enum(['user', 'admin']).default(decideChangeOrderResponseOneDataStagesItemExecutionActorsItemRoleDefault).describe('User account role. Both is_builtin_admin=true and role=admin grant access to \/admin\/\* management pages.'),
+  "auth_provider": zod.enum(['local', 'ldap', 'oidc']).default(decideChangeOrderResponseOneDataStagesItemExecutionActorsItemAuthProviderDefault).describe('Identity provider managing this user\'s password; only local non-builtin accounts allow admin password reset.'),
   "version": zod.int().min(1),
   "created_at": zod.iso.datetime({"offset":true}),
   "updated_at": zod.iso.datetime({"offset":true})
@@ -8234,6 +8361,7 @@ export const createExecutionVerificationResponseOneDataDisplayNumberRegExp = new
 
 
 export const createExecutionVerificationResponseOneDataStagesItemExecutionActorsItemRoleDefault = `user`;
+export const createExecutionVerificationResponseOneDataStagesItemExecutionActorsItemAuthProviderDefault = `local`;
 
 export const createExecutionVerificationResponseOneDataManuallyVerifiedDefault = false;
 export const createExecutionVerificationResponseOneDataHasDdlDefault = false;
@@ -8269,6 +8397,7 @@ export const CreateExecutionVerificationResponse = zod.union([zod.object({
   "email": zod.email().nullish(),
   "is_builtin_admin": zod.boolean(),
   "role": zod.enum(['user', 'admin']).default(createExecutionVerificationResponseOneDataStagesItemExecutionActorsItemRoleDefault).describe('User account role. Both is_builtin_admin=true and role=admin grant access to \/admin\/\* management pages.'),
+  "auth_provider": zod.enum(['local', 'ldap', 'oidc']).default(createExecutionVerificationResponseOneDataStagesItemExecutionActorsItemAuthProviderDefault).describe('Identity provider managing this user\'s password; only local non-builtin accounts allow admin password reset.'),
   "version": zod.int().min(1),
   "created_at": zod.iso.datetime({"offset":true}),
   "updated_at": zod.iso.datetime({"offset":true})
@@ -8347,6 +8476,7 @@ export const withdrawChangeOrderResponseOneDataDisplayNumberRegExp = new RegExp(
 
 
 export const withdrawChangeOrderResponseOneDataStagesItemExecutionActorsItemRoleDefault = `user`;
+export const withdrawChangeOrderResponseOneDataStagesItemExecutionActorsItemAuthProviderDefault = `local`;
 
 export const withdrawChangeOrderResponseOneDataManuallyVerifiedDefault = false;
 export const withdrawChangeOrderResponseOneDataHasDdlDefault = false;
@@ -8382,6 +8512,7 @@ export const WithdrawChangeOrderResponse = zod.union([zod.object({
   "email": zod.email().nullish(),
   "is_builtin_admin": zod.boolean(),
   "role": zod.enum(['user', 'admin']).default(withdrawChangeOrderResponseOneDataStagesItemExecutionActorsItemRoleDefault).describe('User account role. Both is_builtin_admin=true and role=admin grant access to \/admin\/\* management pages.'),
+  "auth_provider": zod.enum(['local', 'ldap', 'oidc']).default(withdrawChangeOrderResponseOneDataStagesItemExecutionActorsItemAuthProviderDefault).describe('Identity provider managing this user\'s password; only local non-builtin accounts allow admin password reset.'),
   "version": zod.int().min(1),
   "created_at": zod.iso.datetime({"offset":true}),
   "updated_at": zod.iso.datetime({"offset":true})
@@ -8460,6 +8591,7 @@ export const voidChangeOrderResponseOneDataDisplayNumberRegExp = new RegExp('^YR
 
 
 export const voidChangeOrderResponseOneDataStagesItemExecutionActorsItemRoleDefault = `user`;
+export const voidChangeOrderResponseOneDataStagesItemExecutionActorsItemAuthProviderDefault = `local`;
 
 export const voidChangeOrderResponseOneDataManuallyVerifiedDefault = false;
 export const voidChangeOrderResponseOneDataHasDdlDefault = false;
@@ -8495,6 +8627,7 @@ export const VoidChangeOrderResponse = zod.union([zod.object({
   "email": zod.email().nullish(),
   "is_builtin_admin": zod.boolean(),
   "role": zod.enum(['user', 'admin']).default(voidChangeOrderResponseOneDataStagesItemExecutionActorsItemRoleDefault).describe('User account role. Both is_builtin_admin=true and role=admin grant access to \/admin\/\* management pages.'),
+  "auth_provider": zod.enum(['local', 'ldap', 'oidc']).default(voidChangeOrderResponseOneDataStagesItemExecutionActorsItemAuthProviderDefault).describe('Identity provider managing this user\'s password; only local non-builtin accounts allow admin password reset.'),
   "version": zod.int().min(1),
   "created_at": zod.iso.datetime({"offset":true}),
   "updated_at": zod.iso.datetime({"offset":true})
@@ -8553,7 +8686,8 @@ export const listQueryAccessRequestsQueryLimitMax = 200;
 export const ListQueryAccessRequestsQueryParams = zod.object({
   "limit": zod.int().min(1).max(listQueryAccessRequestsQueryLimitMax).default(listQueryAccessRequestsQueryLimitDefault),
   "after": zod.string().optional(),
-  "state": zod.enum(['access_pending', 'grant_active', 'access_rejected', 'withdrawn', 'invalid']).optional().describe('按申请状态过滤（RCP-20261021；缺省返回全部状态的关系可见项）。')
+  "state": zod.enum(['access_pending', 'grant_active', 'access_rejected', 'withdrawn', 'invalid']).optional().describe('按申请状态过滤（RCP-20261021；缺省返回全部状态的关系可见项）。'),
+  "scope": zod.enum(['all', 'reviewer', 'requester']).optional().describe('Optional relationship scope filter (all = requester or frozen reviewer, reviewer = frozen reviewer only, requester = requester only). Narrowing only; never widens authorization.')
 })
 
 
@@ -8571,6 +8705,7 @@ export const ListQueryAccessRequestsResponse = zod.union([zod.object({
 }).and(zod.object({
   "items": zod.array(zod.object({
   "id": zod.uuid(),
+  "flow_id": zod.uuid().optional().describe('Frozen query_access flow ID this request was submitted against.'),
   "requester_user_id": zod.uuid(),
   "applicant_name": zod.string().nullish().describe('Display name of the requester at read time (null when the user was deleted; callers fall back to requester_user_id).'),
   "state": zod.enum(['access_pending', 'grant_active', 'access_rejected', 'withdrawn', 'invalid']),
@@ -8581,7 +8716,8 @@ export const ListQueryAccessRequestsResponse = zod.union([zod.object({
   "created_at": zod.iso.datetime({"offset":true}),
   "reason": zod.string().nullish().describe('Application reason submitted by the requester (snapshot of the original request payload).'),
   "requested_until": zod.union([zod.iso.datetime({"offset":true}),zod.null()]).optional(),
-  "terminal_at": zod.union([zod.iso.datetime({"offset":true}),zod.null()]).optional().describe('Time the request reached a terminal state (rejected, withdrawn or invalid); null while pending or under an active grant.')
+  "terminal_at": zod.union([zod.iso.datetime({"offset":true}),zod.null()]).optional().describe('Time the request reached a terminal state (rejected, withdrawn or invalid); null while pending or under an active grant.'),
+  "can_decide": zod.boolean().optional().describe('Whether the current session actor is a frozen approver of the currently active step on an access_pending request (authoritative server-side eligibility).')
 }))
 })),
   "request_id": zod.uuid()
@@ -8628,6 +8764,7 @@ export const CreateQueryAccessRequestResponse = zod.union([zod.object({
   "message": zod.literal("ok"),
   "data": zod.object({
   "id": zod.uuid(),
+  "flow_id": zod.uuid().optional().describe('Frozen query_access flow ID this request was submitted against.'),
   "requester_user_id": zod.uuid(),
   "applicant_name": zod.string().nullish().describe('Display name of the requester at read time (null when the user was deleted; callers fall back to requester_user_id).'),
   "state": zod.enum(['access_pending', 'grant_active', 'access_rejected', 'withdrawn', 'invalid']),
@@ -8638,7 +8775,8 @@ export const CreateQueryAccessRequestResponse = zod.union([zod.object({
   "created_at": zod.iso.datetime({"offset":true}),
   "reason": zod.string().nullish().describe('Application reason submitted by the requester (snapshot of the original request payload).'),
   "requested_until": zod.union([zod.iso.datetime({"offset":true}),zod.null()]).optional(),
-  "terminal_at": zod.union([zod.iso.datetime({"offset":true}),zod.null()]).optional().describe('Time the request reached a terminal state (rejected, withdrawn or invalid); null while pending or under an active grant.')
+  "terminal_at": zod.union([zod.iso.datetime({"offset":true}),zod.null()]).optional().describe('Time the request reached a terminal state (rejected, withdrawn or invalid); null while pending or under an active grant.'),
+  "can_decide": zod.boolean().optional().describe('Whether the current session actor is a frozen approver of the currently active step on an access_pending request (authoritative server-side eligibility).')
 }),
   "request_id": zod.uuid()
 }),zod.object({
@@ -8666,6 +8804,7 @@ export const GetQueryAccessRequestResponse = zod.union([zod.object({
   "message": zod.literal("ok"),
   "data": zod.object({
   "id": zod.uuid(),
+  "flow_id": zod.uuid().optional().describe('Frozen query_access flow ID this request was submitted against.'),
   "requester_user_id": zod.uuid(),
   "applicant_name": zod.string().nullish().describe('Display name of the requester at read time (null when the user was deleted; callers fall back to requester_user_id).'),
   "state": zod.enum(['access_pending', 'grant_active', 'access_rejected', 'withdrawn', 'invalid']),
@@ -8676,7 +8815,8 @@ export const GetQueryAccessRequestResponse = zod.union([zod.object({
   "created_at": zod.iso.datetime({"offset":true}),
   "reason": zod.string().nullish().describe('Application reason submitted by the requester (snapshot of the original request payload).'),
   "requested_until": zod.union([zod.iso.datetime({"offset":true}),zod.null()]).optional(),
-  "terminal_at": zod.union([zod.iso.datetime({"offset":true}),zod.null()]).optional().describe('Time the request reached a terminal state (rejected, withdrawn or invalid); null while pending or under an active grant.')
+  "terminal_at": zod.union([zod.iso.datetime({"offset":true}),zod.null()]).optional().describe('Time the request reached a terminal state (rejected, withdrawn or invalid); null while pending or under an active grant.'),
+  "can_decide": zod.boolean().optional().describe('Whether the current session actor is a frozen approver of the currently active step on an access_pending request (authoritative server-side eligibility).')
 }),
   "request_id": zod.uuid()
 }),zod.object({
@@ -8725,6 +8865,7 @@ export const DecideQueryAccessResponse = zod.union([zod.object({
   "message": zod.literal("ok"),
   "data": zod.object({
   "id": zod.uuid(),
+  "flow_id": zod.uuid().optional().describe('Frozen query_access flow ID this request was submitted against.'),
   "requester_user_id": zod.uuid(),
   "applicant_name": zod.string().nullish().describe('Display name of the requester at read time (null when the user was deleted; callers fall back to requester_user_id).'),
   "state": zod.enum(['access_pending', 'grant_active', 'access_rejected', 'withdrawn', 'invalid']),
@@ -8735,7 +8876,8 @@ export const DecideQueryAccessResponse = zod.union([zod.object({
   "created_at": zod.iso.datetime({"offset":true}),
   "reason": zod.string().nullish().describe('Application reason submitted by the requester (snapshot of the original request payload).'),
   "requested_until": zod.union([zod.iso.datetime({"offset":true}),zod.null()]).optional(),
-  "terminal_at": zod.union([zod.iso.datetime({"offset":true}),zod.null()]).optional().describe('Time the request reached a terminal state (rejected, withdrawn or invalid); null while pending or under an active grant.')
+  "terminal_at": zod.union([zod.iso.datetime({"offset":true}),zod.null()]).optional().describe('Time the request reached a terminal state (rejected, withdrawn or invalid); null while pending or under an active grant.'),
+  "can_decide": zod.boolean().optional().describe('Whether the current session actor is a frozen approver of the currently active step on an access_pending request (authoritative server-side eligibility).')
 }),
   "request_id": zod.uuid()
 }),zod.object({
@@ -8783,6 +8925,7 @@ export const WithdrawQueryAccessRequestResponse = zod.union([zod.object({
   "message": zod.literal("ok"),
   "data": zod.object({
   "id": zod.uuid(),
+  "flow_id": zod.uuid().optional().describe('Frozen query_access flow ID this request was submitted against.'),
   "requester_user_id": zod.uuid(),
   "applicant_name": zod.string().nullish().describe('Display name of the requester at read time (null when the user was deleted; callers fall back to requester_user_id).'),
   "state": zod.enum(['access_pending', 'grant_active', 'access_rejected', 'withdrawn', 'invalid']),
@@ -8793,7 +8936,8 @@ export const WithdrawQueryAccessRequestResponse = zod.union([zod.object({
   "created_at": zod.iso.datetime({"offset":true}),
   "reason": zod.string().nullish().describe('Application reason submitted by the requester (snapshot of the original request payload).'),
   "requested_until": zod.union([zod.iso.datetime({"offset":true}),zod.null()]).optional(),
-  "terminal_at": zod.union([zod.iso.datetime({"offset":true}),zod.null()]).optional().describe('Time the request reached a terminal state (rejected, withdrawn or invalid); null while pending or under an active grant.')
+  "terminal_at": zod.union([zod.iso.datetime({"offset":true}),zod.null()]).optional().describe('Time the request reached a terminal state (rejected, withdrawn or invalid); null while pending or under an active grant.'),
+  "can_decide": zod.boolean().optional().describe('Whether the current session actor is a frozen approver of the currently active step on an access_pending request (authoritative server-side eligibility).')
 }),
   "request_id": zod.uuid()
 }),zod.object({
@@ -8842,7 +8986,8 @@ export const ListQueryGrantsResponse = zod.union([zod.object({
   "revoked_at": zod.union([zod.iso.datetime({"offset":true}),zod.null()]).optional(),
   "expires_at": zod.union([zod.iso.datetime({"offset":true}),zod.null()]).optional(),
   "version": zod.int().min(1),
-  "created_at": zod.iso.datetime({"offset":true})
+  "created_at": zod.iso.datetime({"offset":true}),
+  "can_revoke": zod.boolean().optional().describe('Whether the current session actor is eligible to revoke this active grant (frozen approver of the originating access request or builtin admin).')
 }))
 })),
   "request_id": zod.uuid()
@@ -8879,7 +9024,8 @@ export const GetQueryGrantResponse = zod.union([zod.object({
   "revoked_at": zod.union([zod.iso.datetime({"offset":true}),zod.null()]).optional(),
   "expires_at": zod.union([zod.iso.datetime({"offset":true}),zod.null()]).optional(),
   "version": zod.int().min(1),
-  "created_at": zod.iso.datetime({"offset":true})
+  "created_at": zod.iso.datetime({"offset":true}),
+  "can_revoke": zod.boolean().optional().describe('Whether the current session actor is eligible to revoke this active grant (frozen approver of the originating access request or builtin admin).')
 }),
   "request_id": zod.uuid()
 }),zod.object({
@@ -8935,7 +9081,8 @@ export const RevokeQueryGrantResponse = zod.union([zod.object({
   "revoked_at": zod.union([zod.iso.datetime({"offset":true}),zod.null()]).optional(),
   "expires_at": zod.union([zod.iso.datetime({"offset":true}),zod.null()]).optional(),
   "version": zod.int().min(1),
-  "created_at": zod.iso.datetime({"offset":true})
+  "created_at": zod.iso.datetime({"offset":true}),
+  "can_revoke": zod.boolean().optional().describe('Whether the current session actor is eligible to revoke this active grant (frozen approver of the originating access request or builtin admin).')
 }),
   "request_id": zod.uuid()
 }),zod.object({
@@ -8991,7 +9138,8 @@ export const RelinquishQueryGrantResponse = zod.union([zod.object({
   "revoked_at": zod.union([zod.iso.datetime({"offset":true}),zod.null()]).optional(),
   "expires_at": zod.union([zod.iso.datetime({"offset":true}),zod.null()]).optional(),
   "version": zod.int().min(1),
-  "created_at": zod.iso.datetime({"offset":true})
+  "created_at": zod.iso.datetime({"offset":true}),
+  "can_revoke": zod.boolean().optional().describe('Whether the current session actor is eligible to revoke this active grant (frozen approver of the originating access request or builtin admin).')
 }),
   "request_id": zod.uuid()
 }),zod.object({
@@ -9038,6 +9186,7 @@ export const CreateQueryGrantRenewalRequestResponse = zod.union([zod.object({
   "message": zod.literal("ok"),
   "data": zod.object({
   "id": zod.uuid(),
+  "flow_id": zod.uuid().optional().describe('Frozen query_access flow ID this request was submitted against.'),
   "requester_user_id": zod.uuid(),
   "applicant_name": zod.string().nullish().describe('Display name of the requester at read time (null when the user was deleted; callers fall back to requester_user_id).'),
   "state": zod.enum(['access_pending', 'grant_active', 'access_rejected', 'withdrawn', 'invalid']),
@@ -9048,7 +9197,8 @@ export const CreateQueryGrantRenewalRequestResponse = zod.union([zod.object({
   "created_at": zod.iso.datetime({"offset":true}),
   "reason": zod.string().nullish().describe('Application reason submitted by the requester (snapshot of the original request payload).'),
   "requested_until": zod.union([zod.iso.datetime({"offset":true}),zod.null()]).optional(),
-  "terminal_at": zod.union([zod.iso.datetime({"offset":true}),zod.null()]).optional().describe('Time the request reached a terminal state (rejected, withdrawn or invalid); null while pending or under an active grant.')
+  "terminal_at": zod.union([zod.iso.datetime({"offset":true}),zod.null()]).optional().describe('Time the request reached a terminal state (rejected, withdrawn or invalid); null while pending or under an active grant.'),
+  "can_decide": zod.boolean().optional().describe('Whether the current session actor is a frozen approver of the currently active step on an access_pending request (authoritative server-side eligibility).')
 }),
   "request_id": zod.uuid()
 }),zod.object({
@@ -9098,6 +9248,7 @@ export const ListQueryOrdersResponse = zod.union([zod.object({
   "created_at": zod.iso.datetime({"offset":true}),
   "request": zod.object({
   "id": zod.uuid(),
+  "flow_id": zod.uuid().optional().describe('Frozen query_access flow ID this request was submitted against.'),
   "requester_user_id": zod.uuid(),
   "applicant_name": zod.string().nullish().describe('Display name of the requester at read time (null when the user was deleted; callers fall back to requester_user_id).'),
   "state": zod.enum(['access_pending', 'grant_active', 'access_rejected', 'withdrawn', 'invalid']),
@@ -9108,7 +9259,8 @@ export const ListQueryOrdersResponse = zod.union([zod.object({
   "created_at": zod.iso.datetime({"offset":true}),
   "reason": zod.string().nullish().describe('Application reason submitted by the requester (snapshot of the original request payload).'),
   "requested_until": zod.union([zod.iso.datetime({"offset":true}),zod.null()]).optional(),
-  "terminal_at": zod.union([zod.iso.datetime({"offset":true}),zod.null()]).optional().describe('Time the request reached a terminal state (rejected, withdrawn or invalid); null while pending or under an active grant.')
+  "terminal_at": zod.union([zod.iso.datetime({"offset":true}),zod.null()]).optional().describe('Time the request reached a terminal state (rejected, withdrawn or invalid); null while pending or under an active grant.'),
+  "can_decide": zod.boolean().optional().describe('Whether the current session actor is a frozen approver of the currently active step on an access_pending request (authoritative server-side eligibility).')
 }).optional(),
   "session": zod.object({
   "id": zod.uuid(),
@@ -10808,6 +10960,7 @@ export const submitAssistantSqlDraftOrderResponseOneDataDisplayNumberRegExp = ne
 
 
 export const submitAssistantSqlDraftOrderResponseOneDataStagesItemExecutionActorsItemRoleDefault = `user`;
+export const submitAssistantSqlDraftOrderResponseOneDataStagesItemExecutionActorsItemAuthProviderDefault = `local`;
 
 export const submitAssistantSqlDraftOrderResponseOneDataManuallyVerifiedDefault = false;
 export const submitAssistantSqlDraftOrderResponseOneDataHasDdlDefault = false;
@@ -10843,6 +10996,7 @@ export const SubmitAssistantSqlDraftOrderResponse = zod.union([zod.object({
   "email": zod.email().nullish(),
   "is_builtin_admin": zod.boolean(),
   "role": zod.enum(['user', 'admin']).default(submitAssistantSqlDraftOrderResponseOneDataStagesItemExecutionActorsItemRoleDefault).describe('User account role. Both is_builtin_admin=true and role=admin grant access to \/admin\/\* management pages.'),
+  "auth_provider": zod.enum(['local', 'ldap', 'oidc']).default(submitAssistantSqlDraftOrderResponseOneDataStagesItemExecutionActorsItemAuthProviderDefault).describe('Identity provider managing this user\'s password; only local non-builtin accounts allow admin password reset.'),
   "version": zod.int().min(1),
   "created_at": zod.iso.datetime({"offset":true}),
   "updated_at": zod.iso.datetime({"offset":true})

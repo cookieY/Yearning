@@ -10,9 +10,11 @@ import (
 
 	"gorm.io/gorm"
 
+	"github.com/cookieY/YearningX/backend/internal/authorization/auditlog"
 	orderdomain "github.com/cookieY/YearningX/backend/internal/changeorder/domain"
 	"github.com/cookieY/YearningX/backend/internal/execution/domain"
 	"github.com/cookieY/YearningX/backend/internal/execution/persistence"
+	"github.com/cookieY/YearningX/backend/internal/platform/ptr"
 )
 
 // stmtFact holds the terminal observed facts for a single statement.
@@ -64,7 +66,7 @@ func (s *Services) applyResult(ctx context.Context, attemptID string, expectFenc
 		if domain.AttemptState(at.State).Terminal() {
 			return nil // Idempotent: terminal state already persisted (protects against task replay / race double-writes)
 		}
-		if at.FenceToken != expectFence || derefStr(at.LeaseOwner) != s.instanceOwner() {
+		if at.FenceToken != expectFence || ptr.Deref(at.LeaseOwner) != s.instanceOwner() {
 			return domain.ErrConcurrent() // Stale worker fence invalidated; abort write
 		}
 		order, err := s.lockOrder(ctx, tx, at.OrderID)
@@ -297,9 +299,9 @@ func (s *Services) advanceOrder(ctx context.Context, tx *gorm.DB, at *persistenc
 		}
 	}
 	if internalEvent != "" {
-		if eerr := s.emitOrderEvent(ctx, tx, internalEvent, order.ID, auditActor(actor), StateChangedPayload{
-			AggregateID: order.ID, From: strPtr(order.State), To: string(next),
-			ReasonCode: reason, StageID: strPtr(stage.StageID), AggregateVersion: nextVersion,
+		if eerr := s.emitOrderEvent(ctx, tx, internalEvent, order.ID, auditlog.UserActor(actor.UserID, actor.Username), StateChangedPayload{
+			AggregateID: order.ID, From: ptr.To(order.State), To: string(next),
+			ReasonCode: reason, StageID: ptr.To(stage.StageID), AggregateVersion: nextVersion,
 		}); eerr != nil {
 			return eerr
 		}
@@ -389,7 +391,7 @@ func (s *Services) activateNextStage(ctx context.Context, tx *gorm.DB, orderID s
 	if activated.StepID == "" {
 		return domain.ErrConcurrent()
 	}
-	return s.emitOrderEvent(ctx, tx, EventStepActivated, orderID, auditActor(actor), StepActivatedPayload{
+	return s.emitOrderEvent(ctx, tx, EventStepActivated, orderID, auditlog.UserActor(actor.UserID, actor.Username), StepActivatedPayload{
 		AggregateID:      orderID,
 		StageID:          next.StageID,
 		StepID:           activated.StepID,
@@ -429,9 +431,9 @@ func (s *Services) markResultUnknown(ctx context.Context, tx *gorm.DB,
 		if err := s.syncSourceOrderRollbackOnOrderTransitionTx(ctx, tx, order, next, now); err != nil {
 			return err
 		}
-		return s.emitOrderEvent(ctx, tx, EventExecUnknown, order.ID, auditActor(actor), StateChangedPayload{
-			AggregateID: order.ID, From: strPtr(order.State), To: string(next),
-			ReasonCode: "result_became_unknown", StageID: strPtr(at.StageID),
+		return s.emitOrderEvent(ctx, tx, EventExecUnknown, order.ID, auditlog.UserActor(actor.UserID, actor.Username), StateChangedPayload{
+			AggregateID: order.ID, From: ptr.To(order.State), To: string(next),
+			ReasonCode: "result_became_unknown", StageID: ptr.To(at.StageID),
 			AggregateVersion: nextVersion,
 		})
 	}

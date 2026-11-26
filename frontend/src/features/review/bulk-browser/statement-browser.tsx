@@ -13,6 +13,7 @@ import { highlightSqlLine } from "@/shared/components/ui/code-block";
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/shared/components/ui/empty";
 import { Tabs, TabsList, TabsTrigger } from "@/shared/components/ui/tabs";
 import { TransitionPanel } from "@/shared/components/ui/transition-panel";
+import { formatBytes } from "@/shared/lib/format";
 import { Download, TriangleAlert } from "lucide-react";
 
 /**
@@ -28,22 +29,14 @@ import { Download, TriangleAlert } from "lucide-react";
 const PREVIEW_MAX_CHARS = 160;
 const ROW_HEIGHT = 44;
 
-function formatBytes(bytes: number): string {
-  if (bytes >= 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MiB`;
-  if (bytes >= 1024) return `${(bytes / 1024).toFixed(1)} KiB`;
-  return `${String(bytes)} B`;
-}
-
 export interface StatementBrowserProps {
   sql: string;
   digest: SqlDigest;
   /** Authoritative fingerprint-group count once a review run exists. */
   serverGroupCount: number | null;
-  /** Draft ordinal to scroll to (from finding locate), keyed by nonce. */
-  locate?: { ordinal: number; nonce: number } | null;
 }
 
-export function StatementBrowser({ sql, digest, serverGroupCount, locate }: StatementBrowserProps) {
+export function StatementBrowser({ sql, digest, serverGroupCount }: StatementBrowserProps) {
   const { t } = useTranslation();
   const [view, setView] = useState<"groups" | "statements">("groups");
   const [selectedGroup, setSelectedGroup] = useState<number | null>(null);
@@ -68,27 +61,14 @@ export function StatementBrowser({ sql, digest, serverGroupCount, locate }: Stat
     initialRect: { width: 800, height: 440 },
   });
 
-  // Finding-driven locate: scroll to the statement ordinal and highlight it.
+  // Anomaly navigation: scroll to the target statement ordinal and highlight it.
   // The scroll is deferred to the effect after the view-switch commit — the
   // virtualizer only knows the new item count once that render landed.
   const [pendingScroll, setPendingScroll] = useState<{ index: number; nonce: number } | null>(
     null,
   );
   const jumpNonceRef = useRef(0);
-  const lastLocateNonce = useRef(0);
   const lastScrollNonce = useRef(0);
-  useEffect(() => {
-    if (locate === null || locate === undefined || locate.nonce === lastLocateNonce.current) return;
-    lastLocateNonce.current = locate.nonce;
-    const target = digest.statements.find(
-      (statement) => statement.index === locate.ordinal,
-    );
-    if (target === undefined) return;
-    setView("statements");
-    setSelectedGroup(null);
-    setHighlightIndex(target.index);
-    setPendingScroll({ index: target.index - 1, nonce: locate.nonce });
-  }, [locate, digest.statements]);
 
   const jumpToFirstAnomaly = (): void => {
     const anomaly = digest.statements.find((statement) => statement.anomaly);

@@ -57,10 +57,7 @@ func postgresCallablesMatch(
 // checker sees a callable defined after the freeze, and an inspected DDL whose
 // callable identity no longer matches the frozen evidence is never sent.
 func TestPostgresCallableIdentityDriftFailsClosedBeforeSend(t *testing.T) {
-	runBothEnginesWithLoopbackForTest(t, func(t *testing.T, env *suiteEnv) {
-		if env.target.mode != "postgresql" {
-			t.Skip("PostgreSQL-only callable identity drift")
-		}
+	runPostgresWithLoopbackForTest(t, func(t *testing.T, env *suiteEnv) {
 		ctx := context.Background()
 		snapshot, err := database.ProbePostgresSearchPath(ctx, env.exec)
 		if err != nil {
@@ -229,10 +226,7 @@ func TestPostgresCallableIdentityDriftFailsClosedBeforeSend(t *testing.T) {
 //	control: nothing is ever created            -> send accepted, SQL executed
 //	drift:   the name appears after the freeze  -> send refused, SQL never sent
 func TestPostgresCallableIdentityAbsentNamePostFreezeDriftFailsClosed(t *testing.T) {
-	runBothEnginesWithLoopbackForTest(t, func(t *testing.T, env *suiteEnv) {
-		if env.target.mode != "postgresql" {
-			t.Skip("PostgreSQL-only callable identity drift")
-		}
+	runPostgresWithLoopbackForTest(t, func(t *testing.T, env *suiteEnv) {
 		ctx := context.Background()
 		snapshot, err := database.ProbePostgresSearchPath(ctx, env.exec)
 		if err != nil {
@@ -361,10 +355,7 @@ func TestPostgresCallableIdentityAbsentNamePostFreezeDriftFailsClosed(t *testing
 // pg_catalog the send is allowed; defining the user-side overload after the
 // freeze must make the inspected send fail closed and not execute the DDL.
 func TestPostgresCallableIdentityKeywordLikePostFreezeFailsClosed(t *testing.T) {
-	runBothEnginesWithLoopbackForTest(t, func(t *testing.T, env *suiteEnv) {
-		if env.target.mode != "postgresql" {
-			t.Skip("PostgreSQL-only callable identity drift")
-		}
+	runPostgresWithLoopbackForTest(t, func(t *testing.T, env *suiteEnv) {
 		ctx := context.Background()
 		snapshot, err := database.ProbePostgresSearchPath(ctx, env.exec)
 		if err != nil {

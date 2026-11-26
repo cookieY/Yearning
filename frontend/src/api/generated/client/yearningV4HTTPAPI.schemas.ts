@@ -168,6 +168,18 @@ export const UserRole = {
   admin: 'admin',
 } as const;
 
+/**
+ * Identity provider managing this user's password; only local non-builtin accounts allow admin password reset.
+ */
+export type UserAuthProvider = typeof UserAuthProvider[keyof typeof UserAuthProvider];
+
+
+export const UserAuthProvider = {
+  local: 'local',
+  ldap: 'ldap',
+  oidc: 'oidc',
+} as const;
+
 export interface User {
   id: Uuid;
   username: string;
@@ -177,6 +189,8 @@ export interface User {
   is_builtin_admin: boolean;
   /** User account role. Both is_builtin_admin=true and role=admin grant access to /admin/* management pages. */
   role?: UserRole;
+  /** Identity provider managing this user's password; only local non-builtin accounts allow admin password reset. */
+  auth_provider?: UserAuthProvider;
   /** @minimum 1 */
   version: number;
   created_at: Timestamp;
@@ -209,6 +223,14 @@ export interface ChangeMyPasswordRequest {
      * @maxLength 1024
      */
   old_password: string;
+  /**
+     * @minLength 12
+     * @maxLength 1024
+     */
+  new_password: string;
+}
+
+export interface ResetUserPasswordRequest {
   /**
      * @minLength 12
      * @maxLength 1024
@@ -778,10 +800,11 @@ export interface DatasourceWrite {
      */
   database_name?: string | null;
   /**
+     * Optional version constraint. When omitted on create, defaults from the capability matrix for the engine and compatibility_mode; when omitted on replace, preserves the stored value or falls back to the matrix default.
      * @minLength 1
      * @maxLength 64
      */
-  version_constraint: string;
+  version_constraint?: string;
   enabled: boolean;
   /** Connection test purpose stored on the datasource; the connection-test action probes with this purpose's stored credential. Full-replacement semantics like every other field — omitting it resets the purpose to review. */
   test_purpose?: DatasourceWriteTestPurpose;
@@ -938,7 +961,7 @@ export const PromptToolWriteEngine = {
 export type PromptToolWriteParameters = {[key: string]: number | string | boolean | string[]};
 
 /**
- * Retained for v1 definition, API and stored-configuration compatibility. This field is not a submission ceiling for enabled mandatory rules and cannot authorize a lower-risk result: every actual hit from an enabled, frozen and scope-matched Prompt Tool or internal-experience rule becomes effective Critical and blocks submission regardless of the model-provided severity. Unbound model observations remain visible but are capped at Medium. The finding key is system-derived and is injected alongside the rule text.
+ * Retained for v1 definition, API and stored-configuration compatibility. This field is not a submission ceiling for enabled mandatory rules and cannot authorize a lower-risk result: every actual hit from an enabled, frozen and scope-matched Prompt Tool rule becomes effective Critical and blocks submission regardless of the model-provided severity. Unbound model observations remain visible but are capped at Medium. The finding key is system-derived and is injected alongside the rule text.
  */
 export type ReviewInputDefinitionMaxSeverity = typeof ReviewInputDefinitionMaxSeverity[keyof typeof ReviewInputDefinitionMaxSeverity];
 
@@ -957,7 +980,7 @@ export interface ReviewInputDefinition {
      * @maxLength 65536
      */
   knowledge_text: string;
-  /** Retained for v1 definition, API and stored-configuration compatibility. This field is not a submission ceiling for enabled mandatory rules and cannot authorize a lower-risk result: every actual hit from an enabled, frozen and scope-matched Prompt Tool or internal-experience rule becomes effective Critical and blocks submission regardless of the model-provided severity. Unbound model observations remain visible but are capped at Medium. The finding key is system-derived and is injected alongside the rule text. */
+  /** Retained for v1 definition, API and stored-configuration compatibility. This field is not a submission ceiling for enabled mandatory rules and cannot authorize a lower-risk result: every actual hit from an enabled, frozen and scope-matched Prompt Tool rule becomes effective Critical and blocks submission regardless of the model-provided severity. Unbound model observations remain visible but are capped at Medium. The finding key is system-derived and is injected alongside the rule text. */
   max_severity: ReviewInputDefinitionMaxSeverity;
   /** @minimum 1 */
   version: number;
@@ -1510,7 +1533,6 @@ export type KnowledgeEntryWriteScopeType = typeof KnowledgeEntryWriteScopeType[k
 
 
 export const KnowledgeEntryWriteScopeType = {
-  global: 'global',
   datasource: 'datasource',
   table: 'table',
 } as const;
@@ -1522,6 +1544,30 @@ export const KnowledgeEntryWriteProvenance = {
   manual: 'manual',
   finding_conversion: 'finding_conversion',
 } as const;
+
+/**
+ * Advisory maximum severity for non-blocking internal experience guidance (info, low, or medium). Internal experience entries assist the Database AI Assistant and emit non-blocking advisory findings during AI Review without ever blocking submission.
+ */
+export type KnowledgeEntryDefinitionWriteMaxSeverity = typeof KnowledgeEntryDefinitionWriteMaxSeverity[keyof typeof KnowledgeEntryDefinitionWriteMaxSeverity];
+
+
+export const KnowledgeEntryDefinitionWriteMaxSeverity = {
+  info: 'info',
+  low: 'low',
+  medium: 'medium',
+} as const;
+
+export interface KnowledgeEntryDefinitionWrite {
+  /**
+     * @minLength 1
+     * @maxLength 65536
+     */
+  knowledge_text: string;
+  /** Advisory maximum severity for non-blocking internal experience guidance (info, low, or medium). Internal experience entries assist the Database AI Assistant and emit non-blocking advisory findings during AI Review without ever blocking submission. */
+  max_severity: KnowledgeEntryDefinitionWriteMaxSeverity;
+  /** @minimum 1 */
+  version: number;
+}
 
 export interface KnowledgeEntryWrite {
   /**
@@ -1544,26 +1590,94 @@ export interface KnowledgeEntryWrite {
      * @maxLength 128
      */
   table_name?: string;
-  definition: ReviewInputDefinition;
+  definition: KnowledgeEntryDefinitionWrite;
   provenance?: KnowledgeEntryWriteProvenance;
   source_finding_id?: Uuid;
 }
 
-export type KnowledgeEntry = KnowledgeEntryWrite & {
+export type KnowledgeEntryState = typeof KnowledgeEntryState[keyof typeof KnowledgeEntryState];
+
+
+export const KnowledgeEntryState = {
+  draft: 'draft',
+  enabled: 'enabled',
+  disabled: 'disabled',
+} as const;
+
+export type KnowledgeEntryScopeType = typeof KnowledgeEntryScopeType[keyof typeof KnowledgeEntryScopeType];
+
+
+export const KnowledgeEntryScopeType = {
+  global: 'global',
+  datasource: 'datasource',
+  table: 'table',
+} as const;
+
+export type KnowledgeEntryProvenance = typeof KnowledgeEntryProvenance[keyof typeof KnowledgeEntryProvenance];
+
+
+export const KnowledgeEntryProvenance = {
+  manual: 'manual',
+  finding_conversion: 'finding_conversion',
+} as const;
+
+/**
+ * Stored advisory maximum severity for internal experience entries. Legacy high/critical values remain readable for historical rows and are capped at medium at runtime; new writes restrict max_severity to info, low, or medium.
+ */
+export type KnowledgeEntryDefinitionMaxSeverity = typeof KnowledgeEntryDefinitionMaxSeverity[keyof typeof KnowledgeEntryDefinitionMaxSeverity];
+
+
+export const KnowledgeEntryDefinitionMaxSeverity = {
+  info: 'info',
+  low: 'low',
+  medium: 'medium',
+  high: 'high',
+  critical: 'critical',
+} as const;
+
+export interface KnowledgeEntryDefinition {
+  /**
+     * @minLength 1
+     * @maxLength 65536
+     */
+  knowledge_text: string;
+  /** Stored advisory maximum severity for internal experience entries. Legacy high/critical values remain readable for historical rows and are capped at medium at runtime; new writes restrict max_severity to info, low, or medium. */
+  max_severity: KnowledgeEntryDefinitionMaxSeverity;
+  /** @minimum 1 */
+  version: number;
+}
+
+export interface KnowledgeEntry {
   id: Uuid;
+  /**
+     * @minLength 1
+     * @maxLength 128
+     */
+  name: string;
+  /** @maxLength 512 */
+  purpose?: string;
+  state: KnowledgeEntryState;
+  scope_type: KnowledgeEntryScopeType;
+  datasource_id?: Uuid;
+  /**
+     * @minLength 1
+     * @maxLength 128
+     */
+  database_name?: string;
+  /**
+     * @minLength 1
+     * @maxLength 128
+     */
+  table_name?: string;
+  definition: KnowledgeEntryDefinition;
+  provenance: KnowledgeEntryProvenance;
+  source_finding_id?: Uuid;
   config_hash: string;
   /** @minimum 1 */
   version: number;
   created_at: Timestamp;
   updated_at: Timestamp;
-} & Required<Pick<KnowledgeEntryWrite & {
-  id: Uuid;
-  config_hash: string;
-  /** @minimum 1 */
-  version: number;
-  created_at: Timestamp;
-  updated_at: Timestamp;
-}, 'state' | 'provenance'>>;
+}
 
 export interface KnowledgeEntryEvaluation {
   pass: boolean;
@@ -2214,6 +2328,25 @@ export interface FlowStageWrite {
   execution_actors: ActorRef[];
 }
 
+export type FlowStageViewDatasourceEngine = typeof FlowStageViewDatasourceEngine[keyof typeof FlowStageViewDatasourceEngine];
+
+
+export const FlowStageViewDatasourceEngine = {
+  mysql: 'mysql',
+  postgresql: 'postgresql',
+  tidb: 'tidb',
+  oceanbase: 'oceanbase',
+  polardb: 'polardb',
+} as const;
+
+export type FlowStageViewDatasourceCompatibilityMode = typeof FlowStageViewDatasourceCompatibilityMode[keyof typeof FlowStageViewDatasourceCompatibilityMode];
+
+
+export const FlowStageViewDatasourceCompatibilityMode = {
+  mysql: 'mysql',
+  postgresql: 'postgresql',
+} as const;
+
 /**
  * Read-face projection of one flow stage with the resolved datasource catalog name (server-side join, RCP-20260904-FLOW-STAGE-DATASOURCE-NAME). The write face (FlowStageWrite) keeps the bare datasource_id; the name is a live join over the datasource catalog, never a persisted snapshot. The join always resolves while the catalog row exists, and flow stages block datasource deletion (logical-relations on_target_delete=block), so producers must never serialize an empty name; a temporarily missing catalog row falls back to the datasource_id value, which still satisfies minLength 1.
  */
@@ -2226,6 +2359,13 @@ export interface FlowStageView {
      * @maxLength 128
      */
   datasource_name: string;
+  datasource_engine?: FlowStageViewDatasourceEngine;
+  datasource_compatibility_mode?: FlowStageViewDatasourceCompatibilityMode;
+  /**
+     * @maxLength 128
+     * @nullable
+     */
+  datasource_database_name?: string | null;
   /**
      * @minItems 1
      * @maxItems 10
@@ -2343,6 +2483,12 @@ export interface ChangeDraft {
      */
   requested_scheduled_for?: string | null;
   rollback_enabled?: boolean;
+  /**
+     * @minLength 1
+     * @maxLength 128
+     * @nullable
+     */
+  target_database?: string | null;
   ticket_type?: ChangeDraftTicketType;
   source_order_id?: Uuid | null;
   /** @nullable */
@@ -2381,6 +2527,11 @@ export interface CreateChangeDraftRequest {
   /** Desired execution time (RFC3339, must be in the future at save time). Optional; §18.56 ruling B. */
   requested_scheduled_for?: string;
   rollback_enabled?: boolean;
+  /**
+     * @minLength 1
+     * @maxLength 128
+     */
+  target_database?: string;
 }
 
 export interface UpdateChangeDraftRequest {
@@ -2398,6 +2549,12 @@ export interface UpdateChangeDraftRequest {
      */
   requested_scheduled_for?: string | null;
   rollback_enabled?: boolean;
+  /**
+     * @minLength 1
+     * @maxLength 128
+     * @nullable
+     */
+  target_database?: string | null;
 }
 
 export type ChangeOrderState = typeof ChangeOrderState[keyof typeof ChangeOrderState];
@@ -2686,8 +2843,15 @@ export interface SubmissionGate {
 
 export interface ReviewRun {
   id: Uuid;
-  draft_id: Uuid;
-  /** @minimum 1 */
+  /**
+     * Associated change draft UUID, or empty string when precheck ran ephemerally without a saved draft (RCP-20261101 / RCP-20261125).
+     * @pattern ^($|[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})$
+     */
+  draft_id: string;
+  /**
+     * Persisted draft revision (>= 1), or 0 when precheck ran ephemerally without a persisted draft revision (RCP-20261101 / RCP-20261125).
+     * @minimum 0
+     */
   draft_revision: number;
   state: ReviewRunState;
   /**
@@ -3151,6 +3315,8 @@ export const QueryOrderEntryKind = {
 
 export interface QueryAccessRequest {
   id: Uuid;
+  /** Frozen query_access flow ID this request was submitted against. */
+  flow_id?: Uuid;
   requester_user_id: Uuid;
   /**
      * Display name of the requester at read time (null when the user was deleted; callers fall back to requester_user_id).
@@ -3173,6 +3339,8 @@ export interface QueryAccessRequest {
   requested_until?: Timestamp | null;
   /** Time the request reached a terminal state (rejected, withdrawn or invalid); null while pending or under an active grant. */
   terminal_at?: Timestamp | null;
+  /** Whether the current session actor is a frozen approver of the currently active step on an access_pending request (authoritative server-side eligibility). */
+  can_decide?: boolean;
 }
 
 export type QuerySessionState = typeof QuerySessionState[keyof typeof QuerySessionState];
@@ -3263,6 +3431,8 @@ export interface QueryGrant {
   /** @minimum 1 */
   version: number;
   created_at: Timestamp;
+  /** Whether the current session actor is eligible to revoke this active grant (frozen approver of the originating access request or builtin admin). */
+  can_revoke?: boolean;
 }
 
 export interface CreateQuerySession {
@@ -4776,6 +4946,16 @@ export type ListAuthenticationProviders200 = {
   label: string;
   start_url: string;
 }[];
+  /** Public branding fields configured under the branding settings namespace (product_name and plain-text login_description). */
+  branding?: {
+  /**
+     * @minLength 1
+     * @maxLength 64
+     */
+  product_name: string;
+  /** @maxLength 500 */
+  login_description: string;
+};
 };
   request_id: Uuid;
 } | BusinessErrorResponse;
@@ -4857,6 +5037,14 @@ export type UpdateUser200 = {
 } | BusinessErrorResponse;
 
 export type DeleteUser200 = {
+  err_code: 0;
+  message: 'ok';
+  /** @nullable */
+  data: null;
+  request_id: Uuid;
+} | BusinessErrorResponse;
+
+export type ResetUserPassword200 = {
   err_code: 0;
   message: 'ok';
   /** @nullable */
@@ -5838,6 +6026,13 @@ export type RunDraftReviewBody = {
   /** Current editor SQL reviewed verbatim (max 32 MiB). */
   sql: string;
   /**
+     * Optional default database override for MySQL-compatible stages, or optional Target Schema override within the connected Database for PostgreSQL stages; explicit null clears any draft-level override during ephemeral precheck without mutating the draft.
+     * @minLength 1
+     * @maxLength 128
+     * @nullable
+     */
+  target_database?: string | null;
+  /**
      * Optional explicit locale; overrides the header when present.
      * @maxLength 16
      */
@@ -5901,6 +6096,13 @@ export type SubmitChangeDraftBody = {
   /** SQL submitted verbatim; must equal the prechecked text. */
   sql: string;
   run_id: Uuid;
+  /**
+     * Optional default database (MySQL-compatible stages) or Target Schema within the connected Database (PostgreSQL stages) bound during precheck; explicit null clears any saved draft override on submission.
+     * @minLength 1
+     * @maxLength 128
+     * @nullable
+     */
+  target_database?: string | null;
   /** Required only for draftless create-mode submission. */
   metadata?: SubmitChangeDraftBodyMetadata;
 };
@@ -5936,11 +6138,11 @@ q?: string;
  */
 datasource?: string;
 /**
- * Inclusive lower bound on submitted_at (UTC calendar day start).
+ * Inclusive lower bound on submitted_at (calendar day start in general.system_timezone).
  */
 submitted_from?: string;
 /**
- * Inclusive upper bound on submitted_at (UTC calendar day end).
+ * Inclusive upper bound on submitted_at (calendar day end in general.system_timezone).
  */
 submitted_to?: string;
 };
@@ -6173,7 +6375,20 @@ after?: AfterParameter;
  * 按申请状态过滤（RCP-20261021；缺省返回全部状态的关系可见项）。
  */
 state?: QueryAccessRequestState;
+/**
+ * Optional relationship scope filter (all = requester or frozen reviewer, reviewer = frozen reviewer only, requester = requester only). Narrowing only; never widens authorization.
+ */
+scope?: ListQueryAccessRequestsScope;
 };
+
+export type ListQueryAccessRequestsScope = typeof ListQueryAccessRequestsScope[keyof typeof ListQueryAccessRequestsScope];
+
+
+export const ListQueryAccessRequestsScope = {
+  all: 'all',
+  reviewer: 'reviewer',
+  requester: 'requester',
+} as const;
 
 export type ListQueryAccessRequests200 = {
   err_code: 0;

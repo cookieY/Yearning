@@ -38,7 +38,10 @@ func TestNotificationCoverageHTTPAndTemplateIntegration(t *testing.T) {
 	})
 	router := gin.New()
 	router.Use(session.Middleware(memStore, session.Options{CookieName: "sid", AnonymousAllowed: true}))
-	RegisterRoutes(router, &Deps{Service: svc})
+	RegisterRoutes(router, &Deps{
+		Service: svc,
+		Guard:   func(_ string) gin.HandlerFunc { return func(c *gin.Context) { c.Next() } },
+	})
 
 	doReq := func(method, path, body, ifMatch string) *httptest.ResponseRecorder {
 		var r *bytes.Buffer

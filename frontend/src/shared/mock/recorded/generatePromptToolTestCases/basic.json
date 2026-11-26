@@ -1,0 +1,78 @@
+{
+  "contract_version": 1,
+  "openapi_sha": "b08b588223c0b586a5c9c4e0f1c9b0cd818d7ef1d61f3f9e823d5a489e37fb73",
+  "zod_runtime_sha256": "32b72a82897ae698b7566aad9821c07cf5194173a3dc69adfb00a8f00f04a446",
+  "operation_id": "generatePromptToolTestCases",
+  "case_id": "basic",
+  "http_status": 200,
+  "err_code": 0,
+  "response": {
+    "data": {
+      "cases": [
+        {
+          "id": "case-1",
+          "sql": "UPDATE customers SET status = 'active', updated_at = CURRENT_TIMESTAMP WHERE customer_id = 42;",
+          "expected_compliant": true,
+          "rationale": "The UPDATE includes a WHERE clause on the primary key column customer_id with a literal value, restricting the change to exactly one specific row. This satisfies the bounded WHERE requirement."
+        },
+        {
+          "id": "case-2",
+          "sql": "UPDATE orders SET shipped = TRUE WHERE order_id = 10087 AND status = 'pending';",
+          "expected_compliant": true,
+          "rationale": "The WHERE clause combines an equality on order_id with a status filter, yielding a specific non-empty scope of rows. The predicate is a real filtering condition, so the rule passes."
+        },
+        {
+          "id": "case-3",
+          "sql": "UPDATE accounts SET balance = balance - 100.00 WHERE account_id = 1001 AND balance >= 100.00;",
+          "expected_compliant": true,
+          "rationale": "The update is bounded by account_id plus a balance guard that further restricts affected rows. This is a real, non-tautological filtering condition and satisfies the rule."
+        },
+        {
+          "id": "case-4",
+          "sql": "UPDATE employees SET department_id = 3 WHERE employee_id IN (101, 102, 103);",
+          "expected_compliant": true,
+          "rationale": "The WHERE clause uses an IN list of specific employee identifiers, limiting the affected rows to a defined, non-empty scope. The rule is satisfied."
+        },
+        {
+          "id": "case-5",
+          "sql": "UPDATE products SET price = price * 1.10 WHERE category = 'electronics' AND discontinued = FALSE;",
+          "expected_compliant": true,
+          "rationale": "The predicate filters on category and discontinued status, bounding the update to a specific subset of rows rather than the whole table. This meets the bounded WHERE criteria."
+        },
+        {
+          "id": "case-6",
+          "sql": "UPDATE customers SET status = 'inactive';",
+          "expected_compliant": false,
+          "rationale": "The UPDATE has no WHERE clause at all, so it applies to every row in the table. This directly violates the requirement for a bounded WHERE clause."
+        },
+        {
+          "id": "case-7",
+          "sql": "UPDATE orders SET shipped = TRUE WHERE 1 = 1;",
+          "expected_compliant": false,
+          "rationale": "The WHERE clause is a tautology (1 = 1) that is always true and does not restrict the target rows. This is explicitly listed as a violation trigger."
+        },
+        {
+          "id": "case-8",
+          "sql": "UPDATE accounts SET balance = 0 WHERE TRUE;",
+          "expected_compliant": false,
+          "rationale": "The predicate TRUE is always true and provides no row bounding, effectively updating the entire table. The rule rejects non-restrictive WHERE clauses such as this."
+        },
+        {
+          "id": "case-9",
+          "sql": "UPDATE logs SET archived = TRUE WHERE archived = archived;",
+          "expected_compliant": false,
+          "rationale": "The condition compares a column to itself, which is a non-restrictive tautology and does not limit the affected rows to a specific scope. This violates the bounded WHERE requirement."
+        },
+        {
+          "id": "case-10",
+          "sql": "UPDATE products SET price = 0 WHERE 'x' = 'x' OR product_id > 0;",
+          "expected_compliant": false,
+          "rationale": "The OR with a constant-true comparison ('x' = 'x') makes the whole predicate always true, so no rows are bounded. The WHERE clause is non-restrictive and the statement fails the rule."
+        }
+      ]
+    },
+    "err_code": 0,
+    "message": "ok",
+    "request_id": "00000000-0000-4000-8000-999999999999"
+  }
+}

@@ -8,34 +8,19 @@ package main
 
 import (
 	"context"
-	"os"
 	"testing"
 
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 	gormlogger "gorm.io/gorm/logger"
+
+	"github.com/cookieY/YearningX/backend/internal/platform/testenv"
 )
 
-// integrationLedgerDSN reuses the global integration DB convention (YEARNING_TEST_DATABASE_*).
+// integrationLedgerDSN reuses the global integration DB convention via testenv.
 func integrationLedgerDSN(t *testing.T) string {
 	t.Helper()
-	password := os.Getenv("YEARNING_TEST_DATABASE_PASSWORD")
-	if password == "" {
-		t.Skip("integration PostgreSQL not configured: set YEARNING_TEST_DATABASE_PASSWORD")
-	}
-	return "host=" + testEnvOr("YEARNING_TEST_DATABASE_HOST", "localhost") +
-		" port=" + testEnvOr("YEARNING_TEST_DATABASE_PORT", "54330") +
-		" user=" + testEnvOr("YEARNING_TEST_DATABASE_USER", "yearning") +
-		" password=" + password +
-		" dbname=" + testEnvOr("YEARNING_TEST_DATABASE_DBNAME", "yearning_v4") +
-		" sslmode=" + testEnvOr("YEARNING_TEST_DATABASE_SSLMODE", "disable")
-}
-
-func testEnvOr(key, def string) string {
-	if v := os.Getenv(key); v != "" {
-		return v
-	}
-	return def
+	return testenv.MetaDSN(t)
 }
 
 func TestGormSchemaLedgerAgainstRealPostgres(t *testing.T) {
@@ -48,7 +33,7 @@ func TestGormSchemaLedgerAgainstRealPostgres(t *testing.T) {
 		t.Fatalf("probe schema_migrations: %v", err)
 	}
 	if !ledgerExists {
-		t.Skip("schema_migrations absent in integration DB; run schema migration job first")
+		testenv.SkipOrFatal(t, "schema_migrations absent in integration DB; run schema migration job first")
 	}
 	var failed int
 	if err := db.Raw(`select count(*) filter (where not success) from schema_migrations`).Scan(&failed).Error; err != nil {

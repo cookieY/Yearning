@@ -1,0 +1,73 @@
+{
+  "request_schema_version": 1,
+  "review_run_id": "00000000-0000-4000-8000-000000000001",
+  "engine_profile": "mysql/mysql",
+  "anonymized_statement_groups": [
+    {
+      "group_id": "10000000-0000-4000-8000-000000000001",
+      "representative_shape": "kind=ddl op=rename where=true",
+      "representative_anonymized_sql": "RENAME TABLE shop.orders_old TO shop.orders_archive",
+      "objects": [
+        {
+          "token": "shop",
+          "kind": "schema",
+          "relation": "reference",
+          "schema_token": "shop",
+          "statement_ordinal": 1,
+          "statement_ordinal_ranges": [
+            {
+              "start": 1,
+              "end": 1
+            }
+          ]
+        },
+        {
+          "token": "shop.orders_old",
+          "kind": "table",
+          "relation": "target",
+          "schema_token": "shop",
+          "statement_ordinal": 1,
+          "statement_ordinal_ranges": [
+            {
+              "start": 1,
+              "end": 1
+            }
+          ]
+        },
+        {
+          "token": "shop.orders_archive",
+          "kind": "table",
+          "relation": "define",
+          "schema_token": "shop",
+          "statement_ordinal": 1,
+          "statement_ordinal_ranges": [
+            {
+              "start": 1,
+              "end": 1
+            }
+          ]
+        }
+      ],
+      "metadata_context_complete": true,
+      "statement_count": 1,
+      "statement_ordinal": 1,
+      "statement_ordinal_ranges": [
+        {
+          "start": 1,
+          "end": 1
+        }
+      ],
+      "statistics": {
+        "algorithm_version": "yearning-fingerprint-v1",
+        "ddl_across_db_rename": false,
+        "ddl_is_rename_table": true,
+        "in_value_count_max": 0,
+        "max_statement_bytes": 51,
+        "unbounded_mutation": false,
+        "values_row_count_max": 0
+      }
+    }
+  ],
+  "normalized_evidence": [],
+  "allowed_tool_descriptors": []
+}

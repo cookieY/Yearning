@@ -11,7 +11,9 @@ import {
   useSubmitAssistantSqlDraftOrder,
 } from "./use-assistant";
 import { describeError } from "@/shared/api/error-display";
+import { InlineCodeText } from "@/shared/components/inline-code-text";
 import { appToast } from "@/shared/components/shadcn-dashboard/sonner/sonner-08";
+import { writeClipboardText } from "@/shared/lib/clipboard";
 import { Alert, AlertDescription } from "@/shared/components/ui/alert";
 import { Badge } from "@/shared/components/ui/badge";
 import { Button } from "@/shared/components/ui/button";
@@ -112,15 +114,16 @@ export function SqlDraftCard({
     submittedOrder?.display_number ?? activeDraft.submitted_order_display_no;
 
   const handleCopySql = async () => {
-    try {
-      await navigator.clipboard.writeText(activeDraft.sql_text);
+    const ok = await writeClipboardText(activeDraft.sql_text);
+    if (ok) {
       setCopied(true);
       appToast.info(t("assistant.draft.copied"));
       setTimeout(() => {
         setCopied(false);
       }, 1500);
-    } catch {
+    } else {
       setCopied(false);
+      appToast.error(t("common.copyFailed"));
     }
   };
 
@@ -227,13 +230,16 @@ export function SqlDraftCard({
             </Badge>
             <Button
               type="button"
-              variant="ghost"
+              variant={isSelected ? "secondary" : "ghost"}
               size="sm"
+              disabled={isSelected}
+              aria-pressed={isSelected}
               onClick={() => {
                 onSelectDraft(draft.id);
               }}
               data-testid={`assistant-select-draft-${draft.id}`}
             >
+              {isSelected && <Check data-icon="inline-start" aria-hidden="true" />}
               {isSelected ? t("assistant.draft.selected") : t("assistant.draft.useAsContext")}
             </Button>
           </div>
@@ -285,7 +291,9 @@ export function SqlDraftCard({
               </span>
               <ul className="list-disc pl-4">
                 {draft.semantic_warnings.map((warning, idx) => (
-                  <li key={idx}>{warning}</li>
+                  <li key={idx}>
+                    <InlineCodeText text={warning} />
+                  </li>
                 ))}
               </ul>
             </AlertDescription>
@@ -299,7 +307,9 @@ export function SqlDraftCard({
             </span>
             <ul className="text-foreground/90 list-disc pl-4">
               {draft.assumptions.map((item, idx) => (
-                <li key={idx}>{item}</li>
+                <li key={idx}>
+                  <InlineCodeText text={item} />
+                </li>
               ))}
             </ul>
           </div>
@@ -312,7 +322,9 @@ export function SqlDraftCard({
             </span>
             <ul className="text-foreground/90 list-disc pl-4">
               {draft.next_steps.map((step, idx) => (
-                <li key={idx}>{step}</li>
+                <li key={idx}>
+                  <InlineCodeText text={step} />
+                </li>
               ))}
             </ul>
           </div>

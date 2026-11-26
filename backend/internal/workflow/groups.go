@@ -13,6 +13,7 @@ import (
 
 	"github.com/cookieY/YearningX/backend/internal/authorization/auditlog"
 	"github.com/cookieY/YearningX/backend/internal/authorization/bizerr"
+	"github.com/cookieY/YearningX/backend/internal/platform/ptr"
 	"github.com/cookieY/YearningX/backend/internal/platform/txutil"
 )
 
@@ -58,7 +59,7 @@ func (s *Service) CreateGroup(ctx context.Context, actor AdminActor, w *GroupWri
 			Version: 1, CreatedByUserID: actor.UserID, CreatedAt: now, UpdatedAt: now,
 		}
 		if err := tx.Create(&row).Error; err != nil {
-			if isUniqueErr(err) {
+			if txutil.IsUniqueViolation(err) {
 				return bizerr.ErrAlreadyExists
 			}
 			return err
@@ -67,7 +68,7 @@ func (s *Service) CreateGroup(ctx context.Context, actor AdminActor, w *GroupWri
 			return err
 		}
 		_ = s.audit.NotifyRealtimeTargets(ctx, tx, "flow.updated", "permission-groups/"+groupID, "created",
-			auditlog.Actor{Kind: "user", UserID: actor.UserID, Username: actor.Username},
+			auditlog.UserActor(actor.UserID, actor.Username),
 			w.MemberUserIDs, true)
 		return nil
 	})
@@ -139,7 +140,7 @@ func (s *Service) ReplaceGroup(ctx context.Context, actor AdminActor, groupID st
 		}
 		allMembers := append(prevMembers, w.MemberUserIDs...)
 		_ = s.audit.NotifyRealtimeTargets(ctx, tx, "flow.updated", "permission-groups/"+groupID, "updated",
-			auditlog.Actor{Kind: "user", UserID: actor.UserID, Username: actor.Username},
+			auditlog.UserActor(actor.UserID, actor.Username),
 			allMembers, true)
 		return nil
 	})
@@ -189,12 +190,12 @@ func (s *Service) DeleteGroup(ctx context.Context, actor AdminActor, groupID str
 			ActorID: &actor.UserID, ActorUsername: &actor.Username,
 			ResourceType: "permission_group", ResourceID: &groupID,
 			Action: "delete_permission_group", Outcome: "succeeded",
-			RequestID: strPtr(meta.RequestID),
+			RequestID: ptr.NonZero(meta.RequestID),
 		}); err != nil {
 			return err
 		}
 		_ = s.audit.NotifyRealtimeTargets(ctx, tx, "flow.updated", "permission-groups/"+groupID, "deleted",
-			auditlog.Actor{Kind: "user", UserID: actor.UserID, Username: actor.Username},
+			auditlog.UserActor(actor.UserID, actor.Username),
 			prevMembers, true)
 		return nil
 	})
@@ -303,7 +304,7 @@ func writeGroupMembership(ctx context.Context, tx *gorm.DB, groupID string, w *G
 		if err := tx.WithContext(ctx).Create(&PermissionGroupMemberModel{
 			PermissionGroupID: groupID, UserID: uid,
 		}).Error; err != nil {
-			if isUniqueErr(err) {
+			if txutil.IsUniqueViolation(err) {
 				return bizerr.ErrAlreadyExists
 			}
 			return err
@@ -313,7 +314,7 @@ func writeGroupMembership(ctx context.Context, tx *gorm.DB, groupID string, w *G
 		if err := tx.WithContext(ctx).Create(&PermissionGroupFlowGrantModel{
 			PermissionGroupID: groupID, FlowID: fid,
 		}).Error; err != nil {
-			if isUniqueErr(err) {
+			if txutil.IsUniqueViolation(err) {
 				return bizerr.ErrAlreadyExists
 			}
 			return err
@@ -367,6 +368,6 @@ func (s *Service) auditGroup(ctx context.Context, actor AdminActor, eventType, a
 	_ = s.audit.Audit(ctx, nil, auditlog.AuditInput{
 		EventType: eventType, ActorKind: "user", ActorID: &actor.UserID, ActorUsername: &actor.Username,
 		ResourceType: "permission_group", ResourceID: &groupID, Action: action, Outcome: "succeeded",
-		RequestID: strPtr(meta.RequestID),
+		RequestID: ptr.NonZero(meta.RequestID),
 	})
 }

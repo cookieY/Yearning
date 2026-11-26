@@ -8,8 +8,8 @@ See the dedicated guide for the **Scoped Database AI Assistant** (platform help,
 
 ## Step 1: Verify Native Statement Statistics on Target DB
 
-- **MySQL 5.7 / 8.0 / TiDB**: Ensure `performance_schema = ON` and grant `SELECT ON performance_schema.events_statements_summary_by_digest` to `yearning_ro`.
-- **PostgreSQL 14–18**: Preload `pg_stat_statements` in `shared_preload_libraries`, run `CREATE EXTENSION IF NOT EXISTS pg_stat_statements;`, and grant `pg_read_all_stats` to `yearning_ro`.
+- **MySQL 5.7+ / TiDB**: Ensure `performance_schema = ON` and grant `SELECT ON performance_schema.events_statements_summary_by_digest` to `yearning_ro`.
+- **PostgreSQL 14+**: Preload `pg_stat_statements` in `shared_preload_libraries`, run `CREATE EXTENSION IF NOT EXISTS pg_stat_statements;`, and grant `pg_read_all_stats` to `yearning_ro`.
 
 ## Step 2: Enable Collection & Drill Down Across 6 Linked Charts
 

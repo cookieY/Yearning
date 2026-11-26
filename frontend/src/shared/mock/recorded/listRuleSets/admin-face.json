@@ -1,0 +1,33 @@
+{
+  "contract_version": 1,
+  "openapi_sha": "b08b588223c0b586a5c9c4e0f1c9b0cd818d7ef1d61f3f9e823d5a489e37fb73",
+  "zod_runtime_sha256": "32b72a82897ae698b7566aad9821c07cf5194173a3dc69adfb00a8f00f04a446",
+  "operation_id": "listRuleSets",
+  "case_id": "admin-face",
+  "http_status": 200,
+  "err_code": 0,
+  "response": {
+    "data": {
+      "items": [
+        {
+          "id": "00000000-0000-4000-8000-000000000196",
+          "name": "f12-rules",
+          "enabled": true,
+          "rules": {},
+          "prompt_tool_ids": [],
+          "config_hash": "5c67af8fdf305751c861bc49eaec16d1030f47d65368758741677e03e0bc64d8",
+          "version": 1,
+          "created_at": "2026-11-25T04:50:00.000Z",
+          "updated_at": "2026-11-25T04:50:00.000Z"
+        }
+      ],
+      "page": {
+        "has_more": false,
+        "next_cursor": null
+      }
+    },
+    "err_code": 0,
+    "message": "ok",
+    "request_id": "00000000-0000-4000-8000-999999999999"
+  }
+}

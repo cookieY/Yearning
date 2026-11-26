@@ -1,0 +1,29 @@
+{
+  "contract_version": 1,
+  "openapi_sha": "b08b588223c0b586a5c9c4e0f1c9b0cd818d7ef1d61f3f9e823d5a489e37fb73",
+  "zod_runtime_sha256": "32b72a82897ae698b7566aad9821c07cf5194173a3dc69adfb00a8f00f04a446",
+  "operation_id": "publishAnnouncementRevision",
+  "case_id": "scratch-publish",
+  "http_status": 200,
+  "err_code": 0,
+  "response": {
+    "data": {
+      "published_at": "2026-11-25T02:01:00.000Z",
+      "published_by_username": "admin",
+      "revision": {
+        "id": "00000000-0000-4000-8000-000000000207",
+        "revision_number": 1,
+        "title": "F12 contract 3105b410",
+        "sanitized_html": "<h1>F12 contract announcement</h1>\n<p>Scratch revision from the contract suite.</p>\n<p></p>\n",
+        "content_sha256": "e863bce36359ca5be020bfd8db20765cfec1daa93efa2607eda2bb4fbc532383",
+        "sanitizer_policy_version": "allowlist-1",
+        "created_by_username": "admin",
+        "created_at": "2026-11-25T02:00:00.000Z"
+      },
+      "version": 1
+    },
+    "err_code": 0,
+    "message": "ok",
+    "request_id": "00000000-0000-4000-8000-999999999999"
+  }
+}

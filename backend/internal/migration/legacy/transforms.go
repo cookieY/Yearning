@@ -411,17 +411,6 @@ func (tc *TransformContext) TransformCoreAccount(row Row, ev *StatusEvidence) *U
 	}
 }
 
-func strList(v any) []string {
-	switch t := v.(type) {
-	case []string:
-		return t
-	case nil:
-		return nil
-	default:
-		return nil
-	}
-}
-
 // addUserRoleObservation records the legacy IsRecorder observation (never grants admin or workflow privileges).
 func (tc *TransformContext) addUserRoleObservation(username, isRecorder string) {
 	list, _ := tc.Report["user_role_observation"].([]string)

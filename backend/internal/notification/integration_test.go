@@ -11,48 +11,22 @@ import (
 	"fmt"
 	"net"
 	"net/textproto"
-	"os"
 	"strings"
 	"sync"
-	"syscall"
 	"testing"
 	"time"
 
 	"github.com/cookieY/YearningX/backend/internal/authorization/auditlog"
 	"github.com/cookieY/YearningX/backend/internal/crypto"
 	"github.com/cookieY/YearningX/backend/internal/platform/addrguard"
+	"github.com/cookieY/YearningX/backend/internal/platform/testkit"
 
-	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
-	gormlogger "gorm.io/gorm/logger"
 )
 
 func itestDB(t *testing.T) *gorm.DB {
 	t.Helper()
-	password := envOr(t, "YEARNING_TEST_DATABASE_PASSWORD", "")
-	if password == "" {
-		t.Skip("integration PostgreSQL not configured")
-	}
-	dsn := fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=disable",
-		envOr(t, "YEARNING_TEST_DATABASE_HOST", "localhost"),
-		envOr(t, "YEARNING_TEST_DATABASE_PORT", "54330"),
-		envOr(t, "YEARNING_TEST_DATABASE_USER", "yearning"),
-		password,
-		envOr(t, "YEARNING_TEST_DATABASE_DBNAME", "yearning_v4"))
-	acquireSharedITestLock(t)
-	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{Logger: gormlogger.Discard})
-	if err != nil {
-		t.Fatalf("postgres connect: %v", err)
-	}
-	return db
-}
-
-func envOr(t *testing.T, key, def string) string {
-	t.Helper()
-	if v := goGetenv(key); v != "" {
-		return v
-	}
-	return def
+	return testkit.OpenPG(t)
 }
 
 func newTestService(t *testing.T) (*gorm.DB, *Service, *Worker) {
@@ -761,24 +735,6 @@ func atoi(s string) int {
 		n = n*10 + int(c-'0')
 	}
 	return n
-}
-
-// acquireSharedITestLock shares the same flock file with httpapi/dashboard/review packages:
-// once httpapi truncation includes notification tables, cross-package runs must serialize access to the shared itest DB.
-func acquireSharedITestLock(t *testing.T) {
-	t.Helper()
-	f, err := os.OpenFile(os.TempDir()+"/yearningx-itest-shared.lock", os.O_CREATE|os.O_RDWR, 0o600)
-	if err != nil {
-		return
-	}
-	if err := syscall.Flock(int(f.Fd()), syscall.LOCK_EX); err != nil {
-		_ = f.Close()
-		return
-	}
-	t.Cleanup(func() {
-		_ = syscall.Flock(int(f.Fd()), syscall.LOCK_UN)
-		_ = f.Close()
-	})
 }
 
 // createDingtalkChannel creates an enabled DingTalk channel with a configured Secret (the rule engine

@@ -15,12 +15,9 @@ export function timezoneOptions(current: string): string[] {
   return [...zones].sort((left, right) => left.localeCompare(right));
 }
 
-let activeSystemTimezone = "UTC";
+const DEFAULT_SYSTEM_TIMEZONE = "Asia/Shanghai";
+let activeSystemTimezone = DEFAULT_SYSTEM_TIMEZONE;
 const listeners = new Set<() => void>();
-
-export function getSystemTimezone(): string {
-  return activeSystemTimezone;
-}
 
 export function setSystemTimezone(zone: string | null | undefined): void {
   const trimmed = (zone ?? "").trim();
@@ -60,7 +57,7 @@ export function formatTimestamp(
   if (Number.isNaN(parsed.getTime())) {
     return value.replace("T", " ").replace("Z", " UTC");
   }
-  const targetZone = (timeZone ?? activeSystemTimezone).trim() || "UTC";
+  const targetZone = (timeZone ?? activeSystemTimezone).trim() || DEFAULT_SYSTEM_TIMEZONE;
   const formatWithZone = (zone: string): string => {
     const parts = new Intl.DateTimeFormat("en-CA", {
       timeZone: zone,
@@ -84,7 +81,11 @@ export function formatTimestamp(
   try {
     return formatWithZone(targetZone);
   } catch {
-    return formatWithZone("UTC");
+    try {
+      return formatWithZone(DEFAULT_SYSTEM_TIMEZONE);
+    } catch {
+      return formatWithZone("UTC");
+    }
   }
 }
 
@@ -104,5 +105,36 @@ export function formatWatermark(
     return "";
   }
   return watermark.replace(ISO_TIMESTAMP_IN_TEXT, (iso) => formatTimestamp(iso, timeZone));
+}
+
+/**
+ * Formats an instant (ISO timestamp or Date) as a YYYY-MM-DD calendar date key
+ * in the active system timezone (general.system_timezone, defaulting to Asia/Shanghai).
+ */
+export function dateKeyInTimeZone(
+  value: string | Date,
+  timeZone?: string,
+): string {
+  const parsed = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    return "";
+  }
+  const targetZone = (timeZone ?? activeSystemTimezone).trim() || DEFAULT_SYSTEM_TIMEZONE;
+  const formatWithZone = (zone: string): string =>
+    new Intl.DateTimeFormat("en-CA", {
+      timeZone: zone,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).format(parsed);
+  try {
+    return formatWithZone(targetZone);
+  } catch {
+    try {
+      return formatWithZone(DEFAULT_SYSTEM_TIMEZONE);
+    } catch {
+      return formatWithZone("UTC");
+    }
+  }
 }
 

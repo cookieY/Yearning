@@ -1,14 +1,11 @@
 package privacy
 
 import (
-	"encoding/base64"
-	"encoding/json"
-	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/cookieY/YearningX/backend/internal/crypto"
+	"github.com/cookieY/YearningX/backend/internal/platform/testkit"
 )
 
 func TestRunMapperStableTokens(t *testing.T) {
@@ -151,38 +148,7 @@ func TestMappingMarshalRoundTrip(t *testing.T) {
 // TestSplitSemicolonOnlyInsideLiterals spot-checks semicolon boundaries and lexical consistency.
 func newTestCrypter(t *testing.T) *crypto.Crypter {
 	t.Helper()
-	dir := t.TempDir()
-	mk := func(seed byte) string {
-		b := make([]byte, 32)
-		for i := range b {
-			b[i] = byte(i) + seed
-		}
-		return base64.StdEncoding.EncodeToString(b)
-	}
-	doc := map[string]any{
-		"contract_version": 1,
-		"deployment_id":    "test-deploy-privacy",
-		"keys": []map[string]any{
-			{"key_id": "payload-1", "purpose": "payload", "status": "encrypt_decrypt",
-				"created_at": "2026-08-25T00:00:00Z", "key_base64": mk(1)},
-			{"key_id": "fprint-1", "purpose": "sql_fingerprint", "status": "encrypt_decrypt",
-				"created_at": "2026-08-25T00:00:00Z", "key_base64": mk(2)},
-		},
-	}
-	raw, _ := json.Marshal(doc)
-	path := filepath.Join(dir, "keyring.json")
-	if err := os.WriteFile(path, raw, 0o400); err != nil {
-		t.Fatal(err)
-	}
-	ring, err := crypto.LoadKeyring(path)
-	if err != nil {
-		t.Fatalf("LoadKeyring: %v", err)
-	}
-	c, err := crypto.NewCrypter(ring)
-	if err != nil {
-		t.Fatalf("NewCrypter: %v", err)
-	}
-	return c
+	return testkit.NewCrypter(t)
 }
 
 func TestMappingEnvelopeRoundTrip(t *testing.T) {
@@ -259,7 +225,7 @@ func TestHMACKeyDomainSeparation(t *testing.T) {
 	if err != nil {
 		t.Fatalf("hmac key id: %v", err)
 	}
-	if fid != "fprint-1" {
+	if fid != "fp-1" {
 		t.Fatalf("fingerprint key id = %s", fid)
 	}
 }

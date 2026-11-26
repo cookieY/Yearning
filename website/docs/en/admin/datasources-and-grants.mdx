@@ -10,7 +10,7 @@ Yearning v4 separates **Read-Only (`review` & `query`)** credentials from **Exec
   captionEn="Datasource registry (/admin/datasources) with separated read-only/execution credentials, TLS verification, and live probes"
 />
 
-## 1. MySQL 5.7 / 8.0 (TiDB / OceanBase / PolarDB MySQL) Grant SQL
+## 1. MySQL 5.7+ / 8.0 / 8.4 LTS (TiDB / OceanBase / PolarDB MySQL) Grant SQL
 
 ```sql
 -- 1) Read-only account for AI Precheck probes, Query Workspace, and SQL Diagnostics
@@ -30,7 +30,7 @@ GRANT SUPER, TRIGGER, LOCK TABLES ON *.* TO 'yearning_exec'@'10.0.%';
 FLUSH PRIVILEGES;
 ```
 
-## 2. PostgreSQL 14–18 (PolarDB PG) Grant SQL
+## 2. PostgreSQL 14+ (PolarDB PG) Grant SQL
 
 ```sql
 -- 1) Read-only account

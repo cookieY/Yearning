@@ -6,12 +6,13 @@ package application
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"time"
 
 	"gorm.io/gorm"
 
+	"github.com/cookieY/YearningX/backend/internal/authorization/auditlog"
+	"github.com/cookieY/YearningX/backend/internal/platform/txutil"
 	"github.com/cookieY/YearningX/backend/internal/query/domain"
 	"github.com/cookieY/YearningX/backend/internal/query/persistence"
 )
@@ -28,6 +29,7 @@ type GrantView struct {
 	ExpiresAt         *string `json:"expires_at"`
 	Version           int64   `json:"version"`
 	CreatedAt         string  `json:"created_at"`
+	CanRevoke         bool    `json:"can_revoke"`
 }
 
 func grantView(g *persistence.QueryGrantModel) *GrantView {
@@ -62,7 +64,13 @@ func (s *Services) GetGrant(ctx context.Context, actor Actor, grantID string) (*
 	if !ok {
 		return nil, domain.ErrNotFound()
 	}
-	return grantView(g), nil
+	view := grantView(g)
+	canRevokeByID, err := s.canRevokeMap(ctx, s.DB, actor, []persistence.QueryGrantModel{*g})
+	if err != nil {
+		return nil, err
+	}
+	view.CanRevoke = canRevokeByID[g.ID]
+	return view, nil
 }
 
 func (s *Services) loadGrant(ctx context.Context, grantID string) (*persistence.QueryGrantModel, error) {
@@ -113,9 +121,14 @@ func (s *Services) ListGrants(ctx context.Context, actor Actor, limit int, after
 	if hasMore {
 		rows = rows[:limit]
 	}
+	canRevokeByID, err := s.canRevokeMap(ctx, s.DB, actor, rows)
+	if err != nil {
+		return nil, nil, err
+	}
 	out := make([]GrantView, 0, len(rows))
 	for i := range rows {
 		view := grantView(&rows[i])
+		view.CanRevoke = canRevokeByID[rows[i].ID]
 		// UX-005: populate grantee display name from the frozen username snapshot (preserving historical identity evidence even after user deletion).
 		if rows[i].RequesterUsername != "" {
 			holder := rows[i].RequesterUsername
@@ -127,6 +140,61 @@ func (s *Services) ListGrants(ctx context.Context, actor Actor, limit int, after
 		return out, nil, nil
 	}
 	return out, &rows[len(rows)-1].ID, nil
+}
+
+// canRevokeMap computes authoritative grant revocation eligibility (active grant AND builtin admin or
+// frozen approver of the originating access request) in a single query.
+func (s *Services) canRevokeMap(ctx context.Context, db *gorm.DB, actor Actor, rows []persistence.QueryGrantModel) (map[string]bool, error) {
+	out := make(map[string]bool, len(rows))
+	if len(rows) == 0 {
+		return out, nil
+	}
+	if actor.IsBuiltinAdmin {
+		for i := range rows {
+			if rows[i].State == string(domain.GrantActive) {
+				out[rows[i].ID] = true
+			}
+		}
+		return out, nil
+	}
+	if actor.UserID == "" {
+		return out, nil
+	}
+	reqIDs := make([]string, 0, len(rows))
+	seen := make(map[string]struct{}, len(rows))
+	for i := range rows {
+		if rows[i].State != string(domain.GrantActive) || rows[i].QueryAccessRequestID == "" {
+			continue
+		}
+		if _, ok := seen[rows[i].QueryAccessRequestID]; !ok {
+			seen[rows[i].QueryAccessRequestID] = struct{}{}
+			reqIDs = append(reqIDs, rows[i].QueryAccessRequestID)
+		}
+	}
+	if len(reqIDs) == 0 {
+		return out, nil
+	}
+	var eligibleReqs []string
+	if err := db.WithContext(ctx).Raw(`
+		select distinct st.request_id::text
+		from query_access_approval_steps st
+		join query_access_approval_actors a on a.step_id = st.id
+		where st.request_id in ? and a.reviewer_user_id_snapshot = ?`,
+		reqIDs, actor.UserID).Scan(&eligibleReqs).Error; err != nil {
+		return nil, err
+	}
+	reqSet := make(map[string]struct{}, len(eligibleReqs))
+	for _, rid := range eligibleReqs {
+		reqSet[rid] = struct{}{}
+	}
+	for i := range rows {
+		if rows[i].State == string(domain.GrantActive) {
+			if _, ok := reqSet[rows[i].QueryAccessRequestID]; ok {
+				out[rows[i].ID] = true
+			}
+		}
+	}
+	return out, nil
 }
 
 // RevokeInput holds parameters for revoking a Grant.
@@ -142,44 +210,26 @@ type RevokeInput struct {
 // revoked state to Sessions and detaches running queries so any subsequent in-flight results are discarded).
 func (s *Services) Revoke(ctx context.Context, in RevokeInput) (*GrantView, bool, error) {
 	route := "POST:/query-grants/{grant_id}/revocations"
-	reqHash := idemRequestHash(in.Actor.UserID, in.GrantID, in.Reason)
-	claimed, replay, cerr := s.idemClaim(ctx, in.Actor.UserID, route, in.GrantID, in.IdempotencyKey, reqHash)
-	if cerr != nil {
-		return nil, false, cerr
-	}
-	if !claimed {
-		var v GrantView
-		if err := json.Unmarshal(replay, &v); err != nil {
-			return nil, false, err
+	reqHash := txutil.RequestHash(in.Actor.UserID, in.GrantID, in.Reason)
+	return txutil.RunIdempotent(ctx, s.idemStore(), in.Actor.UserID, route, in.GrantID, in.IdempotencyKey, reqHash, func() (*GrantView, error) {
+		var out *GrantView
+		var affectedSessions []string
+		if txErr := s.serializable(ctx, func(tx *gorm.DB) error {
+			v, sessions, err := s.revokeOnce(ctx, tx, in)
+			if err != nil {
+				return err
+			}
+			out = v
+			affectedSessions = sessions
+			return nil
+		}); txErr != nil {
+			return nil, txErr
 		}
-		return &v, true, nil
-	}
-	var out *GrantView
-	var affectedSessions []string
-	txErr := s.serializable(ctx, func(tx *gorm.DB) error {
-		v, sessions, err := s.revokeOnce(ctx, tx, in)
-		if err != nil {
-			return err
-		}
-		out = v
-		affectedSessions = sessions
-		return nil
+		// After commit, detach live cursors across all Sessions of this Grant (H4: do not force-stop running queries;
+		// in-flight results are discarded by postFetchGuard, and new requests immediately fail with 4004).
+		s.detachSessionsCursors(ctx, affectedSessions)
+		return out, nil
 	})
-	if txErr != nil {
-		_ = s.idemRelease(ctx, in.Actor.UserID, route, in.GrantID, in.IdempotencyKey)
-		return nil, false, txErr
-	}
-	// After commit, detach live cursors across all Sessions of this Grant (H4: do not force-stop running queries;
-	// in-flight results are discarded by postFetchGuard, and new requests immediately fail with 4004).
-	s.detachSessionsCursors(ctx, affectedSessions)
-	raw, merr := json.Marshal(out)
-	if merr != nil {
-		return nil, false, merr
-	}
-	if cerr := s.idemComplete(ctx, in.Actor.UserID, route, in.GrantID, in.IdempotencyKey, raw); cerr != nil {
-		return nil, false, cerr
-	}
-	return out, false, nil
 }
 
 func (s *Services) revokeOnce(ctx context.Context, tx *gorm.DB, in RevokeInput) (*GrantView, []string, error) {
@@ -187,7 +237,7 @@ func (s *Services) revokeOnce(ctx context.Context, tx *gorm.DB, in RevokeInput) 
 		return nil, nil, domain.ErrValidation()
 	}
 	var g persistence.QueryGrantModel
-	if err := tx.WithContext(ctx).Clauses(lockUpdate()).
+	if err := tx.WithContext(ctx).Clauses(txutil.ForUpdate()).
 		Where("id = ?", in.GrantID).First(&g).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, nil, domain.ErrNotFound()
@@ -271,47 +321,29 @@ type RelinquishInput struct {
 // Relinquish allows the grantee to irreversibly relinquish a Grant, terminating all associated Sessions.
 func (s *Services) Relinquish(ctx context.Context, in RelinquishInput) (*GrantView, bool, error) {
 	route := "POST:/query-grants/{grant_id}/relinquishment"
-	reqHash := idemRequestHash(in.Actor.UserID, in.GrantID, in.Reason)
-	claimed, replay, cerr := s.idemClaim(ctx, in.Actor.UserID, route, in.GrantID, in.IdempotencyKey, reqHash)
-	if cerr != nil {
-		return nil, false, cerr
-	}
-	if !claimed {
-		var v GrantView
-		if err := json.Unmarshal(replay, &v); err != nil {
-			return nil, false, err
+	reqHash := txutil.RequestHash(in.Actor.UserID, in.GrantID, in.Reason)
+	return txutil.RunIdempotent(ctx, s.idemStore(), in.Actor.UserID, route, in.GrantID, in.IdempotencyKey, reqHash, func() (*GrantView, error) {
+		var out *GrantView
+		var sessions []string
+		if txErr := s.serializable(ctx, func(tx *gorm.DB) error {
+			v, ss, err := s.relinquishOnce(ctx, tx, in)
+			if err != nil {
+				return err
+			}
+			out = v
+			sessions = ss
+			return nil
+		}); txErr != nil {
+			return nil, txErr
 		}
-		return &v, true, nil
-	}
-	var out *GrantView
-	var sessions []string
-	txErr := s.serializable(ctx, func(tx *gorm.DB) error {
-		v, ss, err := s.relinquishOnce(ctx, tx, in)
-		if err != nil {
-			return err
-		}
-		out = v
-		sessions = ss
-		return nil
+		s.detachSessionsCursors(ctx, sessions)
+		return out, nil
 	})
-	if txErr != nil {
-		_ = s.idemRelease(ctx, in.Actor.UserID, route, in.GrantID, in.IdempotencyKey)
-		return nil, false, txErr
-	}
-	s.detachSessionsCursors(ctx, sessions)
-	raw, merr := json.Marshal(out)
-	if merr != nil {
-		return nil, false, merr
-	}
-	if cerr := s.idemComplete(ctx, in.Actor.UserID, route, in.GrantID, in.IdempotencyKey, raw); cerr != nil {
-		return nil, false, cerr
-	}
-	return out, false, nil
 }
 
 func (s *Services) relinquishOnce(ctx context.Context, tx *gorm.DB, in RelinquishInput) (*GrantView, []string, error) {
 	var g persistence.QueryGrantModel
-	if err := tx.WithContext(ctx).Clauses(lockUpdate()).
+	if err := tx.WithContext(ctx).Clauses(txutil.ForUpdate()).
 		Where("id = ?", in.GrantID).First(&g).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, nil, domain.ErrNotFound()
@@ -355,7 +387,7 @@ func (s *Services) relinquishOnce(ctx context.Context, tx *gorm.DB, in Relinquis
 		return nil, nil, err
 	}
 	_ = s.Recorder.NotifyRealtime(ctx, tx, "query_grant.relinquished",
-		"query-grants/"+g.ID, string(domain.GrantRelinquished), auditActor(in.Actor))
+		"query-grants/"+g.ID, string(domain.GrantRelinquished), auditlog.UserActor(in.Actor.UserID, in.Actor.Username))
 	var final persistence.QueryGrantModel
 	if err := tx.WithContext(ctx).Where("id = ?", g.ID).First(&final).Error; err != nil {
 		return nil, nil, err

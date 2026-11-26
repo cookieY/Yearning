@@ -143,6 +143,8 @@ import type {
   ReplaceRuleSet200,
   ReplaceSettingsNamespace200,
   ReplaceSettingsNamespaceRequest,
+  ResetUserPassword200,
+  ResetUserPasswordRequest,
   RuleSetWrite,
   RunPromptToolTest200,
   RunPromptToolTestRequest,
@@ -258,6 +260,37 @@ export const deleteUser = async (userId: string, options?: Parameters<typeof cus
     method: 'DELETE'
 
 
+  }
+);}
+
+
+export const getResetUserPasswordUrl = (userId: string,) => {
+
+
+
+
+  return `/api/v4/admin/users/${userId}/password`
+}
+
+/**
+ * Resets a local non-builtin user's password to a temporary value meeting the 12-character policy and revokes all active sessions for that user. Rejects the builtin admin (ADMIN_IMMUTABLE) and external identity users (PASSWORD_MANAGED_BY_IDENTITY_SOURCE).
+ * @summary Admin reset of a local user's password
+ */
+export const resetUserPassword = async (userId: string,
+    resetUserPasswordRequest: ResetUserPasswordRequest, options?: Parameters<typeof customInstance>[1]): Promise<ResetUserPassword200> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Array.isArray(h)) return Object.fromEntries(h);
+    return h;
+  };
+return customInstance<ResetUserPassword200>(getResetUserPasswordUrl(userId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(resetUserPasswordRequest)
   }
 );}
 

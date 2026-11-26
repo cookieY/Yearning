@@ -16,6 +16,8 @@ import (
 	"github.com/cookieY/YearningX/backend/internal/authorization/auditlog"
 	"github.com/cookieY/YearningX/backend/internal/authorization/bizerr"
 	"github.com/cookieY/YearningX/backend/internal/crypto"
+	"github.com/cookieY/YearningX/backend/internal/platform/ptr"
+	"github.com/cookieY/YearningX/backend/internal/platform/txutil"
 )
 
 // ProviderView is the API response view for a Provider; exposes only secret_configured and never the Secret itself.
@@ -101,20 +103,20 @@ func (s *Service) CreateProvider(ctx context.Context, actor ActorRef, providerKe
 		UpdatedAt:         now,
 	}
 	if len(secret) > 0 {
-		env, err := s.crypter.Seal(crypto.PurposePayload, secret, crypto.AAD{
-			DeploymentID: s.crypter.DeploymentID(),
-			Table:        "identity_providers", PrimaryKey: row.ID,
-			Column: "secret", Purpose: "provider_secret",
-		})
+		env, err := s.crypter.SealColumn(crypto.PurposeProviderSecret, crypto.ColumnRef{
+			Table:      "identity_providers",
+			PrimaryKey: row.ID,
+			Column:     "secret",
+		}, secret)
 		if err != nil {
 			return nil, err
 		}
 		row.SecretCiphertext, row.SecretNonce = env.Ciphertext, env.Nonce
-		row.SecretKeyID, row.SecretAlgorithm = strPtr(env.KeyID), strPtr(env.Algorithm)
+		row.SecretKeyID, row.SecretAlgorithm = ptr.NonZero(env.KeyID), ptr.NonZero(env.Algorithm)
 	}
 	err := s.db.WithContext(ctx).Create(&row).Error
 	if err != nil {
-		if isUniqueErr(err) {
+		if txutil.IsUniqueViolation(err) {
 			// Unique provider_key conflict or singleton LDAP index conflict.
 			return nil, bizerr.ErrAlreadyExists
 		}
@@ -126,7 +128,7 @@ func (s *Service) CreateProvider(ctx context.Context, actor ActorRef, providerKe
 		ActorID: &actor.UserID, ActorUsername: &actor.Username,
 		ResourceType: "identity_provider", ResourceID: &row.ID,
 		Action: "create_identity_provider", Outcome: "succeeded",
-		RequestID: strPtr(meta.RequestID),
+		RequestID: ptr.NonZero(meta.RequestID),
 		Metadata:  map[string]any{"provider_key": providerKey, "provider_kind": kind},
 	})
 	return &view, nil
@@ -159,11 +161,11 @@ func (s *Service) ReplaceProvider(ctx context.Context, actor ActorRef, providerI
 		if s.crypter == nil {
 			return nil, fmt.Errorf("identity: crypter unavailable")
 		}
-		env, err := s.crypter.Seal(crypto.PurposePayload, secret, crypto.AAD{
-			DeploymentID: s.crypter.DeploymentID(),
-			Table:        "identity_providers", PrimaryKey: row.ID,
-			Column: "secret", Purpose: "provider_secret",
-		})
+		env, err := s.crypter.SealColumn(crypto.PurposeProviderSecret, crypto.ColumnRef{
+			Table:      "identity_providers",
+			PrimaryKey: row.ID,
+			Column:     "secret",
+		}, secret)
 		if err != nil {
 			return nil, err
 		}
@@ -192,7 +194,7 @@ func (s *Service) ReplaceProvider(ctx context.Context, actor ActorRef, providerI
 		ActorID: &actor.UserID, ActorUsername: &actor.Username,
 		ResourceType: "identity_provider", ResourceID: &providerID,
 		Action: "replace_identity_provider", Outcome: "succeeded",
-		RequestID: strPtr(meta.RequestID),
+		RequestID: ptr.NonZero(meta.RequestID),
 	})
 	return &view, nil
 }
@@ -226,7 +228,7 @@ func (s *Service) DeleteProvider(ctx context.Context, actor ActorRef, providerID
 			ActorID: &actor.UserID, ActorUsername: &actor.Username,
 			ResourceType: "identity_provider", ResourceID: &providerID,
 			Action: "delete_identity_provider", Outcome: "succeeded",
-			RequestID: strPtr(meta.RequestID),
+			RequestID: ptr.NonZero(meta.RequestID),
 		})
 	})
 }

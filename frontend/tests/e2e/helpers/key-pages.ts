@@ -124,7 +124,7 @@ export const KEY_PAGE_TYPES: KeyPageType[] = [
     session: "default",
     identity: "henry",
     prepare: async (page) => {
-      await page.goto("/query/sessions/qs-fixture-active");
+      await page.goto("/query/sessions/6f0f2b3c-5555-4555-8555-000000000101");
       await expect(page.getByTestId("query-workspace")).toBeVisible();
       await page.getByTestId("query-schema-input").click();
       await page.getByRole("option", { name: "app" }).click();

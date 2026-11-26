@@ -34,15 +34,7 @@ const WORKBOOK_RELS_XML =
   '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/>' +
   "</Relationships>";
 
-/** Cells arrive as JSON values; numbers/booleans stringify losslessly and
- * anything else renders its JSON form (never "[object Object]"). */
-function stringifyCell(value: unknown): string {
-  if (typeof value === "string") return value;
-  if (typeof value === "number" || typeof value === "boolean" || typeof value === "bigint") {
-    return String(value);
-  }
-  return JSON.stringify(value);
-}
+import { stringifyCell } from "./cell-format";
 
 function xmlEscape(value: string): string {
   return value

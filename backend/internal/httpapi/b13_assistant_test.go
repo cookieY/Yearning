@@ -1,3 +1,5 @@
+//go:build integration
+
 // b13_assistant_test.go tests Database AI Assistant (BE-B13-AI-ASSISTANT) HTTP routes, SSE streaming,
 // permission isolation, Cache-Control: no-store, If-Match optimistic concurrency, and idempotent order submission.
 package httpapi
@@ -12,79 +14,29 @@ import (
 	"net/http/httptest"
 	"os"
 	"strings"
-	"syscall"
 	"testing"
 	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
-	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
-	gormlogger "gorm.io/gorm/logger"
 
 	assistantapp "github.com/cookieY/YearningX/backend/internal/assistant/application"
 	assistantdomain "github.com/cookieY/YearningX/backend/internal/assistant/domain"
 	assistanttool "github.com/cookieY/YearningX/backend/internal/assistant/tool"
+	"github.com/cookieY/YearningX/backend/internal/authorization/auditlog"
 	orderapp "github.com/cookieY/YearningX/backend/internal/changeorder/application"
 	"github.com/cookieY/YearningX/backend/internal/crypto"
 	"github.com/cookieY/YearningX/backend/internal/database"
 	"github.com/cookieY/YearningX/backend/internal/identity/session"
+	"github.com/cookieY/YearningX/backend/internal/platform/testenv"
+	"github.com/cookieY/YearningX/backend/internal/platform/testkit"
+	reviewapp "github.com/cookieY/YearningX/backend/internal/review/application"
 )
-
-func acquireB13HTTPLock(t *testing.T) {
-	t.Helper()
-	path := os.TempDir() + "/yearningx-b13-assistant-test.lock"
-	f, err := os.OpenFile(path, os.O_CREATE|os.O_RDWR, 0o600)
-	if err != nil {
-		t.Fatalf("open lock %s: %v", path, err)
-	}
-	if err := syscall.Flock(int(f.Fd()), syscall.LOCK_EX); err != nil {
-		_ = f.Close()
-		t.Fatalf("flock %s: %v", path, err)
-	}
-	t.Cleanup(func() {
-		_ = syscall.Flock(int(f.Fd()), syscall.LOCK_UN)
-		_ = f.Close()
-	})
-}
 
 func openB13HTTPTestDB(t *testing.T) *gorm.DB {
 	t.Helper()
-	acquireItestLock(t, "shared")
-	acquireB13HTTPLock(t)
-	host := os.Getenv("YEARNING_B13_TEST_DB_HOST")
-	if host == "" {
-		host = "127.0.0.1"
-	}
-	port := os.Getenv("YEARNING_B13_TEST_DB_PORT")
-	if port == "" {
-		port = "54332"
-	}
-	user := os.Getenv("YEARNING_B13_TEST_DB_USER")
-	if user == "" {
-		user = "yearning"
-	}
-	pass := os.Getenv("YEARNING_B13_TEST_DB_PASSWORD")
-	if pass == "" {
-		pass = os.Getenv("YEARNING_TEST_DATABASE_PASSWORD")
-	}
-	if pass == "" {
-		t.Skip("PostgreSQL test credentials not configured (set YEARNING_B13_TEST_DB_PASSWORD or YEARNING_TEST_DATABASE_PASSWORD)")
-	}
-	dbname := os.Getenv("YEARNING_B13_TEST_DB_NAME")
-	if dbname == "" {
-		dbname = "yearning_b13_test"
-	}
-	dsn := fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=disable", host, port, user, pass, dbname)
-	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{Logger: gormlogger.Discard})
-	if err != nil {
-		t.Skipf("PostgreSQL test database not reachable (%v)", err)
-	}
-	sqlDB, err := db.DB()
-	if err != nil {
-		t.Fatalf("db.DB(): %v", err)
-	}
-	t.Cleanup(func() { _ = sqlDB.Close() })
+	db := testkit.OpenPG(t, testenv.WithDefaultPort(54332), testenv.WithDefaultDBName("yearning_b13_test"))
 	for _, tbl := range []string{
 		"ai_assistant_sql_drafts",
 		"ai_assistant_context_summaries",
@@ -275,7 +227,15 @@ func newB13HTTPRouter(t *testing.T, db *gorm.DB) (*gin.Engine, string, string, s
 		t.Fatalf("seed flow grant: %v", err)
 	}
 
-	svc, err := assistantapp.NewServices(db, crypter, nil, nil, nil)
+	rec, err := auditlog.NewRecorder(db)
+	if err != nil {
+		t.Fatalf("NewRecorder: %v", err)
+	}
+	reviewSvc, err := reviewapp.NewServices(db, crypter, rec, nil)
+	if err != nil {
+		t.Fatalf("review NewServices: %v", err)
+	}
+	svc, err := assistantapp.NewServices(db, crypter, reviewSvc, nil, nil)
 	if err != nil {
 		t.Fatalf("NewServices: %v", err)
 	}

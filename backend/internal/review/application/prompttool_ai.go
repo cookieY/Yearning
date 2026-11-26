@@ -12,6 +12,8 @@ import (
 	"sort"
 	"strings"
 
+	"go.uber.org/zap"
+
 	"github.com/cookieY/YearningX/backend/internal/review/agent"
 	"github.com/cookieY/YearningX/backend/internal/review/domain"
 	"github.com/cookieY/YearningX/backend/internal/review/promptprofile"
@@ -198,6 +200,14 @@ func (s *Services) OptimizePromptToolPrompt(ctx context.Context, in OptimizeProm
 // GeneratePromptToolTestCases generates 10 SQL test cases (5 expected compliant, 5 expected non-compliant)
 // using the active AI provider chain, failing closed with 2011 AI_PROVIDER_FAILED when unavailable or invalid.
 func (s *Services) GeneratePromptToolTestCases(ctx context.Context, in GeneratePromptToolTestCasesInput) (*GeneratePromptToolTestCasesOutput, error) {
+	return generatePromptToolTestCases(ctx, in, s.callActiveProviderJSON)
+}
+
+func generatePromptToolTestCases(
+	ctx context.Context,
+	in GeneratePromptToolTestCasesInput,
+	callJSON func(ctx context.Context, sysPrompt, userContent string) (string, error),
+) (*GeneratePromptToolTestCasesOutput, error) {
 	rawText := strings.TrimSpace(in.KnowledgeText)
 	if rawText == "" || len(rawText) > 64*1024 {
 		return nil, &domain.Error{Code: 1001, Name: "VALIDATION_FAILED"}
@@ -229,37 +239,75 @@ func (s *Services) GeneratePromptToolTestCases(ctx context.Context, in GenerateP
 		"Respond strictly with a JSON object of shape:\n" +
 		"{\"cases\": [{\"id\": \"case-1\", \"sql\": \"...\", \"expected_compliant\": true, \"rationale\": \"...\"}, ...]}"
 
-	userPayload, _ := json.Marshal(map[string]any{
-		"name":               strings.TrimSpace(in.Name),
-		"description":        strings.TrimSpace(in.Description),
-		"engine":             engine,
-		"statement_category": string(category),
-		"rendered_rule":      renderedRule,
-	})
+	const maxAttempts = 2
+	retryFeedback := ""
+	for attempt := 1; attempt <= maxAttempts; attempt++ {
+		payloadMap := map[string]any{
+			"name":               strings.TrimSpace(in.Name),
+			"description":        strings.TrimSpace(in.Description),
+			"engine":             engine,
+			"statement_category": string(category),
+			"rendered_rule":      renderedRule,
+		}
+		if retryFeedback != "" {
+			payloadMap["retry_feedback"] = retryFeedback
+		}
+		userPayload, _ := json.Marshal(payloadMap)
 
-	rawResp, err := s.callActiveProviderJSON(ctx, sysPrompt, string(userPayload))
-	if err != nil {
-		return nil, providerFailedError(err, "AI provider request failed during test case generation")
-	}
-	var parsed struct {
-		Cases []PromptToolTestCase `json:"cases"`
-	}
-	if err := json.Unmarshal([]byte(rawResp), &parsed); err != nil {
-		return nil, &domain.Error{
-			Code:   domain.CodeAIProviderFailed,
-			Name:   "AI_PROVIDER_FAILED",
-			Detail: "AI provider returned invalid JSON for test case generation",
+		rawResp, err := callJSON(ctx, sysPrompt, string(userPayload))
+		if err != nil {
+			return nil, providerFailedError(err, "AI provider request failed during test case generation")
+		}
+		var parsed struct {
+			Cases []PromptToolTestCase `json:"cases"`
+		}
+		if err := json.Unmarshal([]byte(rawResp), &parsed); err != nil {
+			zap.L().Warn("prompt_tool_test_cases_rejected",
+				zap.Int("attempt", attempt),
+				zap.Int("max_attempts", maxAttempts),
+				zap.String("category", string(category)),
+				zap.String("engine", engine),
+				zap.String("reason", "invalid_json"),
+			)
+			if attempt < maxAttempts {
+				retryFeedback = "Previous response was not valid JSON. Respond strictly with a JSON object containing a \"cases\" array of 5 expected_compliant=true and 5 expected_compliant=false " + strings.ToUpper(string(category)) + " SQL statements."
+				continue
+			}
+			return nil, &domain.Error{
+				Code:   domain.CodeAIProviderFailed,
+				Name:   "AI_PROVIDER_FAILED",
+				Detail: "AI provider returned invalid JSON for test case generation",
+			}
+		}
+		merged, stats, ok := normalizeAndFilterGeneratedTestCases(parsed.Cases, category)
+		if ok {
+			return &GeneratePromptToolTestCasesOutput{Cases: merged}, nil
+		}
+		zap.L().Warn("prompt_tool_test_cases_rejected",
+			zap.Int("attempt", attempt),
+			zap.Int("max_attempts", maxAttempts),
+			zap.String("category", string(category)),
+			zap.String("engine", engine),
+			zap.String("reason", "insufficient_valid_cases"),
+			zap.Int("raw_count", stats.rawCount),
+			zap.Int("valid_compliant", stats.validCompliant),
+			zap.Int("valid_non_compliant", stats.validNonCompliant),
+			zap.Int("rejected_count", stats.rejectedCount),
+		)
+		if attempt < maxAttempts {
+			catUpper := strings.ToUpper(string(category))
+			retryFeedback = fmt.Sprintf(
+				"Previous attempt produced %d valid compliant and %d valid non-compliant %s statements (%d rejected). Return strictly 5 expected_compliant=true and 5 expected_compliant=false %s SQL statements with no SELECT or cross-category statements.",
+				stats.validCompliant, stats.validNonCompliant, catUpper, stats.rejectedCount, catUpper,
+			)
+			continue
 		}
 	}
-	merged, ok := normalizeAndFilterGeneratedTestCases(parsed.Cases, category)
-	if !ok {
-		return nil, &domain.Error{
-			Code:   domain.CodeAIProviderFailed,
-			Name:   "AI_PROVIDER_FAILED",
-			Detail: "AI provider did not return 5 valid compliant and 5 valid non-compliant SQL test cases",
-		}
+	return nil, &domain.Error{
+		Code:   domain.CodeAIProviderFailed,
+		Name:   "AI_PROVIDER_FAILED",
+		Detail: "AI provider did not return 5 valid compliant and 5 valid non-compliant SQL test cases",
 	}
-	return &GeneratePromptToolTestCasesOutput{Cases: merged}, nil
 }
 
 // RunPromptToolTest evaluates the provided SQL test cases against the skill definition via the active
@@ -552,167 +600,4 @@ func hasAllPlaceholders(text string, placeholders []string) bool {
 		}
 	}
 	return true
-}
-
-func classifySkillCategory(name, description, ruleText string) skillStatementCategory {
-	lowerName := strings.ToLower(strings.TrimSpace(name))
-	if strings.Contains(lowerName, "dml") {
-		return skillCategoryDML
-	}
-	if strings.Contains(lowerName, "ddl") || strings.Contains(lowerName, "truncate") || strings.Contains(lowerName, "drop") {
-		return skillCategoryDDL
-	}
-	combined := strings.ToLower(name + " " + description + " " + ruleText)
-	if strings.Contains(combined, "ddl-implicit-type-conversion") || strings.Contains(combined, "ddlimplicittypeconversion") {
-		return skillCategoryDML
-	}
-	dmlKeywords := []string{
-		"dml_",
-		"unbounded_mutation",
-		"insert_has_columns",
-		"values_row_count_max",
-		"where_literal_null",
-		"insert_has_null_literal",
-		"in_value_count_max",
-		"update ",
-		"update/",
-		"delete ",
-		"/delete",
-		"insert ",
-		"\u5b50\u67e5\u8be2",       // subquery
-		"\u6279\u91cf\u884c\u6570", // batch rows
-	}
-	ddlKeywords := []string{
-		"ddl_",
-		"ddl",
-		"create table",
-		"alter table",
-		"drop table",
-		"drop database",
-		"truncate",
-		"rename table",
-		"create view",
-		"create index",
-		"primary key",
-		"foreign key",
-		"auto_increment",
-		"unsigned",
-		"charset",
-		"collate",
-		"collation",
-		"partition",
-		"\u5efa\u8868",             // create table
-		"\u8868\u540d",             // table name
-		"\u8868\u6ce8\u91ca",       // table comment
-		"\u5217\u6ce8\u91ca",       // column comment
-		"\u4e3b\u952e",             // primary key
-		"\u5916\u952e",             // foreign key
-		"\u7d22\u5f15",             // index
-		"\u5b57\u6bb5\u957f\u5ea6", // column length
-		"\u5217\u7c7b\u578b",       // column type
-		"\u5217\u4f4d\u7f6e",       // column position
-		"\u9ed8\u8ba4\u503c",       // default value
-		"\u53ef\u7a7a",             // nullable
-		"\u81ea\u589e",             // auto increment
-		"\u5b57\u7b26\u96c6",       // charset
-		"\u6392\u5e8f\u89c4\u5219", // collation
-		"\u5206\u533a",             // partition
-		"\u89c6\u56fe",             // view
-	}
-	for _, kw := range ddlKeywords {
-		if strings.Contains(combined, kw) {
-			return skillCategoryDDL
-		}
-	}
-	for _, kw := range dmlKeywords {
-		if strings.Contains(combined, kw) {
-			return skillCategoryDML
-		}
-	}
-	return skillCategoryDDL
-}
-
-func isStatementValidForCategory(sqlText string, category skillStatementCategory) bool {
-	upper := strings.ToUpper(strings.TrimSpace(sqlText))
-	if upper == "" {
-		return false
-	}
-	// Standalone SELECT or read-only / session statements are strictly forbidden in skill tests.
-	for _, forbiddenPrefix := range []string{
-		"SELECT ", "SELECT\t", "SELECT\n", "SELECT*",
-		"WITH ", "SHOW ", "EXPLAIN ", "DESC ", "DESCRIBE ",
-		"USE ", "SET ", "BEGIN", "COMMIT", "ROLLBACK",
-	} {
-		if strings.HasPrefix(upper, forbiddenPrefix) {
-			return false
-		}
-	}
-	if category == skillCategoryDDL {
-		for _, ddlPrefix := range []string{
-			"CREATE ", "ALTER ", "DROP ", "TRUNCATE ", "RENAME ", "COMMENT ON ",
-		} {
-			if strings.HasPrefix(upper, ddlPrefix) {
-				return true
-			}
-		}
-		return false
-	}
-	for _, dmlPrefix := range []string{
-		"INSERT ", "UPDATE ", "DELETE ", "REPLACE ",
-	} {
-		if strings.HasPrefix(upper, dmlPrefix) {
-			return true
-		}
-	}
-	return false
-}
-
-func normalizeAndFilterGeneratedTestCases(
-	cases []PromptToolTestCase,
-	category skillStatementCategory,
-) ([]PromptToolTestCase, bool) {
-	var compliant, nonCompliant []PromptToolTestCase
-	for _, c := range cases {
-		sqlText := strings.TrimSpace(c.SQL)
-		if !isStatementValidForCategory(sqlText, category) {
-			continue
-		}
-		rationale := strings.TrimSpace(c.Rationale)
-		if rationale == "" {
-			if c.ExpectedCompliant {
-				rationale = "Complies with the skill rule."
-			} else {
-				rationale = "Violates the skill rule."
-			}
-		}
-		item := PromptToolTestCase{
-			SQL:               sqlText,
-			ExpectedCompliant: c.ExpectedCompliant,
-			Rationale:         rationale,
-		}
-		if c.ExpectedCompliant {
-			if len(compliant) < 5 {
-				compliant = append(compliant, item)
-			}
-		} else {
-			if len(nonCompliant) < 5 {
-				nonCompliant = append(nonCompliant, item)
-			}
-		}
-	}
-	if len(compliant) != 5 || len(nonCompliant) != 5 {
-		return nil, false
-	}
-	out := make([]PromptToolTestCase, 0, 10)
-	for i := 0; i < 5; i++ {
-		c := compliant[i]
-		c.ID = fmt.Sprintf("case-%d", i+1)
-		out = append(out, c)
-	}
-	for i := 0; i < 5; i++ {
-		c := nonCompliant[i]
-		c.ID = fmt.Sprintf("case-%d", i+6)
-		out = append(out, c)
-	}
-	return out, true
 }

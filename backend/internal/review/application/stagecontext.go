@@ -10,13 +10,11 @@ import (
 
 const stageReviewContextTable = "stage_review_snapshots"
 
-func stageReviewContextAAD(c *crypto.Crypter, runID string, stagePosition int32) crypto.AAD {
-	return crypto.AAD{
-		DeploymentID: c.DeploymentID(),
-		Table:        stageReviewContextTable,
-		PrimaryKey:   runID + "#" + fmt.Sprint(stagePosition),
-		Column:       "normalized_context_ciphertext",
-		Purpose:      crypto.PurposePayload,
+func stageReviewContextRef(runID string, stagePosition int32) crypto.ColumnRef {
+	return crypto.ColumnRef{
+		Table:      stageReviewContextTable,
+		PrimaryKey: runID + "#" + fmt.Sprint(stagePosition),
+		Column:     "normalized_context_ciphertext",
 	}
 }
 
@@ -25,7 +23,7 @@ func stageReviewContextAAD(c *crypto.Crypter, runID string, stagePosition int32)
 func openStageReviewContext(
 	c *crypto.Crypter, runID string, stagePosition int32, env crypto.Envelope,
 ) (map[string]any, error) {
-	plain, err := c.Open(crypto.PurposePayload, env, stageReviewContextAAD(c, runID, stagePosition))
+	plain, err := c.OpenColumn(crypto.PurposePayload, stageReviewContextRef(runID, stagePosition), env)
 	if err != nil {
 		return nil, err
 	}
@@ -48,7 +46,7 @@ func sealStageReviewContext(
 	if err != nil {
 		return crypto.Envelope{}, err
 	}
-	return c.Seal(crypto.PurposePayload, plain, stageReviewContextAAD(c, runID, stagePosition))
+	return c.SealColumn(crypto.PurposePayload, stageReviewContextRef(runID, stagePosition), plain)
 }
 
 func acceptedSummaryAndLocaleFromStageContext(

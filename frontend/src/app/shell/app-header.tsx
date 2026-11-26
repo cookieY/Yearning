@@ -1,8 +1,6 @@
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { appToast as toast } from "@/shared/components/shadcn-dashboard/sonner/sonner-08";
-import { useQueryClient } from "@tanstack/react-query";
-import { ArrowRight, RefreshCw, Search, Tags } from "lucide-react";
+import { ArrowRight, Search, Tags } from "lucide-react";
 import { SidebarTrigger } from "@/shared/components/ui/sidebar";
 import { Button } from "@/shared/components/ui/button";
 import { Spinner } from "@/shared/components/ui/spinner";
@@ -23,7 +21,6 @@ const CommandMenu = lazy(() => import("./command-menu").then((module) => ({ defa
  */
 export function AppHeader() {
   const { t } = useTranslation();
-  const queryClient = useQueryClient();
   const [commandOpen, setCommandOpen] = useState(false);
   const [commandRequested, setCommandRequested] = useState(false);
   const commandReturnFocus = useRef<HTMLElement | null>(null);
@@ -43,23 +40,6 @@ export function AppHeader() {
   const currentVersion = releaseSnapshot?.current_version ?? null;
   const hasUpdate =
     currentVersion !== null && currentVersion !== releaseSnapshot?.tag_name;
-
-  // Dashboard PRD §9: 60s polling refreshes on its own, this is the manual
-  // equivalent. It reports the outcome because a silent button gives the
-  // operator no feedback that fresh numbers are on screen.
-  const refreshAll = async () => {
-    const results = await Promise.allSettled([
-      queryClient.invalidateQueries({ queryKey: ["dashboard"] }),
-      queryClient.invalidateQueries({ queryKey: ["admin", "dashboard"] }),
-      queryClient.invalidateQueries({ queryKey: ["releases"] }),
-      queryClient.invalidateQueries({ queryKey: ["change-orders", "mine"] }),
-    ]);
-    if (results.some((result) => result.status === "rejected")) {
-      toast.error(t("shell.refresh.failed"));
-    } else {
-      toast.success(t("shell.refresh.success"));
-    }
-  };
 
   // ⌘K / Ctrl+K anywhere in the shell toggles the menu; the listener ignores
   // repeats so a held key cannot strobe the dialog open and closed.
@@ -136,8 +116,7 @@ export function AppHeader() {
           {/* Release cluster. Owner report 2026-10-23: it read as a foreign
               widget beside the theme/language controls, so it now matches them
               exactly — foreground (pure white in dark), 13px at the same
-              optical size as their 20px glyphs, and the same ghost button
-              rhythm for the refresh action. */}
+              optical size as their 20px glyphs. */}
           <div
             className="text-foreground mr-1 hidden items-center gap-2.5 text-[13px] font-medium xl:flex"
             data-testid="header-release"
@@ -166,17 +145,6 @@ export function AppHeader() {
                 </a>
               </>
             )}
-            <Button
-              variant="ghost"
-              size="icon"
-              aria-label={t("shell.release.refresh")}
-              data-testid="header-refresh"
-              onClick={() => {
-                void refreshAll();
-              }}
-            >
-              <RefreshCw className="size-5" />
-            </Button>
           </div>
 
           <ThemeToggle />

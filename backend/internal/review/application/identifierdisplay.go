@@ -30,7 +30,8 @@ func (s *Services) restoreRunDisplay(ctx context.Context, actor Actor, meta Requ
 		return nil, err
 	}
 	copyView := *view
-	copyView.StageResults = append([]StageResultView(nil), view.StageResults...)
+	copyView.StageResults = make([]StageResultView, len(view.StageResults))
+	copy(copyView.StageResults, view.StageResults)
 	total := 0
 	for i, stage := range view.StageResults {
 		text, count := renderer.RestorePointerLimit(stage.Summary, 4000)

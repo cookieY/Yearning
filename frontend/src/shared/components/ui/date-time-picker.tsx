@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 import {
   CalendarIcon,
@@ -53,7 +54,9 @@ export function DateTimePicker({
   const { t, i18n } = useTranslation();
   const zh = i18n.language?.startsWith("zh") ?? false;
   const rootRef = useRef<HTMLDivElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
   const [open, setOpen] = useState(false);
+  const [panelPos, setPanelPos] = useState<{ top: number; left: number } | null>(null);
   // Floor captured at panel open — pure render derives everything from it.
   const [floor, setFloor] = useState<Date | null>(null);
   const [view, setView] = useState<"date" | "months" | "time">("date");
@@ -66,9 +69,11 @@ export function DateTimePicker({
   useEffect(() => {
     if (!open) return;
     const onPointerDown = (event: PointerEvent): void => {
-      if (rootRef.current !== null && !rootRef.current.contains(event.target as Node)) {
-        setOpen(false);
+      const target = event.target as Node;
+      if (rootRef.current?.contains(target) || panelRef.current?.contains(target)) {
+        return;
       }
+      setOpen(false);
     };
     const onKeyDown = (event: KeyboardEvent): void => {
       if (event.key === "Escape") setOpen(false);
@@ -80,6 +85,41 @@ export function DateTimePicker({
       document.removeEventListener("keydown", onKeyDown);
     };
   }, [open]);
+
+  useLayoutEffect(() => {
+    if (!open) return;
+    const PANEL_WIDTH = 256;
+    const GAP = 4;
+    const MARGIN = 8;
+    const FALLBACK_HEIGHT = 320;
+    const updatePosition = (): void => {
+      const trigger = rootRef.current;
+      if (trigger === null) return;
+      const rect = trigger.getBoundingClientRect();
+      const viewportWidth = window.innerWidth;
+      const viewportHeight = window.innerHeight;
+      const panelHeight =
+        panelRef.current !== null && panelRef.current.offsetHeight > 0
+          ? panelRef.current.offsetHeight
+          : FALLBACK_HEIGHT;
+      const spaceBelow = viewportHeight - rect.bottom - GAP - MARGIN;
+      const spaceAbove = rect.top - GAP - MARGIN;
+      const flipUp = spaceBelow < panelHeight && spaceAbove > spaceBelow;
+      const rawTop = flipUp ? rect.top - panelHeight - GAP : rect.bottom + GAP;
+      const maxTop = Math.max(MARGIN, viewportHeight - panelHeight - MARGIN);
+      const top = Math.min(Math.max(MARGIN, rawTop), maxTop);
+      const maxLeft = Math.max(MARGIN, viewportWidth - PANEL_WIDTH - MARGIN);
+      const left = Math.min(Math.max(MARGIN, rect.left), maxLeft);
+      setPanelPos({ top, left });
+    };
+    updatePosition();
+    window.addEventListener("resize", updatePosition);
+    window.addEventListener("scroll", updatePosition, true);
+    return () => {
+      window.removeEventListener("resize", updatePosition);
+      window.removeEventListener("scroll", updatePosition, true);
+    };
+  }, [open, view]);
 
   const openPanel = (): void => {
     const now = new Date();
@@ -157,11 +197,13 @@ export function DateTimePicker({
         </span>
       </div>
 
-      {open && (
+      {open && typeof document !== "undefined" && createPortal(
         <div
+          ref={panelRef}
           role="dialog"
           aria-label={t("dateTimePicker.title")}
-          className="bg-popover text-popover-foreground absolute top-[calc(100%+4px)] left-0 z-50 w-64 rounded-lg border p-2"
+          className="bg-popover text-popover-foreground fixed z-50 w-64 rounded-lg border p-2 shadow-md"
+          style={{ top: panelPos?.top ?? 0, left: panelPos?.left ?? 0 }}
           data-testid={testId === undefined ? undefined : `${testId}-panel`}
         >
           {view === "date" && (
@@ -220,7 +262,8 @@ export function DateTimePicker({
               {t("dateTimePicker.confirm")}
             </Button>
           </div>
-        </div>
+        </div>,
+        document.body,
       )}
     </div>
   );

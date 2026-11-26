@@ -17,6 +17,9 @@ import (
 	"github.com/cookieY/YearningX/backend/internal/changeorder/persistence"
 	"github.com/cookieY/YearningX/backend/internal/crypto"
 	"github.com/cookieY/YearningX/backend/internal/execution/rollback"
+	"github.com/cookieY/YearningX/backend/internal/platform/ptr"
+	"github.com/cookieY/YearningX/backend/internal/platform/txutil"
+	"github.com/cookieY/YearningX/backend/internal/platform/watermark"
 )
 
 const idemRouteRollbackDraft = "POST /change-orders/{order_id}/rollback-drafts"
@@ -286,7 +289,7 @@ func (s *Services) RevealOrderRollbackSQL(ctx context.Context, actor Actor, meta
 	res := &SQLRevealResult{
 		RevealID:   revealID,
 		SQL:        bundle.RollbackSQL,
-		Watermark:  buildWatermark(actor.Username, now),
+		Watermark:  watermark.SQLViewer(actor.Username, now),
 		ValidUntil: now.Add(5 * time.Minute).UTC().Format("2006-01-02T15:04:05.000Z07:00"),
 	}
 	if purpose == "" {
@@ -294,11 +297,11 @@ func (s *Services) RevealOrderRollbackSQL(ctx context.Context, actor Actor, meta
 	}
 	if err := s.Recorder.Audit(ctx, nil, auditlog.AuditInput{
 		EventType: "workorder.sql_revealed", ActorKind: "user",
-		ActorID: strPtrOrNil(actor.UserID), ActorUsername: strPtrOrNil(actor.Username),
-		ResourceType: "change_order", ResourceID: strPtrOrNil(orderID),
+		ActorID: ptr.NonZero(actor.UserID), ActorUsername: ptr.NonZero(actor.Username),
+		ResourceType: "change_order", ResourceID: ptr.NonZero(orderID),
 		Action: "reveal", Outcome: "succeeded",
-		RequestID: strPtrOrNil(meta.RequestID), SourceIP: strPtrOrNil(meta.SourceIP),
-		UserAgent: strPtrOrNil(meta.UserAgent),
+		RequestID: ptr.NonZero(meta.RequestID), SourceIP: ptr.NonZero(meta.SourceIP),
+		UserAgent: ptr.NonZero(meta.UserAgent),
 		Metadata:  map[string]any{"reveal_id": revealID, "purpose": purpose, "target": "rollback_sql"},
 	}); err != nil {
 		return nil, err
@@ -308,31 +311,10 @@ func (s *Services) RevealOrderRollbackSQL(ctx context.Context, actor Actor, meta
 
 // CreateRollbackDraft creates a rollback draft in one click from verified rollback evidence of a completed work order.
 func (s *Services) CreateRollbackDraft(ctx context.Context, actor Actor, meta RequestMeta, in RollbackDraftInput) (view *CopyView, replayed bool, err error) {
-	reqHash := idemRequestHash(actor.UserID, in.OrderID, "rollback_draft")
-	claimed, replay, err := s.idemClaim(ctx, actor.UserID, idemRouteRollbackDraft, in.OrderID, in.IdempotencyKey, reqHash)
-	if err != nil {
-		return nil, false, err
-	}
-	if claimed == nil {
-		var v CopyView
-		if err := json.Unmarshal(replay, &v); err != nil {
-			return nil, false, err
-		}
-		return &v, true, nil
-	}
-	view, err = s.createRollbackDraftTx(ctx, actor, meta, in)
-	if err != nil {
-		_ = s.idemRelease(ctx, actor.UserID, idemRouteRollbackDraft, in.OrderID, in.IdempotencyKey)
-		return nil, false, err
-	}
-	raw, err := json.Marshal(view)
-	if err != nil {
-		return nil, false, err
-	}
-	if err := s.idemComplete(ctx, actor.UserID, idemRouteRollbackDraft, in.OrderID, in.IdempotencyKey, raw); err != nil {
-		return nil, false, err
-	}
-	return view, false, nil
+	reqHash := txutil.RequestHash(actor.UserID, in.OrderID, "rollback_draft")
+	return txutil.RunIdempotent(ctx, s.idemStore(), actor.UserID, idemRouteRollbackDraft, in.OrderID, in.IdempotencyKey, reqHash, func() (*CopyView, error) {
+		return s.createRollbackDraftTx(ctx, actor, meta, in)
+	})
 }
 
 func (s *Services) createRollbackDraftTx(ctx context.Context, actor Actor, meta RequestMeta, in RollbackDraftInput) (*CopyView, error) {
@@ -447,17 +429,15 @@ func (s *Services) createRollbackDraftOnce(ctx context.Context, tx *gorm.DB, act
 	if len(flowSnapRow.Ciphertext) == 0 {
 		return nil, domain.ErrValidation()
 	}
-	flowPlain, err := s.Crypter.Open(crypto.PurposePayload, crypto.Envelope{
+	flowPlain, err := s.Crypter.OpenColumn(crypto.PurposePayload, crypto.ColumnRef{
+		Table:      "order_flow_snapshots",
+		PrimaryKey: in.OrderID,
+		Column:     "flow_snapshot_ciphertext",
+	}, crypto.Envelope{
 		Ciphertext: flowSnapRow.Ciphertext,
 		Nonce:      flowSnapRow.Nonce,
 		KeyID:      flowSnapRow.KeyID,
 		Algorithm:  flowSnapRow.Algorithm,
-	}, crypto.AAD{
-		DeploymentID: s.Crypter.DeploymentID(),
-		Table:        "order_flow_snapshots",
-		PrimaryKey:   in.OrderID,
-		Column:       "flow_snapshot_ciphertext",
-		Purpose:      crypto.PurposePayload,
 	})
 	if err != nil {
 		return nil, err
@@ -516,23 +496,54 @@ func (s *Services) createRollbackDraftOnce(ctx context.Context, tx *gorm.DB, act
 		stmtCount = 1
 	}
 
+	var stage1 struct {
+		ID                       string `gorm:"column:id"`
+		TargetSnapshotCiphertext []byte `gorm:"column:target_snapshot_ciphertext"`
+		TargetSnapshotNonce      []byte `gorm:"column:target_snapshot_nonce"`
+		TargetSnapshotKeyID      string `gorm:"column:target_snapshot_key_id"`
+		TargetSnapshotAlgorithm  string `gorm:"column:target_snapshot_algorithm"`
+	}
+	var targetDBPtr *string
+	if err := tx.WithContext(ctx).Raw(`
+		select id::text as id, target_snapshot_ciphertext, target_snapshot_nonce,
+		       target_snapshot_key_id, target_snapshot_algorithm
+		from order_stages
+		where order_id = ? and position = 1`, in.OrderID).Scan(&stage1).Error; err != nil {
+		return nil, err
+	}
+	if stage1.ID != "" && len(stage1.TargetSnapshotCiphertext) > 0 {
+		snap, oerr := domain.OpenTargetSnapshot(s.Crypter, stage1.ID, crypto.Envelope{
+			Ciphertext: stage1.TargetSnapshotCiphertext,
+			Nonce:      stage1.TargetSnapshotNonce,
+			KeyID:      stage1.TargetSnapshotKeyID,
+			Algorithm:  stage1.TargetSnapshotAlgorithm,
+		})
+		if oerr != nil {
+			return nil, oerr
+		}
+		if db := strings.TrimSpace(snap.TargetDatabase); db != "" {
+			targetDBPtr = &db
+		}
+	}
+
 	draftID := newID()
 	now := time.Now().UTC()
 	if err := tx.WithContext(ctx).Exec(`
 		insert into change_drafts (
 			id, owner_user_id, flow_id, flow_version_seen, title, description,
-			rollback_enabled, ticket_type, source_order_id, rollback_evidence_id,
+			rollback_enabled, target_database, ticket_type, source_order_id, rollback_evidence_id,
 			revision, state, version, created_at, updated_at
-		) values (?, ?, ?, ?, ?, ?, false, 'rollback', ?, ?, 1, 'draft', 1, ?, ?)`,
+		) values (?, ?, ?, ?, ?, ?, false, ?, 'rollback', ?, ?, 1, 'draft', 1, ?, ?)`,
 		draftID, actor.UserID, flow.ID, flow.Version, title, desc,
-		order.ID, ev.ID, now, now).Error; err != nil {
+		targetDBPtr, order.ID, ev.ID, now, now).Error; err != nil {
 		return nil, err
 	}
 
-	env, err := s.Crypter.Seal(crypto.PurposePayload, plainBytes, crypto.AAD{
-		DeploymentID: s.Crypter.DeploymentID(), Table: "draft_sql_payloads",
-		PrimaryKey: draftID, Column: "sql_ciphertext", Purpose: crypto.PurposePayload,
-	})
+	env, err := s.Crypter.SealColumn(crypto.PurposePayload, crypto.ColumnRef{
+		Table:      "draft_sql_payloads",
+		PrimaryKey: draftID,
+		Column:     "sql_ciphertext",
+	}, plainBytes)
 	if err != nil {
 		return nil, err
 	}
@@ -547,11 +558,11 @@ func (s *Services) createRollbackDraftOnce(ctx context.Context, tx *gorm.DB, act
 
 	if err := s.Recorder.Audit(ctx, tx, auditlog.AuditInput{
 		EventType: "workorder.rollback_draft_created", ActorKind: "user",
-		ActorID: strPtrOrNil(actor.UserID), ActorUsername: strPtrOrNil(actor.Username),
-		ResourceType: "change_order", ResourceID: strPtrOrNil(order.ID),
+		ActorID: ptr.NonZero(actor.UserID), ActorUsername: ptr.NonZero(actor.Username),
+		ResourceType: "change_order", ResourceID: ptr.NonZero(order.ID),
 		Action: "create_rollback_draft", Outcome: "succeeded",
-		RequestID: strPtrOrNil(meta.RequestID), SourceIP: strPtrOrNil(meta.SourceIP),
-		UserAgent: strPtrOrNil(meta.UserAgent),
+		RequestID: ptr.NonZero(meta.RequestID), SourceIP: ptr.NonZero(meta.SourceIP),
+		UserAgent: ptr.NonZero(meta.UserAgent),
 		Metadata: map[string]any{
 			"source_order_id":      order.ID,
 			"rollback_evidence_id": ev.ID,

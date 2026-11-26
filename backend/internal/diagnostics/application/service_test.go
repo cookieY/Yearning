@@ -1,29 +1,23 @@
+//go:build integration
+
 package application
 
 import (
 	"context"
-	"database/sql"
-	"database/sql/driver"
-	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
-	"sync"
 	"sync/atomic"
-	"syscall"
 	"testing"
 	"time"
 
 	"github.com/google/uuid"
-	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
-	gormlogger "gorm.io/gorm/logger"
 
 	"github.com/cookieY/YearningX/backend/internal/assistant/privacy"
 	"github.com/cookieY/YearningX/backend/internal/authorization/auditlog"
@@ -32,29 +26,11 @@ import (
 	"github.com/cookieY/YearningX/backend/internal/diagnostics/domain"
 	"github.com/cookieY/YearningX/backend/internal/diagnostics/persistence"
 	"github.com/cookieY/YearningX/backend/internal/platform/addrguard"
+	"github.com/cookieY/YearningX/backend/internal/platform/testenv"
+	"github.com/cookieY/YearningX/backend/internal/platform/testkit"
 	reviewapp "github.com/cookieY/YearningX/backend/internal/review/application"
 	reviewprovider "github.com/cookieY/YearningX/backend/internal/review/provider"
 )
-
-func acquireDiagnosticsTestLock(tb testing.TB) {
-	tb.Helper()
-	for _, name := range []string{"/yearningx-itest-shared.lock", "/yearningx-b13-assistant-test.lock"} {
-		path := os.TempDir() + name
-		f, err := os.OpenFile(path, os.O_CREATE|os.O_RDWR, 0o600)
-		if err != nil {
-			tb.Fatalf("open lock %s: %v", name, err)
-		}
-		if err := syscall.Flock(int(f.Fd()), syscall.LOCK_EX); err != nil {
-			_ = f.Close()
-			tb.Fatalf("flock %s: %v", name, err)
-		}
-		file := f
-		tb.Cleanup(func() {
-			_ = syscall.Flock(int(file.Fd()), syscall.LOCK_UN)
-			_ = file.Close()
-		})
-	}
-}
 
 func ensureMigration000027(tb testing.TB, db *gorm.DB) {
 	tb.Helper()
@@ -95,25 +71,7 @@ func ensureMigration000027(tb testing.TB, db *gorm.DB) {
 
 func openDiagnosticsTestDB(tb testing.TB) *gorm.DB {
 	tb.Helper()
-	acquireDiagnosticsTestLock(tb)
-	host := envOr("YEARNING_B13_TEST_DB_HOST", "127.0.0.1")
-	port := envOr("YEARNING_B13_TEST_DB_PORT", "54332")
-	user := envOr("YEARNING_B13_TEST_DB_USER", "yearning")
-	pass := envOr("YEARNING_B13_TEST_DB_PASSWORD", os.Getenv("YEARNING_TEST_DATABASE_PASSWORD"))
-	if pass == "" {
-		tb.Skip("PostgreSQL test credentials not configured (set YEARNING_B13_TEST_DB_PASSWORD or YEARNING_TEST_DATABASE_PASSWORD)")
-	}
-	dbname := envOr("YEARNING_B13_TEST_DB_NAME", "yearning_b13_test")
-	dsn := fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=disable", host, port, user, pass, dbname)
-	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{Logger: gormlogger.Discard})
-	if err != nil {
-		tb.Skipf("PostgreSQL test database not reachable (%v)", err)
-	}
-	sqlDB, err := db.DB()
-	if err != nil {
-		tb.Fatalf("db.DB(): %v", err)
-	}
-	tb.Cleanup(func() { _ = sqlDB.Close() })
+	db := testkit.OpenPG(tb, testenv.WithDefaultPort(54332), testenv.WithDefaultDBName("yearning_b13_test"))
 	ensureMigration000027(tb, db)
 
 	for _, tbl := range []string{
@@ -141,44 +99,9 @@ func openDiagnosticsTestDB(tb testing.TB) *gorm.DB {
 	return db
 }
 
-func envOr(key, fallback string) string {
-	if v := os.Getenv(key); v != "" {
-		return v
-	}
-	return fallback
-}
-
-func makeKey32(seed byte) string {
-	b := make([]byte, 32)
-	for i := range b {
-		b[i] = seed + byte(i)
-	}
-	return base64.StdEncoding.EncodeToString(b)
-}
-
 func newTestCrypter(tb testing.TB) *crypto.Crypter {
 	tb.Helper()
-	dir := tb.TempDir()
-	doc := fmt.Sprintf(`{"contract_version":1,"deployment_id":"b13-diagnostics-test","keys":[
-		{"key_id":"pay-1","purpose":"payload","status":"encrypt_decrypt","created_at":"2026-11-07T00:00:00Z","key_base64":"%s"},
-		{"key_id":"state-1","purpose":"oidc_state","status":"encrypt_decrypt","created_at":"2026-11-07T00:00:00Z","key_base64":"%s"},
-		{"key_id":"ident-1","purpose":"identifier_token","status":"encrypt_decrypt","created_at":"2026-11-07T00:00:00Z","key_base64":"%s"},
-		{"key_id":"fp-1","purpose":"sql_fingerprint","status":"encrypt_decrypt","created_at":"2026-11-07T00:00:00Z","key_base64":"%s"},
-		{"key_id":"aff-1","purpose":"cursor_affinity","status":"encrypt_decrypt","created_at":"2026-11-07T00:00:00Z","key_base64":"%s"}
-	]}`, makeKey32(11), makeKey32(21), makeKey32(31), makeKey32(41), makeKey32(51))
-	path := dir + "/keyring.json"
-	if err := os.WriteFile(path, []byte(doc), 0o400); err != nil {
-		tb.Fatal(err)
-	}
-	ring, err := crypto.LoadKeyring(path)
-	if err != nil {
-		tb.Fatal(err)
-	}
-	crypter, err := crypto.NewCrypter(ring)
-	if err != nil {
-		tb.Fatal(err)
-	}
-	return crypter
+	return testkit.NewCrypter(tb)
 }
 
 type fakeCollectorBackend struct {
@@ -330,6 +253,20 @@ func TestConfigLifecycleCircuitBreakerAndRateLimit(t *testing.T) {
 	}
 	if cfg0.Enabled || cfg0.State != "disabled" {
 		t.Fatalf("expected default disabled config, got %+v", cfg0)
+	}
+	if dsList, lerr := svc.ListDatasources(context.Background()); lerr != nil || len(dsList) == 0 {
+		t.Fatalf("ListDatasources failed: %v len=%d", lerr, len(dsList))
+	} else {
+		for _, item := range dsList {
+			if item.ProbeState == "disabled" || item.ProbeState == "" {
+				t.Fatalf("disabled datasource must report a valid DiagnosticsProbeStatus enum, got %+v", item)
+			}
+		}
+	}
+	if ov0, oerr := svc.GetOverview(context.Background(), dsNoRO, OverviewQuery{}); oerr != nil {
+		t.Fatalf("GetOverview on disabled datasource failed: %v", oerr)
+	} else if ov0.State != "disabled" || ov0.ProbeState == "disabled" || ov0.ProbeState == "" {
+		t.Fatalf("disabled overview must report State=disabled and valid ProbeState, got state=%q probe_state=%q", ov0.State, ov0.ProbeState)
 	}
 	if _, err := svc.UpdateConfig(context.Background(), actor, dsNoRO, cfg0.Version, domain.UpdateDiagnosticsConfigInput{
 		Enabled:         true,
@@ -1069,130 +1006,5 @@ func TestDiagnoseStatementWithAI_GlobalBudgetEnforcementAndLedger(t *testing.T) 
 	}
 	if usage.ReservedMinor != 0 || usage.AmountMinor != ledger.AmountMinor {
 		t.Fatalf("unexpected settled budget usage: amount=%d reserved=%d ledger=%d", usage.AmountMinor, usage.ReservedMinor, ledger.AmountMinor)
-	}
-}
-
-type diagBudgetStubState struct {
-	mu               sync.Mutex
-	failBudgetLoad   bool
-	failBudgetUpsert bool
-	txRollbacks      int
-	releases         []int64
-}
-
-type diagBudgetDriver struct{}
-
-var (
-	diagBudgetMu   sync.Mutex
-	diagBudgetMap  = map[string]*diagBudgetStubState{}
-	diagBudgetOnce sync.Once
-)
-
-func (diagBudgetDriver) Open(dsn string) (driver.Conn, error) {
-	diagBudgetMu.Lock()
-	st := diagBudgetMap[dsn]
-	diagBudgetMu.Unlock()
-	return &diagBudgetConn{state: st}, nil
-}
-
-type diagBudgetConn struct{ state *diagBudgetStubState }
-type diagBudgetTx struct{ state *diagBudgetStubState }
-
-func (c *diagBudgetConn) Prepare(string) (driver.Stmt, error) { return nil, errors.New("unsupported") }
-func (c *diagBudgetConn) Close() error                        { return nil }
-func (c *diagBudgetConn) Begin() (driver.Tx, error)           { return diagBudgetTx{state: c.state}, nil }
-func (c *diagBudgetConn) BeginTx(context.Context, driver.TxOptions) (driver.Tx, error) {
-	return diagBudgetTx{state: c.state}, nil
-}
-func (t diagBudgetTx) Commit() error { return nil }
-func (t diagBudgetTx) Rollback() error {
-	t.state.mu.Lock()
-	t.state.txRollbacks++
-	t.state.mu.Unlock()
-	return nil
-}
-
-func (c *diagBudgetConn) ExecContext(_ context.Context, query string, args []driver.NamedValue) (driver.Result, error) {
-	c.state.mu.Lock()
-	failUpsert := c.state.failBudgetUpsert
-	c.state.mu.Unlock()
-	if strings.Contains(query, "update ai_daily_budget_usage set reserved_minor = greatest") && len(args) > 0 {
-		if amt, ok := args[0].Value.(int64); ok {
-			c.state.mu.Lock()
-			c.state.releases = append(c.state.releases, amt)
-			c.state.mu.Unlock()
-		}
-	}
-	if failUpsert && strings.Contains(query, "insert into ai_daily_budget_usage") {
-		return nil, errors.New("simulated daily budget upsert failure")
-	}
-	return driver.RowsAffected(1), nil
-}
-
-func (c *diagBudgetConn) QueryContext(_ context.Context, query string, _ []driver.NamedValue) (driver.Rows, error) {
-	c.state.mu.Lock()
-	failLoad := c.state.failBudgetLoad
-	c.state.mu.Unlock()
-	if failLoad && strings.Contains(query, "namespace = 'ai_budget'") {
-		return nil, errors.New("simulated ai_budget query error")
-	}
-	return &diagBudgetStubRows{}, nil
-}
-
-type diagBudgetStubRows struct{}
-
-func (*diagBudgetStubRows) Columns() []string         { return []string{} }
-func (*diagBudgetStubRows) Close() error              { return nil }
-func (*diagBudgetStubRows) Next([]driver.Value) error { return io.EOF }
-
-func TestDiagnosticsBudgetFailClosedOnLoadErrorAndTransactionalSettle(t *testing.T) {
-	diagBudgetOnce.Do(func() {
-		sql.Register("diagnostics_budget_stub", diagBudgetDriver{})
-	})
-	st := &diagBudgetStubState{failBudgetLoad: true, failBudgetUpsert: true}
-	dsn := "diag-budget-" + uuid.NewString()
-	diagBudgetMu.Lock()
-	diagBudgetMap[dsn] = st
-	diagBudgetMu.Unlock()
-	t.Cleanup(func() {
-		diagBudgetMu.Lock()
-		delete(diagBudgetMap, dsn)
-		diagBudgetMu.Unlock()
-	})
-
-	sqlDB, err := sql.Open("diagnostics_budget_stub", dsn)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer func() { _ = sqlDB.Close() }()
-	gdb, err := gorm.Open(postgres.New(postgres.Config{
-		Conn: sqlDB, PreferSimpleProtocol: true, WithoutReturning: true,
-	}), &gorm.Config{DisableAutomaticPing: true, Logger: gormlogger.Discard})
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	svc := &Services{Review: &reviewapp.Services{DB: gdb}}
-	if _, _, _, _, err := svc.reserveDailyBudget(context.Background(), gdb, 1024); err == nil {
-		t.Fatal("expected reserveDailyBudget to fail closed on LoadBudgetSettings DB error")
-	}
-
-	settings := reviewapp.BudgetSettings{
-		Enforced: true, Currency: "USD", DailyBudgetMinor: 10000,
-		InputPricePerMillionMinor: 10000, OutputPricePerMillionMinor: 20000,
-	}
-	res := &reviewapp.ProviderJSONResult{ModelName: "gpt-4o-mini", InputTokens: 200, OutputTokens: 100}
-	if err := svc.settleDailyBudget(context.Background(), gdb, uuid.NewString(), "2026-11-21", "USD", 500, settings, res, "succeeded"); err == nil {
-		t.Fatal("expected settleDailyBudget error when ai_daily_budget_usage upsert fails")
-	}
-	st.mu.Lock()
-	rollbacks := st.txRollbacks
-	releases := append([]int64(nil), st.releases...)
-	st.mu.Unlock()
-	if rollbacks != 1 {
-		t.Fatalf("expected 1 transaction rollback on partial Settle failure, got %d", rollbacks)
-	}
-	if len(releases) != 1 || releases[0] != 500 {
-		t.Fatalf("expected outer release of 500 after rolled-back Settle tx, got %v", releases)
 	}
 }

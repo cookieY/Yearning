@@ -29,12 +29,12 @@ interface Envelope<T> {
 }
 
 async function get<T>(path: string): Promise<Envelope<T>> {
-  const response = await fetch(path, { headers: { "x-test": "1" } });
+  const response = await fetch(path.startsWith("/api/v4") ? path : `/api/v4${path}`, { headers: { "x-test": "1" } });
   return (await response.json()) as Envelope<T>;
 }
 
 async function post<T>(path: string, body: unknown, headers: Record<string, string> = {}): Promise<Envelope<T>> {
-  const response = await fetch(path, {
+  const response = await fetch(path.startsWith("/api/v4") ? path : `/api/v4${path}`, {
     method: "POST",
     headers: { "Content-Type": "application/json", ...headers },
     body: JSON.stringify(body),
@@ -61,7 +61,7 @@ describe("query fixture single-SELECT safety", () => {
 
   async function execute(sql: string) {
     return post<{ columns: { name: string }[]; rows: unknown[][]; page: { has_more: boolean } }>(
-      "/query-sessions/qs-fixture-active/executions",
+      "/query-sessions/6f0f2b3c-5555-4555-8555-000000000101/executions",
       {
         datasource_id: QUERY_FIXTURE_DS_MYSQL_ID,
         schema_name: "app",
@@ -109,7 +109,7 @@ describe("query fixture single-SELECT safety", () => {
   });
 
   it("rejects out-of-range timeouts with QUERY_TIMEOUT_OUT_OF_RANGE", async () => {
-    const envelope = await post("/query-sessions/qs-fixture-active/executions", {
+    const envelope = await post("/query-sessions/6f0f2b3c-5555-4555-8555-000000000101/executions", {
       datasource_id: QUERY_FIXTURE_DS_MYSQL_ID,
       schema_name: "app",
       sql: "select 1",
@@ -119,7 +119,7 @@ describe("query fixture single-SELECT safety", () => {
   });
 
   it("rejects datasources outside the frozen session capability set", async () => {
-    const envelope = await post("/query-sessions/qs-fixture-active/executions", {
+    const envelope = await post("/query-sessions/6f0f2b3c-5555-4555-8555-000000000101/executions", {
       // The PG datasource is in the flow but NOT in the grant-frozen session.
       datasource_id: QUERY_FIXTURE_DS_PG_ID,
       schema_name: "public",
@@ -139,7 +139,7 @@ describe("query fixture cursor semantics", () => {
       execution_id: string;
       rows: unknown[][];
       page: { next_cursor: string | null; has_more: boolean };
-    }>("/query-sessions/qs-fixture-active/executions", {
+    }>("/query-sessions/6f0f2b3c-5555-4555-8555-000000000101/executions", {
       datasource_id: QUERY_FIXTURE_DS_MYSQL_ID,
       schema_name: "app",
       sql: "select id from app.users",
@@ -174,7 +174,7 @@ describe("query fixture cursor semantics", () => {
     // The grant froze export=true for mysql only; pages are readable with
     // purpose=export while the capability holds.
     const execution = await post<{ execution_id: string; page: { next_cursor: string | null } }>(
-      "/query-sessions/qs-fixture-active/executions",
+      "/query-sessions/6f0f2b3c-5555-4555-8555-000000000101/executions",
       {
         datasource_id: QUERY_FIXTURE_DS_MYSQL_ID,
         schema_name: "app",
@@ -192,7 +192,7 @@ describe("query fixture cursor semantics", () => {
 
   it("refuses pages without a purpose", async () => {
     const first = await post<{ execution_id: string; page: { next_cursor: string | null } }>(
-      "/query-sessions/qs-fixture-active/executions",
+      "/query-sessions/6f0f2b3c-5555-4555-8555-000000000101/executions",
       {
         datasource_id: QUERY_FIXTURE_DS_MYSQL_ID,
         schema_name: "app",
@@ -219,7 +219,7 @@ describe("query fixture access approval chain", () => {
 
   it("decides approve into an active grant covering the requested datasources", async () => {
     const decision = await post(
-      "/query-access-requests/qar-fixture-pending/decisions",
+      "/query-access-requests/6f0f2b3c-5555-4555-8555-000000000201/decisions",
       { decision: "approve" },
       { "If-Match": '"1"' },
     );
@@ -235,7 +235,7 @@ describe("query fixture access approval chain", () => {
 
   it("rejects the whole request and invalidates remaining steps", async () => {
     const decision = await post(
-      "/query-access-requests/qar-fixture-pending/decisions",
+      "/query-access-requests/6f0f2b3c-5555-4555-8555-000000000201/decisions",
       { decision: "reject" },
       { "If-Match": '"1"' },
     );
@@ -243,7 +243,7 @@ describe("query fixture access approval chain", () => {
   });
 
   it("requires If-Match and rejects stale versions with CONCURRENT_MODIFICATION", async () => {
-    const stale = await post("/query-access-requests/qar-fixture-pending/decisions", { decision: "approve" });
+    const stale = await post("/query-access-requests/6f0f2b3c-5555-4555-8555-000000000201/decisions", { decision: "approve" });
     expect(stale.err_code).toBe(1004);
   });
 });
@@ -282,7 +282,7 @@ describe("query fixture revocation and owner scoping", () => {
     // The blocked execution runs as the session owner (henry), not the
     // reviewer who revoked the grant.
     setMockIdentity("henry");
-    const execution = await post("/query-sessions/qs-fixture-active/executions", {
+    const execution = await post("/query-sessions/6f0f2b3c-5555-4555-8555-000000000101/executions", {
       datasource_id: QUERY_FIXTURE_DS_MYSQL_ID,
       schema_name: "app",
       sql: "select 1",
@@ -291,7 +291,7 @@ describe("query fixture revocation and owner scoping", () => {
   });
 
   it("hides another user's session behind RESOURCE_NOT_FOUND for any session identity", async () => {
-    const other = await get("/query-sessions/qs-fixture-other");
+    const other = await get("/query-sessions/6f0f2b3c-5555-4555-8555-000000000102");
     expect(other.err_code).toBe(1002);
     expect(QUERY_FIXTURE_OTHER_USER_ID).not.toBe(SESSION_USER_ID);
   });
@@ -313,7 +313,7 @@ describe("query fixture session ownership guards", () => {
     // covers the undefined arm — together the three || guards reach both
     // branches, which is what the global branch gate needs.
     const columnsForeign = await get(
-      "/query-sessions/qs-fixture-other/metadata/columns?datasource_id=x&schema_name=app&table_name=users",
+      "/query-sessions/6f0f2b3c-5555-4555-8555-000000000102/metadata/columns?datasource_id=x&schema_name=app&table_name=users",
     );
     expect(columnsForeign.err_code).toBe(1002);
     const columnsUnknown = await get(
@@ -321,7 +321,7 @@ describe("query fixture session ownership guards", () => {
     );
     expect(columnsUnknown.err_code).toBe(1002);
 
-    const postForeign = await post("/query-sessions/qs-fixture-other/executions", {
+    const postForeign = await post("/query-sessions/6f0f2b3c-5555-4555-8555-000000000102/executions", {
       datasource_id: QUERY_FIXTURE_DS_MYSQL_ID,
       schema_name: "app",
       sql: "select id from app.users",
@@ -342,7 +342,7 @@ describe("query fixture session ownership guards", () => {
 
   it("owner-scoped pages still succeed right after the guard checks", async () => {
     seedQueryScenario("query-session");
-    const execution = await post("/query-sessions/qs-fixture-active/executions", {
+    const execution = await post("/query-sessions/6f0f2b3c-5555-4555-8555-000000000101/executions", {
       datasource_id: QUERY_FIXTURE_DS_MYSQL_ID,
       schema_name: "app",
       sql: "select id from app.users",

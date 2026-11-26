@@ -20,7 +20,7 @@ Yearning has been open-source since 2017. The **Community Edition** is free fore
 ### Community Edition (`$0`, Open Source)
 
 - Full SQL change review, frozen multi-stage approvals, and audit trails
-- MySQL 5.7/8.0, PostgreSQL 14–18, TiDB (MySQL), OceanBase (MySQL), and PolarDB (MySQL/PG)
+- MySQL 5.7+ (5.7 / 8.0 / 8.4+), PostgreSQL 14–18+, TiDB (MySQL), OceanBase (MySQL), and PolarDB (MySQL/PG)
 - Privacy-preserving AI precheck, 48 built-in rules, custom prompt tools, and knowledge base
 - Scoped Database AI Assistant and SQL performance diagnostics (Bring-Your-Own-Key)
 - Cross-engine AST rollback evidence and in-process `gh-ost` online DDL

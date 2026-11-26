@@ -10,7 +10,13 @@ import { readStoredScenario } from "@/shared/mock/scenario-store";
 export async function startMockWorker(): Promise<void> {
   const worker = setupWorker(...baseHandlers());
   await worker.start({
-    onUnhandledRequest: "bypass",
+    onUnhandledRequest(request, print) {
+      const pathname = new URL(request.url).pathname;
+      if (pathname.startsWith("/api/")) {
+        print.error();
+        throw new Error(`Unhandled API mock request: ${request.method} ${pathname}`);
+      }
+    },
     quiet: import.meta.env.VITE_DEMO_MODE === "true",
   });
   applyScenarioToWorker(worker, readStoredScenario());

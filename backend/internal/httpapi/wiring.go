@@ -19,7 +19,7 @@ import (
 // dependency order, propagates the root lifecycle context, and runs startup AI usage reconciliation.
 func BuildServeDeps(ctx context.Context, deps ServeDeps) (ServeDeps, error) {
 	if ctx == nil {
-		ctx = context.Background()
+		return ServeDeps{}, errors.New("httpapi: lifecycle context is required")
 	}
 	if deps.B3 == nil || deps.B3.DB == nil || deps.B3.Crypter == nil {
 		return ServeDeps{}, errors.New("httpapi: B3 platform dependencies (DB/Crypter) are required")
@@ -50,6 +50,12 @@ func BuildServeDeps(ctx context.Context, deps ServeDeps) (ServeDeps, error) {
 			Guard:          func(op string) gin.HandlerFunc { return RequireOperation(op, deps.B3.Sessions) },
 			ReleaseFeedURL: deps.ReleaseFeedURL,
 		}
+	}
+	if deps.B3.Identity != nil && deps.Dashboard != nil && deps.Dashboard.Service != nil {
+		dashSvc := deps.Dashboard.Service
+		deps.B3.Identity.SetOnUserDeleted(func(string) {
+			dashSvc.InvalidateOperationsCache()
+		})
 	}
 	if deps.Notification == nil {
 		deps.Notification = &notification.Deps{

@@ -64,7 +64,7 @@ func (fx *b6Fixture) b6CreateDatasource(t *testing.T, name string) string {
 	t.Helper()
 	code, body, raw := fx.admin.do("POST", "/api/v4/admin/datasources", map[string]any{
 		"name": name, "engine": "mysql", "compatibility_mode": "mysql",
-		"deployment_kind": "native", "host": name + ".example.com", "port": 3306,
+		"deployment_kind": "native", "host": name + ".invalid", "port": 3306,
 		// RCP-20261031-REMOVE-FLOW-SCHEMA-MAPPINGS: without stage mappings, MySQL
 		// stage scope = datasource default database; fixture must provide database_name.
 		"database_name":      "shop",

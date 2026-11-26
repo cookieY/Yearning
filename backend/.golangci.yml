@@ -1,0 +1,41 @@
+version: "2"
+
+run:
+  timeout: 3m
+  tests: false
+  build-tags:
+    - nomsgpack
+
+linters:
+  default: none
+  enable:
+    - unused
+    - dupl
+    - forbidigo
+    - funlen
+    - gocognit
+  settings:
+    dupl:
+      threshold: 150
+    forbidigo:
+      forbid:
+        - pattern: '^fmt\.Print(f|ln)?$'
+          msg: "Use structured logger instead of fmt.Print* in internal packages."
+    funlen:
+      lines: 120
+      statements: 80
+      ignore-comments: true
+    gocognit:
+      min-complexity: 30
+  exclusions:
+    generated: lax
+    rules:
+      - path: '^cmd/'
+        linters:
+          - forbidigo
+      - path: '_test\.go$'
+        linters:
+          - dupl
+          - forbidigo
+          - funlen
+          - gocognit

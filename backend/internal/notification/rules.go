@@ -337,12 +337,13 @@ func (w *Worker) eventFlowID(ctx context.Context, ev *OutboxEventModel) string {
 		Scan(&row).Error; err != nil || row.Ciphertext == nil {
 		return ""
 	}
-	plain, err := w.crypter.Open(crypto.PurposePayload, crypto.Envelope{
+	plain, err := w.crypter.OpenColumn(crypto.PurposePayload, crypto.ColumnRef{
+		Table:      "order_flow_snapshots",
+		PrimaryKey: orderID,
+		Column:     "flow_snapshot_ciphertext",
+	}, crypto.Envelope{
 		Ciphertext: row.Ciphertext, Nonce: row.Nonce,
 		KeyID: row.KeyID, Algorithm: row.Algorithm,
-	}, crypto.AAD{
-		DeploymentID: w.crypter.DeploymentID(), Table: "order_flow_snapshots",
-		PrimaryKey: orderID, Column: "flow_snapshot_ciphertext", Purpose: crypto.PurposePayload,
 	})
 	if err != nil {
 		return ""
@@ -583,11 +584,13 @@ func (s *Service) PreviewRule(ctx context.Context, in *RulePreviewInput) (*RuleP
 			Address: maskAddress(t.Address),
 		})
 	}
+	locale := readNotificationLocale(ctx, s.DB)
+	fake.SetLocale(locale)
 	customTpl := derefTemplate(in.Rule.MessageTemplate)
 	if in.SampleOrderID != "" {
 		out.Message = fake.EventBodyWithTemplate(ctx, &ev, "", customTpl)
 	} else {
-		out.Message = previewMessageWithTemplate(in.Rule.EventType, customTpl)
+		out.Message = previewMessageWithTemplateInLocale(in.Rule.EventType, customTpl, locale)
 	}
 	return out, nil
 }
@@ -625,6 +628,21 @@ func maskAddress(addr string) string {
 	return local + "***" + addr[at:]
 }
 
+func readNotificationLocale(ctx context.Context, db *gorm.DB) string {
+	if db == nil {
+		return "zh-CN"
+	}
+	var row struct {
+		Locale *string
+	}
+	if err := db.WithContext(ctx).Raw(
+		`select settings->>'default_locale' as locale from system_settings where namespace = 'general'`,
+	).Scan(&row).Error; err == nil && row.Locale != nil && *row.Locale == "en-US" {
+		return "en-US"
+	}
+	return "zh-CN"
+}
+
 // previewMessage renders the preview message copy for an event using the built-in default template.
 func previewMessage(eventType string) string {
 	return previewMessageWithTemplate(eventType, "")
@@ -633,6 +651,13 @@ func previewMessage(eventType string) string {
 // previewMessageWithTemplate renders preview message copy for an event using customTemplate when
 // non-empty and falling back to the built-in default template with sample placeholder values.
 func previewMessageWithTemplate(eventType, customTemplate string) string {
+	return previewMessageWithTemplateInLocale(eventType, customTemplate, "zh-CN")
+}
+
+func previewMessageWithTemplateInLocale(eventType, customTemplate, locale string) string {
+	if locale != "en-US" {
+		locale = "zh-CN"
+	}
 	if _, ok := templateKey[eventType]; !ok {
 		return ""
 	}
@@ -641,10 +666,10 @@ func previewMessageWithTemplate(eventType, customTemplate string) string {
 		tpl = ""
 	}
 	if tpl == "" {
-		tpl = DefaultPlaceholderTemplate(eventType, "zh-CN")
+		tpl = DefaultPlaceholderTemplate(eventType, locale)
 	}
 	if tpl == "" {
 		return ""
 	}
-	return RenderTemplateString(tpl, sampleTemplateVars("zh-CN", eventType))
+	return RenderTemplateString(tpl, sampleTemplateVars(locale, eventType))
 }

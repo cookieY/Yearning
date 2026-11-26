@@ -148,4 +148,16 @@ func TestMemoryStoreConcurrentAccess(t *testing.T) {
 	wg.Wait()
 }
 
+func TestWithIdentityAndViewAsRole(t *testing.T) {
+	id := &Identity{UserID: "u-2", Username: "alice", IsBuiltinAdmin: false, Role: "user", ViewAsRole: "approver"}
+	ctx := WithIdentity(context.Background(), id)
+	got := FromContext(ctx)
+	if got == nil || got.UserID != "u-2" || got.ViewAsRole != "approver" || got.HasAdminAccess() {
+		t.Fatalf("unexpected identity from context: %+v", got)
+	}
+	if FromContext(WithIdentity(context.Background(), nil)) != nil {
+		t.Fatal("expected nil identity for nil WithIdentity")
+	}
+}
+
 func contains(s, sub string) bool { return strings.Contains(s, sub) }

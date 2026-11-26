@@ -143,7 +143,10 @@ func TestLatestReleaseAuthzAndEnvelope(t *testing.T) {
 	}
 	engine := gin.New()
 	engine.Use(session.Middleware(store, session.Options{CookieName: "yearning_session"}))
-	RegisterRoutes(engine, &Deps{Service: s})
+	RegisterRoutes(engine, &Deps{
+		Service: s,
+		Guard:   func(_ string) gin.HandlerFunc { return func(c *gin.Context) { c.Next() } },
+	})
 
 	do := func(cookie string, path string) *httptest.ResponseRecorder {
 		req := httptest.NewRequest(http.MethodGet, path, nil)

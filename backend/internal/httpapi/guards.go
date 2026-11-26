@@ -7,15 +7,13 @@ package httpapi
 
 import (
 	"net/http"
-	"strconv"
-	"strings"
 
 	"github.com/gin-gonic/gin"
 
 	"github.com/cookieY/YearningX/backend/internal/authorization"
-	"github.com/cookieY/YearningX/backend/internal/authorization/bizerr"
 	"github.com/cookieY/YearningX/backend/internal/identity"
 	"github.com/cookieY/YearningX/backend/internal/identity/session"
+	"github.com/cookieY/YearningX/backend/internal/platform/httpenvelope"
 )
 
 // csrfHeader is the CSRF token header required on state-changing requests.
@@ -138,23 +136,7 @@ func clearSessionCookies(c *gin.Context, secure bool) {
 
 // parseIfMatch parses the If-Match optimistic concurrency version (quoted "N").
 func parseIfMatch(c *gin.Context) (int64, bool) {
-	raw := strings.TrimSpace(c.GetHeader("If-Match"))
-	if len(raw) < 3 || raw[0] != '"' || raw[len(raw)-1] != '"' {
-		WriteBusinessError(c, &BusinessError{
-			Code: bizerr.CodeValidationFailed, Name: "VALIDATION_FAILED",
-			Message: "If-Match header must be a quoted version number",
-		})
-		return 0, false
-	}
-	version, err := strconv.ParseInt(raw[1:len(raw)-1], 10, 64)
-	if err != nil || version < 1 {
-		WriteBusinessError(c, &BusinessError{
-			Code: bizerr.CodeValidationFailed, Name: "VALIDATION_FAILED",
-			Message: "Invalid If-Match version",
-		})
-		return 0, false
-	}
-	return version, true
+	return httpenvelope.ParseIfMatch(c)
 }
 
 // requestMeta extracts audit metadata from the request.

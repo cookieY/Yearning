@@ -1,7 +1,7 @@
 ---
 id: help-query-access
 title: Query Workspace & Ephemeral Query Sessions
-source_ref: docs/prd/query-system-prd.md#query-session
+source_ref: docs/features/06-query-prd.md
 route_path: /query
 admin_only: false
 keywords: query, select, workspace, cursor, export, session, read-only, grant, request, timeout, page, limit, rows, csv, json, jsonl, explain, show, describe, schema, autocomplete, metadata, sse, events/stream, real-time, 5000, 21600, 4001, 4002, 4003, 4004, 4005, 4006

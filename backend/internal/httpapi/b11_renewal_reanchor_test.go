@@ -11,6 +11,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+
+	"github.com/cookieY/YearningX/backend/internal/platform/systz"
 )
 
 // TestB11RenewalReanchorsRequestedUntil re-anchors renewal requested_until by
@@ -26,6 +28,7 @@ func TestB11RenewalReanchorsRequestedUntil(t *testing.T) {
 		on conflict (namespace) do update set settings = system_settings.settings || jsonb_build_object('system_timezone', 'Asia/Shanghai')`).Error; err != nil {
 		t.Fatal(err)
 	}
+	systz.InvalidateDB(fx.db)
 	// Request -> approval -> Grant (setup uses creation surface; after +24h wall-clock re-anchoring it remains
 	// strictly in the future and within the 30-day limit).
 	code, body, raw := fx.requester.doWithHeaders("POST", "/api/v4/query-access-requests", map[string]any{

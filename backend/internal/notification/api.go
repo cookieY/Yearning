@@ -4,20 +4,22 @@ package notification
 
 import (
 	"errors"
-	"fmt"
+	"io"
 	"net/http"
 	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 
+	"github.com/cookieY/YearningX/backend/internal/authorization/bizerr"
 	"github.com/cookieY/YearningX/backend/internal/identity/session"
+	"github.com/cookieY/YearningX/backend/internal/platform/httpenvelope"
 	"github.com/cookieY/YearningX/backend/internal/tasks"
 )
 
 // Deps holds HTTP dependencies for the notification domain. Guard is injected by the wiring package
-// (RequireOperation: policy decision + mutating CSRF double-submit); when nil, routes mount directly
-// (in-domain fallback guard for unit tests).
+// (RequireOperation: policy decision + mutating CSRF double-submit) and is mandatory — a nil Guard
+// fails closed with HTTP 500 Problem Details rather than allowing unauthenticated pass-through.
 type Deps struct {
 	Service *Service
 	Guard   func(op string) gin.HandlerFunc
@@ -45,166 +47,166 @@ func RegisterRoutes(rg gin.IRouter, d *Deps) {
 	rg.DELETE("/admin/notification-rules/:rule_id", g("deleteNotificationRule"), h.deleteRule)
 }
 
-// guard returns the operation guard, or a pass-through when none was injected (in-domain fallback).
+// guard returns the injected operation guard, failing closed with HTTP 500 Problem Details when nil.
 func (d *Deps) guard(op string) gin.HandlerFunc {
-	if d.Guard == nil {
-		return func(c *gin.Context) { c.Next() }
+	if d == nil || d.Guard == nil {
+		return func(c *gin.Context) {
+			httpenvelope.WriteProblem(c, http.StatusInternalServerError, "authorization guard not configured")
+			c.Abort()
+		}
 	}
 	return d.Guard(op)
 }
 
 type handler struct{ d *Deps }
 
-func currentAdmin(c *gin.Context) (string, bool) {
+func requireAdmin(c *gin.Context) (string, bool) {
 	id := session.FromContext(c.Request.Context())
 	if id == nil || !id.HasAdminAccess() {
+		httpenvelope.WriteProblem(c, http.StatusForbidden, "permission denied")
+		c.Abort()
 		return "", false
 	}
 	return id.UserID, true
 }
 
-func writeErr(c *gin.Context, err error) {
+// respondNotificationErr maps notification domain errors to canonical HTTP 200 BusinessError envelopes
+// and unrecognized errors to RFC 9457 500 Problem Details.
+// When deleteProfile is true (admin_delete profile is CONCURRENT_MODIFICATION-only), ErrConflict maps to 1004;
+// otherwise (admin_replace profile) it maps to 1003.
+func respondNotificationErr(c *gin.Context, err error, deleteProfile bool) {
 	switch {
 	case err == nil:
 		return
 	case errors.Is(err, ErrNotFound):
-		bizErr(c, 1002, "Resource not found")
+		httpenvelope.WriteCodedError(c, bizerr.CodeResourceNotFound, "RESOURCE_NOT_FOUND", "Resource not found", nil)
 	case errors.Is(err, ErrConflict):
-		bizErr(c, 1003, "Resource version conflict; please refresh and retry")
+		if deleteProfile {
+			httpenvelope.WriteCodedError(c, bizerr.CodeConcurrentModification, "CONCURRENT_MODIFICATION", "Concurrent modification conflict; please retry", nil)
+			return
+		}
+		httpenvelope.WriteCodedError(c, bizerr.CodeVersionConflict, "VERSION_CONFLICT", "Resource version conflict; please refresh and retry", nil)
 	case errors.Is(err, ErrChannelReferenced):
-		bizErr(c, 1006, "Channel is still referenced by notification rules; update or delete those rules first")
+		httpenvelope.WriteCodedError(c, bizerr.CodeResourceReferenced, "RESOURCE_REFERENCED", "Channel is still referenced by notification rules; update or delete those rules first", nil)
 	case errors.Is(err, ErrValidation):
-		bizErr(c, 1001, "Invalid request parameters")
+		httpenvelope.WriteCodedError(c, bizerr.CodeValidationFailed, "VALIDATION_FAILED", "Invalid request parameters", nil)
 	case errors.Is(err, tasks.ErrQueueFull):
-		c.JSON(http.StatusOK, gin.H{
-			"err_code":   1012,
-			"message":    "System capacity exhausted; please retry later",
-			"data":       nil,
-			"request_id": c.GetString("request_id"),
-			"retryable":  true,
-			"meta":       gin.H{"retry_after_ms": 1000},
-		})
+		httpenvelope.WriteCodedError(c, 1012, "SYSTEM_CAPACITY_EXHAUSTED", "System capacity exhausted; please retry later", nil)
 	default:
-		c.JSON(http.StatusInternalServerError, gin.H{"message": "internal error"})
+		httpenvelope.WriteProblem(c, http.StatusInternalServerError, "internal error")
 	}
-}
-
-// writeDeleteErr dedicated error mapping for deleteNotificationChannel: the admin_delete profile
-// declares only CONCURRENT_MODIFICATION (no VERSION_CONFLICT; profile is exhaustive), so If-Match
-// mismatches and delete races surface as 1004, whereas replace (admin_replace declares both codes)
-// continues to use 1003 via writeErr. Pre-aligned for unmounted route (FE-F7 upgrade check, §14.3).
-func writeDeleteErr(c *gin.Context, err error) {
-	if errors.Is(err, ErrConflict) {
-		bizErr(c, 1004, "Concurrent modification conflict; please retry")
-		return
-	}
-	writeErr(c, err)
-}
-
-func okData(c *gin.Context, data any) {
-	c.JSON(http.StatusOK, gin.H{"err_code": 0, "message": "ok", "data": data, "request_id": c.GetString("request_id")})
-}
-
-func bizErr(c *gin.Context, code int, message string) {
-	// BusinessErrorResponse has additionalProperties:false: request_id and
-	// retryable are required (business errors are never retryable).
-	c.JSON(http.StatusOK, gin.H{"err_code": code, "message": message, "data": nil,
-		"request_id": c.GetString("request_id"), "retryable": false})
 }
 
 func (h *handler) list(c *gin.Context) {
-	if _, ok := currentAdmin(c); !ok {
-		c.AbortWithStatus(http.StatusForbidden)
+	if _, ok := requireAdmin(c); !ok {
 		return
 	}
 	items, err := h.d.Service.ListChannels(c.Request.Context())
 	if err != nil {
-		writeErr(c, err)
+		respondNotificationErr(c, err, false)
 		return
 	}
-	okData(c, gin.H{"items": items, "page": gin.H{"next_cursor": nil, "has_more": false}})
+	httpenvelope.WriteSuccess(c, gin.H{"items": items, "page": gin.H{"next_cursor": nil, "has_more": false}})
 }
 
 func (h *handler) create(c *gin.Context) {
-	actorID, ok := currentAdmin(c)
+	actorID, ok := requireAdmin(c)
 	if !ok {
-		c.AbortWithStatus(http.StatusForbidden)
 		return
 	}
 	var in WriteInput
 	if err := c.ShouldBindJSON(&in); err != nil {
-		writeErr(c, ErrValidation)
+		respondNotificationErr(c, ErrValidation, false)
 		return
 	}
 	view, err := h.d.Service.CreateChannel(c.Request.Context(), actorID, &in)
 	if err != nil {
-		writeErr(c, err)
+		respondNotificationErr(c, err, false)
 		return
 	}
-	okData(c, view)
+	httpenvelope.WriteSuccess(c, view)
 }
 
 func (h *handler) get(c *gin.Context) {
-	if _, ok := currentAdmin(c); !ok {
-		c.AbortWithStatus(http.StatusForbidden)
+	if _, ok := requireAdmin(c); !ok {
 		return
 	}
 	view, err := h.d.Service.GetChannel(c.Request.Context(), c.Param("channel_id"))
 	if err != nil {
-		writeErr(c, err)
+		respondNotificationErr(c, err, false)
 		return
 	}
-	okData(c, view)
+	httpenvelope.WriteSuccess(c, view)
 }
 
 func (h *handler) replace(c *gin.Context) {
-	if _, ok := currentAdmin(c); !ok {
-		c.AbortWithStatus(http.StatusForbidden)
+	if _, ok := requireAdmin(c); !ok {
 		return
 	}
 	var in WriteInput
 	if err := c.ShouldBindJSON(&in); err != nil {
-		writeErr(c, ErrValidation)
+		respondNotificationErr(c, ErrValidation, false)
 		return
 	}
-	version := parseVersion(c.GetHeader("If-Match"))
+	version, ok := httpenvelope.ParseIfMatch(c)
+	if !ok {
+		return
+	}
 	view, err := h.d.Service.ReplaceChannel(c.Request.Context(), c.Param("channel_id"), version, &in)
 	if err != nil {
-		writeErr(c, err)
+		respondNotificationErr(c, err, false)
 		return
 	}
-	okData(c, view)
+	httpenvelope.WriteSuccess(c, view)
 }
 
 func (h *handler) delete(c *gin.Context) {
-	if _, ok := currentAdmin(c); !ok {
-		c.AbortWithStatus(http.StatusForbidden)
+	if _, ok := requireAdmin(c); !ok {
 		return
 	}
-	version := parseVersion(c.GetHeader("If-Match"))
+	version, ok := httpenvelope.ParseIfMatch(c)
+	if !ok {
+		return
+	}
 	if err := h.d.Service.DeleteChannel(c.Request.Context(), c.Param("channel_id"), version); err != nil {
-		writeDeleteErr(c, err)
+		respondNotificationErr(c, err, true)
 		return
 	}
-	okData(c, nil)
+	httpenvelope.WriteSuccess(c, nil)
 }
 
 func (h *handler) testDelivery(c *gin.Context) {
-	if _, ok := currentAdmin(c); !ok {
-		c.AbortWithStatus(http.StatusForbidden)
+	if _, ok := requireAdmin(c); !ok {
 		return
+	}
+	var req struct {
+		Recipient *string `json:"recipient"`
+		Locale    string  `json:"locale"`
+	}
+	if c.Request.Body != nil {
+		if err := c.ShouldBindJSON(&req); err != nil && !errors.Is(err, io.EOF) {
+			respondNotificationErr(c, ErrValidation, false)
+			return
+		}
 	}
 	ch, err := h.d.Service.GetChannel(c.Request.Context(), c.Param("channel_id"))
 	if err != nil {
-		writeErr(c, err)
+		respondNotificationErr(c, err, false)
 		return
 	}
-	taskID, err := h.d.Service.CreateTestDelivery(c.Request.Context(), ch.ID)
+	recipient := ""
+	if req.Recipient != nil {
+		recipient = strings.TrimSpace(*req.Recipient)
+	}
+	taskID, err := h.d.Service.CreateTestDeliveryWithOptions(c.Request.Context(), ch.ID, TestDeliveryOptions{
+		Recipient: recipient,
+		Locale:    strings.TrimSpace(req.Locale),
+	})
 	if err != nil {
-		writeErr(c, err)
+		respondNotificationErr(c, err, false)
 		return
 	}
-	okData(c, gin.H{"task_id": taskID, "channel_id": ch.ID})
+	httpenvelope.WriteSuccess(c, gin.H{"task_id": taskID, "channel_id": ch.ID})
 }
 
 // DeliveryView conforms to OpenAPI NotificationDelivery (additionalProperties:
@@ -229,8 +231,7 @@ type DeliveryView struct {
 }
 
 func (h *handler) listDeliveries(c *gin.Context) {
-	if _, ok := currentAdmin(c); !ok {
-		c.AbortWithStatus(http.StatusForbidden)
+	if _, ok := requireAdmin(c); !ok {
 		return
 	}
 	var rows []NotificationDeliveryModel
@@ -239,11 +240,15 @@ func (h *handler) listDeliveries(c *gin.Context) {
 	if v := c.Query("state"); v != "" {
 		q = q.Where("state = ?", v)
 	}
-	if v := c.Query("after"); v != "" && uuid.Validate(v) == nil {
+	if v := c.Query("after"); v != "" {
+		if uuid.Validate(v) != nil {
+			respondNotificationErr(c, ErrValidation, false)
+			return
+		}
 		q = q.Where("(created_at, id) < ((select created_at from notification_deliveries where id = ?), ?::uuid)", v, v)
 	}
 	if err := q.Order("created_at desc, id desc").Limit(50).Find(&rows).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"message": "internal error"})
+		httpenvelope.WriteProblem(c, http.StatusInternalServerError, "internal error")
 		return
 	}
 	// R1 M3: read-side join populates event type and channel name (masked target decryption happens inside the loop).
@@ -286,7 +291,7 @@ func (h *handler) listDeliveries(c *gin.Context) {
 			v.ChannelName = ch.Name
 		}
 		// Masked target: after decryption, retain at most 2 characters of the local part + domain (plaintext never leaves the read surface).
-		if plain, err := h.d.Service.openDeliveryAddress(c.Request.Context(), &r); err == nil {
+		if plain, err := openDeliveryAddress(h.d.Service.Crypter, &r); err == nil {
 			v.MaskedTarget = maskAddress(plain)
 		} else {
 			v.MaskedTarget = "<undecryptable>"
@@ -301,108 +306,102 @@ func (h *handler) listDeliveries(c *gin.Context) {
 	if len(items) >= 50 && len(items) > 0 {
 		nextCursor = items[len(items)-1].ID
 	}
-	okData(c, gin.H{"items": items, "page": gin.H{"next_cursor": nextCursor, "has_more": len(items) >= 50}})
-}
-
-func parseVersion(raw string) int64 {
-	var v int64
-	_, _ = fmt.Sscanf(strings.Trim(raw, `"`), "%d", &v)
-	return v
+	httpenvelope.WriteSuccess(c, gin.H{"items": items, "page": gin.H{"next_cursor": nextCursor, "has_more": len(items) >= 50}})
 }
 
 // ---- S007 rules surface handlers ----
 
 func (h *handler) listRules(c *gin.Context) {
-	if _, ok := currentAdmin(c); !ok {
-		c.AbortWithStatus(http.StatusForbidden)
+	if _, ok := requireAdmin(c); !ok {
 		return
 	}
 	items, err := h.d.Service.ListRules(c.Request.Context())
 	if err != nil {
-		writeErr(c, err)
+		respondNotificationErr(c, err, false)
 		return
 	}
-	okData(c, gin.H{"items": items, "page": gin.H{"next_cursor": nil, "has_more": false}})
+	httpenvelope.WriteSuccess(c, gin.H{"items": items, "page": gin.H{"next_cursor": nil, "has_more": false}})
 }
 
 func (h *handler) createRule(c *gin.Context) {
-	actorID, ok := currentAdmin(c)
+	actorID, ok := requireAdmin(c)
 	if !ok {
-		c.AbortWithStatus(http.StatusForbidden)
 		return
 	}
 	var in RuleWrite
 	if err := c.ShouldBindJSON(&in); err != nil {
-		writeErr(c, ErrValidation)
+		respondNotificationErr(c, ErrValidation, false)
 		return
 	}
 	view, err := h.d.Service.CreateRule(c.Request.Context(), actorID, &in)
 	if err != nil {
-		writeErr(c, err)
+		respondNotificationErr(c, err, false)
 		return
 	}
-	okData(c, view)
+	httpenvelope.WriteSuccess(c, view)
 }
 
 func (h *handler) getRule(c *gin.Context) {
-	if _, ok := currentAdmin(c); !ok {
-		c.AbortWithStatus(http.StatusForbidden)
+	if _, ok := requireAdmin(c); !ok {
 		return
 	}
 	view, err := h.d.Service.GetRule(c.Request.Context(), c.Param("rule_id"))
 	if err != nil {
-		writeErr(c, err)
+		respondNotificationErr(c, err, false)
 		return
 	}
-	okData(c, view)
+	httpenvelope.WriteSuccess(c, view)
 }
 
 func (h *handler) replaceRule(c *gin.Context) {
-	if _, ok := currentAdmin(c); !ok {
-		c.AbortWithStatus(http.StatusForbidden)
+	if _, ok := requireAdmin(c); !ok {
 		return
 	}
 	var in RuleWrite
 	if err := c.ShouldBindJSON(&in); err != nil {
-		writeErr(c, ErrValidation)
+		respondNotificationErr(c, ErrValidation, false)
 		return
 	}
-	version := parseVersion(c.GetHeader("If-Match"))
+	version, ok := httpenvelope.ParseIfMatch(c)
+	if !ok {
+		return
+	}
 	view, err := h.d.Service.ReplaceRule(c.Request.Context(), c.Param("rule_id"), version, &in)
 	if err != nil {
-		writeErr(c, err)
+		respondNotificationErr(c, err, false)
 		return
 	}
-	okData(c, view)
+	httpenvelope.WriteSuccess(c, view)
 }
 
 func (h *handler) deleteRule(c *gin.Context) {
-	if _, ok := currentAdmin(c); !ok {
-		c.AbortWithStatus(http.StatusForbidden)
+	if _, ok := requireAdmin(c); !ok {
 		return
 	}
-	version := parseVersion(c.GetHeader("If-Match"))
+	version, ok := httpenvelope.ParseIfMatch(c)
+	if !ok {
+		return
+	}
 	if err := h.d.Service.DeleteRule(c.Request.Context(), c.Param("rule_id"), version); err != nil {
-		writeDeleteErr(c, err)
+		respondNotificationErr(c, err, true)
 		return
 	}
-	okData(c, nil)
+	httpenvelope.WriteSuccess(c, nil)
 }
 
 func (h *handler) previewRule(c *gin.Context) {
-	if _, ok := currentAdmin(c); !ok {
-		c.AbortWithStatus(http.StatusForbidden)
+	if _, ok := requireAdmin(c); !ok {
 		return
 	}
 	var in RulePreviewInput
 	if err := c.ShouldBindJSON(&in); err != nil {
-		writeErr(c, ErrValidation)
+		respondNotificationErr(c, ErrValidation, false)
 		return
 	}
 	view, err := h.d.Service.PreviewRule(c.Request.Context(), &in)
 	if err != nil {
-		writeErr(c, err)
+		respondNotificationErr(c, err, false)
 		return
 	}
-	okData(c, view)
+	httpenvelope.WriteSuccess(c, view)
 }

@@ -1,0 +1,104 @@
+{
+  "request_schema_version": 1,
+  "review_run_id": "00000000-0000-4000-8000-000000000001",
+  "engine_profile": "mysql/mysql",
+  "anonymized_statement_groups": [
+    {
+      "group_id": "10000000-0000-4000-8000-000000000001",
+      "representative_shape": "kind=ddl op=create where=true",
+      "representative_anonymized_sql": "CREATE TABLE shop.orders_bak AS SELECT * FROM shop.orders WHERE status = 'paid'",
+      "objects": [
+        {
+          "token": "shop",
+          "kind": "schema",
+          "relation": "reference",
+          "schema_token": "shop",
+          "statement_ordinal": 1,
+          "statement_ordinal_ranges": [
+            {
+              "start": 1,
+              "end": 1
+            }
+          ]
+        },
+        {
+          "token": "shop.orders_bak",
+          "kind": "table",
+          "relation": "define",
+          "schema_token": "shop",
+          "statement_ordinal": 1,
+          "statement_ordinal_ranges": [
+            {
+              "start": 1,
+              "end": 1
+            }
+          ]
+        },
+        {
+          "token": "shop.orders",
+          "kind": "table",
+          "relation": "read",
+          "schema_token": "shop",
+          "statement_ordinal": 1,
+          "statement_ordinal_ranges": [
+            {
+              "start": 1,
+              "end": 1
+            }
+          ]
+        },
+        {
+          "token": "status",
+          "kind": "column",
+          "relation": "filter",
+          "schema_token": "shop",
+          "parent_token": "shop.orders",
+          "statement_ordinal": 1,
+          "statement_ordinal_ranges": [
+            {
+              "start": 1,
+              "end": 1
+            }
+          ]
+        }
+      ],
+      "metadata_context_complete": true,
+      "statement_count": 1,
+      "statement_ordinal": 1,
+      "statement_ordinal_ranges": [
+        {
+          "start": 1,
+          "end": 1
+        }
+      ],
+      "statistics": {
+        "algorithm_version": "yearning-fingerprint-v1",
+        "ddl_column_comment_count": 0,
+        "ddl_column_count": 0,
+        "ddl_default_count": 0,
+        "ddl_has_float_double": false,
+        "ddl_has_foreign_key": false,
+        "ddl_has_partition": false,
+        "ddl_has_primary_key": false,
+        "ddl_has_special_type": false,
+        "ddl_index_count": 0,
+        "ddl_index_max_key_parts": 0,
+        "ddl_index_prefix_conformant": true,
+        "ddl_index_unnamed_count": 0,
+        "ddl_max_char_length": 0,
+        "ddl_max_varchar_length": 0,
+        "ddl_not_null_count": 0,
+        "ddl_table_comment_present": false,
+        "ddl_table_identifier_not_keyword": true,
+        "ddl_table_name_length": 10,
+        "ddl_table_prefix_conformant": true,
+        "in_value_count_max": 0,
+        "max_statement_bytes": 79,
+        "unbounded_mutation": false,
+        "values_row_count_max": 0
+      }
+    }
+  ],
+  "normalized_evidence": [],
+  "allowed_tool_descriptors": []
+}

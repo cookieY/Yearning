@@ -132,26 +132,25 @@
   },
   "mandatory_rule_scope": {
     "prompt_tool": "prompt_tool_enabled_and_rule_set_enabled_and_bound_to_current_change_review_flow_and_engine_matches",
-    "internal_experience": "entry_enabled_and_exact_stage_scope_matches",
+    "internal_experience": "retired_from_mandatory_blocking_advisory_only_datasource_or_table_scope_capped_at_medium",
     "actual_hit": "a_mandatory_rule_that_applies_without_a_reported_violation_has_no_finding_or_blocking_effect"
   },
   "knowledge_base": {
-    "concept": "internal_experience_entries_provide_environment_scoped_boundary_rules",
+    "concept": "internal_experience_entries_provide_non_blocking_datasource_and_table_advisory_guidance_for_assistant_and_review",
     "source": [
       "admin_or_auditor_manual_curation",
       "one_click_conversion_from_historical_findings"
     ],
     "automatic_learning": "out_of_scope_v1",
     "scopes": [
-      "global",
       "datasource",
       "table"
     ],
-    "scope_matching": "global_matches_every_stage_datasource_and_table_match_exact_stage_datasource_database_schema_table_tuple_no_cross_stage_union",
+    "scope_matching": "datasource_and_table_match_exact_stage_datasource_database_schema_table_tuple_no_cross_stage_union_legacy_global_retired_and_skipped",
     "injection": "deterministic_context_injection_per_stage_not_model_discretionary_tool_call",
     "reference_freeze": "each_stage_review_snapshot_freezes_its_actual_prompt_tool_and_knowledge_refs_via_review_tool_calls_stage_review_id",
-    "output": "structured_findings_same_schema_and_severity_semantics_as_prompt_tool",
-    "blocking": "every_actual_enabled_scope_matched_knowledge_finding_is_effective_critical_and_blocks_submission_regardless_of_model_severity_or_legacy_max_severity",
+    "output": "structured_advisory_findings_preserving_source_key_provenance_capped_at_entry_max_severity_ceiling_medium",
+    "blocking": "non_blocking_advisory_capped_at_entry_max_severity_ceiling_medium_never_blocks_submission",
     "governance": "prompt_tool_grade_admin_only_enable_privacy_scan_prompt_injection_check_eval_config_hash_run_snapshot_freeze_outdated_on_change_no_physical_delete_once_referenced",
     "visibility": "snapshot_shows_entry_name_purpose_and_hash_only_never_full_content"
   },

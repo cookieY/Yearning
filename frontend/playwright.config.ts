@@ -16,8 +16,8 @@ export default defineConfig({
   // parallel suite for the CPU: under contention the machine, not the motion,
   // decides whether p95 fits. The rest of the suite still runs in parallel.
   testIgnore: process.env.MOTION_FRAMES_ONLY
-    ? /csp-security\.spec\.ts/
-    : [/csp-security\.spec\.ts/, /motion-frames\.spec\.ts/],
+    ? [/csp-security\.spec\.ts/, /invariants\.spec\.ts/]
+    : [/csp-security\.spec\.ts/, /motion-frames\.spec\.ts/, /invariants\.spec\.ts/],
   timeout: 30_000,
   retries: process.env.CI ? 1 : 0,
   reporter: process.env.CI ? "list" : "html",

@@ -1,0 +1,90 @@
+{
+  "request_schema_version": 1,
+  "review_run_id": "00000000-0000-4000-8000-000000000001",
+  "engine_profile": "mysql/mysql",
+  "anonymized_statement_groups": [
+    {
+      "group_id": "10000000-0000-4000-8000-000000000001",
+      "representative_shape": "kind=dml op=update where=true",
+      "representative_anonymized_sql": "UPDATE shop.orders SET status = 'archived' WHERE id IN (1, 2, 3)",
+      "objects": [
+        {
+          "token": "shop",
+          "kind": "schema",
+          "relation": "reference",
+          "schema_token": "shop",
+          "statement_ordinal": 1,
+          "statement_ordinal_ranges": [
+            {
+              "start": 1,
+              "end": 3
+            }
+          ]
+        },
+        {
+          "token": "shop.orders",
+          "kind": "table",
+          "relation": "target",
+          "schema_token": "shop",
+          "statement_ordinal": 1,
+          "statement_ordinal_ranges": [
+            {
+              "start": 1,
+              "end": 3
+            }
+          ]
+        },
+        {
+          "token": "status",
+          "kind": "column",
+          "relation": "write",
+          "schema_token": "shop",
+          "parent_token": "shop.orders",
+          "statement_ordinal": 1,
+          "statement_ordinal_ranges": [
+            {
+              "start": 1,
+              "end": 3
+            }
+          ]
+        },
+        {
+          "token": "id",
+          "kind": "column",
+          "relation": "filter",
+          "schema_token": "shop",
+          "parent_token": "shop.orders",
+          "statement_ordinal": 1,
+          "statement_ordinal_ranges": [
+            {
+              "start": 1,
+              "end": 3
+            }
+          ]
+        }
+      ],
+      "metadata_context_complete": true,
+      "statement_count": 3,
+      "statement_ordinal": 1,
+      "statement_ordinal_ranges": [
+        {
+          "start": 1,
+          "end": 3
+        }
+      ],
+      "statistics": {
+        "algorithm_version": "yearning-fingerprint-v1",
+        "dml_has_limit": false,
+        "dml_has_order_by": false,
+        "dml_has_subselect": false,
+        "in_value_count_max": 25,
+        "max_statement_bytes": 146,
+        "unbounded_mutation": false,
+        "values_row_count_max": 0,
+        "where_literal_null": false
+      }
+    }
+  ],
+  "normalized_evidence": [],
+  "allowed_tool_descriptors": []
+}

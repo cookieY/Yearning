@@ -9,11 +9,14 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"html"
 	"strings"
 	"time"
 
 	"github.com/google/uuid"
 	"gorm.io/gorm"
+
+	"github.com/cookieY/YearningX/backend/internal/platform/pagination"
 )
 
 // SanitizerPolicyVersion is the current allowlist policy version (must increment when the policy is updated).
@@ -119,9 +122,7 @@ func inline(s string) string {
 }
 
 func escapeHTML(s string) string {
-	r := strings.NewReplacer("&", "&amp;", "<", "&lt;", ">", "&gt;",
-		`"`, "&#34;", "'", "&#39;", "`", "&#96;")
-	return r.Replace(s)
+	return strings.ReplaceAll(html.EscapeString(s), "`", "&#96;")
 }
 
 // CreateRevisionInput holds parameters for creating an announcement revision.
@@ -189,9 +190,7 @@ func (s *Service) CreateRevision(ctx context.Context, in CreateRevisionInput) (*
 
 // ListRevisions lists revision history (bounded in descending order).
 func (s *Service) ListRevisions(ctx context.Context, limit int) ([]AnnouncementRevisionView, error) {
-	if limit <= 0 || limit > 100 {
-		limit = 50
-	}
+	limit = pagination.ClampLimit(limit, 50, 100)
 	var rows []AnnouncementRevisionModel
 	if err := s.DB.WithContext(ctx).Order("revision_number desc").Limit(limit).Find(&rows).Error; err != nil {
 		return nil, err

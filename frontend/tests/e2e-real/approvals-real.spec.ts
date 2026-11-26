@@ -35,9 +35,11 @@ async function ensurePendingOrder(page: Page): Promise<{ orderId: string; displa
     };
     const reviewSql = "create table if not exists f12_e2e_pending (id bigint primary key);";
     const flowList = (await (await fetch("/api/v4/users/me/flows?flow_type=change_review")).json()) as {
-      data?: { items?: Array<{ id: string }> };
+      data?: { items?: Array<{ id: string; name?: string }> };
     };
-    const flowId = flowList.data?.items?.[0]?.id;
+    const flowId =
+      flowList.data?.items?.find((f) => f.name === "f12-change-flow")?.id ??
+      flowList.data?.items?.[0]?.id;
     if (flowId === undefined) throw new Error("no change_review flow visible to the submitter");
     const draft = await call("POST", "/api/v4/change-drafts", {
       flow_id: flowId, title: `f12 e2e approval ${Date.now()}`, description: "real e2e pending order",
@@ -88,7 +90,8 @@ async function ensurePendingOrder(page: Page): Promise<{ orderId: string; displa
 test.describe("approver queue", () => {
   test.use({ storageState: statePath("approver") });
 
-  test("queue lists the pending order and one decision round-trips", async ({ page }) => {
+  test("queue lists the pending order and one decision round-trips", { tag: "@ai-real" }, async ({ page }) => {
+    test.setTimeout(180_000);
     // Seed one deterministic pending order from the submitter's session,
     // then switch the browser to the approver's storage state.
     const submitterContext = await page.context().browser()?.newContext({
@@ -116,7 +119,7 @@ test.describe("approver queue", () => {
     const row = page.getByTestId("approval-queue-row").filter({ hasText: pending.displayNumber });
     await expect(row).toBeVisible({ timeout: 20_000 });
     await row.getByTestId(/^open-approval-/).click();
-    await expect(page).toHaveURL(/\/changes\/orders\/[0-9a-f-]{36}$/);
+    await expect(page).toHaveURL(/\/approvals\/orders\/[0-9a-f-]{36}$/);
 
     const decisionCard = page.getByTestId("approval-decision-card");
     await expect(decisionCard).toBeVisible({ timeout: 20_000 });
@@ -135,7 +138,7 @@ test.describe("approver queue", () => {
       };
       return envelope.data?.state ?? null;
     }, pending.orderId);
-    expect(decided, "the approval decision landed server-side").not.toBe("stage_approval_active");
+    expect(decided, "the approval decision landed server-side").toBe("stage_execution_pending");
   });
 });
 

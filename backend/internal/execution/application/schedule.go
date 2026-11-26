@@ -6,7 +6,6 @@ package application
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"time"
 
@@ -16,6 +15,8 @@ import (
 	orderdomain "github.com/cookieY/YearningX/backend/internal/changeorder/domain"
 	"github.com/cookieY/YearningX/backend/internal/execution/domain"
 	"github.com/cookieY/YearningX/backend/internal/execution/persistence"
+	"github.com/cookieY/YearningX/backend/internal/platform/ptr"
+	"github.com/cookieY/YearningX/backend/internal/platform/txutil"
 	"github.com/cookieY/YearningX/backend/internal/tasks"
 )
 
@@ -57,39 +58,21 @@ type CreateScheduleInput struct {
 // order -> scheduled; authorizes a single system execution at due time).
 func (s *Services) CreateSchedule(ctx context.Context, in CreateScheduleInput) (*ScheduleView, bool, error) {
 	route := "POST:/change-orders/{order_id}/execution-schedules"
-	reqHash := idemRequestHash(in.Actor.UserID, in.OrderID, in.ScheduledFor.UTC().Format(time.RFC3339Nano))
-	claimed, replay, cerr := s.idemClaim(ctx, in.Actor.UserID, route, in.OrderID, in.IdempotencyKey, reqHash)
-	if cerr != nil {
-		return nil, false, cerr
-	}
-	if !claimed {
-		var v ScheduleView
-		if err := json.Unmarshal(replay, &v); err != nil {
-			return nil, false, err
+	reqHash := txutil.RequestHash(in.Actor.UserID, in.OrderID, in.ScheduledFor.UTC().Format(time.RFC3339Nano))
+	return txutil.RunIdempotent(ctx, s.idemStore(), in.Actor.UserID, route, in.OrderID, in.IdempotencyKey, reqHash, func() (*ScheduleView, error) {
+		var out *ScheduleView
+		if txErr := s.serializable(ctx, func(tx *gorm.DB) error {
+			v, err := s.createScheduleOnce(ctx, tx, in)
+			if err != nil {
+				return err
+			}
+			out = v
+			return nil
+		}); txErr != nil {
+			return nil, txErr
 		}
-		return &v, true, nil
-	}
-	var out *ScheduleView
-	txErr := s.serializable(ctx, func(tx *gorm.DB) error {
-		v, err := s.createScheduleOnce(ctx, tx, in)
-		if err != nil {
-			return err
-		}
-		out = v
-		return nil
+		return out, nil
 	})
-	if txErr != nil {
-		_ = s.idemRelease(ctx, in.Actor.UserID, route, in.OrderID, in.IdempotencyKey)
-		return nil, false, txErr
-	}
-	raw, merr := json.Marshal(out)
-	if merr != nil {
-		return nil, false, merr
-	}
-	if cerr := s.idemComplete(ctx, in.Actor.UserID, route, in.OrderID, in.IdempotencyKey, raw); cerr != nil {
-		return nil, false, cerr
-	}
-	return out, false, nil
 }
 
 func (s *Services) createScheduleOnce(ctx context.Context, tx *gorm.DB, in CreateScheduleInput) (*ScheduleView, error) {
@@ -154,14 +137,14 @@ func (s *Services) createScheduleOnce(ctx context.Context, tx *gorm.DB, in Creat
 		Version: 1, CreatedAt: now, UpdatedAt: now,
 	}
 	if err := tx.WithContext(ctx).Create(row).Error; err != nil {
-		if isUniqueViolation(err) {
+		if txutil.IsUniqueViolation(err) {
 			return nil, domain.ErrAlreadyStarted()
 		}
 		return nil, err
 	}
-	if eerr := s.emitOrderEvent(ctx, tx, "execution.scheduled", order.ID, auditActor(in.Actor), StateChangedPayload{
-		AggregateID: order.ID, From: strPtr(order.State), To: string(next),
-		ReasonCode: "executor_scheduled", StageID: strPtr(stage.StageID),
+	if eerr := s.emitOrderEvent(ctx, tx, "execution.scheduled", order.ID, auditlog.UserActor(in.Actor.UserID, in.Actor.Username), StateChangedPayload{
+		AggregateID: order.ID, From: ptr.To(order.State), To: string(next),
+		ReasonCode: "executor_scheduled", StageID: ptr.To(stage.StageID),
 		AggregateVersion: order.Version + 1,
 	}); eerr != nil {
 		return nil, eerr
@@ -193,39 +176,21 @@ type CancelScheduleInput struct {
 // drift (the scheduler reads from the table on every tick with no in-memory state).
 func (s *Services) CancelSchedule(ctx context.Context, in CancelScheduleInput) (*ScheduleView, bool, error) {
 	route := "POST:/change-orders/{order_id}/execution-schedules/cancellation"
-	reqHash := idemRequestHash(in.Actor.UserID, in.OrderID, "cancel")
-	claimed, replay, cerr := s.idemClaim(ctx, in.Actor.UserID, route, in.OrderID, in.IdempotencyKey, reqHash)
-	if cerr != nil {
-		return nil, false, cerr
-	}
-	if !claimed {
-		var v ScheduleView
-		if err := json.Unmarshal(replay, &v); err != nil {
-			return nil, false, err
+	reqHash := txutil.RequestHash(in.Actor.UserID, in.OrderID, "cancel")
+	return txutil.RunIdempotent(ctx, s.idemStore(), in.Actor.UserID, route, in.OrderID, in.IdempotencyKey, reqHash, func() (*ScheduleView, error) {
+		var out *ScheduleView
+		if txErr := s.serializable(ctx, func(tx *gorm.DB) error {
+			v, err := s.cancelScheduleOnce(ctx, tx, in)
+			if err != nil {
+				return err
+			}
+			out = v
+			return nil
+		}); txErr != nil {
+			return nil, txErr
 		}
-		return &v, true, nil
-	}
-	var out *ScheduleView
-	txErr := s.serializable(ctx, func(tx *gorm.DB) error {
-		v, err := s.cancelScheduleOnce(ctx, tx, in)
-		if err != nil {
-			return err
-		}
-		out = v
-		return nil
+		return out, nil
 	})
-	if txErr != nil {
-		_ = s.idemRelease(ctx, in.Actor.UserID, route, in.OrderID, in.IdempotencyKey)
-		return nil, false, txErr
-	}
-	raw, merr := json.Marshal(out)
-	if merr != nil {
-		return nil, false, merr
-	}
-	if cerr := s.idemComplete(ctx, in.Actor.UserID, route, in.OrderID, in.IdempotencyKey, raw); cerr != nil {
-		return nil, false, cerr
-	}
-	return out, false, nil
 }
 
 func (s *Services) cancelScheduleOnce(ctx context.Context, tx *gorm.DB, in CancelScheduleInput) (*ScheduleView, error) {
@@ -250,7 +215,7 @@ func (s *Services) cancelScheduleOnce(ctx context.Context, tx *gorm.DB, in Cance
 	}
 	// Schedule row lock + CAS: row missing or no longer scheduled = due-time claim already won or was already handled.
 	var sched persistence.ExecutionScheduleModel
-	if err := tx.WithContext(ctx).Clauses(forUpdate()).
+	if err := tx.WithContext(ctx).Clauses(txutil.ForUpdate()).
 		Where("stage_id = ? and state = 'scheduled'", stage.StageID).
 		First(&sched).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -275,9 +240,9 @@ func (s *Services) cancelScheduleOnce(ctx context.Context, tx *gorm.DB, in Cance
 	if res.RowsAffected != 1 {
 		return nil, domain.ErrConcurrent()
 	}
-	if eerr := s.emitOrderEvent(ctx, tx, "execution.schedule_cancelled", order.ID, auditActor(in.Actor), StateChangedPayload{
-		AggregateID: order.ID, From: strPtr(order.State), To: string(next),
-		ReasonCode: "executor_cancelled_schedule", StageID: strPtr(stage.StageID),
+	if eerr := s.emitOrderEvent(ctx, tx, "execution.schedule_cancelled", order.ID, auditlog.UserActor(in.Actor.UserID, in.Actor.Username), StateChangedPayload{
+		AggregateID: order.ID, From: ptr.To(order.State), To: string(next),
+		ReasonCode: "executor_cancelled_schedule", StageID: ptr.To(stage.StageID),
 		AggregateVersion: order.Version + 1,
 	}); eerr != nil {
 		return nil, eerr
@@ -406,7 +371,7 @@ func (s *Services) claimDueSchedule(ctx context.Context, row dueScheduleRow) (du
 		}
 		// Schedule row lock + CAS (executes at most once across multiple instances).
 		var sched persistence.ExecutionScheduleModel
-		if err := tx.WithContext(ctx).Clauses(forUpdate()).
+		if err := tx.WithContext(ctx).Clauses(txutil.ForUpdate()).
 			Where("id = ?", row.ID).First(&sched).Error; err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
 				return domain.ErrNotFound()
@@ -503,7 +468,7 @@ func (s *Services) claimDueSchedule(ctx context.Context, row dueScheduleRow) (du
 		return dueBlocked, nil
 	}
 	// Transient DB error: keep scheduled and retry on the next tick.
-	if isSerializationFailure(txErr) {
+	if txutil.IsSerializationFailure(txErr) {
 		return dueSkipped, nil
 	}
 	return dueSkipped, txErr
@@ -522,7 +487,7 @@ func (s *Services) failDueScheduleAfterPostgresSearchPathPreflightTx(
 		return err
 	}
 	var sched persistence.ExecutionScheduleModel
-	if err := tx.WithContext(ctx).Clauses(forUpdate()).
+	if err := tx.WithContext(ctx).Clauses(txutil.ForUpdate()).
 		Where("id = ?", row.ID).First(&sched).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil
@@ -586,12 +551,11 @@ func (s *Services) failDueScheduleAfterPostgresSearchPathPreflightTx(
 		return domain.ErrConcurrent()
 	}
 	return s.emitOrderEvent(
-		ctx, tx, EventExecFailed, order.ID, auditlog.Actor{
-			UserID: row.ScheduledBy, Username: row.ScheduledByName,
-		}, StateChangedPayload{
-			AggregateID: order.ID, From: strPtr(order.State),
+		ctx, tx, EventExecFailed, order.ID,
+		auditlog.UserActor(row.ScheduledBy, row.ScheduledByName), StateChangedPayload{
+			AggregateID: order.ID, From: ptr.To(order.State),
 			To: string(next), ReasonCode: reason,
-			StageID: strPtr(stage.StageID), AggregateVersion: nextVersion,
+			StageID: ptr.To(stage.StageID), AggregateVersion: nextVersion,
 		},
 	)
 }
@@ -629,10 +593,10 @@ func (s *Services) blockSchedule(ctx context.Context, tx *gorm.DB, order *orderR
 	}
 	var stageRef *string
 	if stageID != "" {
-		stageRef = strPtr(stageID)
+		stageRef = ptr.To(stageID)
 	}
-	return s.emitOrderEvent(ctx, tx, EventBlockedDSUnavailable, order.ID, auditActor(actor), StateChangedPayload{
-		AggregateID: order.ID, From: strPtr(string(orderdomain.StateScheduled)), To: string(next),
+	return s.emitOrderEvent(ctx, tx, EventBlockedDSUnavailable, order.ID, auditlog.UserActor(actor.UserID, actor.Username), StateChangedPayload{
+		AggregateID: order.ID, From: ptr.To(string(orderdomain.StateScheduled)), To: string(next),
 		ReasonCode: "datasource_unavailable", StageID: stageRef, AggregateVersion: order.Version + 1,
 	})
 }
@@ -648,7 +612,7 @@ func (s *Services) blockDueSchedule(ctx context.Context, row dueScheduleRow) err
 			return nil
 		}
 		var sched persistence.ExecutionScheduleModel
-		if err := tx.WithContext(ctx).Clauses(forUpdate()).
+		if err := tx.WithContext(ctx).Clauses(txutil.ForUpdate()).
 			Where("id = ?", row.ID).First(&sched).Error; err != nil {
 			return nil
 		}
@@ -683,7 +647,7 @@ func (s *Services) markScheduleMissed(ctx context.Context, row dueScheduleRow) (
 			return err
 		}
 		var sched persistence.ExecutionScheduleModel
-		if err := tx.WithContext(ctx).Clauses(forUpdate()).
+		if err := tx.WithContext(ctx).Clauses(txutil.ForUpdate()).
 			Where("id = ?", row.ID).First(&sched).Error; err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
 				return domain.ErrNotFound()
@@ -738,12 +702,12 @@ func (s *Services) markScheduleMissed(ctx context.Context, row dueScheduleRow) (
 				return err
 			}
 			if st.StageID != "" {
-				stageRef = strPtr(st.StageID)
+				stageRef = ptr.To(st.StageID)
 			}
 		}
 		if eerr := s.emitOrderEvent(ctx, tx, EventScheduleMissed, order.ID,
-			auditActor(Actor{UserID: row.ScheduledBy, Username: row.ScheduledByName}), StateChangedPayload{
-				AggregateID: order.ID, From: strPtr(string(orderdomain.StateScheduled)), To: string(next),
+			auditlog.UserActor(row.ScheduledBy, row.ScheduledByName), StateChangedPayload{
+				AggregateID: order.ID, From: ptr.To(string(orderdomain.StateScheduled)), To: string(next),
 				ReasonCode: "schedule_missed", StageID: stageRef, AggregateVersion: order.Version + 1,
 			}); eerr != nil {
 			return eerr
@@ -756,7 +720,7 @@ func (s *Services) markScheduleMissed(ctx context.Context, row dueScheduleRow) (
 		if errors.As(txErr, &de) && (de.Code == domain.CodeConcurrent || de.Code == domain.CodeNotFound) {
 			return false, nil
 		}
-		if isSerializationFailure(txErr) {
+		if txutil.IsSerializationFailure(txErr) {
 			return false, nil
 		}
 		return false, txErr

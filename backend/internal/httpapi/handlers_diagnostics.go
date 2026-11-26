@@ -75,17 +75,6 @@ func diagnosticsActor(c *gin.Context) diagdomain.Actor {
 	}
 }
 
-func writeDiagnosticsErr(c *gin.Context, err error) bool {
-	if err == nil {
-		return true
-	}
-	var de *diagdomain.Error
-	if !errors.As(err, &de) {
-		return false
-	}
-	return writeDomainCodedError(c, de.Code, de.Name, de.Message, de.Meta)
-}
-
 func parseTimeQuery(c *gin.Context, name string) (time.Time, bool) {
 	raw := strings.TrimSpace(c.Query(name))
 	if raw == "" {
@@ -107,7 +96,7 @@ func (d *DiagnosticsDeps) HandleGetDatasourceDiagnosticsConfig(c *gin.Context) {
 	}
 	view, err := d.Diagnostics.GetConfig(c.Request.Context(), datasourceID)
 	if err != nil {
-		if !writeDiagnosticsErr(c, err) {
+		if !writeCodedError(c, err) {
 			WriteProblem(c, http.StatusInternalServerError, "internal error")
 		}
 		return
@@ -147,7 +136,7 @@ func (d *DiagnosticsDeps) HandleUpdateDatasourceDiagnosticsConfig(c *gin.Context
 		ResumeFromPause: resume,
 	})
 	if err != nil {
-		if !writeDiagnosticsErr(c, err) {
+		if !writeCodedError(c, err) {
 			WriteProblem(c, http.StatusInternalServerError, "internal error")
 		}
 		return
@@ -160,7 +149,7 @@ func (d *DiagnosticsDeps) HandleUpdateDatasourceDiagnosticsConfig(c *gin.Context
 func (d *DiagnosticsDeps) HandleListDiagnosticDatasources(c *gin.Context) {
 	items, err := d.Diagnostics.ListDatasources(c.Request.Context())
 	if err != nil {
-		if !writeDiagnosticsErr(c, err) {
+		if !writeCodedError(c, err) {
 			WriteProblem(c, http.StatusInternalServerError, "internal error")
 		}
 		return
@@ -205,7 +194,7 @@ func (d *DiagnosticsDeps) HandleGetDiagnosticsOverview(c *gin.Context) {
 		Limit:       intQuery(c, "limit", 50),
 	})
 	if err != nil {
-		if !writeDiagnosticsErr(c, err) {
+		if !writeCodedError(c, err) {
 			WriteProblem(c, http.StatusInternalServerError, "internal error")
 		}
 		return
@@ -222,7 +211,7 @@ func (d *DiagnosticsDeps) HandleTriggerManualDiagnosticsSnapshot(c *gin.Context)
 	}
 	summary, err := d.Diagnostics.TriggerManualSnapshot(c.Request.Context(), diagnosticsActor(c), datasourceID)
 	if err != nil {
-		if !writeDiagnosticsErr(c, err) {
+		if !writeCodedError(c, err) {
 			WriteProblem(c, http.StatusInternalServerError, "internal error")
 		}
 		return
@@ -251,7 +240,7 @@ func (d *DiagnosticsDeps) HandleGetDiagnosticStatementDetail(c *gin.Context) {
 	}
 	view, err := d.Diagnostics.GetStatementDetail(c.Request.Context(), datasourceID, statementID, from, to)
 	if err != nil {
-		if !writeDiagnosticsErr(c, err) {
+		if !writeCodedError(c, err) {
 			WriteProblem(c, http.StatusInternalServerError, "internal error")
 		}
 		return
@@ -285,7 +274,7 @@ func (d *DiagnosticsDeps) HandleConfirmDiagnosticOrderLink(c *gin.Context) {
 	}
 	view, err := d.Diagnostics.ConfirmOrderLink(c.Request.Context(), diagnosticsActor(c), datasourceID, statementID, req.ChangeOrderID, req.RelationKind, req.TargetStatementID)
 	if err != nil {
-		if !writeDiagnosticsErr(c, err) {
+		if !writeCodedError(c, err) {
 			WriteProblem(c, http.StatusInternalServerError, "internal error")
 		}
 		return
@@ -335,7 +324,7 @@ func (d *DiagnosticsDeps) HandleDiagnoseStatementWithAI(c *gin.Context) {
 	diagCtx := reviewapp.WithOutputLocale(c.Request.Context(), resolveRequestOutputLocale(c, req.OutputLocale))
 	view, err := d.Diagnostics.DiagnoseStatementWithAI(diagCtx, diagnosticsActor(c), datasourceID, statementID, from, to)
 	if err != nil {
-		if !writeDiagnosticsErr(c, err) {
+		if !writeCodedError(c, err) {
 			WriteProblem(c, http.StatusInternalServerError, "internal error")
 		}
 		return
@@ -374,7 +363,7 @@ func (d *DiagnosticsDeps) HandlePrecheckDiagnosticOptimizationDraft(c *gin.Conte
 		strings.TrimSpace(c.GetHeader("Idempotency-Key")),
 	)
 	if err != nil {
-		if !writeDiagnosticsErr(c, err) {
+		if !writeCodedError(c, err) {
 			WriteProblem(c, http.StatusInternalServerError, "internal error")
 		}
 		return
@@ -419,7 +408,7 @@ func (d *DiagnosticsDeps) HandleSubmitDiagnosticOptimizationOrder(c *gin.Context
 		strings.TrimSpace(c.GetHeader("Idempotency-Key")),
 	)
 	if err != nil {
-		if !writeDiagnosticsErr(c, err) {
+		if !writeCodedError(c, err) {
 			WriteProblem(c, http.StatusInternalServerError, "internal error")
 		}
 		return

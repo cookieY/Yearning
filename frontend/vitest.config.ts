@@ -46,7 +46,7 @@ export default defineConfig({
         "src/app/layouts/**",
         "src/routes/**",
         "src/app/providers/app-providers.tsx",
-        "src/shared/mock/browser.ts",
+        "src/shared/mock/**",
         // Browser-only Monaco integration shell: the real editor cannot run
         // under jsdom (layout APIs). The Playwright precheck suite exercises
         // it for real (mount, typing, explicit theme surfaces); lifecycle

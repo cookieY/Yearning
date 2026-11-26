@@ -1,7 +1,7 @@
 ---
 id: help-sql-diagnostics
 title: SQL Performance Diagnostics, Top SQL & 4-Section AI Diagnosis (Admin)
-source_ref: docs/iterations/v4.0.0/prd/20261107-sql-performance-diagnostics-prd.md
+source_ref: docs/iterations/v4.0.0/features/sql-performance-diagnostics-prd.md
 route_path: /admin/diagnostics
 admin_only: true
 keywords: diagnostics, slow, slow sql, performance, top sql, digest, performance_schema, pg_stat_statements, snapshot, ai report, before after, index_ddl, latency, chart, brush, index, 6101, 6102, 6103
@@ -16,7 +16,7 @@ summary: Administrators (builtin_admin) can directly access SQL Performance Diag
 ## Detailed Guide
 - **Enabling SQL Diagnostics & Database Prerequisites (`/admin/datasources`)**:
   - Enable diagnostics per datasource in `/admin/datasources` (configure sampling interval, Top-N statement cap, and snapshot retention days).
-  - **MySQL Prerequisite**: `performance_schema = ON` with `events_statements_summary_by_digest` enabled.
+  - **MySQL Prerequisite**: `performance_schema = ON` with `events_statements_summary_by_digest` enabled. Because `performance_schema` is a static MySQL parameter, managed cloud consoles (e.g., Tencent Cloud CDB) require enabling it in parameter settings and restarting the instance. On restricted cloud/SaaS instances where `performance_schema` cannot be enabled, disable automatic SQL Performance Diagnostics for that datasource and use the AI Assistant for manual SQL tuning—AI Precheck, Change Orders, and SQL Console do not depend on `performance_schema`.
   - **PostgreSQL Prerequisite**: `pg_stat_statements` extension installed and preloaded in `shared_preload_libraries` (`6102` if missing).
 - **6 Overview Trend Charts & Top SQL Ranking (`/admin/diagnostics`)**:
   - Select an enabled datasource and time window (`1h`, `6h`, `24h`, `7d`, or custom range) to view **6 overview charts**: Total Execution Time, Execution Calls, Average Latency, Rows Examined (MySQL) / Shared Blocks Read (PG), Lock Wait Time, and Errors/Warnings.

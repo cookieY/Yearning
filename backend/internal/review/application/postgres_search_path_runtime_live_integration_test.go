@@ -7,12 +7,11 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"os"
-	"strconv"
 	"testing"
 	"time"
 
 	"github.com/cookieY/YearningX/backend/internal/database"
+	"github.com/cookieY/YearningX/backend/internal/platform/testenv"
 )
 
 // TestPostgresSearchPathRuntimeLiveProductionPaths exercises the production
@@ -20,24 +19,16 @@ import (
 // The valid frozen paths beyond the initial probe are supplied as data because
 // this test must not mutate role or database defaults shared with other tests.
 func TestPostgresSearchPathRuntimeLiveProductionPaths(t *testing.T) {
-	password := os.Getenv("YEARNING_TEST_ADAPTER_PG_PASSWORD")
-	if password == "" {
-		t.Skip("target PostgreSQL not configured: set YEARNING_TEST_ADAPTER_PG_PASSWORD")
-	}
-	port, err := strconv.Atoi(itestEnv("YEARNING_TEST_ADAPTER_PG_PORT", "54333"))
-	if err != nil {
-		t.Fatalf("YEARNING_TEST_ADAPTER_PG_PORT is not an integer: %v", err)
-	}
-	host := itestEnv("YEARNING_TEST_ADAPTER_PG_HOST", "127.0.0.1")
-	user := itestEnv("YEARNING_TEST_ADAPTER_PG_USER", "yearning")
-	databaseName := itestEnv("YEARNING_TEST_ADAPTER_PG_DB", "yearning")
+	cfg := testenv.RequireTargetPG(t, testenv.WithDefaultHost("127.0.0.1"), testenv.WithDefaultPort(54333))
+	port := cfg.Port
+	host := cfg.Host
+	user := cfg.User
+	password := cfg.Password
+	databaseName := cfg.DBName
 	t.Setenv("YEARNING_ALLOW_LOOPBACK_TARGETS", "1")
 
 	ctx := context.Background()
-	adminDB, err := sql.Open("pgx", fmt.Sprintf(
-		"host=%s port=%d user=%s password=%s dbname=%s sslmode=disable",
-		host, port, user, password, databaseName,
-	))
+	adminDB, err := sql.Open("pgx", cfg.LibpqDSN())
 	if err != nil {
 		t.Fatalf("open target PostgreSQL: %v", err)
 	}

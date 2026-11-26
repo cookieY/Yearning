@@ -95,6 +95,9 @@ func TestRateVersionCRUDAndOverlap(t *testing.T) {
 	if err != nil || v1.Version != 1 {
 		t.Fatalf("v1 create: %v version=%d", err, v1.Version)
 	}
+	if len(v1.Windows) != 1 || v1.Windows[0].ID == "" {
+		t.Fatalf("v1 window must include persisted UUID: %+v", v1.Windows)
+	}
 	// New version start is later than open-ended version start -> automatically closes v1 at 12-01 (the open
 	// end is merely a placeholder, leaving historical application periods unchanged and never recomputing history per Price-01); cross-midnight [1320,360) -> two rows.
 	v2, err := f.svc.CreateRateVersion(ctx, f.userID, CreateRateVersionInput{
@@ -138,10 +141,16 @@ func TestRateVersionCRUDAndOverlap(t *testing.T) {
 	if err := f.svc.CheckProviderEnableRateCurrency(ctx, f.db, pid); err != nil {
 		t.Fatalf("matching currency must enable: %v", err)
 	}
-	// List read-back: two rows ordered newest -> oldest.
+	// List read-back: two rows ordered newest -> oldest, window IDs match CreateRateVersion return.
 	list, err := f.svc.ListRateVersions(ctx, pid)
 	if err != nil || len(list) != 2 || list[0].Version != 2 || list[1].Version != 1 {
 		t.Fatalf("list: %v len=%d", err, len(list))
+	}
+	if len(v2.Windows) != 2 || v2.Windows[0].ID == "" || v2.Windows[1].ID == "" ||
+		v2.Windows[0].ID != list[0].Windows[0].ID || v2.Windows[1].ID != list[0].Windows[1].ID ||
+		v1.Windows[0].ID != list[1].Windows[0].ID {
+		t.Fatalf("returned window IDs must match persisted DB IDs: create_v1=%+v list_v1=%+v create_v2=%+v list_v2=%+v",
+			v1.Windows, list[1].Windows, v2.Windows, list[0].Windows)
 	}
 }
 

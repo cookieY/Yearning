@@ -286,3 +286,20 @@ func TestB11HandlersSanitizeInternalDBErrors(t *testing.T) {
 		}
 	}
 }
+
+func TestHandleListQueryAccessRequestsInvalidScope(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	deps := &B11Deps{}
+	r := gin.New()
+	r.GET("/query-access-requests", deps.HandleListQueryAccessRequests)
+
+	req := httptest.NewRequest(http.MethodGet, "/query-access-requests?scope=bogus", nil)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200 (body=%s)", w.Code, w.Body.String())
+	}
+	if !strings.Contains(w.Body.String(), `"err_code":1001`) {
+		t.Fatalf("want err_code=1001 for invalid scope, got %s", w.Body.String())
+	}
+}

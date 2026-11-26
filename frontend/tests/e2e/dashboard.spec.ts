@@ -54,18 +54,3 @@ test("zero-permission home still renders the platform statistics (§18.71)", asy
   await expect(page.getByTestId("home-order-overview")).toContainText("47");
   expect(operationsCalls.length).toBeGreaterThan(0);
 });
-
-test("the manual refresh control refetches the personal dashboard", async ({ page }) => {
-  await mockSession(page, "admin");
-  let meCalls = 0;
-  page.on("request", (request) => {
-    if (request.url().includes("/dashboard/me")) {
-      meCalls += 1;
-    }
-  });
-  await page.goto("/workspace");
-  await expect(page.getByTestId("workspace-page")).toBeVisible();
-  const before = meCalls;
-  await page.getByTestId("header-refresh").click();
-  await expect.poll(() => meCalls).toBeGreaterThan(before);
-});

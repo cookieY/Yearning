@@ -91,7 +91,7 @@ func (s *Services) MaterializeEphemeralRunTxWithSQL(ctx context.Context, tx *gor
 				stmtID = newID()
 			}
 			rowModel, berr := buildSQLStatementModel(
-				er.ID, stmtID, ordinal, res, op, statementClassOf(op),
+				er.ID, stmtID, ordinal, res, op, fingerprint.StatementClassOf(op),
 				objectsAtStatementOrdinal(res.Objects, ordinal),
 			)
 			if berr != nil {

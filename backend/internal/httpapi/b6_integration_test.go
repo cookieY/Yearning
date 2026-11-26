@@ -6,24 +6,21 @@ package httpapi
 
 import (
 	"context"
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"os"
 	"strings"
 	"sync"
 	"testing"
 	"time"
 
 	"github.com/google/uuid"
-	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
-	gormlogger "gorm.io/gorm/logger"
 
 	"github.com/cookieY/YearningX/backend/internal/authorization/auditlog"
 	"github.com/cookieY/YearningX/backend/internal/crypto"
 	"github.com/cookieY/YearningX/backend/internal/identity"
+	"github.com/cookieY/YearningX/backend/internal/platform/testkit"
 	"github.com/cookieY/YearningX/backend/internal/review/application"
 	"github.com/cookieY/YearningX/backend/internal/review/provider"
 	"github.com/cookieY/YearningX/backend/internal/review/tool"
@@ -78,44 +75,9 @@ func (fx *b6Fixture) currentAgentFacts() func(context.Context, string, applicati
 	return fx.agentFacts
 }
 
-func b6IntegrationDSN(t *testing.T) string {
-	t.Helper()
-	password := os.Getenv("YEARNING_TEST_DATABASE_PASSWORD")
-	if password == "" {
-		t.Skip("integration PostgreSQL not configured: set YEARNING_TEST_DATABASE_PASSWORD")
-	}
-	return fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=%s",
-		itestEnvB6("YEARNING_TEST_DATABASE_HOST", "localhost"),
-		itestEnvB6("YEARNING_TEST_DATABASE_PORT", "54330"),
-		itestEnvB6("YEARNING_TEST_DATABASE_USER", "yearning"),
-		password,
-		itestEnvB6("YEARNING_TEST_DATABASE_DBNAME", "yearning_v4"),
-		itestEnvB6("YEARNING_TEST_DATABASE_SSLMODE", "disable"))
-}
-
-func itestEnvB6(key, def string) string {
-	if v := os.Getenv(key); v != "" {
-		return v
-	}
-	return def
-}
-
-func b6Make32(seed byte) []byte {
-	out := make([]byte, 32)
-	for i := range out {
-		out[i] = seed
-	}
-	return out
-}
-
 func newB6Fixture(t *testing.T) *b6Fixture {
 	t.Helper()
-	acquireItestLock(t, "shared")
-	db, err := gorm.Open(postgres.Open(b6IntegrationDSN(t)), &gorm.Config{Logger: gormlogger.Discard})
-	if err != nil {
-		t.Fatalf("postgres connect: %v", err)
-	}
-	registerIntegrationDBCleanup(t, db)
+	db := testkit.OpenPG(t)
 	truncateAll(t, db)
 	// B3 table list excludes review domain tables; B6 must truncate them as well.
 	for _, tbl := range []string{
@@ -127,28 +89,7 @@ func newB6Fixture(t *testing.T) *b6Fixture {
 			t.Fatalf("truncate %s: %v", tbl, err)
 		}
 	}
-
-	dir := t.TempDir()
-	keyringDoc := fmt.Sprintf(`{"contract_version":1,"deployment_id":"b6-http-itest","keys":[
-		{"key_id":"pay-1","purpose":"payload","status":"encrypt_decrypt","created_at":"2026-08-25T00:00:00Z","key_base64":"%s"},
-		{"key_id":"state-1","purpose":"oidc_state","status":"encrypt_decrypt","created_at":"2026-08-25T00:00:00Z","key_base64":"%s"},
-		{"key_id":"ident-1","purpose":"identifier_token","status":"encrypt_decrypt","created_at":"2026-08-25T00:00:00Z","key_base64":"%s"},
-		{"key_id":"fp-1","purpose":"sql_fingerprint","status":"encrypt_decrypt","created_at":"2026-08-25T00:00:00Z","key_base64":"%s"},
-		{"key_id":"aff-1","purpose":"cursor_affinity","status":"encrypt_decrypt","created_at":"2026-08-25T00:00:00Z","key_base64":"%s"}]}`,
-		base64.StdEncoding.EncodeToString(b6Make32(1)),
-		base64.StdEncoding.EncodeToString(b6Make32(2)),
-		base64.StdEncoding.EncodeToString(b6Make32(3)),
-		base64.StdEncoding.EncodeToString(b6Make32(4)),
-		base64.StdEncoding.EncodeToString(b6Make32(5)))
-	path := dir + "/keyring.json"
-	if err := os.WriteFile(path, []byte(keyringDoc), 0o400); err != nil {
-		t.Fatal(err)
-	}
-	ring, err := crypto.LoadKeyring(path)
-	if err != nil {
-		t.Fatal(err)
-	}
-	crypter, _ := crypto.NewCrypter(ring)
+	crypter := testkit.NewCrypter(t)
 
 	logger, _ := observedLogger()
 	recorder, _ := auditlog.NewRecorder(db)

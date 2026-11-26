@@ -13,20 +13,14 @@ package application
 
 import (
 	"context"
-	"encoding/base64"
 	"fmt"
-	"os"
-	"path/filepath"
-	"syscall"
 	"testing"
 
 	"github.com/google/uuid"
-	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
-	gormlogger "gorm.io/gorm/logger"
 
 	"github.com/cookieY/YearningX/backend/internal/authorization/auditlog"
-	"github.com/cookieY/YearningX/backend/internal/crypto"
+	"github.com/cookieY/YearningX/backend/internal/platform/testkit"
 )
 
 type copyFx struct {
@@ -37,43 +31,13 @@ type copyFx struct {
 
 func newCopyFx(t *testing.T) *copyFx {
 	t.Helper()
-	acquireCopyLock(t)
-	db, err := gorm.Open(postgres.Open(copyDSN(t)), &gorm.Config{Logger: gormlogger.Discard})
-	if err != nil {
-		t.Fatalf("postgres connect: %v", err)
-	}
-	if sqlDB, serr := db.DB(); serr == nil {
-		t.Cleanup(func() { _ = sqlDB.Close() })
-	}
+	db := testkit.OpenPG(t)
 	for _, tbl := range []string{"change_orders", "audit_events"} {
 		if err := db.Exec("truncate table " + tbl).Error; err != nil {
 			t.Fatalf("truncate %s: %v", tbl, err)
 		}
 	}
-	dir := t.TempDir()
-	mk := func(seed byte) string {
-		out := make([]byte, 32)
-		for i := range out {
-			out[i] = seed
-		}
-		return base64.StdEncoding.EncodeToString(out)
-	}
-	doc := fmt.Sprintf(`{"contract_version":1,"deployment_id":"copy-itest","keys":[
-	{"key_id":"pay-1","purpose":"payload","status":"encrypt_decrypt","created_at":"2026-08-25T00:00:00Z","key_base64":"%s"},
-	{"key_id":"fp-1","purpose":"sql_fingerprint","status":"encrypt_decrypt","created_at":"2026-08-25T00:00:00Z","key_base64":"%s"}]}`,
-		mk(1), mk(4))
-	path := filepath.Join(dir, "keyring.json")
-	if err := os.WriteFile(path, []byte(doc), 0o400); err != nil {
-		t.Fatal(err)
-	}
-	ring, err := crypto.LoadKeyring(path)
-	if err != nil {
-		t.Fatal(err)
-	}
-	crypter, err := crypto.NewCrypter(ring)
-	if err != nil {
-		t.Fatal(err)
-	}
+	crypter := testkit.NewCrypter(t)
 	recorder, err := auditlog.NewRecorder(db)
 	if err != nil {
 		t.Fatal(err)
@@ -83,44 +47,6 @@ func newCopyFx(t *testing.T) *copyFx {
 		t.Fatal(err)
 	}
 	return &copyFx{db: db, svc: svc}
-}
-
-func acquireCopyLock(t *testing.T) {
-	t.Helper()
-	path := os.TempDir() + "/yearningx-itest-shared.lock"
-	f, err := os.OpenFile(path, os.O_CREATE|os.O_RDWR, 0o600)
-	if err != nil {
-		return
-	}
-	if err := syscall.Flock(int(f.Fd()), syscall.LOCK_EX); err != nil {
-		_ = f.Close()
-		return
-	}
-	t.Cleanup(func() {
-		_ = syscall.Flock(int(f.Fd()), syscall.LOCK_UN)
-		_ = f.Close()
-	})
-}
-
-func copyDSN(t *testing.T) string {
-	t.Helper()
-	password := os.Getenv("YEARNING_TEST_DATABASE_PASSWORD")
-	if password == "" {
-		t.Skip("integration PostgreSQL not configured: set YEARNING_TEST_DATABASE_PASSWORD")
-	}
-	env := func(key, def string) string {
-		if v := os.Getenv(key); v != "" {
-			return v
-		}
-		return def
-	}
-	return fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=%s",
-		env("YEARNING_TEST_DATABASE_HOST", "localhost"),
-		env("YEARNING_TEST_DATABASE_PORT", "54330"),
-		env("YEARNING_TEST_DATABASE_USER", "yearning"),
-		password,
-		env("YEARNING_TEST_DATABASE_DBNAME", "yearning_v4"),
-		env("YEARNING_TEST_DATABASE_SSLMODE", "disable"))
 }
 
 func repeatHex64(s string) string {

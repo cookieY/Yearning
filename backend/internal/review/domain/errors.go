@@ -17,6 +17,30 @@ type Error struct {
 
 func (e *Error) Error() string { return "review: " + e.Name }
 
+// BizCode implements bizerr.Coded.
+func (e *Error) BizCode() int { return e.Code }
+
+// BizName implements bizerr.Coded.
+func (e *Error) BizName() string { return e.Name }
+
+// BizMessage implements bizerr.Coded.
+func (e *Error) BizMessage() string { return e.Name }
+
+// BizMeta implements bizerr.Coded.
+func (e *Error) BizMeta() map[string]any {
+	if e.Detail == "" && len(e.Fields) == 0 {
+		return nil
+	}
+	meta := make(map[string]any, 2)
+	if e.Detail != "" {
+		meta["detail"] = e.Detail
+	}
+	if len(e.Fields) > 0 {
+		meta["fields"] = e.Fields
+	}
+	return meta
+}
+
 // Review-domain business error codes matching api/contracts/error-codes.json.
 const (
 	CodeReviewOutdated         = 2001

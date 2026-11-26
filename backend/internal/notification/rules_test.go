@@ -103,6 +103,9 @@ func TestDefaultPlaceholderTemplateCoverage(t *testing.T) {
 			if tpl == "" {
 				t.Fatalf("missing default placeholder template for %s (%s)", event, locale)
 			}
+			if !strings.Contains(tpl, "\n") {
+				t.Fatalf("default template for %s (%s) must use structured multi-line formatting", event, locale)
+			}
 			if err := ValidateMessageTemplate(tpl); err != nil {
 				t.Fatalf("default template for %s (%s) failed validation: %v", event, locale, err)
 			}
@@ -110,6 +113,10 @@ func TestDefaultPlaceholderTemplateCoverage(t *testing.T) {
 	}
 	if DefaultPlaceholderTemplate("review.blocked", "zh-CN") != "" {
 		t.Fatal("excluded event must return empty default template")
+	}
+	enPreview := previewMessageWithTemplateInLocale("ai.budget_warning", "", "en-US")
+	if !strings.Contains(enPreview, "AI daily budget threshold reached.") || !strings.Contains(enPreview, "Event: AI Budget Warning") {
+		t.Fatalf("unexpected en-US preview: %q", enPreview)
 	}
 }
 

@@ -19,8 +19,7 @@ function rawStore(): MockServerDimensions | undefined {
 }
 
 const DEFAULTS: MockServerDimensions = {
-  identity: "henry",
-  superMode: true,
+  identity: "owner",
   scenario: "ready",
   authBehavior: "default",
 };
@@ -42,28 +41,25 @@ describe("server dimensions store", () => {
   it("patches only the provided fields and keeps the rest", () => {
     setServerDimensions({ identity: "reviewer-a" });
     expect(getServerDimensions()).toEqual({ ...DEFAULTS, identity: "reviewer-a" });
-    setServerDimensions({ superMode: false, scenario: "orders-busy" });
+    setServerDimensions({ scenario: "orders-busy" });
     expect(getServerDimensions()).toEqual({
       ...DEFAULTS,
       identity: "reviewer-a",
-      superMode: false,
       scenario: "orders-busy",
     });
     setServerDimensions({ authBehavior: "admin_locked" });
     expect(getServerDimensions().authBehavior).toBe("admin_locked");
   });
 
-  it("treats explicit falsy values as real patches, not skips", () => {
-    setServerDimensions({ superMode: false, identity: "executor-a" });
+  it("updates identity cleanly across explicit patches", () => {
+    setServerDimensions({ identity: "executor-a" });
     const dimensions = getServerDimensions();
-    expect(dimensions.superMode).toBe(false);
     expect(dimensions.identity).toBe("executor-a");
   });
 
   it("returns copies: callers cannot mutate the shared store", () => {
     const view = getServerDimensions();
     view.identity = "executor-a";
-    view.superMode = false;
     expect(getServerDimensions()).toEqual(DEFAULTS);
     const patched = setServerDimensions({ scenario: "review-busy" });
     patched.scenario = "tampered";

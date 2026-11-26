@@ -35,14 +35,14 @@ kubectl apply -f backend/deploy/k8s/control-plane.yaml`,
 
 const ENGINES = [
   {
-    name: 'MySQL 5.7 / 8.0',
+    name: 'MySQL 5.7+ / 8.0 / 8.4',
     modeZh: '原生 MySQL',
     modeEn: 'Native MySQL',
     ghost: true,
     diag: 'performance_schema',
   },
   {
-    name: 'PostgreSQL 14 – 18',
+    name: 'PostgreSQL 14+',
     modeZh: '原生 PostgreSQL',
     modeEn: 'Native PostgreSQL',
     ghost: false,

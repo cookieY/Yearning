@@ -28,6 +28,34 @@ export interface CursorPageState {
   reset: () => void;
 }
 
+export interface NormalizedCursorPage<T> {
+  items: T[];
+  page: {
+    has_more: boolean;
+    next_cursor: string | null;
+  };
+}
+
+export const EMPTY_PAGE: NormalizedCursorPage<never> = {
+  items: [],
+  page: { has_more: false, next_cursor: null },
+};
+
+export function normalizePage<T>(
+  data:
+    | { items?: T[]; page?: { has_more?: boolean; next_cursor?: string | null } }
+    | undefined
+    | null,
+): NormalizedCursorPage<T> {
+  return {
+    items: data?.items ?? [],
+    page: {
+      has_more: data?.page?.has_more ?? false,
+      next_cursor: data?.page?.next_cursor ?? null,
+    },
+  };
+}
+
 export function useCursorPage(initialSize = 50): CursorPageState {
   const [pageSize, setPageSizeState] = useState(initialSize);
   const [cursorStack, setCursorStack] = useState<string[]>([]);

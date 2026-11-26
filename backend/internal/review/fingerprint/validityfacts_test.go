@@ -713,10 +713,10 @@ func TestValidityUnsupportedSyntaxIsExplicitlyIncomplete(t *testing.T) {
 	}
 }
 
-func TestValidityViewStaysIncompleteWhenParserRejectsFixture(t *testing.T) {
+func TestValidityBareViewStaysIncompleteAsUnsupportedView(t *testing.T) {
 	facts := extractValidityFromParser(t, "CREATE VIEW app.v AS SELECT id FROM app.orders")
-	if facts.Complete || facts.Unsupported != "parser_fallback" {
-		t.Fatalf("view validity = %+v, want an explicit parser fallback", facts)
+	if facts.Complete || facts.Unsupported != "unsupported_view" {
+		t.Fatalf("view validity = %+v, want unsupported_view", facts)
 	}
 }
 

@@ -114,14 +114,14 @@ test("query access approvals follow the same separation: only the reviewer sees 
   // henry (the requester's peer, not the actor) sees an empty queue.
   await page.goto("/approvals/query-access");
   await expect(page.getByTestId("query-access-approvals")).toBeVisible();
-  await expect(page.getByTestId("query-access-pending-qar-fixture-pending")).toHaveCount(0);
+  await expect(page.getByTestId("query-access-pending-6f0f2b3c-5555-4555-8555-000000000201")).toHaveCount(0);
 
   // reviewer-a holds the frozen approval slot: the pending row appears.
   // (Nothing user-created lives in this world, so a full navigation is
   // safe — the scenario re-seeds the pending request deterministically.)
   await becomeIdentity(page, "reviewer-a");
   await page.goto("/approvals/query-access");
-  await expect(page.getByTestId("query-access-pending-qar-fixture-pending")).toBeVisible({
+  await expect(page.getByTestId("query-access-pending-6f0f2b3c-5555-4555-8555-000000000201")).toBeVisible({
     timeout: 8_000,
   });
 });
@@ -151,8 +151,8 @@ test("the default world seeds both pending queues for the reviewer (§18.44 foll
   // Query Approval: the default world now carries pending access requests too.
   await page.goto("/approvals/query-access");
   await expect(page.getByTestId("query-access-approvals")).toBeVisible();
-  await expect(page.getByTestId("query-access-pending-qar-demo-mysql")).toBeVisible({
+  await expect(page.getByTestId("query-access-pending-6f0f2b3c-5555-4555-8555-000000000202")).toBeVisible({
     timeout: 8_000,
   });
-  await expect(page.getByTestId("query-access-pending-qar-demo-pg")).toBeVisible();
+  await expect(page.getByTestId("query-access-pending-6f0f2b3c-5555-4555-8555-000000000203")).toBeVisible();
 });

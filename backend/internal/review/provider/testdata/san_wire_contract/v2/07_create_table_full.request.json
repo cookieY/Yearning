@@ -1,0 +1,210 @@
+{
+  "request_schema_version": 1,
+  "review_run_id": "00000000-0000-4000-8000-000000000001",
+  "engine_profile": "mysql/mysql",
+  "anonymized_statement_groups": [
+    {
+      "group_id": "10000000-0000-4000-8000-000000000001",
+      "representative_shape": "kind=ddl op=create where=true",
+      "representative_anonymized_sql": "CREATE TABLE shop.payments (\n  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT 'primary id',\n  order_id BIGINT UNSIGNED NOT NULL COMMENT 'order reference',\n  currency CHAR(3) NOT NULL DEFAULT 'USD' COMMENT 'ISO currency',\n  reference_code VARCHAR(128) NOT NULL DEFAULT '' COMMENT 'external reference',\n  PRIMARY KEY (id),\n  UNIQUE KEY uniq_payments_order (order_id),\n  KEY idx_payments_order_currency (order_id, currency)\n) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='payment ledger'",
+      "objects": [
+        {
+          "token": "shop",
+          "kind": "schema",
+          "relation": "reference",
+          "schema_token": "shop",
+          "statement_ordinal": 1,
+          "statement_ordinal_ranges": [
+            {
+              "start": 1,
+              "end": 1
+            }
+          ]
+        },
+        {
+          "token": "shop.payments",
+          "kind": "table",
+          "relation": "define",
+          "schema_token": "shop",
+          "statement_ordinal": 1,
+          "statement_ordinal_ranges": [
+            {
+              "start": 1,
+              "end": 1
+            }
+          ]
+        },
+        {
+          "token": "id",
+          "kind": "column",
+          "relation": "define",
+          "schema_token": "shop",
+          "parent_token": "shop.payments",
+          "statement_ordinal": 1,
+          "statement_ordinal_ranges": [
+            {
+              "start": 1,
+              "end": 1
+            }
+          ]
+        },
+        {
+          "token": "order_id",
+          "kind": "column",
+          "relation": "define",
+          "schema_token": "shop",
+          "parent_token": "shop.payments",
+          "statement_ordinal": 1,
+          "statement_ordinal_ranges": [
+            {
+              "start": 1,
+              "end": 1
+            }
+          ]
+        },
+        {
+          "token": "currency",
+          "kind": "column",
+          "relation": "define",
+          "schema_token": "shop",
+          "parent_token": "shop.payments",
+          "statement_ordinal": 1,
+          "statement_ordinal_ranges": [
+            {
+              "start": 1,
+              "end": 1
+            }
+          ]
+        },
+        {
+          "token": "reference_code",
+          "kind": "column",
+          "relation": "define",
+          "schema_token": "shop",
+          "parent_token": "shop.payments",
+          "statement_ordinal": 1,
+          "statement_ordinal_ranges": [
+            {
+              "start": 1,
+              "end": 1
+            }
+          ]
+        },
+        {
+          "token": "id",
+          "kind": "column",
+          "relation": "reference",
+          "schema_token": "shop",
+          "parent_token": "shop.payments",
+          "statement_ordinal": 1,
+          "statement_ordinal_ranges": [
+            {
+              "start": 1,
+              "end": 1
+            }
+          ]
+        },
+        {
+          "token": "uniq_payments_order",
+          "kind": "index",
+          "relation": "define",
+          "schema_token": "shop",
+          "parent_token": "shop.payments",
+          "statement_ordinal": 1,
+          "statement_ordinal_ranges": [
+            {
+              "start": 1,
+              "end": 1
+            }
+          ]
+        },
+        {
+          "token": "order_id",
+          "kind": "column",
+          "relation": "reference",
+          "schema_token": "shop",
+          "parent_token": "shop.payments",
+          "statement_ordinal": 1,
+          "statement_ordinal_ranges": [
+            {
+              "start": 1,
+              "end": 1
+            }
+          ]
+        },
+        {
+          "token": "idx_payments_order_currency",
+          "kind": "index",
+          "relation": "define",
+          "schema_token": "shop",
+          "parent_token": "shop.payments",
+          "statement_ordinal": 1,
+          "statement_ordinal_ranges": [
+            {
+              "start": 1,
+              "end": 1
+            }
+          ]
+        },
+        {
+          "token": "currency",
+          "kind": "column",
+          "relation": "reference",
+          "schema_token": "shop",
+          "parent_token": "shop.payments",
+          "statement_ordinal": 1,
+          "statement_ordinal_ranges": [
+            {
+              "start": 1,
+              "end": 1
+            }
+          ]
+        }
+      ],
+      "metadata_context_complete": true,
+      "statement_count": 1,
+      "statement_ordinal": 1,
+      "statement_ordinal_ranges": [
+        {
+          "start": 1,
+          "end": 1
+        }
+      ],
+      "statistics": {
+        "algorithm_version": "yearning-fingerprint-v1",
+        "ddl_autoincrement_init_one": true,
+        "ddl_autoincrement_unsigned": true,
+        "ddl_charset": "utf8mb4",
+        "ddl_collation": "utf8mb4_0900_ai_ci",
+        "ddl_column_comment_count": 4,
+        "ddl_column_count": 4,
+        "ddl_default_count": 3,
+        "ddl_has_auto_increment": true,
+        "ddl_has_float_double": false,
+        "ddl_has_foreign_key": false,
+        "ddl_has_partition": false,
+        "ddl_has_primary_key": true,
+        "ddl_has_special_type": false,
+        "ddl_index_count": 3,
+        "ddl_index_max_key_parts": 2,
+        "ddl_index_prefix_conformant": true,
+        "ddl_index_unnamed_count": 0,
+        "ddl_max_char_length": 3,
+        "ddl_max_varchar_length": 128,
+        "ddl_not_null_count": 4,
+        "ddl_pk_is_integer": true,
+        "ddl_pk_named_id": true,
+        "ddl_table_comment_present": true,
+        "ddl_table_identifier_not_keyword": true,
+        "ddl_table_name_length": 8,
+        "ddl_table_prefix_conformant": true,
+        "in_value_count_max": 0,
+        "max_statement_bytes": 533,
+        "unbounded_mutation": false,
+        "values_row_count_max": 0
+      }
+    }
+  ],
+  "normalized_evidence": [],
+  "allowed_tool_descriptors": []
+}

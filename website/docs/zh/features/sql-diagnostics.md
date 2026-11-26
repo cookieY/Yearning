@@ -8,7 +8,7 @@ SQL 性能诊断是 Yearning v4.0 面向 DBA 与管理员打造的无侵入慢 S
 
 ## 第 1 步：在目标库确认开启原生语句统计
 
-**MySQL 5.7 / 8.0 / TiDB**：确认 `performance_schema` 已开启且只读账号有查询权限（见 [数据源建权 SQL](/admin/datasources-and-grants)）：
+**MySQL 5.7+ / TiDB**：确认 `performance_schema` 已开启且只读账号有查询权限（见 [数据源建权 SQL](/admin/datasources-and-grants)）：
 
 ```sql
 -- 核查是否已开启（返回 ON 即就绪）
@@ -16,7 +16,7 @@ SHOW VARIABLES LIKE 'performance_schema';
 SELECT COUNT(*) FROM performance_schema.events_statements_summary_by_digest;
 ```
 
-**PostgreSQL 14–18**：确认 `pg_stat_statements` 已预加载并启用：
+**PostgreSQL 14+**：确认 `pg_stat_statements` 已预加载并启用：
 
 ```sql
 -- postgresql.conf 中需配置：shared_preload_libraries = 'pg_stat_statements'

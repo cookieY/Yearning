@@ -5,7 +5,9 @@ import { SessionProvider } from "@/features/auth/session-provider";
 import { HttpResponse, http } from "msw";
 import { MemoryRouter, Route, Routes } from "react-router";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { apiRoute } from "@/shared/mock/api-route";
 import { server } from "@/test/msw/server";
+import { grantSession } from "@/test/session";
 import "@/shared/i18n";
 import {
   FIXTURE_OWNER_ID,
@@ -104,38 +106,11 @@ beforeEach(() => {
   grantSession();
 });
 
-
-/** The order pages gate lifecycle buttons on the session identity; plant an
- * authenticated /users/me whose id matches the fixture submitter (guards
- * test precedent). */
-function grantSession(): void {
-  server.use(
-    http.get("*/users/me", () =>
-      HttpResponse.json({
-        err_code: 0,
-        message: "ok",
-        data: {
-          id: FIXTURE_OWNER_ID,
-          username: "henry",
-          display_name: "henry",
-          email: null,
-          is_builtin_admin: true,
-          version: 1,
-          created_at: "2026-08-28T08:00:00Z",
-          updated_at: "2026-08-28T08:00:00Z",
-          can_access_admin: true,
-        },
-        request_id: FIXTURE_OWNER_ID,
-      }),
-    ),
-  );
-}
-
 describe("OrderDetailPage", () => {
   it("renders the frozen stages, snapshot facts and the audit timeline", async () => {
     const id = seedOrder();
     // A lifecycle fact first, so the timeline has a real entry to project.
-    await fetch(`/change-orders/${id}/withdrawal`, {
+    await fetch(`/api/v4/change-orders/${id}/withdrawal`, {
       method: "POST",
       headers: { "Content-Type": "application/json", "If-Match": '"1"' },
       body: JSON.stringify({ reason: "\u4ea7\u751f\u4e00\u6761\u65f6\u95f4\u7ebf\u4e8b\u4ef6" }),
@@ -196,7 +171,7 @@ describe("OrderDetailPage", () => {
     // comment container at all.
     const id = seedOrder();
     server.use(
-      http.get("*/change-orders/:orderId/timeline", () =>
+      http.get(apiRoute("/change-orders/:orderId/timeline"), () =>
         HttpResponse.json({
           err_code: 0,
           message: "ok",
@@ -296,7 +271,7 @@ describe("OrderDetailPage", () => {
     const user = userEvent.setup();
     const id = seedOrder();
     server.use(
-      http.post("*/change-orders/:orderId/withdrawal", () =>
+      http.post(apiRoute("/change-orders/:orderId/withdrawal"), () =>
         HttpResponse.json({
           err_code: 1010,
           message: "withdraw is not legal from state stage_approval_active",
@@ -401,7 +376,7 @@ describe("execution wait note for non-executors (§18.57)", () => {
   it("displays rollback SQL and generates a rollback draft on completed orders", async () => {
     const id = seedOrder({ state: "completed" });
     server.use(
-      http.get("*/change-orders/:orderId", () =>
+      http.get(apiRoute("/change-orders/:orderId"), () =>
         HttpResponse.json({
           err_code: 0,
           message: "ok",
@@ -435,7 +410,7 @@ describe("execution wait note for non-executors (§18.57)", () => {
           request_id: REQUEST_ID,
         }),
       ),
-      http.post("*/change-orders/:orderId/sql-reveals", async ({ request }) => {
+      http.post(apiRoute("/change-orders/:orderId/sql-reveals"), async ({ request }) => {
         const body = (await request.json()) as { purpose?: string };
         return HttpResponse.json({
           err_code: 0,
@@ -451,7 +426,7 @@ describe("execution wait note for non-executors (§18.57)", () => {
           request_id: REQUEST_ID,
         });
       }),
-      http.post("*/change-orders/:orderId/rollback-drafts", () =>
+      http.post(apiRoute("/change-orders/:orderId/rollback-drafts"), () =>
         HttpResponse.json({
           err_code: 0,
           message: "ok",
@@ -488,7 +463,7 @@ describe("execution wait note for non-executors (§18.57)", () => {
   it("localizes canonical English timeline summaries from the backend by event_type", async () => {
     const id = seedOrder();
     server.use(
-      http.get("*/change-orders/:orderId/timeline", () =>
+      http.get(apiRoute("/change-orders/:orderId/timeline"), () =>
         HttpResponse.json({
           err_code: 0,
           message: "ok",
@@ -535,7 +510,7 @@ describe("execution wait note for non-executors (§18.57)", () => {
       state: "failed",
     });
     server.use(
-      http.get("*/change-orders/:orderId/timeline", () =>
+      http.get(apiRoute("/change-orders/:orderId/timeline"), () =>
         HttpResponse.json({
           err_code: 0,
           message: "ok",

@@ -1,3 +1,5 @@
+import type { Annotation } from "agentation";
+
 /**
  * Dev-only Agentation storage cleanup (RCP-20261103-FE-AGENTATION-DEV-TOOL).
  *
@@ -12,8 +14,11 @@
  * through a dynamic import inside the `import.meta.env.DEV` branch, so it never
  * reaches a production build.
  */
+const ANNOTATION_STORAGE_PREFIX = "feedback-annotations-";
+const ANNOTATION_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
+
 const AGENTATION_STORAGE_PREFIXES = [
-  "feedback-annotations-",
+  ANNOTATION_STORAGE_PREFIX,
   // Holds the toolbar settings, which can include a webhook URL that would POST
   // annotations out of the page; clear it so a stale webhook can never fire.
   "feedback-toolbar-settings",
@@ -22,6 +27,11 @@ const AGENTATION_STORAGE_PREFIXES = [
   "agentation-wireframe-",
   "agentation-session-",
 ] as const;
+
+interface PageAnnotations {
+  pathname: string;
+  annotations: Annotation[];
+}
 
 /**
  * Removes the toolbar's annotation and settings keys. The pure UI preferences
@@ -45,4 +55,98 @@ function clearAgentationStorage(): void {
   }
 }
 
-export { clearAgentationStorage };
+/**
+ * Reads all non-expired Agentation annotations across every pathname stored in
+ * `localStorage` during the current dev session.
+ */
+function loadAllAgentationAnnotations(): PageAnnotations[] {
+  const pages: PageAnnotations[] = [];
+  const cutoff = Date.now() - ANNOTATION_RETENTION_MS;
+  try {
+    for (let index = 0; index < localStorage.length; index += 1) {
+      const key = localStorage.key(index);
+      if (key === null || !key.startsWith(ANNOTATION_STORAGE_PREFIX)) {
+        continue;
+      }
+      const raw = localStorage.getItem(key);
+      if (!raw) {
+        continue;
+      }
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(raw);
+      } catch {
+        continue;
+      }
+      if (!Array.isArray(parsed)) {
+        continue;
+      }
+      const valid = parsed.filter(
+        (item): item is Annotation =>
+          typeof item === "object" &&
+          item !== null &&
+          (typeof (item as Annotation).timestamp !== "number" ||
+            (item as Annotation).timestamp > cutoff),
+      );
+      if (valid.length === 0) {
+        continue;
+      }
+      const pathname = key.slice(ANNOTATION_STORAGE_PREFIX.length) || "/";
+      pages.push({ pathname, annotations: valid });
+    }
+  } catch {
+    return [];
+  }
+  pages.sort((a, b) => a.pathname.localeCompare(b.pathname));
+  return pages;
+}
+
+/**
+ * Formats annotations from multiple pages using Agentation's standard Markdown
+ * format (`## Page Feedback: <pathname>` + `### <n>. <element>`).
+ */
+function formatAllAgentationMarkdown(pages: PageAnnotations[]): string {
+  if (pages.length === 0) {
+    return "";
+  }
+  const viewport =
+    typeof window !== "undefined"
+      ? `${String(window.innerWidth)}×${String(window.innerHeight)}`
+      : "unknown";
+  const lines: string[] = [];
+
+  for (const page of pages) {
+    lines.push(`## Page Feedback: ${page.pathname}`);
+    lines.push(`**Viewport:** ${viewport}`);
+    lines.push("");
+    page.annotations.forEach((item, index) => {
+      const title = item.element || item.elementPath || "Element";
+      lines.push(`### ${String(index + 1)}. ${title}`);
+      if (item.elementPath) {
+        lines.push(`**Location:** ${item.elementPath}`);
+      }
+      if (item.sourceFile) {
+        lines.push(`**Source:** ${item.sourceFile}`);
+      }
+      if (item.reactComponents) {
+        lines.push(`**React:** ${item.reactComponents}`);
+      }
+      if (item.selectedText) {
+        lines.push(`**Selected text:** "${item.selectedText}"`);
+      }
+      if (item.comment) {
+        lines.push(`**Feedback:** ${item.comment}`);
+      }
+      lines.push("");
+    });
+  }
+
+  return lines.join("\n").trimEnd();
+}
+
+export {
+  clearAgentationStorage,
+  formatAllAgentationMarkdown,
+  loadAllAgentationAnnotations,
+  type PageAnnotations,
+};

@@ -3,10 +3,13 @@ import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter } from "react-router";
 import { beforeEach, describe, expect, it } from "vitest";
+import { apiRoute } from "@/shared/mock/api-route";
 import { server } from "@/test/msw/server";
 import { HttpResponse, http } from "msw";
 import "@/shared/i18n";
 import { SESSION_EXPIRED_EVENT } from "@/shared/api/mutator";
+import { testProblemJson } from "@/test/envelope";
+import { buildSessionEnvelope, SESSION_USER_ID, stubSession } from "@/test/session";
 import { SessionProvider, useSession } from "./session-provider";
 
 /**
@@ -15,25 +18,8 @@ import { SessionProvider, useSession } from "./session-provider";
  * logout clears the cached session.
  */
 
-const UUID = "0198d9cc-e65d-7b9d-a8aa-3c81945f99ac";
-
 function currentUserEnvelope(canAccessAdmin: boolean) {
-  return {
-    err_code: 0,
-    message: "ok",
-    data: {
-      id: UUID,
-      username: "henry",
-      display_name: "Henry",
-      email: null,
-      is_builtin_admin: canAccessAdmin,
-      version: 1,
-      created_at: "2026-08-28T08:00:00Z",
-      updated_at: "2026-08-28T08:00:00Z",
-      can_access_admin: canAccessAdmin,
-    },
-    request_id: UUID,
-  };
+  return buildSessionEnvelope({ admin: canAccessAdmin, displayName: "Henry" });
 }
 
 function Probe() {
@@ -76,7 +62,7 @@ describe("SessionProvider", () => {
   });
 
   it("reports authenticated with the server identity and admin capability", async () => {
-    server.use(http.get("*/users/me", () => HttpResponse.json(currentUserEnvelope(true))));
+    stubSession({ admin: true, displayName: "Henry" });
     renderProbe();
     await waitFor(() => expect(screen.getByTestId("status")).toHaveTextContent("authenticated"));
     expect(screen.getByTestId("displayName")).toHaveTextContent("Henry");
@@ -84,19 +70,8 @@ describe("SessionProvider", () => {
 
   it("reports a retryable unavailable state for non-authentication failures", async () => {
     server.use(
-      http.get(
-        "*/users/me",
-        () =>
-          HttpResponse.json(
-            {
-              type: "about:blank",
-              title: "internal_error",
-              status: 500,
-              detail: "boom",
-              request_id: UUID,
-            },
-            { status: 500, headers: { "Content-Type": "application/problem+json" } },
-          ),
+      http.get(apiRoute("/users/me"), () =>
+        testProblemJson(500, "internal_error", "boom", SESSION_USER_ID),
       ),
     );
     renderProbe();
@@ -106,18 +81,9 @@ describe("SessionProvider", () => {
   it("flips an authenticated session to anonymous when the mutator announces expiry", async () => {
     let expired = false;
     server.use(
-      http.get("*/users/me", () => {
+      http.get(apiRoute("/users/me"), () => {
         if (!expired) return HttpResponse.json(currentUserEnvelope(false));
-        return HttpResponse.json(
-          {
-            type: "about:blank",
-            title: "session_expired",
-            status: 401,
-            detail: "expired",
-            request_id: UUID,
-          },
-          { status: 401, headers: { "Content-Type": "application/problem+json" } },
-        );
+        return testProblemJson(401, "session_expired", "expired", SESSION_USER_ID);
       }),
     );
     renderProbe();
@@ -136,7 +102,7 @@ describe("SessionProvider", () => {
   });
 
   it("clears the session after logout", async () => {
-    server.use(http.get("*/users/me", () => HttpResponse.json(currentUserEnvelope(false))));
+    stubSession({ admin: false, displayName: "Henry" });
     renderProbe();
     await waitFor(() => expect(screen.getByTestId("status")).toHaveTextContent("authenticated"));
     await userEvent.click(screen.getByRole("button", { name: "logout" }));

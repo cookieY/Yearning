@@ -999,3 +999,197 @@ func TestQueryDatasourceIdentityBootstrap(t *testing.T) {
 		t.Fatalf("approval-free session on unreachable unprobed datasource: got HTTP %d err_code=%d (%s), want HTTP 200 err_code=3010", code, errCode(body), raw)
 	}
 }
+
+func TestB11QueryAccessScopeAndEligibilityIntegration(t *testing.T) {
+	fx := newB11Fixture(t)
+
+	// Create a 2-step query flow: Step 1 = reviewer1, Step 2 = reviewer2.
+	code, body, raw := fx.admin.do("POST", "/api/v4/admin/flows", map[string]any{
+		"name":      "b11-2step-eligibility-" + uuid.NewString()[:8],
+		"flow_type": "query_access",
+		"enabled":   true,
+		"approval_steps": []map[string]any{
+			{"position": 1, "actors": []map[string]any{{"user_id": fx.reviewer1ID}}},
+			{"position": 2, "actors": []map[string]any{{"user_id": fx.reviewer2ID}}},
+		},
+		"query_capabilities": []map[string]any{
+			{"datasource_id": fx.qDsID, "can_query": true, "can_export": false},
+		},
+	}, true)
+	if code != 200 || errCode(body) != 0 {
+		t.Fatalf("create 2-step query flow: %d %s", code, raw)
+	}
+	twoStepFlowID := body["data"].(map[string]any)["id"].(string)
+	fx.b9CreateGrant(t, fx.requesterID, twoStepFlowID)
+
+	// 1. Requester submits request (not a frozen approver).
+	code, body, raw = fx.requester.doWithHeaders("POST", "/api/v4/query-access-requests", map[string]any{
+		"flow_id":         twoStepFlowID,
+		"datasource_ids":  []string{fx.qDsID},
+		"requested_until": time.Now().Add(24 * time.Hour).UTC().Format(time.RFC3339Nano),
+		"reason":          "two-step eligibility test",
+	}, map[string]string{
+		"Idempotency-Key": "b11-elig-req-" + uuid.NewString()[:12],
+		"X-CSRF-Token":    fx.requester.cookies["yearning_csrf"],
+	})
+	if code != 200 || errCode(body) != 0 {
+		t.Fatalf("create 2-step request: %d %s", code, raw)
+	}
+	reqData := body["data"].(map[string]any)
+	reqID := reqData["id"].(string)
+	if reqData["flow_id"] != twoStepFlowID {
+		t.Fatalf("POST /query-access-requests must return flow_id=%q, got %v", twoStepFlowID, reqData["flow_id"])
+	}
+	if reqData["can_decide"] != false {
+		t.Fatalf("non-approver requester POST must return can_decide=false, got %v", reqData["can_decide"])
+	}
+
+	findReq := func(actor testClient, query string) (map[string]any, int) {
+		c, b, r := actor.do("GET", "/api/v4/query-access-requests"+query, nil, false)
+		if c != 200 || errCode(b) != 0 {
+			t.Fatalf("GET /query-access-requests%s: %d %s", query, c, r)
+		}
+		items := b["data"].(map[string]any)["items"].([]any)
+		for _, rawItem := range items {
+			m := rawItem.(map[string]any)
+			if m["id"] == reqID {
+				return m, len(items)
+			}
+		}
+		return nil, len(items)
+	}
+
+	// Invalid scope returns 1001.
+	code, body, raw = fx.requester.do("GET", "/api/v4/query-access-requests?scope=invalid", nil, false)
+	if code != 200 || errCode(body) != 1001 {
+		t.Fatalf("invalid scope: got (%d, %d) %s, want (200, 1001)", code, errCode(body), raw)
+	}
+
+	// Requester: absent in scope=reviewer; present in scope=requester and scope=all with can_decide=false.
+	if found, _ := findReq(fx.requester, "?scope=reviewer"); found != nil {
+		t.Fatalf("requester non-approver must not see own request in scope=reviewer: %v", found)
+	}
+	if found, _ := findReq(fx.requester, "?scope=requester"); found == nil || found["can_decide"] != false || found["flow_id"] != twoStepFlowID {
+		t.Fatalf("requester scope=requester must see row with flow_id=%q and can_decide=false: %v", twoStepFlowID, found)
+	}
+
+	// Reviewer1 (Step 1 active): present in scope=reviewer with can_decide=true; absent in scope=requester.
+	if found, _ := findReq(fx.reviewer1, "?scope=reviewer"); found == nil || found["can_decide"] != true {
+		t.Fatalf("active Step 1 reviewer must see can_decide=true: %v", found)
+	}
+	if found, _ := findReq(fx.reviewer1, "?scope=requester"); found != nil {
+		t.Fatalf("reviewer1 must not see requester's row in scope=requester: %v", found)
+	}
+
+	// Reviewer2 (Step 2 pending): present in scope=reviewer with can_decide=false until Step 1 completes.
+	if found, _ := findReq(fx.reviewer2, "?scope=reviewer"); found == nil || found["can_decide"] != false {
+		t.Fatalf("pending Step 2 reviewer must see can_decide=false while Step 1 active: %v", found)
+	}
+
+	// 2. Reviewer1 approves Step 1 -> Step 2 becomes active.
+	version := int64(reqData["version"].(float64))
+	code, body, raw = fx.reviewer1.doWithHeaders("POST", "/api/v4/query-access-requests/"+reqID+"/decisions",
+		map[string]any{"decision": "approve", "comment": "step1 ok"}, map[string]string{
+			"Idempotency-Key": "b11-elig-s1-" + uuid.NewString()[:12],
+			"If-Match":        fmt.Sprintf(`"%d"`, version),
+			"X-CSRF-Token":    fx.reviewer1.cookies["yearning_csrf"],
+		})
+	if code != 200 || errCode(body) != 0 {
+		t.Fatalf("reviewer1 approve step1: %d %s", code, raw)
+	}
+	if body["data"].(map[string]any)["can_decide"] != false {
+		t.Fatalf("reviewer1 after advancing to step 2 must have can_decide=false")
+	}
+	if found, _ := findReq(fx.reviewer1, "?scope=reviewer"); found == nil || found["can_decide"] != false {
+		t.Fatalf("reviewer1 after step1 must see can_decide=false: %v", found)
+	}
+	if found, _ := findReq(fx.reviewer2, "?scope=reviewer"); found == nil || found["can_decide"] != true {
+		t.Fatalf("reviewer2 once step2 is active must see can_decide=true: %v", found)
+	}
+
+	// 3. Reviewer2 approves Step 2 -> Grant becomes active; check can_revoke across requester vs reviewers.
+	version2 := int64(body["data"].(map[string]any)["version"].(float64))
+	code, body, raw = fx.reviewer2.doWithHeaders("POST", "/api/v4/query-access-requests/"+reqID+"/decisions",
+		map[string]any{"decision": "approve", "comment": "step2 ok"}, map[string]string{
+			"Idempotency-Key": "b11-elig-s2-" + uuid.NewString()[:12],
+			"If-Match":        fmt.Sprintf(`"%d"`, version2),
+			"X-CSRF-Token":    fx.reviewer2.cookies["yearning_csrf"],
+		})
+	if code != 200 || errCode(body) != 0 {
+		t.Fatalf("reviewer2 approve step2: %d %s", code, raw)
+	}
+	grantID := body["data"].(map[string]any)["grant_id"].(string)
+
+	findGrant := func(actor testClient) map[string]any {
+		c, b, r := actor.do("GET", "/api/v4/query-grants", nil, false)
+		if c != 200 || errCode(b) != 0 {
+			t.Fatalf("GET /query-grants: %d %s", c, r)
+		}
+		for _, rawItem := range b["data"].(map[string]any)["items"].([]any) {
+			m := rawItem.(map[string]any)
+			if m["id"] == grantID {
+				return m
+			}
+		}
+		return nil
+	}
+	if g := findGrant(fx.requester); g == nil || g["can_revoke"] != false {
+		t.Fatalf("non-admin requester grantee must have can_revoke=false: %v", g)
+	}
+	if g := findGrant(fx.reviewer1); g == nil || g["can_revoke"] != true {
+		t.Fatalf("frozen reviewer1 must have can_revoke=true: %v", g)
+	}
+	if g := findGrant(fx.reviewer2); g == nil || g["can_revoke"] != true {
+		t.Fatalf("frozen reviewer2 must have can_revoke=true: %v", g)
+	}
+
+	// 4. Dual-role self-approver flow: requester is ALSO the Step 1 frozen approver.
+	code, body, raw = fx.admin.do("POST", "/api/v4/admin/flows", map[string]any{
+		"name":      "b11-dual-role-self-" + uuid.NewString()[:8],
+		"flow_type": "query_access",
+		"enabled":   true,
+		"approval_steps": []map[string]any{
+			{"position": 1, "actors": []map[string]any{{"user_id": fx.requesterID}}},
+		},
+		"query_capabilities": []map[string]any{
+			{"datasource_id": fx.qDsID, "can_query": true, "can_export": false},
+		},
+	}, true)
+	if code != 200 || errCode(body) != 0 {
+		t.Fatalf("create dual-role flow: %d %s", code, raw)
+	}
+	dualFlowID := body["data"].(map[string]any)["id"].(string)
+	fx.b9CreateGrant(t, fx.requesterID, dualFlowID)
+
+	code, body, raw = fx.requester.doWithHeaders("POST", "/api/v4/query-access-requests", map[string]any{
+		"flow_id":         dualFlowID,
+		"datasource_ids":  []string{fx.qDsID},
+		"requested_until": time.Now().Add(24 * time.Hour).UTC().Format(time.RFC3339Nano),
+		"reason":          "dual-role self-approval test",
+	}, map[string]string{
+		"Idempotency-Key": "b11-elig-dual-" + uuid.NewString()[:12],
+		"X-CSRF-Token":    fx.requester.cookies["yearning_csrf"],
+	})
+	if code != 200 || errCode(body) != 0 {
+		t.Fatalf("create dual-role request: %d %s", code, raw)
+	}
+	dualReq := body["data"].(map[string]any)
+	if dualReq["can_decide"] != true {
+		t.Fatalf("dual-role requester/approver POST must return can_decide=true, got %v", dualReq["can_decide"])
+	}
+	dualReqID := dualReq["id"].(string)
+	code, body, raw = fx.requester.do("GET", "/api/v4/query-access-requests?scope=reviewer", nil, false)
+	if code != 200 || errCode(body) != 0 {
+		t.Fatalf("dual-role GET scope=reviewer: %d %s", code, raw)
+	}
+	foundDual := false
+	for _, rawItem := range body["data"].(map[string]any)["items"].([]any) {
+		m := rawItem.(map[string]any)
+		if m["id"] == dualReqID && m["can_decide"] == true {
+			foundDual = true
+		}
+	}
+	if !foundDual {
+		t.Fatalf("dual-role requester/approver must see own request in scope=reviewer with can_decide=true: %s", raw)
+	}
+}

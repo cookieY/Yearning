@@ -2,15 +2,15 @@ import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router";
 import { appToast as toast } from "@/shared/components/shadcn-dashboard/sonner/sonner-08";
-import { Ban, CalendarClock, ChevronRight, Clock, Database, FilePlus2 } from "lucide-react";
+import { Ban, CalendarClock, ChevronRight, Clock, Database, FilePlus2, Undo2 } from "lucide-react";
 import type { Flow, QueryAccessRequest, QueryGrant } from "@/api/generated/client/yearningV4HTTPAPI.schemas";
 import { useSession } from "@/features/auth/session-provider";
 import {
-  businessErrCodeByName,
   describeError,
   describeErrorText,
+  isBusinessErrorCode,
 } from "@/shared/api/error-display";
-import { BusinessError } from "@/shared/api/mutator";
+import { todayLocal } from "@/features/query/query-error-text";
 import { ErrorState } from "@/shared/components/status/status-components";
 import { LoadingState } from "@/shared/components/status/loading-state";
 import { EmptyState } from "@/shared/components/status/empty-state";
@@ -34,6 +34,11 @@ import {
   useMySessions,
   useRelinquishGrant,
 } from "@/features/query/use-query-domain";
+import {
+  QueryReasonActionDialog,
+  WithdrawQueryAccessDialog,
+  type WithdrawQueryAccessTarget,
+} from "@/features/query/withdraw-query-access-dialog";
 
 /**
  * Query Entry (route /query; migration contract §2, UI spec §7.5).
@@ -44,11 +49,11 @@ import {
  * which the page converts into the Request Access guidance — the frontend never
  * reads the admin-only query settings namespace to guess the mode.
  *
- * Grant matching: the request view carries no flow id (the backend keeps
- * flow_id_snapshot internal), so an active grant is attached to a flow by
- * construction — its approved datasource set is a subset of the flow's
- * capabilities. The subset rule is derived purely from server facts and is
- * recorded as a presentation boundary in the migration contract §17.
+ * Flow matching: QueryAccessRequest exposes the frozen flow_id it was
+ * submitted against, so active grants and pending requests bind strictly to
+ * their own flow (PRD §5: grants and requests never cross query flows even
+ * when two flows share overlapping datasource sets). Legacy payloads without
+ * flow_id fall back to datasource-subset matching.
  */
 
 import { formatTimestamp } from "@/shared/lib/timezones";
@@ -62,6 +67,13 @@ interface FlowGrantMatch {
   request: QueryAccessRequest;
 }
 
+function requestMatchesFlow(flow: Flow, request: QueryAccessRequest, capabilityIds: Set<string>): boolean {
+  if (request.flow_id !== undefined && request.flow_id !== "") {
+    return request.flow_id === flow.id;
+  }
+  return request.datasource_ids.length > 0 && request.datasource_ids.every((id) => capabilityIds.has(id));
+}
+
 function matchGrantForFlow(flow: Flow, requests: QueryAccessRequest[], grants: QueryGrant[]): FlowGrantMatch | null {
   const grantById = new Map(grants.map((grant) => [grant.id, grant]));
   const capabilityIds = new Set((flow.query_capabilities ?? []).map((capability) => capability.datasource_id));
@@ -70,8 +82,7 @@ function matchGrantForFlow(flow: Flow, requests: QueryAccessRequest[], grants: Q
     if (request.state !== "grant_active" || request.grant_id === null || request.grant_id === undefined) continue;
     const grant = grantById.get(request.grant_id);
     if (grant === undefined || grant.state !== "active") continue;
-    const subset = request.datasource_ids.every((id) => capabilityIds.has(id));
-    if (subset) candidates.push({ grant, request });
+    if (requestMatchesFlow(flow, request, capabilityIds)) candidates.push({ grant, request });
   }
   if (candidates.length === 0) return null;
   return candidates.reduce((latest, current) =>
@@ -84,19 +95,12 @@ function matchPendingRequestForFlow(flow: Flow, requests: QueryAccessRequest[]):
   const candidates: QueryAccessRequest[] = [];
   for (const request of requests) {
     if (request.state !== "access_pending") continue;
-    const subset = request.datasource_ids.length > 0 && request.datasource_ids.every((id) => capabilityIds.has(id));
-    if (subset) candidates.push(request);
+    if (requestMatchesFlow(flow, request, capabilityIds)) candidates.push(request);
   }
   if (candidates.length === 0) return null;
   return candidates.reduce((latest, current) =>
     current.created_at > latest.created_at ? current : latest,
   );
-}
-
-/** UX-006: today in local timezone (YYYY-MM-DD), used by the date picker to disable past dates. */
-function todayLocal(): string {
-  const now = new Date();
-  return `${String(now.getFullYear())}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
 }
 
 export default function QueryEntryPage() {
@@ -105,13 +109,14 @@ export default function QueryEntryPage() {
   const session = useSession();
   const authenticated = session.status === "authenticated";
   const flowsQuery = useMyQueryFlows(authenticated);
-  const requestsQuery = useMyAccessRequests(authenticated);
+  const requestsQuery = useMyAccessRequests(authenticated, { scope: "requester" });
   const grantsQuery = useMyGrants(authenticated);
   const sessionsQuery = useMySessions(authenticated);
   const createSession = useCreateSession();
 
   const [requestFlow, setRequestFlow] = useState<Flow | null>(null);
   const [terminateTarget, setTerminateTarget] = useState<{ flow: Flow; grant: QueryGrant } | null>(null);
+  const [withdrawTarget, setWithdrawTarget] = useState<WithdrawQueryAccessTarget | null>(null);
   const [entryError, setEntryError] = useState<string | null>(null);
   const [needsAccessHint, setNeedsAccessHint] = useState<string | null>(null);
   // §18.49 (owner ruling): the apply affordance is server-driven — it only
@@ -185,10 +190,7 @@ export default function QueryEntryPage() {
       });
       void navigate(`/query/sessions/${created.id}`);
     } catch (error) {
-      if (
-        error instanceof BusinessError &&
-        error.err_code === businessErrCodeByName("QUERY_GRANT_REQUIRED")
-      ) {
+      if (isBusinessErrorCode(error, "QUERY_GRANT_REQUIRED")) {
         setNeedsAccessHint(flow.name);
         setNeedsAccessFlows((current) => new Set(current).add(flow.id));
         return;
@@ -298,15 +300,26 @@ export default function QueryEntryPage() {
                             paths (Q002). §18.49 server-driven handling remains as a fallback (grant expiring mid-flight
                             -> 4001 -> needsAccessFlows). */}
                         {match === null && pending !== null ? (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            disabled
-                            data-testid={`query-flow-pending-${flow.id}`}
-                          >
-                            <Clock />
-                            {t("query.request.state.access_pending")}
-                          </Button>
+                          <>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              disabled
+                              data-testid={`query-flow-pending-${flow.id}`}
+                            >
+                              <Clock />
+                              {t("query.request.state.access_pending")}
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => { setWithdrawTarget({ label: flow.name, request: pending }); }}
+                              data-testid={`query-flow-withdraw-${flow.id}`}
+                            >
+                              <Undo2 aria-hidden />
+                              {t("query.entry.withdraw")}
+                            </Button>
+                          </>
                         ) : requiresAccess ? (
                           <Button size="sm" variant="outline" onClick={() => { setRequestFlow(flow); }} data-testid={`query-flow-apply-${flow.id}`}>
                             <FilePlus2 />
@@ -376,6 +389,7 @@ export default function QueryEntryPage() {
 
       <AccessRequestDialog flow={requestFlow} onClose={() => { setRequestFlow(null); }} />
       <TerminateGrantDialog target={terminateTarget} onClose={() => { setTerminateTarget(null); }} />
+      <WithdrawQueryAccessDialog target={withdrawTarget} onClose={() => { setWithdrawTarget(null); }} />
     </PageLayout>
   );
 }
@@ -389,69 +403,30 @@ function TerminateGrantDialog({
 }) {
   const { t } = useTranslation();
   const relinquish = useRelinquishGrant();
-  const [reason, setReason] = useState("");
-  const [errorText, setErrorText] = useState<string | null>(null);
-
-  const close = () => {
-    setReason("");
-    setErrorText(null);
-    onClose();
-  };
-
-  const submit = async () => {
-    if (target === null) return;
-    setErrorText(null);
-    try {
-      await relinquish.mutateAsync({
-        grantId: target.grant.id,
-        version: target.grant.version,
-        reason: reason.trim() === "" ? t("query.entry.terminateDefaultReason") : reason.trim(),
-      });
-      toast.success(t("query.entry.terminateSubmitted"));
-      close();
-    } catch (error) {
-      setErrorText(describeErrorText(describeError(error, "relinquishQueryGrant")));
-    }
-  };
 
   return (
-    <Dialog open={target !== null} onOpenChange={(open) => { if (!open) close(); }}>
-      <DialogContent data-testid="query-terminate-dialog">
-        <DialogHeader>
-          <DialogTitle>{t("query.entry.terminateTitle", { name: target?.flow.name ?? "" })}</DialogTitle>
-          <DialogDescription>{t("query.entry.terminateDescription")}</DialogDescription>
-        </DialogHeader>
-        <div className="flex flex-col gap-2">
-          <Label htmlFor="query-terminate-reason">{t("query.entry.terminateReason")}</Label>
-          <Textarea
-            id="query-terminate-reason"
-            value={reason}
-            onChange={(event) => { setReason(event.target.value); }}
-            maxLength={4096}
-            data-testid="query-terminate-reason"
-          />
-          {errorText !== null && (
-            <Alert variant="destructive" data-testid="query-terminate-error">
-              <AlertTitle>{t("query.entry.terminateFailed")}</AlertTitle>
-              <AlertDescription>{errorText}</AlertDescription>
-            </Alert>
-          )}
-        </div>
-        <DialogFooter>
-          <Button variant="outline" onClick={close}>
-            {t("common.cancel")}
-          </Button>
-          <PendingButton
-            variant="destructive"
-            pending={relinquish.isPending}
-            onClick={() => void submit()}
-            data-testid="query-terminate-confirm"
-          >
-            {t("query.entry.terminateConfirm")}
-          </PendingButton>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+    <QueryReasonActionDialog
+      open={target !== null}
+      onClose={onClose}
+      title={t("query.entry.terminateTitle", { name: target?.flow.name ?? "" })}
+      description={t("query.entry.terminateDescription")}
+      reasonLabel={t("query.entry.terminateReason")}
+      defaultReason={t("query.entry.terminateDefaultReason")}
+      confirmLabel={t("query.entry.terminateConfirm")}
+      failedTitle={t("query.entry.terminateFailed")}
+      submittedToast={t("query.entry.terminateSubmitted")}
+      operationId="relinquishQueryGrant"
+      pending={relinquish.isPending}
+      testIdPrefix="query-terminate"
+      onConfirm={async (reason) => {
+        if (target === null) return;
+        await relinquish.mutateAsync({
+          grantId: target.grant.id,
+          version: target.grant.version,
+          reason,
+        });
+      }}
+    />
   );
 }
 

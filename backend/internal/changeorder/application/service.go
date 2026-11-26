@@ -14,7 +14,6 @@ import (
 	"time"
 
 	"gorm.io/gorm"
-	"gorm.io/gorm/clause"
 
 	"github.com/google/uuid"
 
@@ -22,12 +21,10 @@ import (
 	"github.com/cookieY/YearningX/backend/internal/changeorder/domain"
 	"github.com/cookieY/YearningX/backend/internal/changeorder/persistence"
 	"github.com/cookieY/YearningX/backend/internal/crypto"
+	"github.com/cookieY/YearningX/backend/internal/platform/hashutil"
 	"github.com/cookieY/YearningX/backend/internal/platform/txutil"
 	reviewdomain "github.com/cookieY/YearningX/backend/internal/review/domain"
 )
-
-// forUpdate row locking clause (command contract locks field).
-func forUpdate() clause.Locking { return clause.Locking{Strength: "UPDATE"} }
 
 // Actor represents the command initiator (session identity snapshot).
 type Actor struct {
@@ -67,10 +64,6 @@ func (s *Services) serializable(ctx context.Context, fn func(tx *gorm.DB) error)
 	return txutil.Serializable(ctx, s.DB, fn)
 }
 
-func isSerializationFailure(err error) bool { return txutil.IsSerializationFailure(err) }
-
-func isUniqueViolation(err error) bool { return txutil.IsUniqueViolation(err) }
-
 // ---- Domain Events ----
 
 // Internal event names (repository-event-routing.json rules; external types are mapped by
@@ -104,15 +97,7 @@ func orderSubject(orderID string) string { return "change-orders/" + orderID }
 // emitOrderEvent writes a change_order domain event (domain_events + outbox in the same transaction).
 func (s *Services) emitOrderEvent(ctx context.Context, tx *gorm.DB, internalType, orderID string,
 	actor auditlog.Actor, data any) error {
-	payload, err := json.Marshal(data)
-	if err != nil {
-		return err
-	}
-	m := map[string]any{}
-	if err := json.Unmarshal(payload, &m); err != nil {
-		return err
-	}
-	return s.Recorder.Emit(ctx, tx, internalType, orderSubject(orderID), actor, m)
+	return s.Recorder.EmitPayload(ctx, tx, internalType, orderSubject(orderID), actor, data)
 }
 
 // OrderSubmittedPayload maps to domain-event.schema.json orderSubmitted
@@ -316,7 +301,7 @@ func computeFlowSnapshotHash(flowID string, flowVersion int64, stages []stageFac
 // knowledge candidate, so a policy change after the worker read still makes
 // submission outdated.
 func (s *Services) computeRuleConfigHashes(ctx context.Context, db *gorm.DB, ruleSetID *string) (string, string, error) {
-	noneHash := sha256Hex([]byte("none"))
+	noneHash := hashutil.SHA256Hex([]byte("none"))
 	ruleHash := noneHash
 	var toolHashes []string
 	if ruleSetID != nil && *ruleSetID != "" {
@@ -387,64 +372,22 @@ func (s *Services) flowGranted(ctx context.Context, db *gorm.DB, userID, flowID 
 	return n > 0, err
 }
 
-// sha256Hex computes an unkeyed SHA-256 hex digest.
-func sha256Hex(data []byte) string {
-	sum := sha256.Sum256(data)
-	return hex.EncodeToString(sum[:])
-}
-
-// splitCursor parses a "ts|id" cursor.
-func splitCursor(c string) (string, string, bool) {
-	for i := len(c) - 1; i >= 0; i-- {
-		if c[i] == '|' {
-			return c[:i], c[i+1:], true
-		}
-	}
-	return "", "", false
-}
-
 // ---- Idempotency (idempotency_records; response envelopes stored encrypted) ----
 
 func (s *Services) idemStore() *txutil.IdempotencyStore {
-	return &txutil.IdempotencyStore{
-		DB:      s.DB,
-		Crypter: s.Crypter,
-		Errs: txutil.IdempotencyErrors{
-			Reused:     func() error { return domain.ErrIdemReused() },
-			InProgress: func() error { return domain.ErrIdemInProgress() },
-			Concurrent: func() error { return domain.ErrConcurrent() },
-		},
-	}
+	return txutil.NewIdempotencyStore(s.DB, s.Crypter, txutil.IdempotencyErrors{
+		Reused:     func() error { return domain.ErrIdemReused() },
+		InProgress: func() error { return domain.ErrIdemInProgress() },
+		Concurrent: func() error { return domain.ErrConcurrent() },
+	})
 }
-
-// idemClaim claims an idempotency key. claimed=nil and replay!=nil indicates replaying an existing response.
-func (s *Services) idemClaim(ctx context.Context, userID, route, aggregateID, key, reqHash string) (claimed *struct{}, replay []byte, err error) {
-	ok, replay, err := s.idemStore().Claim(ctx, userID, route, aggregateID, key, reqHash)
-	if err != nil || !ok {
-		return nil, replay, err
-	}
-	return &struct{}{}, nil, nil
-}
-
-// idemRelease deletes an in_progress claim after business failure (allowing retry).
-func (s *Services) idemRelease(ctx context.Context, userID, route, aggregateID, key string) error {
-	return s.idemStore().Release(ctx, userID, route, aggregateID, key)
-}
-
-// idemComplete persists the encrypted response and marks the record completed.
-func (s *Services) idemComplete(ctx context.Context, userID, route, aggregateID, key string, response []byte) error {
-	return s.idemStore().Complete(ctx, userID, route, aggregateID, key, response)
-}
-
-// idemRequestHash computes the canonical request hash.
-func idemRequestHash(parts ...string) string { return txutil.RequestHash(parts...) }
 
 // ---- Common Row Loaders ----
 
 // loadOrderForUpdate locks and returns the work order row.
 func (s *Services) loadOrderForUpdate(ctx context.Context, tx *gorm.DB, orderID string) (*persistence.ChangeOrderModel, error) {
 	var m persistence.ChangeOrderModel
-	if err := tx.WithContext(ctx).Clauses(forUpdate()).
+	if err := tx.WithContext(ctx).Clauses(txutil.ForUpdate()).
 		Where("id = ?", orderID).First(&m).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, domain.ErrNotFound()

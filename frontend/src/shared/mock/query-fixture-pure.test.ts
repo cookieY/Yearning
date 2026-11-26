@@ -22,7 +22,7 @@ interface Envelope<T> {
 }
 
 async function post<T>(path: string, body: unknown): Promise<Envelope<T>> {
-  const response = await fetch(path, {
+  const response = await fetch(path.startsWith("/api/v4") ? path : `/api/v4${path}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
@@ -45,7 +45,7 @@ describe("safety-check edges", () => {
 
   it("refuses empty SQL and NUL bytes with QUERY_ONLY_SINGLE_SELECT", async () => {
     for (const sql of ["", "select\x001"]) {
-      const execution = await post("/query-sessions/qs-fixture-active/executions", {
+      const execution = await post("/query-sessions/6f0f2b3c-5555-4555-8555-000000000101/executions", {
         datasource_id: QUERY_FIXTURE_DS_MYSQL_ID,
         schema_name: "app",
         sql,
@@ -55,14 +55,14 @@ describe("safety-check edges", () => {
   });
 
   it("refuses out-of-bound page sizes and timeouts", async () => {
-    const pageSize = await post("/query-sessions/qs-fixture-active/executions", {
+    const pageSize = await post("/query-sessions/6f0f2b3c-5555-4555-8555-000000000101/executions", {
       datasource_id: QUERY_FIXTURE_DS_MYSQL_ID,
       schema_name: "app",
       sql: "select 1",
       page_size: 0,
     });
     expect(pageSize.err_code).toBe(1001);
-    const huge = await post("/query-sessions/qs-fixture-active/executions", {
+    const huge = await post("/query-sessions/6f0f2b3c-5555-4555-8555-000000000101/executions", {
       datasource_id: QUERY_FIXTURE_DS_MYSQL_ID,
       schema_name: "app",
       sql: "select 1",
@@ -101,7 +101,7 @@ describe("deterministic cell coverage", () => {
       // world. Run mysql-shaped ones here, pg in the direct world below.
       if (sql.includes("public.")) continue;
       const execution = await post<{ rows: unknown[][] }>(
-        "/query-sessions/qs-fixture-active/executions",
+        "/query-sessions/6f0f2b3c-5555-4555-8555-000000000101/executions",
         { datasource_id: QUERY_FIXTURE_DS_MYSQL_ID, schema_name: sql.includes("stats.") ? "stats" : "app", sql },
       );
       expect(execution.err_code).toBe(0);

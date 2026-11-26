@@ -17,8 +17,8 @@ import type {
   PrecheckDiagnosticOptimizationDraftRequest,
   SubmitDiagnosticOptimizationOrderRequest,
 } from "@/api/generated/client/yearningV4HTTPAPI.schemas";
-import { unwrapApi } from "@/shared/api/mutator";
-import { randomUUID } from "@/shared/lib/uuid";
+import { useIdempotentMutation } from "@/shared/api/idempotency";
+import { idempotencyKeyHeader, unwrapApi } from "@/shared/api/mutator";
 
 export function useDiagnosticDatasources(enabled: boolean) {
   return useQuery({
@@ -145,18 +145,19 @@ export function useDiagnoseStatementWithAi() {
 
 export function usePrecheckDiagnosticOptimizationDraft() {
   const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: (input: {
-      datasourceId: string;
-      statementId: string;
-      reportId: string;
-      body: PrecheckDiagnosticOptimizationDraftRequest;
-    }) =>
+  return useIdempotentMutation("diag-precheck", {
+    mutationFn: (
+      input: {
+        datasourceId: string;
+        statementId: string;
+        reportId: string;
+        body: PrecheckDiagnosticOptimizationDraftRequest;
+      },
+      idempotencyKey,
+    ) =>
       unwrapApi(
         precheckDiagnosticOptimizationDraft(input.datasourceId, input.reportId, input.body, {
-          headers: {
-            "Idempotency-Key": `diag-precheck-${randomUUID()}`,
-          },
+          headers: idempotencyKeyHeader(idempotencyKey),
         }),
       ),
     onSuccess: (_data, variables) => {
@@ -169,18 +170,19 @@ export function usePrecheckDiagnosticOptimizationDraft() {
 
 export function useSubmitDiagnosticOptimizationOrder() {
   const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: (input: {
-      datasourceId: string;
-      statementId: string;
-      reportId: string;
-      body: SubmitDiagnosticOptimizationOrderRequest;
-    }) =>
+  return useIdempotentMutation("diag-order", {
+    mutationFn: (
+      input: {
+        datasourceId: string;
+        statementId: string;
+        reportId: string;
+        body: SubmitDiagnosticOptimizationOrderRequest;
+      },
+      idempotencyKey,
+    ) =>
       unwrapApi(
         submitDiagnosticOptimizationOrder(input.datasourceId, input.reportId, input.body, {
-          headers: {
-            "Idempotency-Key": `diag-order-${randomUUID()}`,
-          },
+          headers: idempotencyKeyHeader(idempotencyKey),
         }),
       ),
     onSuccess: (_data, variables) => {

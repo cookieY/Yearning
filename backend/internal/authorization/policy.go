@@ -63,7 +63,7 @@ var (
 	// Built-in admin management surface (aligned with OpenAPI operationIds).
 	builtinAdminOps = []string{
 		// B3 identity, flows, datasources, permission groups, identity providers
-		"listUsers", "createUser", "updateUser", "deleteUser", "getUserDeletionImpact",
+		"listUsers", "createUser", "updateUser", "resetUserPassword", "deleteUser", "getUserDeletionImpact",
 		"listFlows", "createFlow", "getFlow", "replaceFlow", "deleteFlow",
 		"listFlowMaskingRules", "replaceFlowMaskingRule",
 		"listDatasources", "createDatasource", "getDatasource", "replaceDatasource", "deleteDatasource",

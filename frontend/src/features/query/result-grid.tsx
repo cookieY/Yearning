@@ -7,17 +7,7 @@ import { ScrollArea } from "@/shared/components/ui/scroll-area";
 import { TablePagination } from "@/shared/components/ui/table-pagination";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/shared/components/ui/tooltip";
 import type { QueryResultPage } from "@/api/generated/client/yearningV4HTTPAPI.schemas";
-
-/** JSON cell renderer — never "[object Object]". Exported for the coverage
- * suite (jsdom gives the virtualizer no layout, so cell rendering itself
- * cannot be asserted through the DOM). */
-export function stringifyCell(value: unknown): string {
-  if (typeof value === "string") return value;
-  if (typeof value === "number" || typeof value === "boolean" || typeof value === "bigint") {
-    return String(value);
-  }
-  return JSON.stringify(value);
-}
+import { stringifyCell } from "./cell-format";
 
 /**
  * Virtualized result grid (UI spec §7.5): rows arrive through the server

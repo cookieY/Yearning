@@ -30,7 +30,7 @@ const scenarioByBehavior: Record<string, MockScenario> = {
 /** RCP-20261101 ephemeral precheck: POST /review-runs sends current SQL, response directly returns run_id. */
 async function startPrecheck(flowId: string, draftId: string, sql: string): Promise<string> {
   const run = (await (
-    await fetch("https://yearning.test/review-runs", {
+    await fetch("https://yearning.test/api/v4/review-runs", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ flow_id: flowId, draft_id: draftId, sql }),
@@ -41,14 +41,14 @@ async function startPrecheck(flowId: string, draftId: string, sql: string): Prom
 
 async function createAndRunToTerminal(): Promise<{ draftId: string; runId: string }> {
   const create = (await (
-    await fetch("https://yearning.test/change-drafts", {
+    await fetch("https://yearning.test/api/v4/change-drafts", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ flow_id: FIXTURE_FLOW_ID, title: "Behavior matrix" }),
     })
   ).json()) as { data: { id: string } };
   const draftId = create.data.id;
-  await fetch(`https://yearning.test/change-drafts/${draftId}/sql`, {
+  await fetch(`https://yearning.test/api/v4/change-drafts/${draftId}/sql`, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ sql: "SELECT 1;" }),
@@ -79,7 +79,7 @@ describe("review fixture behavior matrix", () => {
       expect(runId).not.toBe("");
 
       const run = (await (
-        await fetch(`https://yearning.test/review-runs/${runId}`)
+        await fetch(`https://yearning.test/api/v4/review-runs/${runId}`)
       ).json()) as {
         data: {
           state: string;
@@ -109,7 +109,7 @@ describe("review fixture behavior matrix", () => {
 
       // Precheck does not write to draft (RCP-20261101): regardless of run terminal state, draft row stays in draft.
       const draft = (await (
-        await fetch(`https://yearning.test/change-drafts/${draftId}`)
+        await fetch(`https://yearning.test/api/v4/change-drafts/${draftId}`)
       ).json()) as { data: { state: string } };
       expect(draft.data.state).toBe("draft");
     });
@@ -121,7 +121,7 @@ describe("review fixture behavior matrix", () => {
     // Ephemeral runs do not emit domain events (explicitly stated in backend ephemeralFinish, RCP-20261101) —
     // persistent domain event change_order.submitted is emitted only after submission materializes the order.
     const first = (await (
-      await fetch("https://yearning.test/change-orders", {
+      await fetch("https://yearning.test/api/v4/change-orders", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ flow_id: FIXTURE_FLOW_ID, draft_id: draftId, sql: "SELECT 1;", run_id: runId }),
@@ -134,7 +134,7 @@ describe("review fixture behavior matrix", () => {
       setTimeout(resolve, 1_600);
     });
     const second = (await (
-      await fetch("https://yearning.test/change-orders", {
+      await fetch("https://yearning.test/api/v4/change-orders", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

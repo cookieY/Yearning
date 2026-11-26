@@ -334,7 +334,10 @@ func TestSEC0041OutOfScopeExplicitQualifierFailsClosedWithoutDBTouch(t *testing.
 			"tool_name": "safe_explain", "arguments": map[string]any{
 				"schema": sec0041SchemaToken, "group_id": sec0041GroupID,
 			}},
-	}, nil, nil, "update app.orders set amount = amount + 1 where id = 1;\n")
+		// Since MySQL multi-db support allows valid non-system qualifiers (verified via catalog lookup),
+		// built-in system schema references such as mysql.user must fail closed with 2012 (sql_schema_out_of_scope)
+		// without reaching FactSource.
+	}, nil, nil, "update mysql.user set amount = amount + 1 where id = 1;\n")
 	for _, id := range []string{
 		"9f0b1e2c-0000-4000-8000-000000000219",
 		"9f0b1e2c-0000-4000-8000-000000000220",
@@ -360,6 +363,13 @@ func TestSEC0041OutOfScopeExplicitQualifierFailsClosedWithoutDBTouch(t *testing.
 		t.Fatalf("out-of-scope qualifier calls produced evidence: %d", evidence)
 	}
 	expectSEC0041RunState(t, b, runID, string(domain.RunStatePartial), 2007)
+	var failureName *string
+	if err := b.db.Raw(`select failure_name from review_runs where id = ?`, runID).Scan(&failureName).Error; err != nil {
+		t.Fatalf("read failure_name: %v", err)
+	}
+	if failureName == nil || *failureName != "sql_schema_out_of_scope" {
+		t.Fatalf("out-of-scope explicit schema failure_name = %v, want sql_schema_out_of_scope", failureName)
+	}
 }
 
 // TestSEC0041PhysicalSchemaUsesMatchingFactsAndScopes covers B10-compatible

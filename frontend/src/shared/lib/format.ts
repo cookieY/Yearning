@@ -7,3 +7,10 @@ export function formatCompactCount(value: number): string {
   if (value >= 1e3) return String(Math.floor(value / 1e3)) + "K";
   return String(value);
 }
+
+/** Human-readable binary byte size formatter (B / KiB / MiB). */
+export function formatBytes(bytes: number): string {
+  if (bytes >= 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MiB`;
+  if (bytes >= 1024) return `${(bytes / 1024).toFixed(1)} KiB`;
+  return `${String(bytes)} B`;
+}

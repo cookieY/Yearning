@@ -1,0 +1,910 @@
+{
+  "contract_version": 1,
+  "openapi_sha": "b08b588223c0b586a5c9c4e0f1c9b0cd818d7ef1d61f3f9e823d5a489e37fb73",
+  "zod_runtime_sha256": "32b72a82897ae698b7566aad9821c07cf5194173a3dc69adfb00a8f00f04a446",
+  "operation_id": "listChangeOrders",
+  "case_id": "submitter-face",
+  "http_status": 200,
+  "err_code": 0,
+  "response": {
+    "data": {
+      "items": [
+        {
+          "id": "00000000-0000-4000-8000-000000000188",
+          "display_number": "YR-20261126-000011",
+          "submitter_user_id": "00000000-0000-4000-8000-000000000002",
+          "submitter_username": "f12-submitter",
+          "submitter_display_name": "F12 submitter",
+          "title": "f12 exec 7561a591",
+          "state": "completed",
+          "current_stage_position": 1,
+          "latest_attempt_id": "00000000-0000-4000-8000-000000000195",
+          "stages": [
+            {
+              "id": "00000000-0000-4000-8000-000000000189",
+              "position": 1,
+              "datasource_name": "f12-pg-target",
+              "state": "succeeded",
+              "approval_steps": [
+                {
+                  "id": "00000000-0000-4000-8000-000000000190",
+                  "position": 1,
+                  "state": "approved",
+                  "decided_at": "2026-11-25T01:44:00.000Z",
+                  "actors": [
+                    {
+                      "id": "00000000-0000-4000-8000-000000000018",
+                      "username": "f12-approver",
+                      "display_name": "F12 approver",
+                      "is_builtin_admin": false,
+                      "version": 1,
+                      "created_at": "2026-11-25T00:09:00.000Z",
+                      "updated_at": "2026-11-25T00:09:00.000Z"
+                    }
+                  ]
+                }
+              ],
+              "execution_actors": [
+                {
+                  "id": "00000000-0000-4000-8000-000000000019",
+                  "username": "f12-executor",
+                  "display_name": "F12 executor",
+                  "is_builtin_admin": false,
+                  "version": 1,
+                  "created_at": "2026-11-25T00:10:00.000Z",
+                  "updated_at": "2026-11-25T00:10:00.000Z"
+                }
+              ]
+            }
+          ],
+          "has_sql": true,
+          "sql_hash": "370ae5326750b593f1da57d52dde0318be29d8fef82eb2063384aead9f1597e2",
+          "snapshot_hash": "2395f5f6fc4ab833a574026a2a881fcc2cb8ef244e06c12d82daa152f0286477",
+          "has_ddl": true,
+          "rollback_enabled": true,
+          "ticket_type": "normal",
+          "rollback_evidence_id": "00000000-0000-4000-8000-000000000233",
+          "rollback_status": "available",
+          "version": 5,
+          "submitted_at": "2026-11-25T01:40:00.000Z",
+          "terminal_at": "2026-11-25T02:55:00.000Z"
+        },
+        {
+          "id": "00000000-0000-4000-8000-000000000191",
+          "display_number": "YR-20261126-000010",
+          "submitter_user_id": "00000000-0000-4000-8000-000000000002",
+          "submitter_username": "f12-submitter",
+          "submitter_display_name": "F12 submitter",
+          "title": "f12 schedule 7561a591",
+          "state": "scheduled",
+          "current_stage_position": 1,
+          "active_schedule": {
+            "id": "00000000-0000-4000-8000-000000000194",
+            "stage_id": "00000000-0000-4000-8000-000000000192",
+            "scheduled_for": "2026-11-25T01:43:00.000Z",
+            "state": "scheduled"
+          },
+          "stages": [
+            {
+              "id": "00000000-0000-4000-8000-000000000192",
+              "position": 1,
+              "datasource_name": "f12-pg-target",
+              "state": "execution_pending",
+              "approval_steps": [
+                {
+                  "id": "00000000-0000-4000-8000-000000000193",
+                  "position": 1,
+                  "state": "approved",
+                  "decided_at": "2026-11-25T01:42:00.000Z",
+                  "actors": [
+                    {
+                      "id": "00000000-0000-4000-8000-000000000018",
+                      "username": "f12-approver",
+                      "display_name": "F12 approver",
+                      "is_builtin_admin": false,
+                      "version": 1,
+                      "created_at": "2026-11-25T00:09:00.000Z",
+                      "updated_at": "2026-11-25T00:09:00.000Z"
+                    }
+                  ]
+                }
+              ],
+              "execution_actors": [
+                {
+                  "id": "00000000-0000-4000-8000-000000000019",
+                  "username": "f12-executor",
+                  "display_name": "F12 executor",
+                  "is_builtin_admin": false,
+                  "version": 1,
+                  "created_at": "2026-11-25T00:10:00.000Z",
+                  "updated_at": "2026-11-25T00:10:00.000Z"
+                }
+              ]
+            }
+          ],
+          "has_sql": true,
+          "sql_hash": "370ae5326750b593f1da57d52dde0318be29d8fef82eb2063384aead9f1597e2",
+          "snapshot_hash": "2395f5f6fc4ab833a574026a2a881fcc2cb8ef244e06c12d82daa152f0286477",
+          "has_ddl": true,
+          "rollback_enabled": true,
+          "ticket_type": "normal",
+          "rollback_status": "pending",
+          "version": 3,
+          "submitted_at": "2026-11-25T01:41:00.000Z",
+          "terminal_at": null
+        },
+        {
+          "id": "00000000-0000-4000-8000-000000000166",
+          "display_number": "YR-20261126-000008",
+          "submitter_user_id": "00000000-0000-4000-8000-000000000002",
+          "submitter_username": "f12-submitter",
+          "submitter_display_name": "F12 submitter",
+          "title": "f12-diag-link-3f232f58",
+          "state": "stage_approval_active",
+          "current_stage_position": 1,
+          "stages": [
+            {
+              "id": "00000000-0000-4000-8000-000000000167",
+              "position": 1,
+              "datasource_name": "f12-pg-target",
+              "state": "approval_active",
+              "approval_steps": [
+                {
+                  "id": "00000000-0000-4000-8000-000000000168",
+                  "position": 1,
+                  "state": "active",
+                  "actors": [
+                    {
+                      "id": "00000000-0000-4000-8000-000000000018",
+                      "username": "f12-approver",
+                      "display_name": "F12 approver",
+                      "is_builtin_admin": false,
+                      "version": 1,
+                      "created_at": "2026-11-25T00:09:00.000Z",
+                      "updated_at": "2026-11-25T00:09:00.000Z"
+                    }
+                  ]
+                }
+              ],
+              "execution_actors": [
+                {
+                  "id": "00000000-0000-4000-8000-000000000019",
+                  "username": "f12-executor",
+                  "display_name": "F12 executor",
+                  "is_builtin_admin": false,
+                  "version": 1,
+                  "created_at": "2026-11-25T00:10:00.000Z",
+                  "updated_at": "2026-11-25T00:10:00.000Z"
+                }
+              ]
+            }
+          ],
+          "has_sql": true,
+          "sql_hash": "45ea61e7a5f7ca91d4b851387b108176ad14d8453a1555471ed41288ea03278a",
+          "snapshot_hash": "2395f5f6fc4ab833a574026a2a881fcc2cb8ef244e06c12d82daa152f0286477",
+          "has_ddl": true,
+          "rollback_enabled": true,
+          "ticket_type": "normal",
+          "rollback_status": "pending",
+          "version": 1,
+          "submitted_at": "2026-11-25T01:18:00.000Z",
+          "terminal_at": null
+        },
+        {
+          "id": "00000000-0000-4000-8000-000000000098",
+          "display_number": "YR-20261126-000007",
+          "submitter_user_id": "00000000-0000-4000-8000-000000000002",
+          "submitter_username": "f12-submitter",
+          "submitter_display_name": "F12 submitter",
+          "title": "b6 assistant draft order 3f232f58",
+          "state": "stage_approval_active",
+          "current_stage_position": 1,
+          "stages": [
+            {
+              "id": "00000000-0000-4000-8000-000000000099",
+              "position": 1,
+              "datasource_name": "f12-pg-target",
+              "state": "approval_active",
+              "approval_steps": [
+                {
+                  "id": "00000000-0000-4000-8000-000000000100",
+                  "position": 1,
+                  "state": "active",
+                  "actors": [
+                    {
+                      "id": "00000000-0000-4000-8000-000000000018",
+                      "username": "f12-approver",
+                      "display_name": "F12 approver",
+                      "is_builtin_admin": false,
+                      "version": 1,
+                      "created_at": "2026-11-25T00:09:00.000Z",
+                      "updated_at": "2026-11-25T00:09:00.000Z"
+                    }
+                  ]
+                }
+              ],
+              "execution_actors": [
+                {
+                  "id": "00000000-0000-4000-8000-000000000019",
+                  "username": "f12-executor",
+                  "display_name": "F12 executor",
+                  "is_builtin_admin": false,
+                  "version": 1,
+                  "created_at": "2026-11-25T00:10:00.000Z",
+                  "updated_at": "2026-11-25T00:10:00.000Z"
+                }
+              ]
+            }
+          ],
+          "has_sql": true,
+          "sql_hash": "e40af07d3974db996c5e87251756cd5b331166820970054bf1b4ffc9f37c49ca",
+          "snapshot_hash": "2395f5f6fc4ab833a574026a2a881fcc2cb8ef244e06c12d82daa152f0286477",
+          "rollback_enabled": true,
+          "ticket_type": "normal",
+          "rollback_status": "pending",
+          "version": 1,
+          "submitted_at": "2026-11-25T01:02:00.000Z",
+          "terminal_at": null
+        },
+        {
+          "id": "00000000-0000-4000-8000-000000000089",
+          "display_number": "YR-20261126-000006",
+          "submitter_user_id": "00000000-0000-4000-8000-000000000002",
+          "submitter_username": "f12-submitter",
+          "submitter_display_name": "F12 submitter",
+          "title": "f12-cancel-schedule-3f232f58",
+          "state": "stage_execution_pending",
+          "current_stage_position": 1,
+          "stages": [
+            {
+              "id": "00000000-0000-4000-8000-000000000090",
+              "position": 1,
+              "datasource_name": "f12-pg-target",
+              "state": "execution_pending",
+              "approval_steps": [
+                {
+                  "id": "00000000-0000-4000-8000-000000000091",
+                  "position": 1,
+                  "state": "approved",
+                  "decided_at": "2026-11-25T00:56:00.000Z",
+                  "actors": [
+                    {
+                      "id": "00000000-0000-4000-8000-000000000018",
+                      "username": "f12-approver",
+                      "display_name": "F12 approver",
+                      "is_builtin_admin": false,
+                      "version": 1,
+                      "created_at": "2026-11-25T00:09:00.000Z",
+                      "updated_at": "2026-11-25T00:09:00.000Z"
+                    }
+                  ]
+                }
+              ],
+              "execution_actors": [
+                {
+                  "id": "00000000-0000-4000-8000-000000000019",
+                  "username": "f12-executor",
+                  "display_name": "F12 executor",
+                  "is_builtin_admin": false,
+                  "version": 1,
+                  "created_at": "2026-11-25T00:10:00.000Z",
+                  "updated_at": "2026-11-25T00:10:00.000Z"
+                }
+              ]
+            }
+          ],
+          "has_sql": true,
+          "sql_hash": "45ea61e7a5f7ca91d4b851387b108176ad14d8453a1555471ed41288ea03278a",
+          "snapshot_hash": "2395f5f6fc4ab833a574026a2a881fcc2cb8ef244e06c12d82daa152f0286477",
+          "has_ddl": true,
+          "rollback_enabled": true,
+          "ticket_type": "normal",
+          "rollback_status": "pending",
+          "version": 4,
+          "submitted_at": "2026-11-25T00:55:00.000Z",
+          "terminal_at": null
+        },
+        {
+          "id": "00000000-0000-4000-8000-000000000045",
+          "display_number": "YR-20261126-000005",
+          "submitter_user_id": "00000000-0000-4000-8000-000000000002",
+          "submitter_username": "f12-submitter",
+          "submitter_display_name": "F12 submitter",
+          "title": "f12 copy source",
+          "state": "stage_approval_active",
+          "current_stage_position": 1,
+          "stages": [
+            {
+              "id": "00000000-0000-4000-8000-000000000046",
+              "position": 1,
+              "datasource_name": "f12-pg-target",
+              "state": "approval_active",
+              "approval_steps": [
+                {
+                  "id": "00000000-0000-4000-8000-000000000047",
+                  "position": 1,
+                  "state": "active",
+                  "actors": [
+                    {
+                      "id": "00000000-0000-4000-8000-000000000018",
+                      "username": "f12-approver",
+                      "display_name": "F12 approver",
+                      "is_builtin_admin": false,
+                      "version": 1,
+                      "created_at": "2026-11-25T00:09:00.000Z",
+                      "updated_at": "2026-11-25T00:09:00.000Z"
+                    }
+                  ]
+                }
+              ],
+              "execution_actors": [
+                {
+                  "id": "00000000-0000-4000-8000-000000000019",
+                  "username": "f12-executor",
+                  "display_name": "F12 executor",
+                  "is_builtin_admin": false,
+                  "version": 1,
+                  "created_at": "2026-11-25T00:10:00.000Z",
+                  "updated_at": "2026-11-25T00:10:00.000Z"
+                }
+              ]
+            }
+          ],
+          "has_sql": true,
+          "sql_hash": "15970a970c768d3a0261c1bd5ca27cd78ff0089d148272026ac7796ac453a517",
+          "snapshot_hash": "2395f5f6fc4ab833a574026a2a881fcc2cb8ef244e06c12d82daa152f0286477",
+          "has_ddl": true,
+          "rollback_enabled": true,
+          "ticket_type": "normal",
+          "rollback_status": "pending",
+          "version": 1,
+          "submitted_at": "2026-11-25T00:22:00.000Z",
+          "terminal_at": null
+        },
+        {
+          "id": "00000000-0000-4000-8000-000000000036",
+          "display_number": "YR-20261126-000004",
+          "submitter_user_id": "00000000-0000-4000-8000-000000000002",
+          "submitter_username": "f12-submitter",
+          "submitter_display_name": "F12 submitter",
+          "title": "f12 void order",
+          "state": "voided",
+          "current_stage_position": 1,
+          "stages": [
+            {
+              "id": "00000000-0000-4000-8000-000000000037",
+              "position": 1,
+              "datasource_name": "f12-pg-target",
+              "state": "cancelled",
+              "approval_steps": [
+                {
+                  "id": "00000000-0000-4000-8000-000000000038",
+                  "position": 1,
+                  "state": "skipped",
+                  "decided_at": "2026-11-25T00:21:00.000Z",
+                  "actors": [
+                    {
+                      "id": "00000000-0000-4000-8000-000000000018",
+                      "username": "f12-approver",
+                      "display_name": "F12 approver",
+                      "is_builtin_admin": false,
+                      "version": 1,
+                      "created_at": "2026-11-25T00:09:00.000Z",
+                      "updated_at": "2026-11-25T00:09:00.000Z"
+                    }
+                  ]
+                }
+              ],
+              "execution_actors": [
+                {
+                  "id": "00000000-0000-4000-8000-000000000019",
+                  "username": "f12-executor",
+                  "display_name": "F12 executor",
+                  "is_builtin_admin": false,
+                  "version": 1,
+                  "created_at": "2026-11-25T00:10:00.000Z",
+                  "updated_at": "2026-11-25T00:10:00.000Z"
+                }
+              ]
+            }
+          ],
+          "has_sql": true,
+          "sql_hash": "7a5468b0801f0a803a45508df8ddce8708ec0d0217621de12589f9620cad44b9",
+          "snapshot_hash": "2395f5f6fc4ab833a574026a2a881fcc2cb8ef244e06c12d82daa152f0286477",
+          "has_ddl": true,
+          "rollback_enabled": true,
+          "ticket_type": "normal",
+          "rollback_status": "pending",
+          "version": 2,
+          "submitted_at": "2026-11-25T00:20:00.000Z",
+          "terminal_at": "2026-11-25T00:21:00.000Z"
+        },
+        {
+          "id": "00000000-0000-4000-8000-000000000026",
+          "display_number": "YR-20261126-000003",
+          "submitter_user_id": "00000000-0000-4000-8000-000000000002",
+          "submitter_username": "f12-submitter",
+          "submitter_display_name": "F12 submitter",
+          "title": "f12 withdraw order",
+          "state": "withdrawn",
+          "current_stage_position": 1,
+          "stages": [
+            {
+              "id": "00000000-0000-4000-8000-000000000027",
+              "position": 1,
+              "datasource_name": "f12-pg-target",
+              "state": "cancelled",
+              "approval_steps": [
+                {
+                  "id": "00000000-0000-4000-8000-000000000028",
+                  "position": 1,
+                  "state": "skipped",
+                  "decided_at": "2026-11-25T00:18:00.000Z",
+                  "actors": [
+                    {
+                      "id": "00000000-0000-4000-8000-000000000018",
+                      "username": "f12-approver",
+                      "display_name": "F12 approver",
+                      "is_builtin_admin": false,
+                      "version": 1,
+                      "created_at": "2026-11-25T00:09:00.000Z",
+                      "updated_at": "2026-11-25T00:09:00.000Z"
+                    }
+                  ]
+                }
+              ],
+              "execution_actors": [
+                {
+                  "id": "00000000-0000-4000-8000-000000000019",
+                  "username": "f12-executor",
+                  "display_name": "F12 executor",
+                  "is_builtin_admin": false,
+                  "version": 1,
+                  "created_at": "2026-11-25T00:10:00.000Z",
+                  "updated_at": "2026-11-25T00:10:00.000Z"
+                }
+              ]
+            }
+          ],
+          "has_sql": true,
+          "sql_hash": "4137c3529574464206f11da506535e4837216f9fac5e313cdaccdb3dd98b10d4",
+          "snapshot_hash": "2395f5f6fc4ab833a574026a2a881fcc2cb8ef244e06c12d82daa152f0286477",
+          "has_ddl": true,
+          "rollback_enabled": true,
+          "ticket_type": "normal",
+          "rollback_status": "pending",
+          "version": 2,
+          "submitted_at": "2026-11-25T00:17:00.000Z",
+          "terminal_at": "2026-11-25T00:18:00.000Z"
+        },
+        {
+          "id": "00000000-0000-4000-8000-000000000015",
+          "display_number": "YR-20261126-000002",
+          "submitter_user_id": "00000000-0000-4000-8000-000000000002",
+          "submitter_username": "f12-submitter",
+          "submitter_display_name": "F12 submitter",
+          "title": "f12 chain order",
+          "state": "cancelled",
+          "current_stage_position": 1,
+          "latest_attempt_id": "00000000-0000-4000-8000-000000000022",
+          "stages": [
+            {
+              "id": "00000000-0000-4000-8000-000000000016",
+              "position": 1,
+              "datasource_name": "f12-pg-target",
+              "state": "cancelled",
+              "approval_steps": [
+                {
+                  "id": "00000000-0000-4000-8000-000000000017",
+                  "position": 1,
+                  "state": "approved",
+                  "decided_at": "2026-11-25T00:14:00.000Z",
+                  "actors": [
+                    {
+                      "id": "00000000-0000-4000-8000-000000000018",
+                      "username": "f12-approver",
+                      "display_name": "F12 approver",
+                      "is_builtin_admin": false,
+                      "version": 1,
+                      "created_at": "2026-11-25T00:09:00.000Z",
+                      "updated_at": "2026-11-25T00:09:00.000Z"
+                    }
+                  ]
+                }
+              ],
+              "execution_actors": [
+                {
+                  "id": "00000000-0000-4000-8000-000000000019",
+                  "username": "f12-executor",
+                  "display_name": "F12 executor",
+                  "is_builtin_admin": false,
+                  "version": 1,
+                  "created_at": "2026-11-25T00:10:00.000Z",
+                  "updated_at": "2026-11-25T00:10:00.000Z"
+                }
+              ]
+            }
+          ],
+          "has_sql": true,
+          "sql_hash": "31b9b1e1a44ce43f514e8d445de65efef275b0e24a2fa9544903153ef0d53b0f",
+          "snapshot_hash": "2395f5f6fc4ab833a574026a2a881fcc2cb8ef244e06c12d82daa152f0286477",
+          "has_ddl": true,
+          "rollback_enabled": true,
+          "ticket_type": "normal",
+          "rollback_status": "pending",
+          "version": 4,
+          "submitted_at": "2026-11-25T00:11:00.000Z",
+          "terminal_at": "2026-11-25T02:56:00.000Z"
+        },
+        {
+          "id": "00000000-0000-4000-8000-000000000234",
+          "display_number": "YR-20261126-000001",
+          "submitter_user_id": "00000000-0000-4000-8000-000000000002",
+          "submitter_username": "f12-submitter",
+          "submitter_display_name": "F12 submitter",
+          "title": "f12 integration chain",
+          "state": "failed",
+          "current_stage_position": 1,
+          "latest_attempt_id": "00000000-0000-4000-8000-000000000235",
+          "stages": [
+            {
+              "id": "00000000-0000-4000-8000-000000000236",
+              "position": 1,
+              "datasource_name": "f12-pg-target",
+              "state": "failed",
+              "approval_steps": [
+                {
+                  "id": "00000000-0000-4000-8000-000000000237",
+                  "position": 1,
+                  "state": "approved",
+                  "decided_at": "2026-11-25T02:57:00.000Z",
+                  "actors": [
+                    {
+                      "id": "00000000-0000-4000-8000-000000000018",
+                      "username": "f12-approver",
+                      "display_name": "F12 approver",
+                      "is_builtin_admin": false,
+                      "version": 1,
+                      "created_at": "2026-11-25T00:09:00.000Z",
+                      "updated_at": "2026-11-25T00:09:00.000Z"
+                    }
+                  ]
+                }
+              ],
+              "execution_actors": [
+                {
+                  "id": "00000000-0000-4000-8000-000000000019",
+                  "username": "f12-executor",
+                  "display_name": "F12 executor",
+                  "is_builtin_admin": false,
+                  "version": 1,
+                  "created_at": "2026-11-25T00:10:00.000Z",
+                  "updated_at": "2026-11-25T00:10:00.000Z"
+                }
+              ]
+            }
+          ],
+          "has_sql": true,
+          "sql_hash": "0b47e0c706eb0089dd60f58ec6647b86843743b813cd6e1d590931d9ac3eb63b",
+          "snapshot_hash": "2395f5f6fc4ab833a574026a2a881fcc2cb8ef244e06c12d82daa152f0286477",
+          "has_ddl": true,
+          "rollback_enabled": true,
+          "ticket_type": "normal",
+          "rollback_evidence_id": "00000000-0000-4000-8000-000000000238",
+          "rollback_status": "unsupported",
+          "rollback_unsupported_reason": "create_table_target_already_exists: table public.f12_demo already exists before CREATE TABLE",
+          "version": 5,
+          "submitted_at": "2026-11-25T02:58:00.000Z",
+          "terminal_at": "2026-11-25T02:59:00.000Z"
+        },
+        {
+          "id": "00000000-0000-4000-8000-000000000239",
+          "display_number": "YR-20261124-900001",
+          "submitter_user_id": "00000000-0000-4000-8000-000000000002",
+          "submitter_username": "f12-submitter",
+          "submitter_display_name": "F12 submitter",
+          "title": "adv ' quote ; semicolon <script>alert(1)</script>",
+          "state": "submitted",
+          "current_stage_position": 1,
+          "stages": [
+            {
+              "id": "00000000-0000-4000-8000-000000000240",
+              "position": 1,
+              "datasource_name": "f12-pg-target",
+              "state": "succeeded",
+              "approval_steps": [],
+              "execution_actors": []
+            }
+          ],
+          "has_sql": true,
+          "sql_hash": "0b47e0c706eb0089dd60f58ec6647b86843743b813cd6e1d590931d9ac3eb63b",
+          "snapshot_hash": "2395f5f6fc4ab833a574026a2a881fcc2cb8ef244e06c12d82daa152f0286477",
+          "has_ddl": true,
+          "rollback_enabled": true,
+          "ticket_type": "normal",
+          "rollback_status": "not_requested",
+          "version": 1,
+          "submitted_at": "2026-11-25T03:00:00.000Z",
+          "terminal_at": null
+        },
+        {
+          "id": "00000000-0000-4000-8000-000000000162",
+          "display_number": "YR-20261124-900060",
+          "submitter_user_id": "00000000-0000-4000-8000-000000000002",
+          "submitter_username": "f12-submitter",
+          "submitter_display_name": "F12 submitter",
+          "title": "adv-order-60-completed",
+          "state": "completed",
+          "current_stage_position": 1,
+          "stages": [
+            {
+              "id": "00000000-0000-4000-8000-000000000241",
+              "position": 1,
+              "datasource_name": "f12-pg-target",
+              "state": "succeeded",
+              "approval_steps": [],
+              "execution_actors": []
+            }
+          ],
+          "has_sql": true,
+          "sql_hash": "0b47e0c706eb0089dd60f58ec6647b86843743b813cd6e1d590931d9ac3eb63b",
+          "snapshot_hash": "2395f5f6fc4ab833a574026a2a881fcc2cb8ef244e06c12d82daa152f0286477",
+          "has_ddl": true,
+          "rollback_enabled": true,
+          "ticket_type": "normal",
+          "rollback_status": "not_requested",
+          "version": 1,
+          "submitted_at": "2026-11-25T03:01:00.000Z",
+          "terminal_at": "2026-11-25T03:02:00.000Z"
+        },
+        {
+          "id": "00000000-0000-4000-8000-000000000242",
+          "display_number": "YR-20261124-900059",
+          "submitter_user_id": "00000000-0000-4000-8000-000000000002",
+          "submitter_username": "f12-submitter",
+          "submitter_display_name": "F12 submitter",
+          "title": "adv-order-59-running",
+          "state": "running",
+          "current_stage_position": 1,
+          "stages": [
+            {
+              "id": "00000000-0000-4000-8000-000000000243",
+              "position": 1,
+              "datasource_name": "f12-pg-target",
+              "state": "succeeded",
+              "approval_steps": [],
+              "execution_actors": []
+            }
+          ],
+          "has_sql": true,
+          "sql_hash": "0b47e0c706eb0089dd60f58ec6647b86843743b813cd6e1d590931d9ac3eb63b",
+          "snapshot_hash": "2395f5f6fc4ab833a574026a2a881fcc2cb8ef244e06c12d82daa152f0286477",
+          "has_ddl": true,
+          "rollback_enabled": true,
+          "ticket_type": "normal",
+          "rollback_status": "not_requested",
+          "version": 1,
+          "submitted_at": "2026-11-25T03:03:00.000Z",
+          "terminal_at": null
+        },
+        {
+          "id": "00000000-0000-4000-8000-000000000244",
+          "display_number": "YR-20261124-900058",
+          "submitter_user_id": "00000000-0000-4000-8000-000000000002",
+          "submitter_username": "f12-submitter",
+          "submitter_display_name": "F12 submitter",
+          "title": "adv-order-58-scheduled",
+          "state": "scheduled",
+          "current_stage_position": 1,
+          "stages": [
+            {
+              "id": "00000000-0000-4000-8000-000000000245",
+              "position": 1,
+              "datasource_name": "f12-pg-target",
+              "state": "succeeded",
+              "approval_steps": [],
+              "execution_actors": []
+            }
+          ],
+          "has_sql": true,
+          "sql_hash": "0b47e0c706eb0089dd60f58ec6647b86843743b813cd6e1d590931d9ac3eb63b",
+          "snapshot_hash": "2395f5f6fc4ab833a574026a2a881fcc2cb8ef244e06c12d82daa152f0286477",
+          "has_ddl": true,
+          "rollback_enabled": true,
+          "ticket_type": "normal",
+          "rollback_status": "not_requested",
+          "version": 1,
+          "submitted_at": "2026-11-25T03:04:00.000Z",
+          "terminal_at": null
+        },
+        {
+          "id": "00000000-0000-4000-8000-000000000246",
+          "display_number": "YR-20261124-900057",
+          "submitter_user_id": "00000000-0000-4000-8000-000000000002",
+          "submitter_username": "f12-submitter",
+          "submitter_display_name": "F12 submitter",
+          "title": "adv-order-57-stage_execution_pending",
+          "state": "stage_execution_pending",
+          "current_stage_position": 1,
+          "stages": [
+            {
+              "id": "00000000-0000-4000-8000-000000000247",
+              "position": 1,
+              "datasource_name": "f12-pg-target",
+              "state": "succeeded",
+              "approval_steps": [],
+              "execution_actors": []
+            }
+          ],
+          "has_sql": true,
+          "sql_hash": "0b47e0c706eb0089dd60f58ec6647b86843743b813cd6e1d590931d9ac3eb63b",
+          "snapshot_hash": "2395f5f6fc4ab833a574026a2a881fcc2cb8ef244e06c12d82daa152f0286477",
+          "has_ddl": true,
+          "rollback_enabled": true,
+          "ticket_type": "normal",
+          "rollback_status": "not_requested",
+          "version": 1,
+          "submitted_at": "2026-11-25T03:05:00.000Z",
+          "terminal_at": null
+        },
+        {
+          "id": "00000000-0000-4000-8000-000000000248",
+          "display_number": "YR-20261124-900056",
+          "submitter_user_id": "00000000-0000-4000-8000-000000000002",
+          "submitter_username": "f12-submitter",
+          "submitter_display_name": "F12 submitter",
+          "title": "adv-order-56-stage_approval_active",
+          "state": "stage_approval_active",
+          "current_stage_position": 1,
+          "stages": [
+            {
+              "id": "00000000-0000-4000-8000-000000000249",
+              "position": 1,
+              "datasource_name": "f12-pg-target",
+              "state": "succeeded",
+              "approval_steps": [],
+              "execution_actors": []
+            }
+          ],
+          "has_sql": true,
+          "sql_hash": "0b47e0c706eb0089dd60f58ec6647b86843743b813cd6e1d590931d9ac3eb63b",
+          "snapshot_hash": "2395f5f6fc4ab833a574026a2a881fcc2cb8ef244e06c12d82daa152f0286477",
+          "has_ddl": true,
+          "rollback_enabled": true,
+          "ticket_type": "normal",
+          "rollback_status": "not_requested",
+          "version": 1,
+          "submitted_at": "2026-11-25T03:06:00.000Z",
+          "terminal_at": null
+        },
+        {
+          "id": "00000000-0000-4000-8000-000000000250",
+          "display_number": "YR-20261124-900055",
+          "submitter_user_id": "00000000-0000-4000-8000-000000000002",
+          "submitter_username": "f12-submitter",
+          "submitter_display_name": "F12 submitter",
+          "title": "adv-order-55-submitted",
+          "state": "submitted",
+          "current_stage_position": 1,
+          "stages": [
+            {
+              "id": "00000000-0000-4000-8000-000000000251",
+              "position": 1,
+              "datasource_name": "f12-pg-target",
+              "state": "succeeded",
+              "approval_steps": [],
+              "execution_actors": []
+            }
+          ],
+          "has_sql": true,
+          "sql_hash": "0b47e0c706eb0089dd60f58ec6647b86843743b813cd6e1d590931d9ac3eb63b",
+          "snapshot_hash": "2395f5f6fc4ab833a574026a2a881fcc2cb8ef244e06c12d82daa152f0286477",
+          "has_ddl": true,
+          "rollback_enabled": true,
+          "ticket_type": "normal",
+          "rollback_status": "not_requested",
+          "version": 1,
+          "submitted_at": "2026-11-25T03:07:00.000Z",
+          "terminal_at": null
+        },
+        {
+          "id": "00000000-0000-4000-8000-000000000252",
+          "display_number": "YR-20261124-900054",
+          "submitter_user_id": "00000000-0000-4000-8000-000000000002",
+          "submitter_username": "f12-submitter",
+          "submitter_display_name": "F12 submitter",
+          "title": "adv-order-54-invalid",
+          "state": "invalid",
+          "current_stage_position": 1,
+          "stages": [
+            {
+              "id": "00000000-0000-4000-8000-000000000253",
+              "position": 1,
+              "datasource_name": "f12-pg-target",
+              "state": "succeeded",
+              "approval_steps": [],
+              "execution_actors": []
+            }
+          ],
+          "has_sql": true,
+          "sql_hash": "0b47e0c706eb0089dd60f58ec6647b86843743b813cd6e1d590931d9ac3eb63b",
+          "snapshot_hash": "2395f5f6fc4ab833a574026a2a881fcc2cb8ef244e06c12d82daa152f0286477",
+          "has_ddl": true,
+          "rollback_enabled": true,
+          "ticket_type": "normal",
+          "rollback_status": "not_requested",
+          "version": 1,
+          "submitted_at": "2026-11-25T03:08:00.000Z",
+          "terminal_at": "2026-11-25T03:02:00.000Z"
+        },
+        {
+          "id": "00000000-0000-4000-8000-000000000254",
+          "display_number": "YR-20261124-900053",
+          "submitter_user_id": "00000000-0000-4000-8000-000000000002",
+          "submitter_username": "f12-submitter",
+          "submitter_display_name": "F12 submitter",
+          "title": "adv-order-53-missed_schedule",
+          "state": "missed_schedule",
+          "current_stage_position": 1,
+          "stages": [
+            {
+              "id": "00000000-0000-4000-8000-000000000255",
+              "position": 1,
+              "datasource_name": "f12-pg-target",
+              "state": "succeeded",
+              "approval_steps": [],
+              "execution_actors": []
+            }
+          ],
+          "has_sql": true,
+          "sql_hash": "0b47e0c706eb0089dd60f58ec6647b86843743b813cd6e1d590931d9ac3eb63b",
+          "snapshot_hash": "2395f5f6fc4ab833a574026a2a881fcc2cb8ef244e06c12d82daa152f0286477",
+          "has_ddl": true,
+          "rollback_enabled": true,
+          "ticket_type": "normal",
+          "rollback_status": "not_requested",
+          "version": 1,
+          "submitted_at": "2026-11-25T03:09:00.000Z",
+          "terminal_at": "2026-11-25T03:02:00.000Z"
+        },
+        {
+          "id": "00000000-0000-4000-8000-000000000256",
+          "display_number": "YR-20261124-900052",
+          "submitter_user_id": "00000000-0000-4000-8000-000000000002",
+          "submitter_username": "f12-submitter",
+          "submitter_display_name": "F12 submitter",
+          "title": "adv-order-52-blocked_datasource_unavailable",
+          "state": "blocked_datasource_unavailable",
+          "current_stage_position": 1,
+          "stages": [
+            {
+              "id": "00000000-0000-4000-8000-000000000257",
+              "position": 1,
+              "datasource_name": "f12-pg-target",
+              "state": "succeeded",
+              "approval_steps": [],
+              "execution_actors": []
+            }
+          ],
+          "has_sql": true,
+          "sql_hash": "0b47e0c706eb0089dd60f58ec6647b86843743b813cd6e1d590931d9ac3eb63b",
+          "snapshot_hash": "2395f5f6fc4ab833a574026a2a881fcc2cb8ef244e06c12d82daa152f0286477",
+          "has_ddl": true,
+          "rollback_enabled": true,
+          "ticket_type": "normal",
+          "rollback_status": "not_requested",
+          "version": 1,
+          "submitted_at": "2026-11-25T03:10:00.000Z",
+          "terminal_at": null
+        }
+      ],
+      "page": {
+        "has_more": true,
+        "next_cursor": "2026-11-02T01:04:00Z|00000000-0000-4000-8000-000000000256"
+      }
+    },
+    "err_code": 0,
+    "message": "ok",
+    "request_id": "00000000-0000-4000-8000-999999999999"
+  }
+}

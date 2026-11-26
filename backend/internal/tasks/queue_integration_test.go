@@ -5,62 +5,18 @@ package tasks
 import (
 	"context"
 	"errors"
-	"fmt"
-	"os"
-	"syscall"
 	"testing"
 	"time"
 
 	"github.com/google/uuid"
-	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
-	gormlogger "gorm.io/gorm/logger"
-)
 
-func acquireTasksTestLock(t *testing.T) {
-	t.Helper()
-	path := os.TempDir() + "/yearningx-itest-shared.lock"
-	f, err := os.OpenFile(path, os.O_CREATE|os.O_RDWR, 0o600)
-	if err != nil {
-		return
-	}
-	if err := syscall.Flock(int(f.Fd()), syscall.LOCK_EX); err != nil {
-		_ = f.Close()
-		return
-	}
-	t.Cleanup(func() {
-		_ = syscall.Flock(int(f.Fd()), syscall.LOCK_UN)
-		_ = f.Close()
-	})
-}
+	"github.com/cookieY/YearningX/backend/internal/platform/testkit"
+)
 
 func openTasksIntegrationDB(t *testing.T) *gorm.DB {
 	t.Helper()
-	password := os.Getenv("YEARNING_TEST_DATABASE_PASSWORD")
-	if password == "" {
-		t.Skip("integration PostgreSQL not configured: set YEARNING_TEST_DATABASE_PASSWORD")
-	}
-	acquireTasksTestLock(t)
-	env := func(key, def string) string {
-		if v := os.Getenv(key); v != "" {
-			return v
-		}
-		return def
-	}
-	dsn := fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=%s",
-		env("YEARNING_TEST_DATABASE_HOST", "localhost"),
-		env("YEARNING_TEST_DATABASE_PORT", "54330"),
-		env("YEARNING_TEST_DATABASE_USER", "yearning"),
-		password,
-		env("YEARNING_TEST_DATABASE_DBNAME", "yearning_v4"),
-		env("YEARNING_TEST_DATABASE_SSLMODE", "disable"))
-	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{Logger: gormlogger.Discard})
-	if err != nil {
-		t.Fatalf("postgres connect: %v", err)
-	}
-	if sqlDB, err := db.DB(); err == nil {
-		t.Cleanup(func() { _ = sqlDB.Close() })
-	}
+	db := testkit.OpenPG(t)
 	if err := db.Exec("truncate table async_tasks").Error; err != nil {
 		t.Fatalf("truncate async_tasks: %v", err)
 	}

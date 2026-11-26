@@ -9,7 +9,6 @@ package httpapi
 import (
 	"context"
 	"fmt"
-	"os"
 	"strconv"
 	"strings"
 	"testing"
@@ -19,6 +18,7 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/cookieY/YearningX/backend/internal/database"
+	"github.com/cookieY/YearningX/backend/internal/platform/testenv"
 	queryapp "github.com/cookieY/YearningX/backend/internal/query/application"
 	"github.com/cookieY/YearningX/backend/internal/scheduler"
 )
@@ -73,41 +73,25 @@ func newB11Fixture(t *testing.T) *b11Fixture {
 	return fx
 }
 
-// resolveB11TargetPG resolves the real target service coordinates. It keeps
-// the historical localhost:54330/yearning default and honors the adapter PG
-// environment used by the isolated F12 target at 127.0.0.1:54333.
+// resolveB11TargetPG resolves the real target service coordinates via testenv.
 func resolveB11TargetPG(t *testing.T, base *b10Fixture) b11TargetPGConfig {
 	t.Helper()
 	scope := strings.ReplaceAll(uuid.NewString(), "-", "")[:20]
-	port := 54330
-	if raw := os.Getenv("YEARNING_TEST_ADAPTER_PG_PORT"); raw != "" {
-		parsed, err := strconv.Atoi(raw)
-		if err != nil || parsed <= 0 {
-			t.Fatalf("invalid YEARNING_TEST_ADAPTER_PG_PORT %q", raw)
-		}
-		port = parsed
-	}
-	password := os.Getenv("YEARNING_TEST_ADAPTER_PG_PASSWORD")
-	if password == "" {
+	cfg, ok := testenv.ResolveTargetPG(testenv.WithDefaultPort(54330))
+	password := cfg.Password
+	if !ok || password == "" {
 		password = base.b10PGPassword(t)
 	}
 	return b11TargetPGConfig{
-		Host:            envOrB6("YEARNING_TEST_ADAPTER_PG_HOST", "localhost"),
-		Port:            port,
-		AdminUser:       envOrB6("YEARNING_TEST_ADAPTER_PG_USER", "yearning"),
+		Host:            cfg.Host,
+		Port:            cfg.Port,
+		AdminUser:       cfg.User,
 		AdminPassword:   password,
 		FixtureDatabase: "yearning_b11_target_" + scope,
 		FixtureRole:     "yearning_b11_role_" + scope,
 		FixturePassword: "b11_" + scope,
 		ApplicationName: "yearning_b11_fixture_" + scope,
 	}
-}
-
-func envOrB6(key, fallback string) string {
-	if value := os.Getenv(key); value != "" {
-		return value
-	}
-	return fallback
 }
 
 // b11EnsureQueryTarget provisions a unique database and role on the target

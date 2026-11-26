@@ -77,7 +77,7 @@ func (fx *b3Fixture) adminCreateDatasource(t *testing.T, name string) string {
 	t.Helper()
 	code, body, raw := fx.admin.do("POST", "/api/v4/admin/datasources", map[string]any{
 		"name": name, "engine": "mysql", "compatibility_mode": "mysql",
-		"deployment_kind": "native", "host": name + ".example.com", "port": 3306,
+		"deployment_kind": "native", "host": name + ".invalid", "port": 3306,
 		"version_constraint": "8.0.x", "enabled": true,
 		"credentials": []map[string]any{{
 			"purpose": "execution", "username": "root",

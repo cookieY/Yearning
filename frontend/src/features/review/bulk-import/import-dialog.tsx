@@ -14,6 +14,7 @@ import {
   DialogTitle,
 } from "@/shared/components/ui/dialog";
 import { Progress } from "@/shared/components/ui/progress";
+import { formatBytes } from "@/shared/lib/format";
 import { AlertTriangle, Ban, CircleCheck, FileUp, TriangleAlert } from "lucide-react";
 
 /**
@@ -23,12 +24,6 @@ import { AlertTriangle, Ban, CircleCheck, FileUp, TriangleAlert } from "lucide-r
  * in-memory SQL copy to the page, which uploads it through the generated
  * client — the server remains the final judge.
  */
-
-function formatBytes(bytes: number): string {
-  if (bytes >= 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MiB`;
-  if (bytes >= 1024) return `${(bytes / 1024).toFixed(1)} KiB`;
-  return `${String(bytes)} B`;
-}
 
 export interface ImportDialogProps {
   open: boolean;

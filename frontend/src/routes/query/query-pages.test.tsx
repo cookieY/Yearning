@@ -68,7 +68,9 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter, Route, Routes } from "react-router";
 import { HttpResponse, http } from "msw";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { apiRoute } from "@/shared/mock/api-route";
 import { server } from "@/test/msw/server";
+import { SESSION_USER_ID, stubSession } from "@/test/session";
 import { OPERATION_ERROR_PROFILES } from "@/api/generated/projections/operation-error-profiles";
 import {
   QUERY_FIXTURE_DS_MYSQL_ID,
@@ -77,7 +79,7 @@ import {
   resetQueryFixture,
   seedQueryScenario,
 } from "@/shared/mock/query-fixture";
-import { setMockIdentity } from "@/shared/mock/identity-store";
+import { MOCK_IDENTITY_IDS, setMockIdentity } from "@/shared/mock/identity-store";
 import { SessionProvider } from "@/features/auth/session-provider";
 import i18next from "@/shared/i18n";
 import QueryEntryPage from "@/routes/query/query-entry-page";
@@ -92,31 +94,7 @@ import { ApprovalsWorkspacePage } from "@/routes/approvals/approval-queue-page";
  * and key states of the unified Query Orders view.
  */
 
-const SESSION_USER_ID = "0198d9cc-e65d-7b9d-a8aa-3c81945f99ac";
 const REVIEWER_USER_ID = "0198d9cc-e65d-7b9d-a8aa-3c81945fa001";
-
-function stubSession(admin: boolean): void {
-  server.use(
-    http.get("*/users/me", () =>
-      HttpResponse.json({
-        err_code: 0,
-        message: "ok",
-        data: {
-          id: SESSION_USER_ID,
-          username: "henry",
-          display_name: "henry",
-          email: null,
-          is_builtin_admin: admin,
-          version: 1,
-          created_at: "2026-08-28T08:00:00Z",
-          updated_at: "2026-08-28T08:00:00Z",
-          can_access_admin: admin,
-        },
-        request_id: SESSION_USER_ID,
-      }),
-    ),
-  );
-}
 
 function renderAt(path: string): void {
   const client = new QueryClient({
@@ -169,7 +147,7 @@ describe("gate: query allows single SELECT only with unbounded-total pagination"
   it("renders the server's 4007 refusal inline and never blocks client-side only", async () => {
     seedQueryScenario("query-session");
     stubSession(false);
-    renderAt("/query/sessions/qs-fixture-active");
+    renderAt("/query/sessions/6f0f2b3c-5555-4555-8555-000000000101");
     await screen.findByTestId("query-workspace");
     await chooseSchema("app");
     // The editor is a lazy Monaco chunk in jsdom; set the SQL through the
@@ -183,7 +161,7 @@ describe("gate: query allows single SELECT only with unbounded-total pagination"
   it("reports rows loaded from the cursor, never a fabricated total", async () => {
     seedQueryScenario("query-session");
     stubSession(false);
-    renderAt("/query/sessions/qs-fixture-active");
+    renderAt("/query/sessions/6f0f2b3c-5555-4555-8555-000000000101");
     await screen.findByTestId("query-workspace");
     await chooseSchema("app");
     const textarea = screen.getByTestId("query-sql-editor");
@@ -202,7 +180,7 @@ describe("gate: query allows single SELECT only with unbounded-total pagination"
   it("marks vocabulary columns as masked in the result header", async () => {
     seedQueryScenario("query-session");
     stubSession(false);
-    renderAt("/query/sessions/qs-fixture-active");
+    renderAt("/query/sessions/6f0f2b3c-5555-4555-8555-000000000101");
     await screen.findByTestId("query-workspace");
     await chooseSchema("app");
     const textarea = screen.getByTestId("query-sql-editor");
@@ -215,7 +193,7 @@ describe("gate: query allows single SELECT only with unbounded-total pagination"
   it("shows SHOW FULL FIELDS parity columns in the structure dialog (§18.51)", async () => {
     seedQueryScenario("query-session");
     stubSession(false);
-    renderAt("/query/sessions/qs-fixture-active");
+    renderAt("/query/sessions/6f0f2b3c-5555-4555-8555-000000000101");
     await screen.findByTestId("query-workspace");
     await chooseSchema("app");
     fireEvent.contextMenu(screen.getByTestId("query-tree-table-app-users"));
@@ -240,7 +218,7 @@ describe("gate: query allows single SELECT only with unbounded-total pagination"
   it("syncs sql state when clicking a table in the metadata tree so running without typing executes the template", async () => {
     seedQueryScenario("query-session");
     stubSession(false);
-    renderAt("/query/sessions/qs-fixture-active");
+    renderAt("/query/sessions/6f0f2b3c-5555-4555-8555-000000000101");
     await screen.findByTestId("query-workspace");
     await chooseSchema("app");
     await userEvent.click(screen.getByTestId("query-tree-table-app-users"));
@@ -253,7 +231,7 @@ describe("gate: query allows single SELECT only with unbounded-total pagination"
   it("only shows multiple result tabs when multiple SELECT statements are executed at the same time", async () => {
     seedQueryScenario("query-session");
     stubSession(false);
-    renderAt("/query/sessions/qs-fixture-active");
+    renderAt("/query/sessions/6f0f2b3c-5555-4555-8555-000000000101");
     await screen.findByTestId("query-workspace");
     await chooseSchema("app");
     const textarea = screen.getByTestId("query-sql-editor");
@@ -285,7 +263,7 @@ describe("gate: query allows single SELECT only with unbounded-total pagination"
 
     const executedPayloads: Array<{ schema_name: string; sql: string }> = [];
     server.use(
-      http.post("*/query-sessions/:sessionId/executions", async ({ request }) => {
+      http.post(apiRoute("/query-sessions/:sessionId/executions"), async ({ request }) => {
         const body = (await request.json()) as { schema_name: string; sql: string };
         executedPayloads.push({ schema_name: body.schema_name, sql: body.sql });
         return HttpResponse.json({
@@ -304,7 +282,7 @@ describe("gate: query allows single SELECT only with unbounded-total pagination"
       }),
     );
 
-    renderAt("/query/sessions/qs-fixture-active");
+    renderAt("/query/sessions/6f0f2b3c-5555-4555-8555-000000000101");
     await screen.findByTestId("query-workspace");
     const textarea = screen.getByTestId<HTMLTextAreaElement>("query-sql-editor");
 
@@ -350,7 +328,7 @@ describe("gate: query allows single SELECT only with unbounded-total pagination"
 
     let failure = "data_type_mismatch";
     server.use(
-      http.post("*/query-sessions/:sessionId/executions", () =>
+      http.post(apiRoute("/query-sessions/:sessionId/executions"), () =>
         HttpResponse.json({
           err_code: 4011,
           message: "QUERY_STATEMENT_REJECTED",
@@ -362,7 +340,7 @@ describe("gate: query allows single SELECT only with unbounded-total pagination"
       ),
     );
 
-    renderAt("/query/sessions/qs-fixture-active");
+    renderAt("/query/sessions/6f0f2b3c-5555-4555-8555-000000000101");
     await screen.findByTestId("query-workspace");
     const textarea = screen.getByTestId("query-sql-editor");
     await userEvent.clear(textarea);
@@ -388,7 +366,7 @@ describe("gate: admin revocation is user-perceptible and admin cannot view queri
   it("shows the non-dismissible revocation notice with the reason after the grant is revoked", async () => {
     seedQueryScenario("query-revoked");
     stubSession(false);
-    renderAt("/query/sessions/qs-fixture-active");
+    renderAt("/query/sessions/6f0f2b3c-5555-4555-8555-000000000101");
     const notice = await screen.findByTestId("query-revoked-notice", undefined, { timeout: 8000 });
     expect(notice).toHaveTextContent("\u8bbf\u95ee\u8d44\u683c\u5df2\u88ab\u64a4\u9500");
     expect(notice).toHaveTextContent("least-privilege rotation");
@@ -396,12 +374,26 @@ describe("gate: admin revocation is user-perceptible and admin cannot view queri
     expect(screen.getByTestId("query-run")).toBeDisabled();
   });
 
-  it("renders the reviewer revocation surface with the terminating semantics copy", async () => {
+  it("renders the reviewer revocation surface with the terminating semantics copy and hides it from non-reviewer grantees", async () => {
     seedQueryScenario("query-session");
+    // Non-reviewer grantee (henry) cannot revoke their own grant; GrantRevocationCard stays empty.
+    setMockIdentity("henry");
     stubSession(false);
     renderAt("/approvals/query-access");
     expect(await screen.findByRole("heading", { level: 1, name: "\u67e5\u8be2\u8bbf\u95ee\u5ba1\u6279" })).toBeVisible();
     expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
+    expect(screen.queryByTestId("query-access-grants-table")).not.toBeInTheDocument();
+
+    // Frozen reviewer (reviewer-a) sees the active grant and revocation dialog.
+    cleanup();
+    setMockIdentity("reviewer-a");
+    stubSession({
+      id: REVIEWER_USER_ID,
+      username: "reviewer-a",
+      admin: false,
+      requestId: SESSION_USER_ID,
+    });
+    renderAt("/approvals/query-access");
     const grantsTable = await screen.findByTestId("query-access-grants-table");
     await openRowActionsAt(within(grantsTable).getByTestId(/query-grant-actions-/));
     await userEvent.click(screen.getByTestId(/query-access-revoke-/));
@@ -409,6 +401,7 @@ describe("gate: admin revocation is user-perceptible and admin cannot view queri
     expect(dialog).toHaveTextContent("\u7ec8\u6b62\u8be5\u6388\u6743\u4e0b\u5168\u90e8\u67e5\u8be2\u4f1a\u8bdd");
     // Revocation is terminating access, never reading it.
     expect(dialog.textContent).not.toContain("\u67e5\u770b\u67e5\u8be2");
+    setMockIdentity("henry");
   });
 
   it("grants apply to the builtin admin identity too — no implicit override, no exclusion (§18.48)", async () => {
@@ -446,7 +439,7 @@ describe("query entry mode branches (server-driven)", () => {
     });
     renderAt("/query");
     await userEvent.click(await screen.findByTestId(/query-flow-enter-/));
-    // Reuse seeded active session qs-fixture-active: enter workspace directly with zero new POST requests.
+    // Reuse seeded active session 6f0f2b3c-5555-4555-8555-000000000101: enter workspace directly with zero new POST requests.
     await screen.findByTestId("query-workspace");
     expect(creates).toHaveLength(0);
     server.events.removeAllListeners();
@@ -482,7 +475,7 @@ describe("query entry mode branches (server-driven)", () => {
   it("replaces the apply button with a disabled pending button when the flow already has a pending access request", async () => {
     seedQueryScenario("query-flow");
     stubSession(false);
-    await fetch("/query-access-requests", {
+    await fetch("/api/v4/query-access-requests", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -498,6 +491,96 @@ describe("query entry mode branches (server-driven)", () => {
     expect(pendingBtn).toBeDisabled();
     expect(pendingBtn).toHaveTextContent("\u5ba1\u6279\u4e2d");
     expect(screen.queryByTestId(/query-flow-apply-/)).toBeNull();
+
+    // Requester can withdraw the pending request directly from the flow card.
+    const withdrawBtn = await screen.findByTestId(/query-flow-withdraw-/);
+    expect(withdrawBtn).toBeVisible();
+    expect(withdrawBtn).toBeEnabled();
+    await userEvent.click(withdrawBtn);
+
+    const dialog = await screen.findByTestId("query-withdraw-dialog");
+    await userEvent.type(within(dialog).getByTestId("query-withdraw-reason"), "no longer needed");
+    await userEvent.click(within(dialog).getByTestId("query-withdraw-confirm"));
+
+    await waitFor(() => {
+      expect(screen.queryByTestId("query-withdraw-dialog")).toBeNull();
+    });
+    expect(await screen.findByTestId(/query-flow-apply-/)).toBeVisible();
+    expect(screen.queryByTestId(/query-flow-pending-/)).toBeNull();
+    expect(screen.queryByTestId(/query-flow-withdraw-/)).toBeNull();
+  });
+
+  it("isolates pending requests by flow_id when two flows share overlapping datasource sets", async () => {
+    seedQueryScenario("query-flow");
+    stubSession(false);
+    const flowA = QUERY_FIXTURE_FLOW_ID;
+    const flowB = "00000000-0000-4000-8000-00000000f002";
+    const ds1 = QUERY_FIXTURE_DS_MYSQL_ID;
+    const ds2 = "00000000-0000-4000-8000-00000000d002";
+
+    server.use(
+      http.get(apiRoute("/users/me/flows"), () =>
+        HttpResponse.json({
+          err_code: 0,
+          name: "OK",
+          message: "ok",
+          request_id: "req-two-flows",
+          data: {
+            items: [
+              {
+                id: flowA,
+                name: "f12-query-flow",
+                flow_type: "query_access",
+                enabled: true,
+                status: "enabled",
+                rule_set_id: null,
+                approval_steps: [{ position: 1, actors: [{ user_id: "00000000-0000-4000-8000-000000000002" }] }],
+                query_capabilities: [{ datasource_id: ds1, datasource_name: "pg-main", can_query: true, can_export: true }],
+                version: 1,
+                created_at: "2026-08-01T00:00:00Z",
+                updated_at: "2026-08-01T00:00:00Z",
+              },
+              {
+                id: flowB,
+                name: "f12-owner-query-flow",
+                flow_type: "query_access",
+                enabled: true,
+                status: "enabled",
+                rule_set_id: null,
+                approval_steps: [{ position: 1, actors: [{ user_id: "00000000-0000-4000-8000-000000000002" }] }],
+                query_capabilities: [
+                  { datasource_id: ds1, datasource_name: "pg-main", can_query: true, can_export: true },
+                  { datasource_id: ds2, datasource_name: "mysql-main", can_query: true, can_export: true },
+                ],
+                version: 1,
+                created_at: "2026-08-01T00:00:00Z",
+                updated_at: "2026-08-01T00:00:00Z",
+              },
+            ],
+          },
+        }),
+      ),
+    );
+
+    // Submit a pending request on flowA only (whose datasource [ds1] is a subset of flowB [ds1, ds2]).
+    await fetch("/api/v4/query-access-requests", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        flow_id: flowA,
+        datasource_ids: [ds1],
+        requested_until: "2026-12-31T23:59:00Z",
+        reason: "only flow A",
+      }),
+    });
+
+    renderAt("/query");
+    expect(await screen.findByTestId(`query-flow-pending-${flowA}`)).toBeDisabled();
+    expect(await screen.findByTestId(`query-flow-withdraw-${flowA}`)).toBeEnabled();
+    // flowB must stay in "Apply Access" state and must NOT borrow flowA's pending request.
+    expect(await screen.findByTestId(`query-flow-apply-${flowB}`)).toBeEnabled();
+    expect(screen.queryByTestId(`query-flow-pending-${flowB}`)).toBeNull();
+    expect(screen.queryByTestId(`query-flow-withdraw-${flowB}`)).toBeNull();
   });
 
   it("renders 3010 DATASOURCE_UNAVAILABLE inline from operation-error-profiles when query access create hits an unreachable datasource and allows retry", async () => {
@@ -516,7 +599,7 @@ describe("query entry mode branches (server-driven)", () => {
     stubSession(false);
     let postCount = 0;
     server.use(
-      http.post("*/query-access-requests", () => {
+      http.post(apiRoute("/query-access-requests"), () => {
         postCount += 1;
         if (postCount === 1) {
           return HttpResponse.json({
@@ -575,7 +658,7 @@ describe("review R1 fixes", () => {
     resetAdminFixture();
     window.localStorage.setItem("yearning-mock-auth", "admin");
     // Seed an OIDC provider so the table carries a real OIDC row.
-    const seedResponse = await fetch("/admin/identity-providers", {
+    const seedResponse = await fetch("/api/v4/admin/identity-providers", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -624,7 +707,7 @@ describe("review R1 fixes", () => {
     });
     // The provider survived with its secret still configured.
     const after = (await (
-      await fetch(`/admin/identity-providers/${seeded.data.id}`)
+      await fetch(`/api/v4/admin/identity-providers/${seeded.data.id}`)
     ).json()) as { err_code: number; data: { secret_configured: boolean } };
     expect(after.err_code).toBe(0);
     expect(after.data.secret_configured).toBe(true);
@@ -638,43 +721,128 @@ describe("review R1 fixes", () => {
     // The handlers read the identity dimension (localStorage), so both the
     // session stub and the store must say reviewer-a.
     setMockIdentity("reviewer-a");
-    server.use(
-      http.get("*/users/me", () =>
-        HttpResponse.json({
-          err_code: 0,
-          message: "ok",
-          data: {
-            id: REVIEWER_USER_ID,
-            username: "reviewer-a",
-            display_name: "reviewer-a",
-            email: null,
-            is_builtin_admin: false,
-            version: 1,
-            created_at: "2026-08-28T08:00:00Z",
-            updated_at: "2026-08-28T08:00:00Z",
-            can_access_admin: false,
-          },
-          request_id: SESSION_USER_ID,
-        }),
-      ),
-    );
+    stubSession({
+      id: REVIEWER_USER_ID,
+      username: "reviewer-a",
+      admin: false,
+      requestId: SESSION_USER_ID,
+    });
     window.localStorage.setItem("yearning-mock-auth", "default");
     renderAt("/approvals/query-access");
-    const row = await screen.findByTestId("query-access-pending-qar-fixture-pending");
-    await openRowActionsAt(within(row).getByTestId("query-access-actions-qar-fixture-pending"));
-    await userEvent.click(screen.getByTestId("query-access-approve-qar-fixture-pending"));
+    const row = await screen.findByTestId("query-access-pending-6f0f2b3c-5555-4555-8555-000000000201");
+    await openRowActionsAt(within(row).getByTestId("query-access-actions-6f0f2b3c-5555-4555-8555-000000000201"));
+    await userEvent.click(screen.getByTestId("query-access-approve-6f0f2b3c-5555-4555-8555-000000000201"));
     await userEvent.click(screen.getByTestId("query-access-decision-confirm"));
     // The invalidated list re-reads: the decided row remains in the table with
     // its updated state (Grant Active) and its decision actions removed.
     await waitFor(
       () => {
-        const updatedRow = screen.getByTestId("query-access-pending-qar-fixture-pending");
+        const updatedRow = screen.getByTestId("query-access-pending-6f0f2b3c-5555-4555-8555-000000000201");
         expect(updatedRow).toBeVisible();
         expect(updatedRow).toHaveTextContent("\u6388\u6743\u751f\u6548");
-        expect(within(updatedRow).queryByTestId("query-access-actions-qar-fixture-pending")).not.toBeInTheDocument();
+        expect(within(updatedRow).queryByTestId("query-access-actions-6f0f2b3c-5555-4555-8555-000000000201")).not.toBeInTheDocument();
       },
       { timeout: 4000 },
     );
+  });
+
+  it("hides requester-only pending requests from /approvals/query-access and tab badge while preserving dual-role and non-active-step behavior", async () => {
+    seedQueryScenario("query-flow");
+    // 1. Non-approver requester (henry) creates a pending request whose frozen approver is reviewer-a.
+    setMockIdentity("henry");
+    stubSession(false);
+    window.localStorage.setItem("yearning-mock-auth", "default");
+    const createRes = await fetch("/api/v4/query-access-requests", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Idempotency-Key": "req-only-test-1" },
+      body: JSON.stringify({
+        flow_id: QUERY_FIXTURE_FLOW_ID,
+        datasource_ids: [QUERY_FIXTURE_DS_MYSQL_ID],
+        requested_until: "2026-12-31T00:00:00Z",
+        reason: "requester-only visibility check",
+      }),
+    });
+    const created = (await createRes.json()) as { err_code: number; data: { id: string; can_decide: boolean } };
+    expect(created.err_code).toBe(0);
+    expect(created.data.can_decide).toBe(false);
+
+    // Requester visits /approvals/query-access: sees empty approval queue and NO badge or decision actions.
+    renderAt("/approvals/query-access");
+    expect(await screen.findByTestId("query-access-pending-empty")).toBeVisible();
+    expect(screen.queryByTestId(`query-access-pending-${created.data.id}`)).not.toBeInTheDocument();
+    expect(screen.queryByTestId(`query-access-actions-${created.data.id}`)).not.toBeInTheDocument();
+    expect(screen.queryByTestId("approvals-tab-query-badge")).not.toBeInTheDocument();
+
+    // 2. Same-identity dual-role actor (owner is both requester and Step 1 frozen approver):
+    // sees own pending row in /approvals/query-access with can_decide=true, decision actions, and badge "1".
+    cleanup();
+    seedQueryScenario("query-flow");
+    setMockIdentity("owner");
+    stubSession({
+      id: MOCK_IDENTITY_IDS.owner,
+      username: "owner",
+      admin: false,
+      requestId: MOCK_IDENTITY_IDS.owner,
+    });
+    const dualCreateRes = await fetch("/api/v4/query-access-requests", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Idempotency-Key": "dual-role-test-1" },
+      body: JSON.stringify({
+        flow_id: QUERY_FIXTURE_FLOW_ID,
+        datasource_ids: [QUERY_FIXTURE_DS_MYSQL_ID],
+        requested_until: "2026-12-31T00:00:00Z",
+        reason: "dual-role self-approval visibility check",
+      }),
+    });
+    const dualCreated = (await dualCreateRes.json()) as { err_code: number; data: { id: string; can_decide: boolean } };
+    expect(dualCreated.err_code).toBe(0);
+    expect(dualCreated.data.can_decide).toBe(true);
+    renderAt("/approvals/query-access");
+    const dualRow = await screen.findByTestId(`query-access-pending-${dualCreated.data.id}`);
+    expect(dualRow).toBeVisible();
+    expect(within(dualRow).getByTestId(`query-access-actions-${dualCreated.data.id}`)).toBeVisible();
+    expect(await screen.findByTestId("approvals-tab-query-badge")).toHaveTextContent("1");
+
+    // 3. Non-active-step reviewer (can_decide=false in scope=reviewer response): sees the row with no approve/reject menu and no badge.
+    cleanup();
+    server.use(
+      http.get(apiRoute("/query-access-requests"), () =>
+        HttpResponse.json({
+          err_code: 0,
+          message: "ok",
+          request_id: "0198d9cc-e65d-7b9d-a8aa-3c81945f9999",
+          data: {
+            items: [
+              {
+                id: "6f0f2b3c-5555-4555-8555-000000000299",
+                requester_user_id: SESSION_USER_ID,
+                applicant_name: "henry",
+                state: "access_pending",
+                datasource_ids: [QUERY_FIXTURE_DS_MYSQL_ID],
+                datasource_names: ["analytics-mysql"],
+                grant_id: null,
+                version: 1,
+                created_at: "2026-11-26T10:00:00Z",
+                can_decide: false,
+              },
+            ],
+            page: { limit: 20, has_more: false, next_cursor: null },
+          },
+        }),
+      ),
+    );
+    setMockIdentity("reviewer-a");
+    stubSession({
+      id: REVIEWER_USER_ID,
+      username: "reviewer-a",
+      admin: false,
+      requestId: SESSION_USER_ID,
+    });
+    renderAt("/approvals/query-access");
+    const step2Row = await screen.findByTestId("query-access-pending-6f0f2b3c-5555-4555-8555-000000000299");
+    expect(step2Row).toBeVisible();
+    expect(within(step2Row).queryByTestId("query-access-actions-6f0f2b3c-5555-4555-8555-000000000299")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("approvals-tab-query-badge")).not.toBeInTheDocument();
   });
 
   // The identity dimension is localStorage-backed and setup.ts never clears
@@ -689,7 +857,7 @@ describe("review R2 fix L-8: export dialog reset at the component level", () => 
   it("runs a second export after closing the dialog on the same page mount", async () => {
     seedQueryScenario("query-session");
     stubSession(false);
-    renderAt("/query/sessions/qs-fixture-active");
+    renderAt("/query/sessions/6f0f2b3c-5555-4555-8555-000000000101");
     await screen.findByTestId("query-workspace");
     await chooseSchema("app");
 
@@ -747,12 +915,12 @@ describe("SEC-0031: workspace export caliber (can_export gate + audited export r
     // Same active session, frozen capability without export: the workspace
     // entry must not render, so there is no in-product export path at all.
     server.use(
-      http.get("*/query-sessions/qs-fixture-active", () =>
+      http.get(apiRoute("/query-sessions/:sessionId"), () =>
         HttpResponse.json({
           err_code: 0,
           message: "ok",
           data: {
-            id: "qs-fixture-active",
+            id: "6f0f2b3c-5555-4555-8555-000000000101",
             user_id: SESSION_USER_ID,
             state: "active",
             capabilities: [
@@ -766,11 +934,11 @@ describe("SEC-0031: workspace export caliber (can_export gate + audited export r
             ],
             created_at: "2026-08-28T08:00:00Z",
           },
-          request_id: "qs-fixture-active",
+          request_id: "6f0f2b3c-5555-4555-8555-000000000101",
         }),
       ),
     );
-    renderAt("/query/sessions/qs-fixture-active");
+    renderAt("/query/sessions/6f0f2b3c-5555-4555-8555-000000000101");
     await screen.findByTestId("query-workspace");
     await chooseSchema("app");
     await userEvent.type(screen.getByTestId("query-sql-editor"), "select id from app.users");
@@ -782,7 +950,7 @@ describe("SEC-0031: workspace export caliber (can_export gate + audited export r
   it("routes export data through audited purpose=export reads with a one-row first screen", async () => {
     seedQueryScenario("query-session");
     stubSession(false);
-    renderAt("/query/sessions/qs-fixture-active");
+    renderAt("/query/sessions/6f0f2b3c-5555-4555-8555-000000000101");
     await screen.findByTestId("query-workspace");
     await chooseSchema("app");
 
@@ -847,7 +1015,7 @@ describe("query renewal dialog — shadcn DatePicker with embedded time (owner 2
       }
     });
 
-    renderAt("/query/sessions/qs-fixture-active");
+    renderAt("/query/sessions/6f0f2b3c-5555-4555-8555-000000000101");
     await screen.findByTestId("query-workspace");
     await userEvent.click(await screen.findByTestId("query-grant-renew"));
     const dialog = await screen.findByTestId("query-renew-dialog");
@@ -883,7 +1051,7 @@ describe("query renewal dialog — shadcn DatePicker with embedded time (owner 2
     seedQueryScenario("query-session");
     stubSession(false);
 
-    renderAt("/query/sessions/qs-fixture-active");
+    renderAt("/query/sessions/6f0f2b3c-5555-4555-8555-000000000101");
     await screen.findByTestId("query-workspace");
     await chooseSchema("app");
     await userEvent.type(screen.getByTestId("query-sql-editor"), "select id, username from app.users");
@@ -892,7 +1060,7 @@ describe("query renewal dialog — shadcn DatePicker with embedded time (owner 2
 
     // Simulate a browser refresh: unmount and render with a fresh QueryClient.
     cleanup();
-    renderAt("/query/sessions/qs-fixture-active");
+    renderAt("/query/sessions/6f0f2b3c-5555-4555-8555-000000000101");
     await screen.findByTestId("query-workspace");
     await userEvent.click(screen.getByTestId("query-left-tab-history"));
     const historyRows = await screen.findAllByTestId(/^query-history-(?!hover-)/);
@@ -905,7 +1073,7 @@ describe("query renewal dialog — shadcn DatePicker with embedded time (owner 2
 
     let mode: "undefined_table" | "driver_error" = "undefined_table";
     server.use(
-      http.post("*/query-sessions/:sessionId/executions", () => {
+      http.post(apiRoute("/query-sessions/:sessionId/executions"), () => {
         const detail =
           mode === "undefined_table"
             ? "database: cursor_rejected_undefined_table"
@@ -921,7 +1089,7 @@ describe("query renewal dialog — shadcn DatePicker with embedded time (owner 2
       }),
     );
 
-    renderAt("/query/sessions/qs-fixture-active");
+    renderAt("/query/sessions/6f0f2b3c-5555-4555-8555-000000000101");
     await screen.findByTestId("query-workspace");
     await chooseSchema("app");
     await userEvent.type(screen.getByTestId("query-sql-editor"), "select * from app.missing_table");
@@ -951,7 +1119,7 @@ describe("query renewal dialog — shadcn DatePicker with embedded time (owner 2
     const tableRequests: string[] = [];
     const columnRequests: string[] = [];
     server.use(
-      http.get("*/query-sessions/qs-fixture-active/metadata/schemas", () =>
+      http.get(apiRoute("/query-sessions/:sessionId/metadata/schemas"), () =>
         HttpResponse.json({
           err_code: 0,
           message: "ok",
@@ -960,7 +1128,7 @@ describe("query renewal dialog — shadcn DatePicker with embedded time (owner 2
           data: { items: [{ name: "app" }, { name: "reporting" }] },
         }),
       ),
-      http.get("*/query-sessions/qs-fixture-active/metadata/tables", ({ request }) => {
+      http.get(apiRoute("/query-sessions/:sessionId/metadata/tables"), ({ request }) => {
         const schemaName = new URL(request.url).searchParams.get("schema_name") ?? "";
         tableRequests.push(schemaName);
         const items =
@@ -978,7 +1146,7 @@ describe("query renewal dialog — shadcn DatePicker with embedded time (owner 2
           data: { items },
         });
       }),
-      http.get("*/query-sessions/qs-fixture-active/metadata/columns", ({ request }) => {
+      http.get(apiRoute("/query-sessions/:sessionId/metadata/columns"), ({ request }) => {
         const url = new URL(request.url);
         const schemaName = url.searchParams.get("schema_name") ?? "";
         const tableName = url.searchParams.get("table_name") ?? "";
@@ -997,7 +1165,7 @@ describe("query renewal dialog — shadcn DatePicker with embedded time (owner 2
       }),
     );
 
-    renderAt("/query/sessions/qs-fixture-active");
+    renderAt("/query/sessions/6f0f2b3c-5555-4555-8555-000000000101");
     await screen.findByTestId("query-workspace");
     // Before selecting any activeSchema, zero table or column fan-out requests fire.
     await new Promise((resolve) => { setTimeout(resolve, 150); });
@@ -1056,14 +1224,14 @@ describe("query renewal dialog — shadcn DatePicker with embedded time (owner 2
 
     // Return both analytics-mysql and analytics-pg on the active session.
     server.use(
-      http.get("*/query-sessions/qs-fixture-active", () =>
+      http.get(apiRoute("/query-sessions/:sessionId"), () =>
         HttpResponse.json({
           err_code: 0,
           message: "ok",
           request_id: "req-multi-ds",
           retryable: false,
           data: {
-            id: "qs-fixture-active",
+            id: "6f0f2b3c-5555-4555-8555-000000000101",
             flow_id: QUERY_FIXTURE_FLOW_ID,
             grant_id: null,
             state: "active",
@@ -1089,7 +1257,7 @@ describe("query renewal dialog — shadcn DatePicker with embedded time (owner 2
           },
         }),
       ),
-      http.get("*/query-sessions/qs-fixture-active/metadata/schemas", ({ request }) => {
+      http.get(apiRoute("/query-sessions/:sessionId/metadata/schemas"), ({ request }) => {
         const dsId = new URL(request.url).searchParams.get("datasource_id");
         const items = dsId === QUERY_FIXTURE_DS_PG_ID ? [{ name: "public" }] : [{ name: "app" }];
         return HttpResponse.json({
@@ -1102,7 +1270,7 @@ describe("query renewal dialog — shadcn DatePicker with embedded time (owner 2
       }),
     );
 
-    renderAt("/query/sessions/qs-fixture-active");
+    renderAt("/query/sessions/6f0f2b3c-5555-4555-8555-000000000101");
     await screen.findByTestId("query-workspace");
 
     // Both analytics-mysql and analytics-pg appear as top-level datasource nodes in the left tree.
@@ -1151,7 +1319,7 @@ describe("query renewal dialog — shadcn DatePicker with embedded time (owner 2
       let executeCalls = 0;
       let resolveFirst!: () => void;
       server.use(
-        http.post("*/query-sessions/:id/executions", async () => {
+        http.post(apiRoute("/query-sessions/:id/executions"), async () => {
           executeCalls += 1;
           await new Promise<void>((resolve) => {
             resolveFirst = resolve;
@@ -1173,7 +1341,7 @@ describe("query renewal dialog — shadcn DatePicker with embedded time (owner 2
 
       const view = render(
         <StrictMode>
-          <ExportDialog context={exportCtx} sessionId="qs-fixture-active" onClose={() => {}} />
+          <ExportDialog context={exportCtx} sessionId="6f0f2b3c-5555-4555-8555-000000000101" onClose={() => {}} />
         </StrictMode>,
       );
       await waitFor(() => {
@@ -1190,7 +1358,7 @@ describe("query renewal dialog — shadcn DatePicker with embedded time (owner 2
       downloadSpy.mockClear();
       let resolveCancelRun!: () => void;
       server.use(
-        http.post("*/query-sessions/:id/executions", async () => {
+        http.post(apiRoute("/query-sessions/:id/executions"), async () => {
           await new Promise<void>((resolve) => {
             resolveCancelRun = resolve;
           });
@@ -1209,7 +1377,7 @@ describe("query renewal dialog — shadcn DatePicker with embedded time (owner 2
         }),
       );
       const cancelView = render(
-        <ExportDialog context={exportCtx} sessionId="qs-fixture-active" onClose={() => {}} />,
+        <ExportDialog context={exportCtx} sessionId="6f0f2b3c-5555-4555-8555-000000000101" onClose={() => {}} />,
       );
       await userEvent.click(await screen.findByTestId("query-export-cancel"));
       resolveCancelRun();
@@ -1221,7 +1389,7 @@ describe("query renewal dialog — shadcn DatePicker with embedded time (owner 2
       let resolveCloseRun!: () => void;
       const onClose = vi.fn();
       server.use(
-        http.post("*/query-sessions/:id/executions", async () => {
+        http.post(apiRoute("/query-sessions/:id/executions"), async () => {
           await new Promise<void>((resolve) => {
             resolveCloseRun = resolve;
           });
@@ -1240,7 +1408,7 @@ describe("query renewal dialog — shadcn DatePicker with embedded time (owner 2
         }),
       );
       const closeView = render(
-        <ExportDialog context={exportCtx} sessionId="qs-fixture-active" onClose={onClose} />,
+        <ExportDialog context={exportCtx} sessionId="6f0f2b3c-5555-4555-8555-000000000101" onClose={onClose} />,
       );
       await userEvent.click(await screen.findByTestId("query-export-close"));
       expect(onClose).toHaveBeenCalledTimes(1);

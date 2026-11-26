@@ -19,6 +19,9 @@ import (
 
 	"gorm.io/gorm"
 
+	"github.com/cookieY/YearningX/backend/internal/platform/hashutil"
+	"github.com/cookieY/YearningX/backend/internal/platform/pagecursor"
+	"github.com/cookieY/YearningX/backend/internal/platform/txutil"
 	"github.com/cookieY/YearningX/backend/internal/review/domain"
 	"github.com/cookieY/YearningX/backend/internal/review/persistence"
 )
@@ -62,7 +65,7 @@ func ruleSetConfigHash(enabled bool, toolIDs []string) string {
 	if err != nil {
 		panic("review: rule set config hash payload must marshal")
 	}
-	return sha256Hex(payload)
+	return hashutil.SHA256Hex(payload)
 }
 
 // validateRuleSetWrite validates write payload constraints: rules must be an empty object.
@@ -285,9 +288,11 @@ func ruleSetViewOf(ctx context.Context, db *gorm.DB, row ruleSetRow) (*RuleSetVi
 func (s *Services) ListRuleSets(ctx context.Context, limit int, after string, search string) ([]*RuleSetView, *string, error) {
 	q := s.DB.WithContext(ctx).Table("rule_sets")
 	if after != "" {
-		if created, id, ok := splitCursor(after); ok {
-			q = q.Where("(created_at, id) < (?, ?)", created, id)
+		created, id, err := pagecursor.DecodeUUID(after)
+		if err != nil {
+			return nil, nil, ErrValidation
 		}
+		q = q.Where("(created_at, id) < (?, ?)", created, id)
 	}
 	// section 18.73 admin server-side q: case-insensitive name substring (matching the q parameter
 	// declaration on OpenAPI listRuleSets; narrows only the cursor walk set without relaxing authorization).
@@ -302,7 +307,7 @@ func (s *Services) ListRuleSets(ctx context.Context, limit int, after string, se
 	var next *string
 	if len(rows) > limit {
 		rows = rows[:limit]
-		v := rows[len(rows)-1].CreatedAt.UTC().Format("2006-01-02T15:04:05.999999Z") + "|" + rows[len(rows)-1].ID
+		v := pagecursor.Encode(rows[len(rows)-1].CreatedAt, rows[len(rows)-1].ID)
 		next = &v
 	}
 	out := make([]*RuleSetView, 0, len(rows))
@@ -343,7 +348,7 @@ func nonEmptyToolIDs(ids []string) []string {
 // composition -> 1001 (the exhaustive set of admin_create/admin_replace profiles excludes 1002);
 // non-existent target rule set -> 1002 (admin_replace declares RESOURCE_NOT_FOUND).
 func mapRuleSetWriteErr(err error) error {
-	if isUniqueViolationErr(err) {
+	if txutil.IsUniqueViolation(err) {
 		return &domain.Error{Code: 1005, Name: "RESOURCE_ALREADY_EXISTS"}
 	}
 	if errors.Is(err, ErrPromptToolNotFound) {

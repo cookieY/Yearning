@@ -23,25 +23,19 @@ package application
 
 import (
 	"context"
-	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"os"
-	"path/filepath"
 	"sync/atomic"
-	"syscall"
 	"testing"
 	"time"
 
 	"github.com/google/uuid"
-	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
-	gormlogger "gorm.io/gorm/logger"
 
 	"github.com/cookieY/YearningX/backend/internal/authorization/auditlog"
-	"github.com/cookieY/YearningX/backend/internal/crypto"
 	"github.com/cookieY/YearningX/backend/internal/execution/domain"
+	"github.com/cookieY/YearningX/backend/internal/platform/testkit"
 	"github.com/cookieY/YearningX/backend/internal/tasks"
 )
 
@@ -53,55 +47,9 @@ type reclaimFx struct {
 	seq    atomic.Int64
 }
 
-// acquireReclaimLock cross-process shared DB mutex (uses the same lock file name as the httpapi fixture).
-func acquireReclaimLock(t *testing.T) {
-	t.Helper()
-	path := os.TempDir() + "/yearningx-itest-shared.lock"
-	f, err := os.OpenFile(path, os.O_CREATE|os.O_RDWR, 0o600)
-	if err != nil {
-		return // Degrade to unlocked when lock is unavailable (safe for single-package test runs)
-	}
-	if err := syscall.Flock(int(f.Fd()), syscall.LOCK_EX); err != nil {
-		_ = f.Close()
-		return
-	}
-	t.Cleanup(func() {
-		_ = syscall.Flock(int(f.Fd()), syscall.LOCK_UN)
-		_ = f.Close()
-	})
-}
-
-func reclaimDSN(t *testing.T) string {
-	t.Helper()
-	password := os.Getenv("YEARNING_TEST_DATABASE_PASSWORD")
-	if password == "" {
-		t.Skip("integration PostgreSQL not configured: set YEARNING_TEST_DATABASE_PASSWORD")
-	}
-	env := func(key, def string) string {
-		if v := os.Getenv(key); v != "" {
-			return v
-		}
-		return def
-	}
-	return fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=%s",
-		env("YEARNING_TEST_DATABASE_HOST", "localhost"),
-		env("YEARNING_TEST_DATABASE_PORT", "54330"),
-		env("YEARNING_TEST_DATABASE_USER", "yearning"),
-		password,
-		env("YEARNING_TEST_DATABASE_DBNAME", "yearning_v4"),
-		env("YEARNING_TEST_DATABASE_SSLMODE", "disable"))
-}
-
 func newReclaimFx(t *testing.T) *reclaimFx {
 	t.Helper()
-	acquireReclaimLock(t)
-	db, err := gorm.Open(postgres.Open(reclaimDSN(t)), &gorm.Config{Logger: gormlogger.Discard})
-	if err != nil {
-		t.Fatalf("postgres connect: %v", err)
-	}
-	if sqlDB, serr := db.DB(); serr == nil {
-		t.Cleanup(func() { _ = sqlDB.Close() })
-	}
+	db := testkit.OpenPG(t)
 	for _, tbl := range []string{
 		"execution_statements", "execution_attempts", "order_stages", "change_orders",
 		"domain_events", "outbox_events", "audit_events", "idempotency_records",
@@ -110,28 +58,7 @@ func newReclaimFx(t *testing.T) *reclaimFx {
 			t.Fatalf("truncate %s: %v", tbl, err)
 		}
 	}
-	// Keyring (same format as the httpapi fixture; test-only keys).
-	mk := func(seed byte) string { return base64.StdEncoding.EncodeToString(bytesSeed(seed)) }
-	dir := t.TempDir()
-	doc := fmt.Sprintf(`{"contract_version":1,"deployment_id":"reclaim-itest","keys":[
-	{"key_id":"pay-1","purpose":"payload","status":"encrypt_decrypt","created_at":"2026-08-25T00:00:00Z","key_base64":"%s"},
-	{"key_id":"state-1","purpose":"oidc_state","status":"encrypt_decrypt","created_at":"2026-08-25T00:00:00Z","key_base64":"%s"},
-	{"key_id":"ident-1","purpose":"identifier_token","status":"encrypt_decrypt","created_at":"2026-08-25T00:00:00Z","key_base64":"%s"},
-	{"key_id":"fp-1","purpose":"sql_fingerprint","status":"encrypt_decrypt","created_at":"2026-08-25T00:00:00Z","key_base64":"%s"},
-	{"key_id":"aff-1","purpose":"cursor_affinity","status":"encrypt_decrypt","created_at":"2026-08-25T00:00:00Z","key_base64":"%s"}]}`,
-		mk(1), mk(2), mk(3), mk(4), mk(5))
-	path := filepath.Join(dir, "keyring.json")
-	if err := os.WriteFile(path, []byte(doc), 0o400); err != nil {
-		t.Fatal(err)
-	}
-	ring, err := crypto.LoadKeyring(path)
-	if err != nil {
-		t.Fatal(err)
-	}
-	crypter, err := crypto.NewCrypter(ring)
-	if err != nil {
-		t.Fatal(err)
-	}
+	crypter := testkit.NewCrypter(t)
 	recorder, err := auditlog.NewRecorder(db)
 	if err != nil {
 		t.Fatal(err)
@@ -141,14 +68,6 @@ func newReclaimFx(t *testing.T) *reclaimFx {
 		t.Fatal(err)
 	}
 	return &reclaimFx{db: db, svc: svc, runner: NewRunner(svc)}
-}
-
-func bytesSeed(seed byte) []byte {
-	out := make([]byte, 32)
-	for i := range out {
-		out[i] = seed
-	}
-	return out
 }
 
 // seedOrder creates a minimal running work order + stage (omits datasource row = structural proof of zero sends).

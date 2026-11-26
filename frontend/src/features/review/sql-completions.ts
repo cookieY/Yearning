@@ -1,3 +1,5 @@
+import { SQL_COMPLETION_KEYWORDS } from "@/shared/lib/sql-highlight";
+
 export interface SqlCompletionCatalog {
   schemas: string[];
   tables: Array<{ schema: string | null; name: string }>;
@@ -10,15 +12,7 @@ export interface SqlCompletionCatalog {
  * namespace so unit tests exercise it directly without an editor instance.
  */
 
-export const SQL_KEYWORDS = [
-  "SELECT", "FROM", "WHERE", "INSERT", "INTO", "VALUES", "UPDATE", "SET",
-  "DELETE", "CREATE", "ALTER", "DROP", "TABLE", "INDEX", "VIEW", "JOIN",
-  "LEFT", "RIGHT", "INNER", "OUTER", "ON", "AND", "OR", "NOT", "NULL",
-  "ORDER", "GROUP", "BY", "HAVING", "LIMIT", "OFFSET", "DISTINCT", "AS",
-  "IN", "BETWEEN", "LIKE", "EXISTS", "UNION", "ALL", "ASC", "DESC",
-  "PRIMARY", "KEY", "FOREIGN", "REFERENCES", "DEFAULT", "CONSTRAINT",
-  "BEGIN", "COMMIT", "ROLLBACK", "TRUNCATE", "RENAME", "IF", "EXISTS",
-] as const;
+export const SQL_KEYWORDS = SQL_COMPLETION_KEYWORDS;
 
 const SQL_KEYWORD_SET = new Set<string>([
   ...SQL_KEYWORDS,

@@ -11,6 +11,9 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
+
+	"github.com/cookieY/YearningX/backend/internal/migration/internal/redact"
+	"github.com/cookieY/YearningX/backend/internal/platform/txutil"
 )
 
 // LedgerRow maps to a single row in schema_migrations.
@@ -515,8 +518,7 @@ func (m *Migrator) applyOne(ctx context.Context, f Migration) (ApplyRecord, erro
 		rec.DurationMs = time.Since(start).Milliseconds()
 		return rec, nil
 	}
-	var pgErr *pgconn.PgError
-	if errors.As(err, &pgErr) && pgErr.Code == "23505" {
+	if txutil.IsUniqueViolation(err) {
 		return rec, fmt.Errorf("%w: version %d", ErrConcurrentMigrator, f.Version)
 	}
 	rec.State = "failed"
@@ -564,9 +566,5 @@ func classifyFailure(err error) string {
 // so only the structured SQLSTATE category is retained; non-driver errors likewise emit only a stable category name,
 // while the raw error is surfaced via stderr/exit code for operator diagnostics without entering reports or the ledger.
 func redactError(err error) string {
-	var pgErr *pgconn.PgError
-	if errors.As(err, &pgErr) {
-		return "postgres error " + pgErr.Code
-	}
-	return classifyFailure(err)
+	return redact.ErrorWithFallback(err, classifyFailure)
 }

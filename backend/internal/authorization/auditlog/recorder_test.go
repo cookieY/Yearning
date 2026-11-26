@@ -178,6 +178,56 @@ func TestResolveHelpers(t *testing.T) {
 	}
 }
 
+func TestActorConstructorsAndEmitPayloadFailClosed(t *testing.T) {
+	u := UserActor("u-1", "alice")
+	if u.Kind != "user" || u.UserID != "u-1" || u.Username != "alice" {
+		t.Fatalf("UserActor mismatch: %+v", u)
+	}
+	sys := SystemActor("00000000-0000-0000-0000-000000000000", "system")
+	if sys.Kind != "system" || sys.Username != "system" {
+		t.Fatalf("SystemActor mismatch: %+v", sys)
+	}
+	w := WorkerActor("outbox")
+	if w.Kind != "worker" || w.Username != "outbox" {
+		t.Fatalf("WorkerActor mismatch: %+v", w)
+	}
+
+	drv := newStubAuditDriver()
+	sqlDB := sql.OpenDB(drv)
+	defer func() { _ = sqlDB.Close() }()
+	gdb, err := gorm.Open(postgres.New(postgres.Config{Conn: sqlDB}), &gorm.Config{})
+	if err != nil {
+		t.Fatalf("gorm.Open: %v", err)
+	}
+	rec, err := NewRecorder(gdb)
+	if err != nil {
+		t.Fatalf("NewRecorder: %v", err)
+	}
+
+	// Empty actor.Kind must fail closed before touching the database.
+	if err := rec.Emit(context.Background(), nil, "execution.started", "change-orders/1", Actor{UserID: "u-1"}, map[string]any{"to": "running"}); err == nil {
+		t.Fatal("expected Emit to reject empty actor.Kind")
+	}
+	if err := rec.EmitPayload(context.Background(), nil, "execution.started", "change-orders/1", Actor{Kind: "   ", UserID: "u-1"}, struct{ To string }{"running"}); err == nil {
+		t.Fatal("expected EmitPayload to reject whitespace actor.Kind")
+	}
+	if drv.insertCount() != 0 {
+		t.Fatalf("expected 0 DB inserts on rejected empty actor.Kind, got %d", drv.insertCount())
+	}
+
+	// EmitPayload serializes arbitrary structs and emits both domain_events and outbox_events.
+	type samplePayload struct {
+		OrderID string `json:"order_id"`
+		To      string `json:"to"`
+	}
+	if err := rec.EmitPayload(context.Background(), nil, "execution.started", "change-orders/1", UserActor("u-1", "alice"), samplePayload{OrderID: "1", To: "running"}); err != nil {
+		t.Fatalf("EmitPayload failed: %v", err)
+	}
+	if drv.insertCount() != 2 {
+		t.Fatalf("expected 2 inserts (domain_events + outbox_events), got %d", drv.insertCount())
+	}
+}
+
 type stubAuditDriver struct {
 	mu        sync.Mutex
 	queryRows map[string][]string

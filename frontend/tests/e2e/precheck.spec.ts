@@ -87,9 +87,15 @@ test("editing never auto-reviews; the explicit run produces Ready and unlocks su
   await page.getByTestId(`use-flow-${FIXTURE_FLOW_ID}`).click();
   await page.getByTestId("draft-title-input").fill("E2E\u9884\u5ba1\u8349\u7a3f");
 
-  // Editing and waiting produce zero review-run creations.
+  // Editing and waiting for animation frames / idle produces zero review-run creations.
   await typeSql(page, SQL_TEXT);
-  await page.waitForTimeout(2_000);
+  await page.evaluate(
+    () =>
+      new Promise<void>((resolve) =>
+        requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+      ),
+  );
+  await expect(page.getByTestId("run-review")).toBeEnabled();
   expect(reviewRunCalls).toEqual([]);
 
   // The explicit action creates exactly one run and reaches Ready. The run
@@ -102,17 +108,19 @@ test("editing never auto-reviews; the explicit run produces Ready and unlocks su
     "data-draft-id",
     /.+/,
   );
-  await expect(page.getByTestId("review-summary")).toContainText(
-    "AI \u5ba1\u6838\u5df2\u5b8c\u6210\uff0c\u7ed3\u8bba\u5df2\u4e0e\u5f53\u524d\u9636\u6bb5\u5feb\u7167\u51bb\u7ed3\u3002",
-  );
+  await expect(page.getByTestId("review-status").getByTestId("review-summary")).toHaveCount(0);
   expect(reviewRunCalls).toHaveLength(1);
   await gotoConfirmStep(page);
   await expect(page.getByTestId("submit-draft")).toBeEnabled();
 
-  // One-page layout: findings and evidence stay structured on the same
-  // page; no reasoning channel exists.
+  // One-page layout: AI conclusions, findings and evidence stay structured
+  // on the Findings tab; no reasoning channel exists.
   await expect(page.getByTestId("tab-findings")).toBeVisible();
   await page.getByTestId("tab-findings").click();
+  await expect(page.getByTestId("review-summary")).toBeVisible();
+  await expect(page.getByTestId("review-summary")).toContainText(
+    "AI \u5ba1\u6838\u5df2\u5b8c\u6210\uff0c\u7ed3\u8bba\u5df2\u4e0e\u5f53\u524d\u9636\u6bb5\u5feb\u7167\u51bb\u7ed3\u3002",
+  );
   await expect(page.getByTestId("finding-item").first()).toBeVisible();
   const body = await page.locator("body").textContent();
   expect(body ?? "").not.toMatch(/\u601d\u7ef4\u94fe|\u601d\u8003\u8fc7\u7a0b|chain of thought|reasoning_content/i);
@@ -199,7 +207,10 @@ for (const locale of ["zh-CN", "en-US"] as const) {
     await expect(page.getByTestId("submit-draft")).toBeDisabled();
 
     await page.getByTestId("tab-overview").click();
+    await expect(page.getByTestId("review-status").getByTestId("review-summary")).toHaveCount(0);
+    await page.getByTestId("tab-findings").click();
     const frozenSummary = page.getByTestId("review-summary").locator("dd").first();
+    await expect(frozenSummary).toBeVisible();
     await expect(frozenSummary).toHaveAttribute("lang", locale);
     await expect(frozenSummary).toHaveText(
       locale === "zh-CN"
@@ -216,13 +227,11 @@ for (const locale of ["zh-CN", "en-US"] as const) {
     await expect(page.locator("html")).toHaveAttribute("lang", otherLocale);
     await page.getByTestId("view-precheck-results").click();
     await expect(page.getByTestId("precheck-dialog")).toBeVisible();
-    await expect(page.getByTestId("review-summary").locator("dd").first()).toHaveText(
-      frozenSummaryText ?? "",
-    );
-    await expect(page.getByTestId("review-summary").locator("dd").first()).toHaveAttribute(
-      "lang",
-      locale,
-    );
+    await page.getByTestId("tab-findings").click();
+    const reopenedSummary = page.getByTestId("review-summary").locator("dd").first();
+    await expect(reopenedSummary).toBeVisible();
+    await expect(reopenedSummary).toHaveText(frozenSummaryText ?? "");
+    await expect(reopenedSummary).toHaveAttribute("lang", locale);
   });
 }
 
@@ -230,12 +239,14 @@ test("Partial outcome reports incompleteness and keeps submit disabled", async (
   await setReviewScenario(page, "review-partial");
   await runReviewThroughUi(page);
   await expect(page.getByTestId("review-status")).toContainText("\u90e8\u5206\u5b8c\u6210");
+  await expect(page.getByTestId("review-failure")).toHaveCount(0);
+  await expect(page.getByTestId("gate-blockers")).toContainText("\u5b58\u5728\u672a\u5b8c\u6210\u7684\u5ba1\u6838\u9636\u6bb5");
+  await expect(page.getByTestId("gate-blocker-failure")).toContainText("\u5f53\u65e5AI\u9884\u7b97\u5df2\u8017\u5c3d");
   await page.getByTestId("tab-findings").click();
-  await expect(page.getByTestId("findings-incomplete")).toBeVisible();
+  await expect(page.getByTestId("findings-incomplete")).toHaveCount(0);
   await expect(page.getByTestId("finding-item").first()).toBeVisible();
   await expect(page.getByTestId("findings-empty-all")).toHaveCount(0);
   await gotoConfirmStep(page);
-  await expect(page.getByTestId("gate-blockers")).toContainText("\u5b58\u5728\u672a\u5b8c\u6210\u7684\u5ba1\u6838\u9636\u6bb5");
   await expect(page.getByTestId("submit-draft")).toBeDisabled();
 });
 
@@ -243,9 +254,11 @@ test("Provider failure shows honest failure copy and keeps submit disabled", asy
   await setReviewScenario(page, "review-provider-failed");
   await runReviewThroughUi(page);
   await expect(page.getByTestId("review-status")).toContainText("\u9884\u5ba1\u5931\u8d25");
-  await expect(page.getByTestId("review-failure")).toContainText("AI\u670d\u52a1\u6682\u4e0d\u53ef\u7528");
+  await expect(page.getByTestId("review-failure")).toHaveCount(0);
+  await expect(page.getByTestId("gate-blocker-failure")).toContainText("AI\u670d\u52a1\u6682\u4e0d\u53ef\u7528");
   await page.getByTestId("tab-findings").click();
-  await expect(page.getByTestId("findings-incomplete")).toBeVisible();
+  await expect(page.getByTestId("findings-none-generated")).toBeVisible();
+  await expect(page.getByTestId("findings-incomplete")).toHaveCount(0);
   await expect(page.getByTestId("findings-empty-all")).toHaveCount(0);
   await gotoConfirmStep(page);
   await expect(page.getByTestId("submit-draft")).toBeDisabled();

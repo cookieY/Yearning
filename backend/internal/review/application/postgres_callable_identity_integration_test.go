@@ -25,13 +25,12 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"os"
-	"strconv"
 	"testing"
 	"time"
 
 	"github.com/cookieY/YearningX/backend/internal/database"
 	"github.com/cookieY/YearningX/backend/internal/platform/addrguard"
+	"github.com/cookieY/YearningX/backend/internal/platform/testenv"
 )
 
 // callableIdentityFixture creates an isolated schema on a real PostgreSQL instance and sets the session
@@ -44,22 +43,8 @@ import (
 func callableIdentityFixture(t *testing.T) (*sql.Conn, string) {
 	t.Helper()
 
-	password := os.Getenv("YEARNING_TEST_ADAPTER_PG_PASSWORD")
-	if password == "" {
-		t.Skip("target PostgreSQL not configured: set YEARNING_TEST_ADAPTER_PG_PASSWORD")
-	}
-	port, err := strconv.Atoi(itestEnv("YEARNING_TEST_ADAPTER_PG_PORT", "54331"))
-	if err != nil {
-		t.Fatalf("YEARNING_TEST_ADAPTER_PG_PORT is not an integer: %v", err)
-	}
-	dsn := fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=disable",
-		itestEnv("YEARNING_TEST_ADAPTER_PG_HOST", "127.0.0.1"),
-		port,
-		itestEnv("YEARNING_TEST_ADAPTER_PG_USER", "yearning"),
-		password,
-		itestEnv("YEARNING_TEST_ADAPTER_PG_DB", "yearning"),
-	)
-	db, err := sql.Open("pgx", dsn)
+	cfg := testenv.RequireTargetPG(t, testenv.WithDefaultHost("127.0.0.1"), testenv.WithDefaultPort(54331))
+	db, err := sql.Open("pgx", cfg.LibpqDSN())
 	if err != nil {
 		t.Fatalf("open target PostgreSQL: %v", err)
 	}
@@ -116,24 +101,17 @@ func callableIdentityPool(t *testing.T) *database.PurposePool {
 	restore := addrguard.SetLoopbackBypassForTest(true)
 	t.Cleanup(restore)
 
-	password := os.Getenv("YEARNING_TEST_ADAPTER_PG_PASSWORD")
-	if password == "" {
-		t.Skip("target PostgreSQL not configured: set YEARNING_TEST_ADAPTER_PG_PASSWORD")
-	}
-	port, err := strconv.Atoi(itestEnv("YEARNING_TEST_ADAPTER_PG_PORT", "54331"))
-	if err != nil {
-		t.Fatalf("YEARNING_TEST_ADAPTER_PG_PORT is not an integer: %v", err)
-	}
+	cfg := testenv.RequireTargetPG(t, testenv.WithDefaultHost("127.0.0.1"), testenv.WithDefaultPort(54331))
 	adapter := database.NewPostgreSQLAdapter(database.Endpoint{
-		Host:             itestEnv("YEARNING_TEST_ADAPTER_PG_HOST", "127.0.0.1"),
-		Port:             port,
-		DatabaseName:     itestEnv("YEARNING_TEST_ADAPTER_PG_DB", "yearning"),
+		Host:             cfg.Host,
+		Port:             cfg.Port,
+		DatabaseName:     cfg.DBName,
 		CompatibilityMod: "postgresql",
 	}, database.AdapterOptions{})
 	pool, err := adapter.OpenPurposePool(context.Background(), database.PurposeReview,
 		database.Credential{
-			Username: itestEnv("YEARNING_TEST_ADAPTER_PG_USER", "yearning"),
-			Password: password,
+			Username: cfg.User,
+			Password: cfg.Password,
 		}, nil)
 	if err != nil {
 		t.Fatalf("open review pool on the fixture target: %v", err)

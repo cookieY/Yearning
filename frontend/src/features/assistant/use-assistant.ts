@@ -21,18 +21,17 @@ import {
   submitAssistantSqlDraftOrder,
 } from "@/api/generated/client/ai-assistant/ai-assistant";
 import { listCurrentUserFlows } from "@/api/generated/client/change-drafts/change-drafts";
-import { SUCCESS_ERR_CODE } from "@/api/generated/projections/business-error-catalog";
+import { useIdempotentMutation } from "@/shared/api/idempotency";
 import {
-  BusinessError,
+  executeFetch,
+  idempotencyKeyHeader,
   ifMatchHeader,
-  type ProblemDetails,
-  readCsrfToken,
+  parseStreamBusinessError,
   resolveActivePlatformLocale,
-  SESSION_EXPIRED_EVENT,
   TransportError,
   unwrapApi,
+  unwrapEnvelopeResponse,
 } from "@/shared/api/mutator";
-import { randomUUID } from "@/shared/lib/uuid";
 
 export interface AssistantStreamCallbacks {
   onProgress?: (payload: { phase?: string; message_id?: string }) => void;
@@ -151,13 +150,6 @@ export function useDeleteAssistantSession() {
   });
 }
 
-const API_BASE_URL: string = import.meta.env.VITE_API_BASE_URL ?? "";
-
-function buildSSEUrl(url: string): string {
-  if (API_BASE_URL === "") return url;
-  return `${API_BASE_URL.replace(/\/$/, "")}${url}`;
-}
-
 export function dispatchSSEFrame(
   rawFrame: string,
   callbacks: AssistantStreamCallbacks | undefined,
@@ -222,16 +214,7 @@ export function dispatchSSEFrame(
       }
       return null;
     case "error":
-      throw new BusinessError({
-        err_code: typeof parsed.err_code === "number" ? parsed.err_code : 5000,
-        message: typeof parsed.message === "string" ? parsed.message : "",
-        request_id:
-          typeof parsed.request_id === "string" ? parsed.request_id : "sse",
-        retryable: Boolean(parsed.retryable),
-        ...(typeof parsed.meta === "object" && parsed.meta !== null
-          ? { meta: parsed.meta as Record<string, unknown> }
-          : {}),
-      });
+      throw parseStreamBusinessError(parsed, "sse");
     case "done":
       return JSON.parse(dataStr) as SendAssistantMessageResponse;
     default:
@@ -257,79 +240,23 @@ export async function streamAssistantMessageSSE(input: {
   }
 
   const activeLocale = resolveActivePlatformLocale();
-  const headers = new Headers({
-    "Content-Type": "application/json",
-    Accept: "text/event-stream",
-    "Accept-Language": activeLocale,
+  const response = await executeFetch(getSendAssistantMessageUrl(input.sessionId), {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Accept: "text/event-stream",
+      "Accept-Language": activeLocale,
+    },
+    body: JSON.stringify({
+      ...input.body,
+      output_locale: activeLocale,
+    }),
+    signal: input.signal,
   });
-  const csrfToken = readCsrfToken();
-  if (csrfToken !== null) {
-    headers.set("X-CSRF-Token", csrfToken);
-  }
-
-  let response: Response;
-  try {
-    response = await fetch(
-      buildSSEUrl(getSendAssistantMessageUrl(input.sessionId)),
-      {
-        method: "POST",
-        headers,
-        body: JSON.stringify({
-          ...input.body,
-          output_locale: activeLocale,
-        }),
-        credentials: "same-origin",
-        signal: input.signal,
-      },
-    );
-  } catch (cause) {
-    throw new TransportError({
-      title: "network_error",
-      status: 0,
-      detail: cause instanceof Error ? cause.message : "network unreachable",
-    });
-  }
-
-  if (!response.ok) {
-    const problem = (await response
-      .json()
-      .catch(() => null)) as ProblemDetails | null;
-    if (response.status === 401 && typeof window !== "undefined") {
-      window.dispatchEvent(new CustomEvent(SESSION_EXPIRED_EVENT));
-    }
-    throw new TransportError(
-      problem &&
-        typeof problem.title === "string" &&
-        typeof problem.status === "number"
-        ? problem
-        : {
-            title: "http_error",
-            status: response.status,
-            detail: response.statusText,
-          },
-    );
-  }
 
   const contentType = (response.headers.get("content-type") ?? "").toLowerCase();
   if (!contentType.includes("text/event-stream") || response.body === null) {
-    const envelope = (await response.json()) as {
-      err_code?: number;
-      message?: string;
-      data?: unknown;
-      request_id?: string;
-      retryable?: boolean;
-      meta?: Record<string, unknown>;
-    };
-    if (envelope.err_code === SUCCESS_ERR_CODE) {
-      return envelope.data as SendAssistantMessageResponse;
-    }
-    throw new BusinessError({
-      err_code: typeof envelope.err_code === "number" ? envelope.err_code : 5000,
-      message: envelope.message ?? "",
-      request_id: envelope.request_id ?? "json",
-      retryable: Boolean(envelope.retryable),
-      ...(envelope.meta === undefined ? {} : { meta: envelope.meta }),
-    });
+    return await unwrapEnvelopeResponse<SendAssistantMessageResponse>(response);
   }
 
   const reader = response.body.getReader();
@@ -429,17 +356,18 @@ export function useCancelAssistantMessageStream(sessionId: string | null) {
 
 export function usePrecheckAssistantSqlDraft(sessionId: string | null) {
   const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: (input: {
-      sessionId: string;
-      draftId: string;
-      body: PrecheckAssistantSqlDraftRequest;
-    }) =>
+  return useIdempotentMutation("assistant-precheck", {
+    mutationFn: (
+      input: {
+        sessionId: string;
+        draftId: string;
+        body: PrecheckAssistantSqlDraftRequest;
+      },
+      idempotencyKey,
+    ) =>
       unwrapApi(
         precheckAssistantSqlDraft(input.sessionId, input.draftId, input.body, {
-          headers: {
-            "Idempotency-Key": `assistant-precheck-${randomUUID()}`,
-          },
+          headers: idempotencyKeyHeader(idempotencyKey),
         }),
       ),
     onSuccess: (_data, variables) => {
@@ -453,17 +381,18 @@ export function usePrecheckAssistantSqlDraft(sessionId: string | null) {
 
 export function useSubmitAssistantSqlDraftOrder(sessionId: string | null) {
   const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: (input: {
-      sessionId: string;
-      draftId: string;
-      body: SubmitAssistantSqlDraftOrderRequest;
-    }) =>
+  return useIdempotentMutation("assistant-order", {
+    mutationFn: (
+      input: {
+        sessionId: string;
+        draftId: string;
+        body: SubmitAssistantSqlDraftOrderRequest;
+      },
+      idempotencyKey,
+    ) =>
       unwrapApi(
         submitAssistantSqlDraftOrder(input.sessionId, input.draftId, input.body, {
-          headers: {
-            "Idempotency-Key": `assistant-order-${randomUUID()}`,
-          },
+          headers: idempotencyKeyHeader(idempotencyKey),
         }),
       ),
     onSuccess: (_data, variables) => {

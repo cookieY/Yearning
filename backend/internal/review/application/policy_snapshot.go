@@ -2,13 +2,13 @@ package application
 
 import (
 	"context"
-	"crypto/subtle"
 	"encoding/json"
 	"errors"
 	"sort"
 
 	"gorm.io/gorm"
 
+	"github.com/cookieY/YearningX/backend/internal/platform/hashutil"
 	"github.com/cookieY/YearningX/backend/internal/review/domain"
 	"github.com/cookieY/YearningX/backend/internal/review/knowledge"
 )
@@ -77,7 +77,7 @@ func canonicalReviewPolicyIdentity(policy FrozenReviewPolicy) (string, []byte, e
 	if err != nil {
 		return "", nil, err
 	}
-	return sha256Hex(raw), raw, nil
+	return hashutil.SHA256Hex(raw), raw, nil
 }
 
 func canonicalReviewPolicy(policy FrozenReviewPolicy) (FrozenReviewPolicy, error) {
@@ -130,7 +130,7 @@ func canonicalReviewPolicy(policy FrozenReviewPolicy) (FrozenReviewPolicy, error
 		if entry.ID == "" || entry.Name == "" || !validSHA256(entry.ConfigHash) {
 			return FrozenReviewPolicy{}, errors.New("knowledge identity missing")
 		}
-		if err := entry.Definition.Validate(); err != nil {
+		if err := entry.Definition.ValidatePersisted(); err != nil {
 			return FrozenReviewPolicy{}, err
 		}
 		switch entry.ScopeType {
@@ -191,8 +191,8 @@ func policyIdentityParts(policy FrozenReviewPolicy) (string, string, string, str
 	if err != nil {
 		return "", "", "", "", err
 	}
-	policyHash := sha256Hex(canonicalRaw)
-	flowHash := sha256Hex(flowRaw)
+	policyHash := hashutil.SHA256Hex(canonicalRaw)
+	flowHash := hashutil.SHA256Hex(flowRaw)
 	ruleHash := canonical.RuleSet.ConfigHash
 	toolHash := effectiveFrozenPolicyToolHash(canonical)
 	return policyHash, flowHash, ruleHash, toolHash, nil
@@ -301,7 +301,7 @@ func loadFrozenPolicyRows(
 	db *gorm.DB,
 	ruleSetID *string,
 ) (FrozenReviewRuleSet, []FrozenPromptTool, []FrozenKnowledgeEntry, error) {
-	ruleSet := FrozenReviewRuleSet{ConfigHash: sha256Hex([]byte("none"))}
+	ruleSet := FrozenReviewRuleSet{ConfigHash: hashutil.SHA256Hex([]byte("none"))}
 	var tools []FrozenPromptTool
 	if ruleSetID != nil && *ruleSetID != "" {
 		var row struct {
@@ -394,6 +394,7 @@ func loadFrozenPolicyRows(
 		       table_name, definition, config_hash, finding_key, version
 		from knowledge_entries
 		where state = 'enabled'
+		  and scope_type in ('datasource', 'table')
 		order by id
 		for update`).Scan(&knowledgeRows).Error; err != nil {
 		return FrozenReviewRuleSet{}, nil, nil, err
@@ -507,13 +508,6 @@ func validSHA256(value string) bool {
 		}
 	}
 	return true
-}
-
-func sameDigest(a, b string) bool {
-	if len(a) != len(b) {
-		return false
-	}
-	return subtle.ConstantTimeCompare([]byte(a), []byte(b)) == 1
 }
 
 func stringValue(value *string) string {

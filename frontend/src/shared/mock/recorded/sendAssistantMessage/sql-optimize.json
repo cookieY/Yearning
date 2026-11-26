@@ -1,0 +1,131 @@
+{
+  "contract_version": 1,
+  "openapi_sha": "b08b588223c0b586a5c9c4e0f1c9b0cd818d7ef1d61f3f9e823d5a489e37fb73",
+  "zod_runtime_sha256": "32b72a82897ae698b7566aad9821c07cf5194173a3dc69adfb00a8f00f04a446",
+  "operation_id": "sendAssistantMessage",
+  "case_id": "sql-optimize",
+  "http_status": 200,
+  "err_code": 0,
+  "response": {
+    "data": {
+      "session": {
+        "id": "00000000-0000-4000-8000-000000000093",
+        "user_id": "00000000-0000-4000-8000-000000000002",
+        "title": "单行 UPDATE 走主键优化",
+        "state": "active",
+        "active_datasource_id": "00000000-0000-4000-8000-000000000009",
+        "active_flow_id": "00000000-0000-4000-8000-000000000003",
+        "active_schema_name": "public",
+        "selected_draft_id": "00000000-0000-4000-8000-000000000094",
+        "compacted_through_seq": 0,
+        "expires_at": "2026-11-25T00:58:00.000Z",
+        "version": 2,
+        "created_at": "2026-11-25T00:59:00.000Z",
+        "updated_at": "2026-11-25T01:00:00.000Z"
+      },
+      "user_message": {
+        "id": "00000000-0000-4000-8000-000000000095",
+        "session_id": "00000000-0000-4000-8000-000000000093",
+        "sequence": 1,
+        "role": "user",
+        "capability": "sql_optimize",
+        "state": "completed",
+        "content": "Update note to 'b6-draft' in public.f12_demo where id = 9001",
+        "citations": [],
+        "sql_draft": null,
+        "failure_code": null,
+        "created_at": "2026-11-25T01:00:00.000Z"
+      },
+      "assistant_message": {
+        "id": "00000000-0000-4000-8000-000000000096",
+        "session_id": "00000000-0000-4000-8000-000000000093",
+        "sequence": 2,
+        "role": "assistant",
+        "capability": "sql_optimize",
+        "state": "completed",
+        "content": "这条 UPDATE 已经通过主键唯一索引 `f12_demo_pkey` 以等值条件定位到单行，因此不需要新增索引，也不需要改写 WHERE 条件；主要优化点在于 text 列带来的写放大和锁持有时间。\n\n- `id` 是主键唯一索引的首列，`9001` 等值匹配可精确命中一行，属于最优访问路径。\n- `note` 是可为空的 text 列，写入较大的值时可能触发 TOAST 重写，并产生额外 WAL；如果需要批量修改多行，建议按主键区间分批提交，缩短单事务持锁时间。\n- 当前没有提供执行计划文本，上述判断来自表结构和语句形态的静态推断，并非 EXPLAIN 验证结果。",
+        "citations": [],
+        "sql_draft": {
+          "id": "00000000-0000-4000-8000-000000000094",
+          "session_id": "00000000-0000-4000-8000-000000000093",
+          "message_id": "00000000-0000-4000-8000-000000000096",
+          "revision": 1,
+          "datasource_id": "00000000-0000-4000-8000-000000000009",
+          "datasource_name": "f12-pg-target",
+          "flow_id": "00000000-0000-4000-8000-000000000003",
+          "engine": "postgresql",
+          "schema_name": "public",
+          "statement_kind": "update",
+          "risk_category": "dml",
+          "sql_text": "UPDATE \"public\".\"f12_demo\" SET \"note\" = 'b6-draft' WHERE \"id\" = 9001 RETURNING \"id\"",
+          "sql_hmac": "e40af07d3974db996c5e87251756cd5b331166820970054bf1b4ffc9f37c49ca",
+          "assumptions": [
+            "本次改写只增加了 RETURNING id，用于确认实际更新的行数；业务逻辑没有改动。",
+            "假定 9001 与 id 的数据类型 bigint 一致，不会发生隐式类型转换。"
+          ],
+          "next_steps": [
+            "如果数据量较大，请提供 EXPLAIN (ANALYZE, BUFFERS) 输出，以确认实际扫描方式和缓冲区读取情况。",
+            "如果需要批量更新同类语句，请按 id 的范围分片循环执行，并分批提交事务。"
+          ],
+          "semantic_warnings": [
+            "RETURNING 会额外返回结果集，如果上层逻辑按受影响行数解析返回结果，需要相应调整。",
+            "UPDATE 会对目标行加行锁，长事务会阻塞同一主键上的并发更新。"
+          ],
+          "referenced_tables": [
+            "f12_demo"
+          ],
+          "submission_state": "draft",
+          "ephemeral_run_id": null,
+          "submitted_order_id": null,
+          "submitted_order_display_no": null,
+          "version": 1,
+          "created_at": "2026-11-25T01:00:00.000Z",
+          "updated_at": "2026-11-25T01:00:00.000Z"
+        },
+        "failure_code": null,
+        "created_at": "2026-11-25T01:00:00.000Z"
+      },
+      "sql_draft": {
+        "id": "00000000-0000-4000-8000-000000000094",
+        "session_id": "00000000-0000-4000-8000-000000000093",
+        "message_id": "00000000-0000-4000-8000-000000000096",
+        "revision": 1,
+        "datasource_id": "00000000-0000-4000-8000-000000000009",
+        "datasource_name": "f12-pg-target",
+        "flow_id": "00000000-0000-4000-8000-000000000003",
+        "engine": "postgresql",
+        "schema_name": "public",
+        "statement_kind": "update",
+        "risk_category": "dml",
+        "sql_text": "UPDATE \"public\".\"f12_demo\" SET \"note\" = 'b6-draft' WHERE \"id\" = 9001 RETURNING \"id\"",
+        "sql_hmac": "e40af07d3974db996c5e87251756cd5b331166820970054bf1b4ffc9f37c49ca",
+        "assumptions": [
+          "本次改写只增加了 RETURNING id，用于确认实际更新的行数；业务逻辑没有改动。",
+          "假定 9001 与 id 的数据类型 bigint 一致，不会发生隐式类型转换。"
+        ],
+        "next_steps": [
+          "如果数据量较大，请提供 EXPLAIN (ANALYZE, BUFFERS) 输出，以确认实际扫描方式和缓冲区读取情况。",
+          "如果需要批量更新同类语句，请按 id 的范围分片循环执行，并分批提交事务。"
+        ],
+        "semantic_warnings": [
+          "RETURNING 会额外返回结果集，如果上层逻辑按受影响行数解析返回结果，需要相应调整。",
+          "UPDATE 会对目标行加行锁，长事务会阻塞同一主键上的并发更新。"
+        ],
+        "referenced_tables": [
+          "f12_demo"
+        ],
+        "submission_state": "draft",
+        "ephemeral_run_id": null,
+        "submitted_order_id": null,
+        "submitted_order_display_no": null,
+        "version": 1,
+        "created_at": "2026-11-25T01:00:00.000Z",
+        "updated_at": "2026-11-25T01:00:00.000Z"
+      },
+      "context_compacted": false
+    },
+    "err_code": 0,
+    "message": "ok",
+    "request_id": "00000000-0000-4000-8000-999999999999"
+  }
+}

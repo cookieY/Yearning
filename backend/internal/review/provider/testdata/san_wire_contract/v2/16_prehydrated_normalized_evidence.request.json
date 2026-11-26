@@ -1,0 +1,135 @@
+{
+  "request_schema_version": 1,
+  "review_run_id": "00000000-0000-4000-8000-000000000001",
+  "engine_profile": "mysql/mysql",
+  "anonymized_statement_groups": [
+    {
+      "group_id": "10000000-0000-4000-8000-000000000001",
+      "representative_shape": "kind=dml op=update where=true",
+      "representative_anonymized_sql": "UPDATE shop.orders SET status = 'shipped' WHERE customer_id = 42",
+      "objects": [
+        {
+          "token": "shop",
+          "kind": "schema",
+          "relation": "reference",
+          "schema_token": "shop",
+          "statement_ordinal": 1,
+          "statement_ordinal_ranges": [
+            {
+              "start": 1,
+              "end": 1
+            }
+          ]
+        },
+        {
+          "token": "shop.orders",
+          "kind": "table",
+          "relation": "target",
+          "schema_token": "shop",
+          "statement_ordinal": 1,
+          "statement_ordinal_ranges": [
+            {
+              "start": 1,
+              "end": 1
+            }
+          ]
+        },
+        {
+          "token": "status",
+          "kind": "column",
+          "relation": "write",
+          "schema_token": "shop",
+          "parent_token": "shop.orders",
+          "statement_ordinal": 1,
+          "statement_ordinal_ranges": [
+            {
+              "start": 1,
+              "end": 1
+            }
+          ]
+        },
+        {
+          "token": "customer_id",
+          "kind": "column",
+          "relation": "filter",
+          "schema_token": "shop",
+          "parent_token": "shop.orders",
+          "statement_ordinal": 1,
+          "statement_ordinal_ranges": [
+            {
+              "start": 1,
+              "end": 1
+            }
+          ]
+        }
+      ],
+      "metadata_context_complete": true,
+      "statement_count": 1,
+      "statement_ordinal": 1,
+      "statement_ordinal_ranges": [
+        {
+          "start": 1,
+          "end": 1
+        }
+      ],
+      "statistics": {
+        "algorithm_version": "yearning-fingerprint-v1",
+        "dml_has_limit": false,
+        "dml_has_order_by": false,
+        "dml_has_subselect": false,
+        "in_value_count_max": 0,
+        "max_statement_bytes": 64,
+        "unbounded_mutation": false,
+        "values_row_count_max": 0,
+        "where_literal_null": false
+      }
+    }
+  ],
+  "normalized_evidence": [
+    {
+      "evidence_id": "20000000-0000-4000-8000-000000000001",
+      "fact_kind": "schema_metadata",
+      "fact": {
+        "column_count": 2,
+        "columns": [
+          {
+            "column_name": "id",
+            "ordinal": 1,
+            "type_class": "integer"
+          },
+          {
+            "column_name": "amount",
+            "ordinal": 2,
+            "type_class": "integer"
+          }
+        ],
+        "estimate": false,
+        "existence": "present",
+        "fact_schema_version": 2,
+        "metadata_complete": true,
+        "returned_column_count": 2,
+        "schema": "shop",
+        "table": "orders",
+        "truncated": false
+      }
+    },
+    {
+      "evidence_id": "20000000-0000-4000-8000-000000000002",
+      "fact_kind": "index_metadata",
+      "fact": {
+        "existence": "present",
+        "fact_schema_version": 2,
+        "indexes": [
+          {
+            "index_name": "PRIMARY"
+          }
+        ],
+        "metadata_complete": true,
+        "schema": "shop",
+        "table": "orders",
+        "truncated": false
+      }
+    }
+  ],
+  "allowed_tool_descriptors": []
+}

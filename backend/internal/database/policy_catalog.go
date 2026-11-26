@@ -235,8 +235,8 @@ func (a *baseAdapter) readPolicyCatalog(
 	}
 	repetitions := 1
 	if a.engine() == "mysql" {
-		// status requested set + schema/table/column/index/constraint visibility.
-		repetitions = 6
+		// status requested set + schema visibility + (table/column/index/constraint: visible subquery + direct WHERE schema pruning).
+		repetitions = 10
 	}
 	for i := 0; i < repetitions; i++ {
 		for _, schema := range schemas {
@@ -398,6 +398,7 @@ LIMIT $` + fmt.Sprint(limitArg)
 
 func mysqlPolicyCatalogSQL(schemaCount int) string {
 	requested := mysqlRequestedSchemasSQL(schemaCount)
+	plainPlaceholders := mysqlPlainSchemaPlaceholders(schemaCount)
 	visible := func(start int) string {
 		return `SELECT s.schema_name
   FROM information_schema.schemata s
@@ -413,14 +414,15 @@ func mysqlPolicyCatalogSQL(schemaCount int) string {
     )`
 	}
 	// MySQL 5.7 has no CTEs. Repeat the bounded, parameterized visible-schema
-	// derived table in the single UNION statement.
+	// derived table in the single UNION statement, and include direct
+	// table_schema IN (...) predicates on each information_schema branch so
+	// MySQL 5.7 prunes unrelated schemas instead of scanning the full instance.
 	s1 := schemaCount + 1
 	s2 := s1 + schemaCount
-	s3 := s2 + schemaCount
-	s4 := s3 + schemaCount
-	s5 := s4 + schemaCount
-	s6 := s5 + schemaCount
-	_ = s6
+	s3 := s2 + 2*schemaCount
+	s4 := s3 + 2*schemaCount
+	s5 := s4 + 2*schemaCount
+	_ = s5
 	return `
 SELECT row_kind, kind, schema_name, relation_name, object_name, NULLIF(schema_status, '')
 FROM (
@@ -450,20 +452,24 @@ FROM (
     t.table_schema, '', t.table_name, ''
   FROM information_schema.tables t
   JOIN (` + visible(s2) + `) visible_schema ON BINARY visible_schema.schema_name = BINARY t.table_schema
-  WHERE t.table_type IN ('BASE TABLE', 'VIEW', 'SYSTEM VIEW')
+  WHERE t.table_schema IN (` + plainPlaceholders + `)
+    AND t.table_type IN ('BASE TABLE', 'VIEW', 'SYSTEM VIEW')
   UNION ALL
   SELECT 'identifier', 'column', c.table_schema, c.table_name, c.column_name, ''
   FROM information_schema.columns c
   JOIN (` + visible(s3) + `) visible_schema ON BINARY visible_schema.schema_name = BINARY c.table_schema
+  WHERE c.table_schema IN (` + plainPlaceholders + `)
   UNION ALL
   SELECT 'identifier', 'index', st.table_schema, st.table_name, st.index_name, ''
   FROM information_schema.statistics st
   JOIN (` + visible(s4) + `) visible_schema ON BINARY visible_schema.schema_name = BINARY st.table_schema
+  WHERE st.table_schema IN (` + plainPlaceholders + `)
   GROUP BY st.table_schema, st.table_name, st.index_name
   UNION ALL
   SELECT 'identifier', 'constraint', tc.table_schema, tc.table_name, tc.constraint_name, ''
   FROM information_schema.table_constraints tc
   JOIN (` + visible(s5) + `) visible_schema ON BINARY visible_schema.schema_name = BINARY tc.table_schema
+  WHERE tc.table_schema IN (` + plainPlaceholders + `)
 ) catalog_rows
 ORDER BY row_kind DESC, schema_name, kind, relation_name, object_name
 LIMIT ?`
@@ -481,6 +487,14 @@ func mysqlBinarySchemaPlaceholders(start, count int) string {
 	values := make([]string, count)
 	for i := range values {
 		values[i] = "BINARY ?"
+	}
+	return strings.Join(values, ",")
+}
+
+func mysqlPlainSchemaPlaceholders(count int) string {
+	values := make([]string, count)
+	for i := range values {
+		values[i] = "?"
 	}
 	return strings.Join(values, ",")
 }

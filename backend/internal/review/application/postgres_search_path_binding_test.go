@@ -939,3 +939,176 @@ func TestPostgresObjectSchemaForReferenceTruncatedNonUniformParity(t *testing.T)
 		t.Fatal("truncated reference with divergent tail schema must fail closed")
 	}
 }
+
+func TestPostgresExplicitExternalAndTargetSchemaBinding(t *testing.T) {
+	t.Parallel()
+	mapper := privacy.NewRunMapper()
+	eventsTok, err := mapper.Token(privacy.KindTable, "events")
+	if err != nil {
+		t.Fatal(err)
+	}
+	accountsTok, err := mapper.Token(privacy.KindTable, "accounts")
+	if err != nil {
+		t.Fatal(err)
+	}
+	analyticsTok, err := mapper.Token(privacy.KindSchema, "analytics")
+	if err != nil {
+		t.Fatal(err)
+	}
+	toastTok, err := mapper.Token(privacy.KindSchema, "pg_toast")
+	if err != nil {
+		t.Fatal(err)
+	}
+	originalName := func(tok string) (string, bool) {
+		_, orig, ok := mapper.Original(tok)
+		return orig, ok
+	}
+
+	basePath := testPostgresPath() // Explicit: ["app", "public"], Effective: ["pg_catalog", "app", "public"]
+	stmts := []StatementValidityAtOrdinal{
+		{
+			Ordinal: 1,
+			Facts: fingerprint.StatementValidity{
+				Complete: true, DefinitionsComplete: true,
+				Operation: fingerprint.ValidityOperationInsert,
+				Requirements: []fingerprint.ValidityRequirement{{
+					Object: fingerprint.ValidityObject{
+						Kind: fingerprint.ValidityObjectTable, Token: eventsTok, SchemaToken: analyticsTok,
+					},
+					State: fingerprint.ValidityRequirementPresent,
+				}},
+			},
+		},
+		{
+			Ordinal: 2,
+			Facts: fingerprint.StatementValidity{
+				Complete: true, DefinitionsComplete: true,
+				Operation: fingerprint.ValidityOperationUpdate,
+				Requirements: []fingerprint.ValidityRequirement{{
+					Object: fingerprint.ValidityObject{
+						Kind: fingerprint.ValidityObjectTable, Token: accountsTok,
+					},
+					State: fingerprint.ValidityRequirementPresent,
+				}},
+			},
+		},
+	}
+	lookups := []postgresRelationLookup{
+		{
+			Ordinal: 1, TableToken: eventsTok, TableName: "events", Complete: true,
+			PresentBySchema: map[string]string{"analytics": "table"},
+			OIDBySchema:     map[string]uint32{"analytics": 501},
+		},
+		{
+			Ordinal: 2, TableToken: accountsTok, TableName: "accounts", Complete: true,
+			PresentBySchema: map[string]string{"public": "table"},
+			OIDBySchema:     map[string]uint32{"public": 502},
+		},
+	}
+
+	// Explicit outside schema + unqualified search_path resolution stay strictly separated.
+	binding, ok := preparePostgresObjectBindingsWithOptions(
+		basePath, stmts, lookups, nil, true, []string{"analytics", "public"}, "", originalName,
+	)
+	if !ok || !binding.Complete || !reflect.DeepEqual(binding.ExplicitSchemas, []string{"analytics"}) {
+		t.Fatalf("explicit external schema binding = %+v ok=%v", binding, ok)
+	}
+	decoded, decOK := decodeFrozenPostgresPathBinding(binding)
+	if !decOK || decoded.Relations[postgresObjectBindingKey(1, eventsTok)].Schema != "analytics" ||
+		decoded.Relations[postgresObjectBindingKey(2, accountsTok)].Schema != "public" {
+		t.Fatalf("decoded multi-schema binding = %+v ok=%v", decoded, decOK)
+	}
+	sb := &stageSchemaBinding{
+		defensible: true,
+		schemas:    map[string]bool{"app": true, "public": true, "analytics": true},
+		postgres:   decoded,
+	}
+	if !sb.postgresAllowsSchemaToken(mapper, analyticsTok) || sb.postgresAllowsSchemaToken(mapper, toastTok) ||
+		!sb.allowsPostgresLookupSchema("analytics") || sb.allowsPostgresLookupSchema("other") {
+		t.Fatal("unexpected schema token authorization on external schema binding")
+	}
+	if got := sb.allPostgresSchemas(); !reflect.DeepEqual(got, []string{"app", "public", "analytics"}) {
+		t.Fatalf("allPostgresSchemas = %v", got)
+	}
+	if auth, aerr := policyCatalogAuthorizedSchemas(&stageSchemaBinding{defensible: true, postgres: decoded}); aerr != nil ||
+		!reflect.DeepEqual(auth, []string{"analytics", "public"}) {
+		t.Fatalf("policyCatalogAuthorizedSchemas = %v err=%v", auth, aerr)
+	}
+
+	// Unqualified table present ONLY in ExplicitSchemas must NOT match unqualified lookup (strict search_path).
+	onlyExternalLookup := []postgresRelationLookup{
+		lookups[0],
+		{
+			Ordinal: 2, TableToken: accountsTok, TableName: "accounts", Complete: true,
+			PresentBySchema: map[string]string{"analytics": "table"},
+			OIDBySchema:     map[string]uint32{"analytics": 502},
+		},
+	}
+	shadowed, shadowOK := preparePostgresObjectBindingsWithOptions(
+		basePath, stmts, onlyExternalLookup, nil, true, []string{"analytics"}, "", originalName,
+	)
+	if !shadowOK || shadowed.Relations[postgresObjectBindingKey(2, accountsTok)].Present {
+		t.Fatalf("unqualified table must not resolve to external ExplicitSchemas: %+v", shadowed.Relations)
+	}
+
+	// Disallowed schemas are rejected in ExplicitSchemas, extraction, and TargetSchema override.
+	for _, bad := range []string{"pg_toast", "pg_toast_1", "pg_temp_1", "information_schema", "pg_catalog"} {
+		if _, ok := normalizePostgresExplicitSchemas(basePath, []string{bad}); ok {
+			t.Fatalf("normalizePostgresExplicitSchemas(%q) unexpectedly succeeded", bad)
+		}
+		if err := ValidateTargetDatabase(bad); err == nil {
+			t.Fatalf("ValidateTargetDatabase(%q) unexpectedly succeeded", bad)
+		}
+	}
+	extra, hasDisallowed := postgresExplicitSQLSchemas([]postgresAnalyzedStatement{{
+		objects: []fingerprint.ObjectReference{
+			{Kind: "schema", Token: analyticsTok, Relation: "reference"},
+			{Kind: "schema", Token: toastTok, Relation: "reference"},
+		},
+	}}, mapper, basePath.Effective)
+	if !hasDisallowed || !reflect.DeepEqual(extra, []string{"analytics"}) {
+		t.Fatalf("postgresExplicitSQLSchemas = (%v, %v)", extra, hasDisallowed)
+	}
+
+	// TargetSchema override round-trip and mismatch rejection.
+	targetPath := FrozenPostgresSearchPath{
+		Version: 1, CurrentUser: "writer", Configured: "analytics",
+		Explicit: []string{"analytics"}, Effective: []string{"pg_catalog", "analytics"}, CreationSchema: "analytics",
+	}
+	targetBinding, targetOK := preparePostgresObjectBindingsWithOptions(
+		targetPath, stmts[:1], lookups[:1], nil, true, []string{"analytics"}, "analytics", originalName,
+	)
+	if !targetOK || len(targetBinding.ExplicitSchemas) != 0 || targetBinding.TargetSchema != "analytics" {
+		t.Fatalf("targetSchema binding = %+v ok=%v", targetBinding, targetOK)
+	}
+	if decTarget, ok := decodeFrozenPostgresPathBinding(targetBinding); !ok || decTarget.TargetSchema != "analytics" {
+		t.Fatalf("decoded targetSchema binding = %+v ok=%v", decTarget, ok)
+	}
+	mismatched := targetBinding
+	mismatched.TargetSchema = "other"
+	if _, ok := decodeFrozenPostgresPathBinding(mismatched); ok {
+		t.Fatal("mismatched TargetSchema vs Path must fail decode")
+	}
+
+	// Unreadable/error status mapping preserves concrete reason codes.
+	crypter := newSealTestCrypter(t)
+	for _, tc := range []struct {
+		status string
+		want   string
+	}{
+		{status: "sql_schema_out_of_scope", want: "sql_schema_out_of_scope"},
+		{status: "catalog_schema_missing", want: "catalog_schema_missing"},
+		{status: "catalog_permission_denied", want: "catalog_permission_denied"},
+		{status: "other", want: "postgres_search_path_unavailable"},
+	} {
+		env, err := sealStageReviewContext(crypter, "run-pg-status", 1, map[string]any{
+			stagePostgresSearchPathStatusKey: tc.status,
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got := postgresUnavailableReasonFromContext(crypter, "run-pg-status", 1, env); got != tc.want {
+			t.Fatalf("status=%q got=%q want=%q", tc.status, got, tc.want)
+		}
+	}
+}

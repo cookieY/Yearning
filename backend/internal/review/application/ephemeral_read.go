@@ -5,10 +5,13 @@ package application
 
 import (
 	"context"
+	"encoding/json"
 	"sort"
 	"time"
 
 	"github.com/cookieY/YearningX/backend/internal/crypto"
+	"github.com/cookieY/YearningX/backend/internal/platform/pagecursor"
+	"github.com/cookieY/YearningX/backend/internal/platform/pagination"
 	"github.com/cookieY/YearningX/backend/internal/review/display"
 	"github.com/cookieY/YearningX/backend/internal/review/domain"
 	"github.com/cookieY/YearningX/backend/internal/review/persistence"
@@ -107,7 +110,8 @@ func (s *Services) restoreEphemeralRunDisplay(ctx context.Context, actor Actor, 
 		return nil, err
 	}
 	copyView := *view
-	copyView.StageResults = append([]StageResultView(nil), view.StageResults...)
+	copyView.StageResults = make([]StageResultView, len(view.StageResults))
+	copy(copyView.StageResults, view.StageResults)
 	total := 0
 	for i, stage := range copyView.StageResults {
 		text, count := renderer.RestorePointerLimit(stage.Summary, 4000)
@@ -126,9 +130,7 @@ func (s *Services) ListEphemeralRunFindings(ctx context.Context, actor Actor, ru
 	if er == nil {
 		return nil, nil, ErrNotFound
 	}
-	if limit <= 0 || limit > 200 {
-		limit = 50
-	}
+	limit = pagination.ClampLimit(limit, 50, 200)
 	er.mu.RLock()
 	findings := append([]ephemeralFinding(nil), er.Findings...)
 	snapshots := append([]persistence.StageReviewSnapshotModel(nil), er.Snapshots...)
@@ -145,21 +147,24 @@ func (s *Services) ListEphemeralRunFindings(ctx context.Context, actor Actor, ru
 		rows = append(rows, sortable{f: findings[i]})
 	}
 	sort.SliceStable(rows, func(i, j int) bool {
-		if rows[i].f.CreatedAt.Equal(rows[j].f.CreatedAt) {
+		ti := rows[i].f.CreatedAt.UTC().Truncate(time.Microsecond)
+		tj := rows[j].f.CreatedAt.UTC().Truncate(time.Microsecond)
+		if ti.Equal(tj) {
 			return rows[i].f.ID > rows[j].f.ID
 		}
-		return rows[i].f.CreatedAt.After(rows[j].f.CreatedAt)
+		return ti.After(tj)
 	})
 	if afterCursor != "" {
-		created, id, ok := splitCursor(afterCursor)
-		if !ok {
+		created, id, err := pagecursor.Decode(afterCursor)
+		if err != nil {
 			return nil, nil, ErrValidation
 		}
 		// Keyset filter (in-memory): retain only rows strictly less than cursor (created, id).
+		curTS := created.UTC().Truncate(time.Microsecond)
 		filtered := rows[:0]
 		for i := range rows {
-			key := rows[i].f.CreatedAt.UTC().Format(timeFormat)
-			if key+","+rows[i].f.ID < created+","+id {
+			rowTS := rows[i].f.CreatedAt.UTC().Truncate(time.Microsecond)
+			if rowTS.Before(curTS) || (rowTS.Equal(curTS) && rows[i].f.ID < id) {
 				filtered = append(filtered, rows[i])
 			}
 		}
@@ -171,7 +176,7 @@ func (s *Services) ListEphemeralRunFindings(ctx context.Context, actor Actor, ru
 	var next *string
 	if len(rows) == limit {
 		last := rows[limit-1].f
-		c := last.CreatedAt.UTC().Format(timeFormat) + "|" + last.ID
+		c := pagecursor.Encode(last.CreatedAt, last.ID)
 		next = &c
 	}
 	renderer, rerr := display.NewRendererFromPairs(er.Mapper.Snapshot())
@@ -251,7 +256,7 @@ func (s *Services) ListEphemeralFindingEvidence(ctx context.Context, actor Actor
 			return nil, err
 		}
 		var normalized any
-		if err := jsonUnmarshalStrict(plaintext, &normalized); err != nil {
+		if err := json.Unmarshal(plaintext, &normalized); err != nil {
 			return nil, err
 		}
 		out = append(out, EvidenceView{

@@ -1,0 +1,122 @@
+{
+  "contract_version": 1,
+  "openapi_sha": "b08b588223c0b586a5c9c4e0f1c9b0cd818d7ef1d61f3f9e823d5a489e37fb73",
+  "zod_runtime_sha256": "32b72a82897ae698b7566aad9821c07cf5194173a3dc69adfb00a8f00f04a446",
+  "operation_id": "getDiagnosticStatementDetail",
+  "case_id": "target",
+  "http_status": 200,
+  "err_code": 0,
+  "response": {
+    "data": {
+      "statement_id": "00000000-0000-4000-8000-000000000128",
+      "datasource_id": "00000000-0000-4000-8000-000000000009",
+      "engine": "postgresql",
+      "compatibility_mode": "postgresql",
+      "engine_fingerprint": "3743533789385642733",
+      "yearning_fingerprint": "7e8f0b2e8adebc560deca8b0b8eeab2ba7cdae82905cf99b73cf4f761929ec7e",
+      "database_or_schema": "target",
+      "template_status": "available",
+      "template_sql": "select d1.id, d1.note from public.f12_demo d1 join public.f12_demo d2 on d1.id <= d2.id where d1.note >= $1 order by d1.note desc limit $2",
+      "template_note": null,
+      "coverage_mode": "cumulative_only",
+      "from": "2026-11-25T01:11:00.000Z",
+      "to": "2026-11-25T01:12:00.000Z",
+      "summary": {
+        "statement_id": "00000000-0000-4000-8000-000000000128",
+        "engine_fingerprint": "3743533789385642733",
+        "yearning_fingerprint": "7e8f0b2e8adebc560deca8b0b8eeab2ba7cdae82905cf99b73cf4f761929ec7e",
+        "database_or_schema": "target",
+        "template_status": "available",
+        "template_preview": "select d1.id, d1.note from public.f12_demo d1 join public.f12_demo d2 on d1.id <= d2.id where d1.note >= $1 order by d1.note desc limit $2",
+        "calls": 80,
+        "total_exec_time_ms": 874.501,
+        "avg_exec_time_ms": 10.931,
+        "rows_examined_or_shared_blks_read": 0,
+        "rows_sent_or_rows_returned": 800,
+        "lock_time_ms_or_temp_blks_written": 0,
+        "share_of_total_time": 1,
+        "coverage_mode": "cumulative_only",
+        "first_seen_at": "2026-11-25T01:09:00.000Z",
+        "last_seen_at": "2026-11-25T01:09:00.000Z"
+      },
+      "cost_unit_notes": {
+        "lock_time_ms_or_temp_blks_written": "temp_blks_written (PostgreSQL temporary blocks spilled to disk)",
+        "rows_examined_or_shared_blks_read": "shared_blks_read (PostgreSQL physical shared buffer blocks read, typically 8 KiB/block)",
+        "rows_sent_or_rows_returned": "rows (PostgreSQL cumulative rows returned or affected)",
+        "shared_blks_hit": "shared_blks_hit (PostgreSQL shared buffer cache block hits)"
+      },
+      "trend_series": [
+        {
+          "bucket_start": "2026-11-25T01:10:00.000Z",
+          "bucket_end": "2026-11-25T01:09:00.000Z",
+          "calls": 80,
+          "avg_exec_time_ms": 10.931,
+          "total_exec_time_ms": 874.501,
+          "reset_detected": false,
+          "unobserved_below_top_n": false
+        }
+      ],
+      "cost_series": [
+        {
+          "bucket_start": "2026-11-25T01:10:00.000Z",
+          "bucket_end": "2026-11-25T01:09:00.000Z",
+          "rows_examined_or_shared_blks_read": 0,
+          "rows_sent_or_rows_returned": 800,
+          "lock_time_ms_or_temp_blks_written": 0,
+          "shared_blks_hit": null
+        }
+      ],
+      "order_comparison": {
+        "linked_change_order_id": null,
+        "linked_order_display_no": null,
+        "relation_kind": null,
+        "reference_executed_at": null,
+        "insufficient_samples": true,
+        "before_window": null,
+        "after_window": null,
+        "candidate_orders_in_window": [
+          {
+            "change_order_id": "00000000-0000-4000-8000-000000000160",
+            "display_no": "YR-20261124-900042",
+            "title": "adv-order-42-completed",
+            "state": "completed",
+            "executed_at": "2026-11-25T01:13:00.000Z",
+            "relation_hint": "time_overlap_only",
+            "confirmed_link_id": null
+          },
+          {
+            "change_order_id": "00000000-0000-4000-8000-000000000161",
+            "display_no": "YR-20261124-900024",
+            "title": "adv-order-24-completed",
+            "state": "completed",
+            "executed_at": "2026-11-25T01:13:00.000Z",
+            "relation_hint": "time_overlap_only",
+            "confirmed_link_id": null
+          },
+          {
+            "change_order_id": "00000000-0000-4000-8000-000000000162",
+            "display_no": "YR-20261124-900060",
+            "title": "adv-order-60-completed",
+            "state": "completed",
+            "executed_at": "2026-11-25T01:13:00.000Z",
+            "relation_hint": "time_overlap_only",
+            "confirmed_link_id": null
+          },
+          {
+            "change_order_id": "00000000-0000-4000-8000-000000000163",
+            "display_no": "YR-20261124-900006",
+            "title": "adv-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+            "state": "completed",
+            "executed_at": "2026-11-25T01:13:00.000Z",
+            "relation_hint": "time_overlap_only",
+            "confirmed_link_id": null
+          }
+        ]
+      },
+      "latest_ai_report": null
+    },
+    "err_code": 0,
+    "message": "ok",
+    "request_id": "00000000-0000-4000-8000-999999999999"
+  }
+}

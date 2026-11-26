@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"strconv"
 
+	"github.com/cookieY/YearningX/backend/internal/platform/hashutil"
 	"github.com/cookieY/YearningX/backend/internal/review/domain"
 	"github.com/cookieY/YearningX/backend/internal/review/fingerprint"
 	"github.com/cookieY/YearningX/backend/internal/review/privacy"
@@ -59,8 +60,8 @@ func evaluateValidityProgramWithGroupLookup(ctx context.Context, program Validit
 		"scope":                 "modeled_object_existence_preconditions",
 		"status":                result.Status,
 		"program_digest":        programDigest,
-		"fact_digest":           sha256Hex(factsJSON),
-		"schema_binding_digest": sha256Hex(bindingJSON),
+		"fact_digest":           hashutil.SHA256Hex(factsJSON),
+		"schema_binding_digest": hashutil.SHA256Hex(bindingJSON),
 	}
 	var findings []mappedFinding
 	for _, violation := range result.Violations {

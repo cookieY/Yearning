@@ -20,6 +20,8 @@ import (
 
 	"gorm.io/gorm"
 
+	"github.com/cookieY/YearningX/backend/internal/platform/pagecursor"
+	"github.com/cookieY/YearningX/backend/internal/platform/txutil"
 	"github.com/cookieY/YearningX/backend/internal/review/agent"
 	"github.com/cookieY/YearningX/backend/internal/review/domain"
 )
@@ -311,7 +313,7 @@ func (s *Services) CreatePromptToolForEngine(ctx context.Context, actorUserID, n
 		values (?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?)`,
 		id, name, description, state, engine, paramsJSON, defJSON, hash, findingKey, actorUserID, now, now)
 	if res.Error != nil {
-		if isUniqueViolationErr(res.Error) {
+		if txutil.IsUniqueViolation(res.Error) {
 			return nil, &domain.Error{Code: 1005, Name: "RESOURCE_ALREADY_EXISTS"}
 		}
 		return nil, res.Error
@@ -359,9 +361,11 @@ func promptToolView(r promptToolRow) *PromptToolView {
 func (s *Services) ListPromptTools(ctx context.Context, limit int, after, search string) ([]*PromptToolView, *string, error) {
 	q := s.DB.WithContext(ctx).Table("prompt_tools")
 	if after != "" {
-		if created, id, ok := splitCursor(after); ok {
-			q = q.Where("(created_at, id) < (?, ?)", created, id)
+		created, id, err := pagecursor.DecodeUUID(after)
+		if err != nil {
+			return nil, nil, ErrValidation
 		}
+		q = q.Where("(created_at, id) < (?, ?)", created, id)
 	}
 	if search != "" {
 		q = q.Where("name ILIKE ?", "%"+search+"%")
@@ -374,7 +378,7 @@ func (s *Services) ListPromptTools(ctx context.Context, limit int, after, search
 	var next *string
 	if len(rows) > limit {
 		rows = rows[:limit]
-		v := rows[len(rows)-1].CreatedAt.UTC().Format("2006-01-02T15:04:05.999999Z") + "|" + rows[len(rows)-1].ID
+		v := pagecursor.Encode(rows[len(rows)-1].CreatedAt, rows[len(rows)-1].ID)
 		next = &v
 	}
 	out := make([]*PromptToolView, 0, len(rows))

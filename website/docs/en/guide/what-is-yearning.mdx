@@ -31,7 +31,7 @@ Yearning v4 is an **AI-powered database change governance platform**, never an u
 | **Control Plane** | Legacy RPC coupling | Single-binary **Go modular monolith**, zero RPC, stateless multi-replica Kubernetes ready |
 | **Frontend Workspace** | Vue (`gemini-next`) | **React 19 + TypeScript + Vite + Tailwind CSS v4 + shadcn/ui** |
 | **Metadata Store** | MySQL + AutoMigrate | **PostgreSQL 14–18** + explicit versioned migrations + 3-role least privilege |
-| **Target Engines** | Primarily MySQL | **MySQL 5.7/8.0, PostgreSQL 14–18, TiDB, OceanBase, PolarDB** |
+| **Target Engines** | Primarily MySQL | **MySQL 5.7+ (5.7 / 8.0 / 8.4 LTS), PostgreSQL 14–18+, TiDB, OceanBase, PolarDB** |
 | **SQL Review Engine** | Static rules | **Deterministic rules + Dual-Track AI Precheck** (up to 100k statements / 32 MiB, 5 metadata tools) |
 | **Workflow & Freezing** | Mutable routing & AutoTask | **Frozen at submission** (1..N stages, 1..10 steps); no `admin` override; AutoTask retired |
 | **Online Schema Change** | External binaries | **In-process Go `gh-ost`** (18 typed parameters, live progress); `pt-osc` retired |

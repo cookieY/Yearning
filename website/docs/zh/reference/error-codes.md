@@ -76,7 +76,7 @@
 | `3006` | `EXECUTION_PREFLIGHT_FAILED` | 执行前漂移或凭据预检失败 |
 | `3007` / `3008` / `3009` | `SCHEDULE_OUT_OF_RANGE` / `OUTSIDE_EXECUTION_WINDOW` / `MISSED_SCHEDULE` | 预约时间非法、超出每周允许执行时段或错过 15 分钟宽限窗口 |
 | `3010` | `DATASOURCE_UNAVAILABLE` | 目标数据源不可达，检查主机、端口与 TLS 证书 |
-| `3011` | `GH_OST_UNSUPPORTED` | 目标表或语句不满足进程内 `gh-ost` 在线改表条件（例如非原生 MySQL 5.7/8.0） |
+| `3011` | `GH_OST_UNSUPPORTED` | 目标表或语句不满足进程内 `gh-ost` 在线改表条件（例如非原生 MySQL 5.7+） |
 | `3012` | `MANUAL_VERIFICATION_EVIDENCE_REQUIRED` | 核验 `result_unknown` 必须填写非空核验证据说明 |
 
 ## `40xx` 查询、`50xx` 迁移、`60xx` AI 助手与 `70xx` SQL 诊断

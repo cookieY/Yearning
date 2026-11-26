@@ -137,6 +137,55 @@ func TestClassifySkillCategoryAndPlaceholders(t *testing.T) {
 	if got := classifySkillCategory("builtin.ddl-primary-key", "", "Require primary key"); got != skillCategoryDDL {
 		t.Fatalf("expected ddl, got %q", got)
 	}
+	if got := classifySkillCategory(
+		"b6-skill-9999",
+		"Require WHERE bounds on DML updates",
+		"All UPDATE statements (non-DDL writes) must include a bounded WHERE clause filtering on a primary key or indexed column.",
+	); got != skillCategoryDML {
+		t.Fatalf("expected optimized DML UPDATE rule mentioning primary key/non-DDL to remain dml, got %q", got)
+	}
+	if got := classifySkillCategory(
+		"custom.fk-cascade",
+		"Forbid ON UPDATE CASCADE in table definitions",
+		"CREATE TABLE and ALTER TABLE foreign key constraints must not use ON UPDATE CASCADE or ON DELETE CASCADE.",
+	); got != skillCategoryDDL {
+		t.Fatalf("expected DDL foreign key rule mentioning ON UPDATE/ON DELETE to remain ddl, got %q", got)
+	}
+	if got := classifySkillCategory(
+		"custom.batch-update",
+		"\u6279\u91cf\u66f4\u65b0\u6570\u636e\u5fc5\u987b\u6309\u4e3b\u952e\u6216\u7d22\u5f15\u5206\u6279\u6267\u884c",
+		"\u5355\u6b21\u66f4\u65b0\u6216\u5220\u9664\u64cd\u4f5c\u5fc5\u987b\u6309\u4e3b\u952e\u6216\u7d22\u5f15\u5217\u8fc7\u6ee4\uff0c\u907f\u514d\u5168\u8868\u626b\u63cf\u3002",
+	); got != skillCategoryDML {
+		t.Fatalf("expected Chinese DML rule mentioning primary key/index to classify as dml, got %q", got)
+	}
+	if got := classifySkillCategory(
+		"custom.no-drop-table-zh",
+		"\u751f\u4ea7\u73af\u5883\u7981\u6b62\u5220\u9664\u8868\u6216\u5220\u9664\u5217",
+		"\u7981\u6b62\u5220\u9664\u8868\u3001\u5220\u9664\u7d22\u5f15\u6216\u4fee\u6539\u8868\u7ed3\u6784\u3002",
+	); got != skillCategoryDDL {
+		t.Fatalf("expected Chinese DDL drop-table rule to classify as ddl, got %q", got)
+	}
+	if got := classifySkillCategory(
+		"custom.safe-delete",
+		"Require primary key filter when deleting rows",
+		"Deleting rows without a primary key filter is forbidden.",
+	); got != skillCategoryDML {
+		t.Fatalf("expected progressive DML verb rule to classify as dml, got %q", got)
+	}
+	if got := classifySkillCategory(
+		"custom.non-ddl-write",
+		"Must filter by primary key",
+		"Non-DDL write rule for updating rows.",
+	); got != skillCategoryDML {
+		t.Fatalf("expected skill named non-ddl-write to classify as dml, got %q", got)
+	}
+	if got := classifySkillCategory(
+		"custom.prevent-backdrop-update",
+		"",
+		"Must filter by primary key.",
+	); got != skillCategoryDML {
+		t.Fatalf("expected skill named prevent-backdrop-update to classify as dml, got %q", got)
+	}
 
 	phs := collectParamPlaceholders("Check {{max_rows}} and {{max_cols}}", map[string]any{"extra_param": 5})
 	if len(phs) != 3 || !hasAllPlaceholders("Rule {{extra_param}} {{max_cols}} {{max_rows}}", phs) {
@@ -165,9 +214,12 @@ func TestNormalizeAndFilterGeneratedTestCases_RejectsSelectAndCrossCategory(t *t
 		{ID: "v-5", SQL: "CREATE TABLE t_bad_5 (id BIGINT PRIMARY KEY);", ExpectedCompliant: false, Rationale: "bad 5"},
 	}
 
-	merged, ok := normalizeAndFilterGeneratedTestCases(rawAICases, skillCategoryDDL)
+	merged, stats, ok := normalizeAndFilterGeneratedTestCases(rawAICases, skillCategoryDDL)
 	if !ok {
 		t.Fatal("normalizeAndFilterGeneratedTestCases returned ok=false")
+	}
+	if stats.rejectedCount != 4 || stats.validCompliant != 5 || stats.validNonCompliant != 5 {
+		t.Fatalf("unexpected filter stats: %+v", stats)
 	}
 	if len(merged) != 10 {
 		t.Fatalf("len(merged) = %d, want 10", len(merged))
@@ -185,7 +237,7 @@ func TestNormalizeAndFilterGeneratedTestCases_RejectsSelectAndCrossCategory(t *t
 		}
 	}
 
-	if _, ok := normalizeAndFilterGeneratedTestCases(rawAICases[:6], skillCategoryDDL); ok {
+	if _, _, ok := normalizeAndFilterGeneratedTestCases(rawAICases[:6], skillCategoryDDL); ok {
 		t.Fatal("expected ok=false when fewer than 5 compliant + 5 non-compliant valid cases remain")
 	}
 	if isStatementValidForCategory("   ", skillCategoryDDL) {
@@ -193,6 +245,81 @@ func TestNormalizeAndFilterGeneratedTestCases_RejectsSelectAndCrossCategory(t *t
 	}
 	if isStatementValidForCategory("CREATE TABLE t (id INT);", skillCategoryDML) {
 		t.Fatal("expected false for DDL in DML category")
+	}
+	if !isStatementValidForCategory("-- compliant case\nUPDATE\n  orders SET status = 1 WHERE id = 1;", skillCategoryDML) {
+		t.Fatal("expected leading line comment + multiline UPDATE to be valid for DML")
+	}
+	if !isStatementValidForCategory("/* header */ CREATE TABLE t1 (id BIGINT PRIMARY KEY);", skillCategoryDDL) {
+		t.Fatal("expected leading block comment + CREATE TABLE to be valid for DDL")
+	}
+	if !isStatementValidForCategory("# mysql comment\nUPDATE orders SET status = 1 WHERE id = 1;", skillCategoryDML) {
+		t.Fatal("expected leading # comment + UPDATE to be valid for DML")
+	}
+	if !isStatementValidForCategory("COMMENT\n  ON TABLE users IS 'ok';", skillCategoryDDL) {
+		t.Fatal("expected multiline COMMENT ON statement to be valid for DDL")
+	}
+	if isStatementValidForCategory("-- tricky\nSELECT id FROM orders;", skillCategoryDML) {
+		t.Fatal("expected SELECT after leading comment to remain rejected")
+	}
+	if isStatementValidForCategory("/* unclosed comment UPDATE orders SET a = 1;", skillCategoryDML) {
+		t.Fatal("expected unclosed block comment to be rejected")
+	}
+}
+
+func TestGeneratePromptToolTestCases_BoundedRetry(t *testing.T) {
+	ctx := context.Background()
+	validDMLJSON := `{"cases":[` +
+		`{"id":"c1","sql":"UPDATE orders SET status='ok' WHERE id=1;","expected_compliant":true,"rationale":"bounded"},` +
+		`{"id":"c2","sql":"UPDATE orders SET status='ok' WHERE id=2;","expected_compliant":true,"rationale":"bounded"},` +
+		`{"id":"c3","sql":"UPDATE orders SET status='ok' WHERE id=3;","expected_compliant":true,"rationale":"bounded"},` +
+		`{"id":"c4","sql":"UPDATE orders SET status='ok' WHERE id=4;","expected_compliant":true,"rationale":"bounded"},` +
+		`{"id":"c5","sql":"UPDATE orders SET status='ok' WHERE id=5;","expected_compliant":true,"rationale":"bounded"},` +
+		`{"id":"v1","sql":"UPDATE orders SET status='bad';","expected_compliant":false,"rationale":"unbounded"},` +
+		`{"id":"v2","sql":"UPDATE items SET qty=0;","expected_compliant":false,"rationale":"unbounded"},` +
+		`{"id":"v3","sql":"UPDATE users SET active=false;","expected_compliant":false,"rationale":"unbounded"},` +
+		`{"id":"v4","sql":"UPDATE invoices SET paid=true;","expected_compliant":false,"rationale":"unbounded"},` +
+		`{"id":"v5","sql":"UPDATE accounts SET balance=0;","expected_compliant":false,"rationale":"unbounded"}` +
+		`]}`
+	invalidJSON := `{"cases":[{"id":"x1","sql":"SELECT * FROM orders;","expected_compliant":true,"rationale":"bad"}]}`
+
+	attempts := 0
+	var secondPayload string
+	out, err := generatePromptToolTestCases(ctx, GeneratePromptToolTestCasesInput{
+		Name:          "b6-skill-retry",
+		Description:   "Require WHERE bounds on DML updates",
+		Engine:        "all",
+		KnowledgeText: "All UPDATE statements must include a WHERE clause using primary key or index.",
+	}, func(_ context.Context, _ string, userContent string) (string, error) {
+		attempts++
+		if attempts == 1 {
+			return invalidJSON, nil
+		}
+		secondPayload = userContent
+		return validDMLJSON, nil
+	})
+	if err != nil {
+		t.Fatalf("expected bounded retry to succeed on attempt 2, got %v", err)
+	}
+	if attempts != 2 || len(out.Cases) != 10 {
+		t.Fatalf("unexpected retry outcome: attempts=%d len=%d", attempts, len(out.Cases))
+	}
+	if !strings.Contains(secondPayload, "retry_feedback") {
+		t.Fatalf("expected retry_feedback in attempt 2 payload, got %s", secondPayload)
+	}
+
+	// Exhausting both attempts fails closed with 2011 AI_PROVIDER_FAILED.
+	failAttempts := 0
+	_, err = generatePromptToolTestCases(ctx, GeneratePromptToolTestCasesInput{
+		Name:          "b6-skill-fail",
+		Description:   "Require WHERE bounds on DML updates",
+		Engine:        "all",
+		KnowledgeText: "All UPDATE statements must include a WHERE clause.",
+	}, func(_ context.Context, _ string, _ string) (string, error) {
+		failAttempts++
+		return invalidJSON, nil
+	})
+	if failAttempts != 2 || !domain.IsCode(err, domain.CodeAIProviderFailed) {
+		t.Fatalf("expected 2 attempts and 2011 AI_PROVIDER_FAILED, got attempts=%d err=%v", failAttempts, err)
 	}
 }
 

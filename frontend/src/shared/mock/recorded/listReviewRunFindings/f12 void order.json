@@ -1,0 +1,60 @@
+{
+  "contract_version": 1,
+  "openapi_sha": "b08b588223c0b586a5c9c4e0f1c9b0cd818d7ef1d61f3f9e823d5a489e37fb73",
+  "zod_runtime_sha256": "32b72a82897ae698b7566aad9821c07cf5194173a3dc69adfb00a8f00f04a446",
+  "operation_id": "listReviewRunFindings",
+  "case_id": "f12 void order",
+  "http_status": 200,
+  "err_code": 0,
+  "response": {
+    "data": {
+      "items": [
+        {
+          "id": "00000000-0000-4000-8000-000000000031",
+          "stage_position": 1,
+          "fingerprint_group_id": "00000000-0000-4000-8000-000000000032",
+          "category": "operability",
+          "severity": "medium",
+          "title": "`IF NOT EXISTS` 会静默跳过结构不兼容的既有表，造成 schema 漂移",
+          "message": "目标库中该表当前不存在，本语句会正常建表；但当同名表已存在时，`IF NOT EXISTS` 不会核对列定义，结构差异会被静默忽略。",
+          "suggestion": "发布前核对各环境同名表的结构；若需要强制结构一致，改用显式迁移并在定义冲突时失败，而不是依赖 `IF NOT EXISTS` 静默通过。",
+          "model_confidence": null,
+          "evidence_ids": [
+            "00000000-0000-4000-8000-000000000033"
+          ]
+        },
+        {
+          "id": "00000000-0000-4000-8000-000000000034",
+          "stage_position": 1,
+          "fingerprint_group_id": "00000000-0000-4000-8000-000000000032",
+          "category": "correctness",
+          "severity": "low",
+          "title": "`note` 可为空，缺失值会进入下游数据链路并增加校验负担",
+          "message": "建表语句把 `note` 声明为可空的 `text`，写入方可以省略该列或写入 `NULL`，读取方必须额外处理缺失值。",
+          "suggestion": "若业务上该列必须有值，请在建表时添加 `NOT NULL`，并在需要时确定默认值；若确实允许缺失，请在表注释或应用契约中明确空值的业务含义。",
+          "model_confidence": null,
+          "evidence_ids": []
+        },
+        {
+          "id": "00000000-0000-4000-8000-000000000035",
+          "stage_position": 1,
+          "fingerprint_group_id": "00000000-0000-4000-8000-000000000032",
+          "category": "correctness",
+          "severity": "low",
+          "title": "`id` 主键没有数据库侧生成策略，插入必须显式提供键值",
+          "message": "建表定义只声明 `bigint primary key`，没有 `GENERATED ... AS IDENTITY` 或默认值；任何未显式提供主键的插入都会失败。",
+          "suggestion": "若主键由数据库生成，请改为 identity 列或设置默认序列；若由应用生成，请在表注释和写入契约中明确该约定。",
+          "model_confidence": null,
+          "evidence_ids": []
+        }
+      ],
+      "page": {
+        "has_more": false,
+        "next_cursor": null
+      }
+    },
+    "err_code": 0,
+    "message": "ok",
+    "request_id": "00000000-0000-4000-8000-999999999999"
+  }
+}

@@ -77,9 +77,8 @@ beforeAll(async () => {
   fx = { flowId: flow.id, datasourceId: ds.id, taskId: task.id ?? null } as ChainFixtures;
 });
 
-const DDL = "create table if not exists f12_contract_b2 (id bigint primary key, note text);";
-
 async function draftToSubmittedOrder(title: string): Promise<{ draftId: string; orderId: string }> {
+  const orderDdl = `create table if not exists f12_contract_b2_${crypto.randomUUID().slice(0, 8)} (id bigint primary key, note text);`;
   await loginAs("submitter");
   const created = await record("createChangeDraft", title, () =>
     createChangeDraft({ flow_id: fx.flowId, title, description: "f12 contract batch2" },
@@ -87,24 +86,25 @@ async function draftToSubmittedOrder(title: string): Promise<{ draftId: string; 
   const draft = asView<IdVersion | undefined>(created.value);
   if (!draft?.id) throw new Error(`draft not created: ${created.errCode} ${created.status}`);
   await record("replaceDraftSql", title, () =>
-    replaceDraftSql(draft.id, { sql: DDL }, { headers: headers(draftETag(draft)) }));
+    replaceDraftSql(draft.id, { sql: orderDdl }, { headers: headers(draftETag(draft)) }));
   // RCP-20261101 ephemeral precheck: request body carries current SQL verbatim for review, response directly returns run_id
   // (no longer going through a task row), polling GET /review-runs/{id} until terminal state.
   const started = await record("runDraftReview", title, () =>
     runDraftReview(
-      { flow_id: fx.flowId, draft_id: draft.id, sql: DDL },
+      { flow_id: fx.flowId, draft_id: draft.id, sql: orderDdl },
       { headers: headers() },
     ));
   const runId = runIdFromStart(started.value);
   expect(runId, `review start carries the run id (${started.errCode} ${started.status})`).toBeTruthy();
-  const run = await record("getReviewRun", title, () => getReviewRun(runId!));
-  let runView = asView<{ state?: string; gate?: { passed?: boolean } } | undefined>(run.value);
-  const runDeadline = Date.now() + 90_000;
-  while (runView?.state !== "ready" && runView?.state !== "failed" && Date.now() < runDeadline) {
+  let runView = asView<{ state?: string; gate?: { passed?: boolean } } | undefined>(await getReviewRun(runId!));
+  const runDeadline = Date.now() + 120_000;
+  while (runView?.state !== "ready" && runView?.state !== "failed" && runView?.state !== "blocked"
+    && runView?.state !== "partial" && runView?.state !== "outdated" && runView?.state !== "timeout" && Date.now() < runDeadline) {
     await new Promise((r) => setTimeout(r, 800));
-    const polled = await record("getReviewRun", "chain-poll", () => getReviewRun(runId!));
-    runView = asView<{ state?: string } | undefined>(polled.value);
+    runView = asView<{ state?: string; gate?: { passed?: boolean } } | undefined>(await getReviewRun(runId!));
   }
+  const finalRun = await record("getReviewRun", "chain-poll", () => getReviewRun(runId!));
+  runView = asView<{ state?: string; gate?: { passed?: boolean } } | undefined>(finalRun.value);
   expect(runView?.state).toBe("ready");
   await record("listReviewRunFindings", title, () => listReviewRunFindings(runId!));
   // RCP-20261101 submission: POST /change-orders carries {flow, draft, sql, run_id},
@@ -113,7 +113,7 @@ async function draftToSubmittedOrder(title: string): Promise<{ draftId: string; 
   await record("getChangeDraft", "pre-submit", () => getChangeDraft(draft.id));
   const submitted = await record("submitChangeDraft", title, () =>
     submitChangeDraft(
-      { flow_id: fx.flowId, draft_id: draft.id, sql: DDL, run_id: runId! },
+      { flow_id: fx.flowId, draft_id: draft.id, sql: orderDdl, run_id: runId! },
       { headers: headers() },
     ));
   const order = asView<IdVersion | undefined>(submitted.value);
@@ -130,25 +130,37 @@ describe("draft lifecycle", () => {
     const draft = asView<IdVersion | undefined>(created.value);
     if (!draft?.id) throw new Error(`scratch draft not created: ${created.errCode} ${created.status}`);
     await record("getChangeDraft", "scratch", () => getChangeDraft(draft.id));
-    await record("updateChangeDraft", "scratch-title", () =>
-      updateChangeDraft(draft.id, { title: "f12 scratch draft renamed" }, { headers: headers(draft.version) }));
+    const updated = await record("updateChangeDraft", "scratch-title", () =>
+      updateChangeDraft(draft.id, { title: "f12 scratch draft renamed" }, { headers: headers(draftETag(draft)) }));
+    const afterUpdate = asView<IdVersion | undefined>(updated.value) ?? draft;
     const withSql = await record("replaceDraftSql", "scratch", () =>
-      replaceDraftSql(draft.id, { sql: "select 1;" }, { headers: headers(draftETag(draft)) }));
-    const afterSql = asView<IdVersion | undefined>(withSql.value) ?? draft;
+      replaceDraftSql(draft.id, { sql: "select 1;" }, { headers: headers(draftETag(afterUpdate)) }));
+    const afterSql = asView<IdVersion | undefined>(withSql.value) ?? afterUpdate;
     const version = draftETag(afterSql);
     await record("revealDraftSql", "scratch", () =>
-      revealDraftSql(draft.id, { reason: "f12 contract reveal" } as never, { headers: headers(version) }));
+      revealDraftSql(draft.id, { purpose: "f12 contract reveal" }, { headers: headers(version) }));
     await record("deleteChangeDraft", "scratch", () =>
       deleteChangeDraft(draft.id, { headers: headers(version, false) }));
   });
 
   it("submitter metadata projection: schemas/tables/columns", async () => {
     await loginAs("submitter");
-    await record("listMyFlowDatasourceSchemas", "submitter", () => listMyFlowDatasourceSchemas(fx.flowId, fx.datasourceId));
-    await record("listMyFlowDatasourceTables", "submitter", () =>
-      listMyFlowDatasourceTables(fx.flowId, fx.datasourceId, { schema_name: "public" } as never));
+    const schemasRes = await record("listMyFlowDatasourceSchemas", "submitter", () =>
+      listMyFlowDatasourceSchemas(fx.flowId, fx.datasourceId));
+    const schemaItems = asView<{ items?: Array<{ name?: string }> } | undefined>(schemasRes.value)?.items ?? [];
+    const schemaName =
+      schemaItems.find((s) => s.name === "public")?.name ??
+      schemaItems[0]?.name ??
+      "public";
+    const tablesRes = await record("listMyFlowDatasourceTables", "submitter", () =>
+      listMyFlowDatasourceTables(fx.flowId, fx.datasourceId, { schema_name: schemaName } as never));
+    const tableItems = asView<{ items?: Array<{ table_name?: string; name?: string }> } | undefined>(tablesRes.value)?.items ?? [];
+    const pickedTable =
+      tableItems.find((t) => (t.table_name ?? t.name) === "f12_demo") ??
+      tableItems[0];
+    const tableName = pickedTable?.table_name ?? pickedTable?.name ?? "f12_demo";
     await record("listMyFlowDatasourceColumns", "submitter", () =>
-      listMyFlowDatasourceColumns(fx.flowId, fx.datasourceId, { schema_name: "public", table_name: "f12_demo" } as never));
+      listMyFlowDatasourceColumns(fx.flowId, fx.datasourceId, { schema_name: schemaName, table_name: tableName } as never));
   });
 });
 

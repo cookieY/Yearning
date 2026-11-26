@@ -14,7 +14,6 @@ import {
 import { DemoBanner } from "@/app/shell/demo-banner";
 import { CATALOG_DATASOURCES } from "@/shared/mock/flow-catalog";
 import { readStoredIdentity, setMockIdentity } from "@/shared/mock/identity-store";
-import { clearMockSuperSession } from "@/shared/dev/mock-super";
 
 const server = setupServer(
   ...assistantFixtureHandlers(),
@@ -29,7 +28,6 @@ describe("Demo Mode MSW fixtures (AI Assistant & SQL Diagnostics)", () => {
   beforeEach(() => {
     resetAssistantFixture();
     resetDiagnosticsFixture();
-    clearMockSuperSession();
     setMockIdentity("henry");
   });
 
@@ -288,6 +286,6 @@ describe("Demo Mode MSW fixtures (AI Assistant & SQL Diagnostics)", () => {
     expect(readStoredIdentity()).toBe("executor-a");
 
     fireEvent.click(fullAccessBtn);
-    expect(readStoredIdentity()).toBe("henry");
+    expect(readStoredIdentity()).toBe("owner");
   });
 });

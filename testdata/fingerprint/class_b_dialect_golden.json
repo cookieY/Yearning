@@ -1,0 +1,94 @@
+{
+  "contract_version": 1,
+  "description": "Static SQL golden corpus for Class B database engine dialects and DEF-21 regression coverage.",
+  "cases": [
+    {
+      "id": "def21_c1cd3c0_mysql_cross_db_rename_table",
+      "engine": "mysql",
+      "mode": "mysql",
+      "sql": "RENAME TABLE shop.orders_old TO archive.orders_old",
+      "expect_kind": "rename",
+      "expect_quality": "exact",
+      "expect_metadata_complete": true,
+      "rollback_supported": false,
+      "rollback_reason": "cross_schema_rename_table_unsupported"
+    },
+    {
+      "id": "mysql57_same_db_rename_table",
+      "engine": "mysql",
+      "mode": "mysql",
+      "sql": "RENAME TABLE shop.orders_old TO shop.orders_new",
+      "expect_kind": "rename",
+      "expect_quality": "exact",
+      "expect_metadata_complete": true,
+      "rollback_supported": true,
+      "rollback_kind": "RENAME_TABLE"
+    },
+    {
+      "id": "mysql84_alter_add_column",
+      "engine": "mysql",
+      "mode": "mysql",
+      "sql": "ALTER TABLE app_db.accounts ADD COLUMN status VARCHAR(32) NOT NULL DEFAULT 'active'",
+      "expect_kind": "alter",
+      "expect_quality": "exact",
+      "expect_metadata_complete": true,
+      "rollback_supported": true,
+      "rollback_kind": "ADD_COLUMN"
+    },
+    {
+      "id": "mariadb_conditional_comment_select",
+      "engine": "mysql",
+      "mode": "mysql",
+      "sql": "SELECT /*M!100600 SQL_NO_CACHE */ id, status FROM app_db.orders WHERE tenant_id = 42",
+      "expect_kind": "select",
+      "expect_quality": "exact",
+      "expect_metadata_complete": true,
+      "rollback_supported": false,
+      "rollback_reason": "unsupported_mysql_ast_statement"
+    },
+    {
+      "id": "tidb_auto_random_create_table",
+      "engine": "tidb",
+      "mode": "mysql",
+      "sql": "CREATE TABLE app_db.events (id BIGINT PRIMARY KEY AUTO_RANDOM(5), payload VARCHAR(128)) SHARD_ROW_ID_BITS = 4",
+      "expect_kind": "create",
+      "expect_quality": "compatible_lexer",
+      "expect_metadata_complete": false,
+      "rollback_supported": true,
+      "rollback_kind": "CREATE_TABLE"
+    },
+    {
+      "id": "oceanbase_mysql_update_dml",
+      "engine": "oceanbase",
+      "mode": "mysql",
+      "sql": "UPDATE app_db.ledger SET balance = 500 WHERE account_id = 9001 AND status = 'open'",
+      "expect_kind": "update",
+      "expect_quality": "exact",
+      "expect_metadata_complete": true,
+      "rollback_supported": true,
+      "rollback_kind": "UPDATE"
+    },
+    {
+      "id": "polardb_mysql_multi_pair_rename",
+      "engine": "polardb",
+      "mode": "mysql",
+      "sql": "RENAME TABLE app_db.t1 TO app_db.t1_old, app_db.t2 TO app_db.t2_old",
+      "expect_kind": "rename",
+      "expect_quality": "exact",
+      "expect_metadata_complete": true,
+      "rollback_supported": false,
+      "rollback_reason": "multi_table_rename_unsupported"
+    },
+    {
+      "id": "polardb_pg_alter_rename_column",
+      "engine": "polardb",
+      "mode": "postgresql",
+      "sql": "ALTER TABLE public.orders RENAME COLUMN legacy_code TO external_code",
+      "expect_kind": "alter",
+      "expect_quality": "exact",
+      "expect_metadata_complete": true,
+      "rollback_supported": true,
+      "rollback_kind": "RENAME_COLUMN"
+    }
+  ]
+}

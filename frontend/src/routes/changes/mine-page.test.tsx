@@ -5,7 +5,9 @@ import { SessionProvider } from "@/features/auth/session-provider";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { HttpResponse, http } from "msw";
+import { apiRoute } from "@/shared/mock/api-route";
 import { server } from "@/test/msw/server";
+import { grantSession } from "@/test/session";
 import {
   publishSseEvent,
   resetSseEventBusForTest,
@@ -41,7 +43,16 @@ function seedOrder(overrides: Record<string, unknown> = {}): void {
     title: "\u5217\u8868\u9875\u5939\u5177\u5de5\u5355",
     state: "submitted",
     current_stage_position: 1,
-    stages: [],
+    stages: [
+      {
+        id: "7e6f1a2b-0000-4000-8000-00000000a011",
+        position: 1,
+        datasource_name: "orders-mysql",
+        state: "pending",
+        approval_steps: [],
+        execution_actors: [],
+      },
+    ],
     has_sql: true,
     sql_hash: "hash-1",
     snapshot_hash: "snap-1",
@@ -86,33 +97,6 @@ beforeEach(() => {
   resetReviewFixture();
   grantSession();
 });
-
-
-/** The order pages gate lifecycle buttons on the session identity; plant an
- * authenticated /users/me whose id matches the fixture submitter (guards
- * test precedent). */
-function grantSession(): void {
-  server.use(
-    http.get("*/users/me", () =>
-      HttpResponse.json({
-        err_code: 0,
-        message: "ok",
-        data: {
-          id: FIXTURE_OWNER_ID,
-          username: "henry",
-          display_name: "henry",
-          email: null,
-          is_builtin_admin: true,
-          version: 1,
-          created_at: "2026-08-28T08:00:00Z",
-          updated_at: "2026-08-28T08:00:00Z",
-          can_access_admin: true,
-        },
-        request_id: FIXTURE_OWNER_ID,
-      }),
-    ),
-  );
-}
 
 /** Pick a calendar day inside the date dialog, matched by its localized
  * aria-label so the query never depends on DOM order (review R2-L1 nit). */
@@ -159,13 +143,13 @@ describe("MinePage", () => {  it("renders draft and order sections separated, or
       state: "stage_execution_pending",
       stages: [
         {
-          id: `${EXEC_PENDING_ID}-s1`,
+          id: "9b6f1a2b-0001-4000-8000-00000000ee01",
           position: 1,
           datasource_name: "prod-pg",
           state: "execution_pending",
           approval_steps: [
             {
-              id: `${EXEC_PENDING_ID}-a1`,
+              id: "9b6f1a2b-0002-4000-8000-00000000ee01",
               position: 1,
               state: "approved",
               decided_at: "2026-10-30T09:00:00Z",
@@ -232,7 +216,7 @@ describe("MinePage", () => {  it("renders draft and order sections separated, or
       submitted_at: "2026-11-22T09:00:00Z",
       stages: [
         {
-          id: `${SELF_PENDING_ID}-s1`,
+          id: "9b6f1a2b-0001-4000-8000-00000000ee02",
           position: 1,
           datasource_name: "prod-pg",
           state: "execution_pending",
@@ -250,7 +234,7 @@ describe("MinePage", () => {  it("renders draft and order sections separated, or
       submitted_at: "2026-11-22T08:00:00Z",
       stages: [
         {
-          id: `${SELF_UNKNOWN_ID}-s1`,
+          id: "9b6f1a2b-0001-4000-8000-00000000ee03",
           position: 1,
           datasource_name: "prod-pg",
           state: "result_unknown",
@@ -293,7 +277,7 @@ describe("MinePage", () => {  it("renders draft and order sections separated, or
     const user = userEvent.setup();
     // Seed one draft through the fixture's own POST so version/state are real.
     const create = (await (
-      await fetch("/change-drafts", {
+      await fetch("/api/v4/change-drafts", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ flow_id: FIXTURE_FLOW_ID, title: "\u5f85\u5220\u9664\u8349\u7a3f" }),
@@ -323,7 +307,7 @@ describe("MinePage", () => {  it("renders draft and order sections separated, or
     await waitFor(() => {
       expect(screen.queryByTestId("mine-drafts-count")).toBeNull();
     });
-    const drafts = (await (await fetch("/change-drafts")).json()) as {
+    const drafts = (await (await fetch("/api/v4/change-drafts")).json()) as {
       data: { items: Array<{ id: string }> };
     };
     expect(drafts.data.items.some((item) => item.id === create.data.id)).toBe(false);
@@ -367,7 +351,7 @@ describe("MinePage", () => {  it("renders draft and order sections separated, or
     // The consumer re-reads the resource, so the list reflects the new state
     // in place instead of duplicating rows.
     server.use(
-      http.get("*/change-orders", () =>
+      http.get(apiRoute("/change-orders"), () =>
         HttpResponse.json({
           err_code: 0,
           message: "ok",
@@ -381,7 +365,16 @@ describe("MinePage", () => {  it("renders draft and order sections separated, or
                 title: "\u5217\u8868\u9875\u5939\u5177\u5de5\u5355",
                 state: "withdrawn",
                 current_stage_position: null,
-                stages: [],
+                stages: [
+                  {
+                    id: "7e6f1a2b-0000-4000-8000-00000000a011",
+                    position: 1,
+                    datasource_name: "orders-mysql",
+                    state: "pending",
+                    approval_steps: [],
+                    execution_actors: [],
+                  },
+                ],
                 has_sql: true,
                 sql_hash: "hash-1",
                 snapshot_hash: "snap-1",
@@ -461,14 +454,11 @@ describe("MinePage", () => {  it("renders draft and order sections separated, or
     seedOrder({
       stages: [
         {
+          id: "7e6f1a2b-0000-4000-8000-00000000a099",
           position: 1,
-          name: "\u5ba1\u6279",
-          datasource_id: "ds-1",
           datasource_name: "prod-mysql",
-          database_name: "app",
-          state: "approval_pending",
-          approval_mode: "any",
-          approval_actors: [],
+          state: "approval_active",
+          approval_steps: [],
           execution_actors: [],
         },
       ],
@@ -540,7 +530,7 @@ describe("MinePage", () => {  it("renders draft and order sections separated, or
     const rawIdNamed = "3c38b5a6-2a34-475a-9fd9-9cb6fb182fdc";
     const rawIdFallback = "4d49c6b7-3b45-486b-0ae0-0dc7fc293ged";
     server.use(
-      http.get("*/query/orders", () =>
+      http.get(apiRoute("/query/orders"), () =>
         HttpResponse.json({
           err_code: 0,
           err_message: "ok",
@@ -602,5 +592,124 @@ describe("MinePage", () => {  it("renders draft and order sections separated, or
     const sheet = await screen.findByTestId("orders-query-detail");
     expect(within(sheet).getByText("f12-pg-target")).toBeVisible();
     expect(within(sheet).queryByText(rawIdNamed)).toBeNull();
+  });
+
+  it("allows the requester to withdraw a pending query access request from the query orders tab", async () => {
+    const user = userEvent.setup();
+    let state: "access_pending" | "withdrawn" = "access_pending";
+    let version = 1;
+    let withdrawnPayload: { reason?: string; ifMatch: string | null; idempotencyKey: string | null } | null = null;
+
+    server.use(
+      http.get(apiRoute("/query/orders"), () =>
+        HttpResponse.json({
+          err_code: 0,
+          name: "OK",
+          message: "ok",
+          request_id: "req-qorders-withdraw",
+          data: {
+            items: [
+              {
+                kind: "access_request",
+                id: "qreq-pending-mine",
+                created_at: "2026-11-26T10:00:00Z",
+                request: {
+                  id: "qreq-pending-mine",
+                  requester_user_id: FIXTURE_OWNER_ID,
+                  state,
+                  datasource_ids: ["00000000-0000-4000-8000-000000000010"],
+                  datasource_names: ["f12-pg-target"],
+                  grant_id: null,
+                  version,
+                  created_at: "2026-11-26T10:00:00Z",
+                  reason: "check prod",
+                  requested_until: "2026-12-31T23:59:00Z",
+                  terminal_at: null,
+                },
+              },
+              {
+                kind: "access_request",
+                id: "qreq-pending-other",
+                created_at: "2026-11-26T09:00:00Z",
+                request: {
+                  id: "qreq-pending-other",
+                  requester_user_id: "00000000-0000-4000-8000-000000009999",
+                  state: "access_pending",
+                  datasource_ids: ["00000000-0000-4000-8000-000000000011"],
+                  datasource_names: ["f12-mysql-target"],
+                  grant_id: null,
+                  version: 1,
+                  created_at: "2026-11-26T09:00:00Z",
+                  reason: "someone else",
+                  requested_until: "2026-12-31T23:59:00Z",
+                  terminal_at: null,
+                },
+              },
+            ],
+            page: { limit: 20, next_cursor: null, has_more: false },
+          },
+        }),
+      ),
+      http.post(apiRoute("/query-access-requests/:requestId/withdrawal"), async ({ request, params }) => {
+        const body = (await request.json().catch(() => ({}))) as { reason?: string };
+        withdrawnPayload = {
+          reason: body.reason,
+          ifMatch: request.headers.get("if-match"),
+          idempotencyKey: request.headers.get("idempotency-key"),
+        };
+        state = "withdrawn";
+        version += 1;
+        return HttpResponse.json({
+          err_code: 0,
+          name: "OK",
+          message: "ok",
+          request_id: "req-qorders-withdraw-post",
+          data: {
+            id: String(params.requestId),
+            requester_user_id: FIXTURE_OWNER_ID,
+            state,
+            datasource_ids: ["00000000-0000-4000-8000-000000000010"],
+            datasource_names: ["f12-pg-target"],
+            grant_id: null,
+            version,
+            created_at: "2026-11-26T10:00:00Z",
+            reason: "check prod",
+            requested_until: "2026-12-31T23:59:00Z",
+            terminal_at: "2026-11-26T10:05:00Z",
+          },
+        });
+      }),
+    );
+
+    renderMine();
+    await user.click(await screen.findByRole("tab", { name: "\u67e5\u8be2\u5de5\u5355" }));
+
+    const myWithdrawBtn = await screen.findByTestId("orders-query-withdraw-qreq-pending-mine");
+    expect(myWithdrawBtn).toBeVisible();
+    expect(screen.queryByTestId("orders-query-withdraw-qreq-pending-other")).toBeNull();
+
+    await user.click(myWithdrawBtn);
+    const dialog = await screen.findByTestId("query-withdraw-dialog");
+    // Leave reason empty to verify default non-empty reason is sent.
+    await user.click(within(dialog).getByTestId("query-withdraw-confirm"));
+
+    await waitFor(() => {
+      expect(screen.queryByTestId("query-withdraw-dialog")).toBeNull();
+    });
+    const captured = withdrawnPayload as {
+      reason?: string;
+      ifMatch: string | null;
+      idempotencyKey: string | null;
+    } | null;
+    if (captured === null) throw new Error("expected withdrawal request to be sent");
+    expect(captured.ifMatch).toBe('"1"');
+    expect(captured.idempotencyKey?.length ?? 0).toBeGreaterThan(0);
+    expect(captured.reason?.length ?? 0).toBeGreaterThan(0);
+
+    await waitFor(() => {
+      expect(screen.queryByTestId("orders-query-withdraw-qreq-pending-mine")).toBeNull();
+    });
+    const updatedRow = await screen.findByTestId("orders-query-row-qreq-pending-mine");
+    expect(within(updatedRow).getByText("\u5df2\u64a4\u56de")).toBeVisible();
   });
 });

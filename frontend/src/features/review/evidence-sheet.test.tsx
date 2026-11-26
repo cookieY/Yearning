@@ -3,7 +3,9 @@ import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { HttpResponse, http } from "msw";
+import { apiRoute } from "@/shared/mock/api-route";
 import { server } from "@/test/msw/server";
+import { testEnvelope } from "@/test/envelope";
 import type { ReviewFinding } from "@/api/generated/client/yearningV4HTTPAPI.schemas";
 import "@/shared/i18n";
 import { EvidenceSheet } from "./evidence-sheet";
@@ -35,7 +37,7 @@ function finding(): ReviewFinding {
 }
 
 function envelope(data: unknown) {
-  return { err_code: 0, message: "ok", data, request_id: FINDING_ID };
+  return testEnvelope(data, FINDING_ID);
 }
 
 function renderSheet(open: boolean) {
@@ -56,7 +58,7 @@ function renderSheet(open: boolean) {
 beforeEach(() => {
   server.resetHandlers();
   server.use(
-    http.get("*/review-findings/:findingId/evidence", () =>
+    http.get(apiRoute("/review-findings/:findingId/evidence"), () =>
       HttpResponse.json(
         envelope([
           {
@@ -86,7 +88,7 @@ describe("EvidenceSheet", () => {
       title: "Target table does not exist",
     };
     server.use(
-      http.get("*/review-findings/:findingId/evidence", ({ params }) =>
+      http.get(apiRoute("/review-findings/:findingId/evidence"), ({ params }) =>
         HttpResponse.json(
           envelope(
             params.findingId === FINDING_ID
@@ -143,7 +145,7 @@ describe("EvidenceSheet", () => {
 
   it("renders a per-finding header even when a group member carries no evidence", async () => {
     server.use(
-      http.get("*/review-findings/:findingId/evidence", ({ params }) =>
+      http.get(apiRoute("/review-findings/:findingId/evidence"), ({ params }) =>
         HttpResponse.json(
           envelope(
             params.findingId === FINDING_ID
@@ -202,7 +204,7 @@ describe("EvidenceSheet", () => {
   it("reveals the raw payload with the server watermark after an explicit action", async () => {
     const user = userEvent.setup();
     server.use(
-      http.post("*/review-evidence/:evidenceId/raw-reveals", () =>
+      http.post(apiRoute("/review-evidence/:evidenceId/raw-reveals"), () =>
         HttpResponse.json(
           envelope({
             reveal_id: "0198d9cc-e65d-7b9d-a8aa-3c81945f9e01".replace("r", "9"),
@@ -231,7 +233,7 @@ describe("EvidenceSheet", () => {
       .mockResolvedValue(undefined);
     let copyAuditCalls = 0;
     server.use(
-      http.post("*/review-evidence/:evidenceId/raw-reveals", () =>
+      http.post(apiRoute("/review-evidence/:evidenceId/raw-reveals"), () =>
         HttpResponse.json(
           envelope({
             reveal_id: "0198d9cc-e65d-7b9d-a8aa-3c81945f9901",
@@ -242,7 +244,7 @@ describe("EvidenceSheet", () => {
           }),
         ),
       ),
-      http.post("*/review-evidence/:evidenceId/raw-copy-events", () => {
+      http.post(apiRoute("/review-evidence/:evidenceId/raw-copy-events"), () => {
         copyAuditCalls += 1;
         return HttpResponse.json(envelope(null));
       }),
@@ -275,7 +277,7 @@ describe("EvidenceSheet", () => {
       writeGate.then(() => undefined),
     );
     server.use(
-      http.post("*/review-evidence/:evidenceId/raw-reveals", () =>
+      http.post(apiRoute("/review-evidence/:evidenceId/raw-reveals"), () =>
         HttpResponse.json(
           envelope({
             reveal_id: "0198d9cc-e65d-7b9d-a8aa-3c81945f9901",
@@ -286,7 +288,7 @@ describe("EvidenceSheet", () => {
           }),
         ),
       ),
-      http.post("*/review-evidence/:evidenceId/raw-copy-events", () => {
+      http.post(apiRoute("/review-evidence/:evidenceId/raw-copy-events"), () => {
         copyAuditCalls += 1;
         return HttpResponse.json(envelope(null));
       }),
@@ -307,7 +309,7 @@ describe("EvidenceSheet", () => {
     const user = userEvent.setup();
     vi.spyOn(navigator.clipboard, "writeText").mockResolvedValue(undefined);
     server.use(
-      http.post("*/review-evidence/:evidenceId/raw-reveals", () =>
+      http.post(apiRoute("/review-evidence/:evidenceId/raw-reveals"), () =>
         HttpResponse.json(
           envelope({
             reveal_id: "0198d9cc-e65d-7b9d-a8aa-3c81945f9901",
@@ -318,7 +320,7 @@ describe("EvidenceSheet", () => {
           }),
         ),
       ),
-      http.post("*/review-evidence/:evidenceId/raw-copy-events", () =>
+      http.post(apiRoute("/review-evidence/:evidenceId/raw-copy-events"), () =>
         HttpResponse.json({
           err_code: 1002,
           message: "evidence not found",
@@ -343,7 +345,7 @@ describe("EvidenceSheet", () => {
     vi.spyOn(navigator.clipboard, "writeText").mockRejectedValue(new Error("denied"));
     let copyAuditCalls = 0;
     server.use(
-      http.post("*/review-evidence/:evidenceId/raw-reveals", () =>
+      http.post(apiRoute("/review-evidence/:evidenceId/raw-reveals"), () =>
         HttpResponse.json(
           envelope({
             reveal_id: "0198d9cc-e65d-7b9d-a8aa-3c81945f9901",
@@ -354,7 +356,7 @@ describe("EvidenceSheet", () => {
           }),
         ),
       ),
-      http.post("*/review-evidence/:evidenceId/raw-copy-events", () => {
+      http.post(apiRoute("/review-evidence/:evidenceId/raw-copy-events"), () => {
         copyAuditCalls += 1;
         return HttpResponse.json(envelope(null));
       }),
@@ -375,7 +377,7 @@ describe("EvidenceSheet", () => {
   it("wipes the revealed plaintext when the sheet closes", async () => {
     const user = userEvent.setup();
     server.use(
-      http.post("*/review-evidence/:evidenceId/raw-reveals", () =>
+      http.post(apiRoute("/review-evidence/:evidenceId/raw-reveals"), () =>
         HttpResponse.json(
           envelope({
             reveal_id: "0198d9cc-e65d-7b9d-a8aa-3c81945f9901",
@@ -403,7 +405,7 @@ describe("EvidenceSheet", () => {
 
   it("shows the mapped error with request id when the evidence query fails", async () => {
     server.use(
-      http.get("*/review-findings/:findingId/evidence", () =>
+      http.get(apiRoute("/review-findings/:findingId/evidence"), () =>
         HttpResponse.json(
           {
             err_code: 1002,
@@ -422,7 +424,7 @@ describe("EvidenceSheet", () => {
 
   it("states when a finding has no linked evidence at all", async () => {
     server.use(
-      http.get("*/review-findings/:findingId/evidence", () =>
+      http.get(apiRoute("/review-findings/:findingId/evidence"), () =>
         HttpResponse.json(envelope([])),
       ),
     );
@@ -432,7 +434,7 @@ describe("EvidenceSheet", () => {
 
   it("shows only normalized evidence after the raw payload expired", async () => {
     server.use(
-      http.get("*/review-findings/:findingId/evidence", () =>
+      http.get(apiRoute("/review-findings/:findingId/evidence"), () =>
         HttpResponse.json(
           envelope([
             {

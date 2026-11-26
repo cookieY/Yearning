@@ -43,6 +43,18 @@ func (e *Error) Error() string {
 	return fmt.Sprintf("assistant error %d (%s)", e.Code, e.Name)
 }
 
+// BizCode implements bizerr.Coded.
+func (e *Error) BizCode() int { return e.Code }
+
+// BizName implements bizerr.Coded.
+func (e *Error) BizName() string { return e.Name }
+
+// BizMessage implements bizerr.Coded.
+func (e *Error) BizMessage() string { return e.Message }
+
+// BizMeta implements bizerr.Coded.
+func (e *Error) BizMeta() map[string]any { return e.Meta }
+
 func ErrValidation(msg string) *Error {
 	if msg == "" {
 		msg = "Invalid request parameters"

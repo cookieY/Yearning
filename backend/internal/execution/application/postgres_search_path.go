@@ -15,6 +15,7 @@ import (
 	"github.com/cookieY/YearningX/backend/internal/database"
 	"github.com/cookieY/YearningX/backend/internal/datasource"
 	"github.com/cookieY/YearningX/backend/internal/execution/domain"
+	"github.com/cookieY/YearningX/backend/internal/platform/ptr"
 	reviewapp "github.com/cookieY/YearningX/backend/internal/review/application"
 )
 
@@ -175,12 +176,11 @@ func (s *Services) failOrderAfterPostgresSearchPathPreflightTx(
 		return err
 	}
 	return s.emitOrderEvent(
-		ctx, tx, EventExecFailed, order.ID, auditlog.Actor{
-			UserID: in.Actor.UserID, Username: in.Actor.Username,
-		}, StateChangedPayload{
-			AggregateID: order.ID, From: strPtr(order.State),
+		ctx, tx, EventExecFailed, order.ID,
+		auditlog.UserActor(in.Actor.UserID, in.Actor.Username), StateChangedPayload{
+			AggregateID: order.ID, From: ptr.To(order.State),
 			To: string(next), ReasonCode: reason,
-			StageID: strPtr(stage.StageID), AggregateVersion: nextVersion,
+			StageID: ptr.To(stage.StageID), AggregateVersion: nextVersion,
 		},
 	)
 }
@@ -188,15 +188,13 @@ func (s *Services) failOrderAfterPostgresSearchPathPreflightTx(
 func (s *Services) openFrozenPostgresReviewContext(
 	row frozenStageReviewRow,
 ) (reviewapp.FrozenPostgresReviewContext, error) {
-	plain, err := s.Crypter.Open(crypto.PurposePayload, crypto.Envelope{
+	plain, err := s.Crypter.OpenColumn(crypto.PurposePayload, crypto.ColumnRef{
+		Table:      "stage_review_snapshots",
+		PrimaryKey: fmt.Sprintf("%s#%d", row.ReviewRunID, row.StagePosition),
+		Column:     "normalized_context_ciphertext",
+	}, crypto.Envelope{
 		Ciphertext: row.Ciphertext, Nonce: row.Nonce,
 		KeyID: row.KeyID, Algorithm: row.Algorithm,
-	}, crypto.AAD{
-		DeploymentID: s.Crypter.DeploymentID(),
-		Table:        "stage_review_snapshots",
-		PrimaryKey:   fmt.Sprintf("%s#%d", row.ReviewRunID, row.StagePosition),
-		Column:       "normalized_context_ciphertext",
-		Purpose:      crypto.PurposePayload,
 	})
 	if err != nil {
 		return reviewapp.FrozenPostgresReviewContext{},
@@ -262,6 +260,40 @@ func (s *Services) verifyPostgresSearchPath(
 	return s.verifyPostgresReviewContext(ctx, pool, expected, nil, 0)
 }
 
+func (s *Services) verifyPostgresSearchPathForBinding(
+	ctx context.Context,
+	pool *database.PurposePool,
+	expected reviewapp.FrozenPostgresSearchPath,
+	binding *reviewapp.FrozenPostgresPathBinding,
+) error {
+	want := databasePostgresSearchPath(expected)
+	if pool == nil || expected.Validate() != nil ||
+		expected.HasTemporarySchema() || want.Validate() != nil {
+		return domain.ErrPreflightFailed("postgres_search_path_snapshot_invalid")
+	}
+	if s.SearchPathProbe != nil {
+		if err := s.SearchPathProbe(ctx, pool, want); err != nil {
+			return domain.ErrPreflightFailed("postgres_search_path_changed")
+		}
+		return nil
+	}
+	observed, err := database.ProbePostgresSearchPath(ctx, pool)
+	if err != nil || !verifyPostgresProbedDefaultPath(observed, want, binding) {
+		return domain.ErrPreflightFailed("postgres_search_path_changed")
+	}
+	return nil
+}
+
+func verifyPostgresProbedDefaultPath(
+	observed, want database.PostgresSearchPath,
+	binding *reviewapp.FrozenPostgresPathBinding,
+) bool {
+	if binding != nil && binding.TargetSchema != "" {
+		return observed.Validate() == nil && observed.CurrentUser == want.CurrentUser
+	}
+	return want.Equal(observed)
+}
+
 func (s *Services) verifyPostgresReviewContext(
 	ctx context.Context,
 	pool *database.PurposePool,
@@ -269,26 +301,17 @@ func (s *Services) verifyPostgresReviewContext(
 	binding *reviewapp.FrozenPostgresPathBinding,
 	ordinal int32,
 ) error {
-	want := databasePostgresSearchPath(expected)
-	if pool == nil || expected.Validate() != nil ||
-		expected.HasTemporarySchema() || want.Validate() != nil {
-		return domain.ErrPreflightFailed("postgres_search_path_snapshot_invalid")
-	}
 	if binding != nil && (!binding.Complete || !binding.CallablesSafe) {
 		return domain.ErrPreflightFailed("postgres_search_path_snapshot_invalid")
 	}
+	if err := s.verifyPostgresSearchPathForBinding(ctx, pool, expected, binding); err != nil {
+		return err
+	}
 	if s.SearchPathProbe != nil {
-		if err := s.SearchPathProbe(ctx, pool, want); err != nil {
-			return domain.ErrPreflightFailed("postgres_search_path_changed")
-		}
 		if binding != nil && !binding.Path.Equal(expected) {
 			return domain.ErrPreflightFailed("postgres_search_path_snapshot_invalid")
 		}
 		return nil
-	}
-	observed, err := database.ProbePostgresSearchPath(ctx, pool)
-	if err != nil || !want.Equal(observed) {
-		return domain.ErrPreflightFailed("postgres_search_path_changed")
 	}
 	if binding != nil {
 		if err := verifyPostgresObjectBindings(ctx, pool, expected, *binding, ordinal); err != nil {
@@ -296,6 +319,42 @@ func (s *Services) verifyPostgresReviewContext(
 		}
 	}
 	return nil
+}
+
+func verifyPostgresInspectedContext(
+	expected reviewapp.FrozenPostgresSearchPath,
+	binding *reviewapp.FrozenPostgresPathBinding,
+	ordinal int32,
+	inspect func(
+		want database.PostgresSearchPath,
+		names []string,
+		requests []database.PostgresCallableRequest,
+		extraSchemas ...string,
+	) (database.PostgresSearchPath, []database.PostgresRelationLookup, []database.PostgresCallableResolution, error),
+) error {
+	want := databasePostgresSearchPath(expected)
+	if expected.Validate() != nil || expected.HasTemporarySchema() || want.Validate() != nil {
+		return domain.ErrPreflightFailed("postgres_search_path_snapshot_invalid")
+	}
+	if binding == nil || !binding.Complete || !binding.CallablesSafe {
+		return domain.ErrPreflightFailed("postgres_search_path_snapshot_invalid")
+	}
+	names, err := reviewedPostgresRelationNames(*binding, ordinal)
+	if err != nil {
+		return err
+	}
+	requests, requestsOK := postgresCallableRequestsFromBinding(*binding)
+	if !requestsOK {
+		return domain.ErrPreflightFailed("postgres_search_path_snapshot_invalid")
+	}
+	observedPath, lookups, resolutions, err := inspect(want, names, requests, binding.ExplicitSchemas...)
+	if err != nil || !want.Equal(observedPath) {
+		return domain.ErrPreflightFailed("postgres_search_path_changed")
+	}
+	if err := verifyPostgresCallables(*binding, resolutions); err != nil {
+		return err
+	}
+	return verifyPostgresInspection(expected, *binding, ordinal, lookups)
 }
 
 func (s *Services) verifyPostgresReviewContextOnDMLTransaction(
@@ -306,34 +365,16 @@ func (s *Services) verifyPostgresReviewContextOnDMLTransaction(
 	binding *reviewapp.FrozenPostgresPathBinding,
 	ordinal int32,
 ) error {
-	if expected.Validate() != nil || expected.HasTemporarySchema() ||
-		databasePostgresSearchPath(expected).Validate() != nil {
-		return domain.ErrPreflightFailed("postgres_search_path_snapshot_invalid")
-	}
-	if binding == nil || !binding.Complete || !binding.CallablesSafe {
-		return domain.ErrPreflightFailed("postgres_search_path_snapshot_invalid")
-	}
-	names, err := reviewedPostgresRelationNames(*binding, ordinal)
-	if err != nil {
-		return domain.ErrPreflightFailed(
-			"postgres_search_path_snapshot_invalid",
-		)
-	}
-	requests, requestsOK := postgresCallableRequestsFromBinding(*binding)
-	if !requestsOK {
-		return domain.ErrPreflightFailed("postgres_search_path_snapshot_invalid")
-	}
-	observedPath, lookups, resolutions, err := database.InspectPostgresDMLTransaction(
-		ctx, pool, tx, databasePostgresSearchPath(expected), names, requests,
+	return verifyPostgresInspectedContext(expected, binding, ordinal,
+		func(
+			want database.PostgresSearchPath,
+			names []string,
+			requests []database.PostgresCallableRequest,
+			extraSchemas ...string,
+		) (database.PostgresSearchPath, []database.PostgresRelationLookup, []database.PostgresCallableResolution, error) {
+			return database.InspectPostgresDMLTransaction(ctx, pool, tx, want, names, requests, extraSchemas...)
+		},
 	)
-	if err != nil ||
-		!databasePostgresSearchPath(expected).Equal(observedPath) {
-		return domain.ErrPreflightFailed("postgres_search_path_changed")
-	}
-	if err := verifyPostgresCallables(*binding, resolutions); err != nil {
-		return err
-	}
-	return verifyPostgresInspection(expected, *binding, ordinal, lookups)
 }
 
 func (s *Services) verifyPostgresReviewContextOnDDLConnection(
@@ -343,35 +384,19 @@ func (s *Services) verifyPostgresReviewContextOnDDLConnection(
 	binding *reviewapp.FrozenPostgresPathBinding,
 	ordinal int32,
 ) error {
-	if conn == nil || expected.Validate() != nil ||
-		expected.HasTemporarySchema() ||
-		databasePostgresSearchPath(expected).Validate() != nil {
+	if conn == nil {
 		return domain.ErrPreflightFailed("postgres_search_path_snapshot_invalid")
 	}
-	if binding == nil || !binding.Complete || !binding.CallablesSafe {
-		return domain.ErrPreflightFailed("postgres_search_path_snapshot_invalid")
-	}
-	names, err := reviewedPostgresRelationNames(*binding, ordinal)
-	if err != nil {
-		return domain.ErrPreflightFailed(
-			"postgres_search_path_snapshot_invalid",
-		)
-	}
-	requests, requestsOK := postgresCallableRequestsFromBinding(*binding)
-	if !requestsOK {
-		return domain.ErrPreflightFailed("postgres_search_path_snapshot_invalid")
-	}
-	observedPath, lookups, resolutions, err := database.InspectPostgresDDLConnection(
-		ctx, conn, databasePostgresSearchPath(expected), names, requests,
+	return verifyPostgresInspectedContext(expected, binding, ordinal,
+		func(
+			want database.PostgresSearchPath,
+			names []string,
+			requests []database.PostgresCallableRequest,
+			extraSchemas ...string,
+		) (database.PostgresSearchPath, []database.PostgresRelationLookup, []database.PostgresCallableResolution, error) {
+			return database.InspectPostgresDDLConnection(ctx, conn, want, names, requests, extraSchemas...)
+		},
 	)
-	if err != nil ||
-		!databasePostgresSearchPath(expected).Equal(observedPath) {
-		return domain.ErrPreflightFailed("postgres_search_path_changed")
-	}
-	if err := verifyPostgresCallables(*binding, resolutions); err != nil {
-		return err
-	}
-	return verifyPostgresInspection(expected, *binding, ordinal, lookups)
 }
 
 func verifyPostgresObjectBindings(
@@ -388,60 +413,30 @@ func verifyPostgresObjectBindings(
 	if err := verifyPostgresCallablesOnPool(ctx, pool, path, binding); err != nil {
 		return err
 	}
-	if ordinal == 0 {
-		names := make([]string, 0, len(binding.Baseline))
-		for name := range binding.Baseline {
-			names = append(names, name)
-		}
-		lookups, err := database.LookupPostgresRelations(
-			ctx, pool, databasePostgresSearchPath(path), names,
-		)
-		if err != nil {
-			return domain.ErrPreflightFailed("postgres_search_path_changed")
-		}
-		return verifyPostgresBaseline(path, binding.Baseline, lookups)
-	}
-	expected, err := expectedPostgresBindingsAtOrdinal(binding, ordinal)
+	names, err := reviewedPostgresRelationNames(binding, ordinal)
 	if err != nil {
 		return err
 	}
-	if len(expected) == 0 {
-		return nil
-	}
-	names := make([]string, 0, len(expected))
-	seen := map[string]bool{}
-	for _, relation := range expected {
-		if !seen[relation.TableName] {
-			seen[relation.TableName] = true
-			names = append(names, relation.TableName)
+	if len(names) == 0 {
+		if ordinal == 0 && (binding.TargetSchema != "" || len(binding.ExplicitSchemas) > 0) {
+			if err := database.VerifyPostgresSchemasVisible(
+				ctx, pool, databasePostgresSearchPath(path), binding.ExplicitSchemas...,
+			); err != nil {
+				return domain.ErrPreflightFailed("postgres_search_path_changed")
+			}
+			return nil
+		}
+		if ordinal > 0 {
+			return nil
 		}
 	}
 	lookups, err := database.LookupPostgresRelations(
-		ctx, pool, databasePostgresSearchPath(path), names,
+		ctx, pool, databasePostgresSearchPath(path), names, binding.ExplicitSchemas...,
 	)
-	if err != nil || len(lookups) != len(names) {
+	if err != nil || (ordinal > 0 && len(lookups) != len(names)) {
 		return domain.ErrPreflightFailed("postgres_search_path_changed")
 	}
-	byName := make(map[string]database.PostgresRelationLookup, len(lookups))
-	for _, lookup := range lookups {
-		byName[lookup.Relation] = lookup
-	}
-	for _, reviewed := range expected {
-		lookup, ok := byName[reviewed.TableName]
-		if !ok {
-			return domain.ErrPreflightFailed("postgres_search_path_changed")
-		}
-		schema, kind, oid, present := reviewedBindingPosition(
-			path, lookup, reviewed.Explicit, reviewed.Schema,
-		)
-		if present != reviewed.Present || (present &&
-			(schema != reviewed.Schema || kind != reviewed.Kind ||
-				(reviewed.OID != 0 && oid != reviewed.OID))) ||
-			(!present && schema != reviewed.Schema) {
-			return domain.ErrPreflightFailed("postgres_search_path_changed")
-		}
-	}
-	return nil
+	return verifyPostgresInspection(path, binding, ordinal, lookups)
 }
 
 // postgresCallableRequestsFromBinding reconstructs the exact catalog questions
@@ -576,7 +571,7 @@ func reviewedPostgresRelationNames(
 	names := make([]string, 0)
 	seen := map[string]bool{}
 	add := func(name string) {
-		if name != "" && !seen[name] {
+		if !seen[name] {
 			seen[name] = true
 			names = append(names, name)
 		}
@@ -607,7 +602,7 @@ func verifyPostgresInspection(
 		return domain.ErrPreflightFailed("postgres_search_path_snapshot_invalid")
 	}
 	if ordinal == 0 {
-		return verifyPostgresBaseline(path, binding.Baseline, lookups)
+		return verifyPostgresBaseline(path, binding.Baseline, lookups, binding.ExplicitSchemas...)
 	}
 	expected, err := expectedPostgresBindingsAtOrdinal(binding, ordinal)
 	if err != nil {
@@ -642,17 +637,20 @@ func verifyPostgresBaseline(
 	path reviewapp.FrozenPostgresSearchPath,
 	baseline map[string]reviewapp.FrozenPostgresBaselineRelation,
 	lookups []database.PostgresRelationLookup,
+	extraSchemas ...string,
 ) error {
 	byName := make(map[string]database.PostgresRelationLookup, len(lookups))
 	for _, lookup := range lookups {
 		byName[lookup.Relation] = lookup
 	}
+	schemas := append([]string(nil), path.Effective...)
+	schemas = append(schemas, extraSchemas...)
 	for tableName, reviewed := range baseline {
 		lookup, ok := byName[tableName]
 		if !ok {
 			return domain.ErrPreflightFailed("postgres_search_path_changed")
 		}
-		for _, schema := range path.Effective {
+		for _, schema := range schemas {
 			kind := lookup.PresentBySchema[schema]
 			oid := lookup.OIDBySchema[schema]
 			if string(kind) != reviewed.PresentBySchema[schema] ||

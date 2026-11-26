@@ -67,7 +67,7 @@ func TestDraftMachineLegalEdges(t *testing.T) {
 	// NewHTTPClient constructs a bounded HTTP client: capped timeout and response body size.
 	// SEC-0009/T05: dialing is guarded by addrguard (rejecting loopback / link-local / cloud metadata /
 	// unspecified / broadcast / multicast / Unix socket after resolution and before connect, covering DNS
-	// rebinding); both production construction sites (handlers_b6/providerstore) use this default.
+	// rebinding); both production construction sites (handlers_review/providerstore) use this default.
 	total := 0
 	for _, m := range draftEdges {
 		total += len(m)

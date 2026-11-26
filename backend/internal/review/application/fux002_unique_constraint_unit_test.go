@@ -6,6 +6,8 @@ import (
 
 	"github.com/go-sql-driver/mysql"
 	"github.com/jackc/pgx/v5/pgconn"
+
+	"github.com/cookieY/YearningX/backend/internal/platform/txutil"
 )
 
 // TestUniqueViolationConstraintParsing F-UX-002 constraint name extraction: PG uses
@@ -13,19 +15,19 @@ import (
 // providerUniqueConflictDetail degrades to listing both axes when the constraint name cannot be determined.
 func TestUniqueViolationConstraintParsing(t *testing.T) {
 	pgErr := &pgconn.PgError{Code: "23505", ConstraintName: "ai_providers_selection_priority_key"}
-	if got := uniqueViolationConstraint(pgErr); got != "ai_providers_selection_priority_key" {
+	if got := txutil.UniqueViolationConstraint(pgErr); got != "ai_providers_selection_priority_key" {
 		t.Fatalf("pg arm: %q", got)
 	}
 	myErr := &mysql.MySQLError{Number: 1062,
 		Message: "Duplicate entry '1' for key 'ai_providers.selection_priority_key'"}
-	if got := uniqueViolationConstraint(myErr); got != "ai_providers.selection_priority_key" {
+	if got := txutil.UniqueViolationConstraint(myErr); got != "ai_providers.selection_priority_key" {
 		t.Fatalf("mysql arm: %q", got)
 	}
-	if got := uniqueViolationConstraint(errors.New("boom")); got != "" {
+	if got := txutil.UniqueViolationConstraint(errors.New("boom")); got != "" {
 		t.Fatalf("non-unique arm: %q", got)
 	}
 	otherPg := &pgconn.PgError{Code: "23502", ConstraintName: "x"}
-	if got := uniqueViolationConstraint(otherPg); got != "" {
+	if got := txutil.UniqueViolationConstraint(otherPg); got != "" {
 		t.Fatalf("non-23505 arm: %q", got)
 	}
 

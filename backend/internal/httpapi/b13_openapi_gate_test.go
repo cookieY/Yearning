@@ -15,6 +15,8 @@ import (
 	"testing"
 
 	"gopkg.in/yaml.v3"
+
+	"github.com/cookieY/YearningX/backend/internal/platform/systz"
 )
 
 type openAPIDoc struct {
@@ -215,6 +217,7 @@ func TestResponsesMatchFrozenOpenAPI(t *testing.T) {
 		t.Fatalf("login: %d %v", code, body)
 	}
 	fx.db.Exec(`delete from system_settings where namespace in ('general','query')`)
+	systz.InvalidateDB(fx.db)
 	fx.db.Exec(`delete from audit_events where event_type = 'settings.replaced'`)
 
 	mustValidate := func(op string, schemaName string, body map[string]any) {

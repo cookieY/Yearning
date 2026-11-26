@@ -1,7 +1,7 @@
 ---
 id: help-permission-model
 title: Platform Role & Permission Model (Who Can Access What)
-source_ref: docs/contracts/authorization-and-permission-contract.md
+source_ref: docs/contracts/permission-matrix.md
 route_path: /dashboard
 admin_only: false
 keywords: permission, role, access, who can, admin, builtin_admin, user, permission group, flow, grant, authorize, separation of duties, datasource, forbidden, 6002, 4001, workspace, announcement, ldap, ldaps, starttls, oidc, sso, identity provider, login, session, 50

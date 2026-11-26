@@ -26,14 +26,11 @@ func SealMapping(c *crypto.Crypter, binding EnvelopeBinding, pairs []MappingPair
 	if binding.ReviewRunID == "" {
 		return crypto.Envelope{}, fmt.Errorf("privacy: empty review run id")
 	}
-	aad := crypto.AAD{
-		DeploymentID: c.DeploymentID(),
-		Table:        MappingTable,
-		PrimaryKey:   fmt.Sprintf("%s#%d", binding.ReviewRunID, binding.StatementIdx),
-		Column:       MappingColumn,
-		Purpose:      crypto.PurposePayload,
-	}
-	return c.Seal(crypto.PurposePayload, MarshalMapping(pairs), aad)
+	return c.SealColumn(crypto.PurposePayload, crypto.ColumnRef{
+		Table:      MappingTable,
+		PrimaryKey: fmt.Sprintf("%s#%d", binding.ReviewRunID, binding.StatementIdx),
+		Column:     MappingColumn,
+	}, MarshalMapping(pairs))
 }
 
 // OpenMapping decrypts and decodes an identifier mapping AEAD envelope after verifying its AAD binding.
@@ -47,14 +44,11 @@ func OpenMapping(c *crypto.Crypter, binding EnvelopeBinding, env crypto.Envelope
 	if binding.StatementIdx < 1 {
 		return nil, fmt.Errorf("privacy: statement index must be positive")
 	}
-	aad := crypto.AAD{
-		DeploymentID: c.DeploymentID(),
-		Table:        MappingTable,
-		PrimaryKey:   fmt.Sprintf("%s#%d", binding.ReviewRunID, binding.StatementIdx),
-		Column:       MappingColumn,
-		Purpose:      crypto.PurposePayload,
-	}
-	plain, err := c.Open(crypto.PurposePayload, env, aad)
+	plain, err := c.OpenColumn(crypto.PurposePayload, crypto.ColumnRef{
+		Table:      MappingTable,
+		PrimaryKey: fmt.Sprintf("%s#%d", binding.ReviewRunID, binding.StatementIdx),
+		Column:     MappingColumn,
+	}, env)
 	if err != nil {
 		return nil, err
 	}

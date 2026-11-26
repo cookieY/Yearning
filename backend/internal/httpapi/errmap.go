@@ -3,16 +3,18 @@ package httpapi
 
 import (
 	"errors"
-	"strings"
+	"net/http"
 
 	"github.com/gin-gonic/gin"
 
 	"github.com/cookieY/YearningX/backend/internal/authorization/bizerr"
 	"github.com/cookieY/YearningX/backend/internal/datasource"
 	"github.com/cookieY/YearningX/backend/internal/identity"
+	"github.com/cookieY/YearningX/backend/internal/platform/httpenvelope"
 	reviewapp "github.com/cookieY/YearningX/backend/internal/review/application"
 	reviewdomain "github.com/cookieY/YearningX/backend/internal/review/domain"
 	"github.com/cookieY/YearningX/backend/internal/review/knowledge"
+	"github.com/cookieY/YearningX/backend/internal/settings"
 	"github.com/cookieY/YearningX/backend/internal/tasks"
 )
 
@@ -171,36 +173,44 @@ func writeDomainError(c *gin.Context, err error, refCode int) bool {
 	return writeBizError(c, err)
 }
 
-func splitColonReason(name string) (baseName, reason string, ok bool) {
-	if i := strings.Index(name, ":"); i >= 0 {
-		return name[:i], name[i+1:], true
-	}
-	return name, "", false
+func writeDomainCodedError(c *gin.Context, code int, name, message string, meta map[string]any) bool {
+	httpenvelope.WriteCodedError(c, code, name, message, meta)
+	return true
 }
 
-func writeDomainCodedError(c *gin.Context, code int, name, message string, meta map[string]any) bool {
-	if message == "" {
-		message = "Business operation failed"
+// writeCodedError maps any bizerr.Coded domain error, review/knowledge/settings sentinel, or shared
+// domain sentinel error to its canonical BusinessError or Problem Details response.
+// Returns false for unrecognized internal errors so callers can emit Problem 500 or record diagnostics.
+func writeCodedError(c *gin.Context, err error) bool {
+	if err == nil {
+		return true
 	}
-	be := &BusinessError{
-		Code:    code,
-		Name:    name,
-		Message: message,
-		Meta:    meta,
+	var coded bizerr.Coded
+	if errors.As(err, &coded) {
+		return writeDomainCodedError(c, coded.BizCode(), coded.BizName(), coded.BizMessage(), coded.BizMeta())
 	}
-	if code == 1012 {
-		be.Retryable = true
-		cloned := make(map[string]any, len(meta)+1)
-		for k, v := range meta {
-			cloned[k] = v
-		}
-		if _, ok := cloned["retry_after_ms"]; !ok {
-			cloned["retry_after_ms"] = 1000
-		}
-		be.Meta = cloned
+	if be := MapReviewError(err); be != nil {
+		WriteBusinessError(c, be)
+		return true
 	}
-	WriteBusinessError(c, be)
-	return true
+	switch {
+	case errors.Is(err, settings.ErrNotFound):
+		return writeDomainCodedError(c, bizerr.CodeResourceNotFound, "RESOURCE_NOT_FOUND", "Resource not found", nil)
+	case errors.Is(err, settings.ErrConflict):
+		return writeDomainCodedError(c, bizerr.CodeVersionConflict, "VERSION_CONFLICT", "Resource version conflict; please refresh and retry", nil)
+	case errors.Is(err, settings.ErrValidation):
+		return writeDomainCodedError(c, bizerr.CodeValidationFailed, "VALIDATION_FAILED", "Invalid request parameters", nil)
+	case errors.Is(err, settings.ErrTokenInvalid):
+		return writeDomainCodedError(c, 1011, "PRECONDITION_REQUIRED", "Impact confirmation token is invalid or expired; please re-evaluate", nil)
+	}
+	return writeDomainError(c, err, 0)
+}
+
+// respondErr maps err via writeCodedError and falls back to an RFC 9457 500 Problem Details response.
+func respondErr(c *gin.Context, err error) {
+	if !writeCodedError(c, err) {
+		WriteProblem(c, http.StatusInternalServerError, "internal error")
+	}
 }
 
 // MapReviewError maps B6/B7 review and knowledge domain errors to BusinessError without altering semantics.

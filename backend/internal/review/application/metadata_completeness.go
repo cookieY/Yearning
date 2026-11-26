@@ -51,8 +51,15 @@ func metadataTokenLegend(initial []agent.TokenLegendEntry, groups []provider.Ano
 // an allowed physical schema; an explicit logical alias makes context
 // incomplete and leaves the object outside tool scope.
 func bindGroupMetadata(groups []provider.AnonymizedGroup, binding *stageSchemaBinding, mapper *privacy.RunMapper) ([]provider.AnonymizedGroup, metadataScope, bool) {
+	bound, scope, complete, _ := bindGroupMetadataWithReason(groups, binding, mapper)
+	return bound, scope, complete
+}
+
+// bindGroupMetadataWithReason behaves identically to bindGroupMetadata while also
+// returning a privacy-safe failure reason code when metadata context is incomplete.
+func bindGroupMetadataWithReason(groups []provider.AnonymizedGroup, binding *stageSchemaBinding, mapper *privacy.RunMapper) ([]provider.AnonymizedGroup, metadataScope, bool, string) {
 	if binding != nil && binding.postgres != nil {
-		return bindPostgresGroupMetadata(groups, binding, mapper)
+		return bindPostgresGroupMetadataWithReason(groups, binding, mapper)
 	}
 	var defaultSchema string
 	if logical := binding.defaultSchema(); logical != "" && mapper != nil {
@@ -64,7 +71,9 @@ func bindGroupMetadata(groups []provider.AnonymizedGroup, binding *stageSchemaBi
 	}
 	out := make([]provider.AnonymizedGroup, len(groups))
 	scope := newMetadataScope()
-	complete := true
+	complete := binding == nil || binding.defensible
+	hasExplicitOutOfScope := false
+	hasUnqualifiedMissingDefault := false
 	for i, group := range groups {
 		out[i] = group
 		out[i].Objects = append([]provider.AnonymizedObjectReference{}, group.Objects...)
@@ -73,6 +82,33 @@ func bindGroupMetadata(groups []provider.AnonymizedGroup, binding *stageSchemaBi
 			complete = false
 		}
 		for j, object := range out[i].Objects {
+			if object.Kind == "alias" || object.Kind == "cte" {
+				continue
+			}
+			if object.Kind == "schema" {
+				schemaTok := object.SchemaToken
+				if schemaTok == "" {
+					schemaTok = object.Token
+				}
+				schemaAllowed := schemaTok != "" && stageExplicitPhysicalSchemaToken(binding, mapper, schemaTok)
+				if object.Relation != "reference" || !schemaAllowed {
+					if !schemaAllowed && binding != nil && binding.defensible {
+						hasExplicitOutOfScope = true
+					}
+					groupComplete = false
+					out[i].MetadataContextComplete = false
+				} else {
+					object.SchemaToken = schemaTok
+					out[i].Objects[j] = object
+					scope.schemas[schemaTok] = true
+				}
+				continue
+			}
+			if object.Kind == "column" && object.SchemaToken == "" && defaultSchema == "" {
+				// CTE/derived/multi-table columns without an explicit schema rely on the enclosing
+				// table/CTE references; physical tables strictly enforce schema qualification below.
+				continue
+			}
 			explicitSchema := object.SchemaToken != ""
 			if !explicitSchema {
 				object.SchemaToken = defaultSchema
@@ -87,16 +123,21 @@ func bindGroupMetadata(groups []provider.AnonymizedGroup, binding *stageSchemaBi
 				}
 			}
 			if !schemaAllowed {
+				if binding != nil && binding.defensible {
+					if explicitSchema {
+						hasExplicitOutOfScope = true
+					} else if defaultSchema == "" {
+						hasUnqualifiedMissingDefault = true
+					}
+				}
 				groupComplete = false
 				out[i].MetadataContextComplete = false
 			} else {
 				scope.schemas[object.SchemaToken] = true
 			}
-			// A schema target or constraint has no complete safe catalog fact
-			// yet. Standalone indexes also lack the owning-table binding needed
-			// by index_metadata. Do not let these objects bypass table coverage.
-			unsupported := (object.Kind == "schema" && object.Relation != "reference") ||
-				(object.Kind == "constraint" && object.Relation != "define") ||
+			// A constraint without define relation or standalone index without an owning table
+			// lacks complete safe catalog facts; do not let it bypass table coverage.
+			unsupported := (object.Kind == "constraint" && object.Relation != "define") ||
 				(object.Kind == "index" && (object.ParentToken == "" || object.SchemaToken == ""))
 			if unsupported {
 				groupComplete = false
@@ -125,7 +166,17 @@ func bindGroupMetadata(groups []provider.AnonymizedGroup, binding *stageSchemaBi
 			complete = false
 		}
 	}
-	return out, scope, complete
+	reason := ""
+	if !complete {
+		if binding != nil && !binding.defensible && binding.unavailableReason != "" {
+			reason = binding.unavailableReason
+		} else if hasExplicitOutOfScope {
+			reason = "sql_schema_out_of_scope"
+		} else if hasUnqualifiedMissingDefault {
+			reason = "datasource_database_required"
+		}
+	}
+	return out, scope, complete, reason
 }
 
 func bindPostgresGroupMetadata(
@@ -133,19 +184,33 @@ func bindPostgresGroupMetadata(
 	binding *stageSchemaBinding,
 	mapper *privacy.RunMapper,
 ) ([]provider.AnonymizedGroup, metadataScope, bool) {
+	out, scope, complete, _ := bindPostgresGroupMetadataWithReason(groups, binding, mapper)
+	return out, scope, complete
+}
+
+func bindPostgresGroupMetadataWithReason(
+	groups []provider.AnonymizedGroup,
+	binding *stageSchemaBinding,
+	mapper *privacy.RunMapper,
+) ([]provider.AnonymizedGroup, metadataScope, bool, string) {
 	out := make([]provider.AnonymizedGroup, len(groups))
 	scope := newMetadataScope()
-	complete := binding.defensible && mapper != nil
+	complete := binding != nil && binding.defensible && mapper != nil
+	hasExplicitOutOfScope := false
 	for i, group := range groups {
 		out[i] = group
 		out[i].Objects = append([]provider.AnonymizedObjectReference{}, group.Objects...)
 		groupComplete := group.RepresentativeAnonymizedSQL != "" && group.MetadataContextComplete
 		objectSchemas := map[string]bool{}
+		tableSchemaByToken := map[string]string{}
 		for j, object := range out[i].Objects {
 			switch object.Kind {
 			case "table":
 				schema, ok := binding.postgresObjectSchemaForReference(object)
 				if !ok {
+					if binding != nil && binding.defensible && object.SchemaToken != "" && !binding.postgresAllowsSchemaToken(mapper, object.SchemaToken) {
+						hasExplicitOutOfScope = true
+					}
 					groupComplete = false
 					continue
 				}
@@ -160,6 +225,7 @@ func bindPostgresGroupMetadata(
 				}
 				object.SchemaToken = schemaToken
 				out[i].Objects[j] = object
+				tableSchemaByToken[object.Token] = schemaToken
 				objectSchemas[schemaToken] = true
 				if scope.objects[schemaToken] == nil {
 					scope.objects[schemaToken] = map[string]bool{}
@@ -172,17 +238,36 @@ func bindPostgresGroupMetadata(
 					continue
 				}
 				if !binding.postgresAllowsSchemaToken(mapper, object.Token) {
+					if binding != nil && binding.defensible {
+						hasExplicitOutOfScope = true
+					}
 					groupComplete = false
 					continue
 				}
 				objectSchemas[object.Token] = true
-			case "index", "constraint":
-				// These require an exact observed table parent. Relation
-				// path proof alone does not provide that additional profile.
-				groupComplete = false
 			}
 		}
-		if len(out[i].Objects) == 0 {
+		for j, object := range out[i].Objects {
+			switch object.Kind {
+			case "index":
+				parentSchema := ""
+				if object.ParentToken != "" {
+					parentSchema = tableSchemaByToken[object.ParentToken]
+				}
+				if object.ParentToken == "" || parentSchema == "" || (object.SchemaToken != "" && object.SchemaToken != parentSchema) {
+					groupComplete = false
+					continue
+				}
+				object.SchemaToken = parentSchema
+				out[i].Objects[j] = object
+				objectSchemas[parentSchema] = true
+			case "constraint":
+				if object.Relation != "define" || (object.ParentToken != "" && tableSchemaByToken[object.ParentToken] == "") {
+					groupComplete = false
+				}
+			}
+		}
+		if len(out[i].Objects) == 0 && binding != nil && binding.postgres != nil {
 			schema := binding.postgres.Path.CreationSchema
 			if schemaToken := mapper.LookupScoped(privacy.KindSchema, privacy.ScopeCaseSensitive, schema); schemaToken != "" {
 				objectSchemas[schemaToken] = true
@@ -207,7 +292,15 @@ func bindPostgresGroupMetadata(
 	if len(groups) == 0 {
 		complete = false
 	}
-	return out, scope, complete
+	reason := ""
+	if !complete {
+		if binding != nil && !binding.defensible && binding.unavailableReason != "" {
+			reason = binding.unavailableReason
+		} else if hasExplicitOutOfScope {
+			reason = "sql_schema_out_of_scope"
+		}
+	}
+	return out, scope, complete, reason
 }
 
 func stageExplicitPhysicalSchemaToken(

@@ -9,12 +9,20 @@ package application
 import (
 	"context"
 	"encoding/json"
+	"errors"
+	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	"gorm.io/gorm"
 
+	"github.com/cookieY/YearningX/backend/internal/platform/systz"
 	"github.com/cookieY/YearningX/backend/internal/review/domain"
 )
+
+// ErrBudgetServiceUnavailable is returned when daily AI budget enforcement cannot run because
+// the review budget service or metadata DB handle is unconfigured (D14 fail-closed invariant).
+var ErrBudgetServiceUnavailable = errors.New("review: daily budget service unavailable")
 
 // BudgetSettings is the frozen read result of the ai_budget namespace.
 type BudgetSettings struct {
@@ -81,24 +89,22 @@ func (s *Services) LoadBudgetSettings(ctx context.Context, db *gorm.DB) (BudgetS
 	return out, nil
 }
 
+// budgetDayWithDB resolves the budget calendar date under general.system_timezone using db
+// (falling back to s.DB when db is nil; defaults to Asia/Shanghai on missing/corrupted config).
+func (s *Services) budgetDayWithDB(ctx context.Context, db *gorm.DB, now time.Time) string {
+	if db == nil && s != nil {
+		db = s.DB
+	}
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	return systz.BusinessDay(now, systz.Location(ctx, db))
+}
+
 // budgetDay resets daily at 00:00 in the system settings timezone (general.system_timezone;
 // defaults to Asia/Shanghai; corrupted configuration falls back to default).
 func (s *Services) budgetDay(now time.Time) string {
-	var tzName *string
-	if s != nil && s.DB != nil {
-		_ = s.DB.Raw(`select settings->>'system_timezone' as tz from system_settings where namespace = 'general'`).Scan(&tzName).Error
-	}
-	name := "Asia/Shanghai"
-	if tzName != nil && *tzName != "" {
-		name = *tzName
-	}
-	tz, err := time.LoadLocation(name)
-	if err != nil {
-		if tz, err = time.LoadLocation("Asia/Shanghai"); err != nil {
-			tz = time.UTC
-		}
-	}
-	return now.In(tz).Format("2006-01-02")
+	return s.budgetDayWithDB(context.Background(), nil, now)
 }
 
 // BudgetDay resolves the current budget calendar date under general.system_timezone.
@@ -167,7 +173,7 @@ func (s *Services) budgetDayOf(now time.Time) string { return s.budgetDay(now) }
 // append-only ledger facts and zeroes out orphaned reservations (leaked by crashes between Reserve and Settle).
 // In-flight call reservations are briefly undercounted — bounded above by the per-stage call cap.
 func (s *Services) ReconcileDailyUsage(ctx context.Context, db *gorm.DB, currency string) error {
-	today := s.budgetDay(time.Now())
+	today := s.budgetDayWithDB(ctx, db, time.Now())
 	return db.WithContext(ctx).Exec(`
 		update ai_daily_budget_usage u
 		set amount_minor = coalesce((
@@ -178,4 +184,167 @@ func (s *Services) ReconcileDailyUsage(ctx context.Context, db *gorm.DB, currenc
 		    updated_at = ?
 		where u.budget_day = ? and u.currency = ?`,
 		nowUTC(), today, currency).Error
+}
+
+// BudgetLease represents a reserved daily AI budget allocation shared across AI surfaces
+// (review, assistant, diagnostics). Finalize via either Settle (books actual usage and releases
+// only unused excess reservedMinor - actualMinor) or Release (full release on abort/failure).
+type BudgetLease struct {
+	svc           *Services
+	db            *gorm.DB
+	day           string
+	currency      string
+	reservedMinor int64
+	settings      BudgetSettings
+	finalized     bool
+}
+
+// NewBudgetLease constructs a BudgetLease from explicit reservation parameters (for tests or
+// callers holding an already-reserved allocation).
+func NewBudgetLease(svc *Services, db *gorm.DB, day, currency string, reservedMinor int64, settings BudgetSettings) *BudgetLease {
+	return &BudgetLease{
+		svc:           svc,
+		db:            db,
+		day:           day,
+		currency:      currency,
+		reservedMinor: reservedMinor,
+		settings:      settings,
+	}
+}
+
+// AcquireBudgetLease loads ai_budget settings, resolves the business day under general.system_timezone,
+// and atomically reserves estimated minor units when enforced. Fails closed with ErrBudgetServiceUnavailable
+// whenever s == nil or no database handle is available.
+func (s *Services) AcquireBudgetLease(ctx context.Context, db *gorm.DB, estTokens int64) (*BudgetLease, error) {
+	if s == nil {
+		return nil, ErrBudgetServiceUnavailable
+	}
+	if db == nil {
+		db = s.DB
+	}
+	if db == nil {
+		return nil, ErrBudgetServiceUnavailable
+	}
+	settings, err := s.LoadBudgetSettings(ctx, db)
+	if err != nil {
+		return nil, err
+	}
+	lease := &BudgetLease{svc: s, db: db, settings: settings}
+	if !settings.Enforced {
+		return lease, nil
+	}
+	amountMinor := int64(1)
+	if settings.InputPricePerMillionMinor > 0 {
+		if calc := (estTokens * settings.InputPricePerMillionMinor) / 1_000_000; calc > amountMinor {
+			amountMinor = calc
+		}
+	}
+	day := s.budgetDayWithDB(ctx, db, time.Now())
+	if err := s.Reserve(ctx, db, day, settings.Currency, settings, amountMinor); err != nil {
+		return nil, err
+	}
+	lease.day = day
+	lease.currency = settings.Currency
+	lease.reservedMinor = amountMinor
+	return lease, nil
+}
+
+// Day returns the budget business day under general.system_timezone (empty when unenforced).
+func (l *BudgetLease) Day() string {
+	if l == nil {
+		return ""
+	}
+	return l.day
+}
+
+// Currency returns the reserved currency code (empty when unenforced).
+func (l *BudgetLease) Currency() string {
+	if l == nil {
+		return ""
+	}
+	return l.currency
+}
+
+// ReservedMinor returns the reserved minor units (0 when unenforced).
+func (l *BudgetLease) ReservedMinor() int64 {
+	if l == nil {
+		return 0
+	}
+	return l.reservedMinor
+}
+
+// Settings returns the budget settings snapshot captured at reservation time.
+func (l *BudgetLease) Settings() BudgetSettings {
+	if l == nil {
+		return BudgetSettings{}
+	}
+	return l.settings
+}
+
+// Settle atomically records actual usage into ai_usage_ledger + ai_daily_budget_usage and releases
+// ONLY the unused excess (reservedMinor - actualMinor). If the settlement transaction fails, the
+// full reservation is released outside the rolled-back transaction so reserved_minor never leaks.
+func (l *BudgetLease) Settle(
+	ctx context.Context,
+	runID, providerID, modelName, defaultModel string,
+	inputTokens, outputTokens int64,
+	outcome string,
+) error {
+	if l == nil || l.finalized {
+		return nil
+	}
+	if !l.settings.Enforced || l.reservedMinor <= 0 || l.day == "" {
+		l.finalized = true
+		return nil
+	}
+	if l.svc == nil || l.db == nil {
+		return ErrBudgetServiceUnavailable
+	}
+	resolvedProviderID := uuid.Nil.String()
+	if parsed, err := uuid.Parse(strings.TrimSpace(providerID)); err == nil {
+		resolvedProviderID = parsed.String()
+	}
+	resolvedModel := strings.TrimSpace(modelName)
+	if resolvedModel == "" {
+		resolvedModel = defaultModel
+	}
+	actualMinor := TokenBasedAmount(
+		inputTokens, outputTokens,
+		l.settings.InputPricePerMillionMinor, l.settings.OutputPricePerMillionMinor,
+		l.reservedMinor,
+	)
+	settleCtx := context.WithoutCancel(ctx)
+	err := l.db.WithContext(settleCtx).Transaction(func(tx *gorm.DB) error {
+		if err := l.svc.Settle(
+			settleCtx, tx, runID, resolvedProviderID, resolvedModel,
+			1, inputTokens, outputTokens, actualMinor, l.currency, l.day, outcome,
+		); err != nil {
+			return err
+		}
+		if rem := l.reservedMinor - actualMinor; rem > 0 {
+			return l.svc.Release(settleCtx, tx, l.day, l.currency, rem)
+		}
+		return nil
+	})
+	l.finalized = true
+	if err != nil {
+		_ = l.svc.Release(settleCtx, l.db, l.day, l.currency, l.reservedMinor)
+		return err
+	}
+	return nil
+}
+
+// Release releases the full unconsumed reservation on abort or provider failure. Idempotent after Settle or Release.
+func (l *BudgetLease) Release(ctx context.Context) error {
+	if l == nil || l.finalized {
+		return nil
+	}
+	l.finalized = true
+	if l.reservedMinor <= 0 || l.day == "" {
+		return nil
+	}
+	if l.svc == nil || l.db == nil {
+		return ErrBudgetServiceUnavailable
+	}
+	return l.svc.Release(context.WithoutCancel(ctx), l.db, l.day, l.currency, l.reservedMinor)
 }

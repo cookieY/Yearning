@@ -1,0 +1,82 @@
+{
+  "request_schema_version": 1,
+  "review_run_id": "00000000-0000-4000-8000-000000000001",
+  "engine_profile": "mysql/mysql",
+  "anonymized_statement_groups": [
+    {
+      "group_id": "10000000-0000-4000-8000-000000000001",
+      "representative_shape": "kind=ddl op=drop where=true",
+      "representative_anonymized_sql": "DROP TABLE IF EXISTS shop.old_sessions",
+      "objects": [
+        {
+          "token": "shop",
+          "kind": "schema",
+          "relation": "reference",
+          "schema_token": "shop",
+          "statement_ordinal": 1,
+          "statement_ordinal_ranges": [
+            {
+              "start": 1,
+              "end": 1
+            }
+          ]
+        },
+        {
+          "token": "shop.old_sessions",
+          "kind": "table",
+          "relation": "target",
+          "schema_token": "shop",
+          "statement_ordinal": 1,
+          "statement_ordinal_ranges": [
+            {
+              "start": 1,
+              "end": 1
+            }
+          ]
+        }
+      ],
+      "metadata_context_complete": true,
+      "statement_count": 1,
+      "statement_ordinal": 1,
+      "statement_ordinal_ranges": [
+        {
+          "start": 1,
+          "end": 1
+        }
+      ],
+      "statistics": {
+        "algorithm_version": "yearning-fingerprint-v1",
+        "ddl_drop_target": "table",
+        "in_value_count_max": 0,
+        "max_statement_bytes": 38,
+        "unbounded_mutation": false,
+        "values_row_count_max": 0
+      }
+    },
+    {
+      "group_id": "10000000-0000-4000-8000-000000000002",
+      "representative_shape": "kind=ddl op=drop where=true",
+      "representative_anonymized_sql": "DROP INDEX idx_orders_status ON shop.orders",
+      "objects": [],
+      "metadata_context_complete": false,
+      "statement_count": 1,
+      "statement_ordinal": 2,
+      "statement_ordinal_ranges": [
+        {
+          "start": 2,
+          "end": 2
+        }
+      ],
+      "statistics": {
+        "algorithm_version": "yearning-fingerprint-v1",
+        "ddl_drop_target": "index",
+        "in_value_count_max": 0,
+        "max_statement_bytes": 43,
+        "unbounded_mutation": false,
+        "values_row_count_max": 0
+      }
+    }
+  ],
+  "normalized_evidence": [],
+  "allowed_tool_descriptors": []
+}

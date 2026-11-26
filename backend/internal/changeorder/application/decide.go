@@ -7,7 +7,6 @@ package application
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
@@ -19,6 +18,8 @@ import (
 	"github.com/cookieY/YearningX/backend/internal/authorization/auditlog"
 	"github.com/cookieY/YearningX/backend/internal/changeorder/domain"
 	"github.com/cookieY/YearningX/backend/internal/changeorder/persistence"
+	"github.com/cookieY/YearningX/backend/internal/platform/ptr"
+	"github.com/cookieY/YearningX/backend/internal/platform/txutil"
 )
 
 // DecideInput parameters for an approval decision.
@@ -41,31 +42,10 @@ func (s *Services) Decide(ctx context.Context, actor Actor, meta RequestMeta, in
 	if in.Decision == "reject" && strings.TrimSpace(in.Comment) == "" {
 		return nil, false, domain.ErrValidation()
 	}
-	reqHash := idemRequestHash(actor.UserID, in.OrderID, in.Decision, in.Comment, fmt.Sprint(in.ExpectVersion))
-	claimed, replay, err := s.idemClaim(ctx, actor.UserID, idemRouteDecide, in.OrderID, in.IdempotencyKey, reqHash)
-	if err != nil {
-		return nil, false, err
-	}
-	if claimed == nil {
-		var v OrderView
-		if err := json.Unmarshal(replay, &v); err != nil {
-			return nil, false, err
-		}
-		return &v, true, nil
-	}
-	view, err = s.decideTx(ctx, actor, in)
-	if err != nil {
-		_ = s.idemRelease(ctx, actor.UserID, idemRouteDecide, in.OrderID, in.IdempotencyKey)
-		return nil, false, err
-	}
-	raw, err := json.Marshal(view)
-	if err != nil {
-		return nil, false, err
-	}
-	if err := s.idemComplete(ctx, actor.UserID, idemRouteDecide, in.OrderID, in.IdempotencyKey, raw); err != nil {
-		return nil, false, err
-	}
-	return view, false, nil
+	reqHash := txutil.RequestHash(actor.UserID, in.OrderID, in.Decision, in.Comment, fmt.Sprint(in.ExpectVersion))
+	return txutil.RunIdempotent(ctx, s.idemStore(), actor.UserID, idemRouteDecide, in.OrderID, in.IdempotencyKey, reqHash, func() (*OrderView, error) {
+		return s.decideTx(ctx, actor, in)
+	})
 }
 
 func (s *Services) decideTx(ctx context.Context, actor Actor, in DecideInput) (*OrderView, error) {
@@ -155,13 +135,13 @@ func (s *Services) decideOnce(ctx context.Context, tx *gorm.DB, actor Actor, in 
 		ReviewerUserIDSnapshot: actor.UserID, ReviewerUsername: actor.Username,
 		Decision: in.Decision, Comment: truncate(in.Comment, 4096), OccurredAt: now,
 	}).Error; err != nil {
-		if isUniqueViolation(err) {
+		if txutil.IsUniqueViolation(err) {
 			return nil, domain.ErrApprovalDecided()
 		}
 		return nil, err
 	}
 
-	auditActor := auditlog.Actor{Kind: "user", UserID: actor.UserID, Username: actor.Username}
+	auditActor := auditlog.UserActor(actor.UserID, actor.Username)
 	nextOrderVersion := order.Version + 1
 
 	if in.Decision == "approve" {
@@ -234,8 +214,8 @@ func (s *Services) decideApprove(ctx context.Context, tx *gorm.DB, actor Actor,
 			return nil, err
 		}
 		if err := s.emitOrderEvent(ctx, tx, EventStageReadyForExec, order.ID, auditActor, StateChangedPayload{
-			AggregateID: order.ID, From: strPtr(order.State), To: string(nextState),
-			ReasonCode: "final_step_approved", StageID: strPtr(step.StageID),
+			AggregateID: order.ID, From: ptr.To(order.State), To: string(nextState),
+			ReasonCode: "final_step_approved", StageID: ptr.To(step.StageID),
 			AggregateVersion: nextVersion,
 		}); err != nil {
 			return nil, err
@@ -292,8 +272,8 @@ func (s *Services) decideReject(ctx context.Context, tx *gorm.DB, actor Actor,
 		return nil, err
 	}
 	if err := s.emitOrderEvent(ctx, tx, EventOrderRejected, order.ID, auditActor, StateChangedPayload{
-		AggregateID: order.ID, From: strPtr(order.State), To: string(nextState),
-		ReasonCode: "approval_rejected", StageID: strPtr(step.StageID),
+		AggregateID: order.ID, From: ptr.To(order.State), To: string(nextState),
+		ReasonCode: "approval_rejected", StageID: ptr.To(step.StageID),
 		AggregateVersion: nextVersion,
 	}); err != nil {
 		return nil, err
@@ -346,5 +326,3 @@ func truncate(s string, n int) string {
 	}
 	return b.String()
 }
-
-func strPtr(s string) *string { return &s }

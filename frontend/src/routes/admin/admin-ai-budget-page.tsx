@@ -17,11 +17,10 @@ import {
   useSettingsRevisions,
 } from "@/features/admin/use-admin";
 import { useSession } from "@/features/auth/session-provider";
-import { BusinessError } from "@/shared/api/mutator";
 import { useCursorPage } from "@/shared/lib/cursor-page";
 import { formatTimestamp } from "@/shared/lib/timezones";
 import { TablePagination } from "@/shared/components/ui/table-pagination";
-import { describeError } from "@/shared/api/error-display";
+import { describeError, isBusinessErrorCode } from "@/shared/api/error-display";
 import { appToast } from "@/shared/components/shadcn-dashboard/sonner/sonner-08";
 import { PageHeader, PageLayout } from "@/shared/components/page-layout";
 import { PendingButton } from "@/shared/components/pending-button";
@@ -411,7 +410,7 @@ export default function AdminAiBudgetPage() {
     } catch (error) {
       // High-impact changes (toggling `enforced`) need a one-time impact token.
       // Transparently run one assess -> retry cycle so the user saves in one click.
-      if (error instanceof BusinessError && error.err_code === 1011) {
+      if (isBusinessErrorCode(error, "PRECONDITION_REQUIRED")) {
         let phase: "assessSettingsImpact" | "replaceSettingsNamespace" = "assessSettingsImpact";
         try {
           const assessment = await assessMutation.mutateAsync({ namespace, settings });

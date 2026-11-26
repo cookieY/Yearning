@@ -12,13 +12,15 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 
+	"github.com/cookieY/YearningX/backend/internal/authorization/bizerr"
 	"github.com/cookieY/YearningX/backend/internal/identity/session"
+	"github.com/cookieY/YearningX/backend/internal/platform/httpenvelope"
 )
 
 // Deps holds HTTP dependencies for the dashboard domain. Guard is injected by the wiring package
-// (RequireOperation: policy decision + mutating CSRF double-submit); when nil, routes mount directly
-// (in-domain fallback guard for unit tests). ReleaseFeedURL is the upstream releases/latest URL
-// (RCP-20261020): an empty string disables the background refresh loop (test wiring).
+// (RequireOperation: policy decision + mutating CSRF double-submit) and is mandatory — a nil Guard
+// fails closed with HTTP 500 Problem Details rather than allowing unauthenticated pass-through.
+// ReleaseFeedURL is the upstream releases/latest URL (RCP-20261020): empty disables the refresh loop.
 type Deps struct {
 	Service        *Service
 	Guard          func(op string) gin.HandlerFunc
@@ -45,31 +47,24 @@ func RegisterRoutes(rg gin.IRouter, d *Deps) {
 	rg.GET("/admin/audit-events", g("listAuditEvents"), h.listAuditEvents)
 }
 
-// guard returns the operation guard, or a pass-through when none was injected (in-domain fallback).
+// guard returns the injected operation guard, failing closed with HTTP 500 Problem Details when nil.
 func (d *Deps) guard(op string) gin.HandlerFunc {
-	if d.Guard == nil {
-		return func(c *gin.Context) { c.Next() }
+	if d == nil || d.Guard == nil {
+		return func(c *gin.Context) {
+			httpenvelope.WriteProblem(c, http.StatusInternalServerError, "authorization guard not configured")
+			c.Abort()
+		}
 	}
 	return d.Guard(op)
 }
 
 type handler struct{ d *Deps }
 
-func okData(c *gin.Context, data any) {
-	c.JSON(http.StatusOK, gin.H{"err_code": 0, "message": "ok", "data": data,
-		"request_id": c.GetString("request_id")})
-}
-
-func bizErr(c *gin.Context, code int, message string) {
-	// BusinessErrorResponse has additionalProperties:false: request_id and
-	// retryable are required (business errors are never retryable).
-	c.JSON(http.StatusOK, gin.H{"err_code": code, "message": message, "data": nil,
-		"request_id": c.GetString("request_id"), "retryable": false})
-}
-
-func currentUser(c *gin.Context) (*session.Identity, bool) {
+func requireUser(c *gin.Context) (*session.Identity, bool) {
 	id := session.FromContext(c.Request.Context())
 	if id == nil {
+		httpenvelope.WriteProblem(c, http.StatusUnauthorized, "authentication required")
+		c.Abort()
 		return nil, false
 	}
 	return id, true
@@ -78,7 +73,8 @@ func currentUser(c *gin.Context) (*session.Identity, bool) {
 func adminGuard(c *gin.Context) bool {
 	id := session.FromContext(c.Request.Context())
 	if id == nil || !id.HasAdminAccess() {
-		c.AbortWithStatus(http.StatusForbidden)
+		httpenvelope.WriteProblem(c, http.StatusForbidden, "permission denied")
+		c.Abort()
 		return false
 	}
 	return true
@@ -90,76 +86,81 @@ func windowDays(c *gin.Context) int {
 }
 
 func (h *handler) myDashboard(c *gin.Context) {
-	id, ok := currentUser(c)
+	id, ok := requireUser(c)
 	if !ok {
-		c.AbortWithStatus(http.StatusUnauthorized)
 		return
 	}
 	view, err := h.d.Service.MyDashboard(c.Request.Context(), id.UserID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"message": "internal error"})
+		httpenvelope.WriteProblem(c, http.StatusInternalServerError, "internal error")
 		return
 	}
-	okData(c, view)
+	httpenvelope.WriteSuccess(c, view)
 }
 
 func (h *handler) operations(c *gin.Context) {
-	// §18.71 (owner 2026-10-16 directive): platform operations stats are open to all authenticated sessions
-	// (authorization-policy authenticated-session rule).
-	if _, ok := currentUser(c); !ok {
-		c.AbortWithStatus(http.StatusUnauthorized)
+	// §18.71: authenticated sessions can read operations stats, scoped by role:
+	// admins receive platform-wide aggregates while non-admin users receive aggregates
+	// scoped strictly to change orders and query executions tied to their own user ID.
+	id, ok := requireUser(c)
+	if !ok {
 		return
 	}
-	view, err := h.d.Service.OperationsDashboard(c.Request.Context(), windowDays(c))
+	var (
+		view *OperationsView
+		err  error
+	)
+	if id.HasAdminAccess() {
+		view, err = h.d.Service.OperationsDashboard(c.Request.Context(), windowDays(c))
+	} else {
+		view, err = h.d.Service.OperationsDashboardForUser(c.Request.Context(), id.UserID, windowDays(c))
+	}
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"message": "internal error"})
+		httpenvelope.WriteProblem(c, http.StatusInternalServerError, "internal error")
 		return
 	}
-	okData(c, view)
+	httpenvelope.WriteSuccess(c, view)
 }
 
 func (h *handler) systemHealth(c *gin.Context) {
 	// §18.83 (owner 2026-10-23 directive): system health read surface is open to all authenticated sessions
 	// (authorization-policy authenticated-session rule) for the home page announcement card health indicator.
-	if _, ok := currentUser(c); !ok {
-		c.AbortWithStatus(http.StatusUnauthorized)
+	if _, ok := requireUser(c); !ok {
 		return
 	}
 	view, err := h.d.Service.SystemHealth(c.Request.Context())
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"message": "internal error"})
+		httpenvelope.WriteProblem(c, http.StatusInternalServerError, "internal error")
 		return
 	}
-	okData(c, view)
+	httpenvelope.WriteSuccess(c, view)
 }
 
 func (h *handler) currentAnnouncement(c *gin.Context) {
 	// OpenAPI global security=sessionCookie with no anonymous override on this operation: authenticated surface.
-	if _, ok := currentUser(c); !ok {
-		c.AbortWithStatus(http.StatusUnauthorized)
+	if _, ok := requireUser(c); !ok {
 		return
 	}
 	view, err := h.d.Service.Current(c.Request.Context())
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"message": "internal error"})
+		httpenvelope.WriteProblem(c, http.StatusInternalServerError, "internal error")
 		return
 	}
-	okData(c, view)
+	httpenvelope.WriteSuccess(c, view)
 }
 
 // latestRelease authenticated surface (same as getCurrentAnnouncement): reads the release snapshot,
 // returning data:null when no snapshot exists yet (frontend renders a min-height placeholder instead of hiding the card).
 func (h *handler) latestRelease(c *gin.Context) {
-	if _, ok := currentUser(c); !ok {
-		c.AbortWithStatus(http.StatusUnauthorized)
+	if _, ok := requireUser(c); !ok {
 		return
 	}
 	view, err := h.d.Service.LatestRelease(c.Request.Context())
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"message": "internal error"})
+		httpenvelope.WriteProblem(c, http.StatusInternalServerError, "internal error")
 		return
 	}
-	okData(c, view)
+	httpenvelope.WriteSuccess(c, view)
 }
 
 func (h *handler) listAnnouncementRevisions(c *gin.Context) {
@@ -168,10 +169,10 @@ func (h *handler) listAnnouncementRevisions(c *gin.Context) {
 	}
 	items, err := h.d.Service.ListRevisions(c.Request.Context(), 50)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"message": "internal error"})
+		httpenvelope.WriteProblem(c, http.StatusInternalServerError, "internal error")
 		return
 	}
-	okData(c, gin.H{"items": items, "page": gin.H{"next_cursor": nil, "has_more": false}})
+	httpenvelope.WriteSuccess(c, gin.H{"items": items, "page": gin.H{"next_cursor": nil, "has_more": false}})
 }
 
 func (h *handler) createAnnouncementRevision(c *gin.Context) {
@@ -184,17 +185,17 @@ func (h *handler) createAnnouncementRevision(c *gin.Context) {
 		Markdown string `json:"markdown_source"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusOK, gin.H{"err_code": 1001, "message": "Invalid request parameters", "data": nil})
+		httpenvelope.WriteCodedError(c, bizerr.CodeValidationFailed, "VALIDATION_FAILED", "Invalid request parameters", nil)
 		return
 	}
 	view, err := h.d.Service.CreateRevision(c.Request.Context(), CreateRevisionInput{
 		Title: req.Title, Markdown: req.Markdown, ActorID: id.UserID, ActorUsername: id.Username,
 	})
 	if err != nil {
-		bizErr(c, 1001, "Invalid announcement content")
+		httpenvelope.WriteCodedError(c, bizerr.CodeValidationFailed, "VALIDATION_FAILED", "Invalid announcement content", nil)
 		return
 	}
-	okData(c, view)
+	httpenvelope.WriteSuccess(c, view)
 }
 
 func (h *handler) publishAnnouncement(c *gin.Context) {
@@ -206,32 +207,25 @@ func (h *handler) publishAnnouncement(c *gin.Context) {
 		AnnouncementRevisionID string `json:"announcement_revision_id"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil || uuid.Validate(req.AnnouncementRevisionID) != nil {
-		bizErr(c, 1001, "Invalid request parameters")
+		httpenvelope.WriteCodedError(c, bizerr.CodeValidationFailed, "VALIDATION_FAILED", "Invalid request parameters", nil)
 		return
 	}
-	// If-Match is required per OpenAPI declaration (quoted positive integer); missing/malformed -> 1001.
-	rawIfMatch := strings.TrimSpace(c.GetHeader("If-Match"))
-	if len(rawIfMatch) < 3 || rawIfMatch[0] != '"' || rawIfMatch[len(rawIfMatch)-1] != '"' {
-		bizErr(c, 1001, "Invalid request parameters")
-		return
-	}
-	version, err := strconv.ParseInt(rawIfMatch[1:len(rawIfMatch)-1], 10, 64)
-	if err != nil || version < 1 {
-		bizErr(c, 1001, "Invalid request parameters")
+	version, ok := httpenvelope.ParseIfMatch(c)
+	if !ok {
 		return
 	}
 	view, pubVersion, err := h.d.Service.Publish(c.Request.Context(), req.AnnouncementRevisionID,
 		id.UserID, id.Username, version)
 	if err != nil {
 		if err == ErrConflict {
-			bizErr(c, 1003, "Resource version conflict; please refresh and retry")
+			httpenvelope.WriteCodedError(c, bizerr.CodeVersionConflict, "VERSION_CONFLICT", "Resource version conflict; please refresh and retry", nil)
 			return
 		}
-		bizErr(c, 1002, "Resource not found")
+		httpenvelope.WriteCodedError(c, bizerr.CodeResourceNotFound, "RESOURCE_NOT_FOUND", "Resource not found", nil)
 		return
 	}
 	// Response version equals the persisted pointer version truth (R2-F12), consistent with Current().
-	okData(c, gin.H{"revision": view, "published_by_username": id.Username,
+	httpenvelope.WriteSuccess(c, gin.H{"revision": view, "published_by_username": id.Username,
 		"published_at": h.d.Service.Now().Format("2006-01-02T15:04:05.999999999Z07:00"), "version": pubVersion})
 }
 
@@ -296,7 +290,7 @@ func (h *handler) listAuditEvents(c *gin.Context) {
 	var conds []string
 	if v := c.Query("actor_id"); v != "" {
 		if uuid.Validate(v) != nil {
-			bizErr(c, 1001, "Invalid request parameters")
+			httpenvelope.WriteCodedError(c, bizerr.CodeValidationFailed, "VALIDATION_FAILED", "Invalid request parameters", nil)
 			return
 		}
 		conds = append(conds, "actor_id = ?::uuid")
@@ -304,7 +298,7 @@ func (h *handler) listAuditEvents(c *gin.Context) {
 	}
 	if v := c.Query("action"); v != "" {
 		if len(v) > 128 {
-			bizErr(c, 1001, "Invalid request parameters")
+			httpenvelope.WriteCodedError(c, bizerr.CodeValidationFailed, "VALIDATION_FAILED", "Invalid request parameters", nil)
 			return
 		}
 		conds = append(conds, "action = ?")
@@ -312,7 +306,7 @@ func (h *handler) listAuditEvents(c *gin.Context) {
 	}
 	if v := c.Query("resource_type"); v != "" {
 		if len(v) > 128 {
-			bizErr(c, 1001, "Invalid request parameters")
+			httpenvelope.WriteCodedError(c, bizerr.CodeValidationFailed, "VALIDATION_FAILED", "Invalid request parameters", nil)
 			return
 		}
 		conds = append(conds, "resource_type = ?")
@@ -320,7 +314,7 @@ func (h *handler) listAuditEvents(c *gin.Context) {
 	}
 	if v := c.Query("outcome"); v != "" {
 		if v != "succeeded" && v != "denied" && v != "failed" {
-			bizErr(c, 1001, "Invalid request parameters")
+			httpenvelope.WriteCodedError(c, bizerr.CodeValidationFailed, "VALIDATION_FAILED", "Invalid request parameters", nil)
 			return
 		}
 		conds = append(conds, "outcome = ?")
@@ -328,7 +322,7 @@ func (h *handler) listAuditEvents(c *gin.Context) {
 	}
 	if v := c.Query("request_id"); v != "" {
 		if uuid.Validate(v) != nil {
-			bizErr(c, 1001, "Invalid request parameters")
+			httpenvelope.WriteCodedError(c, bizerr.CodeValidationFailed, "VALIDATION_FAILED", "Invalid request parameters", nil)
 			return
 		}
 		conds = append(conds, "request_id = ?::uuid")
@@ -340,7 +334,7 @@ func (h *handler) listAuditEvents(c *gin.Context) {
 	// timezone (R1 Medium-1); from = 00:00 UTC on start day, to = end of day UTC inclusive.
 	if v := c.Query("occurred_from"); v != "" {
 		if _, err := time.Parse("2006-01-02", v); err != nil {
-			bizErr(c, 1001, "Invalid request parameters")
+			httpenvelope.WriteCodedError(c, bizerr.CodeValidationFailed, "VALIDATION_FAILED", "Invalid request parameters", nil)
 			return
 		}
 		conds = append(conds, auditOccurredFromPred)
@@ -348,7 +342,7 @@ func (h *handler) listAuditEvents(c *gin.Context) {
 	}
 	if v := c.Query("occurred_to"); v != "" {
 		if _, err := time.Parse("2006-01-02", v); err != nil {
-			bizErr(c, 1001, "Invalid request parameters")
+			httpenvelope.WriteCodedError(c, bizerr.CodeValidationFailed, "VALIDATION_FAILED", "Invalid request parameters", nil)
 			return
 		}
 		conds = append(conds, auditOccurredToPred)
@@ -356,7 +350,7 @@ func (h *handler) listAuditEvents(c *gin.Context) {
 	}
 	if after := c.Query("after"); after != "" {
 		if uuid.Validate(after) != nil {
-			bizErr(c, 1001, "Invalid request parameters")
+			httpenvelope.WriteCodedError(c, bizerr.CodeValidationFailed, "VALIDATION_FAILED", "Invalid request parameters", nil)
 			return
 		}
 		conds = append(conds, "(occurred_at, id) < ((select occurred_at from audit_events where id = ?), ?::uuid)")
@@ -367,7 +361,7 @@ func (h *handler) listAuditEvents(c *gin.Context) {
 	}
 	q += " order by occurred_at desc, id desc limit " + strconv.Itoa(limit)
 	if err := h.d.Service.DB.WithContext(c.Request.Context()).Raw(q, args...).Scan(&rows).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"message": "internal error"})
+		httpenvelope.WriteProblem(c, http.StatusInternalServerError, "internal error")
 		return
 	}
 	items := make([]AuditEventView, 0, len(rows))
@@ -385,5 +379,5 @@ func (h *handler) listAuditEvents(c *gin.Context) {
 	if len(items) >= limit && len(items) > 0 {
 		nextCursor = items[len(items)-1].ID
 	}
-	okData(c, gin.H{"items": items, "page": gin.H{"next_cursor": nextCursor, "has_more": len(items) >= limit}})
+	httpenvelope.WriteSuccess(c, gin.H{"items": items, "page": gin.H{"next_cursor": nextCursor, "has_more": len(items) >= limit}})
 }

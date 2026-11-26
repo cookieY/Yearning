@@ -7,7 +7,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/hex"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
@@ -18,6 +17,10 @@ import (
 
 	"github.com/cookieY/YearningX/backend/internal/authorization/auditlog"
 	"github.com/cookieY/YearningX/backend/internal/crypto"
+	"github.com/cookieY/YearningX/backend/internal/platform/pagecursor"
+	"github.com/cookieY/YearningX/backend/internal/platform/pagination"
+	"github.com/cookieY/YearningX/backend/internal/platform/ptr"
+	"github.com/cookieY/YearningX/backend/internal/platform/watermark"
 	"github.com/cookieY/YearningX/backend/internal/review/changeset"
 	"github.com/cookieY/YearningX/backend/internal/review/domain"
 	"github.com/cookieY/YearningX/backend/internal/review/fingerprint"
@@ -34,6 +37,7 @@ type DraftView struct {
 	// Submitter requested execution time (section 18.56 Option B): RFC3339; nil = unset.
 	RequestedScheduledFor    *string `json:"requested_scheduled_for,omitempty"`
 	RollbackEnabled          bool    `json:"rollback_enabled"`
+	TargetDatabase           *string `json:"target_database,omitempty"`
 	TicketType               string  `json:"ticket_type"`
 	SourceOrderID            *string `json:"source_order_id,omitempty"`
 	SourceOrderDisplayNumber *string `json:"source_order_display_number,omitempty"`
@@ -56,6 +60,7 @@ type CreateDraftInput struct {
 	Description           string
 	RequestedScheduledFor *time.Time
 	RollbackEnabled       *bool
+	TargetDatabase        *string
 }
 
 // ParseRequestedSchedule parses and validates the requested execution time (must be in the future).
@@ -91,6 +96,14 @@ func (s *Services) CreateDraft(ctx context.Context, actor Actor, in CreateDraftI
 	if !granted {
 		return nil, &domain.Error{Code: 2014, Name: "FLOW_GRANT_REVOKED"}
 	}
+	var targetDB *string
+	if in.TargetDatabase != nil {
+		trimmed := strings.TrimSpace(*in.TargetDatabase)
+		if err := ValidateTargetDatabase(trimmed); err != nil {
+			return nil, err
+		}
+		targetDB = &trimmed
+	}
 	now := nowUTC()
 	rollbackEnabled := true
 	if in.RollbackEnabled != nil {
@@ -101,6 +114,7 @@ func (s *Services) CreateDraft(ctx context.Context, actor Actor, in CreateDraftI
 		FlowVersionSeen: flow.Version, Title: in.Title, Description: in.Description,
 		RequestedScheduledFor: in.RequestedScheduledFor,
 		RollbackEnabled:       rollbackEnabled,
+		TargetDatabase:        targetDB,
 		TicketType:            "normal",
 		Revision:              1, State: string(domain.DraftStateDraft), Version: 1,
 		CreatedAt: now, UpdatedAt: now,
@@ -121,7 +135,7 @@ func draftViewOf(m *persistence.ChangeDraftModel, payload *persistence.DraftSQLP
 	v := DraftView{
 		ID: m.ID, OwnerUserID: m.OwnerUserID, FlowID: m.FlowID,
 		Title: m.Title, Description: m.Description,
-		RollbackEnabled: m.RollbackEnabled, TicketType: ticketType,
+		RollbackEnabled: m.RollbackEnabled, TargetDatabase: m.TargetDatabase, TicketType: ticketType,
 		SourceOrderID: m.SourceOrderID, RollbackEvidenceID: m.RollbackEvidenceID,
 		Revision: m.Revision, State: m.State, Version: m.Version,
 		CreatedAt: m.CreatedAt.UTC().Format(timeFormat), UpdatedAt: m.UpdatedAt.UTC().Format(timeFormat),
@@ -142,14 +156,16 @@ const timeFormat = "2006-01-02T15:04:05.000Z07:00"
 
 // ListDrafts lists drafts for the owner using keyset pagination (owner_updated_idx).
 func (s *Services) ListDrafts(ctx context.Context, actor Actor, limit int, afterID string, afterUpdated string) ([]DraftView, *string, error) {
-	if limit <= 0 || limit > 200 {
-		limit = 50
-	}
+	limit = pagination.ClampLimit(limit, 50, 200)
 	rows := []persistence.ChangeDraftModel{}
 	q := s.DB.WithContext(ctx).
 		Where("owner_user_id = ?", actor.UserID)
-	if afterID != "" && afterUpdated != "" {
-		q = q.Where("(updated_at, id) < (?, ?)", afterUpdated, afterID)
+	if afterID != "" || afterUpdated != "" {
+		ts, id, err := pagecursor.DecodeUUID(afterUpdated + "|" + afterID)
+		if err != nil {
+			return nil, nil, ErrValidation
+		}
+		q = q.Where("(updated_at, id) < (?, ?)", ts, id)
 	}
 	if err := q.Order("updated_at desc, id desc").Limit(limit + 1).Find(&rows).Error; err != nil {
 		return nil, nil, err
@@ -157,7 +173,7 @@ func (s *Services) ListDrafts(ctx context.Context, actor Actor, limit int, after
 	var next *string
 	if len(rows) > limit {
 		last := rows[limit-1]
-		cursor := fmt.Sprintf("%s|%s", last.UpdatedAt.UTC().Format(timeFormat), last.ID)
+		cursor := pagecursor.Encode(last.UpdatedAt, last.ID)
 		next = &cursor
 		rows = rows[:limit]
 	}
@@ -224,6 +240,7 @@ type UpdateDraftInput struct {
 	FlowID                *string
 	RequestedScheduledFor **time.Time
 	RollbackEnabled       *bool
+	TargetDatabase        **string
 	ExpectVersion         int64
 }
 
@@ -275,11 +292,26 @@ func (s *Services) UpdateDraft(ctx context.Context, actor Actor, draftID string,
 			m.FlowID = *in.FlowID
 			m.FlowVersionSeen = ver
 		}
+		var nextTargetDB *string
+		targetDBChanged := false
+		if in.TargetDatabase != nil {
+			if *in.TargetDatabase == nil {
+				targetDBChanged = m.TargetDatabase != nil
+				nextTargetDB = nil
+			} else {
+				trimmed := strings.TrimSpace(**in.TargetDatabase)
+				if err := ValidateTargetDatabase(trimmed); err != nil {
+					return err
+				}
+				nextTargetDB = &trimmed
+				targetDBChanged = m.TargetDatabase == nil || *m.TargetDatabase != trimmed
+			}
+		}
 		sets := map[string]any{"version": m.Version + 1, "updated_at": nowUTC()}
 		fromState := domain.DraftState(m.State)
 		toState := fromState
-		// Even when SQL is unchanged, a flow change invalidates existing conclusions (review inputs = SQL + flow).
-		if flowChanged && fromState == domain.DraftStateReady {
+		// Even when SQL is unchanged, a flow or target database change invalidates existing conclusions.
+		if (flowChanged || flowReconfirmed || targetDBChanged) && fromState == domain.DraftStateReady {
 			next, err := domain.DraftTransition(fromState, domain.DraftEventInputsChanged)
 			if err != nil {
 				return err
@@ -293,19 +325,19 @@ func (s *Services) UpdateDraft(ctx context.Context, actor Actor, draftID string,
 		if flowChanged {
 			sets["flow_id"] = m.FlowID
 		}
-		if flowChanged || (flowReconfirmed && fromState == domain.DraftStateReady) {
-			// Flow input change invalidates existing conclusions.
+		if in.TargetDatabase != nil {
+			if nextTargetDB == nil {
+				sets["target_database"] = nil
+			} else {
+				sets["target_database"] = *nextTargetDB
+			}
+			m.TargetDatabase = nextTargetDB
+		}
+		if flowChanged || ((flowReconfirmed || targetDBChanged) && fromState == domain.DraftStateReady) {
+			// Flow or target_database change invalidates existing conclusions.
 			if err := invalidateActiveRuns(ctx, tx, m.ID, m.Revision); err != nil {
 				return err
 			}
-		}
-		if flowReconfirmed && fromState == domain.DraftStateReady {
-			next, err := domain.DraftTransition(fromState, domain.DraftEventInputsChanged)
-			if err != nil {
-				return err
-			}
-			toState = next
-			sets["state"] = string(next)
 		}
 		if in.Title != nil {
 			sets["title"] = *in.Title
@@ -334,7 +366,7 @@ func (s *Services) UpdateDraft(ctx context.Context, actor Actor, draftID string,
 			return err
 		}
 		m.Version++
-		if flowChanged {
+		if flowChanged || targetDBChanged {
 			from := string(fromState)
 			data := domain.DraftStateChangedData{
 				AggregateID: m.ID, From: &from, To: string(toState),
@@ -640,30 +672,19 @@ func (s *Services) RevealDraftSQL(ctx context.Context, actor Actor, meta Request
 	res := &SQLRevealResult{
 		RevealID:   revealID,
 		SQL:        string(plaintext),
-		Watermark:  buildWatermark(actor.Username, now),
+		Watermark:  watermark.SQLViewer(actor.Username, now),
 		ValidUntil: now.Add(5 * time.Minute).UTC().Format(timeFormat),
 	}
 	if err := s.Recorder.Audit(ctx, nil, auditlog.AuditInput{
 		EventType: "draft.sql_revealed",
-		ActorKind: "user", ActorID: strPtrOrNil(actor.UserID), ActorUsername: strPtrOrNil(actor.Username),
-		ResourceType: "change_draft", ResourceID: strPtrOrNil(draftID),
+		ActorKind: "user", ActorID: ptr.NonZero(actor.UserID), ActorUsername: ptr.NonZero(actor.Username),
+		ResourceType: "change_draft", ResourceID: ptr.NonZero(draftID),
 		Action: "reveal", Outcome: "succeeded",
-		RequestID: strPtrOrNil(meta.RequestID), SourceIP: strPtrOrNil(meta.SourceIP),
-		UserAgent: strPtrOrNil(meta.UserAgent),
+		RequestID: ptr.NonZero(meta.RequestID), SourceIP: ptr.NonZero(meta.SourceIP),
+		UserAgent: ptr.NonZero(meta.UserAgent),
 		Metadata:  map[string]any{"reveal_id": revealID, "purpose": purpose, "revision": m.Revision},
 	}); err != nil {
 		return nil, err
 	}
 	return res, nil
 }
-
-// buildWatermark builds a dynamic watermark: viewer + server timestamp (without breaking copy-paste).
-func buildWatermark(username string, at time.Time) string {
-	return fmt.Sprintf("%s | %s", username, at.UTC().Format("2006-01-02T15:04:05Z"))
-}
-
-// jsonMarshal is a deterministic JSON encoding helper.
-func jsonMarshal(v any) ([]byte, error) { return json.Marshal(v) }
-
-// jsonUnmarshalStrict decodes JSON into the target value.
-func jsonUnmarshalStrict(data []byte, v any) error { return json.Unmarshal(data, v) }

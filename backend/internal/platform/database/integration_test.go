@@ -20,6 +20,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -30,6 +31,7 @@ import (
 	"github.com/cookieY/YearningX/backend/internal/config"
 	"github.com/cookieY/YearningX/backend/internal/httpapi"
 	"github.com/cookieY/YearningX/backend/internal/platform/keyprovider"
+	"github.com/cookieY/YearningX/backend/internal/platform/testenv"
 )
 
 func newListener() (net.Listener, error) {
@@ -38,26 +40,16 @@ func newListener() (net.Listener, error) {
 
 func testDatabaseConfig(t *testing.T) config.DatabaseConfig {
 	t.Helper()
-	password := os.Getenv("YEARNING_TEST_DATABASE_PASSWORD")
-	if password == "" {
-		t.Skip("integration PostgreSQL not configured: set YEARNING_TEST_DATABASE_PASSWORD")
-	}
+	cfg := testenv.RequireMetaPG(t)
 	return config.DatabaseConfig{
-		Host:         envOr("YEARNING_TEST_DATABASE_HOST", "localhost"),
-		Port:         envOr("YEARNING_TEST_DATABASE_PORT", "54330"),
-		User:         envOr("YEARNING_TEST_DATABASE_USER", "yearning"),
-		Password:     password,
-		DBName:       envOr("YEARNING_TEST_DATABASE_DBNAME", "yearning_v4"),
-		SSLMode:      envOr("YEARNING_TEST_DATABASE_SSLMODE", "disable"),
+		Host:         cfg.Host,
+		Port:         strconv.Itoa(cfg.Port),
+		User:         cfg.User,
+		Password:     cfg.Password,
+		DBName:       cfg.DBName,
+		SSLMode:      cfg.SSLMode,
 		MaxOpenConns: 5, MaxIdleConns: 2, ConnMaxLifetimeMinutes: 5,
 	}
-}
-
-func envOr(key, fallback string) string {
-	if value := os.Getenv(key); value != "" {
-		return value
-	}
-	return fallback
 }
 
 func TestIntegrationPoolPingAndTransaction(t *testing.T) {

@@ -4,13 +4,9 @@ import (
 	"context"
 	"database/sql"
 	"database/sql/driver"
-	"encoding/base64"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
-	"os"
-	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
@@ -23,6 +19,7 @@ import (
 	"github.com/cookieY/YearningX/backend/internal/authorization/auditlog"
 	"github.com/cookieY/YearningX/backend/internal/authorization/bizerr"
 	"github.com/cookieY/YearningX/backend/internal/crypto"
+	"github.com/cookieY/YearningX/backend/internal/platform/testkit"
 )
 
 func TestArgon2HashAndVerify(t *testing.T) {
@@ -171,44 +168,9 @@ func TestOIDCConfigurationValidation(t *testing.T) {
 	}
 }
 
-// newTestCrypter constructs a Crypter for unit tests (using a temporary keyring file).
 func newTestCrypter(t *testing.T) *crypto.Crypter {
 	t.Helper()
-	dir := t.TempDir()
-	// Use distinct seed material for the two keys: keyring validation forbids reusing key material
-	// across purposes (AEAD/HMAC domain separation), so two all-zero keys would be rejected.
-	payload := make([]byte, 32)
-	state := make([]byte, 32)
-	for i := range payload {
-		payload[i] = byte(i + 1)
-	}
-	for i := range state {
-		state[i] = byte(i + 65)
-	}
-	doc := map[string]any{
-		"contract_version": 1,
-		"deployment_id":    "identity-test",
-		"keys": []map[string]any{
-			{"key_id": "pay-1", "purpose": "payload", "status": "encrypt_decrypt",
-				"key_base64": base64.StdEncoding.EncodeToString(payload)},
-			{"key_id": "state-1", "purpose": "oidc_state", "status": "encrypt_decrypt",
-				"key_base64": base64.StdEncoding.EncodeToString(state)},
-		},
-	}
-	raw, _ := json.Marshal(doc)
-	path := filepath.Join(dir, "keyring.json")
-	if err := os.WriteFile(path, raw, 0o400); err != nil {
-		t.Fatal(err)
-	}
-	ring, err := crypto.LoadKeyring(path)
-	if err != nil {
-		t.Fatal(err)
-	}
-	c, err := crypto.NewCrypter(ring)
-	if err != nil {
-		t.Fatal(err)
-	}
-	return c
+	return testkit.NewCrypter(t)
 }
 
 func TestValidOptionalEmail(t *testing.T) {

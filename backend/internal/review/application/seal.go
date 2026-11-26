@@ -5,7 +5,6 @@
 package application
 
 import (
-	"crypto/sha256"
 	"encoding/hex"
 
 	"github.com/cookieY/YearningX/backend/internal/crypto"
@@ -14,19 +13,13 @@ import (
 // sqlHMACPurpose is the SQL plaintext integrity HMAC purpose (a member of the key contract HMAC manifest).
 const sqlHMACPurpose = "sql_fingerprint"
 
-func payloadAAD(deploymentID, table, primaryKey, column string) crypto.AAD {
-	return crypto.AAD{
-		DeploymentID: deploymentID,
-		Table:        table,
-		PrimaryKey:   primaryKey,
-		Column:       column,
-		Purpose:      crypto.PurposePayload,
-	}
-}
-
 // sealPayload encrypts and returns (envelope, plaintext HMAC hex).
 func sealPayload(c *crypto.Crypter, table, pk, column string, plaintext []byte) (crypto.Envelope, string, error) {
-	env, err := c.Seal(crypto.PurposePayload, plaintext, payloadAAD(c.DeploymentID(), table, pk, column))
+	env, err := c.SealColumn(crypto.PurposePayload, crypto.ColumnRef{
+		Table:      table,
+		PrimaryKey: pk,
+		Column:     column,
+	}, plaintext)
 	if err != nil {
 		return crypto.Envelope{}, "", err
 	}
@@ -39,7 +32,11 @@ func sealPayload(c *crypto.Crypter, table, pk, column string, plaintext []byte) 
 
 // openPayload authenticates and decrypts; fails closed without returning partial plaintext.
 func openPayload(c *crypto.Crypter, table, pk, column string, env crypto.Envelope) ([]byte, error) {
-	return c.Open(crypto.PurposePayload, env, payloadAAD(c.DeploymentID(), table, pk, column))
+	return c.OpenColumn(crypto.PurposePayload, crypto.ColumnRef{
+		Table:      table,
+		PrimaryKey: pk,
+		Column:     column,
+	}, env)
 }
 
 // sealRawEvidence seals a D006 raw payload envelope (SEC-0042): AAD binds the evidence_facts primary
@@ -58,10 +55,4 @@ func factHMAC(c *crypto.Crypter, data []byte) (string, error) {
 		return "", err
 	}
 	return hex.EncodeToString(mac), nil
-}
-
-// sha256Hex computes a non-keyed digest (structural snapshot content hash; contains no sensitive plaintext).
-func sha256Hex(data []byte) string {
-	sum := sha256.Sum256(data)
-	return hex.EncodeToString(sum[:])
 }

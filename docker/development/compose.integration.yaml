@@ -1,0 +1,73 @@
+name: yearning-v4-integration
+
+services:
+  postgres-meta:
+    image: postgres:18.6
+    environment:
+      POSTGRES_DB: yearning_v4
+      POSTGRES_USER: yearning
+      POSTGRES_PASSWORD: ${YEARNING_TEST_META_PASSWORD:?set YEARNING_TEST_META_PASSWORD}
+    ports:
+      - "127.0.0.1:${YEARNING_ITEST_PG_META_PORT:-54339}:5432"
+    volumes:
+      - ${YEARNING_ITEST_TLS_DIR:-../../.cache/itest-tls}:/tls:ro
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        if [ -f /tls/server.crt ] && [ -f /tls/server.key ]; then
+          cp /tls/server.crt /tmp/server.crt
+          cp /tls/server.key /tmp/server.key
+          chown postgres:postgres /tmp/server.crt /tmp/server.key
+          chmod 644 /tmp/server.crt
+          chmod 600 /tmp/server.key
+          exec docker-entrypoint.sh postgres -c ssl=on -c ssl_cert_file=/tmp/server.crt -c ssl_key_file=/tmp/server.key
+        fi
+        exec docker-entrypoint.sh postgres
+    tmpfs:
+      - /var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U yearning -d yearning_v4"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+      start_period: 5s
+    security_opt:
+      - no-new-privileges:true
+
+  postgres-target:
+    image: postgres:17
+    environment:
+      POSTGRES_DB: yearning
+      POSTGRES_USER: yearning
+      POSTGRES_PASSWORD: ${YEARNING_TEST_TARGET_PG_PASSWORD:?set YEARNING_TEST_TARGET_PG_PASSWORD}
+    ports:
+      - "127.0.0.1:${YEARNING_ITEST_PG_TARGET_PORT:-54338}:5432"
+    tmpfs:
+      - /var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U yearning -d yearning"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+      start_period: 5s
+    security_opt:
+      - no-new-privileges:true
+
+  mysql-target:
+    image: mysql:8.0
+    environment:
+      MYSQL_ROOT_PASSWORD: ${YEARNING_TEST_TARGET_MYSQL_PASSWORD:?set YEARNING_TEST_TARGET_MYSQL_PASSWORD}
+      MYSQL_DATABASE: yearning
+    ports:
+      - "127.0.0.1:${YEARNING_ITEST_MYSQL_TARGET_PORT:-33309}:3306"
+    tmpfs:
+      - /var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "MYSQL_PWD=$$MYSQL_ROOT_PASSWORD mysqladmin ping -h 127.0.0.1 -uroot --silent"]
+      interval: 2s
+      timeout: 3s
+      retries: 40
+      start_period: 10s
+    security_opt:
+      - no-new-privileges:true

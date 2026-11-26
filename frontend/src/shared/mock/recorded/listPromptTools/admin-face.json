@@ -1,0 +1,919 @@
+{
+  "contract_version": 1,
+  "openapi_sha": "b08b588223c0b586a5c9c4e0f1c9b0cd818d7ef1d61f3f9e823d5a489e37fb73",
+  "zod_runtime_sha256": "32b72a82897ae698b7566aad9821c07cf5194173a3dc69adfb00a8f00f04a446",
+  "operation_id": "listPromptTools",
+  "case_id": "admin-face",
+  "http_status": 200,
+  "err_code": 0,
+  "response": {
+    "data": {
+      "items": [
+        {
+          "id": "00000000-0000-4000-8000-000000000317",
+          "name": "builtin.ddl-special-type",
+          "description": "特殊类型需复核",
+          "state": "enabled",
+          "engine": "all",
+          "parameters": {},
+          "definition": {
+            "knowledge_text": "规则：特殊类型需复核（旧AllowSpecialType）。判定依据：ddl_has_special_type=true时输出本发现。",
+            "max_severity": "medium",
+            "version": 1
+          },
+          "config_hash": "eb21806f34c83f01c966980d0505e0cac58cce3cd338b008cc2b292e9b5c8fb2",
+          "version": 1,
+          "is_builtin": true,
+          "created_at": "2026-11-25T04:54:00.000Z",
+          "updated_at": "2026-11-25T04:54:00.000Z"
+        },
+        {
+          "id": "00000000-0000-4000-8000-000000000318",
+          "name": "builtin.ddl-require-primary-key",
+          "description": "CREATE TABLE必须声明主键",
+          "state": "enabled",
+          "engine": "all",
+          "parameters": {},
+          "definition": {
+            "knowledge_text": "规则：CREATE TABLE必须声明主键（旧DDLEnablePrimaryKey）。判定依据：op为create且非视图、statistics.ddl_has_primary_key=false时输出本发现。",
+            "max_severity": "high",
+            "version": 1
+          },
+          "config_hash": "2bfd4c385fbdf9e0bc98f7caa62879e8327428264d100367d879c2f2a92af90e",
+          "version": 1,
+          "is_builtin": true,
+          "created_at": "2026-11-25T04:54:00.000Z",
+          "updated_at": "2026-11-25T04:54:00.000Z"
+        },
+        {
+          "id": "00000000-0000-4000-8000-000000000319",
+          "name": "builtin.ddl-identifier-keyword",
+          "description": "标识符不得使用SQL关键词",
+          "state": "enabled",
+          "engine": "all",
+          "parameters": {},
+          "definition": {
+            "knowledge_text": "规则：标识符不得使用SQL关键词（旧CheckIdentifier）。判定依据：ddl_table_identifier_not_keyword=false时输出本发现。",
+            "max_severity": "low",
+            "version": 1
+          },
+          "config_hash": "6c96e460486b6f54641d78903365ed6fb07e5c030b8e59367fc5f95fad39cd2d",
+          "version": 1,
+          "is_builtin": true,
+          "created_at": "2026-11-25T04:54:00.000Z",
+          "updated_at": "2026-11-25T04:54:00.000Z"
+        },
+        {
+          "id": "00000000-0000-4000-8000-000000000320",
+          "name": "builtin.ddl-multi-ddl",
+          "description": "单个工单仅允许一条DDL",
+          "state": "enabled",
+          "engine": "all",
+          "parameters": {},
+          "definition": {
+            "knowledge_text": "规则：单个工单仅允许一条DDL（旧DDLMultiToCommit）。判定依据：上下文中全部ddl组（含alter/create/drop等）的statement_count之和大于1时输出本发现。",
+            "max_severity": "low",
+            "version": 1
+          },
+          "config_hash": "70fa38468d4112d852c2c8427a3d22ff5dcaf36aa7318a1e5a548e2b33f68f32",
+          "version": 1,
+          "is_builtin": true,
+          "created_at": "2026-11-25T04:54:00.000Z",
+          "updated_at": "2026-11-25T04:54:00.000Z"
+        },
+        {
+          "id": "00000000-0000-4000-8000-000000000321",
+          "name": "builtin.dml-insert-explicit-columns",
+          "description": "INSERT必须显式声明目标列",
+          "state": "enabled",
+          "engine": "all",
+          "parameters": {},
+          "definition": {
+            "knowledge_text": "规则：INSERT必须显式声明目标列（旧DMLInsertColumns与DMLInsertMustExplicitly语义合并）。判定依据：statistics.insert_has_columns=false时输出本发现。",
+            "max_severity": "medium",
+            "version": 1
+          },
+          "config_hash": "83ef9e2e0d02cc989d018b7c43c0984904b8f26696e25ee95c066c1619c8037a",
+          "version": 1,
+          "is_builtin": true,
+          "created_at": "2026-11-25T04:54:00.000Z",
+          "updated_at": "2026-11-25T04:54:00.000Z"
+        },
+        {
+          "id": "00000000-0000-4000-8000-000000000322",
+          "name": "builtin.max-affect-rows",
+          "description": "语句预估影响行数不得超过{{max_affect_rows}}",
+          "state": "enabled",
+          "engine": "all",
+          "parameters": {
+            "max_affect_rows": 1000
+          },
+          "definition": {
+            "knowledge_text": "规则：语句预估影响行数不得超过{{max_affect_rows}}。判定依据：调用safe_explain工具取得EstimatedRows事实；EstimatedRows大于{{max_affect_rows}}时输出本发现；无法取得事实时不输出并注明unknown。",
+            "max_severity": "high",
+            "version": 1
+          },
+          "config_hash": "eaf7ab48342d981ffa6d7bc90d68cfc066a29c904884bd07f06686dea9a63713",
+          "version": 1,
+          "is_builtin": true,
+          "created_at": "2026-11-25T04:54:00.000Z",
+          "updated_at": "2026-11-25T04:54:00.000Z"
+        },
+        {
+          "id": "00000000-0000-4000-8000-000000000323",
+          "name": "builtin.ddl-pk-auto-increment",
+          "description": "主键必须为自增列",
+          "state": "enabled",
+          "engine": "mysql",
+          "parameters": {},
+          "definition": {
+            "knowledge_text": "规则：主键必须为自增列（旧DDLEnableAutoIncrement）。判定依据：ddl_has_primary_key=true且ddl_has_auto_increment=false时输出本发现。",
+            "max_severity": "medium",
+            "version": 1
+          },
+          "config_hash": "cdafa8c9fc74d1f70964b693649d7442075f3a437b8a5f0f88d98368561cfedd",
+          "version": 1,
+          "is_builtin": true,
+          "created_at": "2026-11-25T04:54:00.000Z",
+          "updated_at": "2026-11-25T04:54:00.000Z"
+        },
+        {
+          "id": "00000000-0000-4000-8000-000000000324",
+          "name": "builtin.ddl-max-index-count",
+          "description": "单表索引数不得超过{{max_index_count}}",
+          "state": "enabled",
+          "engine": "all",
+          "parameters": {
+            "max_index_count": 5
+          },
+          "definition": {
+            "knowledge_text": "规则：单表索引数不得超过{{max_index_count}}。判定依据：ddl_index_count大于{{max_index_count}}时输出本发现。",
+            "max_severity": "medium",
+            "version": 1
+          },
+          "config_hash": "7120e5b669d9ad0971f524ae87e08e9f86c4291c2314f8448a1e35c87bec0cd4",
+          "version": 1,
+          "is_builtin": true,
+          "created_at": "2026-11-25T04:54:00.000Z",
+          "updated_at": "2026-11-25T04:54:00.000Z"
+        },
+        {
+          "id": "00000000-0000-4000-8000-000000000325",
+          "name": "builtin.dml-forbid-subselect",
+          "description": "DML语句禁止内嵌SELECT子查询",
+          "state": "enabled",
+          "engine": "all",
+          "parameters": {},
+          "definition": {
+            "knowledge_text": "规则：DML语句禁止内嵌SELECT子查询（旧DMLSelect）。判定依据：statistics.dml_has_subselect=true时输出本发现。",
+            "max_severity": "medium",
+            "version": 1
+          },
+          "config_hash": "b4ba491da4686a984f3decab9228a0918a9ce8bd06057a20c057a2e87c0d88d6",
+          "version": 1,
+          "is_builtin": true,
+          "created_at": "2026-11-25T04:54:00.000Z",
+          "updated_at": "2026-11-25T04:54:00.000Z"
+        },
+        {
+          "id": "00000000-0000-4000-8000-000000000326",
+          "name": "builtin.ddl-collation-allowlist",
+          "description": "排序规则必须在允许列表内",
+          "state": "disabled",
+          "engine": "mysql",
+          "parameters": {
+            "allowed_collations": [
+              "utf8mb4_general_ci",
+              "utf8mb4_bin",
+              "utf8_general_ci",
+              "utf8_bin"
+            ]
+          },
+          "definition": {
+            "knowledge_text": "规则：排序规则必须在允许列表内（旧SupportCollation；默认禁用）。判定依据：ddl_collation存在且不在{{allowed_collations}}内时输出本发现；未声明不输出。",
+            "max_severity": "medium",
+            "version": 1
+          },
+          "config_hash": "fa11a351865471d80ec9fff36a79681f09567bc2a4db2f2722000e3d06f821f1",
+          "version": 1,
+          "is_builtin": true,
+          "created_at": "2026-11-25T04:54:00.000Z",
+          "updated_at": "2026-11-25T04:54:00.000Z"
+        },
+        {
+          "id": "00000000-0000-4000-8000-000000000327",
+          "name": "builtin.forbid-truncate",
+          "description": "禁止TRUNCATE语句",
+          "state": "enabled",
+          "engine": "all",
+          "parameters": {},
+          "definition": {
+            "knowledge_text": "规则：禁止TRUNCATE语句。判定依据：representative_shape中op=truncate时输出本发现。",
+            "max_severity": "critical",
+            "version": 1
+          },
+          "config_hash": "472823e3d4cbfc6c6569478442fa97119c31bba38235045377106adc0366041e",
+          "version": 1,
+          "is_builtin": true,
+          "created_at": "2026-11-25T04:54:00.000Z",
+          "updated_at": "2026-11-25T04:54:00.000Z"
+        },
+        {
+          "id": "00000000-0000-4000-8000-000000000328",
+          "name": "builtin.ddl-index-name-prefix",
+          "description": "索引名必须以idx_或uniq_开头",
+          "state": "enabled",
+          "engine": "all",
+          "parameters": {},
+          "definition": {
+            "knowledge_text": "规则：索引名必须以idx_或uniq_开头（旧DDLIndexNameSpec）。判定依据：ddl_index_prefix_conformant=false时输出本发现。",
+            "max_severity": "low",
+            "version": 1
+          },
+          "config_hash": "51ac6def502591b5a5b001230ea9336dc3d49a9f3586b2237460d6a2b93ca21f",
+          "version": 1,
+          "is_builtin": true,
+          "created_at": "2026-11-25T04:54:00.000Z",
+          "updated_at": "2026-11-25T04:54:00.000Z"
+        },
+        {
+          "id": "00000000-0000-4000-8000-000000000329",
+          "name": "builtin.ddl-forbid-drop-other",
+          "description": "DROP视图/索引/触发器/存储过程/函数需阻断复核",
+          "state": "enabled",
+          "engine": "all",
+          "parameters": {},
+          "definition": {
+            "knowledge_text": "规则：DROP视图/索引/触发器/存储过程/函数需阻断复核。判定依据：ddl_drop_target为view/index/trigger/procedure/function/other时输出本发现。",
+            "max_severity": "high",
+            "version": 1
+          },
+          "config_hash": "6136a13e6cca3394aa642da8255cead3d2370d7464de15dcb9b404af1f54c6d7",
+          "version": 1,
+          "is_builtin": true,
+          "created_at": "2026-11-25T04:54:00.000Z",
+          "updated_at": "2026-11-25T04:54:00.000Z"
+        },
+        {
+          "id": "00000000-0000-4000-8000-000000000330",
+          "name": "builtin.ddl-max-index-key-parts",
+          "description": "单索引字段数不得超过{{max_index_key_parts}}",
+          "state": "enabled",
+          "engine": "all",
+          "parameters": {
+            "max_index_key_parts": 5
+          },
+          "definition": {
+            "knowledge_text": "规则：单索引字段数不得超过{{max_index_key_parts}}。判定依据：ddl_index_max_key_parts大于{{max_index_key_parts}}时输出本发现。",
+            "max_severity": "medium",
+            "version": 1
+          },
+          "config_hash": "3b4c65c63b5b147c08a32bca868e5743f275c854fd977147e358e08d01ad018a",
+          "version": 1,
+          "is_builtin": true,
+          "created_at": "2026-11-25T04:54:00.000Z",
+          "updated_at": "2026-11-25T04:54:00.000Z"
+        },
+        {
+          "id": "00000000-0000-4000-8000-000000000331",
+          "name": "builtin.ddl-view-forbid-select-star",
+          "description": "视图禁止SELECT *",
+          "state": "enabled",
+          "engine": "all",
+          "parameters": {},
+          "definition": {
+            "knowledge_text": "规则：视图禁止SELECT *（旧AllowCrateViewWithSelectStar）。判定依据：ddl_is_create_view=true且ddl_view_select_star=true时输出本发现。",
+            "max_severity": "medium",
+            "version": 1
+          },
+          "config_hash": "6b6f108235738f501dc899714cd10acf0034dc7594dc9f975a62eb23f550ebde",
+          "version": 1,
+          "is_builtin": true,
+          "created_at": "2026-11-25T04:54:00.000Z",
+          "updated_at": "2026-11-25T04:54:00.000Z"
+        },
+        {
+          "id": "00000000-0000-4000-8000-000000000332",
+          "name": "builtin.ddl-require-table-comment",
+          "description": "CREATE TABLE必须携带表注释",
+          "state": "enabled",
+          "engine": "all",
+          "parameters": {},
+          "definition": {
+            "knowledge_text": "规则：CREATE TABLE必须携带表注释（旧DDLCheckTableComment）。判定依据：statistics.ddl_table_comment_present=false时输出本发现。",
+            "max_severity": "medium",
+            "version": 1
+          },
+          "config_hash": "691be6d7b6670896a419d7afb5fa506398e0856ada78e1243a73c8b6e2776d1e",
+          "version": 1,
+          "is_builtin": true,
+          "created_at": "2026-11-25T04:54:00.000Z",
+          "updated_at": "2026-11-25T04:54:00.000Z"
+        },
+        {
+          "id": "00000000-0000-4000-8000-000000000333",
+          "name": "builtin.ddl-multi-alter",
+          "description": "单个工单禁止多条ALTER",
+          "state": "enabled",
+          "engine": "all",
+          "parameters": {},
+          "definition": {
+            "knowledge_text": "规则：单个工单禁止多条ALTER（旧DDLAllowMultiAlter）。判定依据：上下文中全部alter组的statement_count之和大于1时输出本发现（对每个alter组各输出一次）。",
+            "max_severity": "low",
+            "version": 1
+          },
+          "config_hash": "76f9ba6a56b9bc357768c789f1057fffd745e491f519f8692e758e12a19e8571",
+          "version": 1,
+          "is_builtin": true,
+          "created_at": "2026-11-25T04:54:00.000Z",
+          "updated_at": "2026-11-25T04:54:00.000Z"
+        },
+        {
+          "id": "00000000-0000-4000-8000-000000000334",
+          "name": "builtin.ddl-allow-create-view",
+          "description": "CREATE VIEW需阻断复核",
+          "state": "enabled",
+          "engine": "all",
+          "parameters": {},
+          "definition": {
+            "knowledge_text": "规则：CREATE VIEW需阻断复核（旧AllowCreateView）。判定依据：ddl_is_create_view=true时输出本发现。",
+            "max_severity": "medium",
+            "version": 1
+          },
+          "config_hash": "763c94b1b210157da50c15b653f1407708d26f299cb72f2d5ffbf8470d1d6149",
+          "version": 1,
+          "is_builtin": true,
+          "created_at": "2026-11-25T04:54:00.000Z",
+          "updated_at": "2026-11-25T04:54:00.000Z"
+        },
+        {
+          "id": "00000000-0000-4000-8000-000000000335",
+          "name": "builtin.ddl-implicit-type-conversion",
+          "description": "WHERE条件字面值类型必须与列类型一致",
+          "state": "enabled",
+          "engine": "all",
+          "parameters": {},
+          "definition": {
+            "knowledge_text": "规则：WHERE条件字面值类型必须与列类型一致（旧DDLImplicitTypeConversion）。判定依据：调用schema_metadata工具核对涉及列类型，与语句字面值类型（字符串/数字）不一致时输出本发现；事实不可得不输出。",
+            "max_severity": "medium",
+            "version": 1
+          },
+          "config_hash": "3a5fdc1beae8df117c45a1ab97674f4c3ddcf8d41ff91ad4d56b31a145b324a7",
+          "version": 1,
+          "is_builtin": true,
+          "created_at": "2026-11-25T04:54:00.000Z",
+          "updated_at": "2026-11-25T04:54:00.000Z"
+        },
+        {
+          "id": "00000000-0000-4000-8000-000000000336",
+          "name": "builtin.dml-where-not-null-literal",
+          "description": "WHERE条件值不得为NULL字面值比较",
+          "state": "enabled",
+          "engine": "all",
+          "parameters": {},
+          "definition": {
+            "knowledge_text": "规则：WHERE条件值不得为NULL字面值比较（旧DMLWhereExprValueIsNull）。判定依据：statistics.where_literal_null=true时输出本发现。",
+            "max_severity": "medium",
+            "version": 1
+          },
+          "config_hash": "47cf1ec20662ca21f58e522e389360b6301496dd4240e5b45accae47c5ad4a50",
+          "version": 1,
+          "is_builtin": true,
+          "created_at": "2026-11-25T04:54:00.000Z",
+          "updated_at": "2026-11-25T04:54:00.000Z"
+        },
+        {
+          "id": "00000000-0000-4000-8000-000000000337",
+          "name": "builtin.ddl-autoincrement-unsigned",
+          "description": "自增列必须声明UNSIGNED",
+          "state": "enabled",
+          "engine": "mysql",
+          "parameters": {},
+          "definition": {
+            "knowledge_text": "规则：自增列必须声明UNSIGNED（旧DDLEnableAutoincrementUnsigned）。判定依据：ddl_has_auto_increment=true且ddl_autoincrement_unsigned=false时输出本发现。",
+            "max_severity": "medium",
+            "version": 1
+          },
+          "config_hash": "ff49eba35d844fa732aa5056df84654b5acd176aaa29ad2bb951d622e7085f9d",
+          "version": 1,
+          "is_builtin": true,
+          "created_at": "2026-11-25T04:54:00.000Z",
+          "updated_at": "2026-11-25T04:54:00.000Z"
+        },
+        {
+          "id": "00000000-0000-4000-8000-000000000338",
+          "name": "builtin.dml-insert-max-batch-rows",
+          "description": "单条INSERT批量行数/单行字段数不得超过{{max_batch_rows}}",
+          "state": "enabled",
+          "engine": "all",
+          "parameters": {
+            "max_batch_rows": 1000
+          },
+          "definition": {
+            "knowledge_text": "规则：单条INSERT批量行数/单行字段数不得超过{{max_batch_rows}}（旧DMLMaxInsertRows）。判定依据：statistics.values_row_count_max大于{{max_batch_rows}}时输出本发现。",
+            "max_severity": "medium",
+            "version": 1
+          },
+          "config_hash": "6f0ed671b0afa0b7de46de674bcfecb807b338de13c3b4afcb7ab6c30a932416",
+          "version": 1,
+          "is_builtin": true,
+          "created_at": "2026-11-25T04:54:00.000Z",
+          "updated_at": "2026-11-25T04:54:00.000Z"
+        },
+        {
+          "id": "00000000-0000-4000-8000-000000000339",
+          "name": "builtin.ddl-column-default-check",
+          "description": "列应携带默认值",
+          "state": "enabled",
+          "engine": "all",
+          "parameters": {},
+          "definition": {
+            "knowledge_text": "规则：列应携带默认值（旧DDLCheckColumnDefault）。判定依据：ddl_default_count小于ddl_column_count时输出本发现；事实缺失不输出。",
+            "max_severity": "medium",
+            "version": 1
+          },
+          "config_hash": "a4ac2908ac653945bd49b02e1a922841f8666c5320f79142889005ca621526eb",
+          "version": 1,
+          "is_builtin": true,
+          "created_at": "2026-11-25T04:54:00.000Z",
+          "updated_at": "2026-11-25T04:54:00.000Z"
+        },
+        {
+          "id": "00000000-0000-4000-8000-000000000340",
+          "name": "builtin.max-in-value-count",
+          "description": "单条语句IN列表字面值数量不得超过{{max_in_values}}",
+          "state": "enabled",
+          "engine": "all",
+          "parameters": {
+            "max_in_values": 1000
+          },
+          "definition": {
+            "knowledge_text": "规则：单条语句IN列表字面值数量不得超过{{max_in_values}}。判定依据：statistics.in_value_count_max大于{{max_in_values}}时输出本发现。",
+            "max_severity": "medium",
+            "version": 1
+          },
+          "config_hash": "2b718ddac9f8ed16996525ee31c694c9fad4c99c7ec3e4cf09c9b04ef6e8e3ba",
+          "version": 1,
+          "is_builtin": true,
+          "created_at": "2026-11-25T04:54:00.000Z",
+          "updated_at": "2026-11-25T04:54:00.000Z"
+        },
+        {
+          "id": "00000000-0000-4000-8000-000000000341",
+          "name": "builtin.ddl-forbid-unnamed-index",
+          "description": "索引必须显式命名",
+          "state": "enabled",
+          "engine": "all",
+          "parameters": {},
+          "definition": {
+            "knowledge_text": "规则：索引必须显式命名（旧DDLEnableNullIndexName）。判定依据：ddl_index_unnamed_count大于0时输出本发现。",
+            "max_severity": "medium",
+            "version": 1
+          },
+          "config_hash": "157bd5471ab7f4e7325d035b97c05814272be695358dfb647eb88e8fe33c76b7",
+          "version": 1,
+          "is_builtin": true,
+          "created_at": "2026-11-25T04:54:00.000Z",
+          "updated_at": "2026-11-25T04:54:00.000Z"
+        },
+        {
+          "id": "00000000-0000-4000-8000-000000000342",
+          "name": "builtin.ddl-forbid-drop-table",
+          "description": "禁止DROP TABLE",
+          "state": "enabled",
+          "engine": "all",
+          "parameters": {},
+          "definition": {
+            "knowledge_text": "规则：禁止DROP TABLE（旧DDLEnableDropTable）。判定依据：ddl_drop_target=table时输出本发现。",
+            "max_severity": "high",
+            "version": 1
+          },
+          "config_hash": "79433bb81b1e9064cdbbcf05aa98b7118d2aa4256e47aad674f5c7acc9e776e3",
+          "version": 1,
+          "is_builtin": true,
+          "created_at": "2026-11-25T04:54:00.000Z",
+          "updated_at": "2026-11-25T04:54:00.000Z"
+        },
+        {
+          "id": "00000000-0000-4000-8000-000000000343",
+          "name": "builtin.max-group-statement-count",
+          "description": "同构语句组合并后的语句数量不得超过{{max_group_statements}}",
+          "state": "enabled",
+          "engine": "all",
+          "parameters": {
+            "max_group_statements": 10000
+          },
+          "definition": {
+            "knowledge_text": "规则：同构语句组合并后的语句数量不得超过{{max_group_statements}}。判定依据：statement_count大于{{max_group_statements}}时输出本发现。",
+            "max_severity": "medium",
+            "version": 1
+          },
+          "config_hash": "3010043da034b57f6ca7aedfbce20ca4b233689522ed7f0d6021a44194e995b1",
+          "version": 1,
+          "is_builtin": true,
+          "created_at": "2026-11-25T04:54:00.000Z",
+          "updated_at": "2026-11-25T04:54:00.000Z"
+        },
+        {
+          "id": "00000000-0000-4000-8000-000000000344",
+          "name": "builtin.ddl-max-affect-rows",
+          "description": "DDL作用表行数不得超过{{max_ddl_affect_rows}}",
+          "state": "enabled",
+          "engine": "all",
+          "parameters": {
+            "max_ddl_affect_rows": 1000
+          },
+          "definition": {
+            "knowledge_text": "规则：DDL作用表行数不得超过{{max_ddl_affect_rows}}。判定依据：调用table_statistics工具取得目标表行数；行数大于{{max_ddl_affect_rows}}时输出本发现；无法取得事实时不输出并注明unknown。",
+            "max_severity": "medium",
+            "version": 1
+          },
+          "config_hash": "15984e11127f2473d9de3d9a65a0c0d9e2b5609e3e2404165aa249a143739b7e",
+          "version": 1,
+          "is_builtin": true,
+          "created_at": "2026-11-25T04:54:00.000Z",
+          "updated_at": "2026-11-25T04:54:00.000Z"
+        },
+        {
+          "id": "00000000-0000-4000-8000-000000000345",
+          "name": "builtin.ddl-charset-allowlist",
+          "description": "字符集必须在允许列表内",
+          "state": "disabled",
+          "engine": "mysql",
+          "parameters": {
+            "allowed_charsets": [
+              "utf8mb4",
+              "utf8"
+            ]
+          },
+          "definition": {
+            "knowledge_text": "规则：字符集必须在允许列表内（旧SupportCharset；默认禁用，启用后按列表判定）。判定依据：ddl_charset存在且不在{{allowed_charsets}}内时输出本发现；未声明字符集不输出。",
+            "max_severity": "medium",
+            "version": 1
+          },
+          "config_hash": "44db1a17b4b4ad99571026746c769a98c63fd096a3f83d8d292999a744e5e62a",
+          "version": 1,
+          "is_builtin": true,
+          "created_at": "2026-11-25T04:54:00.000Z",
+          "updated_at": "2026-11-25T04:54:00.000Z"
+        },
+        {
+          "id": "00000000-0000-4000-8000-000000000346",
+          "name": "builtin.dml-forbid-limit",
+          "description": "UPDATE/DELETE语句禁止使用LIMIT子句",
+          "state": "enabled",
+          "engine": "mysql",
+          "parameters": {},
+          "definition": {
+            "knowledge_text": "规则：UPDATE/DELETE语句禁止使用LIMIT子句（旧DMLAllowLimitSTMT）。判定依据：statistics.dml_has_limit=true时输出本发现。",
+            "max_severity": "medium",
+            "version": 1
+          },
+          "config_hash": "9b104010bcd4d3e0eba84e45f2d3b35a7e26394a2d7248817e952c6af44198d4",
+          "version": 1,
+          "is_builtin": true,
+          "created_at": "2026-11-25T04:54:00.000Z",
+          "updated_at": "2026-11-25T04:54:00.000Z"
+        },
+        {
+          "id": "00000000-0000-4000-8000-000000000347",
+          "name": "builtin.dml-forbid-order-by",
+          "description": "UPDATE/DELETE语句禁止ORDER BY子句",
+          "state": "enabled",
+          "engine": "mysql",
+          "parameters": {},
+          "definition": {
+            "knowledge_text": "规则：UPDATE/DELETE语句禁止ORDER BY子句（旧DMLOrder）。判定依据：statistics.dml_has_order_by=true时输出本发现。",
+            "max_severity": "medium",
+            "version": 1
+          },
+          "config_hash": "da7d12eac3b0b33b520a4f710769135b5fb336b7412f0cfc815500c05ae65772",
+          "version": 1,
+          "is_builtin": true,
+          "created_at": "2026-11-25T04:54:00.000Z",
+          "updated_at": "2026-11-25T04:54:00.000Z"
+        },
+        {
+          "id": "00000000-0000-4000-8000-000000000348",
+          "name": "builtin.ddl-forbid-column-position-change",
+          "description": "ALTER禁止AFTER/FIRST列位置调整",
+          "state": "enabled",
+          "engine": "all",
+          "parameters": {},
+          "definition": {
+            "knowledge_text": "规则：ALTER禁止AFTER/FIRST列位置调整（旧DDLAllowChangeColumnPosition）。判定依据：ddl_changes_column_position=true时输出本发现。",
+            "max_severity": "low",
+            "version": 1
+          },
+          "config_hash": "367a23f90449767da17837ff4fb67536699cd6d8dcbe3d53a15138427f5ccc71",
+          "version": 1,
+          "is_builtin": true,
+          "created_at": "2026-11-25T04:54:00.000Z",
+          "updated_at": "2026-11-25T04:54:00.000Z"
+        },
+        {
+          "id": "00000000-0000-4000-8000-000000000349",
+          "name": "builtin.ddl-forbid-drop-database",
+          "description": "禁止DROP DATABASE",
+          "state": "enabled",
+          "engine": "all",
+          "parameters": {},
+          "definition": {
+            "knowledge_text": "规则：禁止DROP DATABASE（旧DDLEnableDropDatabase）。判定依据：ddl_drop_target=database时输出本发现。",
+            "max_severity": "critical",
+            "version": 1
+          },
+          "config_hash": "fc89417cc5799172529224685df98502756ebd630225d2b317da719ef0f5f0dc",
+          "version": 1,
+          "is_builtin": true,
+          "created_at": "2026-11-25T04:54:00.000Z",
+          "updated_at": "2026-11-25T04:54:00.000Z"
+        },
+        {
+          "id": "00000000-0000-4000-8000-000000000350",
+          "name": "builtin.ddl-forbid-foreign-key",
+          "description": "禁止外键",
+          "state": "enabled",
+          "engine": "all",
+          "parameters": {},
+          "definition": {
+            "knowledge_text": "规则：禁止外键（旧DDLEnableForeignKey）。判定依据：ddl_has_foreign_key=true时输出本发现。",
+            "max_severity": "high",
+            "version": 1
+          },
+          "config_hash": "be00ee52f201c2c893d8871e9904e3786d2e094d8958458a693d645c778ba880",
+          "version": 1,
+          "is_builtin": true,
+          "created_at": "2026-11-25T04:54:00.000Z",
+          "updated_at": "2026-11-25T04:54:00.000Z"
+        },
+        {
+          "id": "00000000-0000-4000-8000-000000000351",
+          "name": "builtin.ddl-max-char-length",
+          "description": "CHAR字段长度不得超过{{max_char_length}}",
+          "state": "enabled",
+          "engine": "all",
+          "parameters": {
+            "max_char_length": 10,
+            "max_varchar_length": 1024
+          },
+          "definition": {
+            "knowledge_text": "规则：CHAR字段长度不得超过{{max_char_length}}（旧DDLMaxCharLength默认）。判定依据：ddl_max_char_length大于{{max_char_length}}时输出本发现；varchar超长（ddl_max_varchar_length大于{{max_varchar_length}}）合并本发现输出。",
+            "max_severity": "medium",
+            "version": 1
+          },
+          "config_hash": "d075860d4df11f2b0d59e0315fc57b917c2ad83c3a47dcbd0e2d5378bac0c48e",
+          "version": 1,
+          "is_builtin": true,
+          "created_at": "2026-11-25T04:54:00.000Z",
+          "updated_at": "2026-11-25T04:54:00.000Z"
+        },
+        {
+          "id": "00000000-0000-4000-8000-000000000352",
+          "name": "builtin.ddl-max-table-name-length",
+          "description": "表名长度不得超过{{max_table_name_length}}",
+          "state": "enabled",
+          "engine": "all",
+          "parameters": {
+            "max_table_name_length": 10
+          },
+          "definition": {
+            "knowledge_text": "规则：表名长度不得超过{{max_table_name_length}}（旧MaxTableNameLen默认）。判定依据：ddl_table_name_length大于{{max_table_name_length}}时输出本发现。",
+            "max_severity": "low",
+            "version": 1
+          },
+          "config_hash": "2202a17d9b18739f87da3be51856c927e8e608e22bae8d1a21987006ad94363c",
+          "version": 1,
+          "is_builtin": true,
+          "created_at": "2026-11-25T04:54:00.000Z",
+          "updated_at": "2026-11-25T04:54:00.000Z"
+        },
+        {
+          "id": "00000000-0000-4000-8000-000000000353",
+          "name": "builtin.ddl-forbid-column-type-change",
+          "description": "ALTER禁止MODIFY/CHANGE列类型",
+          "state": "enabled",
+          "engine": "all",
+          "parameters": {},
+          "definition": {
+            "knowledge_text": "规则：ALTER禁止MODIFY/CHANGE列类型（旧DDLAllowColumnType）。判定依据：ddl_alters_column_type=true时输出本发现。",
+            "max_severity": "medium",
+            "version": 1
+          },
+          "config_hash": "ddeba74d3ea8f793012e329bdd0a8df139628df493e763a33a207012b3215849",
+          "version": 1,
+          "is_builtin": true,
+          "created_at": "2026-11-25T04:54:00.000Z",
+          "updated_at": "2026-11-25T04:54:00.000Z"
+        },
+        {
+          "id": "00000000-0000-4000-8000-000000000354",
+          "name": "builtin.ddl-pk-integer",
+          "description": "主键列必须为整数类型",
+          "state": "enabled",
+          "engine": "all",
+          "parameters": {},
+          "definition": {
+            "knowledge_text": "规则：主键列必须为整数类型（旧DDLAllowPRINotInt）。判定依据：ddl_pk_is_integer=false时输出本发现；类型不可解析时不输出。",
+            "max_severity": "low",
+            "version": 1
+          },
+          "config_hash": "a00732ba8dc040eb11097b9c0f71851299464151672aacd249f06e13ad15475e",
+          "version": 1,
+          "is_builtin": true,
+          "created_at": "2026-11-25T04:54:00.000Z",
+          "updated_at": "2026-11-25T04:54:00.000Z"
+        },
+        {
+          "id": "00000000-0000-4000-8000-000000000355",
+          "name": "builtin.ddl-allow-partition",
+          "description": "分区表需复核",
+          "state": "enabled",
+          "engine": "all",
+          "parameters": {},
+          "definition": {
+            "knowledge_text": "规则：分区表需复核（旧AllowCreatePartition）。判定依据：ddl_has_partition=true时输出本发现。",
+            "max_severity": "medium",
+            "version": 1
+          },
+          "config_hash": "d43db9197539f625647c163cf622472703623161a71599c06548f9bbf93e7f9b",
+          "version": 1,
+          "is_builtin": true,
+          "created_at": "2026-11-25T04:54:00.000Z",
+          "updated_at": "2026-11-25T04:54:00.000Z"
+        },
+        {
+          "id": "00000000-0000-4000-8000-000000000356",
+          "name": "builtin.ddl-pk-named-id",
+          "description": "主键列必须命名为id",
+          "state": "enabled",
+          "engine": "all",
+          "parameters": {},
+          "definition": {
+            "knowledge_text": "规则：主键列必须命名为id（旧DDLPrimaryKeyMust）。判定依据：ddl_pk_named_id=false时输出本发现；主键列名不可解析时不输出。",
+            "max_severity": "low",
+            "version": 1
+          },
+          "config_hash": "f27d134a68f33ef24beeba14741c393bc1947c3eb0290e49a64224a2796bca62",
+          "version": 1,
+          "is_builtin": true,
+          "created_at": "2026-11-25T04:54:00.000Z",
+          "updated_at": "2026-11-25T04:54:00.000Z"
+        },
+        {
+          "id": "00000000-0000-4000-8000-000000000357",
+          "name": "builtin.ddl-column-nullable-check",
+          "description": "列应显式声明NOT NULL",
+          "state": "enabled",
+          "engine": "all",
+          "parameters": {},
+          "definition": {
+            "knowledge_text": "规则：列应显式声明NOT NULL（旧DDLCheckColumnNullable）。判定依据：ddl_column_count减ddl_not_null_count大于0时输出本发现；事实缺失不输出。",
+            "max_severity": "medium",
+            "version": 1
+          },
+          "config_hash": "3f21f1a0a6d3a2246bbc417416c7e47da002abeb7085ef9bff9b55ef6a4efe67",
+          "version": 1,
+          "is_builtin": true,
+          "created_at": "2026-11-25T04:54:00.000Z",
+          "updated_at": "2026-11-25T04:54:00.000Z"
+        },
+        {
+          "id": "00000000-0000-4000-8000-000000000358",
+          "name": "builtin.ddl-require-column-comments",
+          "description": "全部列必须携带列注释",
+          "state": "enabled",
+          "engine": "all",
+          "parameters": {},
+          "definition": {
+            "knowledge_text": "规则：全部列必须携带列注释（旧DDlCheckColumnComment）。判定依据：statistics.ddl_column_comment_count小于ddl_column_count时输出本发现；任一事实缺失不输出。",
+            "max_severity": "medium",
+            "version": 1
+          },
+          "config_hash": "97e60cc0b05670d0111778fc5e75e753a6bb7771dbd7b94f1dce1415ed5f2a70",
+          "version": 1,
+          "is_builtin": true,
+          "created_at": "2026-11-25T04:54:00.000Z",
+          "updated_at": "2026-11-25T04:54:00.000Z"
+        },
+        {
+          "id": "00000000-0000-4000-8000-000000000359",
+          "name": "builtin.ddl-autoincrement-init-one",
+          "description": "自增初始值必须为1",
+          "state": "enabled",
+          "engine": "mysql",
+          "parameters": {},
+          "definition": {
+            "knowledge_text": "规则：自增初始值必须为1（旧DDLEnableAutoincrementInit）。判定依据：ddl_autoincrement_init_one=false时输出本发现；未显式设置初始值（键缺失）不输出。",
+            "max_severity": "medium",
+            "version": 1
+          },
+          "config_hash": "6e1258580f528f74ea8652321f9a271229852690a8a07b0543fc0ea6407362eb",
+          "version": 1,
+          "is_builtin": true,
+          "created_at": "2026-11-25T04:54:00.000Z",
+          "updated_at": "2026-11-25T04:54:00.000Z"
+        },
+        {
+          "id": "00000000-0000-4000-8000-000000000360",
+          "name": "builtin.ddl-forbid-across-db-rename",
+          "description": "禁止跨库RENAME TABLE",
+          "state": "enabled",
+          "engine": "mysql",
+          "parameters": {},
+          "definition": {
+            "knowledge_text": "规则：禁止跨库RENAME TABLE（旧DDLEnableAcrossDBRename）。判定依据：ddl_across_db_rename=true时输出本发现。",
+            "max_severity": "high",
+            "version": 1
+          },
+          "config_hash": "3dd9a1e130688023c67f0ede2dbd471fb7f29dadb6c3d1b8151a28030b4289a1",
+          "version": 1,
+          "is_builtin": true,
+          "created_at": "2026-11-25T04:54:00.000Z",
+          "updated_at": "2026-11-25T04:54:00.000Z"
+        },
+        {
+          "id": "00000000-0000-4000-8000-000000000361",
+          "name": "builtin.max-statement-size",
+          "description": "单条语句尺寸不得超过{{max_statement_bytes}}字节",
+          "state": "enabled",
+          "engine": "all",
+          "parameters": {
+            "max_statement_bytes": 262144
+          },
+          "definition": {
+            "knowledge_text": "规则：单条语句尺寸不得超过{{max_statement_bytes}}字节。判定依据：statistics.max_statement_bytes大于{{max_statement_bytes}}时输出本发现。",
+            "max_severity": "medium",
+            "version": 1
+          },
+          "config_hash": "be1f6c335607ae8f333098a346e93f4f30373d053ec42a53f20bbe3bb6d48bfa",
+          "version": 1,
+          "is_builtin": true,
+          "created_at": "2026-11-25T04:54:00.000Z",
+          "updated_at": "2026-11-25T04:54:00.000Z"
+        },
+        {
+          "id": "00000000-0000-4000-8000-000000000362",
+          "name": "builtin.dml-require-where",
+          "description": "UPDATE或DELETE必须携带WHERE条件",
+          "state": "enabled",
+          "engine": "all",
+          "parameters": {},
+          "definition": {
+            "knowledge_text": "规则：UPDATE或DELETE必须携带WHERE条件。判定依据：组的representative_shape中where=false（statistics.unbounded_mutation=true）且op为update或delete时输出本发现；事实缺失不输出。",
+            "max_severity": "high",
+            "version": 1
+          },
+          "config_hash": "e50372219a11d336dbceb42bb5a258c969fb556f5a1c429c0b12c44cbbc89faf",
+          "version": 1,
+          "is_builtin": true,
+          "created_at": "2026-11-25T04:54:00.000Z",
+          "updated_at": "2026-11-25T04:54:00.000Z"
+        },
+        {
+          "id": "00000000-0000-4000-8000-000000000363",
+          "name": "builtin.ddl-float-double-decimal",
+          "description": "float/double应改为decimal",
+          "state": "enabled",
+          "engine": "all",
+          "parameters": {},
+          "definition": {
+            "knowledge_text": "规则：float/double应改为decimal（旧DDLCheckFloatDouble）。判定依据：ddl_has_float_double=true时输出本发现。",
+            "max_severity": "medium",
+            "version": 1
+          },
+          "config_hash": "bd7fff9983ab336c04ad08f490c876c32356ac44f7e73f01eb7c80e6eabe1058",
+          "version": 1,
+          "is_builtin": true,
+          "created_at": "2026-11-25T04:54:00.000Z",
+          "updated_at": "2026-11-25T04:54:00.000Z"
+        },
+        {
+          "id": "00000000-0000-4000-8000-000000000364",
+          "name": "builtin.dml-insert-forbid-null",
+          "description": "INSERT禁止显式插入NULL字面值",
+          "state": "enabled",
+          "engine": "all",
+          "parameters": {},
+          "definition": {
+            "knowledge_text": "规则：INSERT禁止显式插入NULL字面值（旧DMLAllowInsertNull）。判定依据：statistics.insert_has_null_literal=true时输出本发现。",
+            "max_severity": "medium",
+            "version": 1
+          },
+          "config_hash": "c74f8603324a991e17ca9d1ec3ffb5d93c9ac5a4363842ceeb4a3f5a8ce5bf9d",
+          "version": 1,
+          "is_builtin": true,
+          "created_at": "2026-11-25T04:54:00.000Z",
+          "updated_at": "2026-11-25T04:54:00.000Z"
+        }
+      ],
+      "page": {
+        "has_more": false,
+        "next_cursor": null
+      }
+    },
+    "err_code": 0,
+    "message": "ok",
+    "request_id": "00000000-0000-4000-8000-999999999999"
+  }
+}

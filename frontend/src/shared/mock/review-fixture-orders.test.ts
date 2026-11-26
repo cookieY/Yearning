@@ -30,7 +30,10 @@ async function jsonRequest(
   path: string,
   init?: RequestInit,
 ): Promise<{ status: number; body: Envelope<Record<string, unknown>> }> {
-  const response = await fetch(`https://yearning.test${path}`, init);
+  const response = await fetch(
+    `https://yearning.test${path.startsWith("/api/v4") ? path : `/api/v4${path}`}`,
+    init,
+  );
   return {
     status: response.status,
     body: (await response.json()) as Envelope<Record<string, unknown>>,
@@ -304,33 +307,46 @@ describe("change-order list filters (RCP-20260831-ORDER-LIST-FILTER)", () => {
     expect(none).toHaveLength(0);
   });
 
-  it("applies inclusive UTC day bounds on submitted_at", async () => {
+  it("applies inclusive system_timezone day bounds on submitted_at", async () => {
     seedFilterSet();
     const window = await listWith(
       "submitted_from=2026-08-28&submitted_to=2026-08-28",
     );
     expect(window.map((order) => order.display_number)).toEqual(["YR-20260830-000101"]);
-    const wide = await listWith(
+    // 2026-08-30T18:00:00Z is 2026-08-31 02:00:00 in default Asia/Shanghai.
+    const shanghaiWide = await listWith(
       "submitted_from=2026-08-28&submitted_to=2026-08-30",
     );
-    expect(wide).toHaveLength(2);
-    const future = await listWith("submitted_from=2026-08-31");
-    expect(future).toHaveLength(0);
+    expect(shanghaiWide.map((order) => order.display_number)).toEqual(["YR-20260830-000101"]);
+    const shanghaiNextDay = await listWith("submitted_from=2026-08-31");
+    expect(shanghaiNextDay.map((order) => order.display_number)).toEqual(["YR-20260830-000102"]);
+
+    // Switching general.system_timezone to UTC takes effect immediately on the next list query.
+    const { applySettingsToBridge } = await import("@/shared/mock/settings-bridge");
+    applySettingsToBridge("general", { system_timezone: "UTC" });
+    const utcWide = await listWith(
+      "submitted_from=2026-08-28&submitted_to=2026-08-30",
+    );
+    expect(utcWide).toHaveLength(2);
+    const utcFuture = await listWith("submitted_from=2026-08-31");
+    expect(utcFuture).toHaveLength(0);
+    applySettingsToBridge("general", { system_timezone: "Asia/Shanghai" });
   });
 
-  it("keeps orders submitted exactly at the day-boundary instants", async () => {
+  it("keeps orders submitted exactly at Asia/Shanghai day-boundary instants", async () => {
+    // 2026-08-28 00:00:00 CST = 2026-08-27T16:00:00Z; 23:59:59 CST = 2026-08-28T15:59:59Z.
     seedFixtureOrder(
       seedOrder({
         id: "8a6f1a2b-0000-4000-8000-00000000fa03",
         display_number: "YR-20260830-000103",
-        submitted_at: "2026-08-28T00:00:00Z",
+        submitted_at: "2026-08-27T16:00:00Z",
       }),
     );
     seedFixtureOrder(
       seedOrder({
         id: "8a6f1a2b-0000-4000-8000-00000000fa04",
         display_number: "YR-20260830-000104",
-        submitted_at: "2026-08-28T23:59:59Z",
+        submitted_at: "2026-08-28T15:59:59Z",
       }),
     );
     const both = await listWith("submitted_from=2026-08-28&submitted_to=2026-08-28");

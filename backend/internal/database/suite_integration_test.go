@@ -37,6 +37,7 @@ import (
 
 	"github.com/cookieY/YearningX/backend/internal/database"
 	"github.com/cookieY/YearningX/backend/internal/datasource"
+	"github.com/cookieY/YearningX/backend/internal/platform/testenv"
 )
 
 type suiteFixtures struct {
@@ -86,44 +87,27 @@ func (tg *suiteTarget) credential() database.Credential {
 }
 
 func mysqlTarget() *suiteTarget {
-	pw := os.Getenv("YEARNING_TEST_ADAPTER_MYSQL_PASSWORD")
-	if pw == "" {
+	cfg, ok := testenv.ResolveTargetMySQL()
+	if !ok {
 		return nil
-	}
-	mysqlPort := 33306
-	if v := os.Getenv("YEARNING_TEST_ADAPTER_MYSQL_PORT"); v != "" {
-		fmt.Sscanf(v, "%d", &mysqlPort)
 	}
 	return &suiteTarget{
 		name: "mysql", engine: "mysql", mode: "mysql",
-		host: envOr2("YEARNING_TEST_ADAPTER_MYSQL_HOST", "localhost"),
-		port: mysqlPort, user: envOr2("YEARNING_TEST_ADAPTER_MYSQL_USER", "root"),
-		password: pw, dbname: envOr2("YEARNING_TEST_ADAPTER_MYSQL_DB", "yearning"),
+		host: cfg.Host, port: cfg.Port, user: cfg.User,
+		password: cfg.Password, dbname: cfg.DBName,
 	}
 }
 
 func pgTarget() *suiteTarget {
-	pw := os.Getenv("YEARNING_TEST_ADAPTER_PG_PASSWORD")
-	if pw == "" {
+	cfg, ok := testenv.ResolveTargetPG()
+	if !ok {
 		return nil
-	}
-	port := 54331
-	if v := os.Getenv("YEARNING_TEST_ADAPTER_PG_PORT"); v != "" {
-		fmt.Sscanf(v, "%d", &port)
 	}
 	return &suiteTarget{
 		name: "postgresql", engine: "postgresql", mode: "postgresql",
-		host: envOr2("YEARNING_TEST_ADAPTER_PG_HOST", "localhost"),
-		port: port, user: envOr2("YEARNING_TEST_ADAPTER_PG_USER", "yearning"),
-		password: pw, dbname: envOr2("YEARNING_TEST_ADAPTER_PG_DB", "yearning"),
+		host: cfg.Host, port: cfg.Port, user: cfg.User,
+		password: cfg.Password, dbname: cfg.DBName,
 	}
-}
-
-func envOr2(key, fallback string) string {
-	if v := os.Getenv(key); v != "" {
-		return v
-	}
-	return fallback
 }
 
 // suiteEnv holds all state for a single Suite run.
@@ -257,13 +241,19 @@ func setupSuite(t *testing.T, tg *suiteTarget, fix *suiteFixtures) *suiteEnv {
 func runBothEngines(t *testing.T, fn func(t *testing.T, env *suiteEnv)) {
 	t.Helper()
 	fix := loadFixtures(t)
-	for _, tg := range []*suiteTarget{mysqlTarget(), pgTarget()} {
-		if tg == nil {
-			t.Logf("engine target not configured, skipped")
+	for _, entry := range []struct {
+		name string
+		tg   *suiteTarget
+	}{
+		{name: "mysql", tg: mysqlTarget()},
+		{name: "postgresql", tg: pgTarget()},
+	} {
+		if entry.tg == nil {
+			testenv.SkipOrFatal(t, "%s target not configured", entry.name)
 			continue
 		}
-		t.Run(tg.name, func(t *testing.T) {
-			env := setupSuite(t, tg, fix)
+		t.Run(entry.tg.name, func(t *testing.T) {
+			env := setupSuite(t, entry.tg, fix)
 			fn(t, env)
 		})
 	}
@@ -306,7 +296,7 @@ func (e *suiteEnv) markerName(ctx context.Context) string {
 func TestAdapterSuite_MySQLSessionInitializationPinned(t *testing.T) {
 	tg := mysqlTarget()
 	if tg == nil {
-		t.Skip("mysql target not configured")
+		testenv.SkipOrFatal(t, "mysql target not configured")
 	}
 	cfg, reg, err := database.BuildMySQLConfig(tg.endpoint(), tg.credential(), nil, 10*time.Second)
 	if err != nil {
@@ -340,7 +330,7 @@ func TestAdapterSuite_MySQLSessionInitializationPinned(t *testing.T) {
 func TestAdapterSuite_TLSConnectionVerifiedAgainstRealServer(t *testing.T) {
 	tg := mysqlTarget()
 	if tg == nil {
-		t.Skip("mysql target not configured")
+		testenv.SkipOrFatal(t, "mysql target not configured")
 	}
 	fix := loadFixtures(t)
 	env := &suiteEnv{t: t, target: tg, fix: fix, schema: "tls_probe"}
@@ -392,30 +382,35 @@ func TestAdapterSuite_ConnectionTestAndIdentityStability(t *testing.T) {
 
 // required_suite: capability_fail_closed (failure path: out-of-matrix version must fail with Unsupported, not falsely succeed).
 func TestAdapterSuite_CapabilityFailClosedOutOfMatrix(t *testing.T) {
-	// PG matrix freezes 14-17; use dev PG 18 container (B2/B3 metadata DB) as a real counterexample.
-	pw := os.Getenv("YEARNING_TEST_DATABASE_PASSWORD")
-	if pw == "" {
-		t.Skip("out-of-matrix PG18 target not configured (set YEARNING_TEST_DATABASE_PASSWORD)")
-	}
+	// PG minimum floor is >=14: verify live PG 18 passes while below-floor PG 13.3 fails closed.
+	cfg := testenv.RequireMetaPG(t)
 	tg := &suiteTarget{
 		name: "postgresql-18", engine: "postgresql", mode: "postgresql",
-		host: envOr2("YEARNING_TEST_DATABASE_HOST", "localhost"),
-		port: 54330, user: envOr2("YEARNING_TEST_DATABASE_USER", "yearning"),
-		password: pw, dbname: envOr2("YEARNING_TEST_DATABASE_DBNAME", "yearning_v4"),
+		host: cfg.Host, port: cfg.Port, user: cfg.User,
+		password: cfg.Password, dbname: cfg.DBName,
 	}
-	if value := os.Getenv("YEARNING_TEST_DATABASE_PORT"); value != "" {
-		if _, err := fmt.Sscanf(value, "%d", &tg.port); err != nil {
-			t.Fatalf("invalid metadata database test port: %v", err)
-		}
-	}
-	adapter := database.NewPostgreSQLAdapter(tg.endpoint(), database.AdapterOptions{
-		CapabilityResolver: datasource.ResolveCapabilities,
-	})
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	res, err := adapter.TestConnection(ctx, tg.credential(), nil)
+
+	supportedAdapter := database.NewPostgreSQLAdapter(tg.endpoint(), database.AdapterOptions{
+		CapabilityResolver: datasource.ResolveCapabilities,
+	})
+	okRes, err := supportedAdapter.TestConnection(ctx, tg.credential(), nil)
+	if err != nil {
+		t.Fatalf("supported PG 18 target must pass TestConnection: %v", err)
+	}
+	if okRes == nil || !okRes.Capabilities[datasource.CapQuery] {
+		t.Fatalf("expected resolved PG 18 capabilities, got %+v", okRes)
+	}
+
+	belowFloorAdapter := database.NewPostgreSQLAdapter(tg.endpoint(), database.AdapterOptions{
+		CapabilityResolver: func(engine, mode, _ string) (string, map[string]bool, error) {
+			return datasource.ResolveCapabilities(engine, mode, "13.3")
+		},
+	})
+	res, err := belowFloorAdapter.TestConnection(ctx, tg.credential(), nil)
 	if err == nil {
-		t.Fatal("out-of-matrix version must fail with Unsupported")
+		t.Fatal("below-floor PG version must fail with Unsupported")
 	}
 	if res == nil || res.SanitizedFailureName != database.FailUnsupportedTarget {
 		t.Fatalf("expected capability_target_unsupported, got %+v err=%v", res, err)

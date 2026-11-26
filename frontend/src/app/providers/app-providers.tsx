@@ -16,9 +16,9 @@ export function AppProviders({ children }: { children: ReactNode }) {
       <ThemeProvider>
         <QueryClientProvider client={queryClient}>
           {/* The header is a floating card pinned to the viewport top and
-              carries the refresh control at its right edge. PositionedToaster
+              carries the global controls at its right edge. PositionedToaster
               places top-right toasts at top-[68px] (below the 4px margin + 48px
-              control row + gap) so feedback never overlaps the refresh button. */}
+              control row + gap) so feedback never overlaps the header actions. */}
           <PositionedToaster manager={appToastManager} position="top-right">
             <TooltipProvider>
               <SessionProvider>{children}</SessionProvider>

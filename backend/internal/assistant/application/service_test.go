@@ -1,68 +1,31 @@
+//go:build integration
+
 package application
 
 import (
 	"context"
-	"encoding/base64"
-	"errors"
 	"fmt"
-	"os"
 	"strings"
-	"syscall"
 	"testing"
 
 	"github.com/google/uuid"
-	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
-	gormlogger "gorm.io/gorm/logger"
 
 	"github.com/cookieY/YearningX/backend/internal/assistant/domain"
 	"github.com/cookieY/YearningX/backend/internal/assistant/persistence"
 	assistanttool "github.com/cookieY/YearningX/backend/internal/assistant/tool"
+	"github.com/cookieY/YearningX/backend/internal/authorization/auditlog"
 	orderapp "github.com/cookieY/YearningX/backend/internal/changeorder/application"
 	"github.com/cookieY/YearningX/backend/internal/crypto"
 	"github.com/cookieY/YearningX/backend/internal/database"
+	"github.com/cookieY/YearningX/backend/internal/platform/testenv"
+	"github.com/cookieY/YearningX/backend/internal/platform/testkit"
+	reviewapp "github.com/cookieY/YearningX/backend/internal/review/application"
 )
-
-func acquireTestLock(t *testing.T) {
-	t.Helper()
-	for _, name := range []string{"/yearningx-itest-shared.lock", "/yearningx-b13-assistant-test.lock"} {
-		f, err := os.OpenFile(os.TempDir()+name, os.O_CREATE|os.O_RDWR, 0o600)
-		if err != nil {
-			t.Fatalf("open lock %s: %v", name, err)
-		}
-		if err := syscall.Flock(int(f.Fd()), syscall.LOCK_EX); err != nil {
-			_ = f.Close()
-			t.Fatalf("flock %s: %v", name, err)
-		}
-		file := f
-		t.Cleanup(func() {
-			_ = syscall.Flock(int(file.Fd()), syscall.LOCK_UN)
-			_ = file.Close()
-		})
-	}
-}
 
 func openAssistantTestDB(t *testing.T) *gorm.DB {
 	t.Helper()
-	acquireTestLock(t)
-	host := envOr("YEARNING_B13_TEST_DB_HOST", "127.0.0.1")
-	port := envOr("YEARNING_B13_TEST_DB_PORT", "54332")
-	user := envOr("YEARNING_B13_TEST_DB_USER", "yearning")
-	pass := envOr("YEARNING_B13_TEST_DB_PASSWORD", os.Getenv("YEARNING_TEST_DATABASE_PASSWORD"))
-	if pass == "" {
-		t.Skip("PostgreSQL test credentials not configured (set YEARNING_B13_TEST_DB_PASSWORD or YEARNING_TEST_DATABASE_PASSWORD)")
-	}
-	dbname := envOr("YEARNING_B13_TEST_DB_NAME", "yearning_b13_test")
-	dsn := fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=disable", host, port, user, pass, dbname)
-	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{Logger: gormlogger.Discard})
-	if err != nil {
-		t.Skipf("PostgreSQL test database not reachable (%v)", err)
-	}
-	sqlDB, err := db.DB()
-	if err != nil {
-		t.Fatalf("db.DB(): %v", err)
-	}
-	t.Cleanup(func() { _ = sqlDB.Close() })
+	db := testkit.OpenPG(t, testenv.WithDefaultPort(54332), testenv.WithDefaultDBName("yearning_b13_test"))
 	for _, tbl := range []string{
 		"ai_assistant_sql_drafts",
 		"ai_assistant_context_summaries",
@@ -87,44 +50,9 @@ func openAssistantTestDB(t *testing.T) *gorm.DB {
 	return db
 }
 
-func envOr(key, fallback string) string {
-	if v := os.Getenv(key); v != "" {
-		return v
-	}
-	return fallback
-}
-
-func makeKey32(seed byte) string {
-	b := make([]byte, 32)
-	for i := range b {
-		b[i] = seed + byte(i)
-	}
-	return base64.StdEncoding.EncodeToString(b)
-}
-
 func newTestCrypter(t *testing.T) *crypto.Crypter {
 	t.Helper()
-	dir := t.TempDir()
-	doc := fmt.Sprintf(`{"contract_version":1,"deployment_id":"b13-assistant-test","keys":[
-		{"key_id":"pay-1","purpose":"payload","status":"encrypt_decrypt","created_at":"2026-11-07T00:00:00Z","key_base64":"%s"},
-		{"key_id":"state-1","purpose":"oidc_state","status":"encrypt_decrypt","created_at":"2026-11-07T00:00:00Z","key_base64":"%s"},
-		{"key_id":"ident-1","purpose":"identifier_token","status":"encrypt_decrypt","created_at":"2026-11-07T00:00:00Z","key_base64":"%s"},
-		{"key_id":"fp-1","purpose":"sql_fingerprint","status":"encrypt_decrypt","created_at":"2026-11-07T00:00:00Z","key_base64":"%s"},
-		{"key_id":"aff-1","purpose":"cursor_affinity","status":"encrypt_decrypt","created_at":"2026-11-07T00:00:00Z","key_base64":"%s"}
-	]}`, makeKey32(1), makeKey32(2), makeKey32(3), makeKey32(4), makeKey32(5))
-	path := dir + "/keyring.json"
-	if err := os.WriteFile(path, []byte(doc), 0o400); err != nil {
-		t.Fatal(err)
-	}
-	ring, err := crypto.LoadKeyring(path)
-	if err != nil {
-		t.Fatal(err)
-	}
-	crypter, err := crypto.NewCrypter(ring)
-	if err != nil {
-		t.Fatal(err)
-	}
-	return crypter
+	return testkit.NewCrypter(t)
 }
 
 type fakeCatalog struct{}
@@ -164,17 +92,6 @@ func (f *fakeCatalog) ListIndexes(ctx context.Context, ds assistanttool.Datasour
 	return []database.MetadataIndex{
 		{IndexName: "PRIMARY", Primary: true, NonUnique: false, ColumnNames: []string{"id"}},
 	}, nil
-}
-
-func hasErrCode(err error, code int) bool {
-	if err == nil {
-		return false
-	}
-	var domErr *domain.Error
-	if errors.As(err, &domErr) {
-		return domErr.Code == code
-	}
-	return false
 }
 
 type assistantTestFixture struct {
@@ -276,7 +193,15 @@ func newAssistantFixture(t *testing.T) *assistantTestFixture {
 		t.Fatalf("insert query_session_capability: %v", err)
 	}
 
-	svc, err := NewServices(db, crypter, nil, nil, nil)
+	rec, err := auditlog.NewRecorder(db)
+	if err != nil {
+		t.Fatalf("NewRecorder: %v", err)
+	}
+	reviewSvc, err := reviewapp.NewServices(db, crypter, rec, nil)
+	if err != nil {
+		t.Fatalf("review NewServices: %v", err)
+	}
+	svc, err := NewServices(db, crypter, reviewSvc, nil, nil)
 	if err != nil {
 		t.Fatalf("NewServices: %v", err)
 	}

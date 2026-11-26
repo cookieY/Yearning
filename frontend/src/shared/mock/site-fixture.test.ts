@@ -33,7 +33,7 @@ async function call<T>(
   body?: unknown,
   headers: Record<string, string> = {},
 ): Promise<Envelope<T>> {
-  const response = await fetch(path, {
+  const response = await fetch(path.startsWith("/api/v4") ? path : `/api/v4${path}`, {
     method,
     headers: { "Content-Type": "application/json", ...headers },
     body: body === undefined ? undefined : JSON.stringify(body),
@@ -125,7 +125,7 @@ describe("site fixture flows", () => {
     const flows = await call<{ items: { id: string; flow_type: string }[] }>("GET", "/admin/flows");
     const changeFlow = flows.data.items.find((flow) => flow.flow_type === "change_review");
     const listed = await call("GET", `/admin/flows/${changeFlow?.id ?? ""}/masking-rules`);
-    expect(listed.err_code).toBe(1001);
+    expect(listed.err_code).toBe(1002);
   });
 
   it("rejects change flows without execution actors (FLOW_ACTOR_NODE_EMPTY)", async () => {

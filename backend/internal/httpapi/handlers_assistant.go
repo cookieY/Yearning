@@ -64,17 +64,6 @@ func assistantActor(c *gin.Context) assistantdomain.Actor {
 	}
 }
 
-func writeAssistantErr(c *gin.Context, err error) bool {
-	if err == nil {
-		return true
-	}
-	var de *assistantdomain.Error
-	if !errors.As(err, &de) {
-		return false
-	}
-	return writeDomainCodedError(c, de.Code, de.Name, de.Message, de.Meta)
-}
-
 // HandleListAssistantSessions handles GET /ai-assistant/sessions.
 func (d *AssistantDeps) HandleListAssistantSessions(c *gin.Context) {
 	after, ok := requireCursor(c)
@@ -83,7 +72,7 @@ func (d *AssistantDeps) HandleListAssistantSessions(c *gin.Context) {
 	}
 	items, next, err := d.Assistant.ListSessions(c.Request.Context(), assistantActor(c), intQuery(c, "limit", 50), after)
 	if err != nil {
-		if !writeAssistantErr(c, err) {
+		if !writeCodedError(c, err) {
 			WriteProblem(c, http.StatusInternalServerError, "internal error")
 		}
 		return
@@ -125,7 +114,7 @@ func (d *AssistantDeps) HandleCreateAssistantSession(c *gin.Context) {
 		OutputLocale:       resolveRequestOutputLocale(c, nil),
 	})
 	if err != nil {
-		if !writeAssistantErr(c, err) {
+		if !writeCodedError(c, err) {
 			WriteProblem(c, http.StatusInternalServerError, "internal error")
 		}
 		return
@@ -141,7 +130,7 @@ func (d *AssistantDeps) HandleGetAssistantSession(c *gin.Context) {
 	}
 	view, err := d.Assistant.GetSessionDetail(c.Request.Context(), assistantActor(c), sessionID)
 	if err != nil {
-		if !writeAssistantErr(c, err) {
+		if !writeCodedError(c, err) {
 			WriteProblem(c, http.StatusInternalServerError, "internal error")
 		}
 		return
@@ -161,7 +150,7 @@ func (d *AssistantDeps) HandleDeleteAssistantSession(c *gin.Context) {
 		return
 	}
 	if err := d.Assistant.DeleteSession(c.Request.Context(), assistantActor(c), sessionID, version); err != nil {
-		if !writeAssistantErr(c, err) {
+		if !writeCodedError(c, err) {
 			WriteProblem(c, http.StatusInternalServerError, "internal error")
 		}
 		return
@@ -267,7 +256,7 @@ func (d *AssistantDeps) HandleSendAssistantMessage(c *gin.Context) {
 			}
 			return
 		}
-		if !writeAssistantErr(c, err) {
+		if !writeCodedError(c, err) {
 			WriteProblem(c, http.StatusInternalServerError, "internal error")
 		}
 		return
@@ -292,7 +281,7 @@ func (d *AssistantDeps) HandleCancelAssistantMessageStream(c *gin.Context) {
 	}
 	view, err := d.Assistant.CancelMessageStream(c.Request.Context(), assistantActor(c), sessionID, messageID)
 	if err != nil {
-		if !writeAssistantErr(c, err) {
+		if !writeCodedError(c, err) {
 			WriteProblem(c, http.StatusInternalServerError, "internal error")
 		}
 		return
@@ -331,7 +320,7 @@ func (d *AssistantDeps) HandlePrecheckAssistantSqlDraft(c *gin.Context) {
 		IdempotencyKey: strings.TrimSpace(c.GetHeader("Idempotency-Key")),
 	})
 	if err != nil {
-		if !writeAssistantErr(c, err) {
+		if !writeCodedError(c, err) {
 			WriteProblem(c, http.StatusInternalServerError, "internal error")
 		}
 		return
@@ -390,7 +379,7 @@ func (d *AssistantDeps) HandleSubmitAssistantSqlDraftOrder(c *gin.Context) {
 		IdempotencyKey:        key,
 	})
 	if err != nil {
-		if !writeAssistantErr(c, err) {
+		if !writeCodedError(c, err) {
 			WriteProblem(c, http.StatusInternalServerError, "internal error")
 		}
 		return

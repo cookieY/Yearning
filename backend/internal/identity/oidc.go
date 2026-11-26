@@ -22,6 +22,7 @@ import (
 
 	"github.com/cookieY/YearningX/backend/internal/crypto"
 	"github.com/cookieY/YearningX/backend/internal/platform/addrguard"
+	"github.com/cookieY/YearningX/backend/internal/platform/ptr"
 )
 
 // OIDCConfiguration is the strongly typed view of OIDC settings in identity_providers.configuration.
@@ -353,8 +354,8 @@ func (p *OIDCProviderClient) FinishLogin(ctx context.Context, c *crypto.Crypter,
 	return &OIDCIdentity{
 		Subject:     idToken.Subject,
 		Username:    username,
-		DisplayName: claimString(claims, deref(p.cfg.DisplayNameClaim)),
-		Email:       claimString(claims, deref(p.cfg.EmailClaim)),
+		DisplayName: claimString(claims, ptr.Deref(p.cfg.DisplayNameClaim)),
+		Email:       claimString(claims, ptr.Deref(p.cfg.EmailClaim)),
 	}, nil
 }
 

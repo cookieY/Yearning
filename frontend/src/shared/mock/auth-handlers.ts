@@ -1,7 +1,10 @@
 import { HttpResponse, http } from "msw";
 import type { DefaultBodyType, HttpHandler } from "msw";
+import { apiRoute } from "@/shared/mock/api-route";
 import { readStoredAuthBehavior } from "@/shared/mock/auth-scenario-store";
-import { currentIdentity, mockSuperMode } from "@/shared/mock/identity-store";
+import { currentIdentity, effectiveCanAccessAdmin } from "@/shared/mock/identity-store";
+import { createMockResponder } from "@/shared/mock/kit";
+import { mockPublicBranding, mockSystemTimezone } from "@/shared/mock/settings-bridge";
 
 /**
  * Hand-written MSW handlers for the authentication endpoints, layered on the
@@ -24,26 +27,11 @@ const NOW = "2026-08-28T08:00:00Z";
 // Consistent with minLength of ChangeMyPasswordRequest.new_password in the contract.
 const MIN_NEW_PASSWORD_LENGTH = 12;
 
-function successEnvelope(data: DefaultBodyType) {
-  return { err_code: 0, message: "ok", data, request_id: MOCK_REQUEST_ID };
-}
-
-function businessError(errCode: number, message: string) {
-  return {
-    err_code: errCode,
-    message,
-    data: null,
-    request_id: MOCK_REQUEST_ID,
-    retryable: false,
-  };
-}
-
-function problem(status: number, title: string, detail: string): HttpResponse<DefaultBodyType> {
-  return HttpResponse.json(
-    { type: "about:blank", title, status, detail, request_id: MOCK_REQUEST_ID },
-    { status, headers: { "Content-Type": "application/problem+json" } },
-  );
-}
+const {
+  successEnvelope,
+  businessErrorPayload: businessError,
+  unauthenticated,
+} = createMockResponder(MOCK_REQUEST_ID);
 
 function sessionCookieHeaders(): Headers {
   const headers = new Headers();
@@ -102,15 +90,12 @@ function mockUser(canAccessAdmin: boolean) {
     // §18.52: all mock identities are local accounts; the ldap/oidc branch of
     // the profile security tab is covered by tests overriding /users/me.
     auth_provider: "local",
+    system_timezone: mockSystemTimezone(),
   };
 }
 
 function userEnvelope(canAccessAdmin: boolean) {
   return HttpResponse.json(successEnvelope(mockUser(canAccessAdmin)));
-}
-
-function unauthenticated() {
-  return problem(401, "session_expired", "no active session");
 }
 
 /** Which login form submissions succeed, and who the session belongs to. */
@@ -146,7 +131,7 @@ function credentialProblem(behavior: string, endpoint: "local" | "ldap"): HttpRe
 
 export function authMockHandlers(): HttpHandler[] {
   return [
-    http.post("*/auth/login", async ({ request }) => {
+    http.post(apiRoute("/auth/login"), async ({ request }) => {
       const behavior = readStoredAuthBehavior();
       const failure = credentialProblem(behavior, "local");
       if (failure !== null) return failure;
@@ -164,7 +149,7 @@ export function authMockHandlers(): HttpHandler[] {
       return HttpResponse.json(successEnvelope(null), { headers: sessionCookieHeaders() });
     }),
 
-    http.post("*/auth/ldap/login", async ({ request }) => {
+    http.post(apiRoute("/auth/ldap/login"), async ({ request }) => {
       const behavior = readStoredAuthBehavior();
       const failure = credentialProblem(behavior, "ldap");
       if (failure !== null) return failure;
@@ -182,7 +167,7 @@ export function authMockHandlers(): HttpHandler[] {
       return HttpResponse.json(successEnvelope(null), { headers: sessionCookieHeaders() });
     }),
 
-    http.post("*/auth/logout", () => {
+    http.post(apiRoute("/auth/logout"), () => {
       if (import.meta.env.VITE_DEMO_MODE === "true") {
         demoSessionActive = false;
       }
@@ -193,7 +178,7 @@ export function authMockHandlers(): HttpHandler[] {
     // (an active user with zero workflow permissions); the real serve stack
     // currently disables registration with 403 — a recorded Mock/Real
     // divergence of the FE-F12 contract suite, not a mock defect.
-    http.post("*/auth/register", async ({ request }) => {
+    http.post(apiRoute("/auth/register"), async ({ request }) => {
       const body = (await request.json().catch(() => null)) as {
         username?: unknown; display_name?: unknown; email?: unknown; password?: unknown;
       } | null;
@@ -216,11 +201,11 @@ export function authMockHandlers(): HttpHandler[] {
     // provider key answers with the same problem face the serve stack shows
     // (401 problem — the route mounts behind the session middleware with no
     // provider registered), so both modes record the problem shape.
-    http.get("*/auth/oidc/:providerKey/start", ({ params }) => {
+    http.get(apiRoute("/auth/oidc/:providerKey/start"), ({ params }) => {
       if (String(params.providerKey) !== "corp-oidc") {
         return HttpResponse.json(
           { type: "about:blank", title: "Unauthorized", status: 401, detail: "no oidc provider", request_id: MOCK_REQUEST_ID },
-          { status: 401 },
+          { status: 401, headers: { "Content-Type": "application/problem+json" } },
         );
       }
       return new HttpResponse(null, {
@@ -229,11 +214,11 @@ export function authMockHandlers(): HttpHandler[] {
       });
     }),
 
-    http.get("*/auth/oidc/:providerKey/callback", ({ params }) => {
+    http.get(apiRoute("/auth/oidc/:providerKey/callback"), ({ params }) => {
       if (String(params.providerKey) !== "corp-oidc") {
         return HttpResponse.json(
           { type: "about:blank", title: "Unauthorized", status: 401, detail: "no oidc provider", request_id: MOCK_REQUEST_ID },
-          { status: 401 },
+          { status: 401, headers: { "Content-Type": "application/problem+json" } },
         );
       }
       if (import.meta.env.VITE_DEMO_MODE === "true") {
@@ -247,7 +232,7 @@ export function authMockHandlers(): HttpHandler[] {
     // new_password >= 12 otherwise 1001; on success clear the session cookie, mirroring the backend semantics where
     // "all sessions are invalidated after password change and the client returns to login". Real old-password check / 1109
     // is covered by backend contract tests.
-    http.post("*/users/me/password", async ({ request, cookies }) => {
+    http.post(apiRoute("/users/me/password"), async ({ request, cookies }) => {
       const behavior = readStoredAuthBehavior();
       if (behavior === "expired" || !hasSession(cookies)) {
         return unauthenticated();
@@ -270,7 +255,7 @@ export function authMockHandlers(): HttpHandler[] {
       return HttpResponse.json(successEnvelope(null), { headers: clearedSessionCookieHeaders() });
     }),
 
-    http.get("*/auth/providers", () =>
+    http.get(apiRoute("/auth/providers"), () =>
       HttpResponse.json(
         successEnvelope({
           local: true,
@@ -282,19 +267,17 @@ export function authMockHandlers(): HttpHandler[] {
               start_url: "/mock/oidc/corp-oidc/start",
             },
           ],
+          branding: mockPublicBranding(),
         }),
       ),
     ),
 
-    http.get("*/users/me", ({ cookies }) => {
+    http.get(apiRoute("/users/me"), ({ request, cookies }) => {
       const behavior = readStoredAuthBehavior();
       if (behavior === "expired" || !hasSession(cookies)) {
         return unauthenticated();
       }
-      // Super mode (owner 2026-11-03): the dev-browser session carries the
-      // admin capability on the default face too, without flipping the
-      // auth-behavior dimension (the expired face already returned above).
-      const isAdmin = behavior === "admin" || mockSuperMode();
+      const isAdmin = effectiveCanAccessAdmin(behavior, request);
       return userEnvelope(isAdmin);
     }),
 

@@ -6,11 +6,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"net/url"
-	"os"
-	"strconv"
-	"strings"
-	"syscall"
 	"testing"
 	"time"
 
@@ -18,83 +13,21 @@ import (
 	"github.com/cookieY/YearningX/backend/internal/datasource"
 	"github.com/cookieY/YearningX/backend/internal/execution/rollback"
 	"github.com/cookieY/YearningX/backend/internal/platform/addrguard"
+	"github.com/cookieY/YearningX/backend/internal/platform/testenv"
+	"github.com/cookieY/YearningX/backend/internal/platform/testkit"
 )
-
-func acquireRollbackPGIntegrationLock(t *testing.T) {
-	t.Helper()
-	for _, name := range []string{"/yearningx-itest-shared.lock", "/yearningx-b13-assistant-test.lock"} {
-		f, err := os.OpenFile(os.TempDir()+name, os.O_CREATE|os.O_RDWR, 0o600)
-		if err != nil {
-			t.Fatalf("open lock %s: %v", name, err)
-		}
-		if err := syscall.Flock(int(f.Fd()), syscall.LOCK_EX); err != nil {
-			_ = f.Close()
-			t.Fatalf("flock %s: %v", name, err)
-		}
-		file := f
-		t.Cleanup(func() {
-			_ = syscall.Flock(int(file.Fd()), syscall.LOCK_UN)
-			_ = file.Close()
-		})
-	}
-}
 
 func openConfiguredPGRollbackPool(t *testing.T) (database.Adapter, *database.PurposePool) {
 	t.Helper()
-	acquireRollbackPGIntegrationLock(t)
+	testkit.AcquireSharedLock(t)
 	t.Cleanup(addrguard.SetLoopbackBypassForTest(true))
 
-	host := os.Getenv("YEARNING_TEST_DATABASE_HOST")
-	if host == "" {
-		host = "127.0.0.1"
-	}
-	port := 54332
-	if rawPort := os.Getenv("YEARNING_TEST_DATABASE_PORT"); rawPort != "" {
-		if p, err := strconv.Atoi(rawPort); err == nil && p > 0 {
-			port = p
-		}
-	}
-	user := os.Getenv("YEARNING_TEST_DATABASE_USER")
-	if user == "" {
-		user = "yearning"
-	}
-	pass := os.Getenv("YEARNING_TEST_DATABASE_PASSWORD")
-	dbName := os.Getenv("YEARNING_TEST_DATABASE_DBNAME")
-	if dbName == "" {
-		dbName = "yearning_b13_test"
-	}
-
-	if dsnEnv := os.Getenv("YEARNING_TEST_PG_DSN"); dsnEnv != "" {
-		if u, err := url.Parse(dsnEnv); err == nil {
-			if u.Hostname() != "" {
-				host = u.Hostname()
-			}
-			if u.Port() != "" {
-				if p, perr := strconv.Atoi(u.Port()); perr == nil && p > 0 {
-					port = p
-				}
-			}
-			if u.User != nil {
-				if u.User.Username() != "" {
-					user = u.User.Username()
-				}
-				if p, ok := u.User.Password(); ok && p != "" {
-					pass = p
-				}
-			}
-			if trimmed := strings.TrimPrefix(u.Path, "/"); trimmed != "" {
-				dbName = trimmed
-			}
-		}
-	}
-	if pass == "" {
-		t.Skip("PostgreSQL test password not configured (set YEARNING_TEST_DATABASE_PASSWORD or YEARNING_TEST_PG_DSN)")
-	}
+	cfg := testenv.RequireMetaPG(t, testenv.WithDefaultPort(54332), testenv.WithDefaultDBName("yearning_b13_test"))
 
 	ep := database.Endpoint{
-		Host:             host,
-		Port:             port,
-		DatabaseName:     dbName,
+		Host:             cfg.Host,
+		Port:             cfg.Port,
+		DatabaseName:     cfg.DBName,
 		CompatibilityMod: "postgresql",
 	}
 	opts := database.AdapterOptions{
@@ -105,11 +38,11 @@ func openConfiguredPGRollbackPool(t *testing.T) (database.Adapter, *database.Pur
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	pool, err := adapter.OpenPurposePool(ctx, database.PurposeExecution, database.Credential{
-		Username: user,
-		Password: pass,
+		Username: cfg.User,
+		Password: cfg.Password,
 	}, nil)
 	if err != nil {
-		t.Skipf("PostgreSQL test DB unreachable (%v)", err)
+		testenv.SkipOrFatal(t, "PostgreSQL test DB unreachable (%v)", err)
 	}
 	t.Cleanup(func() { _ = pool.Close() })
 	return adapter, pool

@@ -21,9 +21,10 @@ export async function mockSession(page: Page, behavior: MockAuthBehavior = "admi
     {
       name: "yearning_session",
       value: "e2e-session-token",
-      url: "http://localhost:4173",
+      domain: "localhost",
+      path: "/",
     },
-    { name: "yearning_csrf", value: "e2e-csrf-token", url: "http://localhost:4173" },
+    { name: "yearning_csrf", value: "e2e-csrf-token", domain: "localhost", path: "/" },
   ]);
 }
 

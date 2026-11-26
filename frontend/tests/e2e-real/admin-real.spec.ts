@@ -33,3 +33,53 @@ test("admin datasources page lists the seeded target", async ({ page }) => {
   await expect(page.locator('[data-testid^="ds-row-"]').filter({ hasText: "f12-pg-target" }))
     .toBeVisible();
 });
+
+test("deep-link browser reloads render SPA routes cleanly without returning raw JSON", async ({ page }) => {
+  for (const [route, testId] of [
+    ["/admin/users", "admin-users-table"],
+    ["/admin/permission-groups", "admin-groups-table"],
+    ["/admin/datasources", "ds-create"],
+  ] as const) {
+    await page.goto(route);
+    await expect(page.getByTestId(testId)).toBeVisible({ timeout: 20_000 });
+    await page.reload();
+    await expect(page.getByTestId(testId)).toBeVisible({ timeout: 20_000 });
+    const me = await page.evaluate(async () => {
+      const res = await fetch("/api/v4/users/me");
+      return (await res.json()) as { err_code?: number; data?: { username?: string } };
+    });
+    expect(me.err_code).toBe(0);
+    expect(me.data?.username).toBe("admin");
+  }
+});
+
+test("admin permission group CRUD round-trips through UI search and API differential oracle", async ({ page }) => {
+  const groupName = `e2e-real-grp-${Date.now()}`;
+  await page.goto("/admin/permission-groups");
+  await expect(page.getByTestId("admin-groups-table")).toBeVisible({ timeout: 20_000 });
+
+  await page.getByTestId("admin-groups-create").click();
+  await page.getByTestId("group-name").fill(groupName);
+  await page.getByTestId("group-form-submit").click();
+  await expect(page.getByTestId("group-name")).toBeHidden({ timeout: 15_000 });
+
+  // Search via toolbar input & assert API differential oracle agrees.
+  const searchInput = page.getByTestId("admin-groups-search");
+  await searchInput.fill(groupName);
+  await searchInput.press("Enter");
+  const created = await page.evaluate(async (targetName: string) => {
+    const res = await fetch(`/api/v4/admin/permission-groups?q=${encodeURIComponent(targetName)}`);
+    const doc = (await res.json()) as { data?: { items?: Array<{ id: string; name: string }> } };
+    return doc.data?.items?.find((g) => g.name === targetName) ?? null;
+  }, groupName);
+  expect(created, "created permission group must be persisted on backend").not.toBeNull();
+  if (created === null) throw new Error("created permission group missing");
+  const groupId = created.id;
+  await expect(page.getByTestId(`admin-group-row-${groupId}`)).toBeVisible({ timeout: 15_000 });
+
+  // Cleanup scratch group through real UI deletion flow.
+  await page.getByTestId(`admin-group-actions-${groupId}`).click();
+  await page.getByTestId(`admin-group-delete-${groupId}`).click();
+  await page.getByTestId("admin-group-delete-confirm").click();
+  await expect(page.getByTestId(`admin-group-row-${groupId}`)).toBeHidden({ timeout: 15_000 });
+});

@@ -20,6 +20,7 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/cookieY/YearningX/backend/internal/crypto"
+	"github.com/cookieY/YearningX/backend/internal/platform/systz"
 )
 
 const defaultOpsCacheTTL = 5 * time.Second
@@ -290,6 +291,23 @@ func cloneOperationsView(v *OperationsView) *OperationsView {
 	return &cp
 }
 
+// InvalidateOperationsCache clears the cached platform-wide operations dashboard snapshots
+// so subsequent reads reflect immediate state changes such as user deletion.
+func (s *Service) InvalidateOperationsCache() {
+	if s == nil {
+		return
+	}
+	s.opsMu.Lock()
+	cache := s.opsCache
+	s.opsMu.Unlock()
+	if cache == nil {
+		return
+	}
+	cache.mu.Lock()
+	clear(cache.entries)
+	cache.mu.Unlock()
+}
+
 // OperationsDashboard computes operational statistics (bounded aggregation; timezone from system settings)
 // with short-TTL in-process caching and singleflight coalescing keyed by clamped windowDays.
 func (s *Service) OperationsDashboard(ctx context.Context, windowDays int) (*OperationsView, error) {
@@ -330,7 +348,35 @@ func (s *Service) OperationsDashboard(ctx context.Context, windowDays int) (*Ope
 	}
 }
 
+// OperationsDashboardForUser computes operational statistics scoped strictly to change orders
+// where userID is the submitter, frozen approver, or frozen executor, plus userID's query executions.
+func (s *Service) OperationsDashboardForUser(ctx context.Context, userID string, windowDays int) (*OperationsView, error) {
+	if windowDays <= 0 || windowDays > 90 {
+		windowDays = 30
+	}
+	return s.computeOperationsDashboardScoped(ctx, windowDays, userID)
+}
+
+const userOrderScopeSQL = `(
+	o.submitter_user_id_snapshot = ?
+	or exists (
+		select 1 from order_stages sg_u
+		join order_approval_steps st_u on st_u.stage_id = sg_u.id
+		join order_approval_actors a_u on a_u.step_id = st_u.id
+		where sg_u.order_id = o.id and a_u.reviewer_user_id_snapshot = ?
+	)
+	or exists (
+		select 1 from order_stages sg_e
+		join order_execution_actors ea_e on ea_e.stage_id = sg_e.id
+		where sg_e.order_id = o.id and ea_e.executor_user_id_snapshot = ?
+	)
+)`
+
 func (s *Service) computeOperationsDashboard(ctx context.Context, windowDays int) (*OperationsView, error) {
+	return s.computeOperationsDashboardScoped(ctx, windowDays, "")
+}
+
+func (s *Service) computeOperationsDashboardScoped(ctx context.Context, windowDays int, userID string) (*OperationsView, error) {
 	v := &OperationsView{OrderTrend: []TrendPoint{}, StateDistribution: NewStateDistribution()}
 	tz := s.systemTimezone(ctx)
 	now := s.now()
@@ -358,29 +404,109 @@ func (s *Service) computeOperationsDashboard(ctx context.Context, windowDays int
 		return nil, tx.Error
 	}
 	defer func() { _ = tx.Rollback() }()
-	counts := []struct {
-		dest *int64
-		sql  string
-	}{
-		{&v.QueryExecutionTotal, `select count(*) from query_executions`},
-		{&v.UserTotal, `select count(*) from users`},
-		{&v.DatasourceTotal, `select count(*) from datasources`},
-	}
-	for _, q := range counts {
-		if err := tx.Raw(q.sql).Scan(q.dest).Error; err != nil {
-			return nil, err
-		}
-	}
+
 	var stmtKinds []struct {
 		Kind string `gorm:"column:statement_kind"`
 		N    int64  `gorm:"column:n"`
 	}
-	if err := tx.Raw(`
-		select statement_kind, count(*)::bigint as n
-		from sql_statements
-		group by statement_kind`).Scan(&stmtKinds).Error; err != nil {
-		return nil, err
+	var trend []struct {
+		Day string  `gorm:"column:day"`
+		N   float64 `gorm:"column:n"`
 	}
+	var distribution []struct {
+		State string `gorm:"column:state"`
+		N     int64  `gorm:"column:n"`
+	}
+
+	if userID == "" {
+		counts := []struct {
+			dest *int64
+			sql  string
+		}{
+			{&v.QueryExecutionTotal, `select count(*) from query_executions`},
+			{&v.UserTotal, `select count(*) from users`},
+			{&v.DatasourceTotal, `select count(*) from datasources`},
+		}
+		for _, q := range counts {
+			if err := tx.Raw(q.sql).Scan(q.dest).Error; err != nil {
+				return nil, err
+			}
+		}
+		if err := tx.Raw(`
+			select statement_kind, count(*)::bigint as n
+			from sql_statements
+			group by statement_kind`).Scan(&stmtKinds).Error; err != nil {
+			return nil, err
+		}
+		if err := tx.Raw(`
+			select coalesce(percentile_cont(0.5) within group (order by extract(epoch from (st.decided_at - o.submitted_at)) * 1000)::bigint, 0),
+			       coalesce(percentile_cont(0.95) within group (order by extract(epoch from (st.decided_at - o.submitted_at)) * 1000)::bigint, 0)
+			from order_approval_steps st
+			join order_stages sg on sg.id = st.stage_id
+			join change_orders o on o.id = sg.order_id
+			where st.decided_at is not null
+			  and st.decided_at > $1`, windowStart).
+			Row().Scan(&v.ApprovalDurationP50MS, &v.ApprovalDurationP95MS); err != nil {
+			return nil, err
+		}
+		if err := tx.Raw(`
+			select to_char(submitted_at at time zone ?, 'YYYY-MM-DD') as day, count(*)::float8 as n
+			from change_orders where submitted_at > $2
+			group by 1 order by 1`, tz, windowStart).Scan(&trend).Error; err != nil {
+			return nil, err
+		}
+		if err := tx.Raw(`
+			select state, count(*)::bigint as n
+			from change_orders where submitted_at > $1
+			group by state`, windowStart).Scan(&distribution).Error; err != nil {
+			return nil, err
+		}
+	} else {
+		if err := tx.Raw(`select count(*) from query_executions where user_id_snapshot = ?`, userID).
+			Scan(&v.QueryExecutionTotal).Error; err != nil {
+			return nil, err
+		}
+		if err := tx.Raw(`
+			select ss.statement_kind, count(*)::bigint as n
+			from sql_statements ss
+			where ss.review_run_id in (
+				select distinct srs.review_run_id
+				from stage_review_snapshots srs
+				join order_stages os on os.stage_review_snapshot_id = srs.id
+				join change_orders o on o.id = os.order_id
+				where `+userOrderScopeSQL+`
+			)
+			group by ss.statement_kind`, userID, userID, userID).Scan(&stmtKinds).Error; err != nil {
+			return nil, err
+		}
+		if err := tx.Raw(`
+			select coalesce(percentile_cont(0.5) within group (order by extract(epoch from (st.decided_at - o.submitted_at)) * 1000)::bigint, 0),
+			       coalesce(percentile_cont(0.95) within group (order by extract(epoch from (st.decided_at - o.submitted_at)) * 1000)::bigint, 0)
+			from order_approval_steps st
+			join order_stages sg on sg.id = st.stage_id
+			join change_orders o on o.id = sg.order_id
+			where st.decided_at is not null
+			  and st.decided_at > ?
+			  and `+userOrderScopeSQL, windowStart, userID, userID, userID).
+			Row().Scan(&v.ApprovalDurationP50MS, &v.ApprovalDurationP95MS); err != nil {
+			return nil, err
+		}
+		if err := tx.Raw(`
+			select to_char(o.submitted_at at time zone ?, 'YYYY-MM-DD') as day, count(*)::float8 as n
+			from change_orders o
+			where o.submitted_at > ? and `+userOrderScopeSQL+`
+			group by 1 order by 1`, tz, windowStart, userID, userID, userID).Scan(&trend).Error; err != nil {
+			return nil, err
+		}
+		if err := tx.Raw(`
+			select o.state, count(*)::bigint as n
+			from change_orders o
+			where o.submitted_at > ? and `+userOrderScopeSQL+`
+			group by o.state`, windowStart, userID, userID, userID).Scan(&distribution).Error; err != nil {
+			return nil, err
+		}
+	}
+
 	for _, row := range stmtKinds {
 		switch row.Kind {
 		case "ddl":
@@ -389,45 +515,12 @@ func (s *Service) computeOperationsDashboard(ctx context.Context, windowDays int
 			v.DmlStatementTotal = row.N
 		}
 	}
-	// Approval latency P50/P95 (percentile_cont bounded aggregation).
-	if err := tx.Raw(`
-		select coalesce(percentile_cont(0.5) within group (order by extract(epoch from (st.decided_at - o.submitted_at)) * 1000)::bigint, 0),
-		       coalesce(percentile_cont(0.95) within group (order by extract(epoch from (st.decided_at - o.submitted_at)) * 1000)::bigint, 0)
-		from order_approval_steps st
-		join order_stages sg on sg.id = st.stage_id
-		join change_orders o on o.id = sg.order_id
-		where st.decided_at is not null
-		  and st.decided_at > $1`, windowStart).
-		Row().Scan(&v.ApprovalDurationP50MS, &v.ApprovalDurationP95MS); err != nil {
-		return nil, err
-	}
-	// Change order daily trend counts.
-	var trend []struct {
-		Day string  `gorm:"column:day"`
-		N   float64 `gorm:"column:n"`
-	}
-	if err := tx.Raw(`
-		select to_char(submitted_at at time zone ?, 'YYYY-MM-DD') as day, count(*)::float8 as n
-		from change_orders where submitted_at > $2
-		group by 1 order by 1`, tz, windowStart).Scan(&trend).Error; err != nil {
-		return nil, err
-	}
 	for _, t := range trend {
 		v.OrderTrend = append(v.OrderTrend, TrendPoint{Day: t.Day, Value: t.N})
 	}
 	// State distribution (RCP-20261023-HOME-METRICS-ALIGNMENT): derive ChangeOrderTotal, CompletedTotal,
 	// FailedTotal, and PartialFailedTotal directly from the single grouped scan so sum(StateDistribution) == ChangeOrderTotal
 	// holds without 4 redundant change_orders count queries.
-	var distribution []struct {
-		State string `gorm:"column:state"`
-		N     int64  `gorm:"column:n"`
-	}
-	if err := tx.Raw(`
-		select state, count(*)::bigint as n
-		from change_orders where submitted_at > $1
-		group by state`, windowStart).Scan(&distribution).Error; err != nil {
-		return nil, err
-	}
 	rows := make(map[string]int64, len(distribution))
 	for _, row := range distribution {
 		rows[row.State] = row.N
@@ -508,13 +601,7 @@ func (s *Service) SystemHealth(ctx context.Context) (*SystemHealthView, error) {
 }
 
 func (s *Service) systemTimezone(ctx context.Context) string {
-	var tz string
-	_ = s.DB.WithContext(ctx).Raw(
-		`select settings->>'system_timezone' from system_settings where namespace = 'general'`).Scan(&tz)
-	if tz == "" {
-		return "UTC"
-	}
-	return tz
+	return systz.Name(ctx, s.DB)
 }
 
 // ErrNotFound / ErrConflict are stable domain errors.

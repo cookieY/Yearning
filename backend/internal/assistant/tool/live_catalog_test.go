@@ -13,76 +13,23 @@ import (
 	"fmt"
 	"math/big"
 	"os"
-	"syscall"
 	"testing"
 	"time"
 
 	"github.com/google/uuid"
-	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
-	gormlogger "gorm.io/gorm/logger"
 
 	"github.com/cookieY/YearningX/backend/internal/crypto"
 	"github.com/cookieY/YearningX/backend/internal/platform/addrguard"
+	"github.com/cookieY/YearningX/backend/internal/platform/testenv"
+	"github.com/cookieY/YearningX/backend/internal/platform/testkit"
 )
 
-func acquireToolTestLock(t *testing.T) {
+func openToolTestDB(t *testing.T) (*gorm.DB, testenv.DBConfig) {
 	t.Helper()
-	for _, name := range []string{"/yearningx-itest-shared.lock", "/yearningx-b13-assistant-test.lock"} {
-		f, err := os.OpenFile(os.TempDir()+name, os.O_CREATE|os.O_RDWR, 0o600)
-		if err != nil {
-			t.Fatalf("open lock %s: %v", name, err)
-		}
-		if err := syscall.Flock(int(f.Fd()), syscall.LOCK_EX); err != nil {
-			_ = f.Close()
-			t.Fatalf("flock %s: %v", name, err)
-		}
-		file := f
-		t.Cleanup(func() {
-			_ = syscall.Flock(int(file.Fd()), syscall.LOCK_UN)
-			_ = file.Close()
-		})
-	}
-}
-
-func envOrDefault(key, fallback string) string {
-	if v := os.Getenv(key); v != "" {
-		return v
-	}
-	return fallback
-}
-
-func toolTestDBPassword(t *testing.T) string {
-	t.Helper()
-	if v := os.Getenv("YEARNING_B13_TEST_DB_PASSWORD"); v != "" {
-		return v
-	}
-	if v := os.Getenv("YEARNING_TEST_DATABASE_PASSWORD"); v != "" {
-		return v
-	}
-	t.Skip("PostgreSQL test password not configured (set YEARNING_B13_TEST_DB_PASSWORD or YEARNING_TEST_DATABASE_PASSWORD)")
-	return ""
-}
-
-func openToolTestDB(t *testing.T) (*gorm.DB, string) {
-	t.Helper()
-	pass := toolTestDBPassword(t)
-	acquireToolTestLock(t)
+	cfg := testenv.RequireMetaPG(t, testenv.WithDefaultPort(54332), testenv.WithDefaultDBName("yearning_b13_test"))
 	t.Cleanup(addrguard.SetLoopbackBypassForTest(true))
-	host := envOrDefault("YEARNING_B13_TEST_DB_HOST", "127.0.0.1")
-	port := envOrDefault("YEARNING_B13_TEST_DB_PORT", "54332")
-	user := envOrDefault("YEARNING_B13_TEST_DB_USER", "yearning")
-	dbname := envOrDefault("YEARNING_B13_TEST_DB_NAME", "yearning_b13_test")
-	dsn := fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=disable", host, port, user, pass, dbname)
-	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{Logger: gormlogger.Discard})
-	if err != nil {
-		t.Skipf("PostgreSQL test database not reachable (%v)", err)
-	}
-	sqlDB, err := db.DB()
-	if err != nil {
-		t.Fatalf("db.DB(): %v", err)
-	}
-	t.Cleanup(func() { _ = sqlDB.Close() })
+	db := testkit.OpenPG(t, testenv.WithDefaultPort(54332), testenv.WithDefaultDBName("yearning_b13_test"))
 	for _, tbl := range []string{
 		"query_grants",
 		"query_sessions",
@@ -100,7 +47,7 @@ func openToolTestDB(t *testing.T) (*gorm.DB, string) {
 	} {
 		_ = db.Exec("TRUNCATE TABLE " + tbl + " CASCADE").Error
 	}
-	return db, pass
+	return db, cfg
 }
 
 func makeToolKey32(seed byte) string {
@@ -158,7 +105,7 @@ func generateTestCertAndKeyPEM(t *testing.T) ([]byte, []byte) {
 }
 
 func TestAdapterCatalogReaderAndAuthorizerBranches(t *testing.T) {
-	db, dbPass := openToolTestDB(t)
+	db, dbCfg := openToolTestDB(t)
 	crypter := newToolTestCrypter(t)
 	ctx := context.Background()
 
@@ -177,12 +124,12 @@ func TestAdapterCatalogReaderAndAuthorizerBranches(t *testing.T) {
 
 	// Insert PostgreSQL datasource pointing to the test DB itself
 	pgDSID := uuid.NewString()
-	portStr := envOrDefault("YEARNING_B13_TEST_DB_PORT", "54332")
-	dbName := envOrDefault("YEARNING_B13_TEST_DB_NAME", "yearning_b13_test")
-	dbUser := envOrDefault("YEARNING_B13_TEST_DB_USER", "yearning")
+	dbName := dbCfg.DBName
+	dbUser := dbCfg.User
+	dbPass := dbCfg.Password
 	if err := db.Exec(`INSERT INTO datasources (id, name, engine, compatibility_mode, deployment_kind, host, port, database_name, version_constraint, enabled, version, created_by_user_id, created_at, updated_at)
-		VALUES (?, 'live-pg-ds', 'postgresql', 'postgresql', 'native', '127.0.0.1', ?, ?, '15', true, 1, ?, now(), now())`,
-		pgDSID, portStr, dbName, userID).Error; err != nil {
+		VALUES (?, 'live-pg-ds', 'postgresql', 'postgresql', 'native', ?, ?, ?, '15', true, 1, ?, now(), now())`,
+		pgDSID, dbCfg.Host, dbCfg.Port, dbName, userID).Error; err != nil {
 		t.Fatalf("insert pg datasource: %v", err)
 	}
 

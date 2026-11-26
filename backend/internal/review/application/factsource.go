@@ -9,6 +9,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 
 	"gorm.io/gorm"
 
@@ -24,6 +25,8 @@ import (
 var (
 	ErrFactSourceUnavailable     = errors.New("review: fact source unavailable")
 	ErrFactSourceIdentityChanged = errors.New("review: fact source identity changed")
+	// ErrReviewCredentialMissing indicates the datasource has no enabled read-only (review or query) credential.
+	ErrReviewCredentialMissing = errors.New("review: read-only credential missing")
 )
 
 type factSource struct {
@@ -191,7 +194,7 @@ func openCredential(ctx context.Context, db *gorm.DB, crypter *crypto.Crypter, d
 	})
 	if err != nil {
 		if errors.Is(err, datasource.ErrCredentialMissing) {
-			return database.Credential{}, ErrFactSourceUnavailable
+			return database.Credential{}, fmt.Errorf("%w: %w", ErrFactSourceUnavailable, ErrReviewCredentialMissing)
 		}
 		return database.Credential{}, err
 	}
@@ -561,12 +564,12 @@ func resolveRepresentativeStatementSQL(
 		from draft_sql_payloads where draft_id = ?`, row.DraftID).Scan(&payload).Error; err != nil {
 		return "", err
 	}
-	plain, err := crypter.Open(crypto.PurposePayload, crypto.Envelope{
+	plain, err := crypter.OpenColumn(crypto.PurposePayload, crypto.ColumnRef{
+		Table:      "draft_sql_payloads",
+		PrimaryKey: row.DraftID,
+		Column:     "sql_ciphertext",
+	}, crypto.Envelope{
 		Ciphertext: payload.Ciphertext, Nonce: payload.Nonce, KeyID: payload.KeyID, Algorithm: "aes-256-gcm",
-	}, crypto.AAD{
-		DeploymentID: crypter.DeploymentID(),
-		Table:        "draft_sql_payloads", PrimaryKey: row.DraftID,
-		Column: "sql_ciphertext", Purpose: crypto.PurposePayload,
 	})
 	if err != nil {
 		return "", err
@@ -617,14 +620,6 @@ func runProfileForDB(ctx context.Context, db *gorm.DB, runID string) string {
 		return "mysql/mysql"
 	}
 	return name
-}
-
-// derefString is a local string dereference helper (kept local to avoid duplicate registration outside service package).
-func derefString(p *string) string {
-	if p == nil {
-		return ""
-	}
-	return *p
 }
 
 // policyCatalogSource is intentionally narrower than tool.FactSource. Raw

@@ -2,24 +2,20 @@ package application
 
 import (
 	"context"
-	"encoding/base64"
 	"encoding/json"
-	"fmt"
-	"os"
-	"strconv"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/google/uuid"
-	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
-	gormlogger "gorm.io/gorm/logger"
 
 	"github.com/cookieY/YearningX/backend/internal/authorization/auditlog"
 	"github.com/cookieY/YearningX/backend/internal/crypto"
 	"github.com/cookieY/YearningX/backend/internal/database"
 	"github.com/cookieY/YearningX/backend/internal/platform/addrguard"
+	"github.com/cookieY/YearningX/backend/internal/platform/testenv"
+	"github.com/cookieY/YearningX/backend/internal/platform/testkit"
 )
 
 func TestDatasourceIdentityExposesOnlyMatchedSafeFacts(t *testing.T) {
@@ -81,62 +77,32 @@ func TestEnsureFlowStagesIdentityGuardsAndBootstrap(t *testing.T) {
 	}
 	probeSetSvc.ensureFlowStagesIdentity(context.Background(), uuid.NewString(), uuid.NewString())
 
-	dsn := strings.TrimSpace(os.Getenv("YEARNING_TEST_POSTGRES_DSN"))
-	rawPort := strings.TrimSpace(os.Getenv("YEARNING_TEST_ADAPTER_PG_PORT"))
-	if dsn == "" || rawPort == "" {
-		return
-	}
-	port, err := strconv.Atoi(rawPort)
-	if err != nil || port <= 0 {
+	metaCfg, metaOK := testenv.ResolveMetaPG()
+	targetCfg, targetOK := testenv.ResolveTargetPG(
+		testenv.WithDefaultUser("yr"),
+		testenv.WithDefaultDBName("postgres"),
+	)
+	if !metaOK || !targetOK {
+		if testenv.RequireIntegration() {
+			testenv.SkipOrFatal(t, "integration PostgreSQL or target PostgreSQL not configured")
+		}
 		return
 	}
 	t.Cleanup(addrguard.SetLoopbackBypassForTest(true))
-	acquireSANPGTestLock(t)
-
-	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{Logger: gormlogger.Discard})
-	if err != nil {
-		t.Fatalf("postgres connect failed: %v", err)
-	}
-	sqlDB, err := db.DB()
-	if err != nil {
-		t.Fatalf("postgres sql.DB failed: %v", err)
-	}
-	t.Cleanup(func() { _ = sqlDB.Close() })
+	db := testkit.OpenPG(t)
+	_ = metaCfg
 
 	for _, tbl := range []string{
 		"change_drafts", "flow_stages", "flows",
 		"permission_group_flow_grants", "permission_group_members", "permission_groups",
-		"datasource_tls_materials", "datasource_credentials", "datasources", "rule_sets", "users",
+		"datasource_tls_materials", "datasource_credentials", "datasources", "ai_providers", "rule_sets", "users",
 	} {
 		if err := db.Exec("truncate table " + tbl + " cascade").Error; err != nil {
 			_ = db.Exec("delete from " + tbl).Error
 		}
 	}
 
-	makeKey := func(b byte) string {
-		buf := make([]byte, 32)
-		for i := range buf {
-			buf[i] = b
-		}
-		return base64.StdEncoding.EncodeToString(buf)
-	}
-	keyPath := t.TempDir() + "/keyring.json"
-	keyringDoc := fmt.Sprintf(`{"contract_version":1,"deployment_id":"rev-boot","keys":[
-		{"key_id":"pay-1","purpose":"payload","status":"encrypt_decrypt","created_at":"2026-08-25T00:00:00Z","key_base64":"%s"},
-		{"key_id":"id-1","purpose":"identifier_token","status":"encrypt_decrypt","created_at":"2026-08-25T00:00:00Z","key_base64":"%s"},
-		{"key_id":"fp-1","purpose":"sql_fingerprint","status":"encrypt_decrypt","created_at":"2026-08-25T00:00:00Z","key_base64":"%s"}]}`,
-		makeKey(1), makeKey(2), makeKey(3))
-	if err := os.WriteFile(keyPath, []byte(keyringDoc), 0o400); err != nil {
-		t.Fatal(err)
-	}
-	ring, err := crypto.LoadKeyring(keyPath)
-	if err != nil {
-		t.Fatal(err)
-	}
-	crypter, err := crypto.NewCrypter(ring)
-	if err != nil {
-		t.Fatal(err)
-	}
+	crypter := testkit.NewCrypter(t)
 	recorder, _ := auditlog.NewRecorder(db)
 	svc, err := NewServices(db, crypter, recorder, nil)
 	if err != nil {
@@ -153,21 +119,16 @@ func TestEnsureFlowStagesIdentityGuardsAndBootstrap(t *testing.T) {
 		}
 	}
 
-	host := os.Getenv("YEARNING_TEST_ADAPTER_PG_HOST")
-	if host == "" {
-		host = "127.0.0.1"
-	}
-	user := os.Getenv("YEARNING_TEST_ADAPTER_PG_USER")
-	if user == "" {
-		user = "yr"
-	}
-	pass := os.Getenv("YEARNING_TEST_ADAPTER_PG_PASSWORD")
+	host := targetCfg.Host
+	port := targetCfg.Port
+	user := targetCfg.User
+	pass := targetCfg.Password
 
 	dsID := uuid.NewString()
 	if err := db.Exec(`insert into datasources (id, name, engine, compatibility_mode, deployment_kind,
 		host, port, database_name, version_constraint, enabled, test_purpose, identity_fingerprint, version, created_by_user_id, created_at, updated_at)
-		values (?, 'rev-live-pg', 'postgresql', 'postgresql', 'native', ?, ?, 'postgres', '17.x', true, 'review', null, 1, ?, now(), now())`,
-		dsID, host, port, actorID).Error; err != nil {
+		values (?, 'rev-live-pg', 'postgresql', 'postgresql', 'native', ?, ?, ?, '17.x', true, 'review', null, 1, ?, now(), now())`,
+		dsID, host, port, targetCfg.DBName, actorID).Error; err != nil {
 		t.Fatal(err)
 	}
 	credID := uuid.NewString()

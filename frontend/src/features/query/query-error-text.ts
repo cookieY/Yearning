@@ -1,5 +1,6 @@
 import i18next from "@/shared/i18n";
 import { describeErrorText, type ErrorDisplay } from "@/shared/api/error-display";
+import { dateKeyInTimeZone } from "@/shared/lib/timezones";
 
 const CURSOR_REJECTION_KEYS: Record<string, string> = {
   undefined_table: "query.errors.undefinedTable",
@@ -33,8 +34,7 @@ export function describeQueryErrorText(display: ErrorDisplay): string {
   return describeErrorText(display, { detailSeparator: " " });
 }
 
-/** Today in local timezone (YYYY-MM-DD), used by the date picker to disable past dates. */
+/** Today in general.system_timezone (YYYY-MM-DD), used by the date picker to disable past dates. */
 export function todayLocal(): string {
-  const now = new Date();
-  return `${String(now.getFullYear())}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+  return dateKeyInTimeZone(new Date());
 }

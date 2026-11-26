@@ -1,9 +1,12 @@
 import { render, screen } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter, Route, Routes } from "react-router";
-import { HttpResponse, http } from "msw";
+import { http } from "msw";
 import { beforeEach, describe, expect, it } from "vitest";
+import { apiRoute } from "@/shared/mock/api-route";
 import { server } from "@/test/msw/server";
+import { testProblemJson } from "@/test/envelope";
+import { SESSION_USER_ID, stubSession } from "@/test/session";
 import "@/shared/i18n";
 import { SessionProvider } from "@/features/auth/session-provider";
 import {
@@ -22,25 +25,8 @@ import {
  * session query ends unauthenticated let the network settle before returning.
  */
 
-const UUID = "0198d9cc-e65d-7b9d-a8aa-3c81945f99ac";
-
-function userEnvelope(canAccessAdmin: boolean) {
-  return HttpResponse.json({
-    err_code: 0,
-    message: "ok",
-    data: {
-      id: UUID,
-      username: "henry",
-      display_name: "Henry",
-      email: null,
-      is_builtin_admin: canAccessAdmin,
-      version: 1,
-      created_at: "2026-08-28T08:00:00Z",
-      updated_at: "2026-08-28T08:00:00Z",
-      can_access_admin: canAccessAdmin,
-    },
-    request_id: UUID,
-  });
+function stubGuardUser(canAccessAdmin: boolean): void {
+  stubSession({ admin: canAccessAdmin, displayName: "Henry" });
 }
 
 function renderGuard(ui: React.ReactElement, routePath: string, initialPath: string) {
@@ -87,19 +73,8 @@ describe("RequireSession", () => {
 
   it("renders a retryable degraded panel when the probe fails for non-auth reasons", async () => {
     server.use(
-      http.get(
-        "*/users/me",
-        () =>
-          HttpResponse.json(
-            {
-              type: "about:blank",
-              title: "internal_error",
-              status: 500,
-              detail: "boom",
-              request_id: UUID,
-            },
-            { status: 500, headers: { "Content-Type": "application/problem+json" } },
-          ),
+      http.get(apiRoute("/users/me"), () =>
+        testProblemJson(500, "internal_error", "boom", SESSION_USER_ID),
       ),
     );
     renderGuard(
@@ -118,7 +93,7 @@ describe("RequireSession", () => {
   });
 
   it("admits authenticated visitors", async () => {
-    server.use(http.get("*/users/me", () => userEnvelope(false)));
+    stubGuardUser(false);
     renderGuard(
       <RequireSession>
         <div>protected</div>
@@ -134,7 +109,7 @@ describe("RequireSession", () => {
 
 describe("RedirectIfAuthenticated", () => {
   it("sends an authenticated visitor away from /login", async () => {
-    server.use(http.get("*/users/me", () => userEnvelope(false)));
+    stubGuardUser(false);
     renderGuard(
       <RedirectIfAuthenticated>
         <div>login-form</div>
@@ -160,7 +135,7 @@ describe("RedirectIfAuthenticated", () => {
 
 describe("RequireAdminCapability", () => {
   it("sends users without the server capability to /403", async () => {
-    server.use(http.get("*/users/me", () => userEnvelope(false)));
+    stubGuardUser(false);
     renderGuard(
       <RequireAdminCapability>
         <div>admin-page</div>
@@ -172,7 +147,7 @@ describe("RequireAdminCapability", () => {
   });
 
   it("admits users with the server capability", async () => {
-    server.use(http.get("*/users/me", () => userEnvelope(true)));
+    stubGuardUser(true);
     renderGuard(
       <RequireAdminCapability>
         <div>admin-page</div>

@@ -12,13 +12,14 @@ import (
 	"bytes"
 	"context"
 	"encoding/hex"
-	"encoding/json"
 	"strings"
 	"time"
 
 	"gorm.io/gorm"
 
 	"github.com/cookieY/YearningX/backend/internal/changeorder/domain"
+	"github.com/cookieY/YearningX/backend/internal/platform/ptr"
+	"github.com/cookieY/YearningX/backend/internal/platform/txutil"
 	reviewapp "github.com/cookieY/YearningX/backend/internal/review/application"
 	reviewdomain "github.com/cookieY/YearningX/backend/internal/review/domain"
 )
@@ -32,9 +33,11 @@ type SubmitOrderV2Input struct {
 	// DraftID optional: present = submit existing draft; omitted = direct submit in new-order mode
 	// (backfills a shell draft row within the transaction without producing an editable draft —
 	// the state machine immediately transitions it to submitted).
-	DraftID string
-	SQL     []byte
-	RunID   string
+	DraftID           string
+	SQL               []byte
+	RunID             string
+	TargetDatabase    *string
+	TargetDatabaseSet bool // True when target_database was explicitly provided (including null to clear draft fallback)
 	// Metadata (title is required for direct submit in new-order mode; draft mode uses the draft's metadata and ignores this).
 	Title                 *string
 	Description           *string
@@ -45,31 +48,10 @@ type SubmitOrderV2Input struct {
 
 // SubmitOrderV2 submits an ephemeral precheck result as an immutable work order.
 func (s *Services) SubmitOrderV2(ctx context.Context, actor Actor, reviewSvc *reviewapp.Services, in SubmitOrderV2Input) (view *OrderView, replayed bool, err error) {
-	reqHash := idemRequestHash(actor.UserID, in.FlowID, in.RunID)
-	claimed, replay, err := s.idemClaim(ctx, actor.UserID, idemRouteSubmitV2, in.RunID, in.IdempotencyKey, reqHash)
-	if err != nil {
-		return nil, false, err
-	}
-	if claimed == nil {
-		var v OrderView
-		if err := json.Unmarshal(replay, &v); err != nil {
-			return nil, false, err
-		}
-		return &v, true, nil
-	}
-	view, err = s.submitV2Tx(ctx, actor, reviewSvc, in)
-	if err != nil {
-		_ = s.idemRelease(ctx, actor.UserID, idemRouteSubmitV2, in.RunID, in.IdempotencyKey)
-		return nil, false, err
-	}
-	raw, err := json.Marshal(view)
-	if err != nil {
-		return nil, false, err
-	}
-	if err := s.idemComplete(ctx, actor.UserID, idemRouteSubmitV2, in.RunID, in.IdempotencyKey, raw); err != nil {
-		return nil, false, err
-	}
-	return view, false, nil
+	reqHash := txutil.RequestHash(actor.UserID, in.FlowID, in.RunID)
+	return txutil.RunIdempotent(ctx, s.idemStore(), actor.UserID, idemRouteSubmitV2, in.RunID, in.IdempotencyKey, reqHash, func() (*OrderView, error) {
+		return s.submitV2Tx(ctx, actor, reviewSvc, in)
+	})
 }
 
 func (s *Services) submitV2Tx(ctx context.Context, actor Actor, reviewSvc *reviewapp.Services, in SubmitOrderV2Input) (*OrderView, error) {
@@ -132,6 +114,12 @@ func (s *Services) submitV2Tx(ctx context.Context, actor Actor, reviewSvc *revie
 // ensureDraftForSubmitV2 validates an existing draft (ownership / flow / version) and returns
 // (draftID, expectVersion, revision); backfills a shell row for direct submit in new-order mode.
 func (s *Services) ensureDraftForSubmitV2(ctx context.Context, tx *gorm.DB, actor Actor, in SubmitOrderV2Input, er *reviewapp.EphemeralRun) (string, int64, int64, error) {
+	if in.TargetDatabase != nil {
+		trimmed := strings.TrimSpace(*in.TargetDatabase)
+		if err := reviewapp.ValidateTargetDatabase(trimmed); err != nil {
+			return "", 0, 0, domain.ErrValidation()
+		}
+	}
 	if in.DraftID != "" {
 		var draft struct {
 			ID              string
@@ -140,13 +128,14 @@ func (s *Services) ensureDraftForSubmitV2(ctx context.Context, tx *gorm.DB, acto
 			FlowVersionSeen int64
 			TicketType      string
 			RollbackEnabled bool
+			TargetDatabase  *string
 			State           string
 			Version         int64
 			Revision        int64
 		}
 		if err := tx.WithContext(ctx).Raw(
 			`select id::text as id, owner_user_id::text as owner_user_id, flow_id::text as flow_id,
-			        flow_version_seen, ticket_type, rollback_enabled, state, version, revision
+			        flow_version_seen, ticket_type, rollback_enabled, target_database, state, version, revision
 			 from change_drafts where id = ? for update`, in.DraftID).Scan(&draft).Error; err != nil {
 			return "", 0, 0, err
 		}
@@ -155,6 +144,15 @@ func (s *Services) ensureDraftForSubmitV2(ctx context.Context, tx *gorm.DB, acto
 		}
 		if draft.FlowID != in.FlowID {
 			return "", 0, 0, domain.ErrValidation()
+		}
+		submittedTargetDB := strings.TrimSpace(ptr.Deref(draft.TargetDatabase))
+		if in.TargetDatabase != nil {
+			submittedTargetDB = strings.TrimSpace(*in.TargetDatabase)
+		} else if in.TargetDatabaseSet {
+			submittedTargetDB = ""
+		}
+		if submittedTargetDB != er.TargetDatabase {
+			return "", 0, 0, domain.ErrReviewOutdated()
 		}
 		var flowVersion int64
 		if err := tx.WithContext(ctx).Raw(
@@ -197,11 +195,31 @@ func (s *Services) ensureDraftForSubmitV2(ctx context.Context, tx *gorm.DB, acto
 				return "", 0, 0, err
 			}
 		}
+		if (in.TargetDatabase != nil || in.TargetDatabaseSet) && strings.TrimSpace(ptr.Deref(draft.TargetDatabase)) != submittedTargetDB {
+			var nextTargetDB *string
+			if submittedTargetDB != "" {
+				nextTargetDB = &submittedTargetDB
+			}
+			if err := tx.WithContext(ctx).Exec(
+				`update change_drafts set target_database = ? where id = ?`,
+				nextTargetDB, draft.ID).Error; err != nil {
+				return "", 0, 0, err
+			}
+		}
 		return draft.ID, draft.Version, draft.Revision, nil
 	}
 	// Direct submit in new-order mode: title is required.
 	if in.Title == nil || strings.TrimSpace(*in.Title) == "" {
 		return "", 0, 0, domain.ErrValidation()
+	}
+	var submittedTargetDB string
+	var targetDBCol *string
+	if in.TargetDatabase != nil {
+		submittedTargetDB = strings.TrimSpace(*in.TargetDatabase)
+		targetDBCol = &submittedTargetDB
+	}
+	if submittedTargetDB != er.TargetDatabase {
+		return "", 0, 0, domain.ErrReviewOutdated()
 	}
 	draftID := newID()
 	now := time.Now().UTC()
@@ -215,11 +233,11 @@ func (s *Services) ensureDraftForSubmitV2(ctx context.Context, tx *gorm.DB, acto
 	}
 	if err := tx.WithContext(ctx).Exec(`
 		insert into change_drafts (id, owner_user_id, flow_id, flow_version_seen,
-			title, description, requested_scheduled_for, rollback_enabled, ticket_type,
+			title, description, requested_scheduled_for, rollback_enabled, target_database, ticket_type,
 			state, revision, version, created_at, updated_at)
-		values (?, ?, ?, ?, ?, ?, ?, ?, 'normal', 'draft', 1, 1, ?, ?)`,
+		values (?, ?, ?, ?, ?, ?, ?, ?, ?, 'normal', 'draft', 1, 1, ?, ?)`,
 		draftID, actor.UserID, in.FlowID, er.FlowVersion,
-		*in.Title, description, in.RequestedScheduledFor, rollbackEnabled, now, now).Error; err != nil {
+		*in.Title, description, in.RequestedScheduledFor, rollbackEnabled, targetDBCol, now, now).Error; err != nil {
 		return "", 0, 0, err
 	}
 	return draftID, 1, 1, nil

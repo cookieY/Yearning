@@ -20,6 +20,9 @@ func NewChain(endpoints []Endpoint, dial func(Endpoint) (Client, error)) (*Chain
 	if len(endpoints) == 0 {
 		return nil, ErrNoProvider
 	}
+	if dial == nil {
+		return nil, errors.New("provider: nil dial function")
+	}
 	c := &Chain{Endpoints: endpoints}
 	for _, ep := range endpoints {
 		if err := ep.Validate(); err != nil {

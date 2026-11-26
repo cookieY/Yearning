@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MotionConfig } from "motion/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -6,7 +6,9 @@ import { SessionProvider } from "@/features/auth/session-provider";
 import { MemoryRouter, Route, Routes } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { HttpResponse, http } from "msw";
+import { apiRoute } from "@/shared/mock/api-route";
 import { server } from "@/test/msw/server";
+import { grantSession } from "@/test/session";
 import "@/shared/i18n";
 import type {
   GetReviewRun200,
@@ -15,7 +17,6 @@ import type {
 } from "@/api/generated/client/yearningV4HTTPAPI.schemas";
 import {
   FIXTURE_FLOW_ID,
-  FIXTURE_OWNER_ID,
   fixtureRunIds,
   resetReviewFixture,
 } from "@/shared/mock/review-fixture";
@@ -73,7 +74,6 @@ vi.mock("@/features/review/sql-editor-panel", () => ({
     onChange: (sql: string) => void;
     readOnly?: boolean;
     loadValue?: unknown;
-    onLocate?: unknown;
     "data-testid"?: string;
   }) => (
     <textarea
@@ -89,13 +89,13 @@ vi.mock("@/features/review/sql-editor-panel", () => ({
 
 async function createDraftWithSql(title = "Preflight E2E Draft"): Promise<string> {
   const create = (await (
-    await fetch("/change-drafts", {
+    await fetch("/api/v4/change-drafts", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ flow_id: FIXTURE_FLOW_ID, title }),
     })
   ).json()) as { data: { id: string } };
-  await fetch(`/change-drafts/${create.data.id}/sql`, {
+  await fetch(`/api/v4/change-drafts/${create.data.id}/sql`, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ sql: WORKSPACE_SQL }),
@@ -224,33 +224,6 @@ beforeEach(() => {
   grantSession();
 });
 
-
-/** The order pages gate lifecycle buttons on the session identity; plant an
- * authenticated /users/me whose id matches the fixture submitter (guards
- * test precedent). */
-function grantSession(): void {
-  server.use(
-    http.get("*/users/me", () =>
-      HttpResponse.json({
-        err_code: 0,
-        message: "ok",
-        data: {
-          id: FIXTURE_OWNER_ID,
-          username: "henry",
-          display_name: "henry",
-          email: null,
-          is_builtin_admin: true,
-          version: 1,
-          created_at: "2026-08-28T08:00:00Z",
-          updated_at: "2026-08-28T08:00:00Z",
-          can_access_admin: true,
-        },
-        request_id: FIXTURE_OWNER_ID,
-      }),
-    ),
-  );
-}
-
 describe("DraftWorkspacePage", () => {
   it("mounts, loads draft state and never auto-creates a review run", async () => {
     const draftId = await createDraftWithSql();
@@ -270,7 +243,7 @@ describe("DraftWorkspacePage", () => {
     const { runId } = await renderReadyWorkspace();
     // The precheck run exists in the ephemeral world and passed the gate.
     const run = (await (
-      await fetch(`/review-runs/${runId}`)
+      await fetch(`/api/v4/review-runs/${runId}`)
     ).json()) as GetReviewRun200;
     expect(run.err_code).toBe(0);
     expect(run.data?.state).toBe("ready");
@@ -299,7 +272,7 @@ describe("DraftWorkspacePage", () => {
     // poll hits it -> presents expired state, keeping submission locked (derived semantics, RCP-20261101).
     const draftId = await createDraftWithSql("\u8fc7\u671f\u6001\u9884\u5ba1");
     server.use(
-      http.get("*/review-runs/:runId", () =>
+      http.get(apiRoute("/review-runs/:runId"), () =>
         HttpResponse.json(
           {
             type: "about:blank",
@@ -317,6 +290,8 @@ describe("DraftWorkspacePage", () => {
     await revealEditor();
     fireEvent.click(screen.getByTestId("run-review"));
     expect(await screen.findByTestId("precheck-dialog")).toBeVisible();
+    expect(await screen.findByTestId("review-status-expired")).toHaveTextContent("\u9884\u5ba1\u7ed3\u679c\u5df2\u8fc7\u671f");
+    expect(screen.queryByTestId("review-status-error")).not.toBeInTheDocument();
     fireEvent.click(await screen.findByTestId("tab-findings"));
     expect(await screen.findByTestId("findings-expired")).toHaveTextContent("\u9884\u5ba1\u7ed3\u679c\u5df2\u8fc7\u671f");
     expect(screen.getByTestId("submit-draft")).toBeDisabled();
@@ -326,7 +301,7 @@ describe("DraftWorkspacePage", () => {
     const requestStarted = deferred();
     const releaseRequest = deferred();
     server.use(
-      http.get("*/review-runs/:runId/findings", async () => {
+      http.get(apiRoute("/review-runs/:runId/findings"), async () => {
         requestStarted.resolve();
         await releaseRequest.promise;
         return HttpResponse.json({
@@ -381,7 +356,7 @@ describe("DraftWorkspacePage", () => {
     const requestedCursors: Array<string | null> = [];
     const requestedLimits: Array<string | null> = [];
     server.use(
-      http.get("*/review-runs/:runId/findings", ({ request }) => {
+      http.get(apiRoute("/review-runs/:runId/findings"), ({ request }) => {
         const url = new URL(request.url);
         const after = url.searchParams.get("after");
         requestedCursors.push(after);
@@ -418,7 +393,7 @@ describe("DraftWorkspacePage", () => {
   it("never presents a run read failure as an idle or empty review", async () => {
     const { utils, runId } = await renderReadyWorkspace();
     server.use(
-      http.get("*/review-runs/:runId", () =>
+      http.get(apiRoute("/review-runs/:runId"), () =>
         HttpResponse.json(
           {
             err_code: 5000,
@@ -443,12 +418,12 @@ describe("DraftWorkspacePage", () => {
   it("keeps run loading distinct from a draft that never started a review", async () => {
     const { utils, runId } = await renderReadyWorkspace();
     const snapshot = (await (
-      await fetch(`/review-runs/${runId}`)
+      await fetch(`/api/v4/review-runs/${runId}`)
     ).json()) as GetReviewRun200;
     const requestStarted = deferred();
     const releaseRequest = deferred();
     server.use(
-      http.get("*/review-runs/:runId", async () => {
+      http.get(apiRoute("/review-runs/:runId"), async () => {
         requestStarted.resolve();
         await releaseRequest.promise;
         return HttpResponse.json(snapshot);
@@ -487,7 +462,7 @@ describe("DraftWorkspacePage", () => {
     // Freeze every run read at queued: the wizard never observes a terminal
     // snapshot no matter how the fixture timers advance.
     server.use(
-      http.get("*/review-runs/:runId", ({ params }) =>
+      http.get(apiRoute("/review-runs/:runId"), ({ params }) =>
         HttpResponse.json({
           err_code: 0,
           message: "ok",
@@ -516,7 +491,7 @@ describe("DraftWorkspacePage", () => {
   it("shows a retryable findings error instead of claiming no risks", async () => {
     // Initial fetch returns 500: query fires and fails the instant the run reaches terminal state — error state renders inline with retry.
     server.use(
-      http.get("*/review-runs/:runId/findings", () =>
+      http.get(apiRoute("/review-runs/:runId/findings"), () =>
         HttpResponse.json(
           {
             err_code: 5000,
@@ -546,7 +521,7 @@ describe("DraftWorkspacePage", () => {
       // to assert terminal presentation, let the precheck observe only that terminal state from start to finish).
       const draftId = await createDraftWithSql(state + "\u6001\u65e0\u53d1\u73b0");
       server.use(
-        http.get("*/review-runs/:runId", ({ params }) =>
+        http.get(apiRoute("/review-runs/:runId"), ({ params }) =>
           HttpResponse.json({
             err_code: 0,
             message: "ok",
@@ -554,7 +529,7 @@ describe("DraftWorkspacePage", () => {
             request_id: OWNER,
           }),
         ),
-        http.get("*/review-runs/:runId/findings", () =>
+        http.get(apiRoute("/review-runs/:runId/findings"), () =>
           HttpResponse.json({
             err_code: 0,
             message: "ok",
@@ -567,10 +542,12 @@ describe("DraftWorkspacePage", () => {
       expect(await screen.findByTestId("run-review")).toBeVisible();
       await revealEditor();
       fireEvent.click(screen.getByTestId("run-review"));
+      expect(await screen.findByTestId("gate-blockers", {}, { timeout: 4_000 })).toBeVisible();
+      expect(screen.queryByTestId("review-failure")).not.toBeInTheDocument();
       fireEvent.click(await screen.findByTestId("tab-findings", {}, { timeout: 4_000 }));
 
-      const incomplete = await screen.findByTestId("findings-incomplete");
-      expect(incomplete).toHaveTextContent("\u5ba1\u6838\u672a\u5b8c\u6574\u5b8c\u6210");
+      expect(await screen.findByTestId("findings-none-generated")).toBeVisible();
+      expect(screen.queryByTestId("findings-incomplete")).not.toBeInTheDocument();
       expect(screen.queryByTestId("findings-empty-all")).not.toBeInTheDocument();
       expect(screen.getByTestId("submit-draft")).toBeDisabled();
     },
@@ -626,7 +603,7 @@ describe("DraftWorkspacePage", () => {
     // an older running state (e.g. a CDN/cacheaged response). The fold must
     // keep the presented terminal phase and the submission unlock.
     server.use(
-      http.get("*/review-runs/:runId", () =>
+      http.get(apiRoute("/review-runs/:runId"), () =>
         HttpResponse.json({
           err_code: 0,
           message: "ok",
@@ -653,7 +630,7 @@ describe("DraftWorkspacePage", () => {
 
   it("survives a draft fetch failure with the shared error state", async () => {
     server.use(
-      http.get("*/change-drafts/unknown-draft", () =>
+      http.get(apiRoute("/change-drafts/:draftId"), () =>
         HttpResponse.json({
           err_code: 1002,
           message: "not found",
@@ -671,7 +648,7 @@ describe("DraftWorkspacePage", () => {
     // 2000 similar statements + one no-WHERE anomaly: the precheck digests
     // the bulk SQL into two shape groups and the anomaly blocks the gate.
     const create = (await (
-      await fetch("/change-drafts", {
+      await fetch("/api/v4/change-drafts", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ flow_id: FIXTURE_FLOW_ID, title: "\u6279\u91cf\u9884\u68c0\u8349\u7a3f" }),
@@ -687,7 +664,7 @@ describe("DraftWorkspacePage", () => {
     // Deterministic single anomaly at ordinal 432.
     parts[431] = "UPDATE orders SET status = 'processed';\n";
     const bulkSql = parts.join("");
-    await fetch(`/change-drafts/${draftId}/sql`, {
+    await fetch(`/api/v4/change-drafts/${draftId}/sql`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ sql: bulkSql }),
@@ -739,7 +716,7 @@ describe("DraftWorkspacePage", () => {
       expect(screen.getByTestId("order-detail-page")).toBeVisible();
     });
     const order = (await (
-      await fetch("/change-orders")
+      await fetch("/api/v4/change-orders")
     ).json()) as { data: { items: Array<{ display_number: string }> } };
     expect(order.data.items).toHaveLength(1);
     await waitFor(() => {
@@ -754,7 +731,7 @@ describe("DraftWorkspacePage", () => {
     // Simulate a gate change between the dock's presentation and the
     // submission transaction: the backend answers 2013 through MSW.
     server.use(
-      http.post("*/change-orders", () =>
+      http.post(apiRoute("/change-orders"), () =>
         HttpResponse.json({
           err_code: 2013,
           message: "submission gate failed",
@@ -772,5 +749,202 @@ describe("DraftWorkspacePage", () => {
     expect(screen.queryByTestId("order-detail-page")).toBeNull();
     // The draft stays unsubmitted — no fake success anywhere.
     expect(screen.getByTestId("submit-confirm-dialog")).toBeVisible();
+  });
+
+  it("shows concrete schema mismatch failure across gate blocker, overview, and findings without leaking raw codes", async () => {
+    const draftId = await createDraftWithSql("Schema Mismatch Draft");
+    server.use(
+      http.get(apiRoute("/review-runs/:runId"), ({ params }) =>
+        HttpResponse.json({
+          err_code: 0,
+          message: "ok",
+          data: {
+            ...frozenTerminalRun(String(params.runId), "partial"),
+            failure_code: "sql_schema_out_of_scope",
+          },
+          request_id: OWNER,
+        }),
+      ),
+      http.get(apiRoute("/review-runs/:runId/findings"), () =>
+        HttpResponse.json({
+          err_code: 0,
+          message: "ok",
+          data: { items: [], page: { next_cursor: null, has_more: false } },
+          request_id: OWNER,
+        }),
+      ),
+    );
+    renderWorkspace(draftId);
+    expect(await screen.findByTestId("run-review")).toBeVisible();
+    await revealEditor();
+    fireEvent.click(screen.getByTestId("run-review"));
+
+    const blockerReason = await screen.findByTestId("gate-blocker-failure", {}, { timeout: 4_000 });
+    expect(blockerReason).toHaveTextContent("SQL \u4e2d\u663e\u5f0f\u6307\u5b9a\u7684\u5e93\u540d\u6216 Schema");
+    expect(screen.queryByTestId("review-failure")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId("tab-findings"));
+    expect(await screen.findByTestId("findings-none-generated", {}, { timeout: 4_000 })).toBeVisible();
+    expect(screen.queryByTestId("findings-incomplete")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("findings-incomplete-reason")).not.toBeInTheDocument();
+    expect(screen.queryByText("sql_schema_out_of_scope")).not.toBeInTheDocument();
+  });
+
+  it("renders green passed progress tone even when a passing ready run includes non-blocking findings", async () => {
+    const draftId = await createDraftWithSql("Ready With Low Finding");
+    server.use(
+      http.get(apiRoute("/review-runs/:runId"), ({ params }) =>
+        HttpResponse.json({
+          err_code: 0,
+          message: "ok",
+          data: {
+            ...frozenQueuedRun(String(params.runId)),
+            state: "ready",
+            stage_results: [
+              {
+                stage_position: 1,
+                state: "passed",
+                highest_severity: "low",
+                gate_passed: true,
+                finding_count: 1,
+                evidence_count: 1,
+                snapshot_hash: "snap-ready-low",
+                summary: null,
+                summary_locale: null,
+              },
+            ],
+            gate: { passed: true, reason_codes: [] },
+            failure_code: null,
+            finished_at: "2026-08-30T00:00:02Z",
+          },
+          request_id: OWNER,
+        }),
+      ),
+      http.get(apiRoute("/review-runs/:runId/findings"), () =>
+        HttpResponse.json({
+          err_code: 0,
+          message: "ok",
+          data: { items: [findingFixture({ severity: "low" })], page: { next_cursor: null, has_more: false } },
+          request_id: OWNER,
+        }),
+      ),
+    );
+    renderWorkspace(draftId);
+    expect(await screen.findByTestId("run-review")).toBeVisible();
+    await revealEditor();
+    fireEvent.click(screen.getByTestId("run-review"));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("submit-draft")).toBeEnabled();
+    }, { timeout: 4_000 });
+    expect(screen.getByTestId("precheck-progress")).toHaveAttribute("data-progress-tone", "passed");
+  });
+
+  it("shows AI conclusions inside the findings tab instead of the overview card", async () => {
+    const draftId = await createDraftWithSql("Ready With Summary");
+    const summaryText = "\u6240\u6709 SQL \u7b26\u5408\u5ba1\u6838\u89c4\u8303\u3002";
+    server.use(
+      http.get(apiRoute("/review-runs/:runId"), ({ params }) =>
+        HttpResponse.json({
+          err_code: 0,
+          message: "ok",
+          data: {
+            ...frozenQueuedRun(String(params.runId)),
+            state: "ready",
+            stage_results: [
+              {
+                stage_position: 1,
+                state: "passed",
+                highest_severity: "none",
+                gate_passed: true,
+                finding_count: 0,
+                evidence_count: 1,
+                snapshot_hash: "snap-ready-summary",
+                summary: summaryText,
+                summary_locale: "zh-CN",
+              },
+            ],
+            gate: { passed: true, reason_codes: [] },
+            failure_code: null,
+            finished_at: "2026-08-30T00:00:02Z",
+          },
+          request_id: OWNER,
+        }),
+      ),
+      http.get(apiRoute("/review-runs/:runId/findings"), () =>
+        HttpResponse.json({
+          err_code: 0,
+          message: "ok",
+          data: { items: [], page: { next_cursor: null, has_more: false } },
+          request_id: OWNER,
+        }),
+      ),
+    );
+    renderWorkspace(draftId);
+    expect(await screen.findByTestId("run-review")).toBeVisible();
+    await revealEditor();
+    fireEvent.click(screen.getByTestId("run-review"));
+
+    const overviewCard = await screen.findByTestId("review-status", {}, { timeout: 4_000 });
+    expect(within(overviewCard).queryByTestId("review-summary")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId("tab-findings"));
+    const summarySection = await screen.findByTestId("review-summary", {}, { timeout: 4_000 });
+    expect(summarySection).toHaveTextContent(summaryText);
+    expect(await screen.findByTestId("findings-empty-all")).toBeVisible();
+  });
+
+  it("shows AI conclusions above findings in the findings tab when findings are present", async () => {
+    const draftId = await createDraftWithSql("Ready With Summary And Finding");
+    const summaryText = "\u53d1\u73b0 1 \u6761\u4f4e\u5371\u5efa\u8bae\uff0c\u5141\u8bb8\u63d0\u4ea4\u3002";
+    server.use(
+      http.get(apiRoute("/review-runs/:runId"), ({ params }) =>
+        HttpResponse.json({
+          err_code: 0,
+          message: "ok",
+          data: {
+            ...frozenQueuedRun(String(params.runId)),
+            state: "ready",
+            stage_results: [
+              {
+                stage_position: 1,
+                state: "passed",
+                highest_severity: "low",
+                gate_passed: true,
+                finding_count: 1,
+                evidence_count: 1,
+                snapshot_hash: "snap-ready-summary-finding",
+                summary: summaryText,
+                summary_locale: "zh-CN",
+              },
+            ],
+            gate: { passed: true, reason_codes: [] },
+            failure_code: null,
+            finished_at: "2026-08-30T00:00:02Z",
+          },
+          request_id: OWNER,
+        }),
+      ),
+      http.get(apiRoute("/review-runs/:runId/findings"), () =>
+        HttpResponse.json({
+          err_code: 0,
+          message: "ok",
+          data: { items: [findingFixture({ severity: "low" })], page: { next_cursor: null, has_more: false } },
+          request_id: OWNER,
+        }),
+      ),
+    );
+    renderWorkspace(draftId);
+    expect(await screen.findByTestId("run-review")).toBeVisible();
+    await revealEditor();
+    fireEvent.click(screen.getByTestId("run-review"));
+
+    const overviewCard = await screen.findByTestId("review-status", {}, { timeout: 4_000 });
+    expect(within(overviewCard).queryByTestId("review-summary")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId("tab-findings"));
+    const findingsList = await screen.findByTestId("finding-list", {}, { timeout: 4_000 });
+    expect(within(findingsList).getByTestId("review-summary")).toHaveTextContent(summaryText);
+    expect(await screen.findByTestId("finding-item")).toBeVisible();
   });
 });

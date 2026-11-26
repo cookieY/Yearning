@@ -5,7 +5,9 @@ import { HttpResponse, delay, http } from "msw";
 import { MemoryRouter } from "react-router";
 import userEvent from "@testing-library/user-event";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { apiRoute } from "@/shared/mock/api-route";
 import { server } from "@/test/msw/server";
+import { grantSession as stubAdminSession } from "@/test/session";
 import "@/shared/i18n";
 import { resetAdminFixture } from "@/shared/mock/admin-fixture";
 import { setMockAuthBehavior } from "@/shared/mock/auth-scenario-store";
@@ -46,26 +48,7 @@ class ResizeObserverStub {
 vi.stubGlobal("ResizeObserver", ResizeObserverStub);
 
 function grantSession(): void {
-  server.use(
-    http.get("*/users/me", () =>
-      HttpResponse.json({
-        err_code: 0,
-        message: "ok",
-        data: {
-          id: "0198d9cc-1111-7111-8111-000000000001",
-          username: "henry",
-          display_name: "henry",
-          email: null,
-          is_builtin_admin: true,
-          version: 1,
-          created_at: "2026-08-28T08:00:00Z",
-          updated_at: "2026-08-28T08:00:00Z",
-          can_access_admin: true,
-        },
-        request_id: "x",
-      }),
-    ),
-  );
+  stubAdminSession({ id: "0198d9cc-1111-7111-8111-000000000001", requestId: "x" });
 }
 
 function renderPage(ui: React.ReactElement): QueryClient {
@@ -296,7 +279,7 @@ describe("admin table search (§18.37)", () => {
 
   it("keeps the page controls and table-shaped loading state during first load", () => {
     server.use(
-      http.get("*/admin/datasources", async () => {
+      http.get(apiRoute("/admin/datasources"), async () => {
         await delay("infinite");
         return HttpResponse.json(null);
       }),
@@ -317,7 +300,7 @@ describe("admin table search (§18.37)", () => {
     expect(screen.getByText("Administrator")).toBeVisible();
 
     server.use(
-      http.get("*/admin/users", async () => {
+      http.get(apiRoute("/admin/users"), async () => {
         await delay("infinite");
         return HttpResponse.json(null);
       }),

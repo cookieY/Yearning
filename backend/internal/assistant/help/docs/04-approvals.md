@@ -1,7 +1,7 @@
 ---
 id: help-approvals
 title: Approval Center & Multi-Stage Order Review
-source_ref: docs/prd/change-order-prd.md#approval-flow
+source_ref: docs/features/03-workflow-approval-prd.md
 route_path: /approvals
 admin_only: false
 keywords: approval, approve, reject, return, revisions, changes_requested, request_changes, stage, claim, todo, pending, signoff, multi-stage, flow, any_one, all_must_approve, 2001, 2003, 2009, 2010

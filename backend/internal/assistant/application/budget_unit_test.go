@@ -22,6 +22,7 @@ import (
 	"github.com/cookieY/YearningX/backend/internal/assistant/domain"
 	"github.com/cookieY/YearningX/backend/internal/authorization/auditlog"
 	"github.com/cookieY/YearningX/backend/internal/crypto"
+	"github.com/cookieY/YearningX/backend/internal/platform/systz"
 	reviewapp "github.com/cookieY/YearningX/backend/internal/review/application"
 )
 
@@ -268,6 +269,7 @@ func TestBudgetDayUsesReviewSystemTimezone(t *testing.T) {
 	state.mu.Lock()
 	state.timezone = "UTC"
 	state.mu.Unlock()
+	systz.InvalidateDB(gdb)
 	if got := reviewSvc.BudgetDay(instant); got != "2026-03-10" {
 		t.Fatalf("BudgetDay(UTC) = %q, want 2026-03-10", got)
 	}
@@ -281,14 +283,21 @@ func TestBudgetDayUsesReviewSystemTimezone(t *testing.T) {
 	state.timezone = "America/Los_Angeles"
 	state.execs = nil
 	state.mu.Unlock()
+	systz.InvalidateDB(gdb)
 
 	expectedDay := reviewSvc.BudgetDay(time.Now())
-	_, day, _, err := svc.reserveDailyBudget(context.Background(), 50000)
+	lease, err := svc.acquireDailyBudgetLease(context.Background(), 50000)
 	if err != nil {
-		t.Fatalf("reserveDailyBudget: %v", err)
+		t.Fatalf("acquireDailyBudgetLease: %v", err)
 	}
-	if day != expectedDay {
-		t.Fatalf("reserveDailyBudget day = %q, want Review.BudgetDay %q", day, expectedDay)
+	if lease.Day() != expectedDay {
+		t.Fatalf("acquireDailyBudgetLease day = %q, want Review.BudgetDay %q", lease.Day(), expectedDay)
+	}
+
+	// D14 fail-closed: nil Review must return ErrBudgetServiceUnavailable instead of silently bypassing budget checks.
+	svcNoReview := &Services{DB: gdb}
+	if _, err := svcNoReview.acquireDailyBudgetLease(context.Background(), 50000); !errors.Is(err, reviewapp.ErrBudgetServiceUnavailable) {
+		t.Fatalf("expected ErrBudgetServiceUnavailable when Review is nil, got %v", err)
 	}
 }
 
@@ -304,10 +313,6 @@ func TestSettleDailyBudgetTransfersAndReleasesExcess(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	svc, err := NewServices(gdb, crypter, reviewSvc, nil, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
 
 	settings := reviewapp.BudgetSettings{
 		Enforced:                   true,
@@ -319,14 +324,11 @@ func TestSettleDailyBudgetTransfersAndReleasesExcess(t *testing.T) {
 	providerID := uuid.NewString()
 	turnID := uuid.NewString()
 
-	// Case 1: actual (300) < reserved (1000) -> settles 300 and releases 700.
+	// Case 1: actual (300) < reserved (1000) -> settles 300 and releases only excess 700.
 	state.execs = nil
-	if err := svc.settleDailyBudget(ctx, turnID, "2026-11-21", "USD", 1000, settings, &SynthesizeOutput{
-		ProviderID:  providerID,
-		ModelName:   "gpt-4o-mini",
-		InputTokens: 1_000_000,
-	}); err != nil {
-		t.Fatalf("settleDailyBudget under-budget: %v", err)
+	lease1 := reviewapp.NewBudgetLease(reviewSvc, gdb, "2026-11-21", "USD", 1000, settings)
+	if err := lease1.Settle(ctx, turnID, providerID, "gpt-4o-mini", "assistant", 1_000_000, 0, "succeeded"); err != nil {
+		t.Fatalf("BudgetLease.Settle under-budget: %v", err)
 	}
 	var settledAmt, releasedAmt int64
 	for _, ex := range state.execs {
@@ -340,15 +342,20 @@ func TestSettleDailyBudgetTransfersAndReleasesExcess(t *testing.T) {
 	if settledAmt != 300 || releasedAmt != 700 {
 		t.Fatalf("expected settled=300 released=700, got settled=%d released=%d", settledAmt, releasedAmt)
 	}
+	// Release after Settle must be a no-op (idempotent).
+	beforeReleaseCount := len(state.execs)
+	if err := lease1.Release(ctx); err != nil {
+		t.Fatalf("Release after Settle: %v", err)
+	}
+	if len(state.execs) != beforeReleaseCount {
+		t.Fatal("expected Release after Settle to be a no-op")
+	}
 
 	// Case 2: actual (1500) >= reserved (1000) -> settles 1500 and releases 0.
 	state.execs = nil
-	if err := svc.settleDailyBudget(ctx, turnID, "2026-11-21", "USD", 1000, settings, &SynthesizeOutput{
-		ProviderID:  providerID,
-		ModelName:   "gpt-4o-mini",
-		InputTokens: 5_000_000,
-	}); err != nil {
-		t.Fatalf("settleDailyBudget over-reserve: %v", err)
+	lease2 := reviewapp.NewBudgetLease(reviewSvc, gdb, "2026-11-21", "USD", 1000, settings)
+	if err := lease2.Settle(ctx, turnID, providerID, "gpt-4o-mini", "assistant", 5_000_000, 0, "succeeded"); err != nil {
+		t.Fatalf("BudgetLease.Settle over-reserve: %v", err)
 	}
 	for _, ex := range state.execs {
 		if strings.Contains(ex.query, "update ai_daily_budget_usage set reserved_minor = greatest(reserved_minor -") {
@@ -359,11 +366,8 @@ func TestSettleDailyBudgetTransfersAndReleasesExcess(t *testing.T) {
 	// Case 3: Settle failure releases full reservedMinor (1000) so reserved_minor never leaks.
 	state.execs = nil
 	state.failLedgerInsert = true
-	if err := svc.settleDailyBudget(ctx, turnID, "2026-11-21", "USD", 1000, settings, &SynthesizeOutput{
-		ProviderID:  providerID,
-		ModelName:   "gpt-4o-mini",
-		InputTokens: 1_000_000,
-	}); err == nil {
+	lease3 := reviewapp.NewBudgetLease(reviewSvc, gdb, "2026-11-21", "USD", 1000, settings)
+	if err := lease3.Settle(ctx, turnID, providerID, "gpt-4o-mini", "assistant", 1_000_000, 0, "succeeded"); err == nil {
 		t.Fatal("expected error when ledger insert fails")
 	}
 	var recoveredRelease int64
@@ -374,6 +378,29 @@ func TestSettleDailyBudgetTransfersAndReleasesExcess(t *testing.T) {
 	}
 	if recoveredRelease != 1000 {
 		t.Fatalf("expected full reservation release 1000 on Settle failure, got %d", recoveredRelease)
+	}
+
+	// Case 4: Abort Release releases full reservedMinor once and is idempotent on repeat calls.
+	state.execs = nil
+	state.failLedgerInsert = false
+	lease4 := reviewapp.NewBudgetLease(reviewSvc, gdb, "2026-11-21", "USD", 1000, settings)
+	if err := lease4.Release(ctx); err != nil {
+		t.Fatalf("Release on abort: %v", err)
+	}
+	if err := lease4.Release(ctx); err != nil {
+		t.Fatalf("second Release on abort: %v", err)
+	}
+	releaseCalls := 0
+	for _, ex := range state.execs {
+		if strings.Contains(ex.query, "update ai_daily_budget_usage set reserved_minor = greatest(reserved_minor -") {
+			releaseCalls++
+			if ex.args[0].(int64) != 1000 {
+				t.Fatalf("abort release amount = %v, want 1000", ex.args[0])
+			}
+		}
+	}
+	if releaseCalls != 1 {
+		t.Fatalf("expected exactly 1 release SQL call across two Release() calls, got %d", releaseCalls)
 	}
 }
 
@@ -528,9 +555,8 @@ func TestAssistantBudgetFailClosedOnLoadErrorAndTransactionalSettle(t *testing.T
 		InputPricePerMillionMinor:  300,
 		OutputPricePerMillionMinor: 600,
 	}
-	err = svc.settleDailyBudget(context.Background(), uuid.NewString(), "2026-11-21", "USD", 1000, settings, &SynthesizeOutput{
-		ModelName: "gpt-4o-mini", InputTokens: 500_000, OutputTokens: 250_000,
-	})
+	leaseFail := reviewapp.NewBudgetLease(reviewSvc, gdb, "2026-11-21", "USD", 1000, settings)
+	err = leaseFail.Settle(context.Background(), uuid.NewString(), "", "gpt-4o-mini", "assistant", 500_000, 250_000, "succeeded")
 	if err == nil {
 		t.Fatal("expected error when ai_daily_budget_usage upsert fails inside Settle tx")
 	}

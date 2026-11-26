@@ -39,6 +39,8 @@ export interface CaseRow {
   problem_title?: string;
   /** Known, accepted Mock/Real divergence (e.g. the mock does not model authz). */
   note?: string;
+  /** Sanitized raw HTTP response payload captured when F12_RECORD_FIXTURES=1 in real mode. */
+  response_body?: unknown;
 }
 
 const rows: CaseRow[] = [];
@@ -260,6 +262,9 @@ export async function record<T>(
       if (envelope && typeof envelope.err_code === "number") {
         row.err_code = envelope.err_code;
         result.errCode = envelope.err_code;
+      }
+      if (mode === "real" && process.env.F12_RECORD_FIXTURES === "1") {
+        row.response_body = captured.body;
       }
     } else if (captured.status >= 300) {
       const issues = problemShapeIssues(captured.body);

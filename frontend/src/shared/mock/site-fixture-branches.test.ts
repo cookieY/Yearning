@@ -29,7 +29,7 @@ async function call<T>(
   body?: unknown,
   headers: Record<string, string> = {},
 ): Promise<Envelope<T>> {
-  const response = await fetch(path, {
+  const response = await fetch(path.startsWith("/api/v4") ? path : `/api/v4${path}`, {
     method,
     headers: { "Content-Type": "application/json", ...headers },
     body: body === undefined ? undefined : JSON.stringify(body),
@@ -122,8 +122,8 @@ describe("flow write guards", () => {
       {
         position: 1,
         datasource_id: "4f6f1a2b-0000-4000-8000-00000000a001",
-        approval_steps: [{ position: 1, actors: [{ user_id: "u" }] }],
-        execution_actors: [{ user_id: "u" }],
+        approval_steps: [{ position: 1, actors: [{ user_id: "4f6f1a2b-0000-4000-8000-00000000c001" }] }],
+        execution_actors: [{ user_id: "4f6f1a2b-0000-4000-8000-00000000c001" }],
       },
     ],
   };
@@ -173,14 +173,14 @@ describe("flow write guards", () => {
       `/admin/flows/${changeFlow}/datasources/4f6f1a2b-0000-4000-8000-00000000a001/masking-rules`,
       { sensitive_columns: ["email"] },
     );
-    expect(putChange.err_code).toBe(1001);
+    expect(putChange.err_code).toBe(1002);
     const queryFlow = "7a1a3c4d-3333-4333-8333-00000000f002";
     const outside = await call(
       "PUT",
       `/admin/flows/${queryFlow}/datasources/unknown-ds/masking-rules`,
       { sensitive_columns: ["email"] },
     );
-    expect(outside.err_code).toBe(1001);
+    expect(outside.err_code).toBe(1002);
     const malformed = await call(
       "PUT",
       `/admin/flows/${queryFlow}/datasources/4f6f1a2b-0000-4000-8000-00000000a001/masking-rules`,
@@ -418,7 +418,7 @@ describe("non-admin guard", () => {
       "/admin/notification-channels",
       "/admin/migrations",
     ]) {
-      const response = await fetch(path);
+      const response = await fetch(path.startsWith("/api/v4") ? path : `/api/v4${path}`);
       expect(response.status).toBe(403);
     }
     window.localStorage.setItem("yearning-mock-auth", "admin");

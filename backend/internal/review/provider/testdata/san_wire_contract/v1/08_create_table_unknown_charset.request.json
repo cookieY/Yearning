@@ -1,0 +1,122 @@
+{
+  "request_schema_version": 1,
+  "review_run_id": "00000000-0000-4000-8000-000000000001",
+  "engine_profile": "mysql/mysql",
+  "anonymized_statement_groups": [
+    {
+      "group_id": "10000000-0000-4000-8000-000000000001",
+      "representative_shape": "kind=ddl op=create where=true",
+      "representative_anonymized_sql": "CREATE TABLE shop.legacy_notes (\n  id BIGINT NOT NULL,\n  body VARCHAR(200) NOT NULL DEFAULT '',\n  PRIMARY KEY (id)\n) ENGINE=InnoDB COMMENT='charset=custom_legacy_cs'",
+      "objects": [
+        {
+          "token": "shop",
+          "kind": "schema",
+          "relation": "reference",
+          "schema_token": "shop",
+          "statement_ordinal": 1,
+          "statement_ordinal_ranges": [
+            {
+              "start": 1,
+              "end": 1
+            }
+          ]
+        },
+        {
+          "token": "shop.legacy_notes",
+          "kind": "table",
+          "relation": "define",
+          "schema_token": "shop",
+          "statement_ordinal": 1,
+          "statement_ordinal_ranges": [
+            {
+              "start": 1,
+              "end": 1
+            }
+          ]
+        },
+        {
+          "token": "id",
+          "kind": "column",
+          "relation": "define",
+          "schema_token": "shop",
+          "parent_token": "shop.legacy_notes",
+          "statement_ordinal": 1,
+          "statement_ordinal_ranges": [
+            {
+              "start": 1,
+              "end": 1
+            }
+          ]
+        },
+        {
+          "token": "body",
+          "kind": "column",
+          "relation": "define",
+          "schema_token": "shop",
+          "parent_token": "shop.legacy_notes",
+          "statement_ordinal": 1,
+          "statement_ordinal_ranges": [
+            {
+              "start": 1,
+              "end": 1
+            }
+          ]
+        },
+        {
+          "token": "id",
+          "kind": "column",
+          "relation": "reference",
+          "schema_token": "shop",
+          "parent_token": "shop.legacy_notes",
+          "statement_ordinal": 1,
+          "statement_ordinal_ranges": [
+            {
+              "start": 1,
+              "end": 1
+            }
+          ]
+        }
+      ],
+      "metadata_context_complete": false,
+      "statement_count": 1,
+      "statement_ordinal": 1,
+      "statement_ordinal_ranges": [
+        {
+          "start": 1,
+          "end": 1
+        }
+      ],
+      "statistics": {
+        "algorithm_version": "yearning-fingerprint-v1",
+        "ddl_charset_status": "unknown",
+        "ddl_column_comment_count": 0,
+        "ddl_column_count": 2,
+        "ddl_default_count": 1,
+        "ddl_has_float_double": false,
+        "ddl_has_foreign_key": false,
+        "ddl_has_partition": false,
+        "ddl_has_primary_key": true,
+        "ddl_has_special_type": false,
+        "ddl_index_count": 1,
+        "ddl_index_max_key_parts": 1,
+        "ddl_index_prefix_conformant": true,
+        "ddl_index_unnamed_count": 1,
+        "ddl_max_char_length": 0,
+        "ddl_max_varchar_length": 200,
+        "ddl_not_null_count": 2,
+        "ddl_pk_is_integer": true,
+        "ddl_pk_named_id": true,
+        "ddl_table_comment_present": true,
+        "ddl_table_identifier_not_keyword": true,
+        "ddl_table_name_length": 12,
+        "ddl_table_prefix_conformant": true,
+        "in_value_count_max": 0,
+        "max_statement_bytes": 165,
+        "unbounded_mutation": false,
+        "values_row_count_max": 0
+      }
+    }
+  ],
+  "normalized_evidence": [],
+  "allowed_tool_descriptors": []
+}

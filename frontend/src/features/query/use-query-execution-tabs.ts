@@ -22,6 +22,8 @@ import {
   useSessionColumns,
 } from "@/features/query/use-query-domain";
 
+import { MAX_BATCH_STATEMENTS } from "@/shared/lib/sql-highlight";
+
 export interface HistoryEntry {
   id: string;
   sql: string;
@@ -34,7 +36,6 @@ export interface HistoryEntry {
 
 const AUTO_LOAD_ROW_LIMIT = 100_000;
 const HISTORY_LIMIT = 100;
-const MAX_BATCH_STATEMENTS = 16;
 
 export function useQueryExecutionTabs({
   sessionId,

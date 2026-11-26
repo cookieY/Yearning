@@ -1,8 +1,11 @@
 import { act, render, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider, useQuery } from "@tanstack/react-query";
-import { HttpResponse, http } from "msw";
+import { http } from "msw";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { apiRoute } from "@/shared/mock/api-route";
 import { server } from "@/test/msw/server";
+import { testProblemJson } from "@/test/envelope";
+import { stubSession } from "@/test/session";
 import { SessionProvider } from "@/features/auth/session-provider";
 import {
   GlobalEventBridge,
@@ -100,41 +103,13 @@ function createTestQueryClient(): QueryClient {
 }
 
 function stubAuthenticatedUser(): void {
-  server.use(
-    http.get("*/users/me", () =>
-      HttpResponse.json({
-        err_code: 0,
-        message: "ok",
-        data: {
-          id: "0198d9cc-e65d-7b9d-a8aa-3c81945f99ac",
-          username: "henry",
-          display_name: "henry",
-          email: null,
-          is_builtin_admin: false,
-          version: 1,
-          created_at: "2026-08-28T08:00:00Z",
-          updated_at: "2026-08-28T08:00:00Z",
-          can_access_admin: false,
-        },
-        request_id: "0198d9cc-e65d-7b9d-a8aa-3c81945f99ac",
-      }),
-    ),
-  );
+  stubSession(false);
 }
 
 function stubAnonymousUser(): void {
   server.use(
-    http.get("*/users/me", () =>
-      HttpResponse.json(
-        {
-          type: "about:blank",
-          title: "unauthorized",
-          status: 401,
-          detail: "authentication required",
-          request_id: "0198d9cc-e65d-7b9d-a8aa-3c81945f99ac",
-        },
-        { status: 401 },
-      ),
+    http.get(apiRoute("/users/me"), () =>
+      testProblemJson(401, "unauthorized", "authentication required"),
     ),
   );
 }

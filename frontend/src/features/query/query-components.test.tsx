@@ -1,14 +1,14 @@
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { HttpResponse, http } from "msw";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import { server } from "@/test/msw/server";
 import { resetQueryFixture, seedQueryScenario, QUERY_FIXTURE_DS_MYSQL_ID } from "@/shared/mock/query-fixture";
 import { SessionProvider } from "@/features/auth/session-provider";
 import "@/shared/i18n";
 import { MetadataTree } from "@/features/query/metadata-tree";
-import { ResultGrid, stringifyCell, type ResultTabState } from "@/features/query/result-grid";
+import { stringifyCell } from "@/features/query/cell-format";
+import { ResultGrid, type ResultTabState } from "@/features/query/result-grid";
+import { SESSION_USER_ID, stubSession } from "@/test/session";
 
 /**
  * Query workspace domain components: the frozen-scope metadata tree (lazy
@@ -16,31 +16,6 @@ import { ResultGrid, stringifyCell, type ResultTabState } from "@/features/query
  * template insertion) and the cursor-driven result grid (virtualized rows,
  * rows-loaded footer, continuation and exhaustion states — never a total).
  */
-
-const SESSION_USER_ID = "0198d9cc-e65d-7b9d-a8aa-3c81945f99ac";
-
-function stubSession(): void {
-  server.use(
-    http.get("*/users/me", () =>
-      HttpResponse.json({
-        err_code: 0,
-        message: "ok",
-        data: {
-          id: SESSION_USER_ID,
-          username: "henry",
-          display_name: "henry",
-          email: null,
-          is_builtin_admin: false,
-          version: 1,
-          created_at: "2026-08-28T08:00:00Z",
-          updated_at: "2026-08-28T08:00:00Z",
-          can_access_admin: false,
-        },
-        request_id: SESSION_USER_ID,
-      }),
-    ),
-  );
-}
 
 beforeAll(() => {
   Object.defineProperty(Element.prototype, "hasPointerCapture", { value: () => false, configurable: true });
@@ -59,7 +34,7 @@ describe("MetadataTree", () => {
     stubSession();
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     const session = {
-      id: "qs-fixture-active",
+      id: "6f0f2b3c-5555-4555-8555-000000000101",
       user_id: SESSION_USER_ID,
       state: "active" as const,
       capabilities: [

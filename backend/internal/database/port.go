@@ -146,6 +146,7 @@ type Credential struct {
 type ServerIdentity struct {
 	EngineFamily         string // mysql | postgresql
 	ServerVersion        string
+	RawVersionBanner     string // Full un-normalized server version() banner for Class B flavor detection
 	InstanceMarker       string // Stable instance identifier (invariant across credential rotation)
 	LowerCaseTableNames  string // MySQL @@lower_case_table_names
 	SystemIdentifier     string // PG system_identifier (empty when unavailable)

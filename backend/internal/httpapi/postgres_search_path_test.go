@@ -24,7 +24,6 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
-	"os"
 	"reflect"
 	"strings"
 	"sync"
@@ -36,6 +35,7 @@ import (
 	"github.com/cookieY/YearningX/backend/internal/crypto"
 	"github.com/cookieY/YearningX/backend/internal/database"
 	execapp "github.com/cookieY/YearningX/backend/internal/execution/application"
+	"github.com/cookieY/YearningX/backend/internal/platform/testenv"
 	reviewapp "github.com/cookieY/YearningX/backend/internal/review/application"
 	"github.com/cookieY/YearningX/backend/internal/review/provider"
 )
@@ -58,10 +58,8 @@ func newPostgresSearchPathTarget(
 ) *postgresSearchPathTarget {
 	t.Helper()
 	cfg := resolveB11TargetPG(t, fx)
-	databaseName := os.Getenv("YEARNING_TEST_ADAPTER_PG_DB")
-	if databaseName == "" {
-		databaseName = "postgres"
-	}
+	targetPG, _ := testenv.ResolveTargetPG(testenv.WithDefaultDBName("postgres"))
+	databaseName := targetPG.DBName
 	admin := openTargetPGNamed(
 		t, cfg.Host, fmt.Sprint(cfg.Port), databaseName,
 		cfg.AdminUser, cfg.AdminPassword, cfg.ApplicationName,

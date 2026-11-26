@@ -19,7 +19,10 @@ async function req(
   path: string,
   init?: RequestInit,
 ): Promise<{ status: number; body: Record<string, unknown> }> {
-  const response = await fetch(`https://yearning.test${path}`, init);
+  const response = await fetch(
+    `https://yearning.test${path.startsWith("/api/v4") ? path : `/api/v4${path}`}`,
+    init,
+  );
   return { status: response.status, body: (await response.json()) as Record<string, unknown> };
 }
 

@@ -1,0 +1,58 @@
+{
+  "contract_version": 1,
+  "openapi_sha": "b08b588223c0b586a5c9c4e0f1c9b0cd818d7ef1d61f3f9e823d5a489e37fb73",
+  "zod_runtime_sha256": "32b72a82897ae698b7566aad9821c07cf5194173a3dc69adfb00a8f00f04a446",
+  "operation_id": "listReviewRunFindings",
+  "case_id": "evidence-chain",
+  "http_status": 200,
+  "err_code": 0,
+  "response": {
+    "data": {
+      "items": [
+        {
+          "id": "00000000-0000-4000-8000-000000000260",
+          "stage_position": 1,
+          "fingerprint_group_id": "00000000-0000-4000-8000-000000000261",
+          "category": "governance",
+          "severity": "info",
+          "title": "建表语句未附带表与列注释，库内元数据无法自解释，后续维护需额外查文档",
+          "message": "语句中既没有表注释，也没有列注释，使用方只能靠外部文档推断字段含义。",
+          "suggestion": "建议随本次变更补充 `COMMENT ON TABLE` 与 `COMMENT ON COLUMN` 语句，或至少在评审单中记录字段用途。",
+          "model_confidence": null,
+          "evidence_ids": []
+        },
+        {
+          "id": "00000000-0000-4000-8000-000000000262",
+          "stage_position": 1,
+          "fingerprint_group_id": "00000000-0000-4000-8000-000000000261",
+          "category": "governance",
+          "severity": "low",
+          "title": "`name` 既未声明 `NOT NULL` 也无默认值，写入可能产生全空值行且难以与有效数据区分",
+          "message": "该列允许为空且没有默认值，空值行与真实数据在查询和统计中无法区分，容易造成下游口径偏差。",
+          "suggestion": "先确认该列是否真的需要表达“未知值”：若不需要，建议在语句中补充 `NOT NULL` 与合理默认值；若确需允许空值，请在评审记录中说明业务含义。",
+          "model_confidence": null,
+          "evidence_ids": []
+        },
+        {
+          "id": "00000000-0000-4000-8000-000000000263",
+          "stage_position": 1,
+          "fingerprint_group_id": "00000000-0000-4000-8000-000000000261",
+          "category": "correctness",
+          "severity": "medium",
+          "title": "新建表 `f12_contract_b4` 未声明主键，后续按行定位、去重与逻辑复制的更新将缺少唯一依据",
+          "message": "从提交的语句看，表中只有一个 `text` 列，没有任何主键或唯一约束；应用端幂等写入、按行更新与后续数据订正都没有可靠的定位锚点。",
+          "suggestion": "若该表需要承载写入，建议在语句中追加业务无关的主键列（如自增标识或 `uuid`）并声明 `PRIMARY KEY`；若唯一性由上游系统保证，需在评审记录中说明替代键及校验方式。",
+          "model_confidence": null,
+          "evidence_ids": []
+        }
+      ],
+      "page": {
+        "has_more": false,
+        "next_cursor": null
+      }
+    },
+    "err_code": 0,
+    "message": "ok",
+    "request_id": "00000000-0000-4000-8000-999999999999"
+  }
+}

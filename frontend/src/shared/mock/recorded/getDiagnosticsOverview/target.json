@@ -1,0 +1,1233 @@
+{
+  "contract_version": 1,
+  "openapi_sha": "b08b588223c0b586a5c9c4e0f1c9b0cd818d7ef1d61f3f9e823d5a489e37fb73",
+  "zod_runtime_sha256": "32b72a82897ae698b7566aad9821c07cf5194173a3dc69adfb00a8f00f04a446",
+  "operation_id": "getDiagnosticsOverview",
+  "case_id": "target",
+  "http_status": 200,
+  "err_code": 0,
+  "response": {
+    "data": {
+      "datasource_id": "00000000-0000-4000-8000-000000000009",
+      "engine": "postgresql",
+      "compatibility_mode": "postgresql",
+      "probe_state": "ready",
+      "state": "active",
+      "coverage_mode": "cumulative_only",
+      "from": "2026-11-25T01:06:00.000Z",
+      "to": "2026-11-25T01:07:00.000Z",
+      "compare_from": "2026-11-25T01:08:00.000Z",
+      "compare_to": "2026-11-25T01:06:00.000Z",
+      "last_collected_at": "2026-11-25T01:09:00.000Z",
+      "snapshot_count": 1,
+      "load_trend": [
+        {
+          "bucket_start": "2026-11-25T01:10:00.000Z",
+          "bucket_end": "2026-11-25T01:09:00.000Z",
+          "total_exec_time_ms": 890.994,
+          "calls": 503,
+          "avg_exec_time_ms": 1.771,
+          "reset_detected": false
+        }
+      ],
+      "top_statements": [
+        {
+          "statement_id": "00000000-0000-4000-8000-000000000128",
+          "engine_fingerprint": "3743533789385642733",
+          "database_or_schema": "target",
+          "template_preview": "select d1.id, d1.note from public.f12_demo d1 join public.f12_demo d2 on d1.id <= d2.id where d1.note >= $1 order by d1.note desc limit $2",
+          "calls": 80,
+          "total_exec_time_ms": 874.501,
+          "avg_exec_time_ms": 10.931,
+          "share_of_total_time": 0.9815
+        },
+        {
+          "statement_id": "00000000-0000-4000-8000-000000000129",
+          "engine_fingerprint": "7162344126032689968",
+          "database_or_schema": "target",
+          "template_preview": "WITH requested AS ( SELECT pg_catalog.jsonb_extract_path( $1::pg_catalog.jsonb, $2) AS functions, pg_catalog.jsonb_extract_path( $1::pg_catalog.jsonb, $3) AS op…",
+          "calls": 18,
+          "total_exec_time_ms": 7.5,
+          "avg_exec_time_ms": 0.417,
+          "share_of_total_time": 0.0084
+        },
+        {
+          "statement_id": "00000000-0000-4000-8000-000000000130",
+          "engine_fingerprint": "-5442416245979601656",
+          "database_or_schema": "target",
+          "template_preview": "WITH requested AS ( SELECT pg_catalog.jsonb_extract_path( $1::pg_catalog.jsonb, $2) AS relations, pg_catalog.jsonb_extract_path( $1::pg_catalog.jsonb, $3) AS sc…",
+          "calls": 18,
+          "total_exec_time_ms": 1.84,
+          "avg_exec_time_ms": 0.102,
+          "share_of_total_time": 0.0021
+        },
+        {
+          "statement_id": "00000000-0000-4000-8000-000000000131",
+          "engine_fingerprint": "-1177516425923884264",
+          "database_or_schema": "target",
+          "template_preview": "SELECT a.attname, a.attnum, format_type(a.atttypid, a.atttypmod) || repeat($3, GREATEST(a.attndims - $4, $5)), NOT a.attnotnull, $6, COALESCE(pg_get_expr(ad.adb…",
+          "calls": 6,
+          "total_exec_time_ms": 1.251,
+          "avg_exec_time_ms": 0.209,
+          "share_of_total_time": 0.0014
+        },
+        {
+          "statement_id": "00000000-0000-4000-8000-000000000132",
+          "engine_fingerprint": "1531387174261281955",
+          "database_or_schema": "target",
+          "template_preview": "SELECT system_identifier::text FROM pg_control_system()",
+          "calls": 38,
+          "total_exec_time_ms": 0.981,
+          "avg_exec_time_ms": 0.026,
+          "share_of_total_time": 0.0011
+        },
+        {
+          "statement_id": "00000000-0000-4000-8000-000000000133",
+          "engine_fingerprint": "-7616978463225585861",
+          "database_or_schema": "target",
+          "template_preview": "SELECT (SELECT COUNT(*) FROM pg_catalog.pg_class c JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace WHERE n.nspname = $1 AND c.relname = $2 AND c.relkin…",
+          "calls": 17,
+          "total_exec_time_ms": 0.696,
+          "avg_exec_time_ms": 0.041,
+          "share_of_total_time": 0.0008
+        },
+        {
+          "statement_id": "00000000-0000-4000-8000-000000000134",
+          "engine_fingerprint": "7711260328103084813",
+          "database_or_schema": "target",
+          "template_preview": "SET LOCAL search_path = pg_catalog",
+          "calls": 36,
+          "total_exec_time_ms": 0.681,
+          "avg_exec_time_ms": 0.019,
+          "share_of_total_time": 0.0008
+        },
+        {
+          "statement_id": "00000000-0000-4000-8000-000000000135",
+          "engine_fingerprint": "7070899402066770802",
+          "database_or_schema": "target",
+          "template_preview": "SELECT current_setting($1)::int, current_setting($2), (SELECT oid::int FROM pg_database WHERE datname = current_database()), current_database()",
+          "calls": 38,
+          "total_exec_time_ms": 0.575,
+          "avg_exec_time_ms": 0.015,
+          "share_of_total_time": 0.0006
+        },
+        {
+          "statement_id": "00000000-0000-4000-8000-000000000136",
+          "engine_fingerprint": "677517973162502891",
+          "database_or_schema": "target",
+          "template_preview": "SELECT CURRENT_USER::pg_catalog.text, pg_catalog.current_setting($1)::pg_catalog.text, pg_catalog.array_to_json(pg_catalog.current_schemas($2))::pg_catalog.text…",
+          "calls": 18,
+          "total_exec_time_ms": 0.569,
+          "avg_exec_time_ms": 0.032,
+          "share_of_total_time": 0.0006
+        },
+        {
+          "statement_id": "00000000-0000-4000-8000-000000000137",
+          "engine_fingerprint": "2869606018209600839",
+          "database_or_schema": "target",
+          "template_preview": "begin read only",
+          "calls": 92,
+          "total_exec_time_ms": 0.566,
+          "avg_exec_time_ms": 0.006,
+          "share_of_total_time": 0.0006
+        }
+      ],
+      "scatter_points": [
+        {
+          "statement_id": "00000000-0000-4000-8000-000000000128",
+          "engine_fingerprint": "3743533789385642733",
+          "database_or_schema": "target",
+          "calls": 80,
+          "avg_exec_time_ms": 10.931,
+          "total_exec_time_ms": 874.501,
+          "rows_examined_or_shared_blks_read": 0
+        },
+        {
+          "statement_id": "00000000-0000-4000-8000-000000000129",
+          "engine_fingerprint": "7162344126032689968",
+          "database_or_schema": "target",
+          "calls": 18,
+          "avg_exec_time_ms": 0.417,
+          "total_exec_time_ms": 7.5,
+          "rows_examined_or_shared_blks_read": 0
+        },
+        {
+          "statement_id": "00000000-0000-4000-8000-000000000130",
+          "engine_fingerprint": "-5442416245979601656",
+          "database_or_schema": "target",
+          "calls": 18,
+          "avg_exec_time_ms": 0.102,
+          "total_exec_time_ms": 1.84,
+          "rows_examined_or_shared_blks_read": 0
+        },
+        {
+          "statement_id": "00000000-0000-4000-8000-000000000131",
+          "engine_fingerprint": "-1177516425923884264",
+          "database_or_schema": "target",
+          "calls": 6,
+          "avg_exec_time_ms": 0.209,
+          "total_exec_time_ms": 1.251,
+          "rows_examined_or_shared_blks_read": 0
+        },
+        {
+          "statement_id": "00000000-0000-4000-8000-000000000132",
+          "engine_fingerprint": "1531387174261281955",
+          "database_or_schema": "target",
+          "calls": 38,
+          "avg_exec_time_ms": 0.026,
+          "total_exec_time_ms": 0.981,
+          "rows_examined_or_shared_blks_read": 0
+        },
+        {
+          "statement_id": "00000000-0000-4000-8000-000000000133",
+          "engine_fingerprint": "-7616978463225585861",
+          "database_or_schema": "target",
+          "calls": 17,
+          "avg_exec_time_ms": 0.041,
+          "total_exec_time_ms": 0.696,
+          "rows_examined_or_shared_blks_read": 0
+        },
+        {
+          "statement_id": "00000000-0000-4000-8000-000000000134",
+          "engine_fingerprint": "7711260328103084813",
+          "database_or_schema": "target",
+          "calls": 36,
+          "avg_exec_time_ms": 0.019,
+          "total_exec_time_ms": 0.681,
+          "rows_examined_or_shared_blks_read": 0
+        },
+        {
+          "statement_id": "00000000-0000-4000-8000-000000000135",
+          "engine_fingerprint": "7070899402066770802",
+          "database_or_schema": "target",
+          "calls": 38,
+          "avg_exec_time_ms": 0.015,
+          "total_exec_time_ms": 0.575,
+          "rows_examined_or_shared_blks_read": 0
+        },
+        {
+          "statement_id": "00000000-0000-4000-8000-000000000136",
+          "engine_fingerprint": "677517973162502891",
+          "database_or_schema": "target",
+          "calls": 18,
+          "avg_exec_time_ms": 0.032,
+          "total_exec_time_ms": 0.569,
+          "rows_examined_or_shared_blks_read": 0
+        },
+        {
+          "statement_id": "00000000-0000-4000-8000-000000000137",
+          "engine_fingerprint": "2869606018209600839",
+          "database_or_schema": "target",
+          "calls": 92,
+          "avg_exec_time_ms": 0.006,
+          "total_exec_time_ms": 0.566,
+          "rows_examined_or_shared_blks_read": 0
+        },
+        {
+          "statement_id": "00000000-0000-4000-8000-000000000138",
+          "engine_fingerprint": "-1801820283056510380",
+          "database_or_schema": "target",
+          "calls": 5,
+          "avg_exec_time_ms": 0.087,
+          "total_exec_time_ms": 0.437,
+          "rows_examined_or_shared_blks_read": 0
+        },
+        {
+          "statement_id": "00000000-0000-4000-8000-000000000139",
+          "engine_fingerprint": "-5798645035947812381",
+          "database_or_schema": "target",
+          "calls": 1,
+          "avg_exec_time_ms": 0.432,
+          "total_exec_time_ms": 0.432,
+          "rows_examined_or_shared_blks_read": 0
+        },
+        {
+          "statement_id": "00000000-0000-4000-8000-000000000140",
+          "engine_fingerprint": "-6692782100520165545",
+          "database_or_schema": "target",
+          "calls": 2,
+          "avg_exec_time_ms": 0.149,
+          "total_exec_time_ms": 0.299,
+          "rows_examined_or_shared_blks_read": 0
+        },
+        {
+          "statement_id": "00000000-0000-4000-8000-000000000141",
+          "engine_fingerprint": "-6032530250903767675",
+          "database_or_schema": "target",
+          "calls": 2,
+          "avg_exec_time_ms": 0.066,
+          "total_exec_time_ms": 0.132,
+          "rows_examined_or_shared_blks_read": 0
+        },
+        {
+          "statement_id": "00000000-0000-4000-8000-000000000142",
+          "engine_fingerprint": "-2646723144215712964",
+          "database_or_schema": "target",
+          "calls": 90,
+          "avg_exec_time_ms": 0.001,
+          "total_exec_time_ms": 0.086,
+          "rows_examined_or_shared_blks_read": 0
+        },
+        {
+          "statement_id": "00000000-0000-4000-8000-000000000143",
+          "engine_fingerprint": "-5619111881952276154",
+          "database_or_schema": "target",
+          "calls": 1,
+          "avg_exec_time_ms": 0.078,
+          "total_exec_time_ms": 0.078,
+          "rows_examined_or_shared_blks_read": 0
+        },
+        {
+          "statement_id": "00000000-0000-4000-8000-000000000144",
+          "engine_fingerprint": "5385930926416482441",
+          "database_or_schema": "target",
+          "calls": 1,
+          "avg_exec_time_ms": 0.053,
+          "total_exec_time_ms": 0.053,
+          "rows_examined_or_shared_blks_read": 0
+        },
+        {
+          "statement_id": "00000000-0000-4000-8000-000000000145",
+          "engine_fingerprint": "-7009087094433949720",
+          "database_or_schema": "target",
+          "calls": 2,
+          "avg_exec_time_ms": 0.025,
+          "total_exec_time_ms": 0.05,
+          "rows_examined_or_shared_blks_read": 0
+        },
+        {
+          "statement_id": "00000000-0000-4000-8000-000000000146",
+          "engine_fingerprint": "7858357695544425669",
+          "database_or_schema": "target",
+          "calls": 1,
+          "avg_exec_time_ms": 0.047,
+          "total_exec_time_ms": 0.047,
+          "rows_examined_or_shared_blks_read": 0
+        },
+        {
+          "statement_id": "00000000-0000-4000-8000-000000000147",
+          "engine_fingerprint": "-1379135811954908159",
+          "database_or_schema": "target",
+          "calls": 2,
+          "avg_exec_time_ms": 0.02,
+          "total_exec_time_ms": 0.041,
+          "rows_examined_or_shared_blks_read": 0
+        },
+        {
+          "statement_id": "00000000-0000-4000-8000-000000000148",
+          "engine_fingerprint": "2047535961913585732",
+          "database_or_schema": "target",
+          "calls": 4,
+          "avg_exec_time_ms": 0.01,
+          "total_exec_time_ms": 0.04,
+          "rows_examined_or_shared_blks_read": 0
+        },
+        {
+          "statement_id": "00000000-0000-4000-8000-000000000149",
+          "engine_fingerprint": "6115167015389607406",
+          "database_or_schema": "target",
+          "calls": 18,
+          "avg_exec_time_ms": 0.002,
+          "total_exec_time_ms": 0.029,
+          "rows_examined_or_shared_blks_read": 0
+        },
+        {
+          "statement_id": "00000000-0000-4000-8000-000000000150",
+          "engine_fingerprint": "-8483843790921647549",
+          "database_or_schema": "target",
+          "calls": 1,
+          "avg_exec_time_ms": 0.026,
+          "total_exec_time_ms": 0.026,
+          "rows_examined_or_shared_blks_read": 0
+        },
+        {
+          "statement_id": "00000000-0000-4000-8000-000000000151",
+          "engine_fingerprint": "8356219683524388216",
+          "database_or_schema": "target",
+          "calls": 3,
+          "avg_exec_time_ms": 0.009,
+          "total_exec_time_ms": 0.026,
+          "rows_examined_or_shared_blks_read": 0
+        },
+        {
+          "statement_id": "00000000-0000-4000-8000-000000000152",
+          "engine_fingerprint": "9082080597663679522",
+          "database_or_schema": "target",
+          "calls": 2,
+          "avg_exec_time_ms": 0.008,
+          "total_exec_time_ms": 0.016,
+          "rows_examined_or_shared_blks_read": 0
+        },
+        {
+          "statement_id": "00000000-0000-4000-8000-000000000153",
+          "engine_fingerprint": "5162509649015904499",
+          "database_or_schema": "target",
+          "calls": 1,
+          "avg_exec_time_ms": 0.014,
+          "total_exec_time_ms": 0.014,
+          "rows_examined_or_shared_blks_read": 0
+        },
+        {
+          "statement_id": "00000000-0000-4000-8000-000000000154",
+          "engine_fingerprint": "1913049540002914836",
+          "database_or_schema": "target",
+          "calls": 1,
+          "avg_exec_time_ms": 0.011,
+          "total_exec_time_ms": 0.011,
+          "rows_examined_or_shared_blks_read": 0
+        },
+        {
+          "statement_id": "00000000-0000-4000-8000-000000000155",
+          "engine_fingerprint": "-5421859692537557562",
+          "database_or_schema": "target",
+          "calls": 1,
+          "avg_exec_time_ms": 0.006,
+          "total_exec_time_ms": 0.006,
+          "rows_examined_or_shared_blks_read": 0
+        },
+        {
+          "statement_id": "00000000-0000-4000-8000-000000000156",
+          "engine_fingerprint": "3426470769481110998",
+          "database_or_schema": "target",
+          "calls": 1,
+          "avg_exec_time_ms": 0.003,
+          "total_exec_time_ms": 0.003,
+          "rows_examined_or_shared_blks_read": 0
+        },
+        {
+          "statement_id": "00000000-0000-4000-8000-000000000157",
+          "engine_fingerprint": "6226329061870596326",
+          "database_or_schema": "target",
+          "calls": 1,
+          "avg_exec_time_ms": 0.003,
+          "total_exec_time_ms": 0.003,
+          "rows_examined_or_shared_blks_read": 0
+        },
+        {
+          "statement_id": "00000000-0000-4000-8000-000000000158",
+          "engine_fingerprint": "-1245524085737754250",
+          "database_or_schema": "target",
+          "calls": 1,
+          "avg_exec_time_ms": 0.003,
+          "total_exec_time_ms": 0.003,
+          "rows_examined_or_shared_blks_read": 0
+        },
+        {
+          "statement_id": "00000000-0000-4000-8000-000000000159",
+          "engine_fingerprint": "1497739856785757017",
+          "database_or_schema": "target",
+          "calls": 1,
+          "avg_exec_time_ms": 0.002,
+          "total_exec_time_ms": 0.002,
+          "rows_examined_or_shared_blks_read": 0
+        }
+      ],
+      "heatmap": [
+        {
+          "statement_id": "00000000-0000-4000-8000-000000000128",
+          "engine_fingerprint": "3743533789385642733",
+          "database_or_schema": "target",
+          "buckets": [
+            {
+              "bucket_start": "2026-11-25T01:09:00.000Z",
+              "total_exec_time_ms": 874.501,
+              "calls": 80,
+              "unobserved_below_top_n": false
+            }
+          ]
+        },
+        {
+          "statement_id": "00000000-0000-4000-8000-000000000129",
+          "engine_fingerprint": "7162344126032689968",
+          "database_or_schema": "target",
+          "buckets": [
+            {
+              "bucket_start": "2026-11-25T01:09:00.000Z",
+              "total_exec_time_ms": 7.5,
+              "calls": 18,
+              "unobserved_below_top_n": false
+            }
+          ]
+        },
+        {
+          "statement_id": "00000000-0000-4000-8000-000000000130",
+          "engine_fingerprint": "-5442416245979601656",
+          "database_or_schema": "target",
+          "buckets": [
+            {
+              "bucket_start": "2026-11-25T01:09:00.000Z",
+              "total_exec_time_ms": 1.84,
+              "calls": 18,
+              "unobserved_below_top_n": false
+            }
+          ]
+        },
+        {
+          "statement_id": "00000000-0000-4000-8000-000000000131",
+          "engine_fingerprint": "-1177516425923884264",
+          "database_or_schema": "target",
+          "buckets": [
+            {
+              "bucket_start": "2026-11-25T01:09:00.000Z",
+              "total_exec_time_ms": 1.251,
+              "calls": 6,
+              "unobserved_below_top_n": false
+            }
+          ]
+        },
+        {
+          "statement_id": "00000000-0000-4000-8000-000000000132",
+          "engine_fingerprint": "1531387174261281955",
+          "database_or_schema": "target",
+          "buckets": [
+            {
+              "bucket_start": "2026-11-25T01:09:00.000Z",
+              "total_exec_time_ms": 0.981,
+              "calls": 38,
+              "unobserved_below_top_n": false
+            }
+          ]
+        },
+        {
+          "statement_id": "00000000-0000-4000-8000-000000000133",
+          "engine_fingerprint": "-7616978463225585861",
+          "database_or_schema": "target",
+          "buckets": [
+            {
+              "bucket_start": "2026-11-25T01:09:00.000Z",
+              "total_exec_time_ms": 0.696,
+              "calls": 17,
+              "unobserved_below_top_n": false
+            }
+          ]
+        },
+        {
+          "statement_id": "00000000-0000-4000-8000-000000000134",
+          "engine_fingerprint": "7711260328103084813",
+          "database_or_schema": "target",
+          "buckets": [
+            {
+              "bucket_start": "2026-11-25T01:09:00.000Z",
+              "total_exec_time_ms": 0.681,
+              "calls": 36,
+              "unobserved_below_top_n": false
+            }
+          ]
+        },
+        {
+          "statement_id": "00000000-0000-4000-8000-000000000135",
+          "engine_fingerprint": "7070899402066770802",
+          "database_or_schema": "target",
+          "buckets": [
+            {
+              "bucket_start": "2026-11-25T01:09:00.000Z",
+              "total_exec_time_ms": 0.575,
+              "calls": 38,
+              "unobserved_below_top_n": false
+            }
+          ]
+        },
+        {
+          "statement_id": "00000000-0000-4000-8000-000000000136",
+          "engine_fingerprint": "677517973162502891",
+          "database_or_schema": "target",
+          "buckets": [
+            {
+              "bucket_start": "2026-11-25T01:09:00.000Z",
+              "total_exec_time_ms": 0.569,
+              "calls": 18,
+              "unobserved_below_top_n": false
+            }
+          ]
+        },
+        {
+          "statement_id": "00000000-0000-4000-8000-000000000137",
+          "engine_fingerprint": "2869606018209600839",
+          "database_or_schema": "target",
+          "buckets": [
+            {
+              "bucket_start": "2026-11-25T01:09:00.000Z",
+              "total_exec_time_ms": 0.566,
+              "calls": 92,
+              "unobserved_below_top_n": false
+            }
+          ]
+        }
+      ],
+      "regressions": [],
+      "new_high_load": [
+        {
+          "statement_id": "00000000-0000-4000-8000-000000000128",
+          "engine_fingerprint": "3743533789385642733",
+          "database_or_schema": "target",
+          "current_calls": 80,
+          "current_total_ms": 874.501,
+          "current_avg_ms": 10.931,
+          "unobserved_note": "Not observed in the comparison window Top-N snapshots or collection range; does not imply the statement never executed historically"
+        },
+        {
+          "statement_id": "00000000-0000-4000-8000-000000000129",
+          "engine_fingerprint": "7162344126032689968",
+          "database_or_schema": "target",
+          "current_calls": 18,
+          "current_total_ms": 7.5,
+          "current_avg_ms": 0.417,
+          "unobserved_note": "Not observed in the comparison window Top-N snapshots or collection range; does not imply the statement never executed historically"
+        },
+        {
+          "statement_id": "00000000-0000-4000-8000-000000000130",
+          "engine_fingerprint": "-5442416245979601656",
+          "database_or_schema": "target",
+          "current_calls": 18,
+          "current_total_ms": 1.84,
+          "current_avg_ms": 0.102,
+          "unobserved_note": "Not observed in the comparison window Top-N snapshots or collection range; does not imply the statement never executed historically"
+        },
+        {
+          "statement_id": "00000000-0000-4000-8000-000000000131",
+          "engine_fingerprint": "-1177516425923884264",
+          "database_or_schema": "target",
+          "current_calls": 6,
+          "current_total_ms": 1.251,
+          "current_avg_ms": 0.209,
+          "unobserved_note": "Not observed in the comparison window Top-N snapshots or collection range; does not imply the statement never executed historically"
+        },
+        {
+          "statement_id": "00000000-0000-4000-8000-000000000132",
+          "engine_fingerprint": "1531387174261281955",
+          "database_or_schema": "target",
+          "current_calls": 38,
+          "current_total_ms": 0.981,
+          "current_avg_ms": 0.026,
+          "unobserved_note": "Not observed in the comparison window Top-N snapshots or collection range; does not imply the statement never executed historically"
+        },
+        {
+          "statement_id": "00000000-0000-4000-8000-000000000133",
+          "engine_fingerprint": "-7616978463225585861",
+          "database_or_schema": "target",
+          "current_calls": 17,
+          "current_total_ms": 0.696,
+          "current_avg_ms": 0.041,
+          "unobserved_note": "Not observed in the comparison window Top-N snapshots or collection range; does not imply the statement never executed historically"
+        },
+        {
+          "statement_id": "00000000-0000-4000-8000-000000000134",
+          "engine_fingerprint": "7711260328103084813",
+          "database_or_schema": "target",
+          "current_calls": 36,
+          "current_total_ms": 0.681,
+          "current_avg_ms": 0.019,
+          "unobserved_note": "Not observed in the comparison window Top-N snapshots or collection range; does not imply the statement never executed historically"
+        },
+        {
+          "statement_id": "00000000-0000-4000-8000-000000000135",
+          "engine_fingerprint": "7070899402066770802",
+          "database_or_schema": "target",
+          "current_calls": 38,
+          "current_total_ms": 0.575,
+          "current_avg_ms": 0.015,
+          "unobserved_note": "Not observed in the comparison window Top-N snapshots or collection range; does not imply the statement never executed historically"
+        },
+        {
+          "statement_id": "00000000-0000-4000-8000-000000000136",
+          "engine_fingerprint": "677517973162502891",
+          "database_or_schema": "target",
+          "current_calls": 18,
+          "current_total_ms": 0.569,
+          "current_avg_ms": 0.032,
+          "unobserved_note": "Not observed in the comparison window Top-N snapshots or collection range; does not imply the statement never executed historically"
+        },
+        {
+          "statement_id": "00000000-0000-4000-8000-000000000137",
+          "engine_fingerprint": "2869606018209600839",
+          "database_or_schema": "target",
+          "current_calls": 92,
+          "current_total_ms": 0.566,
+          "current_avg_ms": 0.006,
+          "unobserved_note": "Not observed in the comparison window Top-N snapshots or collection range; does not imply the statement never executed historically"
+        }
+      ],
+      "statements": [
+        {
+          "statement_id": "00000000-0000-4000-8000-000000000128",
+          "engine_fingerprint": "3743533789385642733",
+          "yearning_fingerprint": null,
+          "database_or_schema": "target",
+          "template_status": "not_fetched",
+          "template_preview": "select d1.id, d1.note from public.f12_demo d1 join public.f12_demo d2 on d1.id <= d2.id where d1.note >= $1 order by d1.note desc limit $2",
+          "calls": 80,
+          "total_exec_time_ms": 874.501,
+          "avg_exec_time_ms": 10.931,
+          "rows_examined_or_shared_blks_read": 0,
+          "rows_sent_or_rows_returned": 800,
+          "lock_time_ms_or_temp_blks_written": 0,
+          "share_of_total_time": 0.9815,
+          "coverage_mode": "cumulative_only",
+          "first_seen_at": "2026-11-25T01:09:00.000Z",
+          "last_seen_at": "2026-11-25T01:09:00.000Z"
+        },
+        {
+          "statement_id": "00000000-0000-4000-8000-000000000129",
+          "engine_fingerprint": "7162344126032689968",
+          "yearning_fingerprint": null,
+          "database_or_schema": "target",
+          "template_status": "not_fetched",
+          "template_preview": "WITH requested AS ( SELECT pg_catalog.jsonb_extract_path( $1::pg_catalog.jsonb, $2) AS functions, pg_catalog.jsonb_extract_path( $1::pg_catalog.jsonb, $3) AS op…",
+          "calls": 18,
+          "total_exec_time_ms": 7.5,
+          "avg_exec_time_ms": 0.417,
+          "rows_examined_or_shared_blks_read": 0,
+          "rows_sent_or_rows_returned": 18,
+          "lock_time_ms_or_temp_blks_written": 0,
+          "share_of_total_time": 0.0084,
+          "coverage_mode": "cumulative_only",
+          "first_seen_at": "2026-11-25T01:09:00.000Z",
+          "last_seen_at": "2026-11-25T01:09:00.000Z"
+        },
+        {
+          "statement_id": "00000000-0000-4000-8000-000000000130",
+          "engine_fingerprint": "-5442416245979601656",
+          "yearning_fingerprint": null,
+          "database_or_schema": "target",
+          "template_status": "not_fetched",
+          "template_preview": "WITH requested AS ( SELECT pg_catalog.jsonb_extract_path( $1::pg_catalog.jsonb, $2) AS relations, pg_catalog.jsonb_extract_path( $1::pg_catalog.jsonb, $3) AS sc…",
+          "calls": 18,
+          "total_exec_time_ms": 1.84,
+          "avg_exec_time_ms": 0.102,
+          "rows_examined_or_shared_blks_read": 0,
+          "rows_sent_or_rows_returned": 18,
+          "lock_time_ms_or_temp_blks_written": 0,
+          "share_of_total_time": 0.0021,
+          "coverage_mode": "cumulative_only",
+          "first_seen_at": "2026-11-25T01:09:00.000Z",
+          "last_seen_at": "2026-11-25T01:09:00.000Z"
+        },
+        {
+          "statement_id": "00000000-0000-4000-8000-000000000131",
+          "engine_fingerprint": "-1177516425923884264",
+          "yearning_fingerprint": null,
+          "database_or_schema": "target",
+          "template_status": "not_fetched",
+          "template_preview": "SELECT a.attname, a.attnum, format_type(a.atttypid, a.atttypmod) || repeat($3, GREATEST(a.attndims - $4, $5)), NOT a.attnotnull, $6, COALESCE(pg_get_expr(ad.adb…",
+          "calls": 6,
+          "total_exec_time_ms": 1.251,
+          "avg_exec_time_ms": 0.209,
+          "rows_examined_or_shared_blks_read": 0,
+          "rows_sent_or_rows_returned": 12,
+          "lock_time_ms_or_temp_blks_written": 0,
+          "share_of_total_time": 0.0014,
+          "coverage_mode": "cumulative_only",
+          "first_seen_at": "2026-11-25T01:09:00.000Z",
+          "last_seen_at": "2026-11-25T01:09:00.000Z"
+        },
+        {
+          "statement_id": "00000000-0000-4000-8000-000000000132",
+          "engine_fingerprint": "1531387174261281955",
+          "yearning_fingerprint": null,
+          "database_or_schema": "target",
+          "template_status": "not_fetched",
+          "template_preview": "SELECT system_identifier::text FROM pg_control_system()",
+          "calls": 38,
+          "total_exec_time_ms": 0.981,
+          "avg_exec_time_ms": 0.026,
+          "rows_examined_or_shared_blks_read": 0,
+          "rows_sent_or_rows_returned": 38,
+          "lock_time_ms_or_temp_blks_written": 0,
+          "share_of_total_time": 0.0011,
+          "coverage_mode": "cumulative_only",
+          "first_seen_at": "2026-11-25T01:09:00.000Z",
+          "last_seen_at": "2026-11-25T01:09:00.000Z"
+        },
+        {
+          "statement_id": "00000000-0000-4000-8000-000000000133",
+          "engine_fingerprint": "-7616978463225585861",
+          "yearning_fingerprint": null,
+          "database_or_schema": "target",
+          "template_status": "not_fetched",
+          "template_preview": "SELECT (SELECT COUNT(*) FROM pg_catalog.pg_class c JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace WHERE n.nspname = $1 AND c.relname = $2 AND c.relkin…",
+          "calls": 17,
+          "total_exec_time_ms": 0.696,
+          "avg_exec_time_ms": 0.041,
+          "rows_examined_or_shared_blks_read": 0,
+          "rows_sent_or_rows_returned": 17,
+          "lock_time_ms_or_temp_blks_written": 0,
+          "share_of_total_time": 0.0008,
+          "coverage_mode": "cumulative_only",
+          "first_seen_at": "2026-11-25T01:09:00.000Z",
+          "last_seen_at": "2026-11-25T01:09:00.000Z"
+        },
+        {
+          "statement_id": "00000000-0000-4000-8000-000000000134",
+          "engine_fingerprint": "7711260328103084813",
+          "yearning_fingerprint": null,
+          "database_or_schema": "target",
+          "template_status": "not_fetched",
+          "template_preview": "SET LOCAL search_path = pg_catalog",
+          "calls": 36,
+          "total_exec_time_ms": 0.681,
+          "avg_exec_time_ms": 0.019,
+          "rows_examined_or_shared_blks_read": 0,
+          "rows_sent_or_rows_returned": 0,
+          "lock_time_ms_or_temp_blks_written": 0,
+          "share_of_total_time": 0.0008,
+          "coverage_mode": "cumulative_only",
+          "first_seen_at": "2026-11-25T01:09:00.000Z",
+          "last_seen_at": "2026-11-25T01:09:00.000Z"
+        },
+        {
+          "statement_id": "00000000-0000-4000-8000-000000000135",
+          "engine_fingerprint": "7070899402066770802",
+          "yearning_fingerprint": null,
+          "database_or_schema": "target",
+          "template_status": "not_fetched",
+          "template_preview": "SELECT current_setting($1)::int, current_setting($2), (SELECT oid::int FROM pg_database WHERE datname = current_database()), current_database()",
+          "calls": 38,
+          "total_exec_time_ms": 0.575,
+          "avg_exec_time_ms": 0.015,
+          "rows_examined_or_shared_blks_read": 0,
+          "rows_sent_or_rows_returned": 38,
+          "lock_time_ms_or_temp_blks_written": 0,
+          "share_of_total_time": 0.0006,
+          "coverage_mode": "cumulative_only",
+          "first_seen_at": "2026-11-25T01:09:00.000Z",
+          "last_seen_at": "2026-11-25T01:09:00.000Z"
+        },
+        {
+          "statement_id": "00000000-0000-4000-8000-000000000136",
+          "engine_fingerprint": "677517973162502891",
+          "yearning_fingerprint": null,
+          "database_or_schema": "target",
+          "template_status": "not_fetched",
+          "template_preview": "SELECT CURRENT_USER::pg_catalog.text, pg_catalog.current_setting($1)::pg_catalog.text, pg_catalog.array_to_json(pg_catalog.current_schemas($2))::pg_catalog.text…",
+          "calls": 18,
+          "total_exec_time_ms": 0.569,
+          "avg_exec_time_ms": 0.032,
+          "rows_examined_or_shared_blks_read": 0,
+          "rows_sent_or_rows_returned": 18,
+          "lock_time_ms_or_temp_blks_written": 0,
+          "share_of_total_time": 0.0006,
+          "coverage_mode": "cumulative_only",
+          "first_seen_at": "2026-11-25T01:09:00.000Z",
+          "last_seen_at": "2026-11-25T01:09:00.000Z"
+        },
+        {
+          "statement_id": "00000000-0000-4000-8000-000000000137",
+          "engine_fingerprint": "2869606018209600839",
+          "yearning_fingerprint": null,
+          "database_or_schema": "target",
+          "template_status": "not_fetched",
+          "template_preview": "begin read only",
+          "calls": 92,
+          "total_exec_time_ms": 0.566,
+          "avg_exec_time_ms": 0.006,
+          "rows_examined_or_shared_blks_read": 0,
+          "rows_sent_or_rows_returned": 0,
+          "lock_time_ms_or_temp_blks_written": 0,
+          "share_of_total_time": 0.0006,
+          "coverage_mode": "cumulative_only",
+          "first_seen_at": "2026-11-25T01:09:00.000Z",
+          "last_seen_at": "2026-11-25T01:09:00.000Z"
+        },
+        {
+          "statement_id": "00000000-0000-4000-8000-000000000138",
+          "engine_fingerprint": "-1801820283056510380",
+          "yearning_fingerprint": null,
+          "database_or_schema": "target",
+          "template_status": "not_fetched",
+          "template_preview": "SELECT ic.relname, NOT i.indisunique, i.indisprimary, COALESCE(pa.attname, $3), k.ord::int, CASE WHEN k.ord <= i.indnkeyatts THEN $4 ELSE $5 END, k.attnum = $6,…",
+          "calls": 5,
+          "total_exec_time_ms": 0.437,
+          "avg_exec_time_ms": 0.087,
+          "rows_examined_or_shared_blks_read": 0,
+          "rows_sent_or_rows_returned": 5,
+          "lock_time_ms_or_temp_blks_written": 0,
+          "share_of_total_time": 0.0005,
+          "coverage_mode": "cumulative_only",
+          "first_seen_at": "2026-11-25T01:09:00.000Z",
+          "last_seen_at": "2026-11-25T01:09:00.000Z"
+        },
+        {
+          "statement_id": "00000000-0000-4000-8000-000000000139",
+          "engine_fingerprint": "-5798645035947812381",
+          "yearning_fingerprint": null,
+          "database_or_schema": "target",
+          "template_status": "not_fetched",
+          "template_preview": "EXPLAIN (FORMAT JSON) UPDATE \"public\".\"f12_demo\" SET \"note\" = $1 WHERE \"id\" = $2 RETURNING \"id\"",
+          "calls": 1,
+          "total_exec_time_ms": 0.432,
+          "avg_exec_time_ms": 0.432,
+          "rows_examined_or_shared_blks_read": 0,
+          "rows_sent_or_rows_returned": 0,
+          "lock_time_ms_or_temp_blks_written": 0,
+          "share_of_total_time": 0.0005,
+          "coverage_mode": "cumulative_only",
+          "first_seen_at": "2026-11-25T01:09:00.000Z",
+          "last_seen_at": "2026-11-25T01:09:00.000Z"
+        },
+        {
+          "statement_id": "00000000-0000-4000-8000-000000000140",
+          "engine_fingerprint": "-6692782100520165545",
+          "yearning_fingerprint": null,
+          "database_or_schema": "target",
+          "template_status": "not_fetched",
+          "template_preview": "SELECT COUNT(*) FROM pg_stat_statements($1) WHERE queryid IS NOT NULL AND queryid <> $2",
+          "calls": 2,
+          "total_exec_time_ms": 0.299,
+          "avg_exec_time_ms": 0.149,
+          "rows_examined_or_shared_blks_read": 0,
+          "rows_sent_or_rows_returned": 2,
+          "lock_time_ms_or_temp_blks_written": 0,
+          "share_of_total_time": 0.0003,
+          "coverage_mode": "cumulative_only",
+          "first_seen_at": "2026-11-25T01:09:00.000Z",
+          "last_seen_at": "2026-11-25T01:09:00.000Z"
+        },
+        {
+          "statement_id": "00000000-0000-4000-8000-000000000141",
+          "engine_fingerprint": "-6032530250903767675",
+          "yearning_fingerprint": null,
+          "database_or_schema": "target",
+          "template_status": "not_fetched",
+          "template_preview": "SELECT c.relname FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace WHERE n.nspname = $1 AND c.relkind IN ($2, $3) ORDER BY c.relname",
+          "calls": 2,
+          "total_exec_time_ms": 0.132,
+          "avg_exec_time_ms": 0.066,
+          "rows_examined_or_shared_blks_read": 0,
+          "rows_sent_or_rows_returned": 2,
+          "lock_time_ms_or_temp_blks_written": 0,
+          "share_of_total_time": 0.0001,
+          "coverage_mode": "cumulative_only",
+          "first_seen_at": "2026-11-25T01:09:00.000Z",
+          "last_seen_at": "2026-11-25T01:09:00.000Z"
+        },
+        {
+          "statement_id": "00000000-0000-4000-8000-000000000142",
+          "engine_fingerprint": "-2646723144215712964",
+          "yearning_fingerprint": null,
+          "database_or_schema": "target",
+          "template_status": "not_fetched",
+          "template_preview": "rollback",
+          "calls": 90,
+          "total_exec_time_ms": 0.086,
+          "avg_exec_time_ms": 0.001,
+          "rows_examined_or_shared_blks_read": 0,
+          "rows_sent_or_rows_returned": 0,
+          "lock_time_ms_or_temp_blks_written": 0,
+          "share_of_total_time": 0.0001,
+          "coverage_mode": "cumulative_only",
+          "first_seen_at": "2026-11-25T01:09:00.000Z",
+          "last_seen_at": "2026-11-25T01:09:00.000Z"
+        },
+        {
+          "statement_id": "00000000-0000-4000-8000-000000000143",
+          "engine_fingerprint": "-5619111881952276154",
+          "yearning_fingerprint": null,
+          "database_or_schema": "target",
+          "template_status": "not_fetched",
+          "template_preview": "SELECT a.attname, a.attnum::int, t.typname, pg_catalog.format_type(a.atttypid, a.atttypmod) || repeat($2, GREATEST(a.attndims - $3, $4)), NOT a.attnotnull, pg_c…",
+          "calls": 1,
+          "total_exec_time_ms": 0.078,
+          "avg_exec_time_ms": 0.078,
+          "rows_examined_or_shared_blks_read": 0,
+          "rows_sent_or_rows_returned": 2,
+          "lock_time_ms_or_temp_blks_written": 0,
+          "share_of_total_time": 0.0001,
+          "coverage_mode": "cumulative_only",
+          "first_seen_at": "2026-11-25T01:09:00.000Z",
+          "last_seen_at": "2026-11-25T01:09:00.000Z"
+        },
+        {
+          "statement_id": "00000000-0000-4000-8000-000000000144",
+          "engine_fingerprint": "5385930926416482441",
+          "yearning_fingerprint": null,
+          "database_or_schema": "target",
+          "template_status": "not_fetched",
+          "template_preview": "select pg_stat_statements_reset()",
+          "calls": 1,
+          "total_exec_time_ms": 0.053,
+          "avg_exec_time_ms": 0.053,
+          "rows_examined_or_shared_blks_read": 0,
+          "rows_sent_or_rows_returned": 1,
+          "lock_time_ms_or_temp_blks_written": 0,
+          "share_of_total_time": 0.0001,
+          "coverage_mode": "cumulative_only",
+          "first_seen_at": "2026-11-25T01:09:00.000Z",
+          "last_seen_at": "2026-11-25T01:09:00.000Z"
+        },
+        {
+          "statement_id": "00000000-0000-4000-8000-000000000145",
+          "engine_fingerprint": "-7009087094433949720",
+          "yearning_fingerprint": null,
+          "database_or_schema": "target",
+          "template_status": "not_fetched",
+          "template_preview": "SELECT extversion FROM pg_extension WHERE extname = $1",
+          "calls": 2,
+          "total_exec_time_ms": 0.05,
+          "avg_exec_time_ms": 0.025,
+          "rows_examined_or_shared_blks_read": 0,
+          "rows_sent_or_rows_returned": 2,
+          "lock_time_ms_or_temp_blks_written": 0,
+          "share_of_total_time": 0.0001,
+          "coverage_mode": "cumulative_only",
+          "first_seen_at": "2026-11-25T01:09:00.000Z",
+          "last_seen_at": "2026-11-25T01:09:00.000Z"
+        },
+        {
+          "statement_id": "00000000-0000-4000-8000-000000000146",
+          "engine_fingerprint": "7858357695544425669",
+          "yearning_fingerprint": null,
+          "database_or_schema": "target",
+          "template_status": "not_fetched",
+          "template_preview": "SELECT ic.relname, i.indisunique, i.indisprimary, COALESCE(pa.attname, $2), k.ord::int, k.attnum = $3, pg_catalog.pg_get_indexdef(i.indexrelid) FROM pg_catalog.…",
+          "calls": 1,
+          "total_exec_time_ms": 0.047,
+          "avg_exec_time_ms": 0.047,
+          "rows_examined_or_shared_blks_read": 0,
+          "rows_sent_or_rows_returned": 1,
+          "lock_time_ms_or_temp_blks_written": 0,
+          "share_of_total_time": 0.0001,
+          "coverage_mode": "cumulative_only",
+          "first_seen_at": "2026-11-25T01:09:00.000Z",
+          "last_seen_at": "2026-11-25T01:09:00.000Z"
+        },
+        {
+          "statement_id": "00000000-0000-4000-8000-000000000147",
+          "engine_fingerprint": "-1379135811954908159",
+          "yearning_fingerprint": null,
+          "database_or_schema": "target",
+          "template_status": "not_fetched",
+          "template_preview": "SELECT CASE WHEN c.reltuples < $3 THEN $4 ELSE round(c.reltuples)::bigint END FROM pg_catalog.pg_class c JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespac…",
+          "calls": 2,
+          "total_exec_time_ms": 0.041,
+          "avg_exec_time_ms": 0.02,
+          "rows_examined_or_shared_blks_read": 0,
+          "rows_sent_or_rows_returned": 2,
+          "lock_time_ms_or_temp_blks_written": 0,
+          "share_of_total_time": 0,
+          "coverage_mode": "cumulative_only",
+          "first_seen_at": "2026-11-25T01:09:00.000Z",
+          "last_seen_at": "2026-11-25T01:09:00.000Z"
+        },
+        {
+          "statement_id": "00000000-0000-4000-8000-000000000148",
+          "engine_fingerprint": "2047535961913585732",
+          "yearning_fingerprint": null,
+          "database_or_schema": "target",
+          "template_status": "not_fetched",
+          "template_preview": "SET statement_timeout = 30000",
+          "calls": 4,
+          "total_exec_time_ms": 0.04,
+          "avg_exec_time_ms": 0.01,
+          "rows_examined_or_shared_blks_read": 0,
+          "rows_sent_or_rows_returned": 0,
+          "lock_time_ms_or_temp_blks_written": 0,
+          "share_of_total_time": 0,
+          "coverage_mode": "cumulative_only",
+          "first_seen_at": "2026-11-25T01:09:00.000Z",
+          "last_seen_at": "2026-11-25T01:09:00.000Z"
+        },
+        {
+          "statement_id": "00000000-0000-4000-8000-000000000149",
+          "engine_fingerprint": "6115167015389607406",
+          "yearning_fingerprint": null,
+          "database_or_schema": "target",
+          "template_status": "not_fetched",
+          "template_preview": "SET LOCAL search_path TO DEFAULT",
+          "calls": 18,
+          "total_exec_time_ms": 0.029,
+          "avg_exec_time_ms": 0.002,
+          "rows_examined_or_shared_blks_read": 0,
+          "rows_sent_or_rows_returned": 0,
+          "lock_time_ms_or_temp_blks_written": 0,
+          "share_of_total_time": 0,
+          "coverage_mode": "cumulative_only",
+          "first_seen_at": "2026-11-25T01:09:00.000Z",
+          "last_seen_at": "2026-11-25T01:09:00.000Z"
+        },
+        {
+          "statement_id": "00000000-0000-4000-8000-000000000150",
+          "engine_fingerprint": "-8483843790921647549",
+          "yearning_fingerprint": null,
+          "database_or_schema": "target",
+          "template_status": "not_fetched",
+          "template_preview": "SELECT nspname FROM pg_namespace WHERE nspname NOT LIKE $1 AND nspname <> $2 ORDER BY nspname",
+          "calls": 1,
+          "total_exec_time_ms": 0.026,
+          "avg_exec_time_ms": 0.026,
+          "rows_examined_or_shared_blks_read": 0,
+          "rows_sent_or_rows_returned": 2,
+          "lock_time_ms_or_temp_blks_written": 0,
+          "share_of_total_time": 0,
+          "coverage_mode": "cumulative_only",
+          "first_seen_at": "2026-11-25T01:09:00.000Z",
+          "last_seen_at": "2026-11-25T01:09:00.000Z"
+        },
+        {
+          "statement_id": "00000000-0000-4000-8000-000000000151",
+          "engine_fingerprint": "8356219683524388216",
+          "yearning_fingerprint": null,
+          "database_or_schema": "target",
+          "template_status": "not_fetched",
+          "template_preview": "SET statement_timeout = 2000",
+          "calls": 3,
+          "total_exec_time_ms": 0.026,
+          "avg_exec_time_ms": 0.009,
+          "rows_examined_or_shared_blks_read": 0,
+          "rows_sent_or_rows_returned": 0,
+          "lock_time_ms_or_temp_blks_written": 0,
+          "share_of_total_time": 0,
+          "coverage_mode": "cumulative_only",
+          "first_seen_at": "2026-11-25T01:09:00.000Z",
+          "last_seen_at": "2026-11-25T01:09:00.000Z"
+        },
+        {
+          "statement_id": "00000000-0000-4000-8000-000000000152",
+          "engine_fingerprint": "9082080597663679522",
+          "yearning_fingerprint": null,
+          "database_or_schema": "target",
+          "template_status": "not_fetched",
+          "template_preview": "SET LOCAL search_path = \"public\"",
+          "calls": 2,
+          "total_exec_time_ms": 0.016,
+          "avg_exec_time_ms": 0.008,
+          "rows_examined_or_shared_blks_read": 0,
+          "rows_sent_or_rows_returned": 0,
+          "lock_time_ms_or_temp_blks_written": 0,
+          "share_of_total_time": 0,
+          "coverage_mode": "cumulative_only",
+          "first_seen_at": "2026-11-25T01:09:00.000Z",
+          "last_seen_at": "2026-11-25T01:09:00.000Z"
+        },
+        {
+          "statement_id": "00000000-0000-4000-8000-000000000153",
+          "engine_fingerprint": "5162509649015904499",
+          "yearning_fingerprint": null,
+          "database_or_schema": "target",
+          "template_status": "not_fetched",
+          "template_preview": null,
+          "calls": 1,
+          "total_exec_time_ms": 0.014,
+          "avg_exec_time_ms": 0.014,
+          "rows_examined_or_shared_blks_read": 0,
+          "rows_sent_or_rows_returned": 1,
+          "lock_time_ms_or_temp_blks_written": 0,
+          "share_of_total_time": 0,
+          "coverage_mode": "cumulative_only",
+          "first_seen_at": "2026-11-25T01:09:00.000Z",
+          "last_seen_at": "2026-11-25T01:09:00.000Z"
+        },
+        {
+          "statement_id": "00000000-0000-4000-8000-000000000154",
+          "engine_fingerprint": "1913049540002914836",
+          "yearning_fingerprint": null,
+          "database_or_schema": "target",
+          "template_status": "not_fetched",
+          "template_preview": null,
+          "calls": 1,
+          "total_exec_time_ms": 0.011,
+          "avg_exec_time_ms": 0.011,
+          "rows_examined_or_shared_blks_read": 0,
+          "rows_sent_or_rows_returned": 1,
+          "lock_time_ms_or_temp_blks_written": 0,
+          "share_of_total_time": 0,
+          "coverage_mode": "cumulative_only",
+          "first_seen_at": "2026-11-25T01:09:00.000Z",
+          "last_seen_at": "2026-11-25T01:09:00.000Z"
+        },
+        {
+          "statement_id": "00000000-0000-4000-8000-000000000155",
+          "engine_fingerprint": "-5421859692537557562",
+          "yearning_fingerprint": null,
+          "database_or_schema": "target",
+          "template_status": "not_fetched",
+          "template_preview": null,
+          "calls": 1,
+          "total_exec_time_ms": 0.006,
+          "avg_exec_time_ms": 0.006,
+          "rows_examined_or_shared_blks_read": 0,
+          "rows_sent_or_rows_returned": 0,
+          "lock_time_ms_or_temp_blks_written": 0,
+          "share_of_total_time": 0,
+          "coverage_mode": "cumulative_only",
+          "first_seen_at": "2026-11-25T01:09:00.000Z",
+          "last_seen_at": "2026-11-25T01:09:00.000Z"
+        },
+        {
+          "statement_id": "00000000-0000-4000-8000-000000000156",
+          "engine_fingerprint": "3426470769481110998",
+          "yearning_fingerprint": null,
+          "database_or_schema": "target",
+          "template_status": "not_fetched",
+          "template_preview": null,
+          "calls": 1,
+          "total_exec_time_ms": 0.003,
+          "avg_exec_time_ms": 0.003,
+          "rows_examined_or_shared_blks_read": 0,
+          "rows_sent_or_rows_returned": 1,
+          "lock_time_ms_or_temp_blks_written": 0,
+          "share_of_total_time": 0,
+          "coverage_mode": "cumulative_only",
+          "first_seen_at": "2026-11-25T01:09:00.000Z",
+          "last_seen_at": "2026-11-25T01:09:00.000Z"
+        },
+        {
+          "statement_id": "00000000-0000-4000-8000-000000000157",
+          "engine_fingerprint": "6226329061870596326",
+          "yearning_fingerprint": null,
+          "database_or_schema": "target",
+          "template_status": "not_fetched",
+          "template_preview": null,
+          "calls": 1,
+          "total_exec_time_ms": 0.003,
+          "avg_exec_time_ms": 0.003,
+          "rows_examined_or_shared_blks_read": 0,
+          "rows_sent_or_rows_returned": 0,
+          "lock_time_ms_or_temp_blks_written": 0,
+          "share_of_total_time": 0,
+          "coverage_mode": "cumulative_only",
+          "first_seen_at": "2026-11-25T01:09:00.000Z",
+          "last_seen_at": "2026-11-25T01:09:00.000Z"
+        },
+        {
+          "statement_id": "00000000-0000-4000-8000-000000000158",
+          "engine_fingerprint": "-1245524085737754250",
+          "yearning_fingerprint": null,
+          "database_or_schema": "target",
+          "template_status": "not_fetched",
+          "template_preview": null,
+          "calls": 1,
+          "total_exec_time_ms": 0.003,
+          "avg_exec_time_ms": 0.003,
+          "rows_examined_or_shared_blks_read": 0,
+          "rows_sent_or_rows_returned": 0,
+          "lock_time_ms_or_temp_blks_written": 0,
+          "share_of_total_time": 0,
+          "coverage_mode": "cumulative_only",
+          "first_seen_at": "2026-11-25T01:09:00.000Z",
+          "last_seen_at": "2026-11-25T01:09:00.000Z"
+        },
+        {
+          "statement_id": "00000000-0000-4000-8000-000000000159",
+          "engine_fingerprint": "1497739856785757017",
+          "yearning_fingerprint": null,
+          "database_or_schema": "target",
+          "template_status": "not_fetched",
+          "template_preview": null,
+          "calls": 1,
+          "total_exec_time_ms": 0.002,
+          "avg_exec_time_ms": 0.002,
+          "rows_examined_or_shared_blks_read": 0,
+          "rows_sent_or_rows_returned": 1,
+          "lock_time_ms_or_temp_blks_written": 0,
+          "share_of_total_time": 0,
+          "coverage_mode": "cumulative_only",
+          "first_seen_at": "2026-11-25T01:09:00.000Z",
+          "last_seen_at": "2026-11-25T01:09:00.000Z"
+        }
+      ]
+    },
+    "err_code": 0,
+    "message": "ok",
+    "request_id": "00000000-0000-4000-8000-999999999999"
+  }
+}

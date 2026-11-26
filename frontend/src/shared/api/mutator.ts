@@ -105,7 +105,7 @@ function announceSessionExpired(): void {
   window.dispatchEvent(new CustomEvent(SESSION_EXPIRED_EVENT));
 }
 
-function buildUrl(url: string): string {
+export function buildApiUrl(url: string): string {
   // orval emits root-absolute paths; a deployment behind a path-prefixed
   // reverse proxy sets VITE_API_BASE_URL to that full prefix.
   if (API_BASE_URL === "") return url;
@@ -122,22 +122,51 @@ export function resolveActivePlatformLocale(): "zh-CN" | "en-US" {
   return "zh-CN";
 }
 
-export const customInstance = async <T>(url: string, options?: RequestInit): Promise<T> => {
-  const headers = new Headers(options?.headers);
-  const method = (options?.method ?? "GET").toUpperCase();
+export function buildRequestHeaders(method: string, extraHeaders?: HeadersInit): Headers {
+  const headers = new Headers(extraHeaders);
+  const normalizedMethod = method.toUpperCase();
   if (!headers.has("Accept-Language")) {
     headers.set("Accept-Language", resolveActivePlatformLocale());
   }
-  if (MUTATING_METHODS.has(method)) {
+  if (import.meta.env.DEV) {
+    const viewAs = (globalThis as { __YEARNING_DEV_VIEW_AS__?: unknown }).__YEARNING_DEV_VIEW_AS__;
+    if (
+      (viewAs === "approver" || viewAs === "executor" || viewAs === "user") &&
+      !headers.has("X-Yearning-Dev-View-As")
+    ) {
+      headers.set("X-Yearning-Dev-View-As", viewAs);
+    }
+  }
+  if (MUTATING_METHODS.has(normalizedMethod)) {
     const csrfToken = readCsrfToken();
     if (csrfToken !== null && !headers.has(CSRF_HEADER_NAME)) {
       headers.set(CSRF_HEADER_NAME, csrfToken);
     }
   }
+  return headers;
+}
 
+export async function throwFromErrorResponse(response: Response): Promise<never> {
+  // Transport and security failures stay on the Problem Details path.
+  const problem = (await response.json().catch(() => null)) as ProblemDetails | null;
+  if (response.status === 401) {
+    // Session expiry is a global fact, not a per-page error: every consumer
+    // must see the anonymous state, so announce it before throwing.
+    announceSessionExpired();
+  }
+  throw new TransportError(
+    problem && typeof problem.title === "string" && typeof problem.status === "number"
+      ? problem
+      : { title: "http_error", status: response.status, detail: response.statusText },
+  );
+}
+
+export async function executeFetch(url: string, options?: RequestInit): Promise<Response> {
+  const method = (options?.method ?? "GET").toUpperCase();
+  const headers = buildRequestHeaders(method, options?.headers);
   let response: Response;
   try {
-    response = await fetch(buildUrl(url), {
+    response = await fetch(buildApiUrl(url), {
       ...options,
       method,
       headers,
@@ -150,22 +179,13 @@ export const customInstance = async <T>(url: string, options?: RequestInit): Pro
       detail: cause instanceof Error ? cause.message : "network unreachable",
     });
   }
-
   if (!response.ok) {
-    // Transport and security failures stay on the Problem Details path.
-    const problem = (await response.json().catch(() => null)) as ProblemDetails | null;
-    if (response.status === 401) {
-      // Session expiry is a global fact, not a per-page error: every consumer
-      // must see the anonymous state, so announce it before throwing.
-      announceSessionExpired();
-    }
-    throw new TransportError(
-      problem && typeof problem.title === "string" && typeof problem.status === "number"
-        ? problem
-        : { title: "http_error", status: response.status, detail: response.statusText },
-    );
+    return await throwFromErrorResponse(response);
   }
+  return response;
+}
 
+export async function unwrapEnvelopeResponse<T>(response: Response): Promise<T> {
   let raw: unknown;
   try {
     raw = await response.json();
@@ -212,6 +232,26 @@ export const customInstance = async <T>(url: string, options?: RequestInit): Pro
     status: response.status,
     detail: "response envelope does not match the OpenAPI contract",
   });
+}
+
+export function parseStreamBusinessError(
+  parsed: Record<string, unknown>,
+  fallbackRequestId = "sse",
+): BusinessError {
+  return new BusinessError({
+    err_code: typeof parsed.err_code === "number" ? parsed.err_code : 5000,
+    message: typeof parsed.message === "string" ? parsed.message : "",
+    request_id: typeof parsed.request_id === "string" ? parsed.request_id : fallbackRequestId,
+    retryable: Boolean(parsed.retryable),
+    ...(typeof parsed.meta === "object" && parsed.meta !== null
+      ? { meta: parsed.meta as Record<string, unknown> }
+      : {}),
+  });
+}
+
+export const customInstance = async <T>(url: string, options?: RequestInit): Promise<T> => {
+  const response = await executeFetch(url, options);
+  return unwrapEnvelopeResponse<T>(response);
 };
 
 type SuccessEnvelope<R> = Extract<R, { err_code: 0 }>;
@@ -258,6 +298,58 @@ export function ifMatchHeader(
       "If-Match": `"${String(version ?? 1)}"`,
     },
   };
+}
+
+function generateIdempotencyToken(): string {
+  const webCrypto = globalThis.crypto as
+    | { randomUUID?: () => string; getRandomValues?: (arr: Uint8Array) => Uint8Array }
+    | undefined;
+  if (typeof webCrypto?.randomUUID === "function") {
+    return webCrypto.randomUUID();
+  }
+  if (typeof webCrypto?.getRandomValues === "function") {
+    const bytes = new Uint8Array(16);
+    webCrypto.getRandomValues(bytes);
+    bytes[6] = ((bytes[6] ?? 0) & 0x0f) | 0x40;
+    bytes[8] = ((bytes[8] ?? 0) & 0x3f) | 0x80;
+    const hex = Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
+    return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+  }
+  return `${String(Date.now())}-${Math.random().toString(16).slice(2)}`;
+}
+
+/** Mints a fresh `Idempotency-Key` token with an optional domain prefix. */
+export function newIdempotencyKey(prefix?: string): string {
+  const token = generateIdempotencyToken();
+  return prefix === undefined || prefix === "" ? token : `${prefix}-${token}`;
+}
+
+/** Wraps an already-minted per-operation `Idempotency-Key` into a header map. */
+export function idempotencyKeyHeader(
+  idempotencyKey: string,
+  extraHeaders?: Record<string, string>,
+): Record<string, string> {
+  return {
+    ...extraHeaders,
+    "Idempotency-Key": idempotencyKey,
+  };
+}
+
+/** Builds a header map carrying a newly minted `Idempotency-Key`. */
+export function idempotencyHeaders(
+  prefix?: string,
+  extraHeaders?: Record<string, string>,
+): Record<string, string> {
+  return idempotencyKeyHeader(newIdempotencyKey(prefix), extraHeaders);
+}
+
+/** Combines `If-Match` optimistic locking with a caller-supplied operation `Idempotency-Key`. */
+export function ifMatchIdempotencyHeader(
+  version: number | undefined,
+  idempotencyKey: string,
+  extraHeaders?: Record<string, string>,
+): RequestInit {
+  return ifMatchHeader(version, idempotencyKeyHeader(idempotencyKey, extraHeaders));
 }
 
 export default customInstance;

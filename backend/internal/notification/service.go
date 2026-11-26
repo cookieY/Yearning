@@ -9,6 +9,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/mail"
+	"strings"
 	"time"
 
 	"gorm.io/gorm"
@@ -382,10 +384,18 @@ func (s *Service) DeleteChannel(ctx context.Context, id string, expectVersion in
 
 // sealSecret seals a channel Secret into an AEAD envelope.
 func (s *Service) sealSecret(row *NotificationChannelModel, plain string) error {
-	env, err := s.Crypter.Seal(crypto.PurposePayload, []byte(plain), crypto.AAD{
-		DeploymentID: s.Crypter.DeploymentID(), Table: "notification_channels",
-		PrimaryKey: row.ID, Column: "secret", Purpose: crypto.PurposePayload,
-	})
+	return sealChannelSecret(s.Crypter, row, plain)
+}
+
+func sealChannelSecret(crypter *crypto.Crypter, row *NotificationChannelModel, plain string) error {
+	if crypter == nil || row == nil {
+		return ErrValidation
+	}
+	env, err := crypter.SealColumn(crypto.PurposePayload, crypto.ColumnRef{
+		Table:      "notification_channels",
+		PrimaryKey: row.ID,
+		Column:     "secret",
+	}, []byte(plain))
 	if err != nil {
 		return err
 	}
@@ -396,17 +406,20 @@ func (s *Service) sealSecret(row *NotificationChannelModel, plain string) error 
 	return nil
 }
 
-// openSecret decrypts a channel Secret (used only at the instant of sending).
-func (s *Service) openSecret(ctx context.Context, row *NotificationChannelModel) (string, error) {
-	if row.SecretCiphertext == nil || row.SecretKeyID == nil {
+// openChannelSecret decrypts a channel Secret (used by both Service and Worker; fails closed on nil Crypter or empty ciphertext).
+func openChannelSecret(crypter *crypto.Crypter, row *NotificationChannelModel) (string, error) {
+	if crypter == nil || row == nil || len(row.SecretCiphertext) == 0 || row.SecretKeyID == nil || *row.SecretKeyID == "" || row.SecretAlgorithm == nil {
 		return "", ErrValidation
 	}
-	plain, err := s.Crypter.Open(crypto.PurposePayload, crypto.Envelope{
-		Ciphertext: row.SecretCiphertext, Nonce: row.SecretNonce,
-		KeyID: *row.SecretKeyID, Algorithm: *row.SecretAlgorithm,
-	}, crypto.AAD{
-		DeploymentID: s.Crypter.DeploymentID(), Table: "notification_channels",
-		PrimaryKey: row.ID, Column: "secret", Purpose: crypto.PurposePayload,
+	plain, err := crypter.OpenColumn(crypto.PurposePayload, crypto.ColumnRef{
+		Table:      "notification_channels",
+		PrimaryKey: row.ID,
+		Column:     "secret",
+	}, crypto.Envelope{
+		Ciphertext: row.SecretCiphertext,
+		Nonce:      row.SecretNonce,
+		KeyID:      *row.SecretKeyID,
+		Algorithm:  *row.SecretAlgorithm,
 	})
 	if err != nil {
 		return "", err
@@ -414,18 +427,36 @@ func (s *Service) openSecret(ctx context.Context, row *NotificationChannelModel)
 	return string(plain), nil
 }
 
-// openDeliveryAddress decrypts a delivery recipient address for read-side masking (sharing the same
-// AAD as worker openAddress; used solely to compute masked_target so plaintext never leaves this function).
-func (s *Service) openDeliveryAddress(ctx context.Context, d *NotificationDeliveryModel) (string, error) {
-	if s.Crypter == nil || d.AddressCiphertext == nil || d.AddressKeyID == "" {
+func sealDeliveryAddress(crypter *crypto.Crypter, deliveryID, address string) ([]byte, []byte, string, error) {
+	if crypter == nil {
+		return nil, nil, "", ErrValidation
+	}
+	env, err := crypter.SealColumn(crypto.PurposePayload, crypto.ColumnRef{
+		Table:      "notification_deliveries",
+		PrimaryKey: deliveryID,
+		Column:     "recipient_address",
+	}, []byte(address))
+	if err != nil {
+		return nil, nil, "", err
+	}
+	return env.Ciphertext, env.Nonce, env.KeyID, nil
+}
+
+// openDeliveryAddress decrypts a delivery recipient address for Worker sending and Service read-side masking
+// (shared across both callers so nil Crypter and empty ciphertext guards never drift).
+func openDeliveryAddress(crypter *crypto.Crypter, d *NotificationDeliveryModel) (string, error) {
+	if crypter == nil || d == nil || len(d.AddressCiphertext) == 0 || d.AddressKeyID == "" {
 		return "", ErrValidation
 	}
-	plain, err := s.Crypter.Open(crypto.PurposePayload, crypto.Envelope{
-		Ciphertext: d.AddressCiphertext, Nonce: d.AddressNonce,
-		KeyID: d.AddressKeyID, Algorithm: d.AddressAlgorithm,
-	}, crypto.AAD{
-		DeploymentID: s.Crypter.DeploymentID(), Table: "notification_deliveries",
-		PrimaryKey: d.ID, Column: "recipient_address", Purpose: crypto.PurposePayload,
+	plain, err := crypter.OpenColumn(crypto.PurposePayload, crypto.ColumnRef{
+		Table:      "notification_deliveries",
+		PrimaryKey: d.ID,
+		Column:     "recipient_address",
+	}, crypto.Envelope{
+		Ciphertext: d.AddressCiphertext,
+		Nonce:      d.AddressNonce,
+		KeyID:      d.AddressKeyID,
+		Algorithm:  d.AddressAlgorithm,
 	})
 	if err != nil {
 		return "", err
@@ -498,23 +529,110 @@ func sanitizeToken(token string) string {
 	return token
 }
 
+// TestDeliveryOptions holds optional inputs from OpenAPI NotificationTestRequest.
+type TestDeliveryOptions struct {
+	Recipient string
+	Locale    string
+}
+
+type testDeliveryInput struct {
+	ChannelID          string `json:"channel_id"`
+	RecipientCipher    []byte `json:"recipient_ciphertext,omitempty"`
+	RecipientNonce     []byte `json:"recipient_nonce,omitempty"`
+	RecipientKeyID     string `json:"recipient_key_id,omitempty"`
+	RecipientAlgorithm string `json:"recipient_algorithm,omitempty"`
+	Locale             string `json:"locale,omitempty"`
+}
+
+func validateTestRecipient(raw string) (string, error) {
+	trimmed := strings.TrimSpace(raw)
+	if trimmed == "" || len(trimmed) > 320 || strings.ContainsAny(trimmed, "\r\n") {
+		return "", ErrValidation
+	}
+	addr, err := mail.ParseAddress(trimmed)
+	if err != nil || addr.Address != trimmed || !strings.Contains(addr.Address, "@") {
+		return "", ErrValidation
+	}
+	return addr.Address, nil
+}
+
+func sealTestDeliveryRecipient(crypter *crypto.Crypter, taskID, recipient string) (crypto.Envelope, error) {
+	if crypter == nil || taskID == "" || recipient == "" {
+		return crypto.Envelope{}, ErrValidation
+	}
+	return crypter.SealColumn(crypto.PurposePayload, crypto.ColumnRef{
+		Table:      "async_tasks",
+		PrimaryKey: taskID,
+		Column:     "test_recipient",
+	}, []byte(recipient))
+}
+
+func openTestDeliveryRecipient(crypter *crypto.Crypter, taskID string, in *testDeliveryInput) (string, error) {
+	if crypter == nil || taskID == "" || in == nil || len(in.RecipientCipher) == 0 || in.RecipientKeyID == "" || in.RecipientAlgorithm == "" {
+		return "", ErrValidation
+	}
+	plain, err := crypter.OpenColumn(crypto.PurposePayload, crypto.ColumnRef{
+		Table:      "async_tasks",
+		PrimaryKey: taskID,
+		Column:     "test_recipient",
+	}, crypto.Envelope{
+		Ciphertext: in.RecipientCipher,
+		Nonce:      in.RecipientNonce,
+		KeyID:      in.RecipientKeyID,
+		Algorithm:  in.RecipientAlgorithm,
+	})
+	if err != nil {
+		return "", err
+	}
+	return string(plain), nil
+}
+
 // CreateTestDelivery creates an async test delivery task (PRD08 §6: neither reuses real domain events
 // nor mutates business state; kind=notification_test_delivery is polled and executed by the Worker).
 func (s *Service) CreateTestDelivery(ctx context.Context, channelID string) (string, error) {
-	if _, err := s.loadChannel(ctx, channelID); err != nil {
+	return s.CreateTestDeliveryWithOptions(ctx, channelID, TestDeliveryOptions{})
+}
+
+// CreateTestDeliveryWithOptions creates an async test delivery task with optional OpenAPI NotificationTestRequest inputs.
+// Email recipients are validated and sealed before persisting in async_tasks.input (never stored in plaintext).
+func (s *Service) CreateTestDeliveryWithOptions(ctx context.Context, channelID string, opts TestDeliveryOptions) (string, error) {
+	ch, err := s.loadChannel(ctx, channelID)
+	if err != nil {
 		return "", err
+	}
+	locale := strings.TrimSpace(opts.Locale)
+	if locale != "" && locale != "zh-CN" && locale != "en-US" {
+		return "", ErrValidation
 	}
 	if err := tasks.CheckPendingCapacity(ctx, s.DB); err != nil {
 		return "", err
 	}
-	input, _ := json.Marshal(map[string]string{"channel_id": channelID})
 	taskID := newID()
+	payload := testDeliveryInput{
+		ChannelID: channelID,
+		Locale:    locale,
+	}
+	if ch.Kind == "email" && strings.TrimSpace(opts.Recipient) != "" {
+		addr, err := validateTestRecipient(opts.Recipient)
+		if err != nil {
+			return "", err
+		}
+		env, err := sealTestDeliveryRecipient(s.Crypter, taskID, addr)
+		if err != nil {
+			return "", err
+		}
+		payload.RecipientCipher = env.Ciphertext
+		payload.RecipientNonce = env.Nonce
+		payload.RecipientKeyID = env.KeyID
+		payload.RecipientAlgorithm = env.Algorithm
+	}
+	input, _ := json.Marshal(payload)
 	agg := "notification_channel"
 	now := s.NowFunc()
 	if err := s.DB.WithContext(ctx).Exec(`
 		insert into async_tasks (id, kind, state, aggregate_type, aggregate_id, input,
-		    progress_unit, fence_token, created_at, updated_at)
-		values (?, 'notification_test_delivery', 'queued', ?, ?, ?, 'deliveries', 1, ?, ?)`,
+		    progress_completed, progress_total, progress_unit, fence_token, created_at, updated_at)
+		values (?, 'notification_test_delivery', 'queued', ?, ?, ?, 0, 1, 'deliveries', 1, ?, ?)`,
 		taskID, agg, channelID, input, now, now).Error; err != nil {
 		return "", err
 	}

@@ -65,26 +65,28 @@ type SANTableDescription struct {
 // SynthesizeInput carries the complete anonymized context sent to the model synthesizer.
 // Raw fields are json:"-" and held strictly in memory for explicit SAN ("san") endpoints.
 type SynthesizeInput struct {
-	Capability         domain.Capability                  `json:"capability"`
-	EngineProfile      string                             `json:"engine_profile,omitempty"`
-	OutputLocale       string                             `json:"output_locale,omitempty"`
-	AnonymizedPrompt   string                             `json:"anonymized_prompt"`
-	AnonymizedInputSQL string                             `json:"anonymized_input_sql,omitempty"`
-	AnonymizedPlanText string                             `json:"anonymized_plan_text,omitempty"`
-	AnonymizedMetadata []*tool.AnonymizedTableDescription `json:"anonymized_metadata,omitempty"`
-	AnonymizedHistory  []AnonymizedTurn                   `json:"anonymized_history,omitempty"`
-	AnonymizedSummary  string                             `json:"anonymized_summary,omitempty"`
-	BoundPlaceholders  []string                           `json:"bound_placeholders,omitempty"`
-	PlatformKnowledge  []help.Article                     `json:"-"`
-	Actor              domain.Actor                       `json:"-"`
-	OnDelta            func(kind string, delta string)    `json:"-"`
-	OnSANDelta         func(kind string, delta string)    `json:"-"`
-	RawPrompt          string                             `json:"-"`
-	RawInputSQL        string                             `json:"-"`
-	RawPlanText        string                             `json:"-"`
-	RawMetadata        []SANTableDescription              `json:"-"`
-	RawHistory         []AnonymizedTurn                   `json:"-"`
-	RawSummary         string                             `json:"-"`
+	Capability          domain.Capability                  `json:"capability"`
+	EngineProfile       string                             `json:"engine_profile,omitempty"`
+	OutputLocale        string                             `json:"output_locale,omitempty"`
+	AnonymizedPrompt    string                             `json:"anonymized_prompt"`
+	AnonymizedInputSQL  string                             `json:"anonymized_input_sql,omitempty"`
+	AnonymizedPlanText  string                             `json:"anonymized_plan_text,omitempty"`
+	AnonymizedMetadata  []*tool.AnonymizedTableDescription `json:"anonymized_metadata,omitempty"`
+	AnonymizedKnowledge []AssistantKnowledgeItem           `json:"anonymized_knowledge,omitempty"`
+	AnonymizedHistory   []AnonymizedTurn                   `json:"anonymized_history,omitempty"`
+	AnonymizedSummary   string                             `json:"anonymized_summary,omitempty"`
+	BoundPlaceholders   []string                           `json:"bound_placeholders,omitempty"`
+	PlatformKnowledge   []help.Article                     `json:"-"`
+	Actor               domain.Actor                       `json:"-"`
+	OnDelta             func(kind string, delta string)    `json:"-"`
+	OnSANDelta          func(kind string, delta string)    `json:"-"`
+	RawPrompt           string                             `json:"-"`
+	RawInputSQL         string                             `json:"-"`
+	RawPlanText         string                             `json:"-"`
+	RawMetadata         []SANTableDescription              `json:"-"`
+	RawKnowledge        []AssistantKnowledgeItem           `json:"-"`
+	RawHistory          []AnonymizedTurn                   `json:"-"`
+	RawSummary          string                             `json:"-"`
 }
 
 // SynthesizeOutput represents the structured anonymized draft and Markdown reply returned by the synthesizer.
@@ -159,17 +161,15 @@ func (p *ProviderSynthesizer) loadActiveEndpoints(ctx context.Context) ([]provid
 	}
 	out := make([]provider.Endpoint, 0, len(rows))
 	for _, r := range rows {
-		key, err := p.Crypter.Open(crypto.PurposePayload, crypto.Envelope{
+		key, err := p.Crypter.OpenColumn(crypto.PurposeProviderSecret, crypto.ColumnRef{
+			Table:      "ai_providers",
+			PrimaryKey: r.ID,
+			Column:     "secret_ciphertext",
+		}, crypto.Envelope{
 			Ciphertext: r.SecretCiphertext,
 			Nonce:      r.SecretNonce,
 			KeyID:      r.SecretKeyID,
 			Algorithm:  "aes-256-gcm",
-		}, crypto.AAD{
-			DeploymentID: p.Crypter.DeploymentID(),
-			Table:        "ai_providers",
-			PrimaryKey:   r.ID,
-			Column:       "secret_ciphertext",
-			Purpose:      "provider_secret",
 		})
 		if err != nil {
 			continue
@@ -255,6 +255,9 @@ func (p *ProviderSynthesizer) synthesizeWithEndpoints(ctx context.Context, endpo
 					"anonymized_summary":   in.AnonymizedSummary,
 					"bound_placeholders":   in.BoundPlaceholders,
 				}
+				if len(in.AnonymizedKnowledge) > 0 {
+					userPayload["anonymized_knowledge"] = in.AnonymizedKnowledge
+				}
 				var merr error
 				defaultUserBytes, merr = json.Marshal(userPayload)
 				if merr != nil {
@@ -306,64 +309,6 @@ func (p *ProviderSynthesizer) Summarize(ctx context.Context, turns []AnonymizedT
 		return p.Fallback.Summarize(ctx, turns)
 	}
 	return summarizeAnonymizedTurns(ctx, turns)
-}
-
-func buildSANAssistantMessages(in SynthesizeInput) (string, []byte, error) {
-	actorRole := "authenticated_user"
-	if in.Actor.IsBuiltinAdmin {
-		actorRole = "builtin_admin"
-	}
-	articles := help.ToPromptProfileArticles(in.PlatformKnowledge)
-	if in.Capability != domain.CapabilityPlatformHelp {
-		// RetrieveRelevantArticles assigns PrimaryMatch=true to topK fallback items even when score == 0.
-		// Keep <help_context> omitted on non-help turns unless at least one keyword-matched or synthetic test article matched.
-		for i := range in.PlatformKnowledge {
-			if len(in.PlatformKnowledge[i].Keywords) > 0 && in.PlatformKnowledge[i].RetrievalScore == 0 {
-				articles[i].PrimaryMatch = false
-			}
-		}
-	}
-	sysPrompt, err := promptprofile.BuildSANAssistantSystemPrompt(promptprofile.AssistantSystemPromptInput{
-		OutputLocale:   in.OutputLocale,
-		ActorRole:      actorRole,
-		CapabilityHint: string(in.Capability),
-		HasMetadata:    len(in.RawMetadata) > 0 || len(in.AnonymizedMetadata) > 0,
-		Articles:       articles,
-	})
-	if err != nil {
-		return "", nil, err
-	}
-	promptText := in.RawPrompt
-	if promptText == "" {
-		promptText = in.AnonymizedPrompt
-	}
-	payload := map[string]any{
-		"response_format": "json",
-		"capability_hint": string(in.Capability),
-		"engine_profile":  in.EngineProfile,
-		"output_locale":   promptprofile.NormalizeOutputLocale(in.OutputLocale),
-		"prompt":          promptText,
-	}
-	if strings.TrimSpace(in.RawInputSQL) != "" {
-		payload["input_sql"] = promptprofile.TruncateSQL(in.RawInputSQL)
-	}
-	if strings.TrimSpace(in.RawPlanText) != "" {
-		payload["plan_text"] = in.RawPlanText
-	}
-	if len(in.RawMetadata) > 0 {
-		payload["metadata"] = in.RawMetadata
-	}
-	if len(in.RawHistory) > 0 {
-		payload["history"] = in.RawHistory
-	}
-	if strings.TrimSpace(in.RawSummary) != "" {
-		payload["summary"] = in.RawSummary
-	}
-	raw, err := json.Marshal(payload)
-	if err != nil {
-		return "", nil, err
-	}
-	return sysPrompt, raw, nil
 }
 
 func (p *ProviderSynthesizer) callEndpoint(

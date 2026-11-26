@@ -14,10 +14,7 @@ import (
 )
 
 func TestAdapterSuite_PostgresSearchPathProbeResolveAndApply(t *testing.T) {
-	runBothEnginesWithLoopbackForTest(t, func(t *testing.T, env *suiteEnv) {
-		if env.target.mode != "postgresql" {
-			t.Skip("PostgreSQL-only search_path behavior")
-		}
+	runPostgresWithLoopbackForTest(t, func(t *testing.T, env *suiteEnv) {
 		ctx := context.Background()
 		snapshot, err := database.ProbePostgresSearchPath(ctx, env.exec)
 		if err != nil {
@@ -144,10 +141,7 @@ func TestAdapterSuite_PostgresSearchPathProbeResolveAndApply(t *testing.T) {
 }
 
 func TestAdapterSuite_PostgresExactTransactionInspectionRejectsTemporaryShadow(t *testing.T) {
-	runBothEnginesWithLoopbackForTest(t, func(t *testing.T, env *suiteEnv) {
-		if env.target.mode != "postgresql" {
-			t.Skip("PostgreSQL-only exact transaction inspection")
-		}
+	runPostgresWithLoopbackForTest(t, func(t *testing.T, env *suiteEnv) {
 		ctx := context.Background()
 		snapshot, err := database.ProbePostgresSearchPath(ctx, env.exec)
 		if err != nil {
@@ -302,10 +296,7 @@ func TestAdapterSuite_PostgresExactTransactionInspectionRejectsTemporaryShadow(t
 }
 
 func TestAdapterSuite_PostgresSearchPathTimeoutFailsClosed(t *testing.T) {
-	runBothEnginesWithLoopbackForTest(t, func(t *testing.T, env *suiteEnv) {
-		if env.target.mode != "postgresql" {
-			t.Skip("PostgreSQL-only search_path behavior")
-		}
+	runPostgresWithLoopbackForTest(t, func(t *testing.T, env *suiteEnv) {
 		ctx, cancel := context.WithTimeout(context.Background(), time.Nanosecond)
 		defer cancel()
 		if _, err := database.ProbePostgresSearchPath(ctx, env.exec); err == nil {
@@ -328,10 +319,7 @@ func TestAdapterSuite_PostgresSearchPathTimeoutFailsClosed(t *testing.T) {
 }
 
 func TestAdapterSuite_PostgresDDLConnectionInspectionAndOrderedCreate(t *testing.T) {
-	runBothEnginesWithLoopbackForTest(t, func(t *testing.T, env *suiteEnv) {
-		if env.target.mode != "postgresql" {
-			t.Skip("PostgreSQL-only DDL connection inspection")
-		}
+	runPostgresWithLoopbackForTest(t, func(t *testing.T, env *suiteEnv) {
 		ctx := context.Background()
 		snapshot, err := database.ProbePostgresSearchPath(ctx, env.exec)
 		if err != nil {
@@ -387,10 +375,7 @@ func TestAdapterSuite_PostgresDDLConnectionInspectionAndOrderedCreate(t *testing
 }
 
 func TestAdapterSuite_PostgresSearchPathRejectsTempAndTrailingUser(t *testing.T) {
-	runBothEnginesWithLoopbackForTest(t, func(t *testing.T, env *suiteEnv) {
-		if env.target.mode != "postgresql" {
-			t.Skip("PostgreSQL-only search_path behavior")
-		}
+	runPostgresWithLoopbackForTest(t, func(t *testing.T, env *suiteEnv) {
 		base := database.PostgresSearchPath{
 			SchemaVersion:  database.PostgresSearchPathVersion,
 			CurrentUser:    env.target.user,
@@ -412,10 +397,7 @@ func TestAdapterSuite_PostgresSearchPathRejectsTempAndTrailingUser(t *testing.T)
 }
 
 func TestAdapterSuite_PostgresSearchPathBatchLookupAndExplain(t *testing.T) {
-	runBothEnginesWithLoopbackForTest(t, func(t *testing.T, env *suiteEnv) {
-		if env.target.mode != "postgresql" {
-			t.Skip("PostgreSQL-only search_path behavior")
-		}
+	runPostgresWithLoopbackForTest(t, func(t *testing.T, env *suiteEnv) {
 		ctx := context.Background()
 		suffix := time.Now().UnixNano()
 		first := fmt.Sprintf("batch_first_%d", suffix)
@@ -503,10 +485,7 @@ func TestAdapterSuite_PostgresSearchPathBatchLookupAndExplain(t *testing.T) {
 }
 
 func TestAdapterSuite_PostgresSearchPathCatalogUsesExecutionRolePrivileges(t *testing.T) {
-	runBothEnginesWithLoopbackForTest(t, func(t *testing.T, env *suiteEnv) {
-		if env.target.mode != "postgresql" {
-			t.Skip("PostgreSQL-only search_path behavior")
-		}
+	runPostgresWithLoopbackForTest(t, func(t *testing.T, env *suiteEnv) {
 		ctx := context.Background()
 		suffix := time.Now().UnixNano()
 		role := fmt.Sprintf("path_reader_%d", suffix)
@@ -611,10 +590,7 @@ func TestAdapterSuite_PostgresSearchPathCatalogUsesExecutionRolePrivileges(t *te
 }
 
 func TestAdapterSuite_PostgresSearchPathProbesQuotedUserAndExplicitCatalogOrder(t *testing.T) {
-	runBothEnginesWithLoopbackForTest(t, func(t *testing.T, env *suiteEnv) {
-		if env.target.mode != "postgresql" {
-			t.Skip("PostgreSQL-only search_path behavior")
-		}
+	runPostgresWithLoopbackForTest(t, func(t *testing.T, env *suiteEnv) {
 		ctx := context.Background()
 		suffix := time.Now().UnixNano()
 		role := fmt.Sprintf("path_user_%d", suffix)

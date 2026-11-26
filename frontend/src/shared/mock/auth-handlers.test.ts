@@ -13,7 +13,7 @@ import { setMockAuthBehavior } from "@/shared/mock/auth-scenario-store";
 const server = setupServer(...authMockHandlers());
 
 beforeAll(() => {
-  server.listen({ onUnhandledRequest: "bypass" });
+  server.listen({ onUnhandledRequest: "error" });
 });
 afterEach(() => {
   server.resetHandlers();

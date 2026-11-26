@@ -366,7 +366,7 @@ test("popover entry plays its own enter keyframes", async ({ page }) => {
   await page.addInitScript(() => {
     window.localStorage.setItem("yearning-mock-scenario", "query-session");
   });
-  await page.goto("/query/sessions/qs-fixture-active");
+  await page.goto("/query/sessions/6f0f2b3c-5555-4555-8555-000000000101");
   await expect(page.getByTestId("query-workspace")).toBeVisible({ timeout: 15_000 });
   await page.getByTestId("query-grant-renew").click();
   const trigger = page.getByTestId("query-renew-until");
@@ -515,7 +515,7 @@ test("button press stays inside the frame budget", async ({ page }) => {
   // idle login page has a p95 above the two-frame budget. The press feedback
   // itself is the same shared Button primitive.
   await page.goto("/workspace");
-  const button = page.getByTestId("header-refresh");
+  const button = page.getByTestId("header-command-trigger");
   await expect(button).toBeEnabled({ timeout: 15_000 });
 
   const box = await button.boundingBox();

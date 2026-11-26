@@ -19,71 +19,21 @@ package datasource
 import (
 	"context"
 	"errors"
-	"fmt"
-	"os"
-	"syscall"
 	"testing"
 
 	"github.com/google/uuid"
-	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
-	gormlogger "gorm.io/gorm/logger"
 
 	"github.com/cookieY/YearningX/backend/internal/authorization/auditlog"
 	"github.com/cookieY/YearningX/backend/internal/authorization/bizerr"
 	"github.com/cookieY/YearningX/backend/internal/platform/addrguard"
+	"github.com/cookieY/YearningX/backend/internal/platform/testkit"
 )
 
-func envOrDS(key, def string) string {
-	if v := os.Getenv(key); v != "" {
-		return v
-	}
-	return def
-}
-
-// acquireSharedITestLock shares the same flock file with changeorder/dashboard/httpapi/review packages:
-// all of these packages truncate shared itest tables such as flow_stages/flows/datasources, so parallel
-// package runs must serialize to avoid wiping each other's tables and causing false failures or false passes.
-func acquireSharedITestLock(t *testing.T) {
-	t.Helper()
-	f, err := os.OpenFile(os.TempDir()+"/yearningx-itest-shared.lock", os.O_CREATE|os.O_RDWR, 0o600)
-	if err != nil {
-		return
-	}
-	if err := syscall.Flock(int(f.Fd()), syscall.LOCK_EX); err != nil {
-		_ = f.Close()
-		return
-	}
-	t.Cleanup(func() {
-		_ = syscall.Flock(int(f.Fd()), syscall.LOCK_UN)
-		_ = f.Close()
-	})
-}
-
-// openEngineTestDB connects to the integration test database, skipping if no password is configured.
-//
-// Acquire the shared flock before truncating tables (C3): this package truncates flow_stages/flows/datasources,
-// which changeorder also truncates, so cross-package parallel runs must be serialized.
+// openEngineTestDB connects to the integration test database under the shared flock before truncating tables.
 func openEngineTestDB(t *testing.T) *gorm.DB {
 	t.Helper()
-	password := os.Getenv("YEARNING_TEST_DATABASE_PASSWORD")
-	if password == "" {
-		t.Skip("integration PostgreSQL not configured: set YEARNING_TEST_DATABASE_PASSWORD")
-	}
-	acquireSharedITestLock(t)
-	dsn := fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=disable",
-		envOrDS("YEARNING_TEST_DATABASE_HOST", "localhost"),
-		envOrDS("YEARNING_TEST_DATABASE_PORT", "54330"),
-		envOrDS("YEARNING_TEST_DATABASE_USER", "yearning"),
-		password,
-		envOrDS("YEARNING_TEST_DATABASE_DBNAME", "yearning_v4"))
-	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{Logger: gormlogger.Discard})
-	if err != nil {
-		t.Fatalf("postgres connect: %v", err)
-	}
-	if sqlDB, serr := db.DB(); serr == nil {
-		t.Cleanup(func() { _ = sqlDB.Close() })
-	}
+	db := testkit.OpenPG(t)
 	for _, tbl := range []string{
 		"flow_stages", "flows", "datasources",
 	} {

@@ -1,0 +1,170 @@
+{
+  "contract_version": 1,
+  "openapi_sha": "b08b588223c0b586a5c9c4e0f1c9b0cd818d7ef1d61f3f9e823d5a489e37fb73",
+  "zod_runtime_sha256": "32b72a82897ae698b7566aad9821c07cf5194173a3dc69adfb00a8f00f04a446",
+  "operation_id": "precheckDiagnosticOptimizationDraft",
+  "case_id": "optimize",
+  "http_status": 200,
+  "err_code": 0,
+  "response": {
+    "data": {
+      "report": {
+        "report_id": "00000000-0000-4000-8000-000000000171",
+        "datasource_id": "00000000-0000-4000-8000-000000000009",
+        "statement_id": "00000000-0000-4000-8000-000000000128",
+        "window_start": "2026-11-25T01:23:00.000Z",
+        "window_end": "2026-11-25T01:24:00.000Z",
+        "coverage_mode": "cumulative_only",
+        "desensitized_context_summary": "dialect=postgresql template=\"SELECT column_3 . column_1 , column_3 . column_2 FROM schema_2 . table_1 column_3 JOIN schema_2 . table_1 column_4 ON column_3 . column_1 <= column_4 . column_1 WHERE column_3 . column_2 >= $1 ORDER BY column_3 . column_2 DESC LIMIT $2\" metadata=[schema_1.table_1(column_1:bigint, column_2:text)]",
+        "observed_facts": [
+          {
+            "metric": "窗口内调用次数",
+            "value": "80",
+            "window": "2026-11-26T09:48:15Z ~ 2026-11-26T10:48:15Z (cumulative_only)"
+          },
+          {
+            "metric": "平均执行时间",
+            "value": "10.931 ms",
+            "window": "2026-11-26T09:48:15Z ~ 2026-11-26T10:48:15Z (cumulative_only)"
+          },
+          {
+            "metric": "总执行时间",
+            "value": "874.501 ms",
+            "window": "2026-11-26T09:48:15Z ~ 2026-11-26T10:48:15Z (cumulative_only)"
+          },
+          {
+            "metric": "累计返回行数",
+            "value": "800（约 10 行/次，按 800/80 估算）",
+            "window": "2026-11-26T09:48:15Z ~ 2026-11-26T10:48:15Z (cumulative_only)"
+          },
+          {
+            "metric": "锁等待/临时块指标",
+            "value": "0",
+            "window": "2026-11-26T09:48:15Z ~ 2026-11-26T10:48:15Z (cumulative_only)"
+          },
+          {
+            "metric": "扫描行/块指标",
+            "value": "0（可能未采集或不可用，不能据此判断扫描量）",
+            "window": "2026-11-26T09:48:15Z ~ 2026-11-26T10:48:15Z (cumulative_only)"
+          },
+          {
+            "metric": "SQL 形态",
+            "value": "public.f12_demo 自连接：d1.id <= d2.id；过滤 d1.note >= $1；按 d1.note DESC 排序并 LIMIT $2",
+            "window": "2026-11-26T09:48:15Z ~ 2026-11-26T10:48:15Z (cumulative_only)"
+          },
+          {
+            "metric": "表元数据",
+            "value": "target.f12_demo(id:bigint, note:text)；模板中访问 public.f12_demo，存在 schema 标记不一致，需核实实际对象",
+            "window": "2026-11-26T09:48:15Z ~ 2026-11-26T10:48:15Z (cumulative_only)"
+          }
+        ],
+        "root_cause_hypotheses": [
+          {
+            "hypothesis": "自连接使用同一张表且连接条件为 d1.id <= d2.id 的非等值比较。在 id 非空时，每个 d1 行至少会与自身匹配，因此 JOIN 不会过滤 d1 行，而是按满足 d2.id >= d1.id 的 d2 行数放大中间结果；若 id 可空，则还会过滤 id 为 NULL 的 d1 行。该行放大可能显著增加排序和 LIMIT 前处理成本。",
+            "confidence": "high",
+            "evidence_basis": "SQL 模板显示 d1 与 d2 均为 public.f12_demo 的别名，连接条件为非等值自连接；元数据仅显示 id:bigint、note:text。"
+          },
+          {
+            "hypothesis": "过滤条件 d1.note >= $1 与排序 d1.note DESC 可能在 note 上缺少可用索引，导致需要扫描较多行并进行排序；实际是否走索引或排序方式需执行计划验证。",
+            "confidence": "medium",
+            "evidence_basis": "输入未提供 note 上的索引元数据；窗口内平均执行时间约 10.931 ms、累计返回 800 行，但 rows_or_blocks_scanned 为 0 且 coverage_mode=cumulative_only，无法据此确认扫描量或排序方式。"
+          },
+          {
+            "hypothesis": "自连接非等值条件 d2.id >= d1.id 可能在 d2 侧缺少 id 上的范围检索索引，使连接阶段需要更多行比较；是否使用嵌套循环或哈希/合并连接需执行计划验证。",
+            "confidence": "medium",
+            "evidence_basis": "输入未提供 id 上的索引元数据；SQL 模板中 d2.id 仅出现在非等值连接条件中。"
+          }
+        ],
+        "optimization_recommendations": [
+          {
+            "kind": "sql_rewrite",
+            "title": "移除不必要的自连接（若业务不依赖重复行）",
+            "rationale": "原查询只输出 d1 的列，自连接在 id 非空时不会过滤 d1 行，只会按 d2 匹配数复制结果；若业务只需要 f12_demo 中满足 note >= $1 的行，可去掉自连接以避免行放大和额外连接成本。为保持原查询对 NULL 连接键的过滤语义，可保留 id IS NOT NULL。",
+            "applicable_conditions": [
+              "应用不依赖自连接产生的重复行",
+              "note >= $1 的过滤与 note DESC 排序、LIMIT $2 是主要业务语义",
+              "如 id 可空，需保留 id IS NOT NULL 以匹配原 JOIN 对 NULL 的排除行为"
+            ],
+            "candidate_sql": "SELECT id, note FROM public.f12_demo WHERE note >= $1 AND id IS NOT NULL ORDER BY note DESC LIMIT $2",
+            "risk_notes": [
+              "会改变原查询的重复行语义；若调用方依赖重复行数，不能直接替换",
+              "需确认 id 是否可空以及业务是否需要排除 NULL",
+              "public.f12_demo 与元数据 target.f12_demo 不一致，执行前需核实实际对象"
+            ]
+          },
+          {
+            "kind": "sql_rewrite",
+            "title": "如需保留存在性过滤并去重，使用 EXISTS 替代自连接",
+            "rationale": "EXISTS 只判断是否存在满足 d2.id >= d1.id 的 d2 行，可避免原 JOIN 因多个 d2 匹配而放大结果；在 id 非空时该存在性通常由 d1 自身满足，但该写法保留了对 NULL 连接键的排除语义。",
+            "applicable_conditions": [
+              "业务只关心 d1 行是否存在匹配，不需要重复行",
+              "结果需要按 d1.note DESC 排序并 LIMIT $2",
+              "可接受与 SELECT DISTINCT 等价的去重语义"
+            ],
+            "candidate_sql": "SELECT d1.id, d1.note FROM public.f12_demo d1 WHERE d1.note >= $1 AND EXISTS (SELECT 1 FROM public.f12_demo d2 WHERE d2.id >= d1.id) ORDER BY d1.note DESC LIMIT $2",
+            "risk_notes": [
+              "与原始 JOIN 的重复行输出不等价",
+              "若 id 可空，EXISTS 会排除 id 为 NULL 的 d1 行，与原 JOIN 行为一致但需业务确认",
+              "仍需结合实际执行计划验证 EXISTS 子查询是否被有效执行"
+            ]
+          },
+          {
+            "kind": "index_ddl",
+            "title": "为过滤和排序创建 note / id 复合索引",
+            "rationale": "该索引可服务 WHERE note >= $1 过滤与 ORDER BY note DESC 排序，并包含 id 以支持 SELECT 列访问；适用于重写后仍需按 note 过滤和排序的查询。",
+            "applicable_conditions": [
+              "查询保留 note >= $1 过滤和 note DESC 排序",
+              "note 的选择性使索引扫描优于顺序扫描",
+              "实际对象为 public.f12_demo 或等价对象"
+            ],
+            "candidate_sql": "CREATE INDEX idx_table_1_column_2_desc_column_1 ON public.f12_demo (note DESC, id)",
+            "risk_notes": [
+              "会增加写入和维护成本",
+              "生产环境建议使用 CREATE INDEX CONCURRENTLY 以降低锁影响",
+              "若 note 过滤性很差，优化器可能仍选择顺序扫描加排序",
+              "public.f12_demo 与元数据 target.f12_demo 不一致，需先确认实际 schema"
+            ]
+          },
+          {
+            "kind": "index_ddl",
+            "title": "保留原自连接时为连接列 id 创建索引",
+            "rationale": "原 SQL 的非等值连接条件 d2.id >= d1.id 可能需要在 d2 侧按 id 做范围检索；id 单列索引可为该连接条件提供候选访问路径。",
+            "applicable_conditions": [
+              "保留原始自连接 SQL 形态",
+              "连接阶段确实需要按 d2.id 范围查找",
+              "id 的分布和选择率适合索引访问"
+            ],
+            "candidate_sql": "CREATE INDEX idx_table_1_column_1 ON public.f12_demo (id)",
+            "risk_notes": [
+              "单列索引可能增加写入开销",
+              "是否被使用取决于优化器代价模型和实际数据分布",
+              "需与 note 过滤/排序索引配合评估，避免冗余索引",
+              "public.f12_demo 与元数据 target.f12_demo 不一致，执行前需核实实际对象"
+            ]
+          }
+        ],
+        "verification_steps": [
+          "核实 public.f12_demo 与元数据中的 target.f12_demo 是否为同一实际对象，并确认 id 是否可空、note 的数据分布和过滤选择性。",
+          "与业务确认原自连接产生的重复行是否属于预期语义；若不属于，优先验证移除自连接或 EXISTS 去重改写后的结果集是否符合预期。",
+          "在测试环境对原始 SQL、移除自连接 SQL、EXISTS 改写 SQL 分别执行 EXPLAIN (ANALYZE, BUFFERS) 与 EXPLAIN 对比实际行数、循环次数、排序方式和缓冲区访问；注意本报告未提供执行计划，不能据此断言当前计划。",
+          "使用代表性参数 $1、$2 验证 ORDER BY d1.note DESC LIMIT $2 的结果一致性，特别检查 id 为 NULL 的行是否被原查询排除。",
+          "在确认索引必要后，于测试环境创建候选索引并对比创建前后的平均执行时间、返回行数、排序耗时和缓冲区访问；生产环境评估使用 CREATE INDEX CONCURRENTLY。",
+          "上线后继续观察 pg_stat_statements 中该模板的 calls、avg_exec_time_ms、total_exec_time_ms 和 rows_returned 变化，确认优化收益。"
+        ],
+        "candidate_sql": "CREATE TABLE IF NOT EXISTS f12_diag_opt_3f232f58 (id bigint primary key, note text);",
+        "candidate_statement_kind": "ddl",
+        "submission_state": "prechecked",
+        "flow_id": "00000000-0000-4000-8000-000000000003",
+        "ephemeral_run_id": "00000000-0000-4000-8000-000000000172",
+        "submitted_order_id": null,
+        "submitted_order_display_no": null,
+        "created_at": "2026-11-25T01:24:00.000Z"
+      },
+      "result_ref": "/review-runs/00000000-0000-4000-8000-000000000172",
+      "run_id": "00000000-0000-4000-8000-000000000172"
+    },
+    "err_code": 0,
+    "message": "ok",
+    "request_id": "00000000-0000-4000-8000-999999999999"
+  }
+}
