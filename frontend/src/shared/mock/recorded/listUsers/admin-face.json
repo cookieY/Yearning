@@ -1,6 +1,6 @@
 {
   "contract_version": 1,
-  "openapi_sha": "b08b588223c0b586a5c9c4e0f1c9b0cd818d7ef1d61f3f9e823d5a489e37fb73",
+  "openapi_sha": "d093a5fb3bde5df417746336adc995181c34ed6d35c651a982c93d3dc939c06b",
   "zod_runtime_sha256": "32b72a82897ae698b7566aad9821c07cf5194173a3dc69adfb00a8f00f04a446",
   "operation_id": "listUsers",
   "case_id": "admin-face",
@@ -10,7 +10,7 @@
     "data": {
       "items": [
         {
-          "id": "00000000-0000-4000-8000-000000000170",
+          "id": "00000000-0000-4000-8000-000000000018",
           "username": "admin",
           "display_name": "Administrator",
           "email": null,
@@ -18,8 +18,8 @@
           "role": "admin",
           "auth_provider": "local",
           "version": 1,
-          "created_at": "2026-11-25T03:12:00.000Z",
-          "updated_at": "2026-11-25T03:12:00.000Z"
+          "created_at": "2026-11-25T07:10:00.000Z",
+          "updated_at": "2026-11-25T07:10:00.000Z"
         },
         {
           "id": "00000000-0000-4000-8000-000000000002",
@@ -30,11 +30,11 @@
           "role": "user",
           "auth_provider": "local",
           "version": 1,
-          "created_at": "2026-11-25T03:13:00.000Z",
-          "updated_at": "2026-11-25T03:13:00.000Z"
+          "created_at": "2026-11-25T07:11:00.000Z",
+          "updated_at": "2026-11-25T07:11:00.000Z"
         },
         {
-          "id": "00000000-0000-4000-8000-000000000018",
+          "id": "00000000-0000-4000-8000-000000000017",
           "username": "f12-approver",
           "display_name": "F12 approver",
           "email": null,
@@ -42,8 +42,8 @@
           "role": "user",
           "auth_provider": "local",
           "version": 1,
-          "created_at": "2026-11-25T03:14:00.000Z",
-          "updated_at": "2026-11-25T03:14:00.000Z"
+          "created_at": "2026-11-25T07:12:00.000Z",
+          "updated_at": "2026-11-25T07:12:00.000Z"
         },
         {
           "id": "00000000-0000-4000-8000-000000000019",
@@ -54,11 +54,11 @@
           "role": "user",
           "auth_provider": "local",
           "version": 1,
-          "created_at": "2026-11-25T03:15:00.000Z",
-          "updated_at": "2026-11-25T03:15:00.000Z"
+          "created_at": "2026-11-25T07:13:00.000Z",
+          "updated_at": "2026-11-25T07:13:00.000Z"
         },
         {
-          "id": "00000000-0000-4000-8000-000000000176",
+          "id": "00000000-0000-4000-8000-000000000201",
           "username": "f12-quser",
           "display_name": "F12 quser",
           "email": null,
@@ -66,11 +66,11 @@
           "role": "user",
           "auth_provider": "local",
           "version": 1,
-          "created_at": "2026-11-25T03:16:00.000Z",
-          "updated_at": "2026-11-25T03:16:00.000Z"
+          "created_at": "2026-11-25T07:14:00.000Z",
+          "updated_at": "2026-11-25T07:14:00.000Z"
         },
         {
-          "id": "00000000-0000-4000-8000-000000000199",
+          "id": "00000000-0000-4000-8000-000000000294",
           "username": "owner",
           "display_name": "Owner Full-Role Acceptance",
           "email": null,
@@ -78,11 +78,11 @@
           "role": "admin",
           "auth_provider": "local",
           "version": 1,
-          "created_at": "2026-11-25T03:17:00.000Z",
-          "updated_at": "2026-11-25T03:17:00.000Z"
+          "created_at": "2026-11-25T07:15:00.000Z",
+          "updated_at": "2026-11-25T07:15:00.000Z"
         },
         {
-          "id": "00000000-0000-4000-8000-000000000202",
+          "id": "00000000-0000-4000-8000-000000000297",
           "username": "f12-dual-role",
           "display_name": "Dual Role Submitter+Approver",
           "email": null,
@@ -90,11 +90,11 @@
           "role": "user",
           "auth_provider": "local",
           "version": 1,
-          "created_at": "2026-11-25T03:18:00.000Z",
-          "updated_at": "2026-11-25T03:18:00.000Z"
+          "created_at": "2026-11-25T07:16:00.000Z",
+          "updated_at": "2026-11-25T07:16:00.000Z"
         },
         {
-          "id": "00000000-0000-4000-8000-000000000264",
+          "id": "00000000-0000-4000-8000-000000000392",
           "username": "f12-noperm",
           "display_name": "Zero Permission User",
           "email": null,
@@ -102,11 +102,11 @@
           "role": "user",
           "auth_provider": "local",
           "version": 1,
-          "created_at": "2026-11-25T03:19:00.000Z",
-          "updated_at": "2026-11-25T03:19:00.000Z"
+          "created_at": "2026-11-25T07:17:00.000Z",
+          "updated_at": "2026-11-25T07:17:00.000Z"
         },
         {
-          "id": "00000000-0000-4000-8000-000000000265",
+          "id": "00000000-0000-4000-8000-000000000393",
           "username": "f12-emoji-user",
           "display_name": "🚀 测试长显示名_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
           "email": null,
@@ -114,11 +114,11 @@
           "role": "user",
           "auth_provider": "local",
           "version": 1,
-          "created_at": "2026-11-25T03:20:00.000Z",
-          "updated_at": "2026-11-25T03:20:00.000Z"
+          "created_at": "2026-11-25T07:18:00.000Z",
+          "updated_at": "2026-11-25T07:18:00.000Z"
         },
         {
-          "id": "00000000-0000-4000-8000-000000000266",
+          "id": "00000000-0000-4000-8000-000000000394",
           "username": "f12-adv-user-01",
           "display_name": "Adversarial User 01",
           "email": null,
@@ -126,11 +126,11 @@
           "role": "user",
           "auth_provider": "local",
           "version": 1,
-          "created_at": "2026-11-25T03:21:00.000Z",
-          "updated_at": "2026-11-25T03:21:00.000Z"
+          "created_at": "2026-11-25T07:19:00.000Z",
+          "updated_at": "2026-11-25T07:19:00.000Z"
         },
         {
-          "id": "00000000-0000-4000-8000-000000000267",
+          "id": "00000000-0000-4000-8000-000000000395",
           "username": "f12-adv-user-02",
           "display_name": "Adversarial User 02",
           "email": null,
@@ -138,11 +138,11 @@
           "role": "user",
           "auth_provider": "local",
           "version": 1,
-          "created_at": "2026-11-25T03:22:00.000Z",
-          "updated_at": "2026-11-25T03:22:00.000Z"
+          "created_at": "2026-11-25T07:20:00.000Z",
+          "updated_at": "2026-11-25T07:20:00.000Z"
         },
         {
-          "id": "00000000-0000-4000-8000-000000000268",
+          "id": "00000000-0000-4000-8000-000000000396",
           "username": "f12-adv-user-03",
           "display_name": "Adversarial User 03",
           "email": null,
@@ -150,11 +150,11 @@
           "role": "user",
           "auth_provider": "local",
           "version": 1,
-          "created_at": "2026-11-25T03:23:00.000Z",
-          "updated_at": "2026-11-25T03:23:00.000Z"
+          "created_at": "2026-11-25T07:21:00.000Z",
+          "updated_at": "2026-11-25T07:21:00.000Z"
         },
         {
-          "id": "00000000-0000-4000-8000-000000000269",
+          "id": "00000000-0000-4000-8000-000000000397",
           "username": "f12-adv-user-04",
           "display_name": "Adversarial User 04",
           "email": null,
@@ -162,11 +162,11 @@
           "role": "user",
           "auth_provider": "local",
           "version": 1,
-          "created_at": "2026-11-25T03:24:00.000Z",
-          "updated_at": "2026-11-25T03:24:00.000Z"
+          "created_at": "2026-11-25T07:22:00.000Z",
+          "updated_at": "2026-11-25T07:22:00.000Z"
         },
         {
-          "id": "00000000-0000-4000-8000-000000000270",
+          "id": "00000000-0000-4000-8000-000000000398",
           "username": "f12-adv-user-05",
           "display_name": "Adversarial User 05",
           "email": null,
@@ -174,11 +174,11 @@
           "role": "user",
           "auth_provider": "local",
           "version": 1,
-          "created_at": "2026-11-25T03:25:00.000Z",
-          "updated_at": "2026-11-25T03:25:00.000Z"
+          "created_at": "2026-11-25T07:23:00.000Z",
+          "updated_at": "2026-11-25T07:23:00.000Z"
         },
         {
-          "id": "00000000-0000-4000-8000-000000000271",
+          "id": "00000000-0000-4000-8000-000000000399",
           "username": "f12-adv-user-06",
           "display_name": "Adversarial User 06",
           "email": null,
@@ -186,11 +186,11 @@
           "role": "user",
           "auth_provider": "local",
           "version": 1,
-          "created_at": "2026-11-25T03:26:00.000Z",
-          "updated_at": "2026-11-25T03:26:00.000Z"
+          "created_at": "2026-11-25T07:24:00.000Z",
+          "updated_at": "2026-11-25T07:24:00.000Z"
         },
         {
-          "id": "00000000-0000-4000-8000-000000000272",
+          "id": "00000000-0000-4000-8000-000000000400",
           "username": "f12-adv-user-07",
           "display_name": "Adversarial User 07",
           "email": null,
@@ -198,11 +198,11 @@
           "role": "user",
           "auth_provider": "local",
           "version": 1,
-          "created_at": "2026-11-25T03:27:00.000Z",
-          "updated_at": "2026-11-25T03:27:00.000Z"
+          "created_at": "2026-11-25T07:25:00.000Z",
+          "updated_at": "2026-11-25T07:25:00.000Z"
         },
         {
-          "id": "00000000-0000-4000-8000-000000000273",
+          "id": "00000000-0000-4000-8000-000000000401",
           "username": "f12-adv-user-08",
           "display_name": "Adversarial User 08",
           "email": null,
@@ -210,11 +210,11 @@
           "role": "user",
           "auth_provider": "local",
           "version": 1,
-          "created_at": "2026-11-25T03:28:00.000Z",
-          "updated_at": "2026-11-25T03:28:00.000Z"
+          "created_at": "2026-11-25T07:26:00.000Z",
+          "updated_at": "2026-11-25T07:26:00.000Z"
         },
         {
-          "id": "00000000-0000-4000-8000-000000000274",
+          "id": "00000000-0000-4000-8000-000000000402",
           "username": "f12-adv-user-09",
           "display_name": "Adversarial User 09",
           "email": null,
@@ -222,11 +222,11 @@
           "role": "user",
           "auth_provider": "local",
           "version": 1,
-          "created_at": "2026-11-25T03:29:00.000Z",
-          "updated_at": "2026-11-25T03:29:00.000Z"
+          "created_at": "2026-11-25T07:27:00.000Z",
+          "updated_at": "2026-11-25T07:27:00.000Z"
         },
         {
-          "id": "00000000-0000-4000-8000-000000000275",
+          "id": "00000000-0000-4000-8000-000000000403",
           "username": "f12-adv-user-10",
           "display_name": "Adversarial User 10",
           "email": null,
@@ -234,11 +234,11 @@
           "role": "user",
           "auth_provider": "local",
           "version": 1,
-          "created_at": "2026-11-25T03:30:00.000Z",
-          "updated_at": "2026-11-25T03:30:00.000Z"
+          "created_at": "2026-11-25T07:28:00.000Z",
+          "updated_at": "2026-11-25T07:28:00.000Z"
         },
         {
-          "id": "00000000-0000-4000-8000-000000000276",
+          "id": "00000000-0000-4000-8000-000000000404",
           "username": "f12-adv-user-11",
           "display_name": "Adversarial User 11",
           "email": null,
@@ -246,11 +246,11 @@
           "role": "user",
           "auth_provider": "local",
           "version": 1,
-          "created_at": "2026-11-25T03:31:00.000Z",
-          "updated_at": "2026-11-25T03:31:00.000Z"
+          "created_at": "2026-11-25T07:29:00.000Z",
+          "updated_at": "2026-11-25T07:29:00.000Z"
         },
         {
-          "id": "00000000-0000-4000-8000-000000000277",
+          "id": "00000000-0000-4000-8000-000000000405",
           "username": "f12-adv-user-12",
           "display_name": "Adversarial User 12",
           "email": null,
@@ -258,11 +258,11 @@
           "role": "user",
           "auth_provider": "local",
           "version": 1,
-          "created_at": "2026-11-25T03:32:00.000Z",
-          "updated_at": "2026-11-25T03:32:00.000Z"
+          "created_at": "2026-11-25T07:30:00.000Z",
+          "updated_at": "2026-11-25T07:30:00.000Z"
         },
         {
-          "id": "00000000-0000-4000-8000-000000000278",
+          "id": "00000000-0000-4000-8000-000000000406",
           "username": "f12-adv-user-13",
           "display_name": "Adversarial User 13",
           "email": null,
@@ -270,11 +270,11 @@
           "role": "user",
           "auth_provider": "local",
           "version": 1,
-          "created_at": "2026-11-25T03:33:00.000Z",
-          "updated_at": "2026-11-25T03:33:00.000Z"
+          "created_at": "2026-11-25T07:31:00.000Z",
+          "updated_at": "2026-11-25T07:31:00.000Z"
         },
         {
-          "id": "00000000-0000-4000-8000-000000000279",
+          "id": "00000000-0000-4000-8000-000000000407",
           "username": "f12-adv-user-14",
           "display_name": "Adversarial User 14",
           "email": null,
@@ -282,11 +282,11 @@
           "role": "user",
           "auth_provider": "local",
           "version": 1,
-          "created_at": "2026-11-25T03:34:00.000Z",
-          "updated_at": "2026-11-25T03:34:00.000Z"
+          "created_at": "2026-11-25T07:32:00.000Z",
+          "updated_at": "2026-11-25T07:32:00.000Z"
         },
         {
-          "id": "00000000-0000-4000-8000-000000000280",
+          "id": "00000000-0000-4000-8000-000000000408",
           "username": "f12-adv-user-15",
           "display_name": "Adversarial User 15",
           "email": null,
@@ -294,11 +294,11 @@
           "role": "user",
           "auth_provider": "local",
           "version": 1,
-          "created_at": "2026-11-25T03:35:00.000Z",
-          "updated_at": "2026-11-25T03:35:00.000Z"
+          "created_at": "2026-11-25T07:33:00.000Z",
+          "updated_at": "2026-11-25T07:33:00.000Z"
         },
         {
-          "id": "00000000-0000-4000-8000-000000000281",
+          "id": "00000000-0000-4000-8000-000000000409",
           "username": "f12-adv-user-16",
           "display_name": "Adversarial User 16",
           "email": null,
@@ -306,11 +306,11 @@
           "role": "user",
           "auth_provider": "local",
           "version": 1,
-          "created_at": "2026-11-25T03:36:00.000Z",
-          "updated_at": "2026-11-25T03:36:00.000Z"
+          "created_at": "2026-11-25T07:34:00.000Z",
+          "updated_at": "2026-11-25T07:34:00.000Z"
         },
         {
-          "id": "00000000-0000-4000-8000-000000000282",
+          "id": "00000000-0000-4000-8000-000000000410",
           "username": "f12-adv-user-17",
           "display_name": "Adversarial User 17",
           "email": null,
@@ -318,11 +318,11 @@
           "role": "user",
           "auth_provider": "local",
           "version": 1,
-          "created_at": "2026-11-25T03:37:00.000Z",
-          "updated_at": "2026-11-25T03:37:00.000Z"
+          "created_at": "2026-11-25T07:35:00.000Z",
+          "updated_at": "2026-11-25T07:35:00.000Z"
         },
         {
-          "id": "00000000-0000-4000-8000-000000000283",
+          "id": "00000000-0000-4000-8000-000000000411",
           "username": "f12-adv-user-18",
           "display_name": "Adversarial User 18",
           "email": null,
@@ -330,11 +330,11 @@
           "role": "user",
           "auth_provider": "local",
           "version": 1,
-          "created_at": "2026-11-25T03:38:00.000Z",
-          "updated_at": "2026-11-25T03:38:00.000Z"
+          "created_at": "2026-11-25T07:36:00.000Z",
+          "updated_at": "2026-11-25T07:36:00.000Z"
         },
         {
-          "id": "00000000-0000-4000-8000-000000000284",
+          "id": "00000000-0000-4000-8000-000000000412",
           "username": "f12-adv-user-19",
           "display_name": "Adversarial User 19",
           "email": null,
@@ -342,11 +342,11 @@
           "role": "user",
           "auth_provider": "local",
           "version": 1,
-          "created_at": "2026-11-25T03:39:00.000Z",
-          "updated_at": "2026-11-25T03:39:00.000Z"
+          "created_at": "2026-11-25T07:37:00.000Z",
+          "updated_at": "2026-11-25T07:37:00.000Z"
         },
         {
-          "id": "00000000-0000-4000-8000-000000000285",
+          "id": "00000000-0000-4000-8000-000000000413",
           "username": "f12-adv-user-20",
           "display_name": "Adversarial User 20",
           "email": null,
@@ -354,11 +354,11 @@
           "role": "user",
           "auth_provider": "local",
           "version": 1,
-          "created_at": "2026-11-25T03:40:00.000Z",
-          "updated_at": "2026-11-25T03:40:00.000Z"
+          "created_at": "2026-11-25T07:38:00.000Z",
+          "updated_at": "2026-11-25T07:38:00.000Z"
         },
         {
-          "id": "00000000-0000-4000-8000-000000000286",
+          "id": "00000000-0000-4000-8000-000000000414",
           "username": "f12-adv-user-21",
           "display_name": "Adversarial User 21",
           "email": null,
@@ -366,11 +366,11 @@
           "role": "user",
           "auth_provider": "local",
           "version": 1,
-          "created_at": "2026-11-25T03:41:00.000Z",
-          "updated_at": "2026-11-25T03:41:00.000Z"
+          "created_at": "2026-11-25T07:39:00.000Z",
+          "updated_at": "2026-11-25T07:39:00.000Z"
         },
         {
-          "id": "00000000-0000-4000-8000-000000000287",
+          "id": "00000000-0000-4000-8000-000000000415",
           "username": "f12-adv-user-22",
           "display_name": "Adversarial User 22",
           "email": null,
@@ -378,11 +378,11 @@
           "role": "user",
           "auth_provider": "local",
           "version": 1,
-          "created_at": "2026-11-25T03:42:00.000Z",
-          "updated_at": "2026-11-25T03:42:00.000Z"
+          "created_at": "2026-11-25T07:40:00.000Z",
+          "updated_at": "2026-11-25T07:40:00.000Z"
         },
         {
-          "id": "00000000-0000-4000-8000-000000000288",
+          "id": "00000000-0000-4000-8000-000000000416",
           "username": "f12-adv-user-23",
           "display_name": "Adversarial User 23",
           "email": null,
@@ -390,11 +390,11 @@
           "role": "user",
           "auth_provider": "local",
           "version": 1,
-          "created_at": "2026-11-25T03:43:00.000Z",
-          "updated_at": "2026-11-25T03:43:00.000Z"
+          "created_at": "2026-11-25T07:41:00.000Z",
+          "updated_at": "2026-11-25T07:41:00.000Z"
         },
         {
-          "id": "00000000-0000-4000-8000-000000000289",
+          "id": "00000000-0000-4000-8000-000000000417",
           "username": "f12-adv-user-24",
           "display_name": "Adversarial User 24",
           "email": null,
@@ -402,11 +402,11 @@
           "role": "user",
           "auth_provider": "local",
           "version": 1,
-          "created_at": "2026-11-25T03:44:00.000Z",
-          "updated_at": "2026-11-25T03:44:00.000Z"
+          "created_at": "2026-11-25T07:42:00.000Z",
+          "updated_at": "2026-11-25T07:42:00.000Z"
         },
         {
-          "id": "00000000-0000-4000-8000-000000000290",
+          "id": "00000000-0000-4000-8000-000000000418",
           "username": "f12-adv-user-25",
           "display_name": "Adversarial User 25",
           "email": null,
@@ -414,11 +414,11 @@
           "role": "user",
           "auth_provider": "local",
           "version": 1,
-          "created_at": "2026-11-25T03:45:00.000Z",
-          "updated_at": "2026-11-25T03:45:00.000Z"
+          "created_at": "2026-11-25T07:43:00.000Z",
+          "updated_at": "2026-11-25T07:43:00.000Z"
         },
         {
-          "id": "00000000-0000-4000-8000-000000000291",
+          "id": "00000000-0000-4000-8000-000000000419",
           "username": "f12-adv-user-26",
           "display_name": "Adversarial User 26",
           "email": null,
@@ -426,11 +426,11 @@
           "role": "user",
           "auth_provider": "local",
           "version": 1,
-          "created_at": "2026-11-25T03:46:00.000Z",
-          "updated_at": "2026-11-25T03:46:00.000Z"
+          "created_at": "2026-11-25T07:44:00.000Z",
+          "updated_at": "2026-11-25T07:44:00.000Z"
         },
         {
-          "id": "00000000-0000-4000-8000-000000000292",
+          "id": "00000000-0000-4000-8000-000000000420",
           "username": "f12-adv-user-27",
           "display_name": "Adversarial User 27",
           "email": null,
@@ -438,11 +438,11 @@
           "role": "user",
           "auth_provider": "local",
           "version": 1,
-          "created_at": "2026-11-25T03:47:00.000Z",
-          "updated_at": "2026-11-25T03:47:00.000Z"
+          "created_at": "2026-11-25T07:45:00.000Z",
+          "updated_at": "2026-11-25T07:45:00.000Z"
         },
         {
-          "id": "00000000-0000-4000-8000-000000000293",
+          "id": "00000000-0000-4000-8000-000000000421",
           "username": "f12-adv-user-28",
           "display_name": "Adversarial User 28",
           "email": null,
@@ -450,11 +450,11 @@
           "role": "user",
           "auth_provider": "local",
           "version": 1,
-          "created_at": "2026-11-25T03:48:00.000Z",
-          "updated_at": "2026-11-25T03:48:00.000Z"
+          "created_at": "2026-11-25T07:46:00.000Z",
+          "updated_at": "2026-11-25T07:46:00.000Z"
         },
         {
-          "id": "00000000-0000-4000-8000-000000000294",
+          "id": "00000000-0000-4000-8000-000000000422",
           "username": "f12-adv-user-29",
           "display_name": "Adversarial User 29",
           "email": null,
@@ -462,11 +462,11 @@
           "role": "user",
           "auth_provider": "local",
           "version": 1,
-          "created_at": "2026-11-25T03:49:00.000Z",
-          "updated_at": "2026-11-25T03:49:00.000Z"
+          "created_at": "2026-11-25T07:47:00.000Z",
+          "updated_at": "2026-11-25T07:47:00.000Z"
         },
         {
-          "id": "00000000-0000-4000-8000-000000000295",
+          "id": "00000000-0000-4000-8000-000000000423",
           "username": "f12-adv-user-30",
           "display_name": "Adversarial User 30",
           "email": null,
@@ -474,11 +474,11 @@
           "role": "user",
           "auth_provider": "local",
           "version": 1,
-          "created_at": "2026-11-25T03:50:00.000Z",
-          "updated_at": "2026-11-25T03:50:00.000Z"
+          "created_at": "2026-11-25T07:48:00.000Z",
+          "updated_at": "2026-11-25T07:48:00.000Z"
         },
         {
-          "id": "00000000-0000-4000-8000-000000000296",
+          "id": "00000000-0000-4000-8000-000000000424",
           "username": "f12-adv-user-31",
           "display_name": "Adversarial User 31",
           "email": null,
@@ -486,11 +486,11 @@
           "role": "user",
           "auth_provider": "local",
           "version": 1,
-          "created_at": "2026-11-25T03:51:00.000Z",
-          "updated_at": "2026-11-25T03:51:00.000Z"
+          "created_at": "2026-11-25T07:49:00.000Z",
+          "updated_at": "2026-11-25T07:49:00.000Z"
         },
         {
-          "id": "00000000-0000-4000-8000-000000000297",
+          "id": "00000000-0000-4000-8000-000000000425",
           "username": "f12-adv-user-32",
           "display_name": "Adversarial User 32",
           "email": null,
@@ -498,11 +498,11 @@
           "role": "user",
           "auth_provider": "local",
           "version": 1,
-          "created_at": "2026-11-25T03:52:00.000Z",
-          "updated_at": "2026-11-25T03:52:00.000Z"
+          "created_at": "2026-11-25T07:50:00.000Z",
+          "updated_at": "2026-11-25T07:50:00.000Z"
         },
         {
-          "id": "00000000-0000-4000-8000-000000000298",
+          "id": "00000000-0000-4000-8000-000000000426",
           "username": "f12-adv-user-33",
           "display_name": "Adversarial User 33",
           "email": null,
@@ -510,11 +510,11 @@
           "role": "user",
           "auth_provider": "local",
           "version": 1,
-          "created_at": "2026-11-25T03:53:00.000Z",
-          "updated_at": "2026-11-25T03:53:00.000Z"
+          "created_at": "2026-11-25T07:51:00.000Z",
+          "updated_at": "2026-11-25T07:51:00.000Z"
         },
         {
-          "id": "00000000-0000-4000-8000-000000000299",
+          "id": "00000000-0000-4000-8000-000000000427",
           "username": "f12-adv-user-34",
           "display_name": "Adversarial User 34",
           "email": null,
@@ -522,11 +522,11 @@
           "role": "user",
           "auth_provider": "local",
           "version": 1,
-          "created_at": "2026-11-25T03:54:00.000Z",
-          "updated_at": "2026-11-25T03:54:00.000Z"
+          "created_at": "2026-11-25T07:52:00.000Z",
+          "updated_at": "2026-11-25T07:52:00.000Z"
         },
         {
-          "id": "00000000-0000-4000-8000-000000000300",
+          "id": "00000000-0000-4000-8000-000000000428",
           "username": "f12-adv-user-35",
           "display_name": "Adversarial User 35",
           "email": null,
@@ -534,11 +534,11 @@
           "role": "user",
           "auth_provider": "local",
           "version": 1,
-          "created_at": "2026-11-25T03:55:00.000Z",
-          "updated_at": "2026-11-25T03:55:00.000Z"
+          "created_at": "2026-11-25T07:53:00.000Z",
+          "updated_at": "2026-11-25T07:53:00.000Z"
         },
         {
-          "id": "00000000-0000-4000-8000-000000000301",
+          "id": "00000000-0000-4000-8000-000000000429",
           "username": "f12-adv-user-36",
           "display_name": "Adversarial User 36",
           "email": null,
@@ -546,11 +546,11 @@
           "role": "user",
           "auth_provider": "local",
           "version": 1,
-          "created_at": "2026-11-25T03:56:00.000Z",
-          "updated_at": "2026-11-25T03:56:00.000Z"
+          "created_at": "2026-11-25T07:54:00.000Z",
+          "updated_at": "2026-11-25T07:54:00.000Z"
         },
         {
-          "id": "00000000-0000-4000-8000-000000000302",
+          "id": "00000000-0000-4000-8000-000000000430",
           "username": "f12-adv-user-37",
           "display_name": "Adversarial User 37",
           "email": null,
@@ -558,11 +558,11 @@
           "role": "user",
           "auth_provider": "local",
           "version": 1,
-          "created_at": "2026-11-25T03:57:00.000Z",
-          "updated_at": "2026-11-25T03:57:00.000Z"
+          "created_at": "2026-11-25T07:55:00.000Z",
+          "updated_at": "2026-11-25T07:55:00.000Z"
         },
         {
-          "id": "00000000-0000-4000-8000-000000000303",
+          "id": "00000000-0000-4000-8000-000000000431",
           "username": "f12-adv-user-38",
           "display_name": "Adversarial User 38",
           "email": null,
@@ -570,11 +570,11 @@
           "role": "user",
           "auth_provider": "local",
           "version": 1,
-          "created_at": "2026-11-25T03:58:00.000Z",
-          "updated_at": "2026-11-25T03:58:00.000Z"
+          "created_at": "2026-11-25T07:56:00.000Z",
+          "updated_at": "2026-11-25T07:56:00.000Z"
         },
         {
-          "id": "00000000-0000-4000-8000-000000000304",
+          "id": "00000000-0000-4000-8000-000000000432",
           "username": "f12-adv-user-39",
           "display_name": "Adversarial User 39",
           "email": null,
@@ -582,11 +582,11 @@
           "role": "user",
           "auth_provider": "local",
           "version": 1,
-          "created_at": "2026-11-25T03:59:00.000Z",
-          "updated_at": "2026-11-25T03:59:00.000Z"
+          "created_at": "2026-11-25T07:57:00.000Z",
+          "updated_at": "2026-11-25T07:57:00.000Z"
         },
         {
-          "id": "00000000-0000-4000-8000-000000000305",
+          "id": "00000000-0000-4000-8000-000000000433",
           "username": "f12-adv-user-40",
           "display_name": "Adversarial User 40",
           "email": null,
@@ -594,11 +594,11 @@
           "role": "user",
           "auth_provider": "local",
           "version": 1,
-          "created_at": "2026-11-25T04:00:00.000Z",
-          "updated_at": "2026-11-25T04:00:00.000Z"
+          "created_at": "2026-11-25T07:58:00.000Z",
+          "updated_at": "2026-11-25T07:58:00.000Z"
         },
         {
-          "id": "00000000-0000-4000-8000-000000000306",
+          "id": "00000000-0000-4000-8000-000000000434",
           "username": "f12-adv-user-41",
           "display_name": "Adversarial User 41",
           "email": null,
@@ -606,13 +606,13 @@
           "role": "user",
           "auth_provider": "local",
           "version": 1,
-          "created_at": "2026-11-25T04:01:00.000Z",
-          "updated_at": "2026-11-25T04:01:00.000Z"
+          "created_at": "2026-11-25T07:59:00.000Z",
+          "updated_at": "2026-11-25T07:59:00.000Z"
         }
       ],
       "page": {
         "has_more": true,
-        "next_cursor": "00000000-0000-4000-8000-000000000306"
+        "next_cursor": "00000000-0000-4000-8000-000000000434"
       }
     },
     "err_code": 0,

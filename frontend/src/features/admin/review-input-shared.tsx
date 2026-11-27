@@ -208,13 +208,17 @@ export function DeleteReviewInputDialog({
         <AlertDialogHeader>
           <AlertDialogTitle>{t("admin.reviewInput.deleteTitle")}</AlertDialogTitle>
           <AlertDialogDescription>
-            {t("admin.reviewInput.deleteDescription", { name: target.name })}
+            {isSkills
+              ? t("admin.reviewInput.deleteDescription", { name: target.name })
+              : t("admin.knowledge.deleteDescription", { name: target.name })}
           </AlertDialogDescription>
         </AlertDialogHeader>
         {errorKey !== null ? (
           <Alert variant="destructive" data-testid="review-input-delete-error">
             <AlertTitle>{t(errorKey)}</AlertTitle>
-            <AlertDescription>{t("admin.reviewInput.deleteErrorHint")}</AlertDescription>
+            {isSkills ? (
+              <AlertDescription>{t("admin.reviewInput.deleteErrorHint")}</AlertDescription>
+            ) : null}
           </Alert>
         ) : null}
         <AlertDialogFooter>

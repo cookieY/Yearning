@@ -1,9 +1,7 @@
-import { StatusBadge } from "@/shared/components/status/status-badge";
-import { QUERY_GRANT_TONE, QUERY_REQUEST_TONE } from "@/features/query/query-state-tone";
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Ban, Check, ShieldOff, Stamp, X } from "lucide-react";
-import type { QueryAccessRequest, QueryGrant } from "@/api/generated/client/yearningV4HTTPAPI.schemas";
+import { Check, Eye, Stamp, X } from "lucide-react";
+import type { QueryAccessRequest } from "@/api/generated/client/yearningV4HTTPAPI.schemas";
 import { useSession } from "@/features/auth/session-provider";
 import { describeError, describeErrorText } from "@/shared/api/error-display";
 import { appToast } from "@/shared/components/shadcn-dashboard/sonner/sonner-08";
@@ -23,6 +21,8 @@ import { Button } from "@/shared/components/ui/button";
 import { Card, CardContent, CardTitle } from "@/shared/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/shared/components/ui/dialog";
 import { Label } from "@/shared/components/ui/label";
+import { ScrollArea } from "@/shared/components/ui/scroll-area";
+import { Sheet, SheetContent } from "@/shared/components/ui/sheet";
 import { Textarea } from "@/shared/components/ui/textarea";
 import { useCursorPage } from "@/shared/lib/cursor-page";
 import { formatTimestamp } from "@/shared/lib/timezones";
@@ -42,8 +42,16 @@ import {
   useDecideAccessRequest,
   useMyAccessRequests,
   useMyGrants,
-  useRevokeGrant,
 } from "@/features/query/use-query-domain";
+import {
+  DecisionRequestSummary,
+  GrantRevocationCard,
+  QueryAccessDetailBody,
+  RequestStatusBadge,
+  consolidateActiveGrantEntries,
+  formatRequestDatasources,
+  normalizeReason,
+} from "./query-access-sections";
 
 /**
  * Query Access Approval (route /approvals/query-access; migration contract §2 maps
@@ -86,15 +94,27 @@ export function QueryAccessApprovalsContent() {
   const requestsLoaded = !requestsQuery.isPending && !requestsQuery.isError;
   const decide = useDecideAccessRequest();
 
+  const [inspecting, setInspecting] = useState<QueryAccessRequest | null>(null);
   const [deciding, setDeciding] = useState<QueryAccessRequest | null>(null);
   const [decision, setDecision] = useState<"approve" | "reject">("approve");
   const [comment, setComment] = useState("");
   const [errorText, setErrorText] = useState<string | null>(null);
 
+  const openDecisionDialog = (row: QueryAccessRequest, nextDecision: "approve" | "reject") => {
+    setInspecting(null);
+    setErrorText(null);
+    setComment("");
+    setDecision(nextDecision);
+    setDeciding(row);
+  };
+
   const pending = requestsQuery.data.items;
   const grants = useMemo(() => grantsQuery.data ?? [], [grantsQuery.data]);
   const grantById = useMemo(() => new Map(grants.map((grant) => [grant.id, grant])), [grants]);
-  const activeGrants = grants.filter((row) => row.state === "active" && row.can_revoke === true);
+  const activeGrantEntries = useMemo(
+    () => consolidateActiveGrantEntries(grants, pending),
+    [grants, pending],
+  );
   const anyLoading = requestsQuery.isPending || grantsQuery.isPending;
   const [pendingTerms, setPendingTerms] = useState<SearchTerm[]>([]);
   const [pendingLive, setPendingLive] = useState<SearchTerm | null>(null);
@@ -109,6 +129,11 @@ export function QueryAccessApprovalsContent() {
         key: "datasources",
         label: t("approvals.queryAccess.column.datasources"),
         value: (row) => [...(row.datasource_names ?? []), ...row.datasource_ids].join(" "),
+      },
+      {
+        key: "reason",
+        label: t("approvals.queryAccess.column.reason"),
+        value: (row) => row.reason ?? "",
       },
       {
         key: "state",
@@ -195,7 +220,7 @@ export function QueryAccessApprovalsContent() {
       )}
       {loadError === null && anyLoading && (
         <Card>
-          <LoadingState variant="table" columns={5} />
+          <LoadingState variant="table" columns={6} />
         </Card>
       )}
 
@@ -238,6 +263,7 @@ export function QueryAccessApprovalsContent() {
                     <TableRow>
                       <TableHead>{t("approvals.queryAccess.column.requester")}</TableHead>
                       <TableHead>{t("approvals.queryAccess.column.datasources")}</TableHead>
+                      <TableHead>{t("approvals.queryAccess.column.reason")}</TableHead>
                       <TableHead>{t("approvals.queryAccess.column.state")}</TableHead>
                       <TableHead>{t("approvals.queryAccess.column.submittedAt")}</TableHead>
                       <TableHead />
@@ -246,57 +272,75 @@ export function QueryAccessApprovalsContent() {
                   <TableBody ref={pendingBodyRef} stale={requestsQuery.isFetching && requestsQuery.isPlaceholderData}>
                     {filteredPending.map((row) => {
                       const grant = row.grant_id == null ? undefined : grantById.get(row.grant_id);
-                      const showGrantTerminal = row.state === "grant_active" && grant !== undefined && grant.state !== "active";
+                      const reasonText = normalizeReason(row.reason);
                       return (
                         <TableRow
                           key={row.id}
                           data-row-key={row.id}
+                          className="cursor-pointer"
+                          onClick={() => {
+                            setInspecting(row);
+                          }}
                           data-testid={`query-access-pending-${row.id}`}
                         >
                           <TableCell className="font-mono font-semibold text-foreground">{row.applicant_name ?? row.requester_user_id}</TableCell>
                           <TableCell className="max-w-72 truncate font-mono">
-                            {(row.datasource_names?.length ? row.datasource_names : row.datasource_ids).join(" · ")}
+                            {formatRequestDatasources(row)}
+                          </TableCell>
+                          <TableCell
+                            className="max-w-72 truncate text-muted-foreground"
+                            title={reasonText ?? undefined}
+                            data-testid={`query-access-reason-${row.id}`}
+                          >
+                            {reasonText ?? "—"}
                           </TableCell>
                           <TableCell>
-                            {showGrantTerminal ? (
-                              <StatusBadge tone={QUERY_GRANT_TONE[grant.state]}>
-                                {t(`query.grant.state.${grant.state}`)}
-                              </StatusBadge>
-                            ) : (
-                              <StatusBadge tone={QUERY_REQUEST_TONE[row.state]}>
-                                {t(`query.request.state.${row.state}`)}
-                              </StatusBadge>
-                            )}
+                            <RequestStatusBadge row={row} grant={grant} />
                           </TableCell>
                           <TableCell className="text-muted-foreground">
                             {formatTimestamp(row.created_at)}
                           </TableCell>
                           <TableCell className="text-right">
-                            {row.state === "access_pending" && row.can_decide === true ? (
-                              <TableRowActions testId={`query-access-actions-${row.id}`}>
-                                <DropdownMenuItem
-                                  onClick={() => {
-                                    setDecision("approve");
-                                    setDeciding(row);
-                                  }}
-                                  data-testid={`query-access-approve-${row.id}`}
-                                >
-                                  <Check /> {t("approvals.queryAccess.approve")}
-                                </DropdownMenuItem>
-                                <DropdownMenuItem
-                                  variant="destructive"
-                                  onClick={() => {
-                                    setDecision("reject");
-                                    setDeciding(row);
-                                  }}
-                                  data-testid={`query-access-reject-${row.id}`}
-                                >
-                                  <X /> {t("approvals.queryAccess.reject")}
-                                </DropdownMenuItem>
-                              </TableRowActions>
-                            ) : (
-                              <span className="text-muted-foreground">—</span>
-                            )}
+                            <div
+                              className="flex items-center justify-end gap-1"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                              }}
+                            >
+                              <Button
+                                variant="ghost"
+                                size="icon-sm"
+                                className="text-muted-foreground"
+                                aria-label={t("approvals.queryAccess.viewDetails")}
+                                onClick={() => {
+                                  setInspecting(row);
+                                }}
+                                data-testid={`query-access-detail-${row.id}`}
+                              >
+                                <Eye aria-hidden />
+                              </Button>
+                              {row.state === "access_pending" && row.can_decide === true && (
+                                <TableRowActions testId={`query-access-actions-${row.id}`}>
+                                  <DropdownMenuItem
+                                    onClick={() => {
+                                      openDecisionDialog(row, "approve");
+                                    }}
+                                    data-testid={`query-access-approve-${row.id}`}
+                                  >
+                                    <Check /> {t("approvals.queryAccess.approve")}
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem
+                                    variant="destructive"
+                                    onClick={() => {
+                                      openDecisionDialog(row, "reject");
+                                    }}
+                                    data-testid={`query-access-reject-${row.id}`}
+                                  >
+                                    <X /> {t("approvals.queryAccess.reject")}
+                                  </DropdownMenuItem>
+                                </TableRowActions>
+                              )}
+                            </div>
                           </TableCell>
                         </TableRow>
                       );
@@ -322,10 +366,26 @@ export function QueryAccessApprovalsContent() {
             </CardContent>
           </Card>
 
-          <GrantRevocationCard grants={activeGrants} />
+          <GrantRevocationCard entries={activeGrantEntries} />
           <p className="text-muted-foreground text-xs">{t("approvals.queryAccess.description")}</p>
         </>
       )}
+
+      <Sheet open={inspecting !== null} onOpenChange={(open) => { if (!open) setInspecting(null); }}>
+        <SheetContent className="w-[480px] sm:max-w-[480px]" data-testid="query-access-detail-sheet">
+          <ScrollArea className="min-h-0 flex-1">
+            {inspecting !== null && (
+              <QueryAccessDetailBody
+                row={inspecting}
+                grant={inspecting.grant_id == null ? undefined : grantById.get(inspecting.grant_id)}
+                onDecide={(nextDecision) => {
+                  openDecisionDialog(inspecting, nextDecision);
+                }}
+              />
+            )}
+          </ScrollArea>
+        </SheetContent>
+      </Sheet>
 
       <Dialog open={deciding !== null} onOpenChange={(open) => { if (!open) setDeciding(null); }}>
         <DialogContent data-testid="query-access-decision-dialog">
@@ -341,6 +401,7 @@ export function QueryAccessApprovalsContent() {
                 : t("approvals.queryAccess.rejectDescription")}
             </DialogDescription>
           </DialogHeader>
+          {deciding !== null && <DecisionRequestSummary row={deciding} />}
           <div className="flex flex-col gap-2">
             <Label htmlFor="query-access-comment">{t("approvals.queryAccess.comment")}</Label>
             <Textarea
@@ -375,177 +436,5 @@ export function QueryAccessApprovalsContent() {
         </DialogContent>
       </Dialog>
     </div>
-  );
-}
-
-function GrantRevocationCard({ grants }: { grants: QueryGrant[] }) {
-  const { t } = useTranslation();
-  const revoke = useRevokeGrant();
-  const [revoking, setRevoking] = useState<QueryGrant | null>(null);
-  const [reason, setReason] = useState("");
-  const [errorText, setErrorText] = useState<string | null>(null);
-  const [grantTerms, setGrantTerms] = useState<SearchTerm[]>([]);
-  const [grantLive, setGrantLive] = useState<SearchTerm | null>(null);
-  const grantSearchAccessors = useMemo<SearchAccessor<QueryGrant>[]>(
-    () => [
-      {
-        key: "grant_owner",
-        label: t("approvals.queryAccess.column.grantOwner"),
-        value: (grant) => `${grant.holder_name ?? ""} ${grant.requester_user_id}`,
-      },
-      {
-        key: "state",
-        label: t("approvals.queryAccess.column.state"),
-        value: (grant) => `${grant.state} ${t(`query.grant.state.${grant.state}`)}`,
-        options: [{ value: "active", label: t("query.grant.state.active") }],
-      },
-      {
-        key: "expires_at",
-        label: t("approvals.queryAccess.column.expiresAt"),
-        value: (grant) =>
-          grant.expires_at === null || grant.expires_at === undefined
-            ? ""
-            : formatTimestamp(grant.expires_at),
-        input: "date",
-      },
-    ],
-    [t],
-  );
-  const effectiveGrantTerms =
-    grantLive === null ? grantTerms : [...grantTerms, grantLive];
-  const filteredGrants = filterBySearchTerms(
-    grants,
-    effectiveGrantTerms,
-    grantSearchAccessors,
-  );
-  const grantsBodyRef = useFlipReorder<HTMLTableSectionElement>(
-    JSON.stringify(filteredGrants.map((grant) => grant.id)),
-  );
-
-  const submit = async () => {
-    if (revoking === null) return;
-    setErrorText(null);
-    try {
-      await revoke.mutateAsync({ grantId: revoking.id, version: revoking.version, reason });
-      appToast.success(t("approvals.queryAccess.revoke"));
-      setRevoking(null);
-      setReason("");
-    } catch (error) {
-      const errText = describeErrorText(describeError(error, "revokeQueryGrant"));
-      setErrorText(errText);
-      appToast.error(errText);
-    }
-  };
-
-  return (
-    <Card className="overflow-visible">
-      <ListToolbar fill>
-        <CardTitle className="flex shrink-0 items-center gap-2">
-          <ShieldOff aria-hidden />
-          {t("approvals.queryAccess.grantsCard")}
-        </CardTitle>
-        <GlobalSearchBar
-          fields={grantSearchAccessors}
-          terms={grantTerms}
-          onTermsChange={setGrantTerms}
-          onLiveChange={setGrantLive}
-          placeholder={t("approvals.queryAccess.grantsSearchPlaceholder")}
-          testId="query-grants-search"
-          className="w-full min-w-0 flex-1"
-        />
-      </ListToolbar>
-      <CardContent className="px-0!">
-        {filteredGrants.length === 0 && effectiveGrantTerms.length > 0 ? (
-          <EmptyState
-            filtered
-            title={t("table.emptySearch")}
-            testId="query-grants-search-empty"
-          />
-        ) : grants.length === 0 ? (
-          <EmptyState
-            title={t("approvals.queryAccess.grantsEmpty")}
-            description={t("approvals.queryAccess.grantsEmptyDescription")}
-          />
-        ) : (
-          <Table data-testid="query-access-grants-table">
-            <TableHeader>
-              <TableRow>
-                <TableHead>{t("approvals.queryAccess.column.grantOwner")}</TableHead>
-                <TableHead>{t("approvals.queryAccess.column.state")}</TableHead>
-                <TableHead>{t("approvals.queryAccess.column.expiresAt")}</TableHead>
-                <TableHead />
-              </TableRow>
-            </TableHeader>
-            <TableBody ref={grantsBodyRef}>
-              {filteredGrants.map((grant) => (
-                <TableRow key={grant.id} data-row-key={grant.id} data-testid={`query-access-grant-${grant.id}`}>
-                  <TableCell className="font-mono font-semibold text-foreground">{grant.holder_name ?? grant.requester_user_id}</TableCell>
-                  <TableCell>
-                    <StatusBadge tone="emerald">{t("query.grant.state.active")}</StatusBadge>
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {grant.expires_at === null || grant.expires_at === undefined
-                      ? "—"
-                      : formatTimestamp(grant.expires_at)}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <TableRowActions testId={`query-grant-actions-${grant.id}`}>
-                      <DropdownMenuItem
-                        variant="destructive"
-                        onClick={() => {
-                          setReason("");
-                          setRevoking(grant);
-                        }}
-                        data-testid={`query-access-revoke-${grant.id}`}
-                      >
-                        <Ban /> {t("approvals.queryAccess.revoke")}
-                      </DropdownMenuItem>
-                    </TableRowActions>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        )}
-      </CardContent>
-
-      <Dialog open={revoking !== null} onOpenChange={(open) => { if (!open) setRevoking(null); }}>
-        <DialogContent data-testid="query-access-revoke-dialog">
-          <DialogHeader>
-            <DialogTitle>{t("approvals.queryAccess.revokeTitle")}</DialogTitle>
-            <DialogDescription>{t("approvals.queryAccess.revokeDescription")}</DialogDescription>
-          </DialogHeader>
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="query-access-revoke-reason">{t("approvals.queryAccess.revokeReason")}</Label>
-            <Textarea
-              id="query-access-revoke-reason"
-              value={reason}
-              onChange={(event) => { setReason(event.target.value); }}
-              maxLength={4096}
-              data-testid="query-access-revoke-reason"
-            />
-          </div>
-          {errorText !== null && (
-            <Alert variant="destructive" data-testid="query-access-revoke-error">
-              <AlertDescription>{errorText}</AlertDescription>
-            </Alert>
-          )}
-          <DialogFooter>
-            <Button variant="outline" onClick={() => { setRevoking(null); }}>
-              {t("common.cancel")}
-            </Button>
-            <PendingButton
-              variant="destructive"
-              disabled={reason.trim() === ""}
-              pending={revoke.isPending}
-              onClick={() => void submit()}
-              data-testid="query-access-revoke-confirm"
-            >
-              {t("approvals.queryAccess.revoke")}
-            </PendingButton>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </Card>
   );
 }

@@ -5,19 +5,16 @@ import { ClipboardPaste, Copy, Scissors, TextSelect } from "lucide-react";
 import { ContextMenu, type ContextMenuItem, type ContextMenuState } from "@/shared/components/context-menu";
 import { appToast } from "@/shared/components/shadcn-dashboard/sonner/sonner-08";
 import { cn } from "@/shared/lib/utils";
-// editor.main (not editor.api): the api entry omits the editor
-// contributions — the suggest widget, find, etc. — which the completion
-// provider depends on. All languages ship here too; the chunk stays lazy.
-import * as monaco from "monaco-editor/editor/editor.main.js";
+// Trimmed editor.api + minimal SQL contributions (suggest, find, SQL monarch
+// grammar, and basic editing actions), omitting TypeScript/LSP/other grammars.
+// The chunk still loads lazily via LazySqlEditorPanel.
+import * as monaco from "monaco-editor/editor/editor.api.js";
 // SQL is a monarch-highlighted basic language: tokenization runs on the main
 // thread and only the general editor worker is needed. Bundled workers only —
 // no runtime CDN or floating remote loading (UI spec §14).
 import EditorWorker from "monaco-editor/editor/editor.worker.js?worker";
 import { useTheme } from "@/app/providers/theme-provider";
-
-// Register the SQL language definition (monaco 0.56 layout) for monarch
-// tokenization.
-import "monaco-editor/languages/definitions/sql/register.js";
+import "./monaco-sql-contribs";
 
 /**
  * Monaco SQL editor panel (frontend PRD F4; UI spec §7.4). The editor is the

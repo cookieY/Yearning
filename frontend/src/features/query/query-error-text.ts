@@ -14,9 +14,26 @@ const CURSOR_REJECTION_KEYS: Record<string, string> = {
   authentication_failed: "errors.DATASOURCE_AUTH_FAILED",
 };
 
+const REQUESTED_UNTIL_MAX_PREFIX = "requested_until_exceeds_max_minutes:";
+
+function formatMaxDuration(minutes: number): string {
+  if (minutes % 1440 === 0) {
+    return i18next.t("query.errors.durationDays", { count: minutes / 1440 });
+  }
+  if (minutes % 60 === 0) {
+    return i18next.t("query.errors.durationHours", { count: minutes / 60 });
+  }
+  return i18next.t("query.errors.durationMinutes", { count: minutes });
+}
+
+function withRequestId(message: string, requestId: string | null): string {
+  return requestId === null ? message : `${message} (${requestId})`;
+}
+
 /**
  * Formats backend query/cursor errors with localized hints for `cursor_rejected_*`
- * sanitized database details while falling back to the standard error display formatter.
+ * and query access duration validation details while falling back to the standard
+ * error display formatter.
  */
 export function describeQueryErrorText(display: ErrorDisplay): string {
   const rawDetail = typeof display.detail === "string" ? display.detail.trim() : "";
@@ -27,8 +44,23 @@ export function describeQueryErrorText(display: ErrorDisplay): string {
     const failure = rawDetail.slice("database: cursor_rejected_".length);
     const mappedKey = CURSOR_REJECTION_KEYS[failure];
     if (mappedKey !== undefined) {
-      const mapped = i18next.t(mappedKey);
-      return display.requestId === null ? mapped : `${mapped} (${display.requestId})`;
+      return withRequestId(i18next.t(mappedKey), display.requestId);
+    }
+  }
+  if (display.messageKey === "errors.VALIDATION_FAILED") {
+    if (rawDetail === "requested_until_in_past") {
+      return withRequestId(i18next.t("query.errors.requestedUntilInPast"), display.requestId);
+    }
+    if (rawDetail.startsWith(REQUESTED_UNTIL_MAX_PREFIX)) {
+      const minutes = Number(rawDetail.slice(REQUESTED_UNTIL_MAX_PREFIX.length));
+      if (Number.isInteger(minutes) && minutes > 0) {
+        return withRequestId(
+          i18next.t("query.errors.requestedUntilExceedsMax", {
+            limit: formatMaxDuration(minutes),
+          }),
+          display.requestId,
+        );
+      }
     }
   }
   return describeErrorText(display, { detailSeparator: " " });

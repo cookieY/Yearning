@@ -264,7 +264,24 @@ describe("admin post-F12 operations", () => {
 
   it("manages AI provider rate versions and queries AI usage ledger", async () => {
     await loginAs("admin");
-    const effectiveFrom = new Date(Date.UTC(2027, 0, 1) + ((Date.now() % 86_400_000) * 1000))
+    const existingRates = asView<
+      | Array<{ effective_from?: string; effective_until?: string | null }>
+      | { items?: Array<{ effective_from?: string; effective_until?: string | null }> }
+      | undefined
+    >(await listAiProviderRateVersions(providerId));
+    const rateList = Array.isArray(existingRates) ? existingRates : existingRates?.items ?? [];
+    let latestMs = Date.UTC(2027, 0, 1);
+    for (const item of rateList) {
+      for (const ts of [item.effective_from, item.effective_until]) {
+        if (ts) {
+          const parsed = Date.parse(ts);
+          if (Number.isFinite(parsed) && parsed > latestMs) {
+            latestMs = parsed;
+          }
+        }
+      }
+    }
+    const effectiveFrom = new Date(latestMs + 86_400_000)
       .toISOString()
       .replace(/\.\d{3}Z$/, "Z");
     const created = await record("createAiProviderRateVersion", "usd-full-day", () =>

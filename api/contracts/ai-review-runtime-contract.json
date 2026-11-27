@@ -151,7 +151,7 @@
     "reference_freeze": "each_stage_review_snapshot_freezes_its_actual_prompt_tool_and_knowledge_refs_via_review_tool_calls_stage_review_id",
     "output": "structured_advisory_findings_preserving_source_key_provenance_capped_at_entry_max_severity_ceiling_medium",
     "blocking": "non_blocking_advisory_capped_at_entry_max_severity_ceiling_medium_never_blocks_submission",
-    "governance": "prompt_tool_grade_admin_only_enable_privacy_scan_prompt_injection_check_eval_config_hash_run_snapshot_freeze_outdated_on_change_no_physical_delete_once_referenced",
+    "governance": "prompt_tool_grade_admin_only_enable_privacy_scan_prompt_injection_check_eval_config_hash_run_snapshot_freeze_outdated_on_change_physical_delete_allowed_preserving_historical_snapshots",
     "visibility": "snapshot_shows_entry_name_purpose_and_hash_only_never_full_content"
   },
   "finding_governance": {

@@ -10,6 +10,7 @@ import {
 } from "@/api/generated/client/query-sessions/query-sessions";
 import {
   createQueryAccessRequest,
+  createQueryGrantRenewalRequest,
   decideQueryAccess,
   listQueryAccessRequests,
   listQueryGrants,
@@ -26,6 +27,7 @@ import type {
   ApprovalDecisionRequest,
   PageInfo,
   CreateQueryAccessRequest as CreateQueryAccessRequestBody,
+  CreateQueryGrantRenewalRequest,
   CreateQuerySession as CreateQuerySessionBody,
   ExecuteQueryRequest,
   Flow,
@@ -209,6 +211,25 @@ export function useRelinquishGrant() {
           { reason: input.reason },
           ifMatchIdempotencyHeader(input.version, idempotencyKey),
         ),
+      ),
+    onSettled: () => {
+      void queryClient.invalidateQueries({ queryKey: ["query"] });
+      void queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+    },
+  });
+}
+
+export function useRenewGrant() {
+  const queryClient = useQueryClient();
+  return useIdempotentMutation("query-renew", {
+    mutationFn: (
+      input: { grantId: string; body: CreateQueryGrantRenewalRequest },
+      idempotencyKey,
+    ) =>
+      unwrapApi(
+        createQueryGrantRenewalRequest(input.grantId, input.body, {
+          headers: idempotencyKeyHeader(idempotencyKey),
+        }),
       ),
     onSettled: () => {
       void queryClient.invalidateQueries({ queryKey: ["query"] });

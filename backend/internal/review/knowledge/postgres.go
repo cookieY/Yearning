@@ -151,17 +151,10 @@ func (r *Repository) UpdateVersioned(ctx context.Context, tx *gorm.DB, e *Entry,
 	return nil
 }
 
-// DeleteReferencedGuarded deletes an unreferenced entry under optimistic version checking, returning ErrReferenced if in use.
-func (r *Repository) DeleteReferencedGuarded(ctx context.Context, tx *gorm.DB, id string, expectVersion int64) error {
-	var n int64
-	if err := tx.WithContext(ctx).Raw(
-		`select count(*) from review_tool_calls where tool_kind = 'knowledge_entry' and input_ref_id = ?`, id).
-		Scan(&n).Error; err != nil {
-		return err
-	}
-	if n > 0 {
-		return ErrReferenced
-	}
+// DeleteVersioned deletes a knowledge entry under optimistic version checking.
+// Historical review_tool_calls and submitted order snapshots preserve immutable copies
+// without foreign keys, so physical deletion is safe regardless of prior review references.
+func (r *Repository) DeleteVersioned(ctx context.Context, tx *gorm.DB, id string, expectVersion int64) error {
 	res := tx.WithContext(ctx).Exec(
 		`delete from knowledge_entries where id = ? and version = ?`, id, expectVersion)
 	if res.Error != nil {

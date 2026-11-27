@@ -76,7 +76,7 @@ export interface FixtureAccessRequest {
   state: "access_pending" | "grant_active" | "access_rejected" | "withdrawn" | "invalid";
   datasource_ids: string[];
   grant_id: string | null;
-  /** Fixture-internal; the declared view has no reason/terminal fields. */
+  /** Application reason included in the OpenAPI QueryAccessRequest view. */
   reason: string;
   requested_until: string;
   steps: FixtureApprovalStep[];
@@ -226,6 +226,8 @@ export function accessRequestView(row: FixtureAccessRequest, actorId?: string, r
     state: row.state,
     datasource_ids: [...row.datasource_ids],
     grant_id: row.grant_id,
+    reason: row.reason,
+    requested_until: row.requested_until,
     version: row.version,
     created_at: row.created_at,
     can_decide: actorId !== undefined && canDecideRequestRow(actorId, row, request),
@@ -329,6 +331,34 @@ export function createGrantFromRequest(request: FixtureAccessRequest): FixtureGr
     created_at: nowIso(),
   };
   world.grants.set(grant.id, grant);
+  const capByDS = new Map(grant.capabilities.map((cap) => [cap.datasource_id, cap]));
+  for (const session of world.sessions.values()) {
+    if (
+      session.state !== "active" ||
+      session.user_id !== grant.requester_user_id ||
+      session.grant_id === null ||
+      session.grant_id === grant.id
+    ) {
+      continue;
+    }
+    const oldGrant = world.grants.get(session.grant_id);
+    if (oldGrant === undefined || oldGrant.flow_id !== grant.flow_id) continue;
+    if (
+      oldGrant.state === "active" &&
+      oldGrant.expires_at !== null &&
+      grant.expires_at !== null &&
+      oldGrant.expires_at > grant.expires_at
+    ) {
+      continue;
+    }
+    if (session.capabilities.length === 0) continue;
+    if (session.capabilities.some((cap) => !capByDS.has(cap.datasource_id))) continue;
+    session.grant_id = grant.id;
+    session.capabilities = session.capabilities.map((cap) => ({
+      ...cap,
+      can_export: capByDS.get(cap.datasource_id)?.can_export ?? cap.can_export,
+    }));
+  }
   return grant;
 }
 

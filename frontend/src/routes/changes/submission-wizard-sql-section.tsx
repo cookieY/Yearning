@@ -14,7 +14,7 @@ import { EvidenceSheet } from "@/features/review/evidence-sheet";
 import type { FindingListState } from "@/features/review/finding-list";
 import { PrecheckResultDialog } from "@/features/review/precheck-result-dialog";
 import { FormSection, SubmitConfirmDialog } from "@/features/review/submission-dialogs";
-import { SqlEditorPanel } from "@/features/review/sql-editor-panel";
+import { LazySqlEditorPanel } from "@/features/review/lazy-sql-editor-panel";
 import { PendingButton } from "@/shared/components/pending-button";
 import { Button } from "@/shared/components/ui/button";
 import { CircleAlert, Play } from "lucide-react";
@@ -213,7 +213,7 @@ export function SubmissionWizardSqlSection({
                 )}
               </>
             ) : (
-              <SqlEditorPanel
+              <LazySqlEditorPanel
                 value={editorValue}
                 onChange={onEditorChange}
                 readOnly={isSubmitted || draft?.ticket_type === "rollback"}

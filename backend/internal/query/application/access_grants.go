@@ -388,7 +388,88 @@ func (s *Services) createGrant(ctx context.Context, tx *gorm.DB, req *persistenc
 			return "", err
 		}
 	}
+	if err := s.rebindActiveSessionsToGrant(ctx, tx, req, gid, g.ExpiresAt, ds); err != nil {
+		return "", err
+	}
 	return gid, nil
+}
+
+func sessionEligibleForGrantRebind(oldGrantExpiresAt time.Time, oldGrantState string, newExpiresAt time.Time, sessionDSIDs []string, newGrantDS map[string]persistence.QueryAccessRequestDatasourceModel) bool {
+	if len(sessionDSIDs) == 0 {
+		return false
+	}
+	if oldGrantState == string(domain.GrantActive) && oldGrantExpiresAt.After(newExpiresAt) {
+		return false
+	}
+	for _, dsID := range sessionDSIDs {
+		d, ok := newGrantDS[dsID]
+		if !ok || !d.CanQuery {
+			return false
+		}
+	}
+	return true
+}
+
+func (s *Services) rebindActiveSessionsToGrant(ctx context.Context, tx *gorm.DB, req *persistence.QueryAccessRequestModel, newGrantID string, newExpiresAt time.Time, ds []persistence.QueryAccessRequestDatasourceModel) error {
+	if len(ds) == 0 {
+		return nil
+	}
+	dsMap := make(map[string]persistence.QueryAccessRequestDatasourceModel, len(ds))
+	for _, d := range ds {
+		dsMap[d.DatasourceID] = d
+	}
+	type candidateRow struct {
+		ID             string    `gorm:"column:id"`
+		GrantID        string    `gorm:"column:grant_id"`
+		GrantState     string    `gorm:"column:grant_state"`
+		GrantExpiresAt time.Time `gorm:"column:grant_expires_at"`
+	}
+	var candidates []candidateRow
+	if err := tx.WithContext(ctx).Raw(`
+		select s.id, s.grant_id, g.state as grant_state, g.expires_at as grant_expires_at
+		from query_sessions s
+		join query_grants g on g.id = s.grant_id
+		where s.user_id_snapshot = ?
+		  and s.flow_id_snapshot = ?
+		  and s.state = 'active'
+		  and s.approval_required_snapshot = true
+		  and s.grant_id is not null
+		  and s.grant_id <> ?
+		  and g.state in ('active', 'expired')`,
+		req.RequesterUserID, req.FlowID, newGrantID).Scan(&candidates).Error; err != nil {
+		return err
+	}
+	for _, cand := range candidates {
+		var sessDSIDs []string
+		if err := tx.WithContext(ctx).Model(&persistence.QuerySessionCapabilityModel{}).
+			Where("session_id = ?", cand.ID).
+			Pluck("datasource_id", &sessDSIDs).Error; err != nil {
+			return err
+		}
+		if !sessionEligibleForGrantRebind(cand.GrantExpiresAt, cand.GrantState, newExpiresAt, sessDSIDs, dsMap) {
+			continue
+		}
+		res := tx.WithContext(ctx).Exec(`
+			update query_sessions set grant_id = ?, version = version + 1
+			where id = ? and state = 'active'`,
+			newGrantID, cand.ID)
+		if res.Error != nil {
+			return res.Error
+		}
+		if res.RowsAffected != 1 {
+			continue
+		}
+		for _, dsID := range sessDSIDs {
+			d := dsMap[dsID]
+			if err := tx.WithContext(ctx).Exec(`
+				update query_session_capabilities set can_export = ?
+				where session_id = ? and datasource_id = ?`,
+				d.CanExport, cand.ID, dsID).Error; err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }
 
 // Withdraw allows the requester to withdraw a pending access request.

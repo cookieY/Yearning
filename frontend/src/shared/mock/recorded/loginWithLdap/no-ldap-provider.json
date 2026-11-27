@@ -1,6 +1,6 @@
 {
   "contract_version": 1,
-  "openapi_sha": "b08b588223c0b586a5c9c4e0f1c9b0cd818d7ef1d61f3f9e823d5a489e37fb73",
+  "openapi_sha": "d093a5fb3bde5df417746336adc995181c34ed6d35c651a982c93d3dc939c06b",
   "zod_runtime_sha256": "32b72a82897ae698b7566aad9821c07cf5194173a3dc69adfb00a8f00f04a446",
   "operation_id": "loginWithLdap",
   "case_id": "no-ldap-provider",

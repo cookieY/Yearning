@@ -1,5 +1,6 @@
 import { HttpResponse, http } from "msw";
 import type { HttpHandler } from "msw";
+import { readIdempotencyKeyHeader } from "@/shared/api/mutator";
 import { apiRoute } from "@/shared/mock/api-route";
 import { fixtureUuid as uuid, nowIso, parseIfMatch } from "@/shared/mock/kit";
 import { emitMockSseEvent } from "@/shared/mock/sse-mock";
@@ -269,6 +270,10 @@ export function queryAccessHandlers(): HttpHandler[] {
 
     http.post(apiRoute("/query-grants/:grantId/renewal-requests"), async ({ request, params }) => {
       if (!sessionAuthenticated()) return unauthenticated();
+      const idemKey = readIdempotencyKeyHeader(request);
+      if (idemKey === "" || idemKey.length > 128) {
+        return HttpResponse.json(businessError(1001, "validation failed"));
+      }
       ensureQueryWorld();
       const actorId = queryActorUserId();
       const grant = world.grants.get(String(params.grantId));

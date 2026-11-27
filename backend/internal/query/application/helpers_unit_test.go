@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/jackc/pgx/v5/pgconn"
 	"gorm.io/gorm"
@@ -11,6 +12,8 @@ import (
 	"github.com/cookieY/YearningX/backend/internal/authorization/auditlog"
 	"github.com/cookieY/YearningX/backend/internal/platform/hashutil"
 	"github.com/cookieY/YearningX/backend/internal/platform/txutil"
+	"github.com/cookieY/YearningX/backend/internal/query/domain"
+	"github.com/cookieY/YearningX/backend/internal/query/persistence"
 )
 
 func TestQueryApplicationUnitHelpers(t *testing.T) {
@@ -95,5 +98,65 @@ func TestQueryApplicationUnitHelpers(t *testing.T) {
 	}
 	if _, err := normalizeSensitiveColumns(tooMany); err == nil {
 		t.Fatal("expected error on >256 sensitive columns")
+	}
+}
+
+func TestValidateRequestedUntil(t *testing.T) {
+	now := time.Date(2026, 11, 27, 12, 0, 0, 0, time.UTC)
+
+	if err := validateRequestedUntil(now, now, 43200); err == nil {
+		t.Fatal("expected validation error for requested_until == now")
+	} else {
+		derr, ok := err.(*domain.Error)
+		if !ok || derr.Code != domain.CodeValidationFailed || derr.BizMeta()["detail"] != "requested_until_in_past" {
+			t.Fatalf("unexpected error for past requested_until: %#v", err)
+		}
+	}
+
+	tooFar := now.Add(43201 * time.Minute)
+	if err := validateRequestedUntil(now, tooFar, 43200); err == nil {
+		t.Fatal("expected validation error when requested_until exceeds max duration")
+	} else {
+		derr, ok := err.(*domain.Error)
+		if !ok || derr.Code != domain.CodeValidationFailed || derr.BizMeta()["detail"] != "requested_until_exceeds_max_minutes:43200" {
+			t.Fatalf("unexpected error for exceeding max duration: %#v", err)
+		}
+	}
+
+	within := now.Add(43200 * time.Minute)
+	if err := validateRequestedUntil(now, within, 43200); err != nil {
+		t.Fatalf("expected nil for valid requested_until, got %v", err)
+	}
+}
+
+func TestSessionEligibleForGrantRebind(t *testing.T) {
+	baseExp := time.Date(2026, 11, 28, 12, 0, 0, 0, time.UTC)
+	laterExp := baseExp.Add(24 * time.Hour)
+	earlierExp := baseExp.Add(-2 * time.Hour)
+	covered := map[string]persistence.QueryAccessRequestDatasourceModel{
+		"ds-1": {DatasourceID: "ds-1", CanQuery: true, CanExport: true},
+		"ds-2": {DatasourceID: "ds-2", CanQuery: true, CanExport: false},
+	}
+
+	if !sessionEligibleForGrantRebind(baseExp, string(domain.GrantActive), laterExp, []string{"ds-1"}, covered) {
+		t.Fatal("expected active session with covered datasources and later grant expiry to be eligible")
+	}
+	if sessionEligibleForGrantRebind(baseExp, string(domain.GrantActive), earlierExp, []string{"ds-1"}, covered) {
+		t.Fatal("expected active grant with longer remaining expiry not to be shortened by earlier grant")
+	}
+	if !sessionEligibleForGrantRebind(baseExp, string(domain.GrantExpired), earlierExp, []string{"ds-1"}, covered) {
+		t.Fatal("expected expired old grant session to be eligible when new grant covers its datasources")
+	}
+	if sessionEligibleForGrantRebind(baseExp, string(domain.GrantActive), laterExp, []string{"ds-1", "ds-3"}, covered) {
+		t.Fatal("expected session with uncovered datasource not to be eligible")
+	}
+	noQuery := map[string]persistence.QueryAccessRequestDatasourceModel{
+		"ds-1": {DatasourceID: "ds-1", CanQuery: false, CanExport: false},
+	}
+	if sessionEligibleForGrantRebind(baseExp, string(domain.GrantActive), laterExp, []string{"ds-1"}, noQuery) {
+		t.Fatal("expected session whose datasource lacks CanQuery in new grant not to be eligible")
+	}
+	if sessionEligibleForGrantRebind(baseExp, string(domain.GrantActive), laterExp, nil, covered) {
+		t.Fatal("expected empty session datasource list not to be eligible")
 	}
 }

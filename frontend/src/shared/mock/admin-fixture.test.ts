@@ -691,13 +691,20 @@ describe("admin knowledge entries (internal experience)", () => {
     expect(okEval.pass).toBe(true);
   });
 
-  it("blocks deleting a converted entry and allows deleting a manual one", async () => {
+  it("checks optimistic lock and allows deleting a converted entry", async () => {
     setAuth("admin");
+    const mismatch = await jsonRequest(
+      `/admin/knowledge-entries/${ADMIN_FIXTURE_KNOWLEDGE_CONVERTED_ID}`,
+      request("DELETE", undefined, ifMatch(99)),
+    );
+    expect(mismatch.body.err_code).toBe(1004);
     const converted = await jsonRequest(
       `/admin/knowledge-entries/${ADMIN_FIXTURE_KNOWLEDGE_CONVERTED_ID}`,
       request("DELETE", undefined, ifMatch(1)),
     );
-    expect(converted.body.err_code).toBe(1006);
+    expect(converted.body.err_code).toBe(0);
+    const missing = await jsonRequest(`/admin/knowledge-entries/${ADMIN_FIXTURE_KNOWLEDGE_CONVERTED_ID}`);
+    expect(missing.body.err_code).toBe(1002);
   });
 });
 

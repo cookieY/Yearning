@@ -1,6 +1,6 @@
 {
   "contract_version": 1,
-  "openapi_sha": "b08b588223c0b586a5c9c4e0f1c9b0cd818d7ef1d61f3f9e823d5a489e37fb73",
+  "openapi_sha": "d093a5fb3bde5df417746336adc995181c34ed6d35c651a982c93d3dc939c06b",
   "zod_runtime_sha256": "32b72a82897ae698b7566aad9821c07cf5194173a3dc69adfb00a8f00f04a446",
   "operation_id": "getReviewRun",
   "case_id": "chain-poll",
@@ -21,10 +21,10 @@
           "state": "passed",
           "highest_severity": "low",
           "gate_passed": true,
-          "finding_count": 4,
-          "evidence_count": 2,
-          "snapshot_hash": "aed6498477bf56c741bdb871e88241a58cb24b7caa20d07ad122c715f27d67ef",
-          "summary": "本次仅包含一条 `CREATE TABLE` 语句；`public` 中 `f12_contract_b2_ba8879d2` 当前不存在，语句将创建含 `bigint` 主键和 `text` 列的新表。未发现立即执行的破坏性变更，主要风险集中在幂等建表可能掩盖结构差异、可空列约束不足以及主键生成方式不明确。",
+          "finding_count": 1,
+          "evidence_count": 4,
+          "snapshot_hash": "bb46ddac1c057190ff70e4daa36c25b40d0572da61dfe0846310758605706b0d",
+          "summary": "本次评审仅包含一条建表语句：在 `public` 中创建 `f12_contract_b2_976631b4`，`id` 为 `bigint` 单列主键，`note` 为可空 `text`。已通过元数据确认目标表当前不存在，索引与统计信息同样显示为未创建状态，目标实例身份与版本信息匹配（PostgreSQL 17.11）。语句本身不涉及数据读写，执行时不会产生锁冲突或数据变更风险；唯一需要留意的点是 `IF NOT EXISTS` 的语义，它只保证重复执行不报错，并不校验既有表结构是否一致。",
           "summary_locale": "zh-CN"
         }
       ],
@@ -35,8 +35,8 @@
       "usage": {
         "provider_name": "f12-real",
         "model_name": "deepseek-flash",
-        "input_tokens": 5409,
-        "output_tokens": 5757,
+        "input_tokens": 5599,
+        "output_tokens": 2964,
         "amount_minor": 200,
         "currency": "USD"
       },

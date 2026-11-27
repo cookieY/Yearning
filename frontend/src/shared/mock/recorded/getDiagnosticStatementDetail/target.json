@@ -1,6 +1,6 @@
 {
   "contract_version": 1,
-  "openapi_sha": "b08b588223c0b586a5c9c4e0f1c9b0cd818d7ef1d61f3f9e823d5a489e37fb73",
+  "openapi_sha": "d093a5fb3bde5df417746336adc995181c34ed6d35c651a982c93d3dc939c06b",
   "zod_runtime_sha256": "32b72a82897ae698b7566aad9821c07cf5194173a3dc69adfb00a8f00f04a446",
   "operation_id": "getDiagnosticStatementDetail",
   "case_id": "target",
@@ -8,7 +8,7 @@
   "err_code": 0,
   "response": {
     "data": {
-      "statement_id": "00000000-0000-4000-8000-000000000128",
+      "statement_id": "00000000-0000-4000-8000-000000000144",
       "datasource_id": "00000000-0000-4000-8000-000000000009",
       "engine": "postgresql",
       "compatibility_mode": "postgresql",
@@ -18,26 +18,26 @@
       "template_status": "available",
       "template_sql": "select d1.id, d1.note from public.f12_demo d1 join public.f12_demo d2 on d1.id <= d2.id where d1.note >= $1 order by d1.note desc limit $2",
       "template_note": null,
-      "coverage_mode": "cumulative_only",
-      "from": "2026-11-25T01:11:00.000Z",
-      "to": "2026-11-25T01:12:00.000Z",
+      "coverage_mode": "reset_or_gap",
+      "from": "2026-11-25T02:35:00.000Z",
+      "to": "2026-11-25T02:36:00.000Z",
       "summary": {
-        "statement_id": "00000000-0000-4000-8000-000000000128",
+        "statement_id": "00000000-0000-4000-8000-000000000144",
         "engine_fingerprint": "3743533789385642733",
         "yearning_fingerprint": "7e8f0b2e8adebc560deca8b0b8eeab2ba7cdae82905cf99b73cf4f761929ec7e",
         "database_or_schema": "target",
         "template_status": "available",
         "template_preview": "select d1.id, d1.note from public.f12_demo d1 join public.f12_demo d2 on d1.id <= d2.id where d1.note >= $1 order by d1.note desc limit $2",
-        "calls": 80,
-        "total_exec_time_ms": 874.501,
-        "avg_exec_time_ms": 10.931,
+        "calls": 240,
+        "total_exec_time_ms": 2580.482,
+        "avg_exec_time_ms": 10.752,
         "rows_examined_or_shared_blks_read": 0,
-        "rows_sent_or_rows_returned": 800,
+        "rows_sent_or_rows_returned": 2400,
         "lock_time_ms_or_temp_blks_written": 0,
         "share_of_total_time": 1,
-        "coverage_mode": "cumulative_only",
-        "first_seen_at": "2026-11-25T01:09:00.000Z",
-        "last_seen_at": "2026-11-25T01:09:00.000Z"
+        "coverage_mode": "reset_or_gap",
+        "first_seen_at": "2026-11-25T02:32:00.000Z",
+        "last_seen_at": "2026-11-25T01:32:00.000Z"
       },
       "cost_unit_notes": {
         "lock_time_ms_or_temp_blks_written": "temp_blks_written (PostgreSQL temporary blocks spilled to disk)",
@@ -47,73 +47,1277 @@
       },
       "trend_series": [
         {
-          "bucket_start": "2026-11-25T01:10:00.000Z",
-          "bucket_end": "2026-11-25T01:09:00.000Z",
+          "bucket_start": "2026-11-25T01:33:00.000Z",
+          "bucket_end": "2026-11-25T01:34:00.000Z",
+          "calls": 0,
+          "avg_exec_time_ms": 0,
+          "total_exec_time_ms": 0,
+          "reset_detected": false,
+          "unobserved_below_top_n": false
+        },
+        {
+          "bucket_start": "2026-11-25T01:34:00.000Z",
+          "bucket_end": "2026-11-25T01:35:00.000Z",
+          "calls": 0,
+          "avg_exec_time_ms": 0,
+          "total_exec_time_ms": 0,
+          "reset_detected": false,
+          "unobserved_below_top_n": false
+        },
+        {
+          "bucket_start": "2026-11-25T01:35:00.000Z",
+          "bucket_end": "2026-11-25T01:36:00.000Z",
+          "calls": 0,
+          "avg_exec_time_ms": 0,
+          "total_exec_time_ms": 0,
+          "reset_detected": false,
+          "unobserved_below_top_n": false
+        },
+        {
+          "bucket_start": "2026-11-25T01:36:00.000Z",
+          "bucket_end": "2026-11-25T01:37:00.000Z",
+          "calls": 0,
+          "avg_exec_time_ms": 0,
+          "total_exec_time_ms": 0,
+          "reset_detected": false,
+          "unobserved_below_top_n": false
+        },
+        {
+          "bucket_start": "2026-11-25T01:37:00.000Z",
+          "bucket_end": "2026-11-25T01:38:00.000Z",
+          "calls": 0,
+          "avg_exec_time_ms": 0,
+          "total_exec_time_ms": 0,
+          "reset_detected": false,
+          "unobserved_below_top_n": false
+        },
+        {
+          "bucket_start": "2026-11-25T01:38:00.000Z",
+          "bucket_end": "2026-11-25T01:39:00.000Z",
+          "calls": 0,
+          "avg_exec_time_ms": 0,
+          "total_exec_time_ms": 0,
+          "reset_detected": false,
+          "unobserved_below_top_n": false
+        },
+        {
+          "bucket_start": "2026-11-25T01:39:00.000Z",
+          "bucket_end": "2026-11-25T01:40:00.000Z",
+          "calls": 0,
+          "avg_exec_time_ms": 0,
+          "total_exec_time_ms": 0,
+          "reset_detected": false,
+          "unobserved_below_top_n": false
+        },
+        {
+          "bucket_start": "2026-11-25T01:40:00.000Z",
+          "bucket_end": "2026-11-25T01:41:00.000Z",
+          "calls": 0,
+          "avg_exec_time_ms": 0,
+          "total_exec_time_ms": 0,
+          "reset_detected": false,
+          "unobserved_below_top_n": false
+        },
+        {
+          "bucket_start": "2026-11-25T01:41:00.000Z",
+          "bucket_end": "2026-11-25T01:42:00.000Z",
+          "calls": 0,
+          "avg_exec_time_ms": 0,
+          "total_exec_time_ms": 0,
+          "reset_detected": false,
+          "unobserved_below_top_n": false
+        },
+        {
+          "bucket_start": "2026-11-25T01:42:00.000Z",
+          "bucket_end": "2026-11-25T01:43:00.000Z",
+          "calls": 0,
+          "avg_exec_time_ms": 0,
+          "total_exec_time_ms": 0,
+          "reset_detected": false,
+          "unobserved_below_top_n": false
+        },
+        {
+          "bucket_start": "2026-11-25T01:43:00.000Z",
+          "bucket_end": "2026-11-25T01:44:00.000Z",
+          "calls": 0,
+          "avg_exec_time_ms": 0,
+          "total_exec_time_ms": 0,
+          "reset_detected": false,
+          "unobserved_below_top_n": false
+        },
+        {
+          "bucket_start": "2026-11-25T01:44:00.000Z",
+          "bucket_end": "2026-11-25T01:45:00.000Z",
+          "calls": 0,
+          "avg_exec_time_ms": 0,
+          "total_exec_time_ms": 0,
+          "reset_detected": false,
+          "unobserved_below_top_n": false
+        },
+        {
+          "bucket_start": "2026-11-25T01:45:00.000Z",
+          "bucket_end": "2026-11-25T01:46:00.000Z",
+          "calls": 0,
+          "avg_exec_time_ms": 0,
+          "total_exec_time_ms": 0,
+          "reset_detected": false,
+          "unobserved_below_top_n": false
+        },
+        {
+          "bucket_start": "2026-11-25T01:46:00.000Z",
+          "bucket_end": "2026-11-25T01:47:00.000Z",
+          "calls": 0,
+          "avg_exec_time_ms": 0,
+          "total_exec_time_ms": 0,
+          "reset_detected": false,
+          "unobserved_below_top_n": false
+        },
+        {
+          "bucket_start": "2026-11-25T01:47:00.000Z",
+          "bucket_end": "2026-11-25T01:48:00.000Z",
+          "calls": 0,
+          "avg_exec_time_ms": 0,
+          "total_exec_time_ms": 0,
+          "reset_detected": false,
+          "unobserved_below_top_n": false
+        },
+        {
+          "bucket_start": "2026-11-25T01:48:00.000Z",
+          "bucket_end": "2026-11-25T01:49:00.000Z",
+          "calls": 0,
+          "avg_exec_time_ms": 0,
+          "total_exec_time_ms": 0,
+          "reset_detected": false,
+          "unobserved_below_top_n": false
+        },
+        {
+          "bucket_start": "2026-11-25T01:49:00.000Z",
+          "bucket_end": "2026-11-25T01:50:00.000Z",
+          "calls": 0,
+          "avg_exec_time_ms": 0,
+          "total_exec_time_ms": 0,
+          "reset_detected": false,
+          "unobserved_below_top_n": false
+        },
+        {
+          "bucket_start": "2026-11-25T01:50:00.000Z",
+          "bucket_end": "2026-11-25T01:51:00.000Z",
+          "calls": 0,
+          "avg_exec_time_ms": 0,
+          "total_exec_time_ms": 0,
+          "reset_detected": false,
+          "unobserved_below_top_n": false
+        },
+        {
+          "bucket_start": "2026-11-25T01:51:00.000Z",
+          "bucket_end": "2026-11-25T01:52:00.000Z",
+          "calls": 0,
+          "avg_exec_time_ms": 0,
+          "total_exec_time_ms": 0,
+          "reset_detected": false,
+          "unobserved_below_top_n": false
+        },
+        {
+          "bucket_start": "2026-11-25T01:52:00.000Z",
+          "bucket_end": "2026-11-25T01:53:00.000Z",
+          "calls": 0,
+          "avg_exec_time_ms": 0,
+          "total_exec_time_ms": 0,
+          "reset_detected": false,
+          "unobserved_below_top_n": false
+        },
+        {
+          "bucket_start": "2026-11-25T01:53:00.000Z",
+          "bucket_end": "2026-11-25T01:54:00.000Z",
+          "calls": 0,
+          "avg_exec_time_ms": 0,
+          "total_exec_time_ms": 0,
+          "reset_detected": false,
+          "unobserved_below_top_n": false
+        },
+        {
+          "bucket_start": "2026-11-25T01:54:00.000Z",
+          "bucket_end": "2026-11-25T01:55:00.000Z",
+          "calls": 0,
+          "avg_exec_time_ms": 0,
+          "total_exec_time_ms": 0,
+          "reset_detected": false,
+          "unobserved_below_top_n": false
+        },
+        {
+          "bucket_start": "2026-11-25T01:55:00.000Z",
+          "bucket_end": "2026-11-25T01:56:00.000Z",
           "calls": 80,
-          "avg_exec_time_ms": 10.931,
-          "total_exec_time_ms": 874.501,
+          "avg_exec_time_ms": 10.579,
+          "total_exec_time_ms": 846.287,
+          "reset_detected": true,
+          "unobserved_below_top_n": false
+        },
+        {
+          "bucket_start": "2026-11-25T01:56:00.000Z",
+          "bucket_end": "2026-11-25T01:57:00.000Z",
+          "calls": 0,
+          "avg_exec_time_ms": 0,
+          "total_exec_time_ms": 0,
+          "reset_detected": false,
+          "unobserved_below_top_n": false
+        },
+        {
+          "bucket_start": "2026-11-25T01:57:00.000Z",
+          "bucket_end": "2026-11-25T01:58:00.000Z",
+          "calls": 0,
+          "avg_exec_time_ms": 0,
+          "total_exec_time_ms": 0,
+          "reset_detected": false,
+          "unobserved_below_top_n": false
+        },
+        {
+          "bucket_start": "2026-11-25T01:58:00.000Z",
+          "bucket_end": "2026-11-25T01:59:00.000Z",
+          "calls": 0,
+          "avg_exec_time_ms": 0,
+          "total_exec_time_ms": 0,
+          "reset_detected": false,
+          "unobserved_below_top_n": false
+        },
+        {
+          "bucket_start": "2026-11-25T01:59:00.000Z",
+          "bucket_end": "2026-11-25T02:00:00.000Z",
+          "calls": 0,
+          "avg_exec_time_ms": 0,
+          "total_exec_time_ms": 0,
+          "reset_detected": false,
+          "unobserved_below_top_n": false
+        },
+        {
+          "bucket_start": "2026-11-25T02:00:00.000Z",
+          "bucket_end": "2026-11-25T02:01:00.000Z",
+          "calls": 0,
+          "avg_exec_time_ms": 0,
+          "total_exec_time_ms": 0,
+          "reset_detected": false,
+          "unobserved_below_top_n": false
+        },
+        {
+          "bucket_start": "2026-11-25T02:01:00.000Z",
+          "bucket_end": "2026-11-25T02:02:00.000Z",
+          "calls": 0,
+          "avg_exec_time_ms": 0,
+          "total_exec_time_ms": 0,
+          "reset_detected": false,
+          "unobserved_below_top_n": false
+        },
+        {
+          "bucket_start": "2026-11-25T02:02:00.000Z",
+          "bucket_end": "2026-11-25T02:03:00.000Z",
+          "calls": 0,
+          "avg_exec_time_ms": 0,
+          "total_exec_time_ms": 0,
+          "reset_detected": false,
+          "unobserved_below_top_n": false
+        },
+        {
+          "bucket_start": "2026-11-25T02:03:00.000Z",
+          "bucket_end": "2026-11-25T02:04:00.000Z",
+          "calls": 0,
+          "avg_exec_time_ms": 0,
+          "total_exec_time_ms": 0,
+          "reset_detected": false,
+          "unobserved_below_top_n": false
+        },
+        {
+          "bucket_start": "2026-11-25T02:04:00.000Z",
+          "bucket_end": "2026-11-25T02:05:00.000Z",
+          "calls": 0,
+          "avg_exec_time_ms": 0,
+          "total_exec_time_ms": 0,
+          "reset_detected": false,
+          "unobserved_below_top_n": false
+        },
+        {
+          "bucket_start": "2026-11-25T02:05:00.000Z",
+          "bucket_end": "2026-11-25T02:06:00.000Z",
+          "calls": 0,
+          "avg_exec_time_ms": 0,
+          "total_exec_time_ms": 0,
+          "reset_detected": false,
+          "unobserved_below_top_n": false
+        },
+        {
+          "bucket_start": "2026-11-25T02:06:00.000Z",
+          "bucket_end": "2026-11-25T02:07:00.000Z",
+          "calls": 0,
+          "avg_exec_time_ms": 0,
+          "total_exec_time_ms": 0,
+          "reset_detected": false,
+          "unobserved_below_top_n": false
+        },
+        {
+          "bucket_start": "2026-11-25T02:07:00.000Z",
+          "bucket_end": "2026-11-25T02:08:00.000Z",
+          "calls": 0,
+          "avg_exec_time_ms": 0,
+          "total_exec_time_ms": 0,
+          "reset_detected": false,
+          "unobserved_below_top_n": false
+        },
+        {
+          "bucket_start": "2026-11-25T02:08:00.000Z",
+          "bucket_end": "2026-11-25T02:09:00.000Z",
+          "calls": 0,
+          "avg_exec_time_ms": 0,
+          "total_exec_time_ms": 0,
+          "reset_detected": false,
+          "unobserved_below_top_n": false
+        },
+        {
+          "bucket_start": "2026-11-25T02:09:00.000Z",
+          "bucket_end": "2026-11-25T02:10:00.000Z",
+          "calls": 0,
+          "avg_exec_time_ms": 0,
+          "total_exec_time_ms": 0,
+          "reset_detected": false,
+          "unobserved_below_top_n": false
+        },
+        {
+          "bucket_start": "2026-11-25T02:10:00.000Z",
+          "bucket_end": "2026-11-25T02:11:00.000Z",
+          "calls": 0,
+          "avg_exec_time_ms": 0,
+          "total_exec_time_ms": 0,
+          "reset_detected": false,
+          "unobserved_below_top_n": false
+        },
+        {
+          "bucket_start": "2026-11-25T02:11:00.000Z",
+          "bucket_end": "2026-11-25T02:12:00.000Z",
+          "calls": 0,
+          "avg_exec_time_ms": 0,
+          "total_exec_time_ms": 0,
+          "reset_detected": false,
+          "unobserved_below_top_n": false
+        },
+        {
+          "bucket_start": "2026-11-25T02:12:00.000Z",
+          "bucket_end": "2026-11-25T02:13:00.000Z",
+          "calls": 0,
+          "avg_exec_time_ms": 0,
+          "total_exec_time_ms": 0,
+          "reset_detected": false,
+          "unobserved_below_top_n": false
+        },
+        {
+          "bucket_start": "2026-11-25T02:13:00.000Z",
+          "bucket_end": "2026-11-25T02:14:00.000Z",
+          "calls": 0,
+          "avg_exec_time_ms": 0,
+          "total_exec_time_ms": 0,
+          "reset_detected": false,
+          "unobserved_below_top_n": false
+        },
+        {
+          "bucket_start": "2026-11-25T02:14:00.000Z",
+          "bucket_end": "2026-11-25T02:15:00.000Z",
+          "calls": 0,
+          "avg_exec_time_ms": 0,
+          "total_exec_time_ms": 0,
+          "reset_detected": false,
+          "unobserved_below_top_n": false
+        },
+        {
+          "bucket_start": "2026-11-25T02:15:00.000Z",
+          "bucket_end": "2026-11-25T02:16:00.000Z",
+          "calls": 0,
+          "avg_exec_time_ms": 0,
+          "total_exec_time_ms": 0,
+          "reset_detected": false,
+          "unobserved_below_top_n": false
+        },
+        {
+          "bucket_start": "2026-11-25T02:16:00.000Z",
+          "bucket_end": "2026-11-25T02:17:00.000Z",
+          "calls": 17,
+          "avg_exec_time_ms": 10.965,
+          "total_exec_time_ms": 186.397,
+          "reset_detected": true,
+          "unobserved_below_top_n": false
+        },
+        {
+          "bucket_start": "2026-11-25T02:17:00.000Z",
+          "bucket_end": "2026-11-25T02:18:00.000Z",
+          "calls": 63,
+          "avg_exec_time_ms": 10.947,
+          "total_exec_time_ms": 689.639,
+          "reset_detected": false,
+          "unobserved_below_top_n": false
+        },
+        {
+          "bucket_start": "2026-11-25T02:18:00.000Z",
+          "bucket_end": "2026-11-25T02:19:00.000Z",
+          "calls": 0,
+          "avg_exec_time_ms": 0,
+          "total_exec_time_ms": 0,
+          "reset_detected": false,
+          "unobserved_below_top_n": false
+        },
+        {
+          "bucket_start": "2026-11-25T02:19:00.000Z",
+          "bucket_end": "2026-11-25T02:20:00.000Z",
+          "calls": 0,
+          "avg_exec_time_ms": 0,
+          "total_exec_time_ms": 0,
+          "reset_detected": false,
+          "unobserved_below_top_n": false
+        },
+        {
+          "bucket_start": "2026-11-25T02:20:00.000Z",
+          "bucket_end": "2026-11-25T02:21:00.000Z",
+          "calls": 0,
+          "avg_exec_time_ms": 0,
+          "total_exec_time_ms": 0,
+          "reset_detected": false,
+          "unobserved_below_top_n": false
+        },
+        {
+          "bucket_start": "2026-11-25T02:21:00.000Z",
+          "bucket_end": "2026-11-25T02:22:00.000Z",
+          "calls": 0,
+          "avg_exec_time_ms": 0,
+          "total_exec_time_ms": 0,
+          "reset_detected": false,
+          "unobserved_below_top_n": false
+        },
+        {
+          "bucket_start": "2026-11-25T02:22:00.000Z",
+          "bucket_end": "2026-11-25T02:23:00.000Z",
+          "calls": 0,
+          "avg_exec_time_ms": 0,
+          "total_exec_time_ms": 0,
+          "reset_detected": false,
+          "unobserved_below_top_n": false
+        },
+        {
+          "bucket_start": "2026-11-25T02:23:00.000Z",
+          "bucket_end": "2026-11-25T02:24:00.000Z",
+          "calls": 0,
+          "avg_exec_time_ms": 0,
+          "total_exec_time_ms": 0,
+          "reset_detected": false,
+          "unobserved_below_top_n": false
+        },
+        {
+          "bucket_start": "2026-11-25T02:24:00.000Z",
+          "bucket_end": "2026-11-25T02:25:00.000Z",
+          "calls": 0,
+          "avg_exec_time_ms": 0,
+          "total_exec_time_ms": 0,
+          "reset_detected": false,
+          "unobserved_below_top_n": false
+        },
+        {
+          "bucket_start": "2026-11-25T02:25:00.000Z",
+          "bucket_end": "2026-11-25T02:26:00.000Z",
+          "calls": 0,
+          "avg_exec_time_ms": 0,
+          "total_exec_time_ms": 0,
+          "reset_detected": false,
+          "unobserved_below_top_n": false
+        },
+        {
+          "bucket_start": "2026-11-25T02:26:00.000Z",
+          "bucket_end": "2026-11-25T02:27:00.000Z",
+          "calls": 0,
+          "avg_exec_time_ms": 0,
+          "total_exec_time_ms": 0,
+          "reset_detected": false,
+          "unobserved_below_top_n": false
+        },
+        {
+          "bucket_start": "2026-11-25T02:27:00.000Z",
+          "bucket_end": "2026-11-25T02:28:00.000Z",
+          "calls": 80,
+          "avg_exec_time_ms": 10.727,
+          "total_exec_time_ms": 858.159,
+          "reset_detected": true,
+          "unobserved_below_top_n": false
+        },
+        {
+          "bucket_start": "2026-11-25T02:28:00.000Z",
+          "bucket_end": "2026-11-25T02:29:00.000Z",
+          "calls": 0,
+          "avg_exec_time_ms": 0,
+          "total_exec_time_ms": 0,
+          "reset_detected": false,
+          "unobserved_below_top_n": false
+        },
+        {
+          "bucket_start": "2026-11-25T02:29:00.000Z",
+          "bucket_end": "2026-11-25T02:30:00.000Z",
+          "calls": 0,
+          "avg_exec_time_ms": 0,
+          "total_exec_time_ms": 0,
+          "reset_detected": false,
+          "unobserved_below_top_n": false
+        },
+        {
+          "bucket_start": "2026-11-25T02:30:00.000Z",
+          "bucket_end": "2026-11-25T02:31:00.000Z",
+          "calls": 0,
+          "avg_exec_time_ms": 0,
+          "total_exec_time_ms": 0,
+          "reset_detected": false,
+          "unobserved_below_top_n": false
+        },
+        {
+          "bucket_start": "2026-11-25T02:31:00.000Z",
+          "bucket_end": "2026-11-25T01:26:00.000Z",
+          "calls": 0,
+          "avg_exec_time_ms": 0,
+          "total_exec_time_ms": 0,
+          "reset_detected": false,
+          "unobserved_below_top_n": false
+        },
+        {
+          "bucket_start": "2026-11-25T01:26:00.000Z",
+          "bucket_end": "2026-11-25T01:32:00.000Z",
+          "calls": 0,
+          "avg_exec_time_ms": 0,
+          "total_exec_time_ms": 0,
           "reset_detected": false,
           "unobserved_below_top_n": false
         }
       ],
       "cost_series": [
         {
-          "bucket_start": "2026-11-25T01:10:00.000Z",
-          "bucket_end": "2026-11-25T01:09:00.000Z",
+          "bucket_start": "2026-11-25T01:33:00.000Z",
+          "bucket_end": "2026-11-25T01:34:00.000Z",
+          "rows_examined_or_shared_blks_read": 0,
+          "rows_sent_or_rows_returned": 0,
+          "lock_time_ms_or_temp_blks_written": 0,
+          "shared_blks_hit": 0
+        },
+        {
+          "bucket_start": "2026-11-25T01:34:00.000Z",
+          "bucket_end": "2026-11-25T01:35:00.000Z",
+          "rows_examined_or_shared_blks_read": 0,
+          "rows_sent_or_rows_returned": 0,
+          "lock_time_ms_or_temp_blks_written": 0,
+          "shared_blks_hit": 0
+        },
+        {
+          "bucket_start": "2026-11-25T01:35:00.000Z",
+          "bucket_end": "2026-11-25T01:36:00.000Z",
+          "rows_examined_or_shared_blks_read": 0,
+          "rows_sent_or_rows_returned": 0,
+          "lock_time_ms_or_temp_blks_written": 0,
+          "shared_blks_hit": 0
+        },
+        {
+          "bucket_start": "2026-11-25T01:36:00.000Z",
+          "bucket_end": "2026-11-25T01:37:00.000Z",
+          "rows_examined_or_shared_blks_read": 0,
+          "rows_sent_or_rows_returned": 0,
+          "lock_time_ms_or_temp_blks_written": 0,
+          "shared_blks_hit": 0
+        },
+        {
+          "bucket_start": "2026-11-25T01:37:00.000Z",
+          "bucket_end": "2026-11-25T01:38:00.000Z",
+          "rows_examined_or_shared_blks_read": 0,
+          "rows_sent_or_rows_returned": 0,
+          "lock_time_ms_or_temp_blks_written": 0,
+          "shared_blks_hit": 0
+        },
+        {
+          "bucket_start": "2026-11-25T01:38:00.000Z",
+          "bucket_end": "2026-11-25T01:39:00.000Z",
+          "rows_examined_or_shared_blks_read": 0,
+          "rows_sent_or_rows_returned": 0,
+          "lock_time_ms_or_temp_blks_written": 0,
+          "shared_blks_hit": 0
+        },
+        {
+          "bucket_start": "2026-11-25T01:39:00.000Z",
+          "bucket_end": "2026-11-25T01:40:00.000Z",
+          "rows_examined_or_shared_blks_read": 0,
+          "rows_sent_or_rows_returned": 0,
+          "lock_time_ms_or_temp_blks_written": 0,
+          "shared_blks_hit": 0
+        },
+        {
+          "bucket_start": "2026-11-25T01:40:00.000Z",
+          "bucket_end": "2026-11-25T01:41:00.000Z",
+          "rows_examined_or_shared_blks_read": 0,
+          "rows_sent_or_rows_returned": 0,
+          "lock_time_ms_or_temp_blks_written": 0,
+          "shared_blks_hit": 0
+        },
+        {
+          "bucket_start": "2026-11-25T01:41:00.000Z",
+          "bucket_end": "2026-11-25T01:42:00.000Z",
+          "rows_examined_or_shared_blks_read": 0,
+          "rows_sent_or_rows_returned": 0,
+          "lock_time_ms_or_temp_blks_written": 0,
+          "shared_blks_hit": 0
+        },
+        {
+          "bucket_start": "2026-11-25T01:42:00.000Z",
+          "bucket_end": "2026-11-25T01:43:00.000Z",
+          "rows_examined_or_shared_blks_read": 0,
+          "rows_sent_or_rows_returned": 0,
+          "lock_time_ms_or_temp_blks_written": 0,
+          "shared_blks_hit": 0
+        },
+        {
+          "bucket_start": "2026-11-25T01:43:00.000Z",
+          "bucket_end": "2026-11-25T01:44:00.000Z",
+          "rows_examined_or_shared_blks_read": 0,
+          "rows_sent_or_rows_returned": 0,
+          "lock_time_ms_or_temp_blks_written": 0,
+          "shared_blks_hit": 0
+        },
+        {
+          "bucket_start": "2026-11-25T01:44:00.000Z",
+          "bucket_end": "2026-11-25T01:45:00.000Z",
+          "rows_examined_or_shared_blks_read": 0,
+          "rows_sent_or_rows_returned": 0,
+          "lock_time_ms_or_temp_blks_written": 0,
+          "shared_blks_hit": 0
+        },
+        {
+          "bucket_start": "2026-11-25T01:45:00.000Z",
+          "bucket_end": "2026-11-25T01:46:00.000Z",
+          "rows_examined_or_shared_blks_read": 0,
+          "rows_sent_or_rows_returned": 0,
+          "lock_time_ms_or_temp_blks_written": 0,
+          "shared_blks_hit": 0
+        },
+        {
+          "bucket_start": "2026-11-25T01:46:00.000Z",
+          "bucket_end": "2026-11-25T01:47:00.000Z",
+          "rows_examined_or_shared_blks_read": 0,
+          "rows_sent_or_rows_returned": 0,
+          "lock_time_ms_or_temp_blks_written": 0,
+          "shared_blks_hit": 0
+        },
+        {
+          "bucket_start": "2026-11-25T01:47:00.000Z",
+          "bucket_end": "2026-11-25T01:48:00.000Z",
+          "rows_examined_or_shared_blks_read": 0,
+          "rows_sent_or_rows_returned": 0,
+          "lock_time_ms_or_temp_blks_written": 0,
+          "shared_blks_hit": 0
+        },
+        {
+          "bucket_start": "2026-11-25T01:48:00.000Z",
+          "bucket_end": "2026-11-25T01:49:00.000Z",
+          "rows_examined_or_shared_blks_read": 0,
+          "rows_sent_or_rows_returned": 0,
+          "lock_time_ms_or_temp_blks_written": 0,
+          "shared_blks_hit": 0
+        },
+        {
+          "bucket_start": "2026-11-25T01:49:00.000Z",
+          "bucket_end": "2026-11-25T01:50:00.000Z",
+          "rows_examined_or_shared_blks_read": 0,
+          "rows_sent_or_rows_returned": 0,
+          "lock_time_ms_or_temp_blks_written": 0,
+          "shared_blks_hit": 0
+        },
+        {
+          "bucket_start": "2026-11-25T01:50:00.000Z",
+          "bucket_end": "2026-11-25T01:51:00.000Z",
+          "rows_examined_or_shared_blks_read": 0,
+          "rows_sent_or_rows_returned": 0,
+          "lock_time_ms_or_temp_blks_written": 0,
+          "shared_blks_hit": 0
+        },
+        {
+          "bucket_start": "2026-11-25T01:51:00.000Z",
+          "bucket_end": "2026-11-25T01:52:00.000Z",
+          "rows_examined_or_shared_blks_read": 0,
+          "rows_sent_or_rows_returned": 0,
+          "lock_time_ms_or_temp_blks_written": 0,
+          "shared_blks_hit": 0
+        },
+        {
+          "bucket_start": "2026-11-25T01:52:00.000Z",
+          "bucket_end": "2026-11-25T01:53:00.000Z",
+          "rows_examined_or_shared_blks_read": 0,
+          "rows_sent_or_rows_returned": 0,
+          "lock_time_ms_or_temp_blks_written": 0,
+          "shared_blks_hit": 0
+        },
+        {
+          "bucket_start": "2026-11-25T01:53:00.000Z",
+          "bucket_end": "2026-11-25T01:54:00.000Z",
+          "rows_examined_or_shared_blks_read": 0,
+          "rows_sent_or_rows_returned": 0,
+          "lock_time_ms_or_temp_blks_written": 0,
+          "shared_blks_hit": 0
+        },
+        {
+          "bucket_start": "2026-11-25T01:54:00.000Z",
+          "bucket_end": "2026-11-25T01:55:00.000Z",
+          "rows_examined_or_shared_blks_read": 0,
+          "rows_sent_or_rows_returned": 0,
+          "lock_time_ms_or_temp_blks_written": 0,
+          "shared_blks_hit": 0
+        },
+        {
+          "bucket_start": "2026-11-25T01:55:00.000Z",
+          "bucket_end": "2026-11-25T01:56:00.000Z",
           "rows_examined_or_shared_blks_read": 0,
           "rows_sent_or_rows_returned": 800,
           "lock_time_ms_or_temp_blks_written": 0,
           "shared_blks_hit": null
+        },
+        {
+          "bucket_start": "2026-11-25T01:56:00.000Z",
+          "bucket_end": "2026-11-25T01:57:00.000Z",
+          "rows_examined_or_shared_blks_read": 0,
+          "rows_sent_or_rows_returned": 0,
+          "lock_time_ms_or_temp_blks_written": 0,
+          "shared_blks_hit": 0
+        },
+        {
+          "bucket_start": "2026-11-25T01:57:00.000Z",
+          "bucket_end": "2026-11-25T01:58:00.000Z",
+          "rows_examined_or_shared_blks_read": 0,
+          "rows_sent_or_rows_returned": 0,
+          "lock_time_ms_or_temp_blks_written": 0,
+          "shared_blks_hit": 0
+        },
+        {
+          "bucket_start": "2026-11-25T01:58:00.000Z",
+          "bucket_end": "2026-11-25T01:59:00.000Z",
+          "rows_examined_or_shared_blks_read": 0,
+          "rows_sent_or_rows_returned": 0,
+          "lock_time_ms_or_temp_blks_written": 0,
+          "shared_blks_hit": 0
+        },
+        {
+          "bucket_start": "2026-11-25T01:59:00.000Z",
+          "bucket_end": "2026-11-25T02:00:00.000Z",
+          "rows_examined_or_shared_blks_read": 0,
+          "rows_sent_or_rows_returned": 0,
+          "lock_time_ms_or_temp_blks_written": 0,
+          "shared_blks_hit": 0
+        },
+        {
+          "bucket_start": "2026-11-25T02:00:00.000Z",
+          "bucket_end": "2026-11-25T02:01:00.000Z",
+          "rows_examined_or_shared_blks_read": 0,
+          "rows_sent_or_rows_returned": 0,
+          "lock_time_ms_or_temp_blks_written": 0,
+          "shared_blks_hit": 0
+        },
+        {
+          "bucket_start": "2026-11-25T02:01:00.000Z",
+          "bucket_end": "2026-11-25T02:02:00.000Z",
+          "rows_examined_or_shared_blks_read": 0,
+          "rows_sent_or_rows_returned": 0,
+          "lock_time_ms_or_temp_blks_written": 0,
+          "shared_blks_hit": 0
+        },
+        {
+          "bucket_start": "2026-11-25T02:02:00.000Z",
+          "bucket_end": "2026-11-25T02:03:00.000Z",
+          "rows_examined_or_shared_blks_read": 0,
+          "rows_sent_or_rows_returned": 0,
+          "lock_time_ms_or_temp_blks_written": 0,
+          "shared_blks_hit": 0
+        },
+        {
+          "bucket_start": "2026-11-25T02:03:00.000Z",
+          "bucket_end": "2026-11-25T02:04:00.000Z",
+          "rows_examined_or_shared_blks_read": 0,
+          "rows_sent_or_rows_returned": 0,
+          "lock_time_ms_or_temp_blks_written": 0,
+          "shared_blks_hit": 0
+        },
+        {
+          "bucket_start": "2026-11-25T02:04:00.000Z",
+          "bucket_end": "2026-11-25T02:05:00.000Z",
+          "rows_examined_or_shared_blks_read": 0,
+          "rows_sent_or_rows_returned": 0,
+          "lock_time_ms_or_temp_blks_written": 0,
+          "shared_blks_hit": 0
+        },
+        {
+          "bucket_start": "2026-11-25T02:05:00.000Z",
+          "bucket_end": "2026-11-25T02:06:00.000Z",
+          "rows_examined_or_shared_blks_read": 0,
+          "rows_sent_or_rows_returned": 0,
+          "lock_time_ms_or_temp_blks_written": 0,
+          "shared_blks_hit": 0
+        },
+        {
+          "bucket_start": "2026-11-25T02:06:00.000Z",
+          "bucket_end": "2026-11-25T02:07:00.000Z",
+          "rows_examined_or_shared_blks_read": 0,
+          "rows_sent_or_rows_returned": 0,
+          "lock_time_ms_or_temp_blks_written": 0,
+          "shared_blks_hit": 0
+        },
+        {
+          "bucket_start": "2026-11-25T02:07:00.000Z",
+          "bucket_end": "2026-11-25T02:08:00.000Z",
+          "rows_examined_or_shared_blks_read": 0,
+          "rows_sent_or_rows_returned": 0,
+          "lock_time_ms_or_temp_blks_written": 0,
+          "shared_blks_hit": 0
+        },
+        {
+          "bucket_start": "2026-11-25T02:08:00.000Z",
+          "bucket_end": "2026-11-25T02:09:00.000Z",
+          "rows_examined_or_shared_blks_read": 0,
+          "rows_sent_or_rows_returned": 0,
+          "lock_time_ms_or_temp_blks_written": 0,
+          "shared_blks_hit": 0
+        },
+        {
+          "bucket_start": "2026-11-25T02:09:00.000Z",
+          "bucket_end": "2026-11-25T02:10:00.000Z",
+          "rows_examined_or_shared_blks_read": 0,
+          "rows_sent_or_rows_returned": 0,
+          "lock_time_ms_or_temp_blks_written": 0,
+          "shared_blks_hit": 0
+        },
+        {
+          "bucket_start": "2026-11-25T02:10:00.000Z",
+          "bucket_end": "2026-11-25T02:11:00.000Z",
+          "rows_examined_or_shared_blks_read": 0,
+          "rows_sent_or_rows_returned": 0,
+          "lock_time_ms_or_temp_blks_written": 0,
+          "shared_blks_hit": 0
+        },
+        {
+          "bucket_start": "2026-11-25T02:11:00.000Z",
+          "bucket_end": "2026-11-25T02:12:00.000Z",
+          "rows_examined_or_shared_blks_read": 0,
+          "rows_sent_or_rows_returned": 0,
+          "lock_time_ms_or_temp_blks_written": 0,
+          "shared_blks_hit": 0
+        },
+        {
+          "bucket_start": "2026-11-25T02:12:00.000Z",
+          "bucket_end": "2026-11-25T02:13:00.000Z",
+          "rows_examined_or_shared_blks_read": 0,
+          "rows_sent_or_rows_returned": 0,
+          "lock_time_ms_or_temp_blks_written": 0,
+          "shared_blks_hit": 0
+        },
+        {
+          "bucket_start": "2026-11-25T02:13:00.000Z",
+          "bucket_end": "2026-11-25T02:14:00.000Z",
+          "rows_examined_or_shared_blks_read": 0,
+          "rows_sent_or_rows_returned": 0,
+          "lock_time_ms_or_temp_blks_written": 0,
+          "shared_blks_hit": 0
+        },
+        {
+          "bucket_start": "2026-11-25T02:14:00.000Z",
+          "bucket_end": "2026-11-25T02:15:00.000Z",
+          "rows_examined_or_shared_blks_read": 0,
+          "rows_sent_or_rows_returned": 0,
+          "lock_time_ms_or_temp_blks_written": 0,
+          "shared_blks_hit": 0
+        },
+        {
+          "bucket_start": "2026-11-25T02:15:00.000Z",
+          "bucket_end": "2026-11-25T02:16:00.000Z",
+          "rows_examined_or_shared_blks_read": 0,
+          "rows_sent_or_rows_returned": 0,
+          "lock_time_ms_or_temp_blks_written": 0,
+          "shared_blks_hit": 0
+        },
+        {
+          "bucket_start": "2026-11-25T02:16:00.000Z",
+          "bucket_end": "2026-11-25T02:17:00.000Z",
+          "rows_examined_or_shared_blks_read": 0,
+          "rows_sent_or_rows_returned": 170,
+          "lock_time_ms_or_temp_blks_written": 0,
+          "shared_blks_hit": null
+        },
+        {
+          "bucket_start": "2026-11-25T02:17:00.000Z",
+          "bucket_end": "2026-11-25T02:18:00.000Z",
+          "rows_examined_or_shared_blks_read": 0,
+          "rows_sent_or_rows_returned": 630,
+          "lock_time_ms_or_temp_blks_written": 0,
+          "shared_blks_hit": 152712
+        },
+        {
+          "bucket_start": "2026-11-25T02:18:00.000Z",
+          "bucket_end": "2026-11-25T02:19:00.000Z",
+          "rows_examined_or_shared_blks_read": 0,
+          "rows_sent_or_rows_returned": 0,
+          "lock_time_ms_or_temp_blks_written": 0,
+          "shared_blks_hit": 0
+        },
+        {
+          "bucket_start": "2026-11-25T02:19:00.000Z",
+          "bucket_end": "2026-11-25T02:20:00.000Z",
+          "rows_examined_or_shared_blks_read": 0,
+          "rows_sent_or_rows_returned": 0,
+          "lock_time_ms_or_temp_blks_written": 0,
+          "shared_blks_hit": 0
+        },
+        {
+          "bucket_start": "2026-11-25T02:20:00.000Z",
+          "bucket_end": "2026-11-25T02:21:00.000Z",
+          "rows_examined_or_shared_blks_read": 0,
+          "rows_sent_or_rows_returned": 0,
+          "lock_time_ms_or_temp_blks_written": 0,
+          "shared_blks_hit": 0
+        },
+        {
+          "bucket_start": "2026-11-25T02:21:00.000Z",
+          "bucket_end": "2026-11-25T02:22:00.000Z",
+          "rows_examined_or_shared_blks_read": 0,
+          "rows_sent_or_rows_returned": 0,
+          "lock_time_ms_or_temp_blks_written": 0,
+          "shared_blks_hit": 0
+        },
+        {
+          "bucket_start": "2026-11-25T02:22:00.000Z",
+          "bucket_end": "2026-11-25T02:23:00.000Z",
+          "rows_examined_or_shared_blks_read": 0,
+          "rows_sent_or_rows_returned": 0,
+          "lock_time_ms_or_temp_blks_written": 0,
+          "shared_blks_hit": 0
+        },
+        {
+          "bucket_start": "2026-11-25T02:23:00.000Z",
+          "bucket_end": "2026-11-25T02:24:00.000Z",
+          "rows_examined_or_shared_blks_read": 0,
+          "rows_sent_or_rows_returned": 0,
+          "lock_time_ms_or_temp_blks_written": 0,
+          "shared_blks_hit": 0
+        },
+        {
+          "bucket_start": "2026-11-25T02:24:00.000Z",
+          "bucket_end": "2026-11-25T02:25:00.000Z",
+          "rows_examined_or_shared_blks_read": 0,
+          "rows_sent_or_rows_returned": 0,
+          "lock_time_ms_or_temp_blks_written": 0,
+          "shared_blks_hit": 0
+        },
+        {
+          "bucket_start": "2026-11-25T02:25:00.000Z",
+          "bucket_end": "2026-11-25T02:26:00.000Z",
+          "rows_examined_or_shared_blks_read": 0,
+          "rows_sent_or_rows_returned": 0,
+          "lock_time_ms_or_temp_blks_written": 0,
+          "shared_blks_hit": 0
+        },
+        {
+          "bucket_start": "2026-11-25T02:26:00.000Z",
+          "bucket_end": "2026-11-25T02:27:00.000Z",
+          "rows_examined_or_shared_blks_read": 0,
+          "rows_sent_or_rows_returned": 0,
+          "lock_time_ms_or_temp_blks_written": 0,
+          "shared_blks_hit": 0
+        },
+        {
+          "bucket_start": "2026-11-25T02:27:00.000Z",
+          "bucket_end": "2026-11-25T02:28:00.000Z",
+          "rows_examined_or_shared_blks_read": 0,
+          "rows_sent_or_rows_returned": 800,
+          "lock_time_ms_or_temp_blks_written": 0,
+          "shared_blks_hit": null
+        },
+        {
+          "bucket_start": "2026-11-25T02:28:00.000Z",
+          "bucket_end": "2026-11-25T02:29:00.000Z",
+          "rows_examined_or_shared_blks_read": 0,
+          "rows_sent_or_rows_returned": 0,
+          "lock_time_ms_or_temp_blks_written": 0,
+          "shared_blks_hit": 0
+        },
+        {
+          "bucket_start": "2026-11-25T02:29:00.000Z",
+          "bucket_end": "2026-11-25T02:30:00.000Z",
+          "rows_examined_or_shared_blks_read": 0,
+          "rows_sent_or_rows_returned": 0,
+          "lock_time_ms_or_temp_blks_written": 0,
+          "shared_blks_hit": 0
+        },
+        {
+          "bucket_start": "2026-11-25T02:30:00.000Z",
+          "bucket_end": "2026-11-25T02:31:00.000Z",
+          "rows_examined_or_shared_blks_read": 0,
+          "rows_sent_or_rows_returned": 0,
+          "lock_time_ms_or_temp_blks_written": 0,
+          "shared_blks_hit": 0
+        },
+        {
+          "bucket_start": "2026-11-25T02:31:00.000Z",
+          "bucket_end": "2026-11-25T01:26:00.000Z",
+          "rows_examined_or_shared_blks_read": 0,
+          "rows_sent_or_rows_returned": 0,
+          "lock_time_ms_or_temp_blks_written": 0,
+          "shared_blks_hit": 0
+        },
+        {
+          "bucket_start": "2026-11-25T01:26:00.000Z",
+          "bucket_end": "2026-11-25T01:32:00.000Z",
+          "rows_examined_or_shared_blks_read": 0,
+          "rows_sent_or_rows_returned": 0,
+          "lock_time_ms_or_temp_blks_written": 0,
+          "shared_blks_hit": 0
         }
       ],
       "order_comparison": {
-        "linked_change_order_id": null,
-        "linked_order_display_no": null,
-        "relation_kind": null,
-        "reference_executed_at": null,
-        "insufficient_samples": true,
-        "before_window": null,
-        "after_window": null,
+        "linked_change_order_id": "00000000-0000-4000-8000-000000000182",
+        "linked_order_display_no": "YR-20261127-000009",
+        "relation_kind": "index_or_schema_change",
+        "reference_executed_at": "2026-11-25T02:37:00.000Z",
+        "insufficient_samples": false,
+        "before_window": {
+          "from": "2026-11-25T02:38:00.000Z",
+          "to": "2026-11-25T02:37:00.000Z",
+          "bucket_count": 29,
+          "calls": 160,
+          "total_exec_time_ms": 1722.323,
+          "avg_exec_time_ms": 10.765
+        },
+        "after_window": {
+          "from": "2026-11-25T02:37:00.000Z",
+          "to": "2026-11-25T02:39:00.000Z",
+          "bucket_count": 10,
+          "calls": 80,
+          "total_exec_time_ms": 858.159,
+          "avg_exec_time_ms": 10.727
+        },
         "candidate_orders_in_window": [
           {
-            "change_order_id": "00000000-0000-4000-8000-000000000160",
+            "change_order_id": "00000000-0000-4000-8000-000000000014",
+            "display_no": "YR-20261127-000013",
+            "title": "f12 chain order",
+            "state": "completed",
+            "executed_at": "2026-11-25T02:40:00.000Z",
+            "relation_hint": "time_overlap_only",
+            "confirmed_link_id": null
+          },
+          {
+            "change_order_id": "00000000-0000-4000-8000-000000000183",
+            "display_no": "YR-20261127-000011",
+            "title": "f12 exec bf1854c2",
+            "state": "completed",
+            "executed_at": "2026-11-25T02:41:00.000Z",
+            "relation_hint": "time_overlap_only",
+            "confirmed_link_id": null
+          },
+          {
+            "change_order_id": "00000000-0000-4000-8000-000000000184",
+            "display_no": "YR-20261126-000011",
+            "title": "f12 exec 7561a591",
+            "state": "completed",
+            "executed_at": "2026-11-25T02:42:00.000Z",
+            "relation_hint": "time_overlap_only",
+            "confirmed_link_id": null
+          },
+          {
+            "change_order_id": "00000000-0000-4000-8000-000000000185",
             "display_no": "YR-20261124-900042",
             "title": "adv-order-42-completed",
             "state": "completed",
-            "executed_at": "2026-11-25T01:13:00.000Z",
+            "executed_at": "2026-11-25T02:43:00.000Z",
             "relation_hint": "time_overlap_only",
             "confirmed_link_id": null
           },
           {
-            "change_order_id": "00000000-0000-4000-8000-000000000161",
+            "change_order_id": "00000000-0000-4000-8000-000000000186",
             "display_no": "YR-20261124-900024",
             "title": "adv-order-24-completed",
             "state": "completed",
-            "executed_at": "2026-11-25T01:13:00.000Z",
+            "executed_at": "2026-11-25T02:43:00.000Z",
             "relation_hint": "time_overlap_only",
             "confirmed_link_id": null
           },
           {
-            "change_order_id": "00000000-0000-4000-8000-000000000162",
+            "change_order_id": "00000000-0000-4000-8000-000000000187",
             "display_no": "YR-20261124-900060",
             "title": "adv-order-60-completed",
             "state": "completed",
-            "executed_at": "2026-11-25T01:13:00.000Z",
+            "executed_at": "2026-11-25T02:43:00.000Z",
             "relation_hint": "time_overlap_only",
             "confirmed_link_id": null
           },
           {
-            "change_order_id": "00000000-0000-4000-8000-000000000163",
+            "change_order_id": "00000000-0000-4000-8000-000000000188",
             "display_no": "YR-20261124-900006",
             "title": "adv-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
             "state": "completed",
-            "executed_at": "2026-11-25T01:13:00.000Z",
+            "executed_at": "2026-11-25T02:43:00.000Z",
             "relation_hint": "time_overlap_only",
             "confirmed_link_id": null
           }
         ]
       },
-      "latest_ai_report": null
+      "latest_ai_report": {
+        "report_id": "00000000-0000-4000-8000-000000000189",
+        "datasource_id": "00000000-0000-4000-8000-000000000009",
+        "statement_id": "00000000-0000-4000-8000-000000000144",
+        "window_start": "2026-11-25T02:44:00.000Z",
+        "window_end": "2026-11-25T02:45:00.000Z",
+        "coverage_mode": "reset_or_gap",
+        "desensitized_context_summary": "dialect=postgresql template=\"SELECT column_3 . column_1 , column_3 . column_2 FROM schema_2 . table_1 column_3 JOIN schema_2 . table_1 column_4 ON column_3 . column_1 <= column_4 . column_1 WHERE column_3 . column_2 >= $1 ORDER BY column_3 . column_2 DESC LIMIT $2\" metadata=[schema_1.table_1(column_1:bigint, column_2:text)]",
+        "observed_facts": [
+          {
+            "metric": "avg_exec_time_ms",
+            "value": "10.804",
+            "window": "2026-11-27T06:31:43Z ~ 2026-11-27T07:31:43Z (reset_or_gap)"
+          },
+          {
+            "metric": "calls",
+            "value": "160",
+            "window": "2026-11-27T06:31:43Z ~ 2026-11-27T07:31:43Z (reset_or_gap)"
+          },
+          {
+            "metric": "total_exec_time_ms",
+            "value": "1728.669",
+            "window": "2026-11-27T06:31:43Z ~ 2026-11-27T07:31:43Z (reset_or_gap)"
+          },
+          {
+            "metric": "rows_returned",
+            "value": "1600",
+            "window": "2026-11-27T06:31:43Z ~ 2026-11-27T07:31:43Z (reset_or_gap)"
+          },
+          {
+            "metric": "rows_or_blocks_scanned",
+            "value": "0",
+            "window": "2026-11-27T06:31:43Z ~ 2026-11-27T07:31:43Z (reset_or_gap)"
+          },
+          {
+            "metric": "lock_ms_or_temp_blocks",
+            "value": "0",
+            "window": "2026-11-27T06:31:43Z ~ 2026-11-27T07:31:43Z (reset_or_gap)"
+          },
+          {
+            "metric": "query_shape",
+            "value": "public.f12_demo 自连接；非等值连接条件为 d1.id <= d2.id；对 d1.note 做过滤和降序排序后 LIMIT $2",
+            "window": "2026-11-27T06:31:43Z ~ 2026-11-27T07:31:43Z (reset_or_gap)"
+          },
+          {
+            "metric": "metadata_index_visibility",
+            "value": "元数据仅列出 target.f12_demo(id:bigint, note:text)，未提供现有索引定义；模板中访问的是 public.f12_demo，需按服务端映射确认目标对象",
+            "window": "2026-11-27T06:31:43Z ~ 2026-11-27T07:31:43Z (reset_or_gap)"
+          },
+          {
+            "metric": "coverage_mode",
+            "value": "reset_or_gap",
+            "window": "2026-11-27T06:31:43Z ~ 2026-11-27T07:31:43Z (reset_or_gap)"
+          }
+        ],
+        "root_cause_hypotheses": [
+          {
+            "hypothesis": "非等值自连接 d1.id <= d2.id 可能使 d2 侧按范围反复访问 f12_demo，放大中间结果并拖慢平均耗时。",
+            "confidence": "medium",
+            "evidence_basis": "SQL 中连接条件不是等值键，而是范围比较；SELECT 仅输出 d1 列但 JOIN 可能产生重复行；160 次调用共返回 1600 行，平均约 10 行/调用，且 avg_exec_time_ms 为 10.804。"
+          },
+          {
+            "hypothesis": "缺少匹配 WHERE d1.note >= $1 与 ORDER BY d1.note DESC LIMIT $2 的索引，可能导致先读取较多满足条件的行再做排序或 Top-N 截断。",
+            "confidence": "medium",
+            "evidence_basis": "模板对 d1.note 同时做范围过滤和降序排序，并带 LIMIT；元数据未提供 f12_demo 的现有索引定义，无法排除需要扫描与排序的可能性。"
+          },
+          {
+            "hypothesis": "d2.id 缺少可用于范围查找的索引，连接内表可能需要全表扫描或大范围扫描，导致每次外层行访问 d2 时成本偏高。",
+            "confidence": "medium",
+            "evidence_basis": "连接条件等价于 d2.id >= d1.id；元数据只给出 id:bigint，未提供索引信息；当前窗口 rows_or_blocks_scanned 为 0，不能据此确认实际扫描量。"
+          },
+          {
+            "hypothesis": "若业务并不依赖 JOIN 产生的重复行，当前写法可能把存在性判断写成会产生重复结果的连接，使 LIMIT 在重复结果集上取数，增加无效中间行处理。",
+            "confidence": "low",
+            "evidence_basis": "SELECT 列表只包含 d1.id 和 d1.note，d2 仅用于连接条件；是否允许去重需业务语义确认，当前元数据与统计无法证明重复行是否必要。"
+          }
+        ],
+        "optimization_recommendations": [
+          {
+            "kind": "index_ddl",
+            "title": "为 d1 侧过滤与排序增加复合索引",
+            "rationale": "在 public.f12_demo 上建立 (note DESC, id) 复合索引，可能同时支撑 WHERE d1.note >= $1、ORDER BY d1.note DESC 以及 SELECT 中的 id/note 覆盖访问，减少排序或大批量扫描的风险。",
+            "applicable_conditions": [
+              "确认模板实际访问对象为 public.f12_demo，或按服务端映射还原到正确表",
+              "note 过滤条件在业务参数下具备一定选择性，或 LIMIT $2 较小",
+              "可接受新增索引带来的写入放大和存储开销"
+            ],
+            "candidate_sql": "CREATE INDEX idx_table_1_col2_desc_col1 ON public.f12_demo (note DESC, id);",
+            "risk_notes": [
+              "元数据中写的是 target.f12_demo，模板中写的是 public.f12_demo，执行前必须确认二者映射关系，避免在错误 schema 建索引",
+              "大表建索引可能产生 IO 与锁影响，生产环境建议评估 CREATE INDEX CONCURRENTLY 及低峰执行",
+              "若 note 更新频繁，复合索引会增加写维护成本"
+            ]
+          },
+          {
+            "kind": "index_ddl",
+            "title": "为 d2 侧连接范围增加 id 索引",
+            "rationale": "连接条件 d1.id <= d2.id 可视为对 d2.id 的范围查找；在 public.f12_demo 上建立 id 索引，可能降低内表按范围反复扫描的成本。",
+            "applicable_conditions": [
+              "查询仍保留 JOIN 写法，且不能改写为存在性判断",
+              "d2.id 的范围匹配在业务数据分布下可能命中较多或较少行，需要结合参数验证",
+              "可接受额外索引的写入与存储开销"
+            ],
+            "candidate_sql": "CREATE INDEX idx_table_1_col1 ON public.f12_demo (id);",
+            "risk_notes": [
+              "若 d2.id 范围匹配命中大量行，单列索引仍可能产生较多回表或范围扫描",
+              "需确认现有主键或唯一索引是否已能覆盖 id，避免重复建索引",
+              "执行前同样需核对 target.f12_demo 与 public.f12_demo 的映射关系"
+            ]
+          },
+          {
+            "kind": "sql_rewrite",
+            "title": "若业务不需要重复行，改写为 EXISTS 半连接",
+            "rationale": "当 d2 仅用于判断是否存在满足 d2.id >= d1.id 的行时，EXISTS 可避免 JOIN 产生的重复放大，并允许数据库在找到首条匹配后停止内表扫描。",
+            "applicable_conditions": [
+              "业务不依赖原 JOIN 产生的重复行数",
+              "d2 侧只做存在性判断，不输出 d2 列",
+              "改写前后需使用相同 $1、$2 参数比对结果集"
+            ],
+            "candidate_sql": "SELECT d1.id, d1.note FROM public.f12_demo d1 WHERE d1.note >= $1 AND EXISTS (SELECT 1 FROM public.f12_demo d2 WHERE d2.id >= d1.id) ORDER BY d1.note DESC LIMIT $2;",
+            "risk_notes": [
+              "改写会去重，若下游依赖原 JOIN 的重复行数则结果不一致",
+              "需确认 NULL 语义：原连接条件对 NULL 不匹配，EXISTS 写法也应保持同等过滤行为",
+              "建议先在只读环境对比原 SQL 与改写 SQL 的结果集和行数"
+            ]
+          },
+          {
+            "kind": "sql_rewrite",
+            "title": "若仅需存在性判断，可改写为 MAX 标量子查询",
+            "rationale": "因为 d2 侧没有额外过滤条件，存在满足 d2.id >= d1.id 的行等价于 d1.id <= (SELECT MAX(d2.id) FROM public.f12_demo d2)；该写法可避免逐行连接，并只计算一次最大值。",
+            "applicable_conditions": [
+              "业务不依赖原 JOIN 产生的重复行",
+              "d2 侧没有其他未展示的过滤条件或连接条件",
+              "可接受通过一次聚合子查询替代自连接"
+            ],
+            "candidate_sql": "SELECT d1.id, d1.note FROM public.f12_demo d1 WHERE d1.note >= $1 AND d1.id <= (SELECT MAX(d2.id) FROM public.f12_demo d2) ORDER BY d1.note DESC LIMIT $2;",
+            "risk_notes": [
+              "该改写同样会去重，不能用于必须保留重复行的场景",
+              "MAX 子查询在 f12_demo 很大且 id 无索引时仍可能需要扫描，需要结合索引方案验证",
+              "需确认 id 为 NULL 时的语义与原 JOIN 一致"
+            ]
+          }
+        ],
+        "verification_steps": [
+          "在测试环境使用代表性 $1、$2 参数执行 EXPLAIN (ANALYZE, BUFFERS)，对比优化前后的扫描行数、循环次数、排序方式和缓冲区读取量；不要仅凭当前无执行计划数据下结论。",
+          "创建索引后重新采集相同窗口的 avg_exec_time_ms、calls、total_exec_time_ms、rows_returned，并对比优化前 10.804 ms 的平均耗时。",
+          "验证 note 过滤与 LIMIT 的边界参数，包括 $1 很宽、$1 很窄、$2 很小和 $2 较大等场景，观察是否仍出现大量排序或内表重复扫描。",
+          "若采用 EXISTS 或 MAX 改写，使用相同参数比对原 SQL 与改写 SQL 的结果集行数、去重差异和 NULL 行为，确认业务语义一致后再上线。",
+          "检查 target.f12_demo 与 public.f12_demo 的实际映射，确保索引建在模板真正访问的对象上，并确认 id、note 的现有索引情况，避免重复索引。",
+          "由于当前 coverage_mode 为 reset_or_gap，建议结合更长统计窗口复核，排除统计重置或缺口对平均耗时与调用次数判断的影响。",
+          "上线前评估索引写入开销、表大小、锁影响和生产变更窗口；大表可优先考虑 CREATE INDEX CONCURRENTLY 并监控索引创建期间数据库负载。"
+        ],
+        "candidate_sql": "CREATE TABLE IF NOT EXISTS f12_diag_opt_5416a753 (id bigint primary key, note text);",
+        "candidate_statement_kind": "ddl",
+        "submission_state": "submitted",
+        "flow_id": "00000000-0000-4000-8000-000000000003",
+        "ephemeral_run_id": "00000000-0000-4000-8000-000000000075",
+        "submitted_order_id": "00000000-0000-4000-8000-000000000182",
+        "submitted_order_display_no": "YR-20261127-000009",
+        "created_at": "2026-11-25T02:45:00.000Z"
+      }
     },
     "err_code": 0,
     "message": "ok",

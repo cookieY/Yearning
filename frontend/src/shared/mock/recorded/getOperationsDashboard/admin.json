@@ -1,6 +1,6 @@
 {
   "contract_version": 1,
-  "openapi_sha": "b08b588223c0b586a5c9c4e0f1c9b0cd818d7ef1d61f3f9e823d5a489e37fb73",
+  "openapi_sha": "d093a5fb3bde5df417746336adc995181c34ed6d35c651a982c93d3dc939c06b",
   "zod_runtime_sha256": "32b72a82897ae698b7566aad9821c07cf5194173a3dc69adfb00a8f00f04a446",
   "operation_id": "getOperationsDashboard",
   "case_id": "admin",
@@ -9,24 +9,24 @@
   "response": {
     "data": {
       "meta": {
-        "window_start": "2026-10-27",
-        "window_end": "2026-11-26",
+        "window_start": "2026-10-28",
+        "window_end": "2026-11-27",
         "system_timezone": "Asia/Shanghai",
-        "refreshed_at": "2026-11-25T06:07:00.000Z",
+        "refreshed_at": "2026-11-25T10:06:00.000Z",
         "completeness": "complete",
         "unavailable_metric_keys": []
       },
-      "change_order_total": 70,
-      "ddl_statement_total": 10,
-      "dml_statement_total": 1,
-      "completed_total": 5,
-      "failed_total": 4,
+      "change_order_total": 94,
+      "ddl_statement_total": 32,
+      "dml_statement_total": 3,
+      "completed_total": 8,
+      "failed_total": 6,
       "partial_failed_total": 3,
-      "query_execution_total": 2,
+      "query_execution_total": 20,
       "user_total": 61,
       "datasource_total": 27,
-      "approval_duration_p50_ms": 31,
-      "approval_duration_p95_ms": 104,
+      "approval_duration_p50_ms": 33,
+      "approval_duration_p95_ms": 117,
       "order_trend": [
         {
           "day": "2026-11-01",
@@ -38,27 +38,31 @@
         },
         {
           "day": "2026-11-26",
-          "value": 12
+          "value": 14
+        },
+        {
+          "day": "2026-11-27",
+          "value": 22
         }
       ],
       "state_distribution": {
         "blocked_datasource_unavailable": 3,
-        "cancelled": 4,
-        "completed": 5,
-        "failed": 4,
+        "cancelled": 5,
+        "completed": 8,
+        "failed": 6,
         "invalid": 3,
-        "missed_schedule": 3,
+        "missed_schedule": 4,
         "partial_cancelled": 3,
         "partial_failed": 3,
         "rejected": 3,
         "result_unknown": 3,
         "running": 4,
-        "scheduled": 5,
-        "stage_approval_active": 8,
-        "stage_execution_pending": 4,
+        "scheduled": 6,
+        "stage_approval_active": 17,
+        "stage_execution_pending": 7,
         "submitted": 4,
-        "voided": 4,
-        "withdrawn": 4,
+        "voided": 6,
+        "withdrawn": 6,
         "withdrawn_after_partial_execution": 3
       }
     },

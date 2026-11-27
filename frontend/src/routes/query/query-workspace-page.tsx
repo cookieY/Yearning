@@ -1,13 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate, useParams } from "react-router";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 import { Ban, Copy, Database, Download, LogOut, Play, ShieldAlert, Table2 } from "lucide-react";
 import type { QueryGrant } from "@/api/generated/client/yearningV4HTTPAPI.schemas";
-import { createQueryGrantRenewalRequest } from "@/api/generated/client/query-access/query-access";
 import { useSession } from "@/features/auth/session-provider";
 import { describeQueryErrorText } from "@/features/query/query-error-text";
-import { resolveStatementSchema } from "@/features/query/query-sql-utils";
+import { pickWorkspaceActiveGrant, resolveStatementSchema } from "@/features/query/query-sql-utils";
 import {
   CloseSessionDialog,
   ExportDialog,
@@ -22,12 +21,13 @@ import {
   useCloseSession,
   useMyGrants,
   useQuerySession,
+  useRenewGrant,
   useSessionColumns,
   useSessionCompletionCatalog,
   useSessionSchemas,
 } from "@/features/query/use-query-domain";
 import { useQueryExecutionTabs } from "@/features/query/use-query-execution-tabs";
-import { SqlEditorPanel } from "@/features/review/sql-editor-panel";
+import { LazySqlEditorPanel } from "@/features/review/lazy-sql-editor-panel";
 import { describeError } from "@/shared/api/error-display";
 import { ContextMenu } from "@/shared/components/context-menu";
 import { PageHeader, PageLayout } from "@/shared/components/page-layout";
@@ -134,11 +134,10 @@ export default function QueryWorkspacePage() {
     selectedSqlRef,
   });
 
-  const activeGrant: QueryGrant | null = useMemo(() => {
-    const active = (grantsQuery.data ?? []).filter((grant) => grant.state === "active");
-    if (active.length === 0) return null;
-    return active.reduce((latest, current) => (current.created_at > latest.created_at ? current : latest));
-  }, [grantsQuery.data]);
+  const activeGrant: QueryGrant | null = useMemo(
+    () => pickWorkspaceActiveGrant(grantsQuery.data ?? [], row?.grant_id),
+    [grantsQuery.data, row?.grant_id],
+  );
 
   const revokedGrant = useMemo(() => {
     const revoked = (grantsQuery.data ?? []).filter((grant) => grant.state === "revoked");
@@ -146,24 +145,7 @@ export default function QueryWorkspacePage() {
     return revoked.reduce((latest, current) => (current.created_at > latest.created_at ? current : latest));
   }, [grantsQuery.data]);
 
-  const renewMutation = useMutation({
-    mutationFn: (input: { requested_until: string; reason: string }) => {
-      if (activeGrant === null) {
-        return Promise.reject(new Error("no active grant"));
-      }
-      return createQueryGrantRenewalRequest(activeGrant.id, input);
-    },
-    onSuccess: () => {
-      toast.success(t("query.workspace.renewSubmitted"));
-      setRenewOpen(false);
-      void queryClient.invalidateQueries({ queryKey: ["query"] });
-    },
-    onError: (error) => {
-      const msg = describeQueryErrorText(describeError(error, "createQueryGrantRenewalRequest"));
-      setRenewError(msg);
-      toast.error(msg);
-    },
-  });
+  const renewGrant = useRenewGrant();
 
   const blocked = row !== null && row.state !== "active";
   const capabilityBlocked = capability !== null && capability.state !== "active";
@@ -439,7 +421,7 @@ export default function QueryWorkspacePage() {
 
             {/* Stable container height keeps Monaco overlays properly aligned when results mount below. */}
             <div className="h-[clamp(180px,30vh,280px)] shrink-0">
-              <SqlEditorPanel
+              <LazySqlEditorPanel
                 className="h-full min-h-0"
                 value={sql}
                 onChange={setSql}
@@ -574,12 +556,23 @@ export default function QueryWorkspacePage() {
         <RenewGrantDialog
           key={activeGrant?.id ?? "none"}
           grant={activeGrant}
-          submitting={renewMutation.isPending}
+          submitting={renewGrant.isPending}
           error={renewError}
           onCancel={() => { setRenewOpen(false); }}
           onSubmit={(input) => {
+            if (activeGrant === null) return;
             setRenewError(null);
-            renewMutation.mutate(input);
+            void renewGrant
+              .mutateAsync({ grantId: activeGrant.id, body: input })
+              .then(() => {
+                toast.success(t("query.workspace.renewSubmitted"));
+                setRenewOpen(false);
+              })
+              .catch((error: unknown) => {
+                const msg = describeQueryErrorText(describeError(error, "createQueryGrantRenewalRequest"));
+                setRenewError(msg);
+                toast.error(msg);
+              });
           }}
         />
       ) : null}

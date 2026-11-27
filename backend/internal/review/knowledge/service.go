@@ -193,10 +193,32 @@ func shouldInvalidateOldReferences(oldState, newState State, oldHash, newHash st
 	return oldState == StateEnabled && (newState != StateEnabled || oldHash != newHash)
 }
 
-// Delete removes an unreferenced knowledge entry guarded by optimistic version matching.
+func shouldInvalidateOnDelete(state State) bool {
+	return state == StateEnabled
+}
+
+// Delete removes a knowledge entry guarded by optimistic version matching.
+// Historical review_tool_calls and submitted order snapshots retain immutable copies,
+// so prior references do not block physical deletion; deleting an enabled entry
+// invalidates referencing unsubmitted review runs in the same transaction.
 func (s *Service) Delete(ctx context.Context, id string, expectVersion int64) error {
 	return s.Repo.DB.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		return s.Repo.DeleteReferencedGuarded(ctx, tx, id, expectVersion)
+		e, err := s.Repo.LoadForUpdate(ctx, tx, id)
+		if err != nil {
+			return err
+		}
+		if e.Version != expectVersion {
+			return ErrConcurrent
+		}
+		if err := s.Repo.DeleteVersioned(ctx, tx, id, expectVersion); err != nil {
+			return err
+		}
+		if s.Invalidate != nil && shouldInvalidateOnDelete(e.State) {
+			if err := s.Invalidate(ctx, tx, KindName, e.ID, e.ConfigHash); err != nil {
+				return err
+			}
+		}
+		return nil
 	})
 }
 

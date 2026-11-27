@@ -883,7 +883,7 @@ describe("review-input dialog coverage", () => {
     await userEvent.click(screen.getByRole("button", { name: "\u53d6\u6d88" }));
   });
 
-  it("deletes a draft entry successfully and surfaces the referenced error on a converted one", async () => {
+  it("deletes both a draft entry and a converted entry successfully", async () => {
     renderPage(<AdminReviewKnowledgePage />);
     const rows = await screen.findAllByTestId(/review-input-row-/);
     const draftRow = rows.find((row) => row.textContent.includes("orders-huge-table"));
@@ -893,14 +893,15 @@ describe("review-input dialog coverage", () => {
     await waitFor(() => {
       expect(screen.getAllByTestId(/review-input-row-/)).toHaveLength(2);
     });
-    // The converted entry is review-referenced → 1006 → error alert.
-    const convertedRow = (await screen.findAllByTestId(/review-input-row-/))
+    const convertedButton = (await screen.findAllByTestId(/review-input-row-/))
       .map((row) => ({ row, button: within(row).queryByTestId(/review-input-delete-/) }))
       .find(({ row }) => row.textContent.includes("charset-uniformity"))?.button;
-    if (convertedRow === undefined || convertedRow === null) throw new Error("converted row not rendered");
-    await userEvent.click(convertedRow);
+    if (convertedButton === undefined || convertedButton === null) throw new Error("converted row not rendered");
+    await userEvent.click(convertedButton);
     await userEvent.click(screen.getByTestId("review-input-delete-confirm"));
-    await screen.findByTestId("review-input-delete-error");
+    await waitFor(() => {
+      expect(screen.getAllByTestId(/review-input-row-/)).toHaveLength(1);
+    });
   });
 
   it("renders a failing evaluation with its findings list", async () => {

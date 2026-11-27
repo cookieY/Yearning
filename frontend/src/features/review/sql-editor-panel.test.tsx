@@ -21,7 +21,7 @@ vi.mock("monaco-editor/editor/editor.worker.js?worker", () => ({
   default: vi.fn(),
 }));
 
-vi.mock("monaco-editor/languages/definitions/sql/register.js", () => ({}));
+vi.mock("./monaco-sql-contribs", () => ({}));
 
 interface MockModel {
   getValue: () => string;
@@ -78,7 +78,7 @@ function makeSelection(
   };
 }
 
-vi.mock("monaco-editor/editor/editor.main.js", () => {
+vi.mock("monaco-editor/editor/editor.api.js", () => {
   const model: MockModel = {
     getValue: () => monacoState.text,
     getValueInRange: () => monacoState.text,

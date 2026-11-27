@@ -8,6 +8,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"github.com/cookieY/YearningX/backend/internal/authorization/auditlog"
 	"github.com/cookieY/YearningX/backend/internal/crypto"
 	"github.com/cookieY/YearningX/backend/internal/platform/hashutil"
@@ -73,6 +74,17 @@ type snapshotDatasource struct {
 	CanExport  bool   `json:"can_export"`
 }
 
+func validateRequestedUntil(now, requestedUntil time.Time, maxDurationMinutes int) error {
+	if !requestedUntil.After(now) {
+		return domain.ErrValidation().WithDetail("requested_until_in_past")
+	}
+	maxUntil := now.Add(time.Duration(maxDurationMinutes) * time.Minute)
+	if requestedUntil.After(maxUntil) {
+		return domain.ErrValidation().WithDetail(fmt.Sprintf("requested_until_exceeds_max_minutes:%d", maxDurationMinutes))
+	}
+	return nil
+}
+
 func (s *Services) createRequestOnce(ctx context.Context, tx *gorm.DB, in CreateAccessRequestInput) (*AccessRequestView, error) {
 	settings := s.loadQuerySettings(ctx, tx)
 	if !settings.ApprovalEnabled {
@@ -85,12 +97,8 @@ func (s *Services) createRequestOnce(ctx context.Context, tx *gorm.DB, in Create
 		return nil, domain.ErrValidation()
 	}
 	now := s.now()
-	if !in.RequestedUntil.After(now) {
-		return nil, domain.ErrValidation()
-	}
-	maxUntil := now.Add(time.Duration(settings.MaximumApprovedDurationMinutes) * time.Minute)
-	if in.RequestedUntil.After(maxUntil) {
-		return nil, domain.ErrValidation()
+	if err := validateRequestedUntil(now, in.RequestedUntil, settings.MaximumApprovedDurationMinutes); err != nil {
+		return nil, err
 	}
 	// Flow validation: must be query_access type, enabled, and granted to the user via an enabled permission group.
 	flow, err := s.loadQueryFlowForUser(ctx, tx, in.Actor.UserID, in.FlowID)

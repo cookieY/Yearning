@@ -445,6 +445,77 @@ describe("query entry mode branches (server-driven)", () => {
     server.events.removeAllListeners();
   });
 
+  it("displays bound grant expiry on active sessions and extends the existing session on renewal approval", async () => {
+    seedQueryScenario("query-session");
+    stubSession(false);
+    const sessionId = "6f0f2b3c-5555-4555-8555-000000000101";
+
+    renderAt("/query");
+    const initialExpiry = await screen.findByTestId(`query-session-expiry-${sessionId}`);
+    expect(initialExpiry.textContent).toMatch(/^\u622a\u6b62\u65f6\u95f4\uff1a/);
+    const initialExpiryText = initialExpiry.textContent;
+
+    const grantsRes = (await (await fetch("/api/v4/query-grants")).json()) as {
+      data: { items: { id: string; state: string }[] };
+    };
+    const activeGrantId = grantsRes.data.items.find((g) => g.state === "active")?.id;
+    expect(activeGrantId).toBeDefined();
+
+    const extendedUntil = new Date(Date.now() + 10 * 24 * 60 * 60 * 1000).toISOString();
+    const renewRes = (await (
+      await fetch(`/api/v4/query-grants/${activeGrantId ?? ""}/renewal-requests`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Idempotency-Key": "renew-rebind-session-1",
+        },
+        body: JSON.stringify({ requested_until: extendedUntil, reason: "extend active session" }),
+      })
+    ).json()) as { err_code: number; data: { id: string } };
+    expect(renewRes.err_code).toBe(0);
+
+    setMockIdentity("reviewer-a");
+    const approveRes = (await (
+      await fetch(`/api/v4/query-access-requests/${renewRes.data.id}/decisions`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "If-Match": '"1"',
+          "Idempotency-Key": "approve-rebind-session-1",
+        },
+        body: JSON.stringify({ decision: "approve" }),
+      })
+    ).json()) as { err_code: number; data: { grant_id: string } };
+    expect(approveRes.err_code).toBe(0);
+    const newGrantId = approveRes.data.grant_id;
+    setMockIdentity("henry");
+
+    const sessionsRes = (await (await fetch("/api/v4/query-sessions")).json()) as {
+      data: { items: { id: string; grant_id: string; state: string }[] };
+    };
+    const activeSessions = sessionsRes.data.items.filter((row) => row.state === "active");
+    expect(activeSessions).toHaveLength(1);
+    expect(activeSessions[0]?.id).toBe(sessionId);
+    expect(activeSessions[0]?.grant_id).toBe(newGrantId);
+
+    cleanup();
+    const creates: string[] = [];
+    server.events.on("request:start", ({ request }) => {
+      if (request.method === "POST" && new URL(request.url).pathname.endsWith("/query-sessions")) {
+        creates.push(request.url);
+      }
+    });
+    renderAt("/query");
+    const updatedExpiry = await screen.findByTestId(`query-session-expiry-${sessionId}`);
+    expect(updatedExpiry.textContent).toMatch(/^\u622a\u6b62\u65f6\u95f4\uff1a/);
+    expect(updatedExpiry.textContent).not.toBe(initialExpiryText);
+
+    await userEvent.click(await screen.findByTestId(/query-flow-enter-/));
+    await screen.findByTestId("query-workspace");
+    expect(creates).toHaveLength(0);
+    server.events.removeAllListeners();
+  });
+
   it("hides the enter button and offers apply when review is required without a grant (owner 2026-10-31 round 6)", async () => {
     seedQueryScenario("query-flow");
     stubSession(false);
@@ -841,8 +912,241 @@ describe("review R1 fixes", () => {
     renderAt("/approvals/query-access");
     const step2Row = await screen.findByTestId("query-access-pending-6f0f2b3c-5555-4555-8555-000000000299");
     expect(step2Row).toBeVisible();
+    expect(within(step2Row).getByTestId("query-access-detail-6f0f2b3c-5555-4555-8555-000000000299")).toBeVisible();
     expect(within(step2Row).queryByTestId("query-access-actions-6f0f2b3c-5555-4555-8555-000000000299")).not.toBeInTheDocument();
     expect(screen.queryByTestId("approvals-tab-query-badge")).not.toBeInTheDocument();
+  });
+
+  it("displays requester application reason in the queue table, detail sheet, and decision dialog", async () => {
+    seedQueryScenario("query-approval");
+    setMockIdentity("reviewer-a");
+    stubSession({
+      id: REVIEWER_USER_ID,
+      username: "reviewer-a",
+      admin: false,
+      requestId: SESSION_USER_ID,
+    });
+    window.localStorage.setItem("yearning-mock-auth", "default");
+    renderAt("/approvals/query-access");
+
+    const row = await screen.findByTestId("query-access-pending-6f0f2b3c-5555-4555-8555-000000000201");
+    expect(within(row).getByTestId("query-access-reason-6f0f2b3c-5555-4555-8555-000000000201")).toHaveTextContent(
+      "month-end reconciliation",
+    );
+
+    // Search filters by application reason.
+    fireEvent.change(screen.getByTestId("query-access-search"), {
+      target: { value: "nonexistent-reason-filter" },
+    });
+    expect(await screen.findByTestId("query-access-search-empty")).toBeVisible();
+    fireEvent.change(screen.getByTestId("query-access-search"), {
+      target: { value: "reconciliation" },
+    });
+    expect(screen.getByTestId("query-access-pending-6f0f2b3c-5555-4555-8555-000000000201")).toBeVisible();
+    fireEvent.change(screen.getByTestId("query-access-search"), { target: { value: "" } });
+
+    const liveRow = await screen.findByTestId("query-access-pending-6f0f2b3c-5555-4555-8555-000000000201");
+
+    // 1. Direct row-action path opens decision dialog with requester's reason without opening the detail sheet.
+    await openRowActionsAt(within(liveRow).getByTestId("query-access-actions-6f0f2b3c-5555-4555-8555-000000000201"));
+    await userEvent.click(screen.getByTestId("query-access-approve-6f0f2b3c-5555-4555-8555-000000000201"));
+    expect(screen.queryByTestId("query-access-detail-sheet")).not.toBeInTheDocument();
+    const directDialog = await screen.findByTestId("query-access-decision-dialog");
+    expect(within(directDialog).getByTestId("query-access-decision-reason")).toHaveTextContent(
+      "month-end reconciliation",
+    );
+    await userEvent.click(within(directDialog).getByRole("button", { name: "\u53d6\u6d88" }));
+    await waitFor(() => {
+      expect(screen.queryByTestId("query-access-decision-dialog")).not.toBeInTheDocument();
+    });
+
+    // 2. Detail button opens the detail sheet with full reason & validity, and transitions to decision dialog.
+    await userEvent.click(within(liveRow).getByTestId("query-access-detail-6f0f2b3c-5555-4555-8555-000000000201"));
+    const detailSheet = await screen.findByTestId("query-access-detail-sheet");
+    expect(within(detailSheet).getByTestId("query-access-detail-reason")).toHaveTextContent(
+      "month-end reconciliation",
+    );
+    await userEvent.click(within(detailSheet).getByTestId("query-access-detail-reject"));
+    await waitFor(() => {
+      expect(screen.queryByTestId("query-access-detail-sheet")).not.toBeInTheDocument();
+    });
+    const sheetDecisionDialog = await screen.findByTestId("query-access-decision-dialog");
+    expect(within(sheetDecisionDialog).getByTestId("query-access-decision-reason")).toHaveTextContent(
+      "month-end reconciliation",
+    );
+  });
+
+  it("consolidates renewed active grants of the same flow into a single latest row and revokes the chain together", async () => {
+    seedQueryScenario("query-session");
+    setMockIdentity("henry");
+    stubSession(false);
+
+    const grantsBefore = (await (await fetch("/api/v4/query-grants")).json()) as {
+      data: { items: { id: string; state: string }[] };
+    };
+    const initialGrantId = grantsBefore.data.items.find((grant) => grant.state === "active")?.id;
+    expect(initialGrantId).toBeDefined();
+
+    const extendedUntil = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString();
+    const renewRes = (await (
+      await fetch(`/api/v4/query-grants/${initialGrantId ?? ""}/renewal-requests`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Idempotency-Key": "renew-consolidate-1",
+        },
+        body: JSON.stringify({ requested_until: extendedUntil, reason: "consolidate renewal check" }),
+      })
+    ).json()) as { err_code: number; data: { id: string } };
+    expect(renewRes.err_code).toBe(0);
+
+    setMockIdentity("reviewer-a");
+    stubSession({
+      id: REVIEWER_USER_ID,
+      username: "reviewer-a",
+      admin: false,
+      requestId: SESSION_USER_ID,
+    });
+    window.localStorage.setItem("yearning-mock-auth", "default");
+
+    const approveRes = (await (
+      await fetch(`/api/v4/query-access-requests/${renewRes.data.id}/decisions`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "If-Match": '"1"',
+          "Idempotency-Key": "approve-consolidate-1",
+        },
+        body: JSON.stringify({ decision: "approve" }),
+      })
+    ).json()) as { err_code: number; data: { grant_id: string } };
+    expect(approveRes.err_code).toBe(0);
+    const latestGrantId = approveRes.data.grant_id;
+    expect(latestGrantId).not.toBe(initialGrantId);
+
+    renderAt("/approvals/query-access");
+    const grantsTable = await screen.findByTestId("query-access-grants-table");
+    expect(within(grantsTable).getAllByTestId(/^query-access-grant-/)).toHaveLength(1);
+    expect(within(grantsTable).getByTestId(`query-access-grant-${latestGrantId}`)).toBeVisible();
+    expect(within(grantsTable).queryByTestId(`query-access-grant-${initialGrantId ?? ""}`)).toBeNull();
+
+    // Revoking the consolidated row revokes the entire active chain so the superseded grant does not reappear.
+    await openRowActionsAt(within(grantsTable).getByTestId(`query-grant-actions-${latestGrantId}`));
+    await userEvent.click(screen.getByTestId(`query-access-revoke-${latestGrantId}`));
+    const revokeDialog = await screen.findByTestId("query-access-revoke-dialog");
+    await userEvent.type(within(revokeDialog).getByTestId("query-access-revoke-reason"), "cleanup chain");
+    await userEvent.click(within(revokeDialog).getByTestId("query-access-revoke-confirm"));
+
+    await waitFor(() => {
+      expect(screen.queryByTestId("query-access-grants-table")).not.toBeInTheDocument();
+    });
+  });
+
+  it("keeps broader-datasource grants separate from narrower grants on the same flow during consolidation and revocation", async () => {
+    seedQueryScenario("query-flow");
+    setMockIdentity("henry");
+    stubSession(false);
+
+    const broadUntil = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+    const broadReqRes = (await (
+      await fetch("/api/v4/query-access-requests", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Idempotency-Key": "broad-grant-req-1",
+        },
+        body: JSON.stringify({
+          flow_id: QUERY_FIXTURE_FLOW_ID,
+          datasource_ids: [QUERY_FIXTURE_DS_MYSQL_ID, QUERY_FIXTURE_DS_PG_ID],
+          requested_until: broadUntil,
+          reason: "both mysql and pg",
+        }),
+      })
+    ).json()) as { err_code: number; data: { id: string } };
+    expect(broadReqRes.err_code).toBe(0);
+
+    setMockIdentity("reviewer-a");
+    stubSession({
+      id: REVIEWER_USER_ID,
+      username: "reviewer-a",
+      admin: false,
+      requestId: SESSION_USER_ID,
+    });
+    window.localStorage.setItem("yearning-mock-auth", "default");
+
+    const broadApprove = (await (
+      await fetch(`/api/v4/query-access-requests/${broadReqRes.data.id}/decisions`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "If-Match": '"1"',
+          "Idempotency-Key": "approve-broad-1",
+        },
+        body: JSON.stringify({ decision: "approve" }),
+      })
+    ).json()) as { err_code: number; data: { grant_id: string } };
+    expect(broadApprove.err_code).toBe(0);
+
+    setMockIdentity("henry");
+    stubSession(false);
+    const narrowUntil = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString();
+    const narrowReqRes = (await (
+      await fetch("/api/v4/query-access-requests", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Idempotency-Key": "narrow-grant-req-1",
+        },
+        body: JSON.stringify({
+          flow_id: QUERY_FIXTURE_FLOW_ID,
+          datasource_ids: [QUERY_FIXTURE_DS_MYSQL_ID],
+          requested_until: narrowUntil,
+          reason: "mysql only later expiry",
+        }),
+      })
+    ).json()) as { err_code: number; data: { id: string } };
+    expect(narrowReqRes.err_code).toBe(0);
+
+    setMockIdentity("reviewer-a");
+    stubSession({
+      id: REVIEWER_USER_ID,
+      username: "reviewer-a",
+      admin: false,
+      requestId: SESSION_USER_ID,
+    });
+    const narrowApprove = (await (
+      await fetch(`/api/v4/query-access-requests/${narrowReqRes.data.id}/decisions`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "If-Match": '"1"',
+          "Idempotency-Key": "approve-narrow-1",
+        },
+        body: JSON.stringify({ decision: "approve" }),
+      })
+    ).json()) as { err_code: number; data: { grant_id: string } };
+    expect(narrowApprove.err_code).toBe(0);
+    const broadGrantId = broadApprove.data.grant_id;
+    const narrowGrantId = narrowApprove.data.grant_id;
+
+    renderAt("/approvals/query-access");
+    const grantsTable = await screen.findByTestId("query-access-grants-table");
+    expect(within(grantsTable).getAllByTestId(/^query-access-grant-/)).toHaveLength(2);
+    expect(within(grantsTable).getByTestId(`query-access-grant-${broadGrantId}`)).toBeVisible();
+    expect(within(grantsTable).getByTestId(`query-access-grant-${narrowGrantId}`)).toBeVisible();
+
+    // Revoking the narrower grant leaves the broader {MYSQL, PG} grant active and visible.
+    await openRowActionsAt(within(grantsTable).getByTestId(`query-grant-actions-${narrowGrantId}`));
+    await userEvent.click(screen.getByTestId(`query-access-revoke-${narrowGrantId}`));
+    const revokeDialog = await screen.findByTestId("query-access-revoke-dialog");
+    await userEvent.type(within(revokeDialog).getByTestId("query-access-revoke-reason"), "revoke narrow only");
+    await userEvent.click(within(revokeDialog).getByTestId("query-access-revoke-confirm"));
+
+    await waitFor(() => {
+      const updatedTable = screen.getByTestId("query-access-grants-table");
+      expect(within(updatedTable).getAllByTestId(/^query-access-grant-/)).toHaveLength(1);
+      expect(within(updatedTable).getByTestId(`query-access-grant-${broadGrantId}`)).toBeVisible();
+    });
   });
 
   // The identity dimension is localStorage-backed and setup.ts never clears
@@ -1005,12 +1309,21 @@ describe("query renewal dialog — shadcn DatePicker with embedded time (owner 2
   it("embeds the time input inside the shadcn DatePicker popover and submits requested_until", async () => {
     seedQueryScenario("query-session");
     stubSession(false);
-    const submittedPayloads: { path: string; body: Record<string, unknown> }[] = [];
+    const submittedPayloads: {
+      path: string;
+      body: Record<string, unknown>;
+      idempotencyKey: string | null;
+    }[] = [];
     server.events.on("request:start", ({ request }) => {
       const path = new URL(request.url).pathname;
       if (request.method === "POST" && path.endsWith("/renewal-requests")) {
+        const idempotencyKey = request.headers.get("Idempotency-Key");
         void request.clone().json().then((body) => {
-          submittedPayloads.push({ path, body: body as Record<string, unknown> });
+          submittedPayloads.push({
+            path,
+            body: body as Record<string, unknown>,
+            idempotencyKey,
+          });
         });
       }
     });
@@ -1043,8 +1356,47 @@ describe("query renewal dialog — shadcn DatePicker with embedded time (owner 2
       expect(submittedPayloads).toHaveLength(1);
     });
     expect(submittedPayloads[0]?.path).toMatch(/\/query-grants\/[0-9a-f-]+\/renewal-requests$/);
+    expect(submittedPayloads[0]?.idempotencyKey).toMatch(/^query-renew-/);
     expect(submittedPayloads[0]?.body.reason).toBe("extend analytics window");
     expect(String(submittedPayloads[0]?.body.requested_until)).toMatch(/^\d{4}-\d{2}-\d{2}T18:30:00Z$/);
+    await waitFor(() => {
+      expect(screen.queryByTestId("query-renew-dialog")).not.toBeInTheDocument();
+    });
+  });
+
+  it("maps requested_until validation details into localized max-duration and past-time hints", async () => {
+    seedQueryScenario("query-session");
+    stubSession(false);
+    let detail = "requested_until_exceeds_max_minutes:43200";
+    server.use(
+      http.post(apiRoute("/query-grants/:grantId/renewal-requests"), () =>
+        HttpResponse.json({
+          err_code: 1001,
+          message: "VALIDATION_FAILED",
+          data: null,
+          request_id: "req-renew-limit",
+          retryable: false,
+          meta: { detail },
+        }),
+      ),
+    );
+
+    renderAt("/query/sessions/6f0f2b3c-5555-4555-8555-000000000101");
+    await screen.findByTestId("query-workspace");
+    await userEvent.click(await screen.findByTestId("query-grant-renew"));
+    await screen.findByTestId("query-renew-dialog");
+    await userEvent.type(screen.getByTestId("query-renew-reason"), "extend 60 days");
+    await userEvent.click(screen.getByTestId("query-renew-submit"));
+
+    const maxAlert = await screen.findByTestId("query-renew-error");
+    expect(maxAlert).toHaveTextContent(i18next.t("query.errors.requestedUntilExceedsMax", { limit: "30 \u5929" }));
+    expect(maxAlert).toHaveTextContent("(req-renew-limit)");
+
+    detail = "requested_until_in_past";
+    await userEvent.click(screen.getByTestId("query-renew-submit"));
+    await waitFor(() => {
+      expect(screen.getByTestId("query-renew-error")).toHaveTextContent(i18next.t("query.errors.requestedUntilInPast"));
+    });
   });
 
   it("restores query execution history after a full page refresh via GET /query-sessions/:id", async () => {

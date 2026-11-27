@@ -1,6 +1,6 @@
 {
   "contract_version": 1,
-  "openapi_sha": "b08b588223c0b586a5c9c4e0f1c9b0cd818d7ef1d61f3f9e823d5a489e37fb73",
+  "openapi_sha": "d093a5fb3bde5df417746336adc995181c34ed6d35c651a982c93d3dc939c06b",
   "zod_runtime_sha256": "32b72a82897ae698b7566aad9821c07cf5194173a3dc69adfb00a8f00f04a446",
   "operation_id": "sendAssistantMessage",
   "case_id": "sql-optimize",
@@ -9,23 +9,23 @@
   "response": {
     "data": {
       "session": {
-        "id": "00000000-0000-4000-8000-000000000093",
+        "id": "00000000-0000-4000-8000-000000000109",
         "user_id": "00000000-0000-4000-8000-000000000002",
-        "title": "单行 UPDATE 走主键优化",
+        "title": "UPDATE 语句索引与膨胀优化",
         "state": "active",
         "active_datasource_id": "00000000-0000-4000-8000-000000000009",
         "active_flow_id": "00000000-0000-4000-8000-000000000003",
         "active_schema_name": "public",
-        "selected_draft_id": "00000000-0000-4000-8000-000000000094",
+        "selected_draft_id": "00000000-0000-4000-8000-000000000110",
         "compacted_through_seq": 0,
-        "expires_at": "2026-11-25T00:58:00.000Z",
+        "expires_at": "2026-11-25T01:21:00.000Z",
         "version": 2,
-        "created_at": "2026-11-25T00:59:00.000Z",
-        "updated_at": "2026-11-25T01:00:00.000Z"
+        "created_at": "2026-11-25T01:22:00.000Z",
+        "updated_at": "2026-11-25T01:23:00.000Z"
       },
       "user_message": {
-        "id": "00000000-0000-4000-8000-000000000095",
-        "session_id": "00000000-0000-4000-8000-000000000093",
+        "id": "00000000-0000-4000-8000-000000000111",
+        "session_id": "00000000-0000-4000-8000-000000000109",
         "sequence": 1,
         "role": "user",
         "capability": "sql_optimize",
@@ -34,21 +34,21 @@
         "citations": [],
         "sql_draft": null,
         "failure_code": null,
-        "created_at": "2026-11-25T01:00:00.000Z"
+        "created_at": "2026-11-25T01:23:00.000Z"
       },
       "assistant_message": {
-        "id": "00000000-0000-4000-8000-000000000096",
-        "session_id": "00000000-0000-4000-8000-000000000093",
+        "id": "00000000-0000-4000-8000-000000000112",
+        "session_id": "00000000-0000-4000-8000-000000000109",
         "sequence": 2,
         "role": "assistant",
         "capability": "sql_optimize",
         "state": "completed",
-        "content": "这条 UPDATE 已经通过主键唯一索引 `f12_demo_pkey` 以等值条件定位到单行，因此不需要新增索引，也不需要改写 WHERE 条件；主要优化点在于 text 列带来的写放大和锁持有时间。\n\n- `id` 是主键唯一索引的首列，`9001` 等值匹配可精确命中一行，属于最优访问路径。\n- `note` 是可为空的 text 列，写入较大的值时可能触发 TOAST 重写，并产生额外 WAL；如果需要批量修改多行，建议按主键区间分批提交，缩短单事务持锁时间。\n- 当前没有提供执行计划文本，上述判断来自表结构和语句形态的静态推断，并非 EXPLAIN 验证结果。",
+        "content": "这条 UPDATE 的 WHERE 条件已经落在唯一索引上（f12_demo_pkey 覆盖 id），因此定位单行没有问题，真正的问题在另一头：当新值和原值相同时，PostgreSQL 仍会写一个新行版本，产生死元组，并让 f12_demo 持续膨胀。建议加一个 IS DISTINCT FROM 判断，让「空更新」直接跳过、不落盘。另外，该语句是 PostgreSQL 语法，不要照 MySQL 习惯加 LIMIT，否则会直接报语法错误。注意：在拿到执行计划之前，上面关于索引命中的判断仅仅是基于表结构和语句形态的静态推断，并非 EXPLAIN 实测结论。",
         "citations": [],
         "sql_draft": {
-          "id": "00000000-0000-4000-8000-000000000094",
-          "session_id": "00000000-0000-4000-8000-000000000093",
-          "message_id": "00000000-0000-4000-8000-000000000096",
+          "id": "00000000-0000-4000-8000-000000000110",
+          "session_id": "00000000-0000-4000-8000-000000000109",
+          "message_id": "00000000-0000-4000-8000-000000000112",
           "revision": 1,
           "datasource_id": "00000000-0000-4000-8000-000000000009",
           "datasource_name": "f12-pg-target",
@@ -57,19 +57,22 @@
           "schema_name": "public",
           "statement_kind": "update",
           "risk_category": "dml",
-          "sql_text": "UPDATE \"public\".\"f12_demo\" SET \"note\" = 'b6-draft' WHERE \"id\" = 9001 RETURNING \"id\"",
-          "sql_hmac": "e40af07d3974db996c5e87251756cd5b331166820970054bf1b4ffc9f37c49ca",
+          "sql_text": "UPDATE \"public\".\"f12_demo\" SET \"note\" = 'b6-draft' WHERE \"id\" = 9001 AND \"note\" IS DISTINCT FROM 'b6-draft'",
+          "sql_hmac": "bd80dbd3b7572f20cf0e970394aaca10f3f6536fa26786c0dc1551d39cd53f26",
           "assumptions": [
-            "本次改写只增加了 RETURNING id，用于确认实际更新的行数；业务逻辑没有改动。",
-            "假定 9001 与 id 的数据类型 bigint 一致，不会发生隐式类型转换。"
+            "id 上的 f12_demo_pkey 是唯一索引，因此该 WHERE 条件最多命中一行",
+            "绑定参数 b6-draft 按 text 传入，不需要隐式类型转换",
+            "语句以自动提交或单条事务执行，不含跨语句批量循环"
           ],
           "next_steps": [
-            "如果数据量较大，请提供 EXPLAIN (ANALYZE, BUFFERS) 输出，以确认实际扫描方式和缓冲区读取情况。",
-            "如果需要批量更新同类语句，请按 id 的范围分片循环执行，并分批提交事务。"
+            "在测试库分别对原语句与改写语句执行 EXPLAIN (ANALYZE, BUFFERS)，比对实际扫描行数与 shared hit 变化",
+            "确认业务代码是否依赖受影响行数判断执行结果；若依赖，请保留原语句或改为显式 RETURNING",
+            "检查 f12_demo 的历史死元组比例，必要时手动执行一次 VACUUM (ANALYZE) 回收空间"
           ],
           "semantic_warnings": [
-            "RETURNING 会额外返回结果集，如果上层逻辑按受影响行数解析返回结果，需要相应调整。",
-            "UPDATE 会对目标行加行锁，长事务会阻塞同一主键上的并发更新。"
+            "改写后当 note 已等于新值时受影响行数为 0，RETURNING 不返回任何行，依赖 rowcount 的调用方会被判为失败",
+            "空更新被跳过时，UPDATE 触发器和自动维护的 updated_at 字段都不会被触发，审计类逻辑可能因此漏记",
+            "原语句在列值本就相等时仍会生成新行版本，长期高频执行会让表膨胀并拖慢后续查询"
           ],
           "referenced_tables": [
             "f12_demo"
@@ -79,16 +82,16 @@
           "submitted_order_id": null,
           "submitted_order_display_no": null,
           "version": 1,
-          "created_at": "2026-11-25T01:00:00.000Z",
-          "updated_at": "2026-11-25T01:00:00.000Z"
+          "created_at": "2026-11-25T01:23:00.000Z",
+          "updated_at": "2026-11-25T01:23:00.000Z"
         },
         "failure_code": null,
-        "created_at": "2026-11-25T01:00:00.000Z"
+        "created_at": "2026-11-25T01:23:00.000Z"
       },
       "sql_draft": {
-        "id": "00000000-0000-4000-8000-000000000094",
-        "session_id": "00000000-0000-4000-8000-000000000093",
-        "message_id": "00000000-0000-4000-8000-000000000096",
+        "id": "00000000-0000-4000-8000-000000000110",
+        "session_id": "00000000-0000-4000-8000-000000000109",
+        "message_id": "00000000-0000-4000-8000-000000000112",
         "revision": 1,
         "datasource_id": "00000000-0000-4000-8000-000000000009",
         "datasource_name": "f12-pg-target",
@@ -97,19 +100,22 @@
         "schema_name": "public",
         "statement_kind": "update",
         "risk_category": "dml",
-        "sql_text": "UPDATE \"public\".\"f12_demo\" SET \"note\" = 'b6-draft' WHERE \"id\" = 9001 RETURNING \"id\"",
-        "sql_hmac": "e40af07d3974db996c5e87251756cd5b331166820970054bf1b4ffc9f37c49ca",
+        "sql_text": "UPDATE \"public\".\"f12_demo\" SET \"note\" = 'b6-draft' WHERE \"id\" = 9001 AND \"note\" IS DISTINCT FROM 'b6-draft'",
+        "sql_hmac": "bd80dbd3b7572f20cf0e970394aaca10f3f6536fa26786c0dc1551d39cd53f26",
         "assumptions": [
-          "本次改写只增加了 RETURNING id，用于确认实际更新的行数；业务逻辑没有改动。",
-          "假定 9001 与 id 的数据类型 bigint 一致，不会发生隐式类型转换。"
+          "id 上的 f12_demo_pkey 是唯一索引，因此该 WHERE 条件最多命中一行",
+          "绑定参数 b6-draft 按 text 传入，不需要隐式类型转换",
+          "语句以自动提交或单条事务执行，不含跨语句批量循环"
         ],
         "next_steps": [
-          "如果数据量较大，请提供 EXPLAIN (ANALYZE, BUFFERS) 输出，以确认实际扫描方式和缓冲区读取情况。",
-          "如果需要批量更新同类语句，请按 id 的范围分片循环执行，并分批提交事务。"
+          "在测试库分别对原语句与改写语句执行 EXPLAIN (ANALYZE, BUFFERS)，比对实际扫描行数与 shared hit 变化",
+          "确认业务代码是否依赖受影响行数判断执行结果；若依赖，请保留原语句或改为显式 RETURNING",
+          "检查 f12_demo 的历史死元组比例，必要时手动执行一次 VACUUM (ANALYZE) 回收空间"
         ],
         "semantic_warnings": [
-          "RETURNING 会额外返回结果集，如果上层逻辑按受影响行数解析返回结果，需要相应调整。",
-          "UPDATE 会对目标行加行锁，长事务会阻塞同一主键上的并发更新。"
+          "改写后当 note 已等于新值时受影响行数为 0，RETURNING 不返回任何行，依赖 rowcount 的调用方会被判为失败",
+          "空更新被跳过时，UPDATE 触发器和自动维护的 updated_at 字段都不会被触发，审计类逻辑可能因此漏记",
+          "原语句在列值本就相等时仍会生成新行版本，长期高频执行会让表膨胀并拖慢后续查询"
         ],
         "referenced_tables": [
           "f12_demo"
@@ -119,8 +125,8 @@
         "submitted_order_id": null,
         "submitted_order_display_no": null,
         "version": 1,
-        "created_at": "2026-11-25T01:00:00.000Z",
-        "updated_at": "2026-11-25T01:00:00.000Z"
+        "created_at": "2026-11-25T01:23:00.000Z",
+        "updated_at": "2026-11-25T01:23:00.000Z"
       },
       "context_compacted": false
     },

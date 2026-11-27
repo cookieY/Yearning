@@ -1,6 +1,6 @@
 {
   "contract_version": 1,
-  "openapi_sha": "b08b588223c0b586a5c9c4e0f1c9b0cd818d7ef1d61f3f9e823d5a489e37fb73",
+  "openapi_sha": "d093a5fb3bde5df417746336adc995181c34ed6d35c651a982c93d3dc939c06b",
   "zod_runtime_sha256": "32b72a82897ae698b7566aad9821c07cf5194173a3dc69adfb00a8f00f04a446",
   "operation_id": "listReviewRunFindings",
   "case_id": "evidence-chain",
@@ -10,38 +10,38 @@
     "data": {
       "items": [
         {
-          "id": "00000000-0000-4000-8000-000000000260",
+          "id": "00000000-0000-4000-8000-000000000388",
           "stage_position": 1,
-          "fingerprint_group_id": "00000000-0000-4000-8000-000000000261",
-          "category": "governance",
-          "severity": "info",
-          "title": "建表语句未附带表与列注释，库内元数据无法自解释，后续维护需额外查文档",
-          "message": "语句中既没有表注释，也没有列注释，使用方只能靠外部文档推断字段含义。",
-          "suggestion": "建议随本次变更补充 `COMMENT ON TABLE` 与 `COMMENT ON COLUMN` 语句，或至少在评审单中记录字段用途。",
-          "model_confidence": null,
-          "evidence_ids": []
-        },
-        {
-          "id": "00000000-0000-4000-8000-000000000262",
-          "stage_position": 1,
-          "fingerprint_group_id": "00000000-0000-4000-8000-000000000261",
+          "fingerprint_group_id": "00000000-0000-4000-8000-000000000389",
           "category": "governance",
           "severity": "low",
-          "title": "`name` 既未声明 `NOT NULL` 也无默认值，写入可能产生全空值行且难以与有效数据区分",
-          "message": "该列允许为空且没有默认值，空值行与真实数据在查询和统计中无法区分，容易造成下游口径偏差。",
-          "suggestion": "先确认该列是否真的需要表达“未知值”：若不需要，建议在语句中补充 `NOT NULL` 与合理默认值；若确需允许空值，请在评审记录中说明业务含义。",
+          "title": "新建表与字段均无注释，后续维护者只能从代码反推字段含义",
+          "message": "建表语句未包含表注释或列注释。随着使用方增多，字段语义只能依赖应用代码或口头约定，新增接入与排查成本会上升。",
+          "suggestion": "建议在建表时补充表注释（如 `COMMENT ON TABLE`）和列注释（如 `COMMENT ON COLUMN`），说明 `name` 的业务含义与取值约定。",
           "model_confidence": null,
           "evidence_ids": []
         },
         {
-          "id": "00000000-0000-4000-8000-000000000263",
+          "id": "00000000-0000-4000-8000-000000000390",
           "stage_position": 1,
-          "fingerprint_group_id": "00000000-0000-4000-8000-000000000261",
+          "fingerprint_group_id": "00000000-0000-4000-8000-000000000389",
+          "category": "correctness",
+          "severity": "low",
+          "title": "列 `name` 未声明非空约束，查询与聚合需额外处理 NULL 值",
+          "message": "该列定义为可空，写入路径若遗漏赋值不会收到任何报错。此后的等值查询、去重与聚合统计都需要专门处理 NULL，容易产生口径不一致的结果。",
+          "suggestion": "若该列在业务上始终有值，建议在建表语句中为 `name` 添加 `NOT NULL`；如果确实允许缺失，请在列注释中写明 NULL 的业务含义。",
+          "model_confidence": null,
+          "evidence_ids": []
+        },
+        {
+          "id": "00000000-0000-4000-8000-000000000391",
+          "stage_position": 1,
+          "fingerprint_group_id": "00000000-0000-4000-8000-000000000389",
           "category": "correctness",
           "severity": "medium",
-          "title": "新建表 `f12_contract_b4` 未声明主键，后续按行定位、去重与逻辑复制的更新将缺少唯一依据",
-          "message": "从提交的语句看，表中只有一个 `text` 列，没有任何主键或唯一约束；应用端幂等写入、按行更新与后续数据订正都没有可靠的定位锚点。",
-          "suggestion": "若该表需要承载写入，建议在语句中追加业务无关的主键列（如自增标识或 `uuid`）并声明 `PRIMARY KEY`；若唯一性由上游系统保证，需在评审记录中说明替代键及校验方式。",
+          "title": "新建表 `f12_contract_b4` 未定义主键，行唯一性缺少数据库层面的保障",
+          "message": "该建表语句只声明了一个 `text` 列，没有包含主键或任何唯一约束。缺少主键时重复行无法被数据库拒绝，后续按行更新、去重与逻辑复制也缺少稳定标识。",
+          "suggestion": "若该表用于承载业务数据，请在建表语句中增加主键列（例如自增或 UUID 列）并声明为 `PRIMARY KEY`；若确为临时表或中间表，请在评审说明中写明用途，并确认可以接受无主键。",
           "model_confidence": null,
           "evidence_ids": []
         }

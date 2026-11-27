@@ -253,7 +253,7 @@ func MapReviewError(err error) *BusinessError {
 	case errors.Is(err, reviewapp.ErrValidation), errors.Is(err, knowledge.ErrValidation):
 		return &BusinessError{Code: bizerr.CodeValidationFailed, Name: "VALIDATION_FAILED", Message: "Invalid request parameters"}
 	case errors.Is(err, reviewapp.ErrReferenced), errors.Is(err, reviewapp.ErrReferencedTool),
-		errors.Is(err, reviewapp.ErrRuleSetReferenced), errors.Is(err, knowledge.ErrReferenced):
+		errors.Is(err, reviewapp.ErrRuleSetReferenced):
 		return &BusinessError{Code: bizerr.CodeResourceReferenced, Name: "REFERENCED", Message: "Resource is referenced and cannot be deleted"}
 	case errors.Is(err, reviewdomain.ErrIllegalTransition), errors.Is(err, reviewdomain.ErrTerminalState):
 		return &BusinessError{Code: bizerr.CodeInvalidStateTransition, Name: "INVALID_STATE_TRANSITION", Message: "Operation is not allowed in the current state"}

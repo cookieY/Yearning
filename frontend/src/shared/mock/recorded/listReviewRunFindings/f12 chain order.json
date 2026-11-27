@@ -1,6 +1,6 @@
 {
   "contract_version": 1,
-  "openapi_sha": "b08b588223c0b586a5c9c4e0f1c9b0cd818d7ef1d61f3f9e823d5a489e37fb73",
+  "openapi_sha": "d093a5fb3bde5df417746336adc995181c34ed6d35c651a982c93d3dc939c06b",
   "zod_runtime_sha256": "32b72a82897ae698b7566aad9821c07cf5194173a3dc69adfb00a8f00f04a446",
   "operation_id": "listReviewRunFindings",
   "case_id": "f12 chain order",
@@ -13,28 +13,27 @@
           "id": "00000000-0000-4000-8000-000000000010",
           "stage_position": 1,
           "fingerprint_group_id": "00000000-0000-4000-8000-000000000011",
-          "category": "governance",
-          "severity": "info",
-          "title": "新建表未声明表级与列级注释，字段语义只能靠下游代码猜测",
-          "message": "该建表语句只定义了主键列和一个文本列，没有附加任何表注释或列注释；对新建的公共表而言，后续使用方需要额外查代码才能确认字段含义。",
-          "suggestion": "在建表语句中为 `f12_contract_b2_7a57eb58` 及 `id`、`note` 补充 `COMMENT ON TABLE` / `COMMENT ON COLUMN` 说明，或在评审系统中登记字段口径后再上线。",
-          "model_confidence": null,
-          "evidence_ids": []
-        },
-        {
-          "id": "00000000-0000-4000-8000-000000000012",
-          "stage_position": 1,
-          "fingerprint_group_id": "00000000-0000-4000-8000-000000000011",
-          "category": "operability",
-          "severity": "info",
-          "title": "`IF NOT EXISTS` 在表已存在时会静默跳过，可能掩盖结构不一致",
-          "message": "当前检查确认 `f12_contract_b2_7a57eb58` 尚不存在，本次执行会真实建表而不受影响；但若该语句被重复执行，而目标库中已存在同名但结构不同的表，`IF NOT EXISTS` 只会跳过并返回成功，不会报出结构差异。",
-          "suggestion": "若该语句用于可重复执行的迁移脚本，请在脚本中显式校验既有表结构（或在版本化迁移工具中保证只执行一次）；只有在确实需要幂等建表时才保留 `IF NOT EXISTS`。",
+          "category": "correctness",
+          "severity": "low",
+          "title": "`IF NOT EXISTS` 使同名表已存在时建表静默跳过，可能导致实际表结构与预期不一致",
+          "message": "语句以 `IF NOT EXISTS` 形式创建 `f12_contract_b2_5db5deee`，而该表当前在 `public` 中并不存在；一旦部署到已有同名但结构不同的表的环境，语句会返回成功却不创建预期结构，后续读写可能因列缺失或类型不符而失败。",
+          "suggestion": "如果期望命名冲突时直接报错以暴露结构差异，请去掉 `IF NOT EXISTS`；如果确实需要幂等建表，请在发布前核对目标环境中已存在表的列定义与本语句一致。",
           "model_confidence": null,
           "evidence_ids": [
-            "00000000-0000-4000-8000-000000000013",
-            "00000000-0000-4000-8000-000000000014"
+            "00000000-0000-4000-8000-000000000012"
           ]
+        },
+        {
+          "id": "00000000-0000-4000-8000-000000000013",
+          "stage_position": 1,
+          "fingerprint_group_id": "00000000-0000-4000-8000-000000000011",
+          "category": "governance",
+          "severity": "info",
+          "title": "新建表与列均未填写注释，字段语义在缺少文档时难以被后续维护者识别",
+          "message": "从建表语句看，`f12_contract_b2_5db5deee` 及其 `id`、`note` 都没有注释定义；在没有外部文档的情况下，使用方难以判断文本列承载的业务含义，后续变更与排障沟通成本会上升。",
+          "suggestion": "如团队有注释规范，建议在建表语句中补充 `COMMENT ON TABLE`/`COMMENT ON COLUMN`，或在发布前确认已有等效的字段说明文档。",
+          "model_confidence": null,
+          "evidence_ids": []
         }
       ],
       "page": {

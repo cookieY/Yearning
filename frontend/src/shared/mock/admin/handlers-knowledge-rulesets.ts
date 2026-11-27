@@ -168,9 +168,6 @@ export function adminKnowledgeRulesetsHandlers(): HttpHandler[] {
       const entry = world.knowledgeEntries.get(String(params.knowledgeEntryId));
       if (entry === undefined) return businessError(1002, "knowledge entry not found");
       if (versionMismatch(request, entry.version)) return businessError(1004, "version mismatch");
-      if (entry.provenance === "finding_conversion") {
-        return businessError(1006, "knowledge entry is referenced by a review run");
-      }
       world.knowledgeEntries.delete(entry.id);
       return HttpResponse.json(successEnvelope(null));
     }),

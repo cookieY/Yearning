@@ -1,5 +1,5 @@
 // Package knowledge manages internal review experience entries (R010): scoped matching,
-// deterministic prompt injection, config_hash computation, and reference-guarded updates.
+// deterministic prompt injection, config_hash computation, and optimistic-locked updates and deletion.
 package knowledge
 
 import (
@@ -69,9 +69,6 @@ type Entry struct {
 
 // ErrValidation indicates an invalid Entry or Definition field value or scope/provenance conflict.
 var ErrValidation = errors.New("knowledge: invalid entry")
-
-// ErrReferenced indicates deletion is blocked because existing review tool calls reference this entry.
-var ErrReferenced = errors.New("knowledge: entry referenced by reviews")
 
 // Validate verifies required fields, scope locators, provenance fields, and Definition constraints.
 func (e *Entry) Validate() error {

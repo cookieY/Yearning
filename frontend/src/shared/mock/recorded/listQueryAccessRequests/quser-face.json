@@ -1,6 +1,6 @@
 {
   "contract_version": 1,
-  "openapi_sha": "b08b588223c0b586a5c9c4e0f1c9b0cd818d7ef1d61f3f9e823d5a489e37fb73",
+  "openapi_sha": "d093a5fb3bde5df417746336adc995181c34ed6d35c651a982c93d3dc939c06b",
   "zod_runtime_sha256": "32b72a82897ae698b7566aad9821c07cf5194173a3dc69adfb00a8f00f04a446",
   "operation_id": "listQueryAccessRequests",
   "case_id": "quser-face",
@@ -10,9 +10,9 @@
     "data": {
       "items": [
         {
-          "id": "00000000-0000-4000-8000-000000000174",
-          "flow_id": "00000000-0000-4000-8000-000000000175",
-          "requester_user_id": "00000000-0000-4000-8000-000000000176",
+          "id": "00000000-0000-4000-8000-000000000199",
+          "flow_id": "00000000-0000-4000-8000-000000000200",
+          "requester_user_id": "00000000-0000-4000-8000-000000000201",
           "applicant_name": "F12 quser",
           "state": "grant_active",
           "datasource_ids": [
@@ -21,12 +21,632 @@
           "datasource_names": [
             "f12-pg-target"
           ],
-          "grant_id": "00000000-0000-4000-8000-000000000177",
+          "grant_id": "00000000-0000-4000-8000-000000000202",
           "version": 2,
-          "created_at": "2026-11-25T01:25:00.000Z",
+          "created_at": "2026-11-25T02:57:00.000Z",
           "reason": "FE-F12 real-backend query chain",
-          "requested_until": "2026-11-25T01:26:00.000Z",
-          "terminal_at": "2026-11-25T01:27:00.000Z",
+          "requested_until": "2026-11-25T02:58:00.000Z",
+          "terminal_at": "2026-11-25T02:59:00.000Z",
+          "can_decide": false
+        },
+        {
+          "id": "00000000-0000-4000-8000-000000000203",
+          "flow_id": "00000000-0000-4000-8000-000000000200",
+          "requester_user_id": "00000000-0000-4000-8000-000000000201",
+          "applicant_name": "F12 quser",
+          "state": "access_pending",
+          "datasource_ids": [
+            "00000000-0000-4000-8000-000000000009"
+          ],
+          "datasource_names": [
+            "f12-pg-target"
+          ],
+          "grant_id": null,
+          "version": 1,
+          "created_at": "2026-11-25T03:00:00.000Z",
+          "reason": "f12 batch5 renewal",
+          "requested_until": "2026-11-25T03:01:00.000Z",
+          "terminal_at": null,
+          "can_decide": false
+        },
+        {
+          "id": "00000000-0000-4000-8000-000000000204",
+          "flow_id": "00000000-0000-4000-8000-000000000200",
+          "requester_user_id": "00000000-0000-4000-8000-000000000201",
+          "applicant_name": "F12 quser",
+          "state": "grant_active",
+          "datasource_ids": [
+            "00000000-0000-4000-8000-000000000009"
+          ],
+          "datasource_names": [
+            "f12-pg-target"
+          ],
+          "grant_id": "00000000-0000-4000-8000-000000000205",
+          "version": 2,
+          "created_at": "2026-11-25T03:02:00.000Z",
+          "reason": "f12 batch5 revocation bf1854c2",
+          "requested_until": "2026-11-25T03:03:00.000Z",
+          "terminal_at": "2026-11-25T03:04:00.000Z",
+          "can_decide": false
+        },
+        {
+          "id": "00000000-0000-4000-8000-000000000206",
+          "flow_id": "00000000-0000-4000-8000-000000000200",
+          "requester_user_id": "00000000-0000-4000-8000-000000000201",
+          "applicant_name": "F12 quser",
+          "state": "grant_active",
+          "datasource_ids": [
+            "00000000-0000-4000-8000-000000000009"
+          ],
+          "datasource_names": [
+            "f12-pg-target"
+          ],
+          "grant_id": "00000000-0000-4000-8000-000000000207",
+          "version": 2,
+          "created_at": "2026-11-25T03:05:00.000Z",
+          "reason": "f12 batch5 primary bf1854c2",
+          "requested_until": "2026-11-25T03:03:00.000Z",
+          "terminal_at": "2026-11-25T03:06:00.000Z",
+          "can_decide": false
+        },
+        {
+          "id": "00000000-0000-4000-8000-000000000208",
+          "flow_id": "00000000-0000-4000-8000-000000000200",
+          "requester_user_id": "00000000-0000-4000-8000-000000000201",
+          "applicant_name": "F12 quser",
+          "state": "withdrawn",
+          "datasource_ids": [
+            "00000000-0000-4000-8000-000000000009"
+          ],
+          "datasource_names": [
+            "f12-pg-target"
+          ],
+          "grant_id": null,
+          "version": 2,
+          "created_at": "2026-11-25T03:07:00.000Z",
+          "reason": "f12 batch5 withdrawal bf1854c2",
+          "requested_until": "2026-11-25T03:03:00.000Z",
+          "terminal_at": "2026-11-25T03:08:00.000Z",
+          "can_decide": false
+        },
+        {
+          "id": "00000000-0000-4000-8000-000000000209",
+          "flow_id": "00000000-0000-4000-8000-000000000200",
+          "requester_user_id": "00000000-0000-4000-8000-000000000201",
+          "applicant_name": "F12 quser",
+          "state": "grant_active",
+          "datasource_ids": [
+            "00000000-0000-4000-8000-000000000009"
+          ],
+          "datasource_names": [
+            "f12-pg-target"
+          ],
+          "grant_id": "00000000-0000-4000-8000-000000000210",
+          "version": 2,
+          "created_at": "2026-11-25T03:09:00.000Z",
+          "reason": "FE-F12 real-backend query chain",
+          "requested_until": "2026-11-25T03:10:00.000Z",
+          "terminal_at": "2026-11-25T03:11:00.000Z",
+          "can_decide": false
+        },
+        {
+          "id": "00000000-0000-4000-8000-000000000211",
+          "flow_id": "00000000-0000-4000-8000-000000000200",
+          "requester_user_id": "00000000-0000-4000-8000-000000000201",
+          "applicant_name": "F12 quser",
+          "state": "grant_active",
+          "datasource_ids": [
+            "00000000-0000-4000-8000-000000000009"
+          ],
+          "datasource_names": [
+            "f12-pg-target"
+          ],
+          "grant_id": "00000000-0000-4000-8000-000000000212",
+          "version": 2,
+          "created_at": "2026-11-25T03:12:00.000Z",
+          "reason": "f12 batch5 renewal",
+          "requested_until": "2026-11-25T03:13:00.000Z",
+          "terminal_at": "2026-11-25T03:14:00.000Z",
+          "can_decide": false
+        },
+        {
+          "id": "00000000-0000-4000-8000-000000000213",
+          "flow_id": "00000000-0000-4000-8000-000000000200",
+          "requester_user_id": "00000000-0000-4000-8000-000000000201",
+          "applicant_name": "F12 quser",
+          "state": "grant_active",
+          "datasource_ids": [
+            "00000000-0000-4000-8000-000000000009"
+          ],
+          "datasource_names": [
+            "f12-pg-target"
+          ],
+          "grant_id": "00000000-0000-4000-8000-000000000214",
+          "version": 2,
+          "created_at": "2026-11-25T03:15:00.000Z",
+          "reason": "f12 batch5 revocation 1d5892d0",
+          "requested_until": "2026-11-25T03:16:00.000Z",
+          "terminal_at": "2026-11-25T03:17:00.000Z",
+          "can_decide": false
+        },
+        {
+          "id": "00000000-0000-4000-8000-000000000215",
+          "flow_id": "00000000-0000-4000-8000-000000000200",
+          "requester_user_id": "00000000-0000-4000-8000-000000000201",
+          "applicant_name": "F12 quser",
+          "state": "grant_active",
+          "datasource_ids": [
+            "00000000-0000-4000-8000-000000000009"
+          ],
+          "datasource_names": [
+            "f12-pg-target"
+          ],
+          "grant_id": "00000000-0000-4000-8000-000000000216",
+          "version": 2,
+          "created_at": "2026-11-25T03:18:00.000Z",
+          "reason": "f12 batch5 primary 1d5892d0",
+          "requested_until": "2026-11-25T03:16:00.000Z",
+          "terminal_at": "2026-11-25T03:19:00.000Z",
+          "can_decide": false
+        },
+        {
+          "id": "00000000-0000-4000-8000-000000000217",
+          "flow_id": "00000000-0000-4000-8000-000000000200",
+          "requester_user_id": "00000000-0000-4000-8000-000000000201",
+          "applicant_name": "F12 quser",
+          "state": "withdrawn",
+          "datasource_ids": [
+            "00000000-0000-4000-8000-000000000009"
+          ],
+          "datasource_names": [
+            "f12-pg-target"
+          ],
+          "grant_id": null,
+          "version": 2,
+          "created_at": "2026-11-25T03:20:00.000Z",
+          "reason": "f12 batch5 withdrawal 1d5892d0",
+          "requested_until": "2026-11-25T03:16:00.000Z",
+          "terminal_at": "2026-11-25T03:21:00.000Z",
+          "can_decide": false
+        },
+        {
+          "id": "00000000-0000-4000-8000-000000000218",
+          "flow_id": "00000000-0000-4000-8000-000000000200",
+          "requester_user_id": "00000000-0000-4000-8000-000000000201",
+          "applicant_name": "F12 quser",
+          "state": "grant_active",
+          "datasource_ids": [
+            "00000000-0000-4000-8000-000000000009"
+          ],
+          "datasource_names": [
+            "f12-pg-target"
+          ],
+          "grant_id": "00000000-0000-4000-8000-000000000219",
+          "version": 2,
+          "created_at": "2026-11-25T03:22:00.000Z",
+          "reason": "FE-F12 real-backend query chain",
+          "requested_until": "2026-11-25T03:23:00.000Z",
+          "terminal_at": "2026-11-25T03:24:00.000Z",
+          "can_decide": false
+        },
+        {
+          "id": "00000000-0000-4000-8000-000000000220",
+          "flow_id": "00000000-0000-4000-8000-000000000200",
+          "requester_user_id": "00000000-0000-4000-8000-000000000201",
+          "applicant_name": "F12 quser",
+          "state": "grant_active",
+          "datasource_ids": [
+            "00000000-0000-4000-8000-000000000009"
+          ],
+          "datasource_names": [
+            "f12-pg-target"
+          ],
+          "grant_id": "00000000-0000-4000-8000-000000000221",
+          "version": 2,
+          "created_at": "2026-11-25T03:25:00.000Z",
+          "reason": "f12 batch5 renewal",
+          "requested_until": "2026-11-25T03:26:00.000Z",
+          "terminal_at": "2026-11-25T03:27:00.000Z",
+          "can_decide": false
+        },
+        {
+          "id": "00000000-0000-4000-8000-000000000222",
+          "flow_id": "00000000-0000-4000-8000-000000000200",
+          "requester_user_id": "00000000-0000-4000-8000-000000000201",
+          "applicant_name": "F12 quser",
+          "state": "grant_active",
+          "datasource_ids": [
+            "00000000-0000-4000-8000-000000000009"
+          ],
+          "datasource_names": [
+            "f12-pg-target"
+          ],
+          "grant_id": "00000000-0000-4000-8000-000000000223",
+          "version": 2,
+          "created_at": "2026-11-25T03:28:00.000Z",
+          "reason": "f12 batch5 revocation 86e91a99",
+          "requested_until": "2026-11-25T03:29:00.000Z",
+          "terminal_at": "2026-11-25T03:30:00.000Z",
+          "can_decide": false
+        },
+        {
+          "id": "00000000-0000-4000-8000-000000000224",
+          "flow_id": "00000000-0000-4000-8000-000000000200",
+          "requester_user_id": "00000000-0000-4000-8000-000000000201",
+          "applicant_name": "F12 quser",
+          "state": "grant_active",
+          "datasource_ids": [
+            "00000000-0000-4000-8000-000000000009"
+          ],
+          "datasource_names": [
+            "f12-pg-target"
+          ],
+          "grant_id": "00000000-0000-4000-8000-000000000225",
+          "version": 2,
+          "created_at": "2026-11-25T03:31:00.000Z",
+          "reason": "f12 batch5 primary 86e91a99",
+          "requested_until": "2026-11-25T03:29:00.000Z",
+          "terminal_at": "2026-11-25T03:32:00.000Z",
+          "can_decide": false
+        },
+        {
+          "id": "00000000-0000-4000-8000-000000000226",
+          "flow_id": "00000000-0000-4000-8000-000000000200",
+          "requester_user_id": "00000000-0000-4000-8000-000000000201",
+          "applicant_name": "F12 quser",
+          "state": "withdrawn",
+          "datasource_ids": [
+            "00000000-0000-4000-8000-000000000009"
+          ],
+          "datasource_names": [
+            "f12-pg-target"
+          ],
+          "grant_id": null,
+          "version": 2,
+          "created_at": "2026-11-25T03:33:00.000Z",
+          "reason": "f12 batch5 withdrawal 86e91a99",
+          "requested_until": "2026-11-25T03:29:00.000Z",
+          "terminal_at": "2026-11-25T03:34:00.000Z",
+          "can_decide": false
+        },
+        {
+          "id": "00000000-0000-4000-8000-000000000227",
+          "flow_id": "00000000-0000-4000-8000-000000000200",
+          "requester_user_id": "00000000-0000-4000-8000-000000000201",
+          "applicant_name": "F12 quser",
+          "state": "grant_active",
+          "datasource_ids": [
+            "00000000-0000-4000-8000-000000000009"
+          ],
+          "datasource_names": [
+            "f12-pg-target"
+          ],
+          "grant_id": "00000000-0000-4000-8000-000000000228",
+          "version": 2,
+          "created_at": "2026-11-25T03:35:00.000Z",
+          "reason": "FE-F12 real-backend query chain",
+          "requested_until": "2026-11-25T03:36:00.000Z",
+          "terminal_at": "2026-11-25T03:37:00.000Z",
+          "can_decide": false
+        },
+        {
+          "id": "00000000-0000-4000-8000-000000000229",
+          "flow_id": "00000000-0000-4000-8000-000000000200",
+          "requester_user_id": "00000000-0000-4000-8000-000000000201",
+          "applicant_name": "F12 quser",
+          "state": "grant_active",
+          "datasource_ids": [
+            "00000000-0000-4000-8000-000000000009"
+          ],
+          "datasource_names": [
+            "f12-pg-target"
+          ],
+          "grant_id": "00000000-0000-4000-8000-000000000230",
+          "version": 2,
+          "created_at": "2026-11-25T03:38:00.000Z",
+          "reason": "f12 batch5 renewal",
+          "requested_until": "2026-11-25T03:39:00.000Z",
+          "terminal_at": "2026-11-25T03:40:00.000Z",
+          "can_decide": false
+        },
+        {
+          "id": "00000000-0000-4000-8000-000000000231",
+          "flow_id": "00000000-0000-4000-8000-000000000200",
+          "requester_user_id": "00000000-0000-4000-8000-000000000201",
+          "applicant_name": "F12 quser",
+          "state": "grant_active",
+          "datasource_ids": [
+            "00000000-0000-4000-8000-000000000009"
+          ],
+          "datasource_names": [
+            "f12-pg-target"
+          ],
+          "grant_id": "00000000-0000-4000-8000-000000000232",
+          "version": 2,
+          "created_at": "2026-11-25T03:41:00.000Z",
+          "reason": "f12 batch5 revocation 40db111c",
+          "requested_until": "2026-11-25T03:42:00.000Z",
+          "terminal_at": "2026-11-25T03:43:00.000Z",
+          "can_decide": false
+        },
+        {
+          "id": "00000000-0000-4000-8000-000000000233",
+          "flow_id": "00000000-0000-4000-8000-000000000200",
+          "requester_user_id": "00000000-0000-4000-8000-000000000201",
+          "applicant_name": "F12 quser",
+          "state": "grant_active",
+          "datasource_ids": [
+            "00000000-0000-4000-8000-000000000009"
+          ],
+          "datasource_names": [
+            "f12-pg-target"
+          ],
+          "grant_id": "00000000-0000-4000-8000-000000000234",
+          "version": 2,
+          "created_at": "2026-11-25T03:44:00.000Z",
+          "reason": "f12 batch5 primary 40db111c",
+          "requested_until": "2026-11-25T03:42:00.000Z",
+          "terminal_at": "2026-11-25T03:45:00.000Z",
+          "can_decide": false
+        },
+        {
+          "id": "00000000-0000-4000-8000-000000000235",
+          "flow_id": "00000000-0000-4000-8000-000000000200",
+          "requester_user_id": "00000000-0000-4000-8000-000000000201",
+          "applicant_name": "F12 quser",
+          "state": "withdrawn",
+          "datasource_ids": [
+            "00000000-0000-4000-8000-000000000009"
+          ],
+          "datasource_names": [
+            "f12-pg-target"
+          ],
+          "grant_id": null,
+          "version": 2,
+          "created_at": "2026-11-25T03:46:00.000Z",
+          "reason": "f12 batch5 withdrawal 40db111c",
+          "requested_until": "2026-11-25T03:42:00.000Z",
+          "terminal_at": "2026-11-25T03:47:00.000Z",
+          "can_decide": false
+        },
+        {
+          "id": "00000000-0000-4000-8000-000000000236",
+          "flow_id": "00000000-0000-4000-8000-000000000200",
+          "requester_user_id": "00000000-0000-4000-8000-000000000201",
+          "applicant_name": "F12 quser",
+          "state": "grant_active",
+          "datasource_ids": [
+            "00000000-0000-4000-8000-000000000009"
+          ],
+          "datasource_names": [
+            "f12-pg-target"
+          ],
+          "grant_id": "00000000-0000-4000-8000-000000000237",
+          "version": 2,
+          "created_at": "2026-11-25T03:48:00.000Z",
+          "reason": "FE-F12 real-backend query chain",
+          "requested_until": "2026-11-25T03:49:00.000Z",
+          "terminal_at": "2026-11-25T03:50:00.000Z",
+          "can_decide": false
+        },
+        {
+          "id": "00000000-0000-4000-8000-000000000238",
+          "flow_id": "00000000-0000-4000-8000-000000000200",
+          "requester_user_id": "00000000-0000-4000-8000-000000000201",
+          "applicant_name": "F12 quser",
+          "state": "grant_active",
+          "datasource_ids": [
+            "00000000-0000-4000-8000-000000000009"
+          ],
+          "datasource_names": [
+            "f12-pg-target"
+          ],
+          "grant_id": "00000000-0000-4000-8000-000000000239",
+          "version": 2,
+          "created_at": "2026-11-25T03:51:00.000Z",
+          "reason": "f12 batch5 renewal",
+          "requested_until": "2026-11-25T03:52:00.000Z",
+          "terminal_at": "2026-11-25T03:53:00.000Z",
+          "can_decide": false
+        },
+        {
+          "id": "00000000-0000-4000-8000-000000000240",
+          "flow_id": "00000000-0000-4000-8000-000000000200",
+          "requester_user_id": "00000000-0000-4000-8000-000000000201",
+          "applicant_name": "F12 quser",
+          "state": "grant_active",
+          "datasource_ids": [
+            "00000000-0000-4000-8000-000000000009"
+          ],
+          "datasource_names": [
+            "f12-pg-target"
+          ],
+          "grant_id": "00000000-0000-4000-8000-000000000241",
+          "version": 2,
+          "created_at": "2026-11-25T03:54:00.000Z",
+          "reason": "f12 batch5 revocation e54cedc1",
+          "requested_until": "2026-11-25T03:55:00.000Z",
+          "terminal_at": "2026-11-25T03:56:00.000Z",
+          "can_decide": false
+        },
+        {
+          "id": "00000000-0000-4000-8000-000000000242",
+          "flow_id": "00000000-0000-4000-8000-000000000200",
+          "requester_user_id": "00000000-0000-4000-8000-000000000201",
+          "applicant_name": "F12 quser",
+          "state": "grant_active",
+          "datasource_ids": [
+            "00000000-0000-4000-8000-000000000009"
+          ],
+          "datasource_names": [
+            "f12-pg-target"
+          ],
+          "grant_id": "00000000-0000-4000-8000-000000000243",
+          "version": 2,
+          "created_at": "2026-11-25T03:57:00.000Z",
+          "reason": "f12 batch5 primary e54cedc1",
+          "requested_until": "2026-11-25T03:55:00.000Z",
+          "terminal_at": "2026-11-25T03:58:00.000Z",
+          "can_decide": false
+        },
+        {
+          "id": "00000000-0000-4000-8000-000000000244",
+          "flow_id": "00000000-0000-4000-8000-000000000200",
+          "requester_user_id": "00000000-0000-4000-8000-000000000201",
+          "applicant_name": "F12 quser",
+          "state": "withdrawn",
+          "datasource_ids": [
+            "00000000-0000-4000-8000-000000000009"
+          ],
+          "datasource_names": [
+            "f12-pg-target"
+          ],
+          "grant_id": null,
+          "version": 2,
+          "created_at": "2026-11-25T03:59:00.000Z",
+          "reason": "f12 batch5 withdrawal e54cedc1",
+          "requested_until": "2026-11-25T03:55:00.000Z",
+          "terminal_at": "2026-11-25T04:00:00.000Z",
+          "can_decide": false
+        },
+        {
+          "id": "00000000-0000-4000-8000-000000000245",
+          "flow_id": "00000000-0000-4000-8000-000000000200",
+          "requester_user_id": "00000000-0000-4000-8000-000000000201",
+          "applicant_name": "F12 quser",
+          "state": "grant_active",
+          "datasource_ids": [
+            "00000000-0000-4000-8000-000000000009"
+          ],
+          "datasource_names": [
+            "f12-pg-target"
+          ],
+          "grant_id": "00000000-0000-4000-8000-000000000246",
+          "version": 2,
+          "created_at": "2026-11-25T04:01:00.000Z",
+          "reason": "FE-F12 real-backend query chain",
+          "requested_until": "2026-11-25T04:02:00.000Z",
+          "terminal_at": "2026-11-25T04:03:00.000Z",
+          "can_decide": false
+        },
+        {
+          "id": "00000000-0000-4000-8000-000000000247",
+          "flow_id": "00000000-0000-4000-8000-000000000200",
+          "requester_user_id": "00000000-0000-4000-8000-000000000201",
+          "applicant_name": "F12 quser",
+          "state": "grant_active",
+          "datasource_ids": [
+            "00000000-0000-4000-8000-000000000009"
+          ],
+          "datasource_names": [
+            "f12-pg-target"
+          ],
+          "grant_id": "00000000-0000-4000-8000-000000000248",
+          "version": 2,
+          "created_at": "2026-11-25T04:04:00.000Z",
+          "reason": "f12 e2e query entry 1795690268031",
+          "requested_until": "2026-11-25T04:05:00.000Z",
+          "terminal_at": "2026-11-25T04:06:00.000Z",
+          "can_decide": false
+        },
+        {
+          "id": "00000000-0000-4000-8000-000000000249",
+          "flow_id": "00000000-0000-4000-8000-000000000200",
+          "requester_user_id": "00000000-0000-4000-8000-000000000201",
+          "applicant_name": "F12 quser",
+          "state": "grant_active",
+          "datasource_ids": [
+            "00000000-0000-4000-8000-000000000009"
+          ],
+          "datasource_names": [
+            "f12-pg-target"
+          ],
+          "grant_id": "00000000-0000-4000-8000-000000000250",
+          "version": 2,
+          "created_at": "2026-11-25T04:07:00.000Z",
+          "reason": "f12 batch5 renewal",
+          "requested_until": "2026-11-25T04:08:00.000Z",
+          "terminal_at": "2026-11-25T04:09:00.000Z",
+          "can_decide": false
+        },
+        {
+          "id": "00000000-0000-4000-8000-000000000251",
+          "flow_id": "00000000-0000-4000-8000-000000000200",
+          "requester_user_id": "00000000-0000-4000-8000-000000000201",
+          "applicant_name": "F12 quser",
+          "state": "grant_active",
+          "datasource_ids": [
+            "00000000-0000-4000-8000-000000000009"
+          ],
+          "datasource_names": [
+            "f12-pg-target"
+          ],
+          "grant_id": "00000000-0000-4000-8000-000000000252",
+          "version": 2,
+          "created_at": "2026-11-25T04:10:00.000Z",
+          "reason": "f12 batch5 revocation 7561a591",
+          "requested_until": "2026-11-25T04:11:00.000Z",
+          "terminal_at": "2026-11-25T04:12:00.000Z",
+          "can_decide": false
+        },
+        {
+          "id": "00000000-0000-4000-8000-000000000253",
+          "flow_id": "00000000-0000-4000-8000-000000000200",
+          "requester_user_id": "00000000-0000-4000-8000-000000000201",
+          "applicant_name": "F12 quser",
+          "state": "grant_active",
+          "datasource_ids": [
+            "00000000-0000-4000-8000-000000000009"
+          ],
+          "datasource_names": [
+            "f12-pg-target"
+          ],
+          "grant_id": "00000000-0000-4000-8000-000000000254",
+          "version": 2,
+          "created_at": "2026-11-25T04:13:00.000Z",
+          "reason": "f12 batch5 primary 7561a591",
+          "requested_until": "2026-11-25T04:11:00.000Z",
+          "terminal_at": "2026-11-25T04:14:00.000Z",
+          "can_decide": false
+        },
+        {
+          "id": "00000000-0000-4000-8000-000000000255",
+          "flow_id": "00000000-0000-4000-8000-000000000200",
+          "requester_user_id": "00000000-0000-4000-8000-000000000201",
+          "applicant_name": "F12 quser",
+          "state": "withdrawn",
+          "datasource_ids": [
+            "00000000-0000-4000-8000-000000000009"
+          ],
+          "datasource_names": [
+            "f12-pg-target"
+          ],
+          "grant_id": null,
+          "version": 2,
+          "created_at": "2026-11-25T04:15:00.000Z",
+          "reason": "f12 batch5 withdrawal 7561a591",
+          "requested_until": "2026-11-25T04:11:00.000Z",
+          "terminal_at": "2026-11-25T04:16:00.000Z",
+          "can_decide": false
+        },
+        {
+          "id": "00000000-0000-4000-8000-000000000256",
+          "flow_id": "00000000-0000-4000-8000-000000000200",
+          "requester_user_id": "00000000-0000-4000-8000-000000000201",
+          "applicant_name": "F12 quser",
+          "state": "grant_active",
+          "datasource_ids": [
+            "00000000-0000-4000-8000-000000000009"
+          ],
+          "datasource_names": [
+            "f12-pg-target"
+          ],
+          "grant_id": "00000000-0000-4000-8000-000000000257",
+          "version": 2,
+          "created_at": "2026-11-25T04:17:00.000Z",
+          "reason": "FE-F12 real-backend query chain",
+          "requested_until": "2026-11-25T04:18:00.000Z",
+          "terminal_at": "2026-11-25T04:19:00.000Z",
           "can_decide": false
         }
       ],

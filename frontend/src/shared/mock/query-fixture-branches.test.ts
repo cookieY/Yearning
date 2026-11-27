@@ -160,6 +160,13 @@ describe("grant lifecycle refusals", () => {
     const sessions = await call<{ items: { state: string }[] }>("GET", "/query-sessions");
     expect(sessions.data.items.every((row) => row.state === "closed")).toBe(true);
 
+    const missingIdem = await call(
+      "POST",
+      `/query-grants/${id}/renewal-requests`,
+      { requested_until: new Date(Date.now() + 86400000).toISOString(), reason: "extend" },
+    );
+    expect(missingIdem.err_code).toBe(1001);
+
     const renewed = await call(
       "POST",
       `/query-grants/${id}/renewal-requests`,

@@ -10,7 +10,8 @@ import {
   describeErrorText,
   isBusinessErrorCode,
 } from "@/shared/api/error-display";
-import { todayLocal } from "@/features/query/query-error-text";
+import { describeQueryErrorText, todayLocal } from "@/features/query/query-error-text";
+import { matchGrantForQueryFlow, requestMatchesQueryFlow } from "@/features/query/query-sql-utils";
 import { ErrorState } from "@/shared/components/status/status-components";
 import { LoadingState } from "@/shared/components/status/loading-state";
 import { EmptyState } from "@/shared/components/status/empty-state";
@@ -65,29 +66,7 @@ function formatExpiry(iso: string | null | undefined): string {
 interface FlowGrantMatch {
   grant: QueryGrant;
   request: QueryAccessRequest;
-}
-
-function requestMatchesFlow(flow: Flow, request: QueryAccessRequest, capabilityIds: Set<string>): boolean {
-  if (request.flow_id !== undefined && request.flow_id !== "") {
-    return request.flow_id === flow.id;
-  }
-  return request.datasource_ids.length > 0 && request.datasource_ids.every((id) => capabilityIds.has(id));
-}
-
-function matchGrantForFlow(flow: Flow, requests: QueryAccessRequest[], grants: QueryGrant[]): FlowGrantMatch | null {
-  const grantById = new Map(grants.map((grant) => [grant.id, grant]));
-  const capabilityIds = new Set((flow.query_capabilities ?? []).map((capability) => capability.datasource_id));
-  const candidates: FlowGrantMatch[] = [];
-  for (const request of requests) {
-    if (request.state !== "grant_active" || request.grant_id === null || request.grant_id === undefined) continue;
-    const grant = grantById.get(request.grant_id);
-    if (grant === undefined || grant.state !== "active") continue;
-    if (requestMatchesFlow(flow, request, capabilityIds)) candidates.push({ grant, request });
-  }
-  if (candidates.length === 0) return null;
-  return candidates.reduce((latest, current) =>
-    current.grant.created_at > latest.grant.created_at ? current : latest,
-  );
+  superseded: QueryGrant[];
 }
 
 function matchPendingRequestForFlow(flow: Flow, requests: QueryAccessRequest[]): QueryAccessRequest | null {
@@ -95,7 +74,7 @@ function matchPendingRequestForFlow(flow: Flow, requests: QueryAccessRequest[]):
   const candidates: QueryAccessRequest[] = [];
   for (const request of requests) {
     if (request.state !== "access_pending") continue;
-    if (requestMatchesFlow(flow, request, capabilityIds)) candidates.push(request);
+    if (requestMatchesQueryFlow(flow, request, capabilityIds)) candidates.push(request);
   }
   if (candidates.length === 0) return null;
   return candidates.reduce((latest, current) =>
@@ -115,7 +94,11 @@ export default function QueryEntryPage() {
   const createSession = useCreateSession();
 
   const [requestFlow, setRequestFlow] = useState<Flow | null>(null);
-  const [terminateTarget, setTerminateTarget] = useState<{ flow: Flow; grant: QueryGrant } | null>(null);
+  const [terminateTarget, setTerminateTarget] = useState<{
+    flow: Flow;
+    grant: QueryGrant;
+    superseded: QueryGrant[];
+  } | null>(null);
   const [withdrawTarget, setWithdrawTarget] = useState<WithdrawQueryAccessTarget | null>(null);
   const [entryError, setEntryError] = useState<string | null>(null);
   const [needsAccessHint, setNeedsAccessHint] = useState<string | null>(null);
@@ -134,12 +117,16 @@ export default function QueryEntryPage() {
         : requestsQuery.data.items.filter((request) => request.requester_user_id === currentUserId),
     [currentUserId, requestsQuery.data.items],
   );
+  const grantById = useMemo(
+    () => new Map((grantsQuery.data ?? []).map((grant) => [grant.id, grant])),
+    [grantsQuery.data],
+  );
   const sessions = (sessionsQuery.data.items).filter((row) => row.state === "active");
   const matches = useMemo(
     () => new Map(
       (flowsQuery.data ?? []).map((flow) => [
         flow.id,
-        matchGrantForFlow(flow, requests, grantsQuery.data ?? []),
+        matchGrantForQueryFlow(flow, requests, grantsQuery.data ?? []),
       ]),
     ),
     [flowsQuery.data, grantsQuery.data, requests],
@@ -331,7 +318,13 @@ export default function QueryEntryPage() {
                               <Button
                                 size="sm"
                                 variant="destructive"
-                                onClick={() => { setTerminateTarget({ flow, grant: match.grant }); }}
+                                onClick={() => {
+                                  setTerminateTarget({
+                                    flow,
+                                    grant: match.grant,
+                                    superseded: match.superseded,
+                                  });
+                                }}
                                 data-testid={`query-flow-terminate-${flow.id}`}
                               >
                                 <Ban />
@@ -365,22 +358,34 @@ export default function QueryEntryPage() {
                 <CardDescription>{t("query.entry.sessionsDescription")}</CardDescription>
               </CardHeader>
               <CardContent className="flex flex-col gap-2">
-                {sessions.map((row) => (
-                  <button
-                    key={row.id}
-                    type="button"
-                    onClick={() => { void navigate(`/query/sessions/${row.id}`); }}
-                    className="flex flex-row items-center justify-between gap-3 rounded-lg border px-3 py-2 text-left hover:bg-accent"
-                    data-testid={`query-session-${row.id}`}
-                  >
-                    <span className="text-muted-foreground truncate font-mono text-xs">{row.id}</span>
-                    <span className="flex shrink-0 items-center gap-2">
-                      <Badge variant="secondary">{t(`query.session.state.${row.state}`)}</Badge>
-                      <span className="text-muted-foreground text-xs">{formatExpiry(row.created_at)}</span>
-                      <ChevronRight className="size-4" />
-                    </span>
-                  </button>
-                ))}
+                {sessions.map((row) => {
+                  const sessionGrant = row.grant_id == null ? undefined : grantById.get(row.grant_id);
+                  return (
+                    <button
+                      key={row.id}
+                      type="button"
+                      onClick={() => { void navigate(`/query/sessions/${row.id}`); }}
+                      className="flex flex-row items-center justify-between gap-3 rounded-lg border px-3 py-2 text-left hover:bg-accent"
+                      data-testid={`query-session-${row.id}`}
+                    >
+                      <span className="text-muted-foreground truncate font-mono text-xs">{row.id}</span>
+                      <span className="flex shrink-0 items-center gap-2">
+                        <Badge variant="secondary">{t(`query.session.state.${row.state}`)}</Badge>
+                        <span
+                          className="text-muted-foreground text-xs"
+                          data-testid={`query-session-expiry-${row.id}`}
+                        >
+                          {sessionGrant?.expires_at !== null && sessionGrant?.expires_at !== undefined
+                            ? t("query.entry.sessionExpires", { time: formatExpiry(sessionGrant.expires_at) })
+                            : row.grant_id === null || row.grant_id === undefined
+                              ? t("query.entry.sessionNoExpiry")
+                              : "—"}
+                        </span>
+                        <ChevronRight className="size-4" />
+                      </span>
+                    </button>
+                  );
+                })}
               </CardContent>
             </Card>
           )}
@@ -398,7 +403,7 @@ function TerminateGrantDialog({
   target,
   onClose,
 }: {
-  target: { flow: Flow; grant: QueryGrant } | null;
+  target: { flow: Flow; grant: QueryGrant; superseded: QueryGrant[] } | null;
   onClose: () => void;
 }) {
   const { t } = useTranslation();
@@ -425,6 +430,13 @@ function TerminateGrantDialog({
           version: target.grant.version,
           reason,
         });
+        for (const sib of target.superseded) {
+          await relinquish.mutateAsync({
+            grantId: sib.id,
+            version: sib.version,
+            reason,
+          });
+        }
       }}
     />
   );
@@ -474,7 +486,7 @@ function AccessRequestDialog({ flow, onClose }: { flow: Flow | null; onClose: ()
       toast.success(t("query.apply.submitted"));
       close();
     } catch (error) {
-      const msg = describeErrorText(describeError(error, "createQueryAccessRequest"));
+      const msg = describeQueryErrorText(describeError(error, "createQueryAccessRequest"));
       setErrorText(msg);
       toast.error(msg);
     }

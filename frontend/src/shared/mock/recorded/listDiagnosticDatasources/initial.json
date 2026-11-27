@@ -1,6 +1,6 @@
 {
   "contract_version": 1,
-  "openapi_sha": "b08b588223c0b586a5c9c4e0f1c9b0cd818d7ef1d61f3f9e823d5a489e37fb73",
+  "openapi_sha": "d093a5fb3bde5df417746336adc995181c34ed6d35c651a982c93d3dc939c06b",
   "zod_runtime_sha256": "32b72a82897ae698b7566aad9821c07cf5194173a3dc69adfb00a8f00f04a446",
   "operation_id": "listDiagnosticDatasources",
   "case_id": "initial",
@@ -18,16 +18,16 @@
           "host": "127.0.0.1",
           "port": 54333,
           "database_name": "target",
-          "diagnostics_enabled": false,
-          "state": "disabled",
-          "probe_state": "collection_failed",
+          "diagnostics_enabled": true,
+          "state": "active",
+          "probe_state": "ready",
           "interval_seconds": 60,
           "effective_interval_seconds": 60,
           "top_n": 200,
-          "last_collected_at": null
+          "last_collected_at": "2026-11-25T01:26:00.000Z"
         },
         {
-          "id": "00000000-0000-4000-8000-000000000101",
+          "id": "00000000-0000-4000-8000-000000000117",
           "name": "f12-mysql-target",
           "environment": "native",
           "engine": "mysql",
@@ -44,7 +44,7 @@
           "last_collected_at": null
         },
         {
-          "id": "00000000-0000-4000-8000-000000000102",
+          "id": "00000000-0000-4000-8000-000000000118",
           "name": "f12-unreachable-ds",
           "environment": "native",
           "engine": "postgresql",
@@ -61,7 +61,7 @@
           "last_collected_at": null
         },
         {
-          "id": "00000000-0000-4000-8000-000000000103",
+          "id": "00000000-0000-4000-8000-000000000119",
           "name": "f12-adv-ds-01",
           "environment": "native",
           "engine": "postgresql",
@@ -78,7 +78,7 @@
           "last_collected_at": null
         },
         {
-          "id": "00000000-0000-4000-8000-000000000104",
+          "id": "00000000-0000-4000-8000-000000000120",
           "name": "f12-adv-ds-02",
           "environment": "native",
           "engine": "postgresql",
@@ -95,7 +95,7 @@
           "last_collected_at": null
         },
         {
-          "id": "00000000-0000-4000-8000-000000000105",
+          "id": "00000000-0000-4000-8000-000000000121",
           "name": "f12-adv-ds-03",
           "environment": "native",
           "engine": "postgresql",
@@ -112,7 +112,7 @@
           "last_collected_at": null
         },
         {
-          "id": "00000000-0000-4000-8000-000000000106",
+          "id": "00000000-0000-4000-8000-000000000122",
           "name": "f12-adv-ds-04",
           "environment": "native",
           "engine": "postgresql",
@@ -129,7 +129,7 @@
           "last_collected_at": null
         },
         {
-          "id": "00000000-0000-4000-8000-000000000107",
+          "id": "00000000-0000-4000-8000-000000000123",
           "name": "f12-adv-ds-05",
           "environment": "native",
           "engine": "postgresql",
@@ -146,7 +146,7 @@
           "last_collected_at": null
         },
         {
-          "id": "00000000-0000-4000-8000-000000000108",
+          "id": "00000000-0000-4000-8000-000000000124",
           "name": "f12-adv-ds-06",
           "environment": "native",
           "engine": "postgresql",
@@ -163,7 +163,7 @@
           "last_collected_at": null
         },
         {
-          "id": "00000000-0000-4000-8000-000000000109",
+          "id": "00000000-0000-4000-8000-000000000125",
           "name": "f12-adv-ds-07",
           "environment": "native",
           "engine": "postgresql",
@@ -180,7 +180,7 @@
           "last_collected_at": null
         },
         {
-          "id": "00000000-0000-4000-8000-000000000110",
+          "id": "00000000-0000-4000-8000-000000000126",
           "name": "f12-adv-ds-08",
           "environment": "native",
           "engine": "postgresql",
@@ -197,7 +197,7 @@
           "last_collected_at": null
         },
         {
-          "id": "00000000-0000-4000-8000-000000000111",
+          "id": "00000000-0000-4000-8000-000000000127",
           "name": "f12-adv-ds-09",
           "environment": "native",
           "engine": "postgresql",
@@ -214,7 +214,7 @@
           "last_collected_at": null
         },
         {
-          "id": "00000000-0000-4000-8000-000000000112",
+          "id": "00000000-0000-4000-8000-000000000128",
           "name": "f12-adv-ds-10",
           "environment": "native",
           "engine": "postgresql",
@@ -231,7 +231,7 @@
           "last_collected_at": null
         },
         {
-          "id": "00000000-0000-4000-8000-000000000113",
+          "id": "00000000-0000-4000-8000-000000000129",
           "name": "f12-adv-ds-11",
           "environment": "native",
           "engine": "postgresql",
@@ -248,7 +248,7 @@
           "last_collected_at": null
         },
         {
-          "id": "00000000-0000-4000-8000-000000000114",
+          "id": "00000000-0000-4000-8000-000000000130",
           "name": "f12-adv-ds-12",
           "environment": "native",
           "engine": "postgresql",
@@ -265,7 +265,7 @@
           "last_collected_at": null
         },
         {
-          "id": "00000000-0000-4000-8000-000000000115",
+          "id": "00000000-0000-4000-8000-000000000131",
           "name": "f12-adv-ds-13",
           "environment": "native",
           "engine": "postgresql",
@@ -282,7 +282,7 @@
           "last_collected_at": null
         },
         {
-          "id": "00000000-0000-4000-8000-000000000116",
+          "id": "00000000-0000-4000-8000-000000000132",
           "name": "f12-adv-ds-14",
           "environment": "native",
           "engine": "postgresql",
@@ -299,7 +299,7 @@
           "last_collected_at": null
         },
         {
-          "id": "00000000-0000-4000-8000-000000000117",
+          "id": "00000000-0000-4000-8000-000000000133",
           "name": "f12-adv-ds-15",
           "environment": "native",
           "engine": "postgresql",
@@ -316,7 +316,7 @@
           "last_collected_at": null
         },
         {
-          "id": "00000000-0000-4000-8000-000000000118",
+          "id": "00000000-0000-4000-8000-000000000134",
           "name": "f12-adv-ds-16",
           "environment": "native",
           "engine": "postgresql",
@@ -333,7 +333,7 @@
           "last_collected_at": null
         },
         {
-          "id": "00000000-0000-4000-8000-000000000119",
+          "id": "00000000-0000-4000-8000-000000000135",
           "name": "f12-adv-ds-17",
           "environment": "native",
           "engine": "postgresql",
@@ -350,7 +350,7 @@
           "last_collected_at": null
         },
         {
-          "id": "00000000-0000-4000-8000-000000000120",
+          "id": "00000000-0000-4000-8000-000000000136",
           "name": "f12-adv-ds-18",
           "environment": "native",
           "engine": "postgresql",
@@ -367,7 +367,7 @@
           "last_collected_at": null
         },
         {
-          "id": "00000000-0000-4000-8000-000000000121",
+          "id": "00000000-0000-4000-8000-000000000137",
           "name": "f12-adv-ds-19",
           "environment": "native",
           "engine": "postgresql",
@@ -384,7 +384,7 @@
           "last_collected_at": null
         },
         {
-          "id": "00000000-0000-4000-8000-000000000122",
+          "id": "00000000-0000-4000-8000-000000000138",
           "name": "f12-adv-ds-20",
           "environment": "native",
           "engine": "postgresql",
@@ -401,7 +401,7 @@
           "last_collected_at": null
         },
         {
-          "id": "00000000-0000-4000-8000-000000000123",
+          "id": "00000000-0000-4000-8000-000000000139",
           "name": "f12-adv-ds-21",
           "environment": "native",
           "engine": "postgresql",
@@ -418,7 +418,7 @@
           "last_collected_at": null
         },
         {
-          "id": "00000000-0000-4000-8000-000000000124",
+          "id": "00000000-0000-4000-8000-000000000140",
           "name": "f12-adv-ds-22",
           "environment": "native",
           "engine": "postgresql",
@@ -435,7 +435,7 @@
           "last_collected_at": null
         },
         {
-          "id": "00000000-0000-4000-8000-000000000125",
+          "id": "00000000-0000-4000-8000-000000000141",
           "name": "f12-adv-ds-23",
           "environment": "native",
           "engine": "postgresql",
@@ -452,7 +452,7 @@
           "last_collected_at": null
         },
         {
-          "id": "00000000-0000-4000-8000-000000000126",
+          "id": "00000000-0000-4000-8000-000000000142",
           "name": "f12-adv-ds-24",
           "environment": "native",
           "engine": "postgresql",

@@ -1,6 +1,6 @@
 {
   "contract_version": 1,
-  "openapi_sha": "b08b588223c0b586a5c9c4e0f1c9b0cd818d7ef1d61f3f9e823d5a489e37fb73",
+  "openapi_sha": "d093a5fb3bde5df417746336adc995181c34ed6d35c651a982c93d3dc939c06b",
   "zod_runtime_sha256": "32b72a82897ae698b7566aad9821c07cf5194173a3dc69adfb00a8f00f04a446",
   "operation_id": "listQuerySessions",
   "case_id": "quser-face",
@@ -10,10 +10,10 @@
     "data": {
       "items": [
         {
-          "id": "00000000-0000-4000-8000-000000000181",
-          "user_id": "00000000-0000-4000-8000-000000000176",
+          "id": "00000000-0000-4000-8000-000000000261",
+          "user_id": "00000000-0000-4000-8000-000000000201",
           "state": "active",
-          "grant_id": "00000000-0000-4000-8000-000000000180",
+          "grant_id": "00000000-0000-4000-8000-000000000260",
           "capabilities": [
             {
               "datasource_id": "00000000-0000-4000-8000-000000000009",
@@ -23,13 +23,13 @@
               "can_export": true
             }
           ],
-          "created_at": "2026-11-25T01:33:00.000Z"
+          "created_at": "2026-11-25T04:31:00.000Z"
         },
         {
-          "id": "00000000-0000-4000-8000-000000000182",
-          "user_id": "00000000-0000-4000-8000-000000000176",
+          "id": "00000000-0000-4000-8000-000000000262",
+          "user_id": "00000000-0000-4000-8000-000000000201",
           "state": "closed",
-          "grant_id": "00000000-0000-4000-8000-000000000177",
+          "grant_id": "00000000-0000-4000-8000-000000000202",
           "capabilities": [
             {
               "datasource_id": "00000000-0000-4000-8000-000000000009",
@@ -39,7 +39,247 @@
               "can_export": true
             }
           ],
-          "created_at": "2026-11-25T01:34:00.000Z"
+          "created_at": "2026-11-25T04:32:00.000Z"
+        },
+        {
+          "id": "00000000-0000-4000-8000-000000000263",
+          "user_id": "00000000-0000-4000-8000-000000000201",
+          "state": "closed",
+          "grant_id": "00000000-0000-4000-8000-000000000207",
+          "capabilities": [
+            {
+              "datasource_id": "00000000-0000-4000-8000-000000000009",
+              "datasource_name": "f12-pg-target",
+              "state": "active",
+              "can_query": true,
+              "can_export": true
+            }
+          ],
+          "created_at": "2026-11-25T04:33:00.000Z"
+        },
+        {
+          "id": "00000000-0000-4000-8000-000000000264",
+          "user_id": "00000000-0000-4000-8000-000000000201",
+          "state": "closed",
+          "grant_id": "00000000-0000-4000-8000-000000000210",
+          "capabilities": [
+            {
+              "datasource_id": "00000000-0000-4000-8000-000000000009",
+              "datasource_name": "f12-pg-target",
+              "state": "active",
+              "can_query": true,
+              "can_export": true
+            }
+          ],
+          "created_at": "2026-11-25T04:34:00.000Z"
+        },
+        {
+          "id": "00000000-0000-4000-8000-000000000265",
+          "user_id": "00000000-0000-4000-8000-000000000201",
+          "state": "active",
+          "grant_id": "00000000-0000-4000-8000-000000000212",
+          "capabilities": [
+            {
+              "datasource_id": "00000000-0000-4000-8000-000000000009",
+              "datasource_name": "f12-pg-target",
+              "state": "active",
+              "can_query": true,
+              "can_export": true
+            }
+          ],
+          "created_at": "2026-11-25T04:35:00.000Z"
+        },
+        {
+          "id": "00000000-0000-4000-8000-000000000266",
+          "user_id": "00000000-0000-4000-8000-000000000201",
+          "state": "closed",
+          "grant_id": "00000000-0000-4000-8000-000000000216",
+          "capabilities": [
+            {
+              "datasource_id": "00000000-0000-4000-8000-000000000009",
+              "datasource_name": "f12-pg-target",
+              "state": "active",
+              "can_query": true,
+              "can_export": true
+            }
+          ],
+          "created_at": "2026-11-25T04:36:00.000Z"
+        },
+        {
+          "id": "00000000-0000-4000-8000-000000000267",
+          "user_id": "00000000-0000-4000-8000-000000000201",
+          "state": "closed",
+          "grant_id": "00000000-0000-4000-8000-000000000219",
+          "capabilities": [
+            {
+              "datasource_id": "00000000-0000-4000-8000-000000000009",
+              "datasource_name": "f12-pg-target",
+              "state": "active",
+              "can_query": true,
+              "can_export": true
+            }
+          ],
+          "created_at": "2026-11-25T04:37:00.000Z"
+        },
+        {
+          "id": "00000000-0000-4000-8000-000000000268",
+          "user_id": "00000000-0000-4000-8000-000000000201",
+          "state": "closed",
+          "grant_id": "00000000-0000-4000-8000-000000000225",
+          "capabilities": [
+            {
+              "datasource_id": "00000000-0000-4000-8000-000000000009",
+              "datasource_name": "f12-pg-target",
+              "state": "active",
+              "can_query": true,
+              "can_export": true
+            }
+          ],
+          "created_at": "2026-11-25T04:38:00.000Z"
+        },
+        {
+          "id": "00000000-0000-4000-8000-000000000269",
+          "user_id": "00000000-0000-4000-8000-000000000201",
+          "state": "closed",
+          "grant_id": "00000000-0000-4000-8000-000000000228",
+          "capabilities": [
+            {
+              "datasource_id": "00000000-0000-4000-8000-000000000009",
+              "datasource_name": "f12-pg-target",
+              "state": "active",
+              "can_query": true,
+              "can_export": true
+            }
+          ],
+          "created_at": "2026-11-25T04:39:00.000Z"
+        },
+        {
+          "id": "00000000-0000-4000-8000-000000000270",
+          "user_id": "00000000-0000-4000-8000-000000000201",
+          "state": "revoked",
+          "grant_id": "00000000-0000-4000-8000-000000000239",
+          "capabilities": [
+            {
+              "datasource_id": "00000000-0000-4000-8000-000000000009",
+              "datasource_name": "f12-pg-target",
+              "state": "active",
+              "can_query": true,
+              "can_export": true
+            }
+          ],
+          "created_at": "2026-11-25T04:40:00.000Z"
+        },
+        {
+          "id": "00000000-0000-4000-8000-000000000271",
+          "user_id": "00000000-0000-4000-8000-000000000201",
+          "state": "closed",
+          "grant_id": "00000000-0000-4000-8000-000000000234",
+          "capabilities": [
+            {
+              "datasource_id": "00000000-0000-4000-8000-000000000009",
+              "datasource_name": "f12-pg-target",
+              "state": "active",
+              "can_query": true,
+              "can_export": true
+            }
+          ],
+          "created_at": "2026-11-25T04:41:00.000Z"
+        },
+        {
+          "id": "00000000-0000-4000-8000-000000000272",
+          "user_id": "00000000-0000-4000-8000-000000000201",
+          "state": "closed",
+          "grant_id": "00000000-0000-4000-8000-000000000237",
+          "capabilities": [
+            {
+              "datasource_id": "00000000-0000-4000-8000-000000000009",
+              "datasource_name": "f12-pg-target",
+              "state": "active",
+              "can_query": true,
+              "can_export": true
+            }
+          ],
+          "created_at": "2026-11-25T04:42:00.000Z"
+        },
+        {
+          "id": "00000000-0000-4000-8000-000000000273",
+          "user_id": "00000000-0000-4000-8000-000000000201",
+          "state": "closed",
+          "grant_id": "00000000-0000-4000-8000-000000000243",
+          "capabilities": [
+            {
+              "datasource_id": "00000000-0000-4000-8000-000000000009",
+              "datasource_name": "f12-pg-target",
+              "state": "active",
+              "can_query": true,
+              "can_export": true
+            }
+          ],
+          "created_at": "2026-11-25T04:43:00.000Z"
+        },
+        {
+          "id": "00000000-0000-4000-8000-000000000274",
+          "user_id": "00000000-0000-4000-8000-000000000201",
+          "state": "closed",
+          "grant_id": "00000000-0000-4000-8000-000000000246",
+          "capabilities": [
+            {
+              "datasource_id": "00000000-0000-4000-8000-000000000009",
+              "datasource_name": "f12-pg-target",
+              "state": "active",
+              "can_query": true,
+              "can_export": true
+            }
+          ],
+          "created_at": "2026-11-25T04:44:00.000Z"
+        },
+        {
+          "id": "00000000-0000-4000-8000-000000000275",
+          "user_id": "00000000-0000-4000-8000-000000000201",
+          "state": "revoked",
+          "grant_id": "00000000-0000-4000-8000-000000000248",
+          "capabilities": [
+            {
+              "datasource_id": "00000000-0000-4000-8000-000000000009",
+              "datasource_name": "f12-pg-target",
+              "state": "active",
+              "can_query": true,
+              "can_export": true
+            }
+          ],
+          "created_at": "2026-11-25T04:45:00.000Z"
+        },
+        {
+          "id": "00000000-0000-4000-8000-000000000276",
+          "user_id": "00000000-0000-4000-8000-000000000201",
+          "state": "closed",
+          "grant_id": "00000000-0000-4000-8000-000000000254",
+          "capabilities": [
+            {
+              "datasource_id": "00000000-0000-4000-8000-000000000009",
+              "datasource_name": "f12-pg-target",
+              "state": "active",
+              "can_query": true,
+              "can_export": true
+            }
+          ],
+          "created_at": "2026-11-25T04:46:00.000Z"
+        },
+        {
+          "id": "00000000-0000-4000-8000-000000000277",
+          "user_id": "00000000-0000-4000-8000-000000000201",
+          "state": "closed",
+          "grant_id": "00000000-0000-4000-8000-000000000257",
+          "capabilities": [
+            {
+              "datasource_id": "00000000-0000-4000-8000-000000000009",
+              "datasource_name": "f12-pg-target",
+              "state": "active",
+              "can_query": true,
+              "can_export": true
+            }
+          ],
+          "created_at": "2026-11-25T04:47:00.000Z"
         }
       ],
       "page": {

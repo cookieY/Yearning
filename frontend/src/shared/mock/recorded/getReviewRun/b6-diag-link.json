@@ -1,6 +1,6 @@
 {
   "contract_version": 1,
-  "openapi_sha": "b08b588223c0b586a5c9c4e0f1c9b0cd818d7ef1d61f3f9e823d5a489e37fb73",
+  "openapi_sha": "d093a5fb3bde5df417746336adc995181c34ed6d35c651a982c93d3dc939c06b",
   "zod_runtime_sha256": "32b72a82897ae698b7566aad9821c07cf5194173a3dc69adfb00a8f00f04a446",
   "operation_id": "getReviewRun",
   "case_id": "b6-diag-link",
@@ -8,8 +8,8 @@
   "err_code": 0,
   "response": {
     "data": {
-      "id": "00000000-0000-4000-8000-000000000165",
-      "draft_id": "00000000-0000-4000-8000-000000000164",
+      "id": "00000000-0000-4000-8000-000000000191",
+      "draft_id": "00000000-0000-4000-8000-000000000190",
       "draft_revision": 0,
       "state": "ready",
       "statement_count": 1,
@@ -19,12 +19,12 @@
           "stage_position": 1,
           "datasource_id": "00000000-0000-4000-8000-000000000009",
           "state": "passed",
-          "highest_severity": "low",
+          "highest_severity": "none",
           "gate_passed": true,
-          "finding_count": 2,
-          "evidence_count": 2,
-          "snapshot_hash": "5496c9d62509778cea24b3e82ed2a3b9f5204099dccea95c10d54f3598dcdc90",
-          "summary": "本次变更只有一条 `CREATE TABLE IF NOT EXISTS` 语句，目标表在当前 schema 中经确认尚不存在，因此该语句会实际执行建表，`IF NOT EXISTS` 只是幂等保护，不会掩盖与既有表定义的冲突。表结构很简单，只有一个 `bigint` 主键列和一个 `text` 列；没有索引、外键、分区或特殊类型，也没有并发写入或性能方面的风险点。仅就注释缺失和可空列两点给出提示，未发现需阻断的正确性、可用性或安全问题。",
+          "finding_count": 0,
+          "evidence_count": 3,
+          "snapshot_hash": "a35435b525d5e293025346283e06b3915215899b87a8a3eb0c4fb894b95cc6ad",
+          "summary": "本次审查仅包含一条建表语句。目标表当前不存在，因此 `CREATE TABLE IF NOT EXISTS` 将新建该表，而不会覆盖已有对象；语句定义了 `bigint` 主键和 `text` 列，未发现与本次变更直接相关的正确性、可用性或性能风险。",
           "summary_locale": "zh-CN"
         }
       ],
@@ -35,16 +35,16 @@
       "usage": {
         "provider_name": "f12-real",
         "model_name": "deepseek-flash",
-        "input_tokens": 5436,
-        "output_tokens": 2596,
+        "input_tokens": 5491,
+        "output_tokens": 2499,
         "amount_minor": 200,
         "currency": "USD"
       },
       "failure_code": null,
       "version": 3,
-      "created_at": "2026-11-25T01:15:00.000Z",
-      "started_at": "2026-11-25T01:16:00.000Z",
-      "finished_at": "2026-11-25T01:17:00.000Z"
+      "created_at": "2026-11-25T02:47:00.000Z",
+      "started_at": "2026-11-25T02:48:00.000Z",
+      "finished_at": "2026-11-25T02:49:00.000Z"
     },
     "err_code": 0,
     "message": "ok",

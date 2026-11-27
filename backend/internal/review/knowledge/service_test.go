@@ -112,3 +112,22 @@ func TestShouldInvalidateOldReferences(t *testing.T) {
 		})
 	}
 }
+
+func TestShouldInvalidateOnDelete(t *testing.T) {
+	tests := []struct {
+		name       string
+		state      State
+		invalidate bool
+	}{
+		{name: "enabled entry invalidates unsubmitted runs", state: StateEnabled, invalidate: true},
+		{name: "draft entry does not invalidate", state: StateDraft, invalidate: false},
+		{name: "disabled entry does not invalidate", state: StateDisabled, invalidate: false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := shouldInvalidateOnDelete(tt.state); got != tt.invalidate {
+				t.Fatalf("got %t want %t", got, tt.invalidate)
+			}
+		})
+	}
+}

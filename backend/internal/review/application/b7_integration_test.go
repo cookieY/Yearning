@@ -661,6 +661,109 @@ func TestB7Gate4bKnowledgeDisableInvalidatesRun(t *testing.T) {
 	}
 }
 
+// TestB7Gate4cKnowledgeDeleteInvalidatesRun verifies physical deletion of review-referenced
+// knowledge entries: optimistic-lock mismatch fails with ErrConcurrent, deleting a disabled
+// referenced global entry succeeds without invalidating active runs, deleting an enabled referenced
+// entry removes the row while keeping review_tool_calls, invalidating unsubmitted runs, and
+// preserving submitted orders, and missing IDs return ErrNotFound.
+func TestB7Gate4cKnowledgeDeleteInvalidatesRun(t *testing.T) {
+	b := newB7Fixture(t)
+	deps := b.fakeDial(func(req provider.Request) ([]byte, int, error) {
+		withTool := len(req.NormalizedEvidence) == 0
+		return b.validProviderBody(req.AnonymizedStatementGroups[0].GroupID, withTool)(req)
+	})
+	runID := b.runAgent(t, deps)
+	var state string
+	if err := b.db.Raw(`select state from review_runs where id = ?`, runID).Row().Scan(&state); err != nil {
+		t.Fatal(err)
+	}
+	if state != string(domain.RunStateBlocked) {
+		t.Fatalf("precondition: run should be blocked, got %s", state)
+	}
+
+	submittedRunID := b.runAgent(t, deps)
+	var submittedDraftID string
+	if err := b.db.Raw(`select draft_id::text from review_runs where id = ?`, submittedRunID).Row().Scan(&submittedDraftID); err != nil {
+		t.Fatal(err)
+	}
+	if err := b.db.Exec(`update change_drafts set state = 'submitted' where id = ?`, submittedDraftID).Error; err != nil {
+		t.Fatal(err)
+	}
+
+	ctx := context.Background()
+	repo := &knowledge.Repository{DB: b.db}
+	ks := &knowledge.Service{Repo: repo, Invalidate: InvalidateInputRefs}
+
+	if err := b.db.Exec(`update knowledge_entries set state = 'disabled' where id = ?`, b.entryGlobal).Error; err != nil {
+		t.Fatal(err)
+	}
+	globalEntry, err := repo.Get(ctx, b.entryGlobal)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := b.db.Exec(`
+		insert into review_tool_calls (id, review_run_id, tool_kind, tool_name, input_ref_id, config_hash, success, started_at, finished_at)
+		values (?, ?, 'knowledge_entry', 'knowledge_lookup', ?, ?, true, now(), now())`,
+		uuid.NewString(), runID, globalEntry.ID, globalEntry.ConfigHash).Error; err != nil {
+		t.Fatalf("seed historical review_tool_call for disabled global entry: %v", err)
+	}
+	if err := ks.Delete(ctx, globalEntry.ID, globalEntry.Version); err != nil {
+		t.Fatalf("delete disabled referenced global entry: %v", err)
+	}
+	if _, err := repo.Get(ctx, globalEntry.ID); !errors.Is(err, knowledge.ErrNotFound) {
+		t.Fatalf("expected ErrNotFound after deleting global entry, got %v", err)
+	}
+	if err := b.db.Raw(`select state from review_runs where id = ?`, runID).Row().Scan(&state); err != nil {
+		t.Fatal(err)
+	}
+	if state != string(domain.RunStateBlocked) {
+		t.Fatalf("deleting disabled entry must leave active run blocked, got %s", state)
+	}
+
+	entry, err := repo.Get(ctx, b.entryTable)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := ks.Delete(ctx, entry.ID, entry.Version+99); !errors.Is(err, knowledge.ErrConcurrent) {
+		t.Fatalf("expected ErrConcurrent on version mismatch, got %v", err)
+	}
+	if _, err := repo.Get(ctx, entry.ID); err != nil {
+		t.Fatalf("row must remain intact after version mismatch, got %v", err)
+	}
+
+	if err := ks.Delete(ctx, entry.ID, entry.Version); err != nil {
+		t.Fatalf("delete enabled referenced entry: %v", err)
+	}
+	if _, err := repo.Get(ctx, entry.ID); !errors.Is(err, knowledge.ErrNotFound) {
+		t.Fatalf("expected ErrNotFound after delete, got %v", err)
+	}
+	if err := b.db.Raw(`select state from review_runs where id = ?`, runID).Row().Scan(&state); err != nil {
+		t.Fatal(err)
+	}
+	if state != string(domain.RunStateOutdated) {
+		t.Fatalf("delete must invalidate referencing unsubmitted run, got %s", state)
+	}
+	var submittedState string
+	if err := b.db.Raw(`select state from review_runs where id = ?`, submittedRunID).Row().Scan(&submittedState); err != nil {
+		t.Fatal(err)
+	}
+	if submittedState != string(domain.RunStateBlocked) {
+		t.Fatalf("submitted order run must remain blocked (never outdated) after knowledge delete, got %s", submittedState)
+	}
+	var toolCallCount int64
+	if err := b.db.Raw(`select count(*) from review_tool_calls where tool_kind = 'knowledge_entry' and input_ref_id = ?`, entry.ID).
+		Scan(&toolCallCount).Error; err != nil {
+		t.Fatal(err)
+	}
+	if toolCallCount < 2 {
+		t.Fatalf("expected historical review_tool_calls rows (>=2) to remain intact, got %d", toolCallCount)
+	}
+
+	if err := ks.Delete(ctx, uuid.NewString(), 1); !errors.Is(err, knowledge.ErrNotFound) {
+		t.Fatalf("expected ErrNotFound for missing entry, got %v", err)
+	}
+}
+
 // TestB7Gate5NoProviderCallsOnRead zero Provider calls on the read path
 // (test_gate#9: reviewer viewing never triggers a model call).
 func TestB7Gate5NoProviderCallsOnRead(t *testing.T) {

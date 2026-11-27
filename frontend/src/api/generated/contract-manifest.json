@@ -3,7 +3,7 @@
   "sources": {
     "openapi": {
       "path": "api/openapi/yearning-v4.yaml",
-      "sha256": "b08b588223c0b586a5c9c4e0f1c9b0cd818d7ef1d61f3f9e823d5a489e37fb73"
+      "sha256": "d093a5fb3bde5df417746336adc995181c34ed6d35c651a982c93d3dc939c06b"
     },
     "error_codes": {
       "path": "api/contracts/error-codes.json",
@@ -53,5 +53,5 @@
     }
   },
   "authorization_policy_generated": false,
-  "generated_at": "2026-11-26T10:21:41.891Z"
+  "generated_at": "2026-11-27T07:20:37.488Z"
 }

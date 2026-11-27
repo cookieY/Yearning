@@ -352,4 +352,9 @@ export function ifMatchIdempotencyHeader(
   return ifMatchHeader(version, idempotencyKeyHeader(idempotencyKey, extraHeaders));
 }
 
+/** Extracts and trims the operation idempotency header from a request. */
+export function readIdempotencyKeyHeader(request: Request): string {
+  return request.headers.get("Idempotency-Key")?.trim() ?? "";
+}
+
 export default customInstance;

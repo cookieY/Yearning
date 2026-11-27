@@ -1,5 +1,5 @@
 import type { RefObject } from "react";
-import * as monaco from "monaco-editor/editor/editor.main.js";
+import * as monaco from "monaco-editor/editor/editor.api.js";
 import {
   buildSqlSuggestions,
   type SqlCompletionCatalog,

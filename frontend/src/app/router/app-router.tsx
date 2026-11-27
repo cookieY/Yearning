@@ -24,5 +24,5 @@ export function AppRouter() {
     () => (migrationReview ? buildMigrationRouter() : null),
     [migrationReview],
   );
-  return <RouterProvider router={migrationRouter ?? appRouter} />;
+  return <RouterProvider router={migrationRouter ?? appRouter} useTransitions={false} />;
 }

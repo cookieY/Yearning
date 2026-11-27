@@ -1,6 +1,6 @@
 {
   "contract_version": 1,
-  "openapi_sha": "b08b588223c0b586a5c9c4e0f1c9b0cd818d7ef1d61f3f9e823d5a489e37fb73",
+  "openapi_sha": "d093a5fb3bde5df417746336adc995181c34ed6d35c651a982c93d3dc939c06b",
   "zod_runtime_sha256": "32b72a82897ae698b7566aad9821c07cf5194173a3dc69adfb00a8f00f04a446",
   "operation_id": "submitChangeDraft",
   "case_id": "f12 copy source",
@@ -8,8 +8,8 @@
   "err_code": 0,
   "response": {
     "data": {
-      "id": "00000000-0000-4000-8000-000000000045",
-      "display_number": "YR-20261126-000005",
+      "id": "00000000-0000-4000-8000-000000000044",
+      "display_number": "YR-20261127-000016",
       "submitter_user_id": "00000000-0000-4000-8000-000000000002",
       "submitter_username": "f12-submitter",
       "submitter_display_name": "F12 submitter",
@@ -18,20 +18,29 @@
       "current_stage_position": 1,
       "stages": [
         {
-          "id": "00000000-0000-4000-8000-000000000046",
+          "id": "00000000-0000-4000-8000-000000000045",
           "position": 1,
           "datasource_name": "f12-pg-target",
           "state": "approval_active",
           "approval_steps": [
             {
-              "id": "00000000-0000-4000-8000-000000000047",
+              "id": "00000000-0000-4000-8000-000000000046",
               "position": 1,
               "state": "active",
               "actors": [
                 {
-                  "id": "00000000-0000-4000-8000-000000000018",
+                  "id": "00000000-0000-4000-8000-000000000017",
                   "username": "f12-approver",
                   "display_name": "F12 approver",
+                  "is_builtin_admin": false,
+                  "version": 1,
+                  "created_at": "2026-11-25T00:09:00.000Z",
+                  "updated_at": "2026-11-25T00:09:00.000Z"
+                },
+                {
+                  "id": "00000000-0000-4000-8000-000000000018",
+                  "username": "admin",
+                  "display_name": "Administrator",
                   "is_builtin_admin": false,
                   "version": 1,
                   "created_at": "2026-11-25T00:09:00.000Z",
@@ -49,19 +58,28 @@
               "version": 1,
               "created_at": "2026-11-25T00:10:00.000Z",
               "updated_at": "2026-11-25T00:10:00.000Z"
+            },
+            {
+              "id": "00000000-0000-4000-8000-000000000018",
+              "username": "admin",
+              "display_name": "Administrator",
+              "is_builtin_admin": true,
+              "version": 1,
+              "created_at": "2026-11-25T00:11:00.000Z",
+              "updated_at": "2026-11-25T00:11:00.000Z"
             }
           ]
         }
       ],
       "has_sql": true,
-      "sql_hash": "15970a970c768d3a0261c1bd5ca27cd78ff0089d148272026ac7796ac453a517",
-      "snapshot_hash": "2395f5f6fc4ab833a574026a2a881fcc2cb8ef244e06c12d82daa152f0286477",
+      "sql_hash": "c841894e61be03fe8ab52ddc9d37e1c1fd48877877171fc6a434749c7f9029a9",
+      "snapshot_hash": "d320befb61ec3e6468854f53fcd75f059f99c569dff38ffd13300a1015e02eb3",
       "has_ddl": true,
       "rollback_enabled": true,
       "ticket_type": "normal",
       "rollback_status": "pending",
       "version": 1,
-      "submitted_at": "2026-11-25T00:22:00.000Z",
+      "submitted_at": "2026-11-25T00:23:00.000Z",
       "terminal_at": null
     },
     "err_code": 0,

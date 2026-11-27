@@ -253,6 +253,7 @@ func TestL1AdminPaginationSearchAndKnowledge(t *testing.T) {
 		t.Fatal("expected at least one seeded datasource for DEF-11 knowledge entry test")
 	}
 	targetDSID := dsIDs[0]
+	var enabledEntryID string
 	for _, wantState := range []string{"draft", "disabled", "enabled"} {
 		code, body, raw := fx.admin.do("POST", "/api/v4/admin/knowledge-entries", map[string]any{
 			"name":          "l1-kb-" + wantState,
@@ -279,6 +280,25 @@ func TestL1AdminPaginationSearchAndKnowledge(t *testing.T) {
 		if dataMap(gotBody)["state"] != wantState {
 			t.Fatalf("GET knowledge state=%v, want %s", dataMap(gotBody)["state"], wantState)
 		}
+		if wantState == "enabled" {
+			enabledEntryID = id
+		}
+	}
+	code, delMismatchBody, raw := fx.admin.doWithVersion("DELETE", "/api/v4/admin/knowledge-entries/"+enabledEntryID, nil, 99)
+	if code != 200 || errCode(delMismatchBody) != 1004 {
+		t.Fatalf("expected 1004 CONCURRENT_MODIFICATION on DELETE version mismatch, got %d %s", code, raw)
+	}
+	code, delOKBody, raw := fx.admin.doWithVersion("DELETE", "/api/v4/admin/knowledge-entries/"+enabledEntryID, nil, 1)
+	if code != 200 || errCode(delOKBody) != 0 {
+		t.Fatalf("DELETE enabled knowledge entry: %d %s", code, raw)
+	}
+	code, afterGetBody, raw := fx.admin.do("GET", "/api/v4/admin/knowledge-entries/"+enabledEntryID, nil, false)
+	if code != 200 || errCode(afterGetBody) != 1002 {
+		t.Fatalf("expected 1002 NOT_FOUND after DELETE, got %d %s", code, raw)
+	}
+	code, repeatDelBody, raw := fx.admin.doWithVersion("DELETE", "/api/v4/admin/knowledge-entries/"+enabledEntryID, nil, 1)
+	if code != 200 || errCode(repeatDelBody) != 1002 {
+		t.Fatalf("expected 1002 NOT_FOUND on repeat DELETE, got %d %s", code, raw)
 	}
 	code, body, raw := fx.admin.do("POST", "/api/v4/admin/knowledge-entries", map[string]any{
 		"name":       "l1-kb-global-rejected",

@@ -1,6 +1,6 @@
 {
   "contract_version": 1,
-  "openapi_sha": "b08b588223c0b586a5c9c4e0f1c9b0cd818d7ef1d61f3f9e823d5a489e37fb73",
+  "openapi_sha": "d093a5fb3bde5df417746336adc995181c34ed6d35c651a982c93d3dc939c06b",
   "zod_runtime_sha256": "32b72a82897ae698b7566aad9821c07cf5194173a3dc69adfb00a8f00f04a446",
   "operation_id": "listReviewRunFindings",
   "case_id": "f12 withdraw order",
@@ -8,7 +8,46 @@
   "err_code": 0,
   "response": {
     "data": {
-      "items": [],
+      "items": [
+        {
+          "id": "00000000-0000-4000-8000-000000000026",
+          "stage_position": 1,
+          "fingerprint_group_id": "00000000-0000-4000-8000-000000000027",
+          "category": "operability",
+          "severity": "medium",
+          "title": "建表语句未限定 `schema`，`search_path` 变化时可能把表建到错误模式",
+          "message": "语句只写了表名，未带 `schema` 前缀；执行时若 `search_path` 未固定，表可能落在非预期模式，导致应用访问不到或产生重复对象。",
+          "suggestion": "在 DDL 中显式写出目标 `schema`，或在执行迁移前固定 `search_path` 并校验当前模式。",
+          "model_confidence": null,
+          "evidence_ids": []
+        },
+        {
+          "id": "00000000-0000-4000-8000-000000000028",
+          "stage_position": 1,
+          "fingerprint_group_id": "00000000-0000-4000-8000-000000000027",
+          "category": "operability",
+          "severity": "low",
+          "title": "`IF NOT EXISTS` 会静默跳过同名表，结构不一致时可能掩盖 `schema` 漂移",
+          "message": "当前目标表不存在，本次执行会实际创建；但该保护在已有同名表时不会校验列定义差异，可能让不一致的旧结构继续存在。",
+          "suggestion": "若该脚本会在已有同名表的环境重放，先校验现有表定义，或改用结构不一致时明确失败的迁移方式。",
+          "model_confidence": null,
+          "evidence_ids": [
+            "00000000-0000-4000-8000-000000000029"
+          ]
+        },
+        {
+          "id": "00000000-0000-4000-8000-000000000030",
+          "stage_position": 1,
+          "fingerprint_group_id": "00000000-0000-4000-8000-000000000027",
+          "category": "governance",
+          "severity": "info",
+          "title": "新表及两个列均未定义注释，后续使用方难以从系统目录理解字段含义",
+          "message": "建表语句没有为表和列添加注释；随着表和列增多，维护人员只能依赖外部文档确认用途。",
+          "suggestion": "在创建表后补充表注释和列注释，说明主键含义及 `note` 的存储内容。",
+          "model_confidence": null,
+          "evidence_ids": []
+        }
+      ],
       "page": {
         "has_more": false,
         "next_cursor": null

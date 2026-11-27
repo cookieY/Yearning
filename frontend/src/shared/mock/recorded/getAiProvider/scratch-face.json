@@ -1,6 +1,6 @@
 {
   "contract_version": 1,
-  "openapi_sha": "b08b588223c0b586a5c9c4e0f1c9b0cd818d7ef1d61f3f9e823d5a489e37fb73",
+  "openapi_sha": "d093a5fb3bde5df417746336adc995181c34ed6d35c651a982c93d3dc939c06b",
   "zod_runtime_sha256": "32b72a82897ae698b7566aad9821c07cf5194173a3dc69adfb00a8f00f04a446",
   "operation_id": "getAiProvider",
   "case_id": "scratch-face",
@@ -8,20 +8,20 @@
   "err_code": 0,
   "response": {
     "data": {
-      "id": "00000000-0000-4000-8000-000000000367",
-      "name": "f12-provider-71e3e489",
+      "id": "00000000-0000-4000-8000-000000000495",
+      "name": "f12-provider-88dc2056",
       "provider_kind": "openai_compatible",
       "base_url": "https://api.deepseek.com",
       "model_name": "deepseek-flash",
       "enabled": true,
-      "selection_priority": 28,
+      "selection_priority": 84,
       "api_key_configured": true,
       "configuration": {
         "structured_output_mode": "json_object"
       },
       "version": 1,
-      "created_at": "2026-11-25T05:04:00.000Z",
-      "updated_at": "2026-11-25T05:04:00.000Z"
+      "created_at": "2026-11-25T09:03:00.000Z",
+      "updated_at": "2026-11-25T09:03:00.000Z"
     },
     "err_code": 0,
     "message": "ok",

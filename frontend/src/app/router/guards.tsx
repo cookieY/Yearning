@@ -35,7 +35,11 @@ export function RequireSession({ children }: { children: ReactNode }) {
   const status = useGuardSession();
   const location = useLocation();
   if (status === "loading") {
-    return <PageLoadingState />;
+    return (
+      <div className="mx-auto w-full max-w-[1536px] p-4">
+        <PageLoadingState />
+      </div>
+    );
   }
   if (status === "unavailable") {
     return <SessionUnavailable />;
@@ -51,7 +55,11 @@ export function RedirectIfAuthenticated({ children }: { children: ReactNode }) {
   const location = useLocation();
   const { user } = useSession();
   if (status === "loading") {
-    return <PageLoadingState />;
+    return (
+      <div className="mx-auto w-full max-w-[1536px] p-4">
+        <PageLoadingState />
+      </div>
+    );
   }
   if (status === "unavailable") {
     return <SessionUnavailable />;

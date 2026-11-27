@@ -160,6 +160,8 @@
   --secondary-foreground: oklch(0.2316 0.0038 286.1);
   --muted: oklch(0.9729 0.0029 264.54);
   --muted-foreground: oklch(0.505 0.021 261.29);
+  /* Light-mode --muted blends into --background/--card, so skeletons use a distinct neutral tint. */
+  --skeleton: oklch(0.905 0.006 258);
   --accent: oklch(0.9575 0.0205 254.91);
   --accent-foreground: oklch(0.4848 0.1683 256.44);
   --link: oklch(0.4848 0.1683 256.44);
@@ -280,6 +282,7 @@
   --secondary-foreground: oklch(0.985 0 0);
   --muted: oklch(0.269 0 0);
   --muted-foreground: oklch(0.708 0 0);
+  --skeleton: var(--muted);
   --accent: oklch(0.269 0 0);
   --accent-foreground: oklch(0.985 0 0);
   --destructive: oklch(0.704 0.191 22.216);
@@ -850,6 +853,9 @@ html.light [data-slot="badge"].bg-muted.text-muted-foreground {
   background-color: var(--tone-stone-fill);
   color: var(--tone-stone);
   border-color: var(--border);
+}
+[data-slot="skeleton"].bg-muted {
+  background-color: var(--skeleton);
 }
 
 

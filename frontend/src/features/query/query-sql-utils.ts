@@ -281,3 +281,133 @@ export function buildResultTabLabels(
     return seen === 1 ? base : `${base} ${String(seen)}`;
   });
 }
+
+export interface GrantSummaryRef {
+  id: string;
+  state: string;
+  expires_at?: string | null;
+  created_at: string;
+}
+
+/** Picks the workspace's active grant, preferring the session's bound grant ID then latest expiry. */
+export function pickWorkspaceActiveGrant<T extends GrantSummaryRef>(
+  grants: readonly T[],
+  sessionGrantId: string | null | undefined,
+): T | null {
+  const active = grants.filter((grant) => grant.state === "active");
+  if (active.length === 0) return null;
+  if (sessionGrantId !== null && sessionGrantId !== undefined) {
+    const bound = active.find((grant) => grant.id === sessionGrantId);
+    if (bound !== undefined) return bound;
+  }
+  return active.reduce((latest, current) => {
+    const currentExp = current.expires_at ?? "";
+    const latestExp = latest.expires_at ?? "";
+    if (currentExp !== latestExp) {
+      return currentExp > latestExp ? current : latest;
+    }
+    return current.created_at > latest.created_at ? current : latest;
+  });
+}
+
+export interface GrantDominanceRef extends GrantSummaryRef {
+  requester_user_id: string;
+}
+
+export interface RequestDominanceRef {
+  grant_id?: string | null;
+  flow_id?: string;
+  datasource_ids: readonly string[];
+}
+
+/** Returns true when `primary` supersedes `candidate` (same requester & flow, superset datasources, later expiry). */
+export function grantDominatesCandidate(
+  primary: GrantDominanceRef,
+  candidate: GrantDominanceRef,
+  requestByGrantId: Map<string, RequestDominanceRef>,
+): boolean {
+  if (primary.id === candidate.id || primary.requester_user_id !== candidate.requester_user_id) {
+    return false;
+  }
+  const primaryReq = requestByGrantId.get(primary.id);
+  const candidateReq = requestByGrantId.get(candidate.id);
+  if (
+    primaryReq === undefined ||
+    candidateReq === undefined ||
+    primaryReq.flow_id === undefined ||
+    primaryReq.flow_id === "" ||
+    primaryReq.flow_id !== candidateReq.flow_id ||
+    primaryReq.datasource_ids.length === 0 ||
+    candidateReq.datasource_ids.length === 0
+  ) {
+    return false;
+  }
+  const primaryDS = new Set(primaryReq.datasource_ids);
+  if (!candidateReq.datasource_ids.every((id) => primaryDS.has(id))) {
+    return false;
+  }
+  const pExp = primary.expires_at ?? "";
+  const cExp = candidate.expires_at ?? "";
+  if (pExp !== cExp) return pExp > cExp;
+  if (primary.created_at !== candidate.created_at) return primary.created_at > candidate.created_at;
+  return primary.id > candidate.id;
+}
+
+export interface FlowMatchRef {
+  id: string;
+  query_capabilities?: readonly { datasource_id: string }[];
+}
+
+export interface RequestMatchRef extends RequestDominanceRef {
+  state: string;
+  created_at: string;
+}
+
+export function requestMatchesQueryFlow(
+  flow: FlowMatchRef,
+  request: RequestDominanceRef,
+  capabilityIds: Set<string>,
+): boolean {
+  if (request.flow_id !== undefined && request.flow_id !== "") {
+    return request.flow_id === flow.id;
+  }
+  return request.datasource_ids.length > 0 && request.datasource_ids.every((id) => capabilityIds.has(id));
+}
+
+/** Matches a flow's primary active grant and any superseded active grants in the same renewal chain. */
+export function matchGrantForQueryFlow<
+  TGrant extends GrantDominanceRef & { state: string },
+  TReq extends RequestMatchRef,
+>(
+  flow: FlowMatchRef,
+  requests: readonly TReq[],
+  grants: readonly TGrant[],
+): { grant: TGrant; request: TReq; superseded: TGrant[] } | null {
+  const grantById = new Map(grants.map((grant) => [grant.id, grant]));
+  const capabilityIds = new Set((flow.query_capabilities ?? []).map((cap) => cap.datasource_id));
+  const candidates: { grant: TGrant; request: TReq }[] = [];
+  for (const request of requests) {
+    if (request.state !== "grant_active" || request.grant_id === null || request.grant_id === undefined) {
+      continue;
+    }
+    const grant = grantById.get(request.grant_id);
+    if (grant === undefined || grant.state !== "active") continue;
+    if (requestMatchesQueryFlow(flow, request, capabilityIds)) candidates.push({ grant, request });
+  }
+  if (candidates.length === 0) return null;
+  const requestByGrantId = new Map<string, RequestDominanceRef>(
+    candidates.map((cand) => [cand.grant.id, cand.request]),
+  );
+  const primary = candidates.reduce((latest, current) => {
+    const currentExp = current.grant.expires_at ?? "";
+    const latestExp = latest.grant.expires_at ?? "";
+    if (currentExp !== latestExp) {
+      return currentExp > latestExp ? current : latest;
+    }
+    return current.grant.created_at > latest.grant.created_at ? current : latest;
+  });
+  const superseded = candidates
+    .filter((cand) => grantDominatesCandidate(primary.grant, cand.grant, requestByGrantId))
+    .map((cand) => cand.grant);
+  return { grant: primary.grant, request: primary.request, superseded };
+}

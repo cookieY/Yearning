@@ -2206,7 +2206,7 @@ paths:
       - $ref: '#/components/parameters/IfMatch'
       responses:
         '200':
-          description: Knowledge entry deleted only when never referenced by a review run
+          description: Knowledge entry deleted under optimistic version check; deleting an enabled entry invalidates referencing unsubmitted reviews while preserving historical order snapshots
           content:
             application/json:
               schema:

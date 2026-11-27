@@ -1,6 +1,6 @@
 {
   "contract_version": 1,
-  "openapi_sha": "b08b588223c0b586a5c9c4e0f1c9b0cd818d7ef1d61f3f9e823d5a489e37fb73",
+  "openapi_sha": "d093a5fb3bde5df417746336adc995181c34ed6d35c651a982c93d3dc939c06b",
   "zod_runtime_sha256": "32b72a82897ae698b7566aad9821c07cf5194173a3dc69adfb00a8f00f04a446",
   "operation_id": "updateDatasourceDiagnosticsConfig",
   "case_id": "enable",
@@ -15,12 +15,12 @@
       "top_n": 200,
       "state": "active",
       "last_probe_state": "ready",
-      "last_probe_at": "2026-11-25T01:04:00.000Z",
-      "last_collected_at": null,
+      "last_probe_at": "2026-11-25T01:27:00.000Z",
+      "last_collected_at": "2026-11-25T01:26:00.000Z",
       "consecutive_failures": 0,
       "paused_reason": null,
-      "version": 2,
-      "updated_at": "2026-11-25T01:04:00.000Z"
+      "version": 968,
+      "updated_at": "2026-11-25T01:27:00.000Z"
     },
     "err_code": 0,
     "message": "ok",

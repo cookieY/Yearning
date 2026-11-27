@@ -1,6 +1,6 @@
 {
   "contract_version": 1,
-  "openapi_sha": "b08b588223c0b586a5c9c4e0f1c9b0cd818d7ef1d61f3f9e823d5a489e37fb73",
+  "openapi_sha": "d093a5fb3bde5df417746336adc995181c34ed6d35c651a982c93d3dc939c06b",
   "zod_runtime_sha256": "32b72a82897ae698b7566aad9821c07cf5194173a3dc69adfb00a8f00f04a446",
   "operation_id": "triggerManualDiagnosticsSnapshot",
   "case_id": "manual",
@@ -8,15 +8,15 @@
   "err_code": 0,
   "response": {
     "data": {
-      "snapshot_id": "00000000-0000-4000-8000-000000000127",
+      "snapshot_id": "00000000-0000-4000-8000-000000000143",
       "datasource_id": "00000000-0000-4000-8000-000000000009",
       "trigger_kind": "manual",
       "probe_state": "ready",
-      "statement_count": 32,
-      "duration_ms": 2,
-      "reset_detected": false,
+      "statement_count": 35,
+      "duration_ms": 1,
+      "reset_detected": true,
       "gap_detected": false,
-      "sampled_at": "2026-11-25T01:05:00.000Z"
+      "sampled_at": "2026-11-25T01:28:00.000Z"
     },
     "err_code": 0,
     "message": "ok",
